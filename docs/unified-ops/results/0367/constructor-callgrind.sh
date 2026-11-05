@@ -2,7 +2,7 @@
 # usage: cg.sh OUTDIR BIN_LABEL... ; env ROUTES, COUNTS (message counts), default 8
 # Ir/op = (Ir(12000) - Ir(2000)) / 10000 ; runs sequentially.
 set -euo pipefail
-M=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor
+M=/deleted-coord-artifact
 out=$1; shift
 mkdir -p "$out"
 ROUTES=${ROUTES:-"field_path field_info message_info archive_info archive_info_raw archive_object archive_object_reject parse validate encode retained_parse retained_validate retained_encoded_len retained_encode retained_validate_tight retained_encode_tight archive_info_e2e archive_info_generic_e2e archive_info_raw_e2e archive_object_serialize_e2e"}

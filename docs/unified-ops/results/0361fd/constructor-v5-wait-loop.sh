@@ -2,7 +2,7 @@
 # Wait for a quiet host, then run the next protected matched-v5 attempt; repeat
 # until all blocks qualify, MAX attempts are used or DEADLINE passes.
 cd /home/zhuhe/code/litchi-worktrees/uo2-coordinator-constructors
-V5=../.coord/constructor-0361f-coordinator/matched-v5
+V5=/deleted-coord-artifact
 MAX=${MAX:-12}; DEADLINE=$(( $(date +%s) + ${MINUTES:-100} * 60 ))
 busy() { ps -eo comm=,args= | grep -v -E 'v5-loop' | grep -q -E '^(cargo|rustc|rustdoc|clippy-driver|valgrind|cc|ld|clang|make|cmake|ninja|pytest|nextest|heaptrack|perf) |peculiar |run-abba|run-counting' ; }
 for i in $(seq 1 $MAX); do

@@ -3,7 +3,7 @@
 # on PATH by run_safe_gate.py, so nested Python and shell helpers use the same
 # offline/locked/memory-capped invocation as direct steps.
 set -eu
-real=/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
+real=/deleted-coord-artifact
 command=${1-}
 gate_target=${LITCHI_GATE_TARGET_ROOT-}
 requested_target=${CARGO_TARGET_DIR-}

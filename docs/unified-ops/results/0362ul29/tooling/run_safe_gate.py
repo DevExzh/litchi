@@ -27,7 +27,7 @@ import traceback
 import tomllib
 
 ROOT_DEFAULT = Path("/home/zhuhe/code/litchi-worktrees/unified-ops-api")
-COORD = Path("/home/zhuhe/code/litchi-worktrees/.coord")
+COORD = Path("/deleted-coord-artifact")
 SAFE_CHUNKED = Path(__file__).with_name("safe_chunked_tests.py")
 MAX_TARGET = 20_000_000_000
 LIVE_TARGET = 19_000_000_000
@@ -185,7 +185,7 @@ def builders(exclude: set[int], root: Path, target: Path) -> list[dict]:
     target_text = str(target)
     litchi_prefixes = (
         "/home/zhuhe/code/litchi",
-        "/home/zhuhe/code/litchi-worktrees/.coord",
+        "/deleted-coord-artifact",
     )
 
     def litchi_path(text: str) -> bool:

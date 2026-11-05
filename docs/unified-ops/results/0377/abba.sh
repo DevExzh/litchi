@@ -2,7 +2,7 @@
 # Record 0377 wall clock: binary-level A-B-B-A (baseline, candidate,
 # candidate, baseline), one pinned CPU; inside every run each route is an
 # in-process leaf/unified ABBA of --blocks blocks x --rounds rounds.
-F=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf
+F=/deleted-coord-artifact
 CPU=${CPU:-47} OUT=${OUT:-$F/abba} BLOCKS=${BLOCKS:-5} ROUNDS=${ROUNDS:-3}
 ROUTES=${ROUTES:?route list}
 mkdir -p "$OUT"

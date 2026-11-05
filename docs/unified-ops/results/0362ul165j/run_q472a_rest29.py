@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 
-COORD = Path("/home/zhuhe/code/litchi-worktrees/.coord")
+COORD = Path("/deleted-coord-artifact")
 ROOT_DEFAULT = Path("/home/zhuhe/code/litchi-worktrees/uo2-final-gate-drawingml-tests")
 V4_SCRIPT = COORD / "final-gate-coverage-780cf4c7/rebinder-v4/rebind_final_gate.py"
 V4_SHA256 = "16f68c596c3f0b68f56ac7818a0d683eb3ff8667079831ef234b28c6d840a2e4"

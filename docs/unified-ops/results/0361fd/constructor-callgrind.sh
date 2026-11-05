@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Callgrind Ir for the protected matched-v5 constructor binaries; per-op = (Ir(12000)-Ir(2000))/10000.
 set -euo pipefail
-V5=/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v5
+V5=/deleted-coord-artifact
 cd "$(dirname "$0")"
 sha256sum $V5/build-base/constructor-native $V5/build-candidate/constructor-native > binaries.sha256
 for route in field_path field_info message_info archive_info archive_object archive_object_reject parse validate encode \

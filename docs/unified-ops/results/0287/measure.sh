@@ -2,7 +2,7 @@
 # Record 0287 paired measurements: processes in B A A B order, each an
 # in-process ABBA (leaf vs unified). Pinned to CPU 31.
 set -u
-S=/home/zhuhe/code/litchi-worktrees/.coord/perf-query2
+S=/deleted-coord-artifact
 B=$S/bin
 R=$S/results
 export UNIFIED_QUERY_DIR=$S/uq

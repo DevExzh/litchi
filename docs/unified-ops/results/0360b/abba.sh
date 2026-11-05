@@ -1,7 +1,7 @@
 #!/bin/bash
 # Record 0360b: binary-level A-B-B-A, base (before) vs head (after), release,
 # pinned to one CPU. Binaries: perf/tgt-{before,after}/release/...
-P=${P:-/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf}; CPU=${CPU:-29}; ROUNDS=${ROUNDS:-31}
+P=${P:-/deleted-coord-artifact}; CPU=${CPU:-29}; ROUNDS=${ROUNDS:-31}
 OUT=${OUT:-$P/out}; mkdir -p "$OUT"
 FIXTURE=${FIXTURE:-/home/zhuhe/code/litchi-worktrees/uo2-w4b-xlsb/test-data/poi/test-data/spreadsheet/testVarious.xlsb}
 probe() { taskset -c "$CPU" "$P/tgt-$1/release/examples/xlsb_w4b_probe" "$ROUNDS" > "$OUT/probe-$1-$2.json" 2>>"$OUT/log.txt" || echo "FAIL probe $1 $2" >> "$OUT/log.txt"; }

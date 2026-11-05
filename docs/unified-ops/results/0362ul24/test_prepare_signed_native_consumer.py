@@ -60,8 +60,7 @@ class SignedConsumerPreparationTests(unittest.TestCase):
 
     def test_plan_is_read_only_and_records_caps(self) -> None:
         source = Path(
-            "/home/zhuhe/code/litchi-worktrees/.coord/"
-            "final-api-capture-472b670547/source"
+            "/deleted-coord-artifact"
         )
         if not source.is_dir():
             self.skipTest("final source endpoint is not present")

@@ -3,7 +3,7 @@
 set -euo pipefail
 src=$(realpath "$1"); out=$(realpath -m "$2"); probe=/home/zhuhe/code/litchi-worktrees/uo2-iwa-w0a/docs/unified-ops/results/0361fd/owner_probe.rs
 mkdir -p "$out"
-source /home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/env.sh
+source /deleted-coord-artifact
 export CARGO_TARGET_DIR="$out/target" CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_BUILD_JOBS=6
 cd "$src"
 cargo build --offline --locked --release --lib -p litchi-numbers -p litchi-keynote -p litchi-pages \
