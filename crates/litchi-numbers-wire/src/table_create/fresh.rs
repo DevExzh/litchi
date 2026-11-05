@@ -1,14 +1,14 @@
 //! A from-scratch table graph: every object of a new, empty table built from
 //! typed values, with no template table to clone (record 0420).
 //!
-//! This is the host's table construction without a template, in two
-//! profiles ([`Profile`]):
+//! This reproduces the table construction without a template of the
+//! retired migration host (deleted by record 0429; last present at commit
+//! `4d8a3e161f`), in two profiles ([`Profile`]):
 //!
-//! - [`Profile::Builder`], the host Numbers builder's table
-//!   (`litchi_iwa::numbers::Builder`), which the host Pages builder imports
-//!   for `body_table`: four data lists and the model's references in the
-//!   builder's order;
-//! - [`Profile::Bootstrap`], the host editor's table for a workbook that has
+//! - [`Profile::Builder`], the table of that host's Numbers builder, which
+//!   its Pages builder imported for `body_table`: four data lists and the
+//!   model's references in the builder's order;
+//! - [`Profile::Bootstrap`], that host editor's table for a workbook that had
 //!   no table left to clone (`bootstrap_empty_table_graph`): a fifth,
 //!   control-cell-spec list, the BNC format-table reference and the model's
 //!   references sorted.

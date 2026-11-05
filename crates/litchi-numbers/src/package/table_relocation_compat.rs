@@ -1,4 +1,5 @@
-//! Physical-topology admission for the retiring `litchi-iwa` host.
+//! Physical-topology admission for workbooks built by the retired migration
+//! host (deleted by record 0429; last present at commit `4d8a3e161f`).
 //!
 //! The normal [`Package`](super::Package) constructor deliberately projects
 //! every rooted table into the focused semantic model. Historical host-built

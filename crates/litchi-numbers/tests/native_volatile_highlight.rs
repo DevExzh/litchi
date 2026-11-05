@@ -11,9 +11,9 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{tsce, tst};
-use litchi_numbers::Package;
 use litchi_numbers::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::table::At;
+use litchi_numbers::{Builder, Identity, Package};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -411,6 +411,130 @@ fn first_volatile_rule_on_a_numbers_saved_table_builds_what_numbers_builds() -> 
         .package()
         .apply_table_cell_conditional_highlights(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+/// Every Numbers-saved table registers the owner family, without the
+/// conditional-style owner's tile until its first volatile rule. The retired
+/// host failed here ("dependency tile is missing"); the leaf builds the tile
+/// (record 0432, formerly the leaf half of
+/// `numbers_native_conditional_highlight_volatile_host_fails_leaf_registers`).
+#[test]
+fn numbers_saved_tables_register_their_first_volatile_rule() -> TestResult {
+    for name in ["basic.numbers", "custom-number-native.numbers"] {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers")
+            .join(name);
+        let package = Package::open(path)?;
+        let rule = fill_rule(Condition::DateIsToday)?;
+        let commit = package
+            .edit_table_cell_conditional_highlights(0usize, 0usize)?
+            .set(At::new(1, 1), [rule.clone()])?
+            .commit()?;
+        assert_eq!(
+            commit
+                .package()
+                .table_cell_conditional_highlight(0usize, 0usize, At::new(1, 1))?,
+            Some(vec![rule]),
+            "{name}"
+        );
+    }
+    Ok(())
+}
+
+/// The cells of the conditional-style owner (kind 3).
+fn conditional_style_cells(source: &[u8]) -> TestResult<Vec<(u32, u32)>> {
+    for object in &engine(source)?.objects {
+        for message in &object.messages {
+            if message.type_ == 4_008 {
+                let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+                if owner.owner_kind == Some(3) {
+                    return Ok(owner
+                        .cell_dependencies
+                        .map(|cells| {
+                            cells
+                                .cell_record
+                                .iter()
+                                .map(|record| (record.row, record.column))
+                                .collect()
+                        })
+                        .unwrap_or_default());
+                }
+            }
+        }
+    }
+    Ok(Vec::new())
+}
+
+/// A document built by `Builder`, which the retired host's volatile parity
+/// (`numbers_conditional_highlight_volatile_{,lifecycle_}parity`) ran on: the
+/// first rule registers the family, a second cell joins it, a non-volatile
+/// replacement and a clear each take their cell out, a volatile replacement
+/// keeps it, and every inverse restores the input's bytes.
+#[test]
+fn built_document_volatile_lifecycle() -> TestResult {
+    let identity = Identity::from_bytes([1; 16], [2; 16], [3; 16])?;
+    let package = Builder::new().identity(identity).build()?;
+    let today = fill_rule(Condition::DateIsToday)?;
+    let first = package
+        .edit_table_cell_conditional_highlights(0usize, 0usize)?
+        .set(At::new(1, 1), [today.clone()])?
+        .commit()?;
+    let inverse = first
+        .package()
+        .apply_table_cell_conditional_highlights(&first.patch().inverse())?;
+    assert_eq!(exact_bytes(inverse.package())?, exact_bytes(&package)?);
+    let first = first.package().clone();
+    let first_bytes = exact_bytes(&first)?;
+    assert_eq!(conditional_style_cells(&first_bytes)?, [(1, 1)]);
+
+    let tomorrow = fill_rule(Condition::DateIsTomorrow)?;
+    let yesterday = fill_rule(Condition::DateIsYesterday)?;
+    let blank = fill_rule(Condition::CellIsBlank)?;
+    for (label, at, rule, cells) in [
+        (
+            "second cell",
+            At::new(2, 2),
+            Some(&tomorrow),
+            vec![(1, 1), (2, 2)],
+        ),
+        (
+            "non-volatile replacement",
+            At::new(1, 1),
+            Some(&blank),
+            vec![],
+        ),
+        (
+            "volatile replacement",
+            At::new(1, 1),
+            Some(&yesterday),
+            vec![(1, 1)],
+        ),
+        ("clear", At::new(1, 1), None, vec![]),
+    ] {
+        let edit = first.edit_table_cell_conditional_highlights(0usize, 0usize)?;
+        let commit = match rule {
+            Some(rule) => edit.set(at, [rule.clone()])?,
+            None => edit.clear(at)?,
+        }
+        .commit()?;
+        let bytes = exact_bytes(commit.package())?;
+        assert_eq!(conditional_style_cells(&bytes)?, cells, "{label}");
+        let reopened = Package::from_bytes(&bytes)?;
+        assert_eq!(
+            reopened.table_cell_conditional_highlight(0usize, 0usize, at)?,
+            rule.map(|rule| vec![rule.clone()]),
+            "{label}"
+        );
+        let restored = commit
+            .package()
+            .apply_table_cell_conditional_highlights(&commit.patch().inverse())?;
+        assert_eq!(
+            exact_bytes(restored.package())?,
+            first_bytes,
+            "{label} inverse"
+        );
+    }
     Ok(())
 }
 

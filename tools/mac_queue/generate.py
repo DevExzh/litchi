@@ -5,29 +5,36 @@ Record 0430. For every row of `docs/unified-ops/0363-mac-queue.md` this
 tool produces the package the native open/save/close/reopen check must
 open, groups rows whose packages are byte-identical, and writes a manifest.
 
-    source /home/zhuhe/code/litchi-worktrees/.coord/mac-runbook/env.sh
-    python3 tools/mac_queue/generate.py --out <directory>
+    python3 tools/mac_queue/generate.py --check
+    python3 tools/mac_queue/generate.py --reuse-dumps --out <directory>
 
-Steps:
+How the packages were built (record 0430):
 
-1. `cargo test -p litchi-iwa --all-features --test parity` with
-   `LITCHI_MAC_QUEUE_DUMP=<out>/raw/parity`: every harness case writes its
-   input, host output and leaf output (`tests/parity/harness.rs`, module
-   `mac_queue`). Leaf rows take the leaf output, host rows the host output.
+1. The parity harness of the host crate dumped every case's input, host output
+   and leaf output to `<out>/raw/parity`. Record 0429 deleted that harness with
+   the host, so these dumps cannot be rebuilt: the host drew random UUIDs.
+   Passes on host-built inputs rest on these bytes (`.coord/iwa-w6/queue-out`,
+   manifest SHA-256 6d59fef38bb0900568c337743bcde98a
+   ad0169d4bbf55e8a6a3370f7b98d045a, listed by
+   `test-data/iwork/mac-queue/host-built-inputs.tsv`).
 2. `cargo run -p litchi-ops --example mac_queue_file_routes` writes the
    `litchi_ops::File` rows' packages (and the two builder documents) to
    `<out>/raw/example`, and `cargo run -p litchi-numbers --example
    mac_queue_native_routes` the packages of the routes proven on a workbook
-   Numbers saved.
+   Numbers saved. Neither needs the host.
 3. Every row is mapped (`rows.map_row`) to its sources; the packages are
    deduplicated by SHA-256 into `<out>/packages/<App>/`, and
    `<out>/manifest.json` and `<out>/queue.tsv` (the Mac runner's input) are
-   written. Host-built inputs (inputs that are not a tracked `test-data`
-   file) are copied to `<out>/inputs/` and listed in
-   `<out>/host-built-inputs.tsv` for the W3 snapshot.
+   written. Inputs that are not a tracked `test-data` file are copied to
+   `<out>/inputs/` and listed in `<out>/host-built-inputs.tsv`.
 
-`--reuse-dumps` skips steps 1 and 2. `--check` only proves that every queue
-row maps to sources or an explicit grouping (no build, no output).
+`--check` only proves that every queue row maps to sources or an explicit
+grouping, using the parity-test names frozen in
+`tools/mac_queue/parity-tests.tsv` (no build, no output). `--reuse-dumps --out
+<directory>` runs step 3 on `<directory>/raw`. The frozen output kept its
+packages, inputs and manifest but not its parity dumps (`raw/` holds only
+`example/`), so no complete manifest can be regenerated now; the manifest of
+record 0434 stands as it is. Never point `--out` at it: a run rewrites it.
 """
 
 from __future__ import annotations
@@ -46,7 +53,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import rows as mac_queue  # noqa: E402  (tools/mac_queue/rows.py)
 
 ROOT = mac_queue.ROOT
-DEFAULT_OUT = ROOT.parent / ".coord" / "mac-runbook" / "out"
 RUNNER = Path(__file__).resolve().parent / "run_on_mac.sh"
 SCHEMA = 1
 
@@ -71,24 +77,6 @@ def git_head(root: Path = ROOT) -> str:
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
-
-
-def build(out: Path, root: Path = ROOT) -> None:
-    """Run the parity harness and the File-route example with dumps on."""
-    raw = out / "raw"
-    if raw.exists():
-        shutil.rmtree(raw)
-    env = dict(os.environ, LITCHI_MAC_QUEUE_DUMP=str(raw / "parity"))
-    commands = [
-        (["cargo", "test", "-p", "litchi-iwa", "--all-features", "--test", "parity"], env),
-        (["cargo", "run", "-q", "-p", "litchi-ops", "--features", "pages,keynote,numbers",
-          "--example", "mac_queue_file_routes", "--", str(raw / "example")], dict(os.environ)),
-        (["cargo", "run", "-q", "-p", "litchi-numbers",
-          "--example", "mac_queue_native_routes", "--", str(raw / "example")], dict(os.environ)),
-    ]
-    for command, environment in commands:
-        print("+", " ".join(command), file=sys.stderr)
-        subprocess.run(command, cwd=root, env=environment, check=True)
 
 
 class ParityDumps:
@@ -384,7 +372,7 @@ def generate(out: Path, root: Path = ROOT, *, runs_per_source: int = 2) -> dict:
     missing_rows = [entry for entry in row_entries if entry["status"] == "missing"]
     if missing_rows:
         raise SystemExit(
-            "rows without any dumped package (run without --reuse-dumps?):\n"
+            "rows without any dumped package:\n"
             + "\n".join(f"line {e['line']} {e['id']}: {e['missing_sources']}" for e in missing_rows)
         )
 
@@ -467,8 +455,8 @@ def write_host_inputs_tsv(path: Path, inputs: list[dict]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help=f"output directory (default {DEFAULT_OUT})")
-    parser.add_argument("--reuse-dumps", action="store_true", help="use <out>/raw as it is; do not run cargo")
+    parser.add_argument("--out", type=Path, help="output directory, with the dumps under raw/")
+    parser.add_argument("--reuse-dumps", action="store_true", help="use <out>/raw as it is (required: the harness that built it is gone)")
     parser.add_argument("--runs-per-source", type=int, default=2,
                         help="representative runs kept per parity source (0 keeps every run; default 2)")
     parser.add_argument("--check", action="store_true", help="only check that every queue row is mapped")
@@ -483,6 +471,12 @@ def main(argv: list[str] | None = None) -> int:
               f"{grouped} explicitly grouped, {len(errors)} errors")
         return 1 if errors else 0
 
+    if args.out is None or not args.reuse_dumps:
+        raise SystemExit(
+            "the parity harness was deleted with the host (record 0429): host-built inputs draw "
+            "random UUIDs and cannot be rebuilt; --reuse-dumps --out <directory> indexes dumps "
+            "already in <directory>/raw (see test-data/iwork/mac-queue/README.md)"
+        )
     out = args.out.resolve()
     try:
         out.relative_to(ROOT)
@@ -491,8 +485,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         raise SystemExit(f"{out} is inside the repository; generated packages must stay outside git")
     out.mkdir(parents=True, exist_ok=True)
-    if not args.reuse_dumps:
-        build(out)
     manifest = generate(out, runs_per_source=args.runs_per_source)
     summary = manifest["summary"]
     print(f"mac queue: {summary['rows']} rows -> {summary['packages']} distinct packages "

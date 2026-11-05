@@ -10,7 +10,7 @@
 //! the preset's.
 //!
 //! The engine reads all of this ([`placements`], [`level`], [`numbering`],
-//! [`property`]) and plans the `litchi-iwa` host's per-paragraph property
+//! [`property`]) and plans the retired host's (commit `4d8a3e161f`) per-paragraph property
 //! changes ([`plan`], [`plan_collapse`]): rewrite an isolated exclusive
 //! variation in place, derive a new variation for one paragraph, collapse
 //! a variation that no longer overrides anything, or strip one property

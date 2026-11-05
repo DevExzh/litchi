@@ -3,7 +3,7 @@
 //! The input must contain both the source and destination sheets. The example
 //! intentionally accepts the package path from the caller so it can be used
 //! with an Apple-authored two-sheet fixture without manufacturing a package or
-//! depending on the legacy `litchi-iwa` facade.
+//! depending on a migration host.
 
 #![allow(
     clippy::print_stdout,

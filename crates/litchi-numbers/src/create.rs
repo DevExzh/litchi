@@ -30,9 +30,10 @@
 //!
 //! # Template provenance
 //!
-//! The blank artifact is the output of the migration host's from-scratch
-//! Numbers writer (`litchi_iwa::numbers::Builder::new()`,
-//! file format 14.4.1, stored members), with its identity rewritten to
+//! The blank artifact is the output of the retired migration host's
+//! from-scratch Numbers writer (its `numbers::Builder::new()` at commit
+//! `4d8a3e161f`, the last commit that contains the host; file format 14.4.1,
+//! stored members), with its identity rewritten to
 //! [`Identity::BLANK`] by this module and its build-history producer
 //! string set to `Litchi`. Record 0309 then gave its table's formula owner
 //! the native table extents (the spanning dependencies' total and body

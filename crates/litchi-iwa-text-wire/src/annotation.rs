@@ -8,7 +8,8 @@
 //! [`COMMENT_STORAGE_MESSAGE_TYPE`]): an empty body makes it a plain
 //! highlight, a nonempty one a text comment, whose direct replies are
 //! further comment storages. This is the annotation graph of the
-//! `litchi-iwa` host's `text::Draft` highlight and comment families.
+//! retired host's (commit `4d8a3e161f`) `text::Draft` highlight and comment
+//! families.
 //!
 //! The engine reads graphs through [`Objects`] and encodes or rewrites the
 //! highlight and comment-storage payloads. The caller (a format package)

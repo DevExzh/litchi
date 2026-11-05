@@ -16,7 +16,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MAC_QUEUE = Path("docs/unified-ops/0363-mac-queue.md")
-PARITY_DIR = Path("crates/litchi-iwa/tests/parity")
+# The parity harness was deleted with the host (record 0429); its test names
+# were frozen first, at trunk 4d8a3e161f, which holds every test that built a
+# package of the queue's Mac evidence (records 0430, 0433, 0434).
+PARITY_SNAPSHOT = Path("tools/mac_queue/parity-tests.tsv")
 RECORDS_DIR = Path("docs/unified-ops")
 LEDGER = Path("docs/unified-ops/results/0363/iwa-exit-ledger.tsv")
 
@@ -99,23 +102,15 @@ def read_queue(root: Path = ROOT) -> list[Row]:
     return parse_queue((root / MAC_QUEUE).read_text(encoding="utf-8"))
 
 
-_TEST = re.compile(r"#\[test\]\s*(?:#\[[^\]]*\]\s*)*fn\s+([a-z0-9_]+)\s*\(")
-# Tests a `macro_rules!` table declares: a bare `name_parity` opening a line
-# of the invocation, followed by `:` or `,` (shape_style_cases.rs,
-# series_write_cases.rs).
-_MACRO_TEST = re.compile(r"^\s*([a-z0-9_]+_parity)\s*[:,]", re.MULTILINE)
-
-
 def parity_tests(root: Path = ROOT) -> dict[str, str]:
-    """`#[test]` names of the parity harness (including macro-declared
-    ones), mapped to their source file."""
+    """The deleted parity harness's test names, mapped to their source file
+    when it was deleted (`PARITY_SNAPSHOT`, two header lines)."""
     tests: dict[str, str] = {}
-    for file in sorted((root / PARITY_DIR).rglob("*.rs")):
-        text = file.read_text(encoding="utf-8")
-        relative = file.relative_to(root).as_posix()
-        for pattern in (_TEST, _MACRO_TEST):
-            for match in pattern.finditer(text):
-                tests.setdefault(match.group(1), relative)
+    snapshot = root / PARITY_SNAPSHOT
+    if snapshot.is_file():
+        for line in snapshot.read_text(encoding="utf-8").splitlines()[2:]:
+            name, _, relative = line.partition("\t")
+            tests[name] = relative
     return tests
 
 

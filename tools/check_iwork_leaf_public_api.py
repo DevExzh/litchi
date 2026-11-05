@@ -84,7 +84,6 @@ ALLOWED_EXTERNAL_CRATES = frozenset(
 FORBIDDEN_CRATES = frozenset(
     {
         "buffa",
-        "litchi_iwa",
         "litchi_iwa_archive",
         "litchi_iwa_common",
         "litchi_iwa_core",

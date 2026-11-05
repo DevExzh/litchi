@@ -23,8 +23,12 @@ these bytes.
 
 ### Regenerating
 
-1. Build a throwaway program outside the repository, with its own target
-   directory, depending on `litchi-iwa` by path:
+The generator crate `litchi-iwa` was deleted by record 0429 (W3); check out
+commit `802995d7b7` (or any commit up to `4d8a3e161f`, the last one that
+contains the crate) to regenerate.
+
+1. In that checkout, build a throwaway program outside the repository, with
+   its own target directory, depending on `litchi-iwa` by path:
 
    ```toml
    [package]

@@ -96,17 +96,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // standalone copies do not contain these sibling sources, so the
     // provenance checks below are intentionally conditional on their presence.
     for path in [
-        "../litchi-iwa/src/protobuf.rs",
         "../litchi-numbers-wire/src/table_data_list.rs",
         "../litchi-numbers/src/package/extractor.rs",
-        "../litchi-iwa/src/pages/editor.rs",
-        "../litchi-iwa/src/pages/editor/movies/graph.rs",
-        "../litchi-iwa/src/pages/editor/movies/caption.rs",
-        "../litchi-iwa/src/pages/editor/audio/graph.rs",
-        "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-        "../litchi-iwa/src/image_caption.rs",
-        "../litchi-iwa/src/pages/editor/footnotes.rs",
-        "../litchi-iwa/src/pages/creation.rs",
         "../litchi-pages/src/package.rs",
         "../litchi-pages/src/package/footnote_text.rs",
         "../litchi-pages/src/package/document_settings.rs",
@@ -6724,27 +6715,11 @@ fn enforce_numbers_table_data_list_provenance(
         .all(|field| codec.contains(field))
         && codec.contains(SEGMENT_CODEC_PARITY);
 
-    let registry_path = Path::new("../litchi-iwa/src/protobuf.rs");
     let wire_owner_path = Path::new("../litchi-numbers-wire/src/table_data_list.rs");
     let adapter_paths = [Path::new("../litchi-numbers/src/package/extractor.rs")];
-    let registry_table_data_list_markers = [
-        format!(
-            "{}u32 => decode_table_data_list,",
-            TABLE_DATA_LIST_NATIVE_IDS[0]
-        ),
-        format!(
-            "{}u32 => decode_table_data_list,",
-            TABLE_DATA_LIST_NATIVE_IDS[1]
-        ),
-    ];
-    let registry_table_data_list_segment_marker = format!(
-        "{}u32 => decode_table_data_list_segment,",
-        TABLE_DATA_LIST_SEGMENT_NATIVE_ID
-    );
-    // Message-ID registration remains in the legacy host's type registry,
-    // while candidate routing and root/segment publication now live in the
-    // borrowed Numbers wire coordinator.  Each adapter keeps its decoder,
-    // budget, and converter hooks but delegates the topology walk to
+    // Candidate routing and root/segment publication live in the borrowed
+    // Numbers wire coordinator. Each adapter keeps its decoder, budget, and
+    // converter hooks but delegates the topology walk to
     // `table_data_list::read_list`.
     let wire_table_data_list_markers = [
         "pub const TABLE_DATA_LIST_MESSAGE_KIND: u32 = 6_005;",
@@ -6768,24 +6743,6 @@ fn enforce_numbers_table_data_list_provenance(
         ),
         ".filter(|message| message.type_ == 6_011)".to_owned(),
     ];
-
-    let registry_scope_ok = if registry_path.is_file() {
-        let registry_source = fs::read_to_string(registry_path)?;
-        registry_source
-            .matches(registry_table_data_list_markers[0].as_str())
-            .count()
-            == 1
-            && registry_source
-                .matches(registry_table_data_list_markers[1].as_str())
-                .count()
-                == 1
-            && registry_source
-                .matches(registry_table_data_list_segment_marker.as_str())
-                .count()
-                == 1
-    } else {
-        true
-    };
 
     let adapter_sources = adapter_paths
         .iter()
@@ -6821,7 +6778,7 @@ fn enforce_numbers_table_data_list_provenance(
             && source.contains(adapter_read_list_marker)
             && legacy_filter_absent
     });
-    let route_scope_ok = registry_scope_ok && wire_scope_ok && adapters_scope_ok;
+    let route_scope_ok = wire_scope_ok && adapters_scope_ok;
 
     if !canonical_scope_ok || !projection_scope_ok || !codec_scope_ok || !route_scope_ok {
         return Err(
@@ -8665,79 +8622,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // Keep their workspace routes private and check them only as a build-time
     // provenance seam. The canonical message blocks below are the authority
     // for what each number means; no ID is added to the public codec API.
-    const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 21] = [
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor.rs",
-            "MOVIE_MESSAGE_TYPE => remap_pages_movie_wire",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
-            "../litchi-iwa/src/pages/editor.rs",
-            "CAPTION_INFO_MESSAGE_TYPE => remap_pages_caption_info_wire",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "decode_typed_package_object(package, identifier, MOVIE_MESSAGE_TYPE",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/caption.rs",
-            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor/movies/caption.rs",
-            "MOVIE_MESSAGE_TYPE,\n        \"TSD.MovieArchive\",",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "const AUDIO_MESSAGE_TYPE: u32 = 3_007;",
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "decode_typed_package_object(\n        editor.package(),\n        drawable_object_id,\n        AUDIO_MESSAGE_TYPE,\n",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            "const THEME_MESSAGE_TYPE: u32 = 10_001;",
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            ".filter(|message| message.type_ == THEME_MESSAGE_TYPE)",
-        ),
-        (
-            "../litchi-iwa/src/image_caption.rs",
-            "pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
-            "../litchi-iwa/src/image_caption.rs",
-            ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;",
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "pages_footnote_codec::decode_footnote_reference(",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;",
-            "../litchi-iwa/src/pages/editor/footnotes.rs",
-            "pages_footnote_marker_codec::decode_textual_attachment(",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const DOCUMENT_MESSAGE_TYPE: u32 = 10000;",
-            "../litchi-iwa/src/pages/editor.rs",
-            ".find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)\n            .map(|message| message.data.as_slice())\n            .ok_or_else(|| {\n                Error::InvalidFormat(\"Pages root has no TP.DocumentArchive payload\".to_owned())\n            })?;\n        let snapshot = pages_body_codec::decode_document_root(",
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "const SECTION_MESSAGE_TYPE: u32 = 10011;",
-            "../litchi-iwa/src/pages/editor.rs",
-            "SECTION_MESSAGE_TYPE,\n        \"TP.SectionArchive\",",
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "enum PagesMessageType {",
-            "../litchi-iwa/src/pages/creation.rs",
-            "PagesMessageType::Document,\n            document,",
-        ),
+    const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 9] = [
         (
             "../litchi-pages/src/package.rs",
             "const SECTION_MESSAGE_TYPE: u32 = 10_011;",
@@ -8798,112 +8683,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // private numeric routes exist; these markers prove that each route is
     // still used by the intended code path rather than a comment, string, or
     // test-only compatibility shim.
-    const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 40] = [
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "decode_typed_package_object(\n        editor.package(),\n        drawable_object_id,\n        MOVIE_MESSAGE_TYPE,\n",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            ".filter(|message| message.type_ == MOVIE_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "pages_movie_object(\n            ids.drawable,\n            MOVIE_MESSAGE_TYPE,\n            movie,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            ".filter(|(_, message)| message.type_ == MOVIE_MESSAGE_TYPE)",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/movies/graph.rs",
-            "type_: MOVIE_MESSAGE_TYPE,\n                data,",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "pages_body_codec::decode_document_root(",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "SECTION_MESSAGE_TYPE => {\n                        if !section_objects.insert(identifier)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            ".any(|message| message.type_ == SECTION_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "SECTION_MESSAGE_TYPE => {\n            const REFERENCE_PATHS:",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor.rs",
-            "let mut cloned = clone_pages_object_metadata(\n        source,\n        new_identifier,\n        vec![RawMessage {\n            type_: message.type_,\n            data,\n        }],",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            ".filter(|message| message.type_ == AUDIO_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            ".filter(|(_, message)| message.type_ == AUDIO_MESSAGE_TYPE)",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "decode_typed_package_object(package, identifier, AUDIO_MESSAGE_TYPE, \"TSD.MovieArchive\")?",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "pages_audio_object(\n            ids.drawable,\n            AUDIO_MESSAGE_TYPE,\n            audio,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/audio/graph.rs",
-            "type_: AUDIO_MESSAGE_TYPE,\n                data,",
-            2,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "Document = 10_000,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "Section = 10_011,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "Settings = 10_012,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "PagesMessageType::Section,\n            tp::SectionArchive",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "PagesMessageType::Settings,\n            tp::SettingsArchive",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/creation.rs",
-            "type_: message_type.value(),\n            data,",
-            1,
-        ),
+    const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 17] = [
         (
             "../litchi-pages/src/package.rs",
             "let payload = unique_message_payload(&object.messages, 10_000, \"Pages root object 1\")?",
@@ -8922,16 +8702,6 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         (
             "../litchi-pages/src/package/footnote_text.rs",
             "let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
-            1,
-        ),
-        (
-            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
-            "pages_movie_caption_codec::decode_caption_info(",
             1,
         ),
         (
@@ -8999,13 +8769,6 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
             "let marker_identifier = footnote_marker_identifier(",
             1,
         ),
-    ];
-    const REGISTRY_DECLARATIONS: [&str; 5] = [
-        "3007u32 => decode_shape_archive,",
-        "2004u32 => decode_storage_archive,",
-        "2008u32 => decode_storage_archive,",
-        "2001u32 => decode_storage_archive,",
-        "2022u32 => decode_storage_archive,",
     ];
     const MOVIE_FIELDS: [&str; 2] = [
         "required .TSD.DrawableArchive super = 1;",
@@ -9126,7 +8889,6 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // workspace-only numeric route check is intentionally skipped. A partial
     // sibling checkout is an error so one missing route cannot weaken this
     // seam silently.
-    const REGISTRY_SOURCE: &str = "../litchi-iwa/src/protobuf.rs";
     const ADDITIONAL_ROUTE_SOURCES: [&str; 5] = [
         "../litchi-pages/src/package/footnote_text.rs",
         "../litchi-pages/src/package/section_background.rs",
@@ -9141,8 +8903,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         })
         || ADDITIONAL_ROUTE_SOURCES
             .iter()
-            .any(|path| Path::new(path).is_file())
-        || Path::new(REGISTRY_SOURCE).is_file();
+            .any(|path| Path::new(path).is_file());
     let all_routes_present = ROUTE_DECLARATIONS
         .iter()
         .all(|(declaration_path, _, use_path, _)| {
@@ -9150,8 +8911,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         })
         && ADDITIONAL_ROUTE_SOURCES
             .iter()
-            .all(|path| Path::new(path).is_file())
-        && Path::new(REGISTRY_SOURCE).is_file();
+            .all(|path| Path::new(path).is_file());
     let route_scope_ok = if !any_route_present {
         true
     } else if !all_routes_present {
@@ -9182,18 +8942,9 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         declarations_ok && production_markers_ok
     };
 
-    let registry_scope_ok = if !any_route_present || !all_routes_present {
-        true
-    } else {
-        let registry = fs::read_to_string(REGISTRY_SOURCE)?;
-        REGISTRY_DECLARATIONS
-            .iter()
-            .all(|declaration| rust_code_marker_count(&registry, declaration) == 1)
-    };
-
-    if !canonical_scope_ok || !route_scope_ok || !registry_scope_ok {
+    if !canonical_scope_ok || !route_scope_ok {
         return Err(
-            "Pages native message provenance drifted: private Movie/audio 3007, body-shape theme 10001, Caption 633, FootnoteReference 2008, TextualAttachment 2004, section template/storage (10143/2001/2022), legacy editor Document/Section (10000/10011), creation Document/Section/Settings (10000/10011/10012), package Document/Section/Settings (10000/10011/10012), or table-lock root (10000) routes no longer match their message-scoped canonical declarations and production decode/remap/write sites"
+            "Pages native message provenance drifted: Movie 3007 and Caption 633 schema fields, FootnoteReference 2008, TextualAttachment 2004, section template/storage (10143/2001/2022), package Document/Section/Settings (10000/10011/10012), or table-lock root (10000) routes no longer match their message-scoped canonical declarations and production decode/remap/write sites"
                 .into(),
         );
     }
