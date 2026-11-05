@@ -17,14 +17,15 @@ use crate::model::{
 };
 use crate::transition::Transition;
 use litchi_core::{
-    BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error, History,
-    HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch, PatchLimits, PatchOperation,
-    Result, Reversible, ReversibleOperation, SubEdit,
+    BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error,
+    History as CoreHistory, HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch,
+    PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation,
 };
 use litchi_odf_common::{
-    compact_xml,
+    Error as OdfError, OpenOptions, compact_xml,
     core::{
-        AuthoredXmlFragment, PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
+        AuthoredXmlFragment, PackageWriter, XmlSourcePart, XmlSplicePublication,
+        family::Package as FamilyPackage,
     },
     drawing::Frame,
     media,
@@ -37,9 +38,10 @@ use quick_xml::{
     reader::NsReader,
 };
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     fmt::Write as _,
-    ops::Range,
+    ops::{Deref, Range},
     path::Path,
     sync::Arc,
 };
@@ -108,7 +110,7 @@ mod attribute_span_tests;
 mod attribute_value_tests;
 
 struct State {
-    package: Package,
+    package: FamilyPackage,
     mimetype: &'static str,
     security: SecurityStatus,
     pages: Vec<Page>,
@@ -154,6 +156,20 @@ pub enum SecurityLifecycleOperation {
 pub enum SecurityLifecycleRefusal {
     ExistingPackageReencryptionUnavailable,
     ExistingPackageResigningUnavailable,
+}
+
+impl SecurityLifecycleRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the route does not implement the operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::ExistingPackageReencryptionUnavailable
+            | Self::ExistingPackageResigningUnavailable => {
+                litchi_core::edit::RefusalKind::UnsupportedOperation
+            },
+        }
+    }
 }
 
 /// Supported, exact-preservation-only, or finally unsupported lifecycle disposition.
@@ -381,88 +397,480 @@ impl SecurityStatus {
     }
 }
 
-/// An immutable, source-owning ODG package snapshot.
+/// The immutable, cheap-to-clone owner of one ODG or OTG package.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`, [`Self::from_prepared_package`]), the primary
+/// [`Edit`] transaction, patch application ([`Self::apply`]) and output
+/// ([`Self::save`], [`Self::save_with_durability`], [`Self::to_bytes`],
+/// [`Self::write_to`]). Clones share the exact bytes and the parsed
+/// projection; [`Self::drawing`] returns the read-only [`crate::Drawing`]
+/// projection. A commit publishes a new package and never mutates its
+/// source.
 ///
 /// Unknown package members and unmodeled XML remain in the retained source
 /// bytes. Semantic inspection never evaluates controls, scripts, actions, DDE,
 /// links, or embedded payloads.
 #[derive(Clone)]
-pub struct Snapshot(Arc<State>);
+pub struct Package(Arc<State>);
 
-impl Snapshot {
-    /// Opens a package from a filesystem path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package cannot be read or is not a structurally valid ODG.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(Package::open(path, MIMETYPE, BODY_MARKER, "ODG")?, MIMETYPE)
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .field("template", &self.is_template())
+            .finish_non_exhaustive()
+    }
+}
+
+/// One ODG package flavor: the regular drawing or the OTG template.
+#[derive(Clone, Copy)]
+struct Flavor {
+    mimetype: &'static str,
+    family_name: &'static str,
+}
+
+const DRAWING: Flavor = Flavor {
+    mimetype: MIMETYPE,
+    family_name: "ODG",
+};
+
+const TEMPLATE: Flavor = Flavor {
+    mimetype: TEMPLATE_MIMETYPE,
+    family_name: "OTG",
+};
+
+impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.0.package.package()
     }
 
-    /// Opens an `OpenDocument` drawing template from a filesystem path.
+    /// Creates the minimal valid drawing (one empty `office:drawing` body).
+    ///
+    /// The bytes are deterministic: no clock or randomness is consulted.
     ///
     /// # Errors
     ///
-    /// Returns an error when the package is unreadable or is not a structurally valid `OTG`.
-    pub fn open_template(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(
-            Package::open(path, TEMPLATE_MIMETYPE, BODY_MARKER, "OTG")?,
-            TEMPLATE_MIMETYPE,
-        )
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> std::result::Result<Self, OdfError> {
+        crate::Builder::new().build()
     }
 
-    /// Opens a package from owned bytes.
+    /// Opens an ODG package from a filesystem path with the default
+    /// [`OpenOptions`].
     ///
     /// # Errors
     ///
-    /// Returns an error when the package is not a structurally valid ODG.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_package(
-            Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODG")?,
-            MIMETYPE,
-        )
+    /// Returns [`OdfError::Limit`] when a source or semantic limit is
+    /// exceeded and [`OdfError::Core`] when the package cannot be read or is
+    /// not a structurally valid ODG.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Opens password-protected ODG bytes for inert inspection.
-    ///
-    /// Encrypted snapshots remain read-only: semantic commit and durable application refuse to
-    /// strip or silently re-encrypt protected entries.
+    /// Opens an ODG package from a filesystem path under caller-selected
+    /// limits.
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid package, unsupported encryption metadata, or bad password.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_package(
-            Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODG")?,
-            MIMETYPE,
-        )
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_flavor(path, options, DRAWING)
+    }
+
+    /// Opens an `OpenDocument` drawing template (OTG) from a filesystem path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`], for a structurally valid OTG.
+    pub fn open_template(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_template_with_options(path, OpenOptions::new())
+    }
+
+    /// Opens an OTG drawing template from a filesystem path under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_template`].
+    pub fn open_template_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_flavor(path, options, TEMPLATE)
     }
 
     /// Opens a password-protected ODG file for inert inspection.
     ///
+    /// Encrypted packages remain read-only: semantic commit and durable
+    /// application refuse to strip or silently re-encrypt protected entries.
+    ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_password`] plus filesystem errors.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+    /// As [`Self::open`], plus unsupported encryption metadata or a bad
+    /// password.
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Opens a password-protected ODG file under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = FamilyPackage::open_with_password_and_options(
+            path,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            DRAWING.family_name,
+        )?;
+        Self::from_family(package, MIMETYPE, options)
+    }
+
+    /// Opens an ODG package from borrowed bytes (copied once after the input
+    /// size check).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens an ODG package from borrowed bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_flavor(bytes, options, DRAWING)
+    }
+
+    /// Opens an OTG drawing template from borrowed bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_template`].
+    pub fn from_template_bytes(bytes: &[u8]) -> std::result::Result<Self, OdfError> {
+        Self::from_template_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens an OTG drawing template from borrowed bytes under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_template`].
+    pub fn from_template_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_flavor(bytes, options, TEMPLATE)
+    }
+
+    /// Opens password-protected ODG bytes for inert inspection.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Opens password-protected ODG bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        check_input_bytes(bytes.len(), options)?;
+        let package = FamilyPackage::from_bytes_with_password_and_options(
+            copy_input(bytes)?,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            DRAWING.family_name,
+        )?;
+        Self::from_family(package, MIMETYPE, options)
+    }
+
+    /// Opens an ODG package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, OdfError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Opens an ODG package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = FamilyPackage::from_reader_with_options(
+            reader,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            DRAWING.family_name,
+        )?;
+        Self::from_family(package, MIMETYPE, options)
+    }
+
+    /// Adopts a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index. Both ODG and OTG packages are accepted; the
+    /// package MIME type selects the flavor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OdfError::Core`] carrying [`Error::UnexpectedFormat`] when
+    /// the prepared package is another family, or the usual validation error.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// The source limits were applied when the archive was prepared; its
+    /// existing index and source allocation are reused.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odg {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        let archive = prepared.into_package();
+        let flavor = if archive.mimetype()? == TEMPLATE_MIMETYPE {
+            TEMPLATE
+        } else {
+            DRAWING
+        };
+        let package = FamilyPackage::from_owned_package_with_options(
+            archive,
+            options,
+            flavor.mimetype,
+            BODY_MARKER,
+            flavor.family_name,
+        )?;
+        Self::from_family(package, flavor.mimetype, options)
+    }
+
+    fn open_flavor(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+        flavor: Flavor,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = FamilyPackage::open_with_options(
+            path,
+            options,
+            flavor.mimetype,
+            BODY_MARKER,
+            flavor.family_name,
+        )?;
+        Self::from_family(package, flavor.mimetype, options)
+    }
+
+    fn from_bytes_flavor(
+        bytes: &[u8],
+        options: OpenOptions,
+        flavor: Flavor,
+    ) -> std::result::Result<Self, OdfError> {
+        check_input_bytes(bytes.len(), options)?;
+        let package = FamilyPackage::from_bytes_with_options(
+            copy_input(bytes)?,
+            options,
+            flavor.mimetype,
+            BODY_MARKER,
+            flavor.family_name,
+        )?;
+        Self::from_family(package, flavor.mimetype, options)
+    }
+
+    /// Projects a validated family package and checks the page count against
+    /// the semantic unit limit.
+    fn from_family(
+        package: FamilyPackage,
+        mimetype: &'static str,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let owner = Self::from_package(package, mimetype)?;
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            semantic.check(
+                litchi_odf_common::SemanticLimitKind::Units,
+                u64::try_from(owner.pages().len()).unwrap_or(u64::MAX),
+            )?;
+        }
+        Ok(owner)
+    }
+
+    /// Reopens complete ODG bytes produced inside the crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
         Self::from_package(
-            Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODG")?,
+            FamilyPackage::from_bytes(bytes, MIMETYPE, BODY_MARKER, DRAWING.family_name)?,
             MIMETYPE,
         )
     }
 
-    /// Opens an `OpenDocument` drawing template from owned bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is not a structurally valid `OTG`.
-    pub fn from_template_bytes(bytes: Vec<u8>) -> Result<Self> {
+    /// Reopens complete OTG bytes produced inside the crate.
+    pub(crate) fn from_template_vec(bytes: Vec<u8>) -> Result<Self> {
         Self::from_package(
-            Package::from_bytes(bytes, TEMPLATE_MIMETYPE, BODY_MARKER, "OTG")?,
+            FamilyPackage::from_bytes(bytes, TEMPLATE_MIMETYPE, BODY_MARKER, TEMPLATE.family_name)?,
             TEMPLATE_MIMETYPE,
         )
     }
 
-    fn from_package(package: Package, mimetype: &'static str) -> Result<Self> {
+    /// Reopens complete password-encrypted ODG bytes produced inside the crate.
+    pub(crate) fn from_encrypted_vec(bytes: Vec<u8>, password: String) -> Result<Self> {
+        Self::from_package(
+            FamilyPackage::from_bytes_with_password(
+                bytes,
+                password,
+                MIMETYPE,
+                BODY_MARKER,
+                DRAWING.family_name,
+            )?,
+            MIMETYPE,
+        )
+    }
+
+    /// Reopens bytes of the same flavor as `self`.
+    pub(crate) fn reopen_same_flavor(&self, bytes: Vec<u8>) -> Result<Self> {
+        if self.is_template() {
+            Self::from_template_vec(bytes)
+        } else {
+            Self::from_vec(bytes)
+        }
+    }
+
+    /// The read-only drawing projection of this package (one reference-count
+    /// increment).
+    #[must_use]
+    pub fn drawing(&self) -> crate::Drawing {
+        crate::Drawing::from_package(self.clone())
+    }
+
+    /// Returns the identity of the validated archive index retained by this
+    /// package, for diagnostics and tests.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.0.package.package().prepared_index_identity()
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::ToleranceReport {
+        self.0.package.tolerance_report()
+    }
+
+    /// Applies a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not byte-identical to the patch
+    /// source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, OdfError> {
+        if !patch.is_applicable_to(self) {
+            return Err(OdfError::patch_conflict(
+                "odg.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit {
+            snapshot: patch.apply(self)?,
+            changed: !patch.is_noop(),
+            patch: patch.clone(),
+        })
+    }
+
+    /// Atomically replaces `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OdfError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), OdfError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replaces `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), OdfError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copies the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, OdfError> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Writes the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> std::result::Result<(), OdfError> {
+        writer.write_all(self.as_bytes()).map_err(Error::from)?;
+        Ok(())
+    }
+
+    fn from_package(package: FamilyPackage, mimetype: &'static str) -> Result<Self> {
         let archive = package.package().package()?;
         let security = SecurityStatus {
             encrypted: archive.manifest().has_encrypted_entries(),
@@ -711,7 +1119,7 @@ impl Snapshot {
 
     /// Starts a source-bound semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub fn edit(&self) -> Edit {
         self.edit_with_policies(
             SecurityWritePolicy::Refuse,
             ActiveContentWritePolicy::PreserveInert,
@@ -723,7 +1131,7 @@ impl Snapshot {
     /// Encryption is never silently stripped. `RemoveSignatures` permits signed-package edits and
     /// omits the now-stale signature members from the rebuilt package.
     #[must_use]
-    pub fn edit_with_security_policy(&self, security_policy: SecurityWritePolicy) -> Transaction {
+    pub fn edit_with_security_policy(&self, security_policy: SecurityWritePolicy) -> Edit {
         self.edit_with_policies(security_policy, ActiveContentWritePolicy::PreserveInert)
     }
 
@@ -732,7 +1140,7 @@ impl Snapshot {
     pub fn edit_with_active_content_policy(
         &self,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Transaction {
+    ) -> Edit {
         self.edit_with_policies(SecurityWritePolicy::Refuse, active_content_policy)
     }
 
@@ -742,15 +1150,19 @@ impl Snapshot {
         &self,
         security_policy: SecurityWritePolicy,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Transaction {
-        Transaction {
+    ) -> Edit {
+        Edit {
             source: self.clone(),
-            content: self.content_xml().to_string(),
-            styles: self.styles_xml().map(str::to_owned),
+            content: LazyPart::source(self, EditPart::Content),
+            styles: self
+                .styles_xml()
+                .map(|_| LazyPart::source(self, EditPart::Styles)),
             content_splices: Some(Vec::new()),
             changes: Vec::new(),
             resource_edits: Vec::new(),
             requires_package_projection: false,
+            pending_joined: None,
+            package_replacement: None,
             security_policy,
             active_content_policy,
         }
@@ -762,68 +1174,10 @@ impl Snapshot {
         JoinedEdits::new(Lineage::new(self), limits)
     }
 
-    /// Applies joined disjoint work atomically against this exact base.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, unsupported operations, security refusal, or failed
-    /// whole-package readback. No intermediate snapshot is published on failure.
-    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Snapshot> {
-        self.apply_joined_with_policies(
-            joined,
-            SecurityWritePolicy::Refuse,
-            ActiveContentWritePolicy::PreserveInert,
-        )
-    }
-
-    /// Applies joined work under an explicit signature-write policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::apply_joined`] plus policy refusal.
-    pub fn apply_joined_with_security_policy(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-    ) -> Result<Snapshot> {
-        self.apply_joined_with_policies(
-            joined,
-            security_policy,
-            ActiveContentWritePolicy::PreserveInert,
-        )
-    }
-
-    /// Applies joined work under explicit security and inert active-content dispositions.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::apply_joined`] plus either policy refusal.
-    pub fn apply_joined_with_policies(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-        active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Snapshot> {
-        if !joined.lineage().matches(self) {
-            return invalid("joined ODG edits do not match the exact source snapshot");
-        }
-        let mut current = self.clone();
-        for edit in joined.into_sub_edits() {
-            current = apply_durable_patch(
-                &current,
-                edit.payload(),
-                false,
-                security_policy,
-                active_content_policy,
-            )?;
-        }
-        Ok(current)
-    }
-
     /// Starts explicit bounded undo/redo history at this snapshot.
     #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> SnapshotHistory {
-        History::new(self.clone(), limits)
+    pub fn history(&self, limits: HistoryLimits) -> History {
+        CoreHistory::new(self.clone(), limits)
     }
 
     /// Prepares one compact shape or complete group subtree for checked cross-drawing transfer.
@@ -895,8 +1249,10 @@ impl Snapshot {
                 continue;
             }
             let definition = find_style_definition(self, &style_name)?.ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "ODG transfer source has unresolved style '{style_name}'"
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transfer source has unresolved style",
                 ))
             })?;
             transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
@@ -916,8 +1272,10 @@ impl Snapshot {
         let mut style_resource_sources = BTreeMap::new();
         for (kind, value) in required_style_resources {
             let definition = find_style_resource(self, kind, &value)?.ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "ODG transfer source has unresolved named style resource '{value}'"
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transfer source has unresolved named style resource",
                 ))
             })?;
             transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
@@ -929,8 +1287,10 @@ impl Snapshot {
                 .iter()
                 .any(|declared| declared.id() == control)
             {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer source has unresolved form control '{control}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transfer source has unresolved form control",
                 )));
             }
         }
@@ -986,14 +1346,16 @@ impl Snapshot {
         // allocating one large fragment at a time before discovering the cap.
         let xml = close_transfer_fragment_namespaces(raw_xml, &source_namespaces)?;
         validate_transfer_fragment_namespaces(&xml)?;
-        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+        compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
+            .map_err(Error::from)?;
         let styles = style_sources.keys().cloned().collect::<Vec<_>>();
         let mut style_definitions = BTreeMap::new();
         for (style_name, definition) in style_sources {
             let definition_xml =
                 close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
             validate_transfer_fragment_namespaces(&definition_xml)?;
-            compact_xml::validate(definition_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(definition_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             style_definitions.insert(
                 style_name.clone(),
                 TransferStyle {
@@ -1009,7 +1371,8 @@ impl Snapshot {
             let resource_xml =
                 close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
             validate_transfer_fragment_namespaces(&resource_xml)?;
-            compact_xml::validate(resource_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(resource_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             style_resources.insert(
                 key,
                 TransferStyleResource {
@@ -1052,9 +1415,10 @@ impl Snapshot {
             let size = archive_view
                 .member_materialized_size(resource.path())?
                 .ok_or_else(|| {
-                    Error::Unsupported(format!(
-                        "ODG transfer resource '{}' is missing",
-                        resource.path()
+                    Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odg.package.snapshot",
+                        "ODG transfer resource is missing",
                     ))
                 })?;
             if size > MAX_OUTPUT_BYTES as u64 {
@@ -1069,9 +1433,10 @@ impl Snapshot {
         for resource_index in resource_indices {
             let resource = &self.resources()[resource_index];
             let bytes = self.resource_bytes(resource_index)?.ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "ODG transfer resource '{}' is missing",
-                    resource.path()
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer resource is missing",
                 ))
             })?;
             if bytes.len() > MAX_OUTPUT_BYTES {
@@ -1093,7 +1458,8 @@ impl Snapshot {
                 let control_xml =
                     close_transfer_fragment_namespaces(raw_control_xml, &source_namespaces)?;
                 validate_transfer_fragment_namespaces(&control_xml)?;
-                compact_xml::validate(control_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(control_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 Ok(TransferControl {
                     control,
                     xml: control_xml,
@@ -1113,28 +1479,99 @@ impl Snapshot {
             resources,
         })
     }
+}
 
-    /// Consumes the snapshot and returns its source bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
+/// Refuses input above the selected source input limit before copying it.
+fn check_input_bytes(length: usize, options: OpenOptions) -> std::result::Result<(), OdfError> {
+    let limits = options.source_limits_value();
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(OdfError::Limit {
+            kind: litchi_odf_common::LimitKind::Source(
+                litchi_odf_common::SourceLimitKind::InputBytes,
+            ),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
     }
+    Ok(())
+}
+
+/// Copies caller bytes with a fallible reservation.
+fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODG package bytes",
+            source,
+        })?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
 }
 
 /// A staged source-bound package shape edit.
-pub struct Transaction {
-    source: Snapshot,
-    content: String,
-    styles: Option<String>,
+pub struct Edit {
+    source: Package,
+    content: LazyPart,
+    styles: Option<LazyPart>,
     content_splices: Option<Vec<ContentSplice>>,
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
     requires_package_projection: bool,
+    pending_joined: Option<JoinedEdits>,
+    package_replacement: Option<Package>,
     security_policy: SecurityWritePolicy,
     active_content_policy: ActiveContentWritePolicy,
+}
+
+#[derive(Clone, Copy)]
+enum EditPart {
+    Content,
+    Styles,
+}
+
+/// A source part borrowed through the owning package until the first mutation.
+///
+/// The package clone retained here is O(1); only `set_owned` materializes the
+/// selected XML part.  `Deref` keeps read-only transaction paths borrowed.
+struct LazyPart {
+    source: Package,
+    part: EditPart,
+    owned: Option<String>,
+}
+
+impl LazyPart {
+    fn source(source: &Package, part: EditPart) -> Self {
+        Self {
+            source: source.clone(),
+            part,
+            owned: None,
+        }
+    }
+
+    fn source_text(&self) -> &str {
+        match self.part {
+            EditPart::Content => self.source.content_xml(),
+            EditPart::Styles => self.source.styles_xml().unwrap_or_default(),
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        self.owned.as_deref().unwrap_or_else(|| self.source_text())
+    }
+
+    fn set_owned(&mut self, value: String) {
+        self.owned = Some(value);
+    }
+}
+
+impl Deref for LazyPart {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
 }
 
 #[derive(Debug)]
@@ -1145,7 +1582,207 @@ struct ContentSplice {
     replacement: Vec<u8>,
 }
 
-impl Transaction {
+impl Edit {
+    /// Appends one admitted disjoint composition after the ordinary staged
+    /// operations in this edit.
+    ///
+    /// The composition is retained without publishing or rebuilding. Lineage,
+    /// durable-payload validity, and conflicts with already staged work are
+    /// checked before the composition is moved into the edit, so a refusal
+    /// leaves this edit unchanged. A second composition is refused with the
+    /// rejected plan intact: one plan preserves its original composition
+    /// limits, stable identifiers, and deterministic order.
+    pub fn join(&mut self, joined: JoinedEdits) -> std::result::Result<&mut Self, JoinError> {
+        if self.pending_joined.is_some() {
+            return Err(JoinError::new(
+                joined_refusal("ODG edit accepts one bounded joined plan"),
+                joined,
+            ));
+        }
+        if !joined.lineage().matches(&self.source) {
+            return Err(JoinError::new(Error::PatchConflict, joined));
+        }
+        if let Err(error) = validate_joined_effect_declarations(&joined) {
+            return Err(JoinError::new(error, joined));
+        }
+        let source_fingerprint = fingerprint(self.source.as_bytes());
+        let validation_error = joined.sub_edits().find_map(|sub_edit| {
+            validate_durable_patch(&sub_edit.payload().inner)
+                .err()
+                .or_else(|| {
+                    validate_joined_preconditions(sub_edit.payload(), &source_fingerprint).err()
+                })
+        });
+        if let Some(error) = validation_error {
+            return Err(JoinError::new(error, joined));
+        }
+        match joined_contains_mixed_package_effects(&joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal(
+                        "ODG joined package replacement conflicts with independent staged effects",
+                    ),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
+        }
+        match self.joined_conflicts_with_staged(&joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal("ODG joined edit overlaps staged work"),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
+        }
+        match joined_has_dependent_conflict(&self.source, &joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal("ODG joined edit has dependent presentation effects"),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
+        }
+        if let Err(error) = self.validate_joined_page_names(&joined) {
+            return Err(JoinError::new(error, joined));
+        }
+        self.pending_joined = Some(joined);
+        Ok(self)
+    }
+
+    fn joined_conflicts_with_staged(&self, joined: &JoinedEdits) -> Result<bool> {
+        let staged_package_effect = self.requires_package_projection
+            || !self.resource_edits.is_empty()
+            || self
+                .changes
+                .iter()
+                .any(|change| matches!(change, Change::Structure(_)))
+            || self.package_replacement.is_some();
+        let direct_conflict =
+            joined
+                .sub_edits()
+                .try_fold(false, |conflict, sub_edit| -> Result<bool> {
+                    if conflict {
+                        return Ok(true);
+                    }
+                    let effects = actual_durable_effect_keys(sub_edit.payload())?;
+                    Ok(effects.into_iter().any(|effect| {
+                        if effect == "package" {
+                            return staged_package_effect || !self.changes.is_empty();
+                        }
+                        if staged_package_effect {
+                            return true;
+                        }
+                        self.changes
+                            .iter()
+                            .flat_map(|change| change_effect_keys(&self.source, change))
+                            .any(|staged| staged == effect)
+                    }))
+                })?;
+        if direct_conflict {
+            return Ok(true);
+        }
+        projected_staged_style_conflict(self, joined)
+    }
+
+    fn validate_joined_page_names(&self, joined: &JoinedEdits) -> Result<()> {
+        // A replacement changes the page universe, so validating any later
+        // selector against the source would be both incorrect and an extra
+        // package reopen. The execution segments validate against the active
+        // replacement exactly once before staging their operations.
+        if joined_contains_package_replacement(joined) {
+            return Ok(());
+        }
+        let mut segment = Vec::new();
+        let mut active_replacement = None;
+        for sub_edit in joined.sub_edits() {
+            for operation in sub_edit.payload().operations() {
+                if operation.op == "package.replace" {
+                    self.validate_page_name_segment(active_replacement.as_ref(), &segment)?;
+                    segment.clear();
+                    let blob = durable_blob(sub_edit.payload(), &operation.value)?;
+                    let base = active_replacement.as_ref().unwrap_or(&self.source);
+                    active_replacement = Some(base.reopen_same_flavor(blob.to_vec())?);
+                } else {
+                    segment.push(operation);
+                }
+            }
+        }
+        self.validate_page_name_segment(active_replacement.as_ref(), &segment)
+    }
+
+    fn validate_page_name_segment(
+        &self,
+        active_replacement: Option<&Package>,
+        operations: &[&PatchOperation],
+    ) -> Result<()> {
+        if let Some(replacement) = active_replacement {
+            let edit =
+                replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+            edit.page_name_targets_for_operations(operations.iter().copied())?;
+        } else {
+            self.page_name_targets_for_operations(operations.iter().copied())?;
+        }
+        Ok(())
+    }
+
+    fn page_name_targets_for_operations<'a>(
+        &self,
+        operations: impl Iterator<Item = &'a PatchOperation>,
+    ) -> Result<BTreeMap<usize, String>> {
+        let mut operations = operations
+            .filter(|operation| operation.op == "page.name.set")
+            .peekable();
+        if operations.peek().is_none() {
+            return Ok(BTreeMap::new());
+        }
+        let parsed = parse_content(&self.content)?;
+        let mut names = parsed
+            .pages
+            .iter()
+            .map(|page| page.name().map(str::to_owned))
+            .collect::<Vec<_>>();
+        let mut targets = BTreeMap::new();
+        for operation in operations {
+            let page = parse_page_target(&operation.target)?;
+            let after = string_value(operation)?.to_owned();
+            validate_bounded_value(&after, "ODG page name")?;
+            let before = names.get(page).and_then(Option::as_deref).ok_or_else(|| {
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.edit.join",
+                    "ODG page rename requires an existing draw:name",
+                ))
+            })?;
+            if before != after.as_str()
+                && xml_has_attribute(&self.content, DRAW, b"page-name", before)?
+            {
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.edit.join",
+                    "ODG page rename is blocked by a draw:page-name dependency",
+                )));
+            }
+            names[page] = Some(after.clone());
+            targets.insert(page, after);
+        }
+        for (page, name) in &targets {
+            if names
+                .iter()
+                .enumerate()
+                .any(|(other, value)| other != *page && value.as_deref() == Some(name.as_str()))
+            {
+                return Err(joined_refusal("ODG joined page names would duplicate"));
+            }
+        }
+        Ok(targets)
+    }
+
     fn replace_or_insert_shape_attribute(
         &mut self,
         page: usize,
@@ -1173,7 +1810,8 @@ impl Transaction {
         let mut attribute = String::new();
         push_attribute(&mut attribute, qualified_name, Some(value))?;
         self.invalidate_content_splices();
-        self.content = insert_xml(&self.content, insertion, &attribute)?;
+        self.content
+            .set_owned(insert_xml(&self.content, insertion, &attribute)?);
         Ok(())
     }
 
@@ -1189,7 +1827,7 @@ impl Transaction {
                 escaped.as_bytes(),
             )?;
         }
-        self.content = next;
+        self.content.set_owned(next);
         Ok(())
     }
 
@@ -1212,6 +1850,36 @@ impl Transaction {
 
     fn invalidate_content_splices(&mut self) {
         self.content_splices = None;
+    }
+
+    /// Replace `range` of the staged content with balanced `replacement`
+    /// markup (or delete it), keeping the edit on the exact-source splice
+    /// path when the range maps onto source bytes no earlier edit touched.
+    /// Otherwise the edit falls back to a whole-part rewrite, which the
+    /// commit admits only for compact sources (record 0288).
+    fn splice_content(&mut self, range: &Range<usize>, replacement: &str) -> Result<()> {
+        let next = replace_xml(&self.content, range, replacement)?;
+        if let Some(splices) = &mut self.content_splices
+            && stage_content_splice(
+                self.source.content_xml().as_bytes(),
+                self.content.as_bytes(),
+                splices,
+                range,
+                replacement.as_bytes(),
+            )
+            .is_err()
+        {
+            self.content_splices = None;
+        }
+        self.content.set_owned(next);
+        Ok(())
+    }
+
+    /// Insert `child` markup at `at` in the staged content (expanding an
+    /// empty owner element whose `/>` starts at `at`).
+    fn insert_content_child(&mut self, at: usize, child: &str) -> Result<()> {
+        let (range, replacement) = child_insertion(&self.content, at, child)?;
+        self.splice_content(&range, &replacement)
     }
 
     fn require_group_descendant(&self, page: usize, group: usize, descendant: usize) -> Result<()> {
@@ -1364,7 +2032,11 @@ impl Transaction {
             .get(page)
             .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
         let before = selected.name().ok_or_else(|| {
-            Error::Unsupported("ODG page rename requires an existing draw:name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename requires an existing draw:name",
+            ))
         })?;
         if parsed
             .pages
@@ -1378,9 +2050,11 @@ impl Transaction {
             return Ok(());
         }
         if xml_has_attribute(&self.content, DRAW, b"page-name", before)? {
-            return Err(Error::Unsupported(
-                "ODG page rename is blocked by a draw:page-name dependency".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename is blocked by a draw:page-name dependency",
+            )));
         }
         let span = parsed.page_attribute_spans[page][0]
             .as_ref()
@@ -1416,7 +2090,11 @@ impl Transaction {
             .get(page)
             .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
         let before = selected.style_name().ok_or_else(|| {
-            Error::Unsupported("ODG page style edit requires an existing draw:style-name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page style edit requires an existing draw:style-name",
+            ))
         })?;
         if before == after {
             return Ok(());
@@ -1456,7 +2134,11 @@ impl Transaction {
             .get(page)
             .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
         let style_name = selected.style_name().ok_or_else(|| {
-            Error::Unsupported("ODG page transition requires an existing draw:style-name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page transition requires an existing draw:style-name",
+            ))
         })?;
         let current = parse_page_transitions(&self.content, self.styles.as_deref(), &parsed.pages)?
             .get(page)
@@ -1473,9 +2155,11 @@ impl Transaction {
             page,
             style_name,
         )? {
-            return Err(Error::Unsupported(
-                "ODG page transition style is shared by multiple pages".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page transition style is shared by multiple pages",
+            )));
         }
         let in_content = parse_style_definitions(&self.content)?
             .iter()
@@ -1514,9 +2198,11 @@ impl Transaction {
                     })
             };
             if parent.is_some() {
-                return Err(Error::Unsupported(
-                    "ODG inherited page transition cannot be cleared without changing its parent style".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG inherited page transition cannot be cleared without changing its parent style",
+                )));
             }
         }
         if in_content == 1 {
@@ -1532,7 +2218,7 @@ impl Transaction {
             ) {
                 self.requires_package_projection = true;
             }
-            self.content = after_xml;
+            self.content.set_owned(after_xml);
             self.invalidate_content_splices();
         } else if let Some(styles) = &mut self.styles {
             // styles.xml is handed to PackageWriter as a replacement when it
@@ -1540,7 +2226,8 @@ impl Transaction {
             // here, before editing, so a noncompact producer file is refused
             // atomically instead of being changed and failing publication
             // later.
-            compact_xml::validate(styles.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(styles.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             let matches = parse_style_definitions(styles)?
                 .iter()
                 .filter(|definition| {
@@ -1549,9 +2236,11 @@ impl Transaction {
                 })
                 .count();
             if matches != 1 {
-                return Err(Error::Unsupported(
-                    "ODG page transition style is not uniquely owned".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG page transition style is not uniquely owned",
+                )));
             }
             let after_xml = edit_transition_style_xml(styles, style_name, desired.as_ref())?;
             let requires_projection = !transition_edit_is_lexically_reversible(
@@ -1560,14 +2249,16 @@ impl Transaction {
                 style_name,
                 current.as_ref(),
             );
-            *styles = after_xml;
+            styles.set_owned(after_xml);
             if requires_projection {
                 self.requires_package_projection = true;
             }
         } else {
-            return Err(Error::Unsupported(
-                "ODG page transition style is not declared".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page transition style is not declared",
+            )));
         }
         self.changes
             .push(Change::PageTransition(Box::new(PageTransitionChange {
@@ -1586,7 +2277,9 @@ impl Transaction {
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid selector, unsupported source span, or limit violation.
+    /// Returns [`Error::Refused`] for a shape whose text is not one
+    /// plain span (several paragraphs, spans, links or fields), and
+    /// [`Error::InvalidFormat`] for an invalid selector or a limit violation.
     pub fn set_shape_text(
         &mut self,
         page: usize,
@@ -1611,7 +2304,11 @@ impl Transaction {
             .and_then(|shapes| shapes.get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape source span is missing".to_string()))?;
         if !matches!(spans.as_slice(), [Some(_)]) {
-            return invalid("ODG shape text is not one losslessly replaceable XML span");
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG shape text is not one losslessly replaceable XML span",
+            )));
         }
         if selected.text() == after {
             return Ok(());
@@ -1660,10 +2357,11 @@ impl Transaction {
                 Error::InvalidFormat("ODG shape selector is out of bounds".to_string())
             })?;
         let before = selected.name().ok_or_else(|| {
-            Error::Unsupported(
-                "ODG shape rename requires an existing losslessly addressable draw:name"
-                    .to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG shape rename requires an existing losslessly addressable draw:name",
+            ))
         })?;
         let span = parsed
             .name_spans
@@ -1691,7 +2389,7 @@ impl Transaction {
     ///
     /// ODF 1.4 Part 3 §§10.2.2-10.2.3 and 19.189 define drawing layers and
     /// their shape assignment. The destination must be one of the declarations
-    /// visible through [`Snapshot::layers`].
+    /// visible through [`Package::layers`].
     ///
     /// # Errors
     ///
@@ -1726,10 +2424,11 @@ impl Transaction {
             return invalid("ODG destination layer is not declared");
         }
         let before = selected.layer().ok_or_else(|| {
-            Error::Unsupported(
-                "ODG layer change requires an existing losslessly addressable draw:layer"
-                    .to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG layer change requires an existing losslessly addressable draw:layer",
+            ))
         })?;
         let span = parsed
             .layer_spans
@@ -1792,10 +2491,11 @@ impl Transaction {
             .iter()
             .map(|span| {
                 span.as_ref().ok_or_else(|| {
-                    Error::Unsupported(
-                        "ODG geometry edit requires existing x, y, width, and height attributes"
-                            .into(),
-                    )
+                    Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odg.package.snapshot",
+                        "ODG geometry edit requires existing x, y, width, and height attributes",
+                    ))
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -1838,9 +2538,11 @@ impl Transaction {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if selected.kind().is_three_dimensional() {
-            return Err(Error::Unsupported(
-                "ODG dr3d transforms are inert and cannot be edited through draw:transform".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG dr3d transforms are inert and cannot be edited through draw:transform",
+            )));
         }
         if selected.transform() == Some(after.as_str()) {
             return Ok(());
@@ -1882,9 +2584,11 @@ impl Transaction {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if !matches!(selected.kind(), ShapeKind::Polygon | ShapeKind::Polyline) {
-            return Err(Error::Unsupported(
-                "ODG point-list edit requires a polygon or polyline".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG point-list edit requires a polygon or polyline",
+            )));
         }
         if selected.view_box() == Some(target_view_box.as_str())
             && selected.points() == Some(target_points.as_str())
@@ -1940,9 +2644,11 @@ impl Transaction {
             selected.kind(),
             ShapeKind::Line | ShapeKind::Connector | ShapeKind::Measure
         ) {
-            return Err(Error::Unsupported(
-                "ODG line-endpoint edit requires a line, connector, or measure".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG line-endpoint edit requires a line, connector, or measure",
+            )));
         }
         let before = selected.line_geometry();
         if before
@@ -1993,7 +2699,11 @@ impl Transaction {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         let before = selected.style_name().ok_or_else(|| {
-            Error::Unsupported("ODG style edit requires an existing draw:style-name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG style edit requires an existing draw:style-name",
+            ))
         })?;
         let span = parsed
             .style_name_spans
@@ -2036,12 +2746,18 @@ impl Transaction {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if selected.kind() != ShapeKind::Path {
-            return Err(Error::Unsupported(
-                "ODG path-data edit requires a draw:path shape".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG path-data edit requires a draw:path shape",
+            )));
         }
         let before = selected.path_data().ok_or_else(|| {
-            Error::Unsupported("ODG path-data edit requires an existing svg:d".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG path-data edit requires an existing svg:d",
+            ))
         })?;
         let span = parsed
             .path_spans
@@ -2084,12 +2800,18 @@ impl Transaction {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if selected.kind() != ShapeKind::Control {
-            return Err(Error::Unsupported(
-                "ODG form-control edit requires a draw:control shape".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG form-control edit requires a draw:control shape",
+            )));
         }
         let before = selected.control_reference().ok_or_else(|| {
-            Error::Unsupported("ODG form-control edit requires an existing draw:control".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG form-control edit requires an existing draw:control",
+            ))
         })?;
         let span = parsed
             .control_spans
@@ -2155,11 +2877,12 @@ impl Transaction {
         } else {
             None
         };
-        let styled_content = if let Some((_name, style_xml)) = generated_style.as_ref() {
-            insert_automatic_style(&self.content, style_xml)?
-        } else {
-            self.content.clone()
-        };
+        let styled_content: Cow<'_, str> =
+            if let Some((_name, style_xml)) = generated_style.as_ref() {
+                Cow::Owned(insert_automatic_style(&self.content, style_xml)?)
+            } else {
+                Cow::Borrowed(self.content.as_str())
+            };
         let styled_parsed = parse_content(&styled_content)?;
         let at = if position == styled_parsed.pages.len() {
             styled_parsed.drawing_insert_position
@@ -2170,9 +2893,13 @@ impl Transaction {
                 .start
         };
         let xml = serialize_page(&page)?;
-        let content = insert_child_xml(&styled_content, at, &xml)?;
-        self.invalidate_content_splices();
-        self.content = content;
+        if generated_style.is_some() {
+            let content = insert_child_xml(&styled_content, at, &xml)?;
+            self.invalidate_content_splices();
+            self.content.set_owned(content);
+        } else {
+            self.insert_content_child(at, &xml)?;
+        }
         if let Some((name, _style_xml)) = generated_style {
             self.changes
                 .push(Change::Structure(StructureChange::StyleInserted { name }));
@@ -2214,18 +2941,214 @@ impl Transaction {
         if let Some(name) = page.name()
             && xml_has_attribute(&content, DRAW, b"page-name", name)?
         {
-            return Err(Error::Unsupported(
-                "ODG page removal is blocked by a draw:page-name dependency".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page removal is blocked by a draw:page-name dependency",
+            )));
         }
-        self.invalidate_content_splices();
-        self.content = content;
+        let span = span.clone();
+        self.splice_content(&span, "")?;
         self.changes
             .push(Change::Structure(StructureChange::PageRemoved {
                 position,
                 name: page.name().map(str::to_owned),
             }));
         Ok(page)
+    }
+
+    /// Moves the page at `from` so it ends at position `to` of the page
+    /// order. The page's bytes move unchanged; on a producer drawing both
+    /// edits stay exact-source splices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a position out of bounds or a missing span.
+    pub fn move_page(&mut self, from: usize, to: usize) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        if from >= parsed.pages.len() || to >= parsed.pages.len() {
+            return invalid("ODG page move position is out of bounds");
+        }
+        if from == to {
+            return Ok(());
+        }
+        let span = |index: usize| {
+            parsed.page_spans[index]
+                .clone()
+                .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))
+        };
+        let moved = span(from)?;
+        let at = if to > from {
+            span(to)?.end
+        } else {
+            span(to)?.start
+        };
+        self.relocate_content(moved, at)?;
+        self.changes
+            .push(Change::Structure(StructureChange::PageMoved { from, to }));
+        Ok(())
+    }
+
+    /// Moves the shape at `from` of `page` so it ends at position `to` of the
+    /// page's shape order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a selector out of bounds or a missing span.
+    pub fn move_shape(&mut self, page: usize, from: usize, to: usize) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        let spans = parsed
+            .shape_spans
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        if from >= spans.len() || to >= spans.len() {
+            return invalid("ODG shape move position is out of bounds");
+        }
+        if from == to {
+            return Ok(());
+        }
+        let span = |index: usize| {
+            spans[index]
+                .clone()
+                .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))
+        };
+        let moved = span(from)?;
+        let at = if to > from {
+            span(to)?.end
+        } else {
+            span(to)?.start
+        };
+        self.relocate_content(moved, at)?;
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeMoved {
+                page,
+                from,
+                to,
+            }));
+        Ok(())
+    }
+
+    /// Moves the top-level shape at `from` of `page` into page `to_page`, so
+    /// it ends at position `to` of that page's shape order. The shape's bytes
+    /// move unchanged; on a producer drawing both edits stay exact-source
+    /// splices, and an empty destination page element is expanded.
+    ///
+    /// A shape that is part of a group, an anchor inside a group, and any
+    /// identity dependency that would cross pages (an `xml:id`/`draw:id` of
+    /// the moved subtree referenced from outside it, or a connector in the
+    /// subtree glued to a shape outside it) are refused rather than left
+    /// dangling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a selector out of bounds, a missing span, a
+    /// group member, or a cross-page dependency.
+    pub fn move_shape_to_page(
+        &mut self,
+        page: usize,
+        from: usize,
+        to_page: usize,
+        to: usize,
+    ) -> Result<()> {
+        if page == to_page {
+            let count = parse_content(&self.content)?
+                .shape_spans
+                .get(page)
+                .map_or(0, Vec::len);
+            if to >= count {
+                return invalid("ODG shape move position is out of bounds");
+            }
+            return self.move_shape(page, from, to);
+        }
+        let parsed = parse_content(&self.content)?;
+        let spans = parsed
+            .shape_spans
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let targets = parsed.shape_spans.get(to_page).ok_or_else(|| {
+            Error::InvalidFormat("ODG destination page selector is out of bounds".into())
+        })?;
+        let moved = spans
+            .get(from)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?
+            .clone()
+            .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
+        let nested = |spans: &[Option<Range<usize>>], span: &Range<usize>| {
+            spans
+                .iter()
+                .flatten()
+                .any(|outer| outer != span && outer.start <= span.start && span.end <= outer.end)
+        };
+        if nested(spans, &moved) {
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG group members move with their group",
+            )));
+        }
+        let at = match targets.get(to) {
+            Some(anchor) => {
+                let anchor = anchor
+                    .as_ref()
+                    .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
+                if nested(targets, anchor) {
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odg.package.snapshot",
+                        "ODG shape move position lies inside a group",
+                    )));
+                }
+                anchor.start
+            },
+            None if to == targets.len() => {
+                parsed.page_insert_positions[to_page].ok_or_else(|| {
+                    Error::InvalidFormat("ODG page insertion point is missing".into())
+                })?
+            },
+            None => return invalid("ODG shape move position is out of bounds"),
+        };
+        check_shape_identity(&self.content, &moved)?;
+        let bytes = self
+            .content
+            .get(moved.clone())
+            .ok_or_else(|| Error::InvalidFormat("ODG relocated span is invalid".into()))?
+            .to_owned();
+        if at >= moved.end {
+            self.insert_content_child(at, &bytes)?;
+            self.splice_content(&moved, "")?;
+        } else if at <= moved.start {
+            self.splice_content(&moved, "")?;
+            self.insert_content_child(at, &bytes)?;
+        } else {
+            return invalid("ODG relocation target lies inside the moved element");
+        }
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeTransferred {
+                page,
+                from,
+                to_page,
+                to,
+            }));
+        Ok(())
+    }
+
+    /// Move the staged bytes of `span` to the insertion point `at` (outside
+    /// the span), as a removal and an insertion.
+    fn relocate_content(&mut self, span: Range<usize>, at: usize) -> Result<()> {
+        let bytes = self
+            .content
+            .get(span.clone())
+            .ok_or_else(|| Error::InvalidFormat("ODG relocated span is invalid".into()))?
+            .to_owned();
+        if at >= span.end {
+            self.splice_content(&(at..at), &bytes)?;
+            self.splice_content(&span, "")
+        } else if at <= span.start {
+            self.splice_content(&span, "")?;
+            self.splice_content(&(at..at), &bytes)
+        } else {
+            invalid("ODG relocation target lies inside the moved element")
+        }
     }
 
     /// Inserts a detached shape at a checked page shape position.
@@ -2240,15 +3163,18 @@ impl Transaction {
     )]
     pub fn insert_shape(&mut self, page: usize, position: usize, shape: Shape) -> Result<()> {
         if shape.kind().is_three_dimensional() {
-            return Err(Error::Unsupported(
-                "ODG 3D shapes are inert read-only owners".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG 3D shapes are inert read-only owners",
+            )));
         }
         if shape.source_backed() {
-            return Err(Error::Unsupported(
-                "ODG parsed shapes require prepare_shape_transfer for source-preserving insertion"
-                    .into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odg.package.snapshot",
+                "ODG parsed shapes require prepare_shape_transfer for source-preserving insertion",
+            )));
         }
         let parsed = parse_content(&self.content)?;
         let selected_page = parsed
@@ -2278,9 +3204,7 @@ impl Transaction {
                 .start
         };
         let xml = serialize_shape(&shape)?;
-        let content = insert_child_xml(&self.content, at, &xml)?;
-        self.invalidate_content_splices();
-        self.content = content;
+        self.insert_content_child(at, &xml)?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeInserted {
                 page,
@@ -2352,9 +3276,11 @@ impl Transaction {
             )
         } else {
             if externally_owned {
-                return Err(Error::Unsupported(
-                    "ODG style owned by styles.xml cannot be shadowed".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG style owned by styles.xml cannot be shadowed",
+                )));
             }
             (
                 insert_automatic_style(&self.content, &xml)?,
@@ -2364,7 +3290,7 @@ impl Transaction {
             )
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_style_definitions(&self.content)?;
         self.changes.push(Change::Structure(change));
         Ok(())
@@ -2387,14 +3313,16 @@ impl Transaction {
             || xml_has_attribute(&self.content, DRAW, b"text-style-name", name)?
             || xml_has_attribute(&self.content, STYLE, b"parent-style-name", name)?
         {
-            return Err(Error::Unsupported(
-                "ODG style removal is blocked by a live dependency".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG style removal is blocked by a live dependency",
+            )));
         }
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.style.clone();
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::StyleRemoved {
                 name: name.to_owned(),
@@ -2438,9 +3366,11 @@ impl Transaction {
             )
         } else {
             if externally_owned {
-                return Err(Error::Unsupported(
-                    "ODG named resource owned by styles.xml cannot be shadowed".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG named resource owned by styles.xml cannot be shadowed",
+                )));
             }
             (
                 insert_automatic_style(&self.content, &xml)?,
@@ -2451,7 +3381,7 @@ impl Transaction {
             )
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_style_resources(&self.content)?;
         self.changes.push(Change::Structure(change));
         Ok(())
@@ -2478,15 +3408,17 @@ impl Transaction {
         };
         for reference in style_resource_reference_locals(kind) {
             if xml_has_attribute(&self.content, DRAW, reference, name)? {
-                return Err(Error::Unsupported(
-                    "ODG named style-resource removal is blocked by a live dependency".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG named style-resource removal is blocked by a live dependency",
+                )));
             }
         }
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.resource.clone();
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::StyleResourceRemoved {
                 kind,
@@ -2541,7 +3473,7 @@ impl Transaction {
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlInserted {
@@ -2576,7 +3508,7 @@ impl Transaction {
         let xml = serialize_form_control(control)?;
         let content = replace_xml(&self.content, span, &xml)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlReplaced {
@@ -2597,9 +3529,11 @@ impl Transaction {
                 .iter()
                 .any(|shape| shape.control_reference() == Some(identifier))
         }) {
-            return Err(Error::Unsupported(
-                "ODG form-control removal is blocked by a drawing shape".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG form-control removal is blocked by a drawing shape",
+            )));
         }
         let mut matches = parsed
             .form_controls
@@ -2618,7 +3552,7 @@ impl Transaction {
             .ok_or_else(|| Error::InvalidFormat("ODG form-control span is missing".into()))?;
         let content = remove_xml(&self.content, span)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::FormControlRemoved {
                 id: identifier.to_owned(),
@@ -2720,7 +3654,7 @@ impl Transaction {
             )?;
             let content = insert_automatic_style(&self.content, &resource_xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
             self.changes
                 .push(Change::Structure(StructureChange::StyleResourceInserted {
                     kind,
@@ -2824,7 +3758,7 @@ impl Transaction {
             )?;
             let content = insert_automatic_style(&self.content, &style_xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
             self.changes
                 .push(Change::Structure(StructureChange::StyleInserted {
                     name: destination_name.clone(),
@@ -2982,7 +3916,7 @@ impl Transaction {
         };
         let content = insert_child_xml(&self.content, at, &transfer_xml)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeInserted {
@@ -3009,9 +3943,8 @@ impl Transaction {
         let span = parsed.shape_spans[page][shape]
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
-        let content = remove_xml(&self.content, span)?;
-        self.invalidate_content_splices();
-        self.content = content;
+        let span = span.clone();
+        self.splice_content(&span, "")?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeRemoved {
                 page,
@@ -3066,7 +3999,7 @@ impl Transaction {
             }
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::LayerInserted {
                 page,
@@ -3091,9 +4024,11 @@ impl Transaction {
             .iter()
             .any(|shape| shape.layer() == Some(name))
         {
-            return Err(Error::Unsupported(
-                "ODG layer removal is blocked by a shape assignment".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG layer removal is blocked by a shape assignment",
+            )));
         }
         let mut matches = selected
             .layers()
@@ -3112,7 +4047,7 @@ impl Transaction {
             .ok_or_else(|| Error::InvalidFormat("ODG layer span is missing".into()))?;
         let content = remove_xml(&self.content, span)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::LayerRemoved {
                 page,
@@ -3201,9 +4136,11 @@ impl Transaction {
             .iter()
             .any(|resource| resource.path() == path)
         {
-            return Err(Error::Unsupported(
-                "ODG resource removal is blocked by a drawing reference".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG resource removal is blocked by a drawing reference",
+            )));
         }
         let archive = self.source.0.package.package();
         if !archive.has_file(path)? {
@@ -3376,7 +4313,7 @@ impl Transaction {
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlInserted {
@@ -3385,14 +4322,249 @@ impl Transaction {
         Ok(())
     }
 
+    fn stage_durable_operation(
+        &mut self,
+        operation: &PatchOperation,
+        source_fingerprint: &str,
+        page_name_targets: Option<&BTreeMap<usize, String>>,
+    ) -> Result<()> {
+        if operation
+            .preconditions
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_fingerprint)
+        {
+            return Err(Error::PatchConflict);
+        }
+        match operation.op.as_str() {
+            "page.name.set" => {
+                self.stage_page_name_operation(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?.to_owned(),
+                    page_name_targets,
+                )?;
+            },
+            "page.style.set" => {
+                self.set_page_style_name(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?,
+                )?;
+            },
+            "page.transition.set" => {
+                self.set_page_transition(
+                    parse_page_target(&operation.target)?,
+                    transition_from_value(&operation.value)?,
+                )?;
+            },
+            "shape.geometry.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                let values = geometry_value(&operation.value)?;
+                self.set_shape_geometry(
+                    page, shape, &values[0], &values[1], &values[2], &values[3],
+                )?;
+            },
+            "shape.control.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_control_reference(page, shape, string_value(operation)?)?;
+            },
+            "shape.layer.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_layer(page, shape, string_value(operation)?)?;
+            },
+            "shape.name.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.path.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_path_data(page, shape, string_value(operation)?)?;
+            },
+            "shape.style.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_style_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.text.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_text(page, shape, string_value(operation)?)?;
+            },
+            _ => return invalid("ODG durable patch operation is unsupported"),
+        }
+        Ok(())
+    }
+
+    fn stage_page_name_operation(
+        &mut self,
+        page: usize,
+        after: String,
+        page_name_targets: Option<&BTreeMap<usize, String>>,
+    ) -> Result<()> {
+        if page_name_targets.is_none() {
+            return self.set_page_name(page, after);
+        }
+        validate_bounded_value(&after, "ODG page name")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let before = selected.name().ok_or_else(|| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename requires an existing draw:name",
+            ))
+        })?;
+        if before == after {
+            return Ok(());
+        }
+        if xml_has_attribute(&self.content, DRAW, b"page-name", before)? {
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename is blocked by a draw:page-name dependency",
+            )));
+        }
+        let span = parsed.page_attribute_spans[page][0]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG page name source span is missing".into()))?;
+        let before_owned = before.to_owned();
+        self.replace_content_value(span, &after)?;
+        self.changes.push(Change::PageName(PageNameChange {
+            page,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
+    }
+
+    fn apply_pending_joined(&mut self) -> Result<()> {
+        let Some(joined) = self.pending_joined.as_ref() else {
+            return Ok(());
+        };
+        if self.joined_conflicts_with_staged(joined)? {
+            return invalid("ODG joined edit overlaps staged work");
+        }
+        let source_fingerprint = fingerprint(self.source.as_bytes());
+        for sub_edit in joined.sub_edits() {
+            validate_durable_patch(&sub_edit.payload().inner)?;
+            validate_joined_preconditions(sub_edit.payload(), &source_fingerprint)?;
+        }
+        self.validate_joined_page_names(joined)?;
+        let joined = self
+            .pending_joined
+            .take()
+            .expect("pending joined plan was borrowed above");
+        let mut staged_before_replacement = Vec::new();
+        let mut replacement_operations: Option<Vec<PatchOperation>> = None;
+        for sub_edit in joined.into_sub_edits() {
+            let durable = sub_edit.into_payload();
+            for operation in durable.operations() {
+                if operation.op == "package.replace" {
+                    if let Some(operations) = &replacement_operations {
+                        self.commit_replacement_operations(operations, &source_fingerprint)?;
+                    } else {
+                        self.stage_durable_operations(
+                            &staged_before_replacement,
+                            &source_fingerprint,
+                        )?;
+                        staged_before_replacement.clear();
+                    }
+                    let active = self.package_replacement.as_ref().unwrap_or(&self.source);
+                    enforce_security_policy(active, self.security_policy)?;
+                    enforce_active_content_policy(active, self.active_content_policy)?;
+                    let blob = durable_blob(&durable, &operation.value)?;
+                    let replacement = active.reopen_same_flavor(blob.to_vec())?;
+                    enforce_active_content_policy(&replacement, self.active_content_policy)?;
+                    self.package_replacement = Some(replacement);
+                    replacement_operations = Some(Vec::new());
+                } else if let Some(operations) = &mut replacement_operations {
+                    operations.push(operation.clone());
+                } else {
+                    staged_before_replacement.push(operation.clone());
+                }
+            }
+        }
+        if let Some(operations) = &replacement_operations {
+            self.commit_replacement_operations(operations, &source_fingerprint)?;
+        } else {
+            self.stage_durable_operations(&staged_before_replacement, &source_fingerprint)?;
+        }
+        Ok(())
+    }
+
+    fn stage_durable_operations(
+        &mut self,
+        operations: &[PatchOperation],
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        let page_name_targets = self.page_name_targets_for_operations(operations.iter())?;
+        for operation in operations {
+            self.stage_durable_operation(operation, source_fingerprint, Some(&page_name_targets))?;
+        }
+        Ok(())
+    }
+
+    fn commit_replacement_operations(
+        &mut self,
+        operations: &[PatchOperation],
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        let replacement = self
+            .package_replacement
+            .take()
+            .expect("package replacement was retained for ordered operations");
+        let mut replacement_edit =
+            replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+        let page_name_targets =
+            replacement_edit.page_name_targets_for_operations(operations.iter())?;
+        for operation in operations {
+            replacement_edit.stage_durable_operation(
+                operation,
+                source_fingerprint,
+                Some(&page_name_targets),
+            )?;
+        }
+        self.package_replacement = Some(replacement_edit.commit_core()?.into_package());
+        Ok(())
+    }
+
     /// Atomically validates, rebuilds, and publishes the edited package.
+    ///
+    /// An edit that leaves every part unchanged publishes the exact source
+    /// bytes and reports [`Diagnostics::changed`] as `false`.
     ///
     /// # Errors
     ///
     /// Returns an error when source policy, rebuilding, parsing, or typed readback fails.
-    pub fn commit(self) -> Result<Commit> {
-        if self.content == self.source.content_xml()
-            && self.styles == self.source.styles_xml().map(str::to_owned)
+    pub fn commit(self) -> std::result::Result<Commit, OdfError> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(mut self) -> Result<Commit> {
+        self.apply_pending_joined()?;
+        if let Some(snapshot) = self.package_replacement.take() {
+            let changed = self.source.as_bytes() != snapshot.as_bytes();
+            let patch = Patch {
+                source: self.source,
+                target: snapshot.clone(),
+                changes: Vec::new(),
+                resource_changes: Vec::new(),
+                requires_package_projection: true,
+            };
+            return Ok(Commit {
+                snapshot,
+                patch,
+                changed,
+            });
+        }
+        if self.content.as_str() == self.source.content_xml()
+            && self.styles.as_deref() == self.source.styles_xml()
             && self.resource_edits.is_empty()
         {
             return Ok(Commit::unchanged(self.source));
@@ -3403,9 +4575,11 @@ impl Transaction {
         if self.active_content_policy == ActiveContentWritePolicy::Refuse
             && target_active_content.is_present()
         {
-            return Err(Error::Unsupported(
-                "ODG active-content write policy refuses the staged inventory".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG active-content write policy refuses the staged inventory",
+            )));
         }
         let replacements = self
             .resource_edits
@@ -3442,7 +4616,8 @@ impl Transaction {
         } else {
             requires_package_projection = self.requires_package_projection;
             ensure_compact_rewrite_source(&self.source)?;
-            compact_xml::validate(self.content.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(self.content.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             rebuild(
                 &self.source,
                 &self.content,
@@ -3451,12 +4626,8 @@ impl Transaction {
                 self.security_policy,
             )?
         };
-        let snapshot = if self.source.is_template() {
-            Snapshot::from_template_bytes(rebuilt)?
-        } else {
-            Snapshot::from_bytes(rebuilt)?
-        };
-        if snapshot.content_xml() != self.content {
+        let snapshot = self.source.reopen_same_flavor(rebuilt)?;
+        if snapshot.content_xml() != self.content.as_str() {
             return invalid("ODG package edit failed exact content readback");
         }
         if snapshot.styles_xml() != self.styles.as_deref() {
@@ -3510,6 +4681,44 @@ pub enum Change {
     PageStyle(PageStyleChange),
     PageTransition(Box<PageTransitionChange>),
     Structure(StructureChange),
+}
+
+fn change_effect_keys(_source: &Package, change: &Change) -> Vec<String> {
+    let (target, operation) = match change {
+        Change::ControlReference(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.control.set",
+        ),
+        Change::Text(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.text.set",
+        ),
+        Change::Name(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.name.set",
+        ),
+        Change::Layer(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.layer.set",
+        ),
+        Change::Geometry(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.geometry.set",
+        ),
+        Change::Style(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.style.set",
+        ),
+        Change::Path(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.path.set",
+        ),
+        Change::PageName(value) => (format!("page/{}", value.page), "page.name.set"),
+        Change::PageStyle(value) => (format!("page/{}", value.page), "page.style.set"),
+        Change::PageTransition(value) => (format!("page/{}", value.page), "page.transition.set"),
+        Change::Structure(_) => return vec!["package".to_owned()],
+    };
+    vec![format!("{target}#{operation}")]
 }
 
 /// One reversible page-name change.
@@ -3831,6 +5040,25 @@ pub enum StructureChange {
         position: usize,
         name: Option<String>,
     },
+    /// A page moved from one source-order position to another.
+    PageMoved {
+        from: usize,
+        to: usize,
+    },
+    /// A shape moved within one page's shape order.
+    ShapeMoved {
+        page: usize,
+        from: usize,
+        to: usize,
+    },
+    /// A top-level shape moved from position `from` of `page` to position
+    /// `to` of another page, `to_page`.
+    ShapeTransferred {
+        page: usize,
+        from: usize,
+        to_page: usize,
+        to: usize,
+    },
     PageRemoved {
         position: usize,
         name: Option<String>,
@@ -3962,13 +5190,13 @@ struct ResourceReplacement<'a> {
 
 /// A committed package publication and its exact-source patch.
 pub struct Commit {
-    snapshot: Snapshot,
+    snapshot: Package,
     patch: Patch,
     changed: bool,
 }
 
 impl Commit {
-    fn unchanged(snapshot: Snapshot) -> Self {
+    fn unchanged(snapshot: Package) -> Self {
         Self {
             patch: Patch {
                 source: snapshot.clone(),
@@ -3982,36 +5210,74 @@ impl Commit {
         }
     }
 
-    /// Whether package bytes changed.
+    /// Borrows the published immutable package.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.snapshot
+    }
+
+    /// Borrows the reversible exact-source patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Content-free facts about this commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+            change_count: self.patch.changes.len(),
+            resource_change_count: self.patch.resource_changes.len(),
+        }
+    }
+
+    /// Consumes the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.snapshot
+    }
+
+    /// Consumes the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    change_count: usize,
+    resource_change_count: usize,
+}
+
+impl Diagnostics {
+    /// Whether publication rebuilt the package bytes.
     #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
-    /// The published immutable snapshot.
+    /// The number of semantic operations the commit published.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub const fn change_count(&self) -> usize {
+        self.change_count
     }
 
-    /// The reversible exact-source patch.
+    /// The number of package-local resource changes the commit published.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    pub const fn resource_change_count(&self) -> usize {
+        self.resource_change_count
     }
 }
 
 /// An exact-source-checked reversible package patch.
 #[derive(Clone)]
 pub struct Patch {
-    source: Snapshot,
-    target: Snapshot,
+    source: Package,
+    target: Package,
     changes: Vec<Change>,
     resource_changes: Vec<ResourceChange>,
     requires_package_projection: bool,
@@ -4020,16 +5286,19 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch authorizes the supplied exact source bytes.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Snapshot) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
-    /// Applies this patch only to its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `source` is not the exact source artifact.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    /// Whether this patch preserves the exact package bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
+    /// Applies this patch only to its exact source package; the public route
+    /// is [`Package::apply`].
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return invalid("ODG package patch source does not match");
         }
@@ -4127,7 +5396,7 @@ impl Patch {
     /// Returns an error unless this target is byte-identical to `next`'s source.
     pub fn then(&self, next: &Self) -> Result<Self> {
         if self.target.as_bytes() != next.source.as_bytes() {
-            return invalid("ODG patch composition lineage does not match");
+            return Err(Error::PatchConflict);
         }
         let mut changes = self.changes.clone();
         changes.extend_from_slice(&next.changes);
@@ -4202,21 +5471,16 @@ impl Patch {
         &self,
         identifier: impl Into<String>,
         limits: CompositionLimits,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let durable = self.durable()?;
-        let writes = if durable
+        let writes = durable
             .operations()
             .iter()
-            .any(|operation| operation.op == "package.replace")
-        {
-            vec!["package".to_string()]
-        } else {
-            durable
-                .operations()
-                .iter()
-                .map(|operation| format!("{}#{}", operation.target, operation.op))
-                .collect::<Vec<_>>()
-        };
+            .map(durable_effect_keys)
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
         SubEdit::new(
             Lineage::new(&self.source),
             limits,
@@ -4234,26 +5498,65 @@ impl Patch {
 pub struct Lineage(Arc<[u8]>);
 
 impl Lineage {
-    fn new(snapshot: &Snapshot) -> Self {
+    fn new(snapshot: &Package) -> Self {
         Self(Arc::from(snapshot.as_bytes()))
     }
 
-    fn matches(&self, snapshot: &Snapshot) -> bool {
+    fn matches(&self, snapshot: &Package) -> bool {
         self.0.as_ref() == snapshot.as_bytes()
     }
 }
 
 /// One independently prepared ODG semantic patch.
-pub type PreparedEdit = SubEdit<Lineage, DurablePatch>;
+pub type SubEdit = litchi_core::SubEdit<Lineage, DurablePatch>;
 
 /// Deterministically ordered, provably disjoint ODG sub-edits.
 pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;
+
+/// Recoverable refusal while staging a bounded joined plan on an edit.
+///
+/// The rejected plan is retained so callers can correct or route it to a
+/// different edit without reconstructing its payloads. The error itself is
+/// content-free; the plan is available only through the explicit recovery
+/// accessor.
+#[derive(Debug)]
+pub struct JoinError {
+    error: Error,
+    rejected: Box<JoinedEdits>,
+}
+
+impl JoinError {
+    fn new(error: Error, rejected: JoinedEdits) -> Self {
+        Self {
+            error,
+            rejected: Box::new(rejected),
+        }
+    }
+
+    /// The fixed classified reason for refusing the plan.
+    #[must_use]
+    pub const fn error(&self) -> &Error {
+        &self.error
+    }
+
+    /// Recover the rejected plan for retry or alternate routing.
+    #[must_use]
+    pub fn into_rejected(self) -> JoinedEdits {
+        *self.rejected
+    }
+
+    /// Recover both the refusal and the rejected plan.
+    #[must_use]
+    pub fn into_parts(self) -> (Error, JoinedEdits) {
+        (self.error, *self.rejected)
+    }
+}
 
 /// Non-mutating three-way ODG merge plan.
 pub type MergePlan = litchi_core::ThreeWayMergePlan<Lineage, DurablePatch>;
 
 /// Explicit bounded ODG undo/redo history.
-pub type SnapshotHistory = History<Snapshot>;
+pub type History = CoreHistory<Package>;
 
 /// A bounded, provenance-bound shape or complete group-subtree transfer plan.
 #[derive(Clone)]
@@ -4494,7 +5797,7 @@ impl DurablePatch {
     ///
     /// Returns an error for stale source, unsupported operations, security refusal, or failed
     /// whole-package readback.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         self.apply_with_policies(
             source,
             SecurityWritePolicy::Refuse,
@@ -4509,9 +5812,9 @@ impl DurablePatch {
     /// Returns an error for stale source, invalid policy, unsupported encryption, or readback.
     pub fn apply_with_security_policy(
         &self,
-        source: &Snapshot,
+        source: &Package,
         security_policy: SecurityWritePolicy,
-    ) -> Result<Snapshot> {
+    ) -> Result<Package> {
         self.apply_with_policies(
             source,
             security_policy,
@@ -4526,10 +5829,10 @@ impl DurablePatch {
     /// Returns an error for stale source, policy refusal, unsupported operations, or readback.
     pub fn apply_with_policies(
         &self,
-        source: &Snapshot,
+        source: &Package,
         security_policy: SecurityWritePolicy,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Snapshot> {
+    ) -> Result<Package> {
         apply_durable_patch(source, self, true, security_policy, active_content_policy)
     }
 
@@ -4873,12 +6176,12 @@ fn durable_blob<'patch>(
 }
 
 fn apply_durable_patch(
-    source: &Snapshot,
+    source: &Package,
     patch: &DurablePatch,
     check_source: bool,
     security_policy: SecurityWritePolicy,
     active_content_policy: ActiveContentWritePolicy,
-) -> Result<Snapshot> {
+) -> Result<Package> {
     validate_durable_patch(&patch.inner)?;
     let source_fingerprint = fingerprint(source.as_bytes());
     if check_source
@@ -4890,7 +6193,7 @@ fn apply_durable_patch(
                 != Some(source_fingerprint.as_str())
         })
     {
-        return invalid("ODG durable patch source does not match");
+        return Err(Error::PatchConflict);
     }
     let mut current = source.clone();
     for operation in patch.operations() {
@@ -4898,68 +6201,13 @@ fn apply_durable_patch(
             enforce_security_policy(&current, security_policy)?;
             enforce_active_content_policy(&current, active_content_policy)?;
             let blob = durable_blob(patch, &operation.value)?;
-            current = if current.is_template() {
-                Snapshot::from_template_bytes(blob.to_vec())?
-            } else {
-                Snapshot::from_bytes(blob.to_vec())?
-            };
+            current = current.reopen_same_flavor(blob.to_vec())?;
             enforce_active_content_policy(&current, active_content_policy)?;
             continue;
         }
         let mut edit = current.edit_with_policies(security_policy, active_content_policy);
-        match operation.op.as_str() {
-            "page.name.set" => {
-                edit.set_page_name(
-                    parse_page_target(&operation.target)?,
-                    string_value(operation)?,
-                )?;
-            },
-            "page.style.set" => {
-                edit.set_page_style_name(
-                    parse_page_target(&operation.target)?,
-                    string_value(operation)?,
-                )?;
-            },
-            "page.transition.set" => {
-                edit.set_page_transition(
-                    parse_page_target(&operation.target)?,
-                    transition_from_value(&operation.value)?,
-                )?;
-            },
-            "shape.geometry.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                let values = geometry_value(&operation.value)?;
-                edit.set_shape_geometry(
-                    page, shape, &values[0], &values[1], &values[2], &values[3],
-                )?;
-            },
-            "shape.control.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_control_reference(page, shape, string_value(operation)?)?;
-            },
-            "shape.layer.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_layer(page, shape, string_value(operation)?)?;
-            },
-            "shape.name.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_name(page, shape, string_value(operation)?)?;
-            },
-            "shape.path.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_path_data(page, shape, string_value(operation)?)?;
-            },
-            "shape.style.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_style_name(page, shape, string_value(operation)?)?;
-            },
-            "shape.text.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_text(page, shape, string_value(operation)?)?;
-            },
-            _ => return invalid("ODG durable patch operation is unsupported"),
-        }
-        current = edit.commit()?.into_snapshot();
+        edit.stage_durable_operation(operation, &source_fingerprint, None)?;
+        current = edit.commit_core()?.into_package();
     }
     Ok(current)
 }
@@ -5111,6 +6359,425 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
     Ok(())
 }
 
+fn validate_joined_preconditions(patch: &DurablePatch, source_fingerprint: &str) -> Result<()> {
+    if patch.operations().iter().any(|operation| {
+        operation
+            .preconditions
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_fingerprint)
+    }) {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+fn validate_joined_effect_declarations(joined: &JoinedEdits) -> Result<()> {
+    let mut accepted = BTreeSet::new();
+    for sub_edit in joined.sub_edits() {
+        let declared = sub_edit
+            .effects()
+            .writes()
+            .map(canonical_declared_effect_key)
+            .collect::<BTreeSet<_>>();
+        let actual = actual_durable_effect_keys(sub_edit.payload())?
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        if !actual.is_subset(&declared) {
+            return Err(joined_refusal(
+                "ODG joined payload effects do not match declarations",
+            ));
+        }
+        if actual.iter().any(|effect| !accepted.insert(effect.clone())) {
+            return Err(joined_refusal("ODG joined payload effects overlap"));
+        }
+    }
+    Ok(())
+}
+
+fn durable_effect_keys(operation: &PatchOperation) -> Result<Vec<String>> {
+    let key = match operation.op.as_str() {
+        "package.replace" => "package".to_owned(),
+        op @ ("page.name.set" | "page.style.set" | "page.transition.set") => {
+            format!("page/{}#{op}", parse_page_target(&operation.target)?)
+        },
+        op @ ("shape.geometry.set" | "shape.control.set" | "shape.layer.set" | "shape.name.set"
+        | "shape.path.set" | "shape.style.set" | "shape.text.set") => {
+            let (page, shape) = parse_shape_target(&operation.target)?;
+            format!("page/{page}/shape/{shape}#{op}")
+        },
+        _ => format!("{}#{}", operation.target, operation.op),
+    };
+    Ok(vec![key])
+}
+
+fn actual_durable_effect_keys(patch: &DurablePatch) -> Result<Vec<String>> {
+    patch
+        .operations()
+        .iter()
+        .try_fold(Vec::new(), |mut effects, operation| {
+            effects.extend(durable_effect_keys(operation)?);
+            Ok(effects)
+        })
+}
+
+fn canonical_declared_effect_key(effect: &str) -> String {
+    if effect == "package" {
+        return effect.to_owned();
+    }
+    let Some((target, operation)) = effect.rsplit_once('#') else {
+        return effect.to_owned();
+    };
+    match operation {
+        "page.name.set" | "page.style.set" | "page.transition.set" => parse_page_target(target)
+            .map(|page| format!("page/{page}#{operation}"))
+            .unwrap_or_else(|_| effect.to_owned()),
+        "shape.geometry.set" | "shape.control.set" | "shape.layer.set" | "shape.name.set"
+        | "shape.path.set" | "shape.style.set" | "shape.text.set" => parse_shape_target(target)
+            .map(|(page, shape)| format!("page/{page}/shape/{shape}#{operation}"))
+            .unwrap_or_else(|_| effect.to_owned()),
+        _ => effect.to_owned(),
+    }
+}
+
+const ORDINARY_STYLE_GROUP: usize = usize::MAX;
+
+#[derive(Clone)]
+struct StyleProjection {
+    pages: Vec<Option<String>>,
+    parents: Arc<BTreeMap<String, Option<String>>>,
+}
+
+impl StyleProjection {
+    fn from_package(package: &Package) -> Result<Self> {
+        Ok(Self {
+            pages: package
+                .pages()
+                .iter()
+                .map(|page| page.style_name().map(str::to_owned))
+                .collect(),
+            parents: Arc::new(drawing_page_style_parents(
+                package.content_xml(),
+                package.styles_xml(),
+            )?),
+        })
+    }
+
+    fn page_style(&self, page: usize) -> Option<String> {
+        self.pages.get(page).cloned().flatten()
+    }
+
+    fn set_page_style(&mut self, page: usize, style: String) {
+        if let Some(current) = self.pages.get_mut(page) {
+            *current = Some(style);
+        }
+    }
+}
+
+#[derive(Clone)]
+enum StyleDependencyEvent {
+    Retarget {
+        group: usize,
+        page: usize,
+        source_style: Option<String>,
+        destination: String,
+    },
+    Transition {
+        group: usize,
+        page: usize,
+        source_style: Option<String>,
+        parents: Arc<BTreeMap<String, Option<String>>>,
+    },
+}
+
+fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> Result<bool> {
+    if !joined
+        .sub_edits()
+        .any(|sub_edit| has_style_dependency_operation(sub_edit.payload().operations()))
+    {
+        return Ok(false);
+    }
+    // Cross-sub-edit package/semantic mixing has already been rejected by
+    // `joined_contains_mixed_package_effects`. Any remaining style/transition
+    // operations around a replacement are in one ordered sub-edit, where
+    // intra-sub-edit dependencies are intentional and valid. Do not reopen
+    // replacement blobs merely to walk a dependency graph that cannot cross a
+    // composition boundary.
+    if joined_contains_package_replacement(joined) {
+        return Ok(false);
+    }
+    let events = projected_joined_style_events(source, joined)?;
+    style_events_conflict(&effective_style_events(events))
+}
+
+fn projected_staged_style_conflict(edit: &Edit, joined: &JoinedEdits) -> Result<bool> {
+    if !edit
+        .changes
+        .iter()
+        .any(|change| matches!(change, Change::PageStyle(_) | Change::PageTransition(_)))
+    {
+        return Ok(false);
+    }
+    let mut projection = StyleProjection::from_package(&edit.source)?;
+    let mut events = Vec::new();
+    for change in &edit.changes {
+        match change {
+            Change::PageStyle(value) => {
+                events.push(StyleDependencyEvent::Retarget {
+                    group: ORDINARY_STYLE_GROUP,
+                    page: value.page,
+                    source_style: projection.page_style(value.page),
+                    destination: value.after.clone(),
+                });
+                projection.set_page_style(value.page, value.after.clone());
+            },
+            Change::PageTransition(value) => {
+                events.push(StyleDependencyEvent::Transition {
+                    group: ORDINARY_STYLE_GROUP,
+                    page: value.page,
+                    source_style: projection.page_style(value.page),
+                    parents: projection.parents.clone(),
+                });
+            },
+            _ => {},
+        }
+    }
+    events.extend(projected_joined_style_events_from_projection(
+        edit.source.clone(),
+        projection,
+        joined,
+    )?);
+    style_events_conflict(&effective_style_events(events))
+}
+
+fn has_style_dependency_operation<'a>(
+    operations: impl IntoIterator<Item = &'a PatchOperation>,
+) -> bool {
+    operations.into_iter().any(|operation| {
+        matches!(
+            operation.op.as_str(),
+            "page.style.set" | "page.transition.set"
+        )
+    })
+}
+
+fn joined_contains_package_replacement(joined: &JoinedEdits) -> bool {
+    joined.sub_edits().any(|sub_edit| {
+        sub_edit
+            .payload()
+            .operations()
+            .iter()
+            .any(|operation| operation.op == "package.replace")
+    })
+}
+
+fn projected_joined_style_events(
+    source: &Package,
+    joined: &JoinedEdits,
+) -> Result<Vec<StyleDependencyEvent>> {
+    projected_joined_style_events_from_projection(
+        source.clone(),
+        StyleProjection::from_package(source)?,
+        joined,
+    )
+}
+
+fn projected_joined_style_events_from_projection(
+    mut active_package: Package,
+    mut projection: StyleProjection,
+    joined: &JoinedEdits,
+) -> Result<Vec<StyleDependencyEvent>> {
+    let mut events = Vec::new();
+    for (group, sub_edit) in joined.sub_edits().enumerate() {
+        for operation in sub_edit.payload().operations() {
+            if operation.op == "package.replace" {
+                let blob = durable_blob(sub_edit.payload(), &operation.value)?;
+                active_package = active_package.reopen_same_flavor(blob.to_vec())?;
+                projection = StyleProjection::from_package(&active_package)?;
+                continue;
+            }
+            match operation.op.as_str() {
+                "page.style.set" => {
+                    let page = parse_page_target(&operation.target)?;
+                    let destination = string_value(operation)?.to_owned();
+                    events.push(StyleDependencyEvent::Retarget {
+                        group,
+                        page,
+                        source_style: projection.page_style(page),
+                        destination: destination.clone(),
+                    });
+                    projection.set_page_style(page, destination);
+                },
+                "page.transition.set" => {
+                    let page = parse_page_target(&operation.target)?;
+                    events.push(StyleDependencyEvent::Transition {
+                        group,
+                        page,
+                        source_style: projection.page_style(page),
+                        parents: projection.parents.clone(),
+                    });
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok(events)
+}
+
+fn effective_style_events(events: Vec<StyleDependencyEvent>) -> Vec<StyleDependencyEvent> {
+    // Cross-group dependency checks observe each group's effective final style
+    // state.  Retargets overwritten later in the same group are not external
+    // dependencies; transitions remain because they observe the intermediate
+    // style at their position in the ordered payload.
+    let mut initial_styles = BTreeMap::new();
+    let mut final_retargets = BTreeMap::new();
+    for (index, event) in events.iter().enumerate() {
+        if let StyleDependencyEvent::Retarget {
+            group,
+            page,
+            source_style,
+            ..
+        } = event
+        {
+            initial_styles
+                .entry((*group, *page))
+                .or_insert_with(|| source_style.clone());
+            final_retargets.insert((*group, *page), index);
+        }
+    }
+    events
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, event)| match &event {
+            StyleDependencyEvent::Retarget {
+                group,
+                page,
+                source_style: _,
+                destination,
+            } => {
+                if final_retargets.get(&(*group, *page)) != Some(&index) {
+                    return None;
+                }
+                if initial_styles
+                    .get(&(*group, *page))
+                    .and_then(Option::as_deref)
+                    == Some(destination.as_str())
+                {
+                    return None;
+                }
+                Some(event)
+            },
+            StyleDependencyEvent::Transition { .. } => Some(event),
+        })
+        .collect()
+}
+
+fn style_events_conflict(events: &[StyleDependencyEvent]) -> Result<bool> {
+    for (index, left) in events.iter().enumerate() {
+        for right in events[index.saturating_add(1)..].iter() {
+            if style_event_group(left) == style_event_group(right) {
+                continue;
+            }
+            if style_event_pair_conflicts(left, right)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn style_event_group(event: &StyleDependencyEvent) -> usize {
+    match event {
+        StyleDependencyEvent::Retarget { group, .. }
+        | StyleDependencyEvent::Transition { group, .. } => *group,
+    }
+}
+
+fn style_event_pair_conflicts(
+    left: &StyleDependencyEvent,
+    right: &StyleDependencyEvent,
+) -> Result<bool> {
+    match (left, right) {
+        (
+            StyleDependencyEvent::Retarget {
+                page: left_page,
+                destination,
+                ..
+            },
+            StyleDependencyEvent::Transition {
+                page: right_page,
+                source_style,
+                parents,
+                ..
+            },
+        )
+        | (
+            StyleDependencyEvent::Transition {
+                page: right_page,
+                source_style,
+                parents,
+                ..
+            },
+            StyleDependencyEvent::Retarget {
+                page: left_page,
+                destination,
+                ..
+            },
+        ) => {
+            if left_page == right_page {
+                return Ok(true);
+            }
+            match source_style.as_deref() {
+                Some(source_style) => style_chain_contains(parents, destination, source_style),
+                None => Ok(false),
+            }
+        },
+        (
+            StyleDependencyEvent::Transition {
+                source_style: left_style,
+                parents: left_parents,
+                ..
+            },
+            StyleDependencyEvent::Transition {
+                source_style: right_style,
+                parents: right_parents,
+                ..
+            },
+        ) => {
+            let Some(left_style) = left_style.as_deref() else {
+                return Ok(false);
+            };
+            let Some(right_style) = right_style.as_deref() else {
+                return Ok(false);
+            };
+            if left_style == right_style {
+                return Ok(true);
+            }
+            if style_chain_contains(left_parents, left_style, right_style)? {
+                return Ok(true);
+            }
+            style_chain_contains(right_parents, right_style, left_style)
+        },
+        _ => Ok(false),
+    }
+}
+
+fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> Result<bool> {
+    let sub_edits = joined
+        .sub_edits()
+        .map(|sub_edit| actual_durable_effect_keys(sub_edit.payload()))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(sub_edits.iter().enumerate().any(|(index, left)| {
+        let left_package = left.iter().any(|effect| effect == "package");
+        let left_other = left.iter().any(|effect| effect != "package");
+        sub_edits[index.saturating_add(1)..].iter().any(|right| {
+            let right_package = right.iter().any(|effect| effect == "package");
+            let right_other = right.iter().any(|effect| effect != "package");
+            (left_package && right_other) || (left_other && right_package)
+        })
+    }))
+}
+
 struct Parsed {
     control_spans: ControlSpans,
     form_controls: Vec<FormControl>,
@@ -5144,9 +6811,11 @@ fn group_selection(parsed: &Parsed, page: usize, shape: usize) -> Result<Group> 
         .and_then(|value| value.shapes().get(shape))
         .ok_or_else(|| Error::InvalidFormat("ODG group selector is out of bounds".into()))?;
     if selected.kind() != ShapeKind::Group {
-        return Err(Error::Unsupported(
-            "ODG group operation requires a draw:g root".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG group operation requires a draw:g root",
+        )));
     }
     let root = parsed.shape_spans[page][shape]
         .as_ref()
@@ -7724,7 +9393,7 @@ fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
     Ok(layers)
 }
 
-fn scan_resources(package: &Package) -> Result<Vec<Resource>> {
+fn scan_resources(package: &FamilyPackage) -> Result<Vec<Resource>> {
     let archive = package.package().package()?;
     let images = media::scan_package(package.content_xml(), package.styles_xml(), &archive)?;
     let mut resources = Vec::new();
@@ -8034,7 +9703,7 @@ fn declares_style_resource_xml(xml: &str, kind: StyleResourceKind, name: &str) -
 }
 
 fn find_style_resource(
-    snapshot: &Snapshot,
+    snapshot: &Package,
     kind: StyleResourceKind,
     name: &str,
 ) -> Result<Option<ParsedStyleResource>> {
@@ -8224,35 +9893,64 @@ fn transition_style_is_shared(
     if pages.len() <= 1 {
         return Ok(false);
     }
+    let parents = drawing_page_style_parents(content, styles)?;
+    for (index, page) in pages.iter().enumerate() {
+        if index == selected_page {
+            continue;
+        }
+        if let Some(name) = page.style_name()
+            && style_chain_contains(&parents, name, selected_style)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn drawing_page_style_parents(
+    content: &str,
+    styles: Option<&str>,
+) -> Result<BTreeMap<String, Option<String>>> {
     let content_styles = parse_style_definitions(content)?;
     let named_styles = styles
         .map(parse_style_definitions)
         .transpose()?
         .unwrap_or_default();
     // Use the same family filter and automatic-style shadowing as transition
-    // resolution. An indirect inheritor also shares the selected style owner.
+    // resolution. Content definitions are inserted last so they shadow a
+    // same-named named style and its parent closure.
     let mut parents = BTreeMap::new();
     for definition in named_styles.iter().chain(&content_styles) {
         if definition.style.family() == "drawing-page" {
-            parents.insert(definition.style.name(), definition.style.parent());
+            parents.insert(
+                definition.style.name().to_owned(),
+                definition.style.parent().map(str::to_owned),
+            );
         }
     }
-    for (index, page) in pages.iter().enumerate() {
-        if index == selected_page {
-            continue;
+    Ok(parents)
+}
+
+fn style_chain_contains(
+    parents: &BTreeMap<String, Option<String>>,
+    start: &str,
+    target: &str,
+) -> Result<bool> {
+    let mut current = Some(start);
+    let mut visited = BTreeSet::new();
+    let mut depth = 0usize;
+    while let Some(name) = current {
+        if depth > MAX_DEPTH {
+            return invalid("ODG drawing-page style inheritance exceeds the limit");
         }
-        let mut current = page.style_name();
-        let mut depth = 0usize;
-        while let Some(name) = current {
-            if depth > MAX_DEPTH {
-                return invalid("ODG drawing-page style inheritance exceeds the limit");
-            }
-            if name == selected_style {
-                return Ok(true);
-            }
-            current = parents.get(name).copied().flatten();
-            depth += 1;
+        if !visited.insert(name) {
+            return invalid("ODG drawing-page style inheritance is cyclic");
         }
+        if name == target {
+            return Ok(true);
+        }
+        current = parents.get(name).and_then(|parent| parent.as_deref());
+        depth += 1;
     }
     Ok(false)
 }
@@ -8465,9 +10163,11 @@ fn edit_transition_style_xml(
     validate_xml_source_size(source, "ODG transition XML")?;
     let owner = find_transition_style_owner(source, style_name)?;
     let Some(owner) = owner else {
-        return Err(Error::Unsupported(
-            "ODG drawing-page style has no transition owner".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG drawing-page style has no transition owner",
+        )));
     };
     let fields = transition_fields(transition);
     if owner.property_open_span.is_none() {
@@ -8501,9 +10201,11 @@ fn edit_transition_style_xml(
             let sound_xml = serialize_transition_sound(sound)?;
             if let Some(span) = current_owner.sound_span {
                 if current_owner.sound.as_ref() != Some(sound) {
-                    return Err(Error::Unsupported(
-                        "ODG transition sound edit would discard producer markup".into(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "odg.package.snapshot",
+                        "ODG transition sound edit would discard producer markup",
+                    )));
                 }
                 let _ = span;
             } else if let Some(open) = current_owner.property_open_span {
@@ -8546,9 +10248,11 @@ fn edit_transition_style_xml(
         None => {
             if let Some(span) = current_owner.sound_span {
                 let _ = span;
-                return Err(Error::Unsupported(
-                    "ODG transition sound removal would discard producer markup".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transition sound removal would discard producer markup",
+                )));
             }
         },
     }
@@ -8608,7 +10312,7 @@ fn validate_transition_budget(transition: Option<&Transition>) -> Result<()> {
 }
 
 fn validate_transition_sound_reference(
-    transaction: &Transaction,
+    transaction: &Edit,
     transition: Option<&Transition>,
 ) -> Result<()> {
     let Some(href) = transition
@@ -8643,7 +10347,7 @@ fn validate_transition_sound_reference(
 }
 
 fn validate_transition_xml_ids(
-    transaction: &Transaction,
+    transaction: &Edit,
     current: Option<&Transition>,
     desired: Option<&Transition>,
     in_content: bool,
@@ -9370,7 +11074,7 @@ fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String
 }
 
 fn content_splice_publication(
-    source: &Snapshot,
+    source: &Package,
     splices: &[ContentSplice],
 ) -> Result<XmlSplicePublication> {
     let source_part = XmlSourcePart::load(source.0.package.package(), "content.xml")?;
@@ -9382,6 +11086,8 @@ fn content_splice_publication(
         let proof = source_part.checked_range(splice.source_range.clone(), &splice.expected)?;
         let fragment = if splice.replacement.is_empty() {
             AuthoredXmlFragment::deletion()
+        } else if splice.replacement.first() == Some(&b'<') {
+            AuthoredXmlFragment::markup(splice.replacement.clone())?
         } else {
             AuthoredXmlFragment::text(splice.replacement.clone())?
         };
@@ -9391,7 +11097,7 @@ fn content_splice_publication(
 }
 
 fn rebuild_spliced(
-    source: &Snapshot,
+    source: &Package,
     content: XmlSplicePublication,
     styles: Option<&str>,
     replacements: &[ResourceReplacement<'_>],
@@ -9399,7 +11105,10 @@ fn rebuild_spliced(
 ) -> Result<Vec<u8>> {
     enforce_security_policy(source, security_policy)?;
     let archive = source.0.package.package();
-    let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+    let mut writer = PackageWriter::new_bounded(
+        MAX_OUTPUT_BYTES,
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(source.0.mimetype)?;
     content.publish(&mut writer)?;
     if let Some(styles) = styles {
@@ -9434,7 +11143,7 @@ fn rebuild_spliced(
 }
 
 fn rebuild(
-    source: &Snapshot,
+    source: &Package,
     content: &str,
     styles: Option<&str>,
     replacements: &[ResourceReplacement<'_>],
@@ -9442,7 +11151,10 @@ fn rebuild(
 ) -> Result<Vec<u8>> {
     enforce_security_policy(source, security_policy)?;
     let archive = source.0.package.package();
-    let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+    let mut writer = PackageWriter::new_bounded(
+        MAX_OUTPUT_BYTES,
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(source.0.mimetype)?;
     writer.add_file("content.xml", content.as_bytes())?;
     if let Some(styles) = styles {
@@ -9472,7 +11184,7 @@ fn rebuild(
     writer.finish_to_bounded_bytes()
 }
 
-fn enforce_security_policy(source: &Snapshot, policy: SecurityWritePolicy) -> Result<()> {
+fn enforce_security_policy(source: &Package, policy: SecurityWritePolicy) -> Result<()> {
     if source.security().is_signed() && policy == SecurityWritePolicy::Refuse {
         return invalid("ODG package edits refuse signed packages");
     }
@@ -9482,26 +11194,26 @@ fn enforce_security_policy(source: &Snapshot, policy: SecurityWritePolicy) -> Re
     Ok(())
 }
 
-fn enforce_active_content_policy(
-    source: &Snapshot,
-    policy: ActiveContentWritePolicy,
-) -> Result<()> {
+fn enforce_active_content_policy(source: &Package, policy: ActiveContentWritePolicy) -> Result<()> {
     if policy == ActiveContentWritePolicy::Refuse && source.active_content().is_present() {
-        return Err(Error::Unsupported(
-            "ODG active-content write policy refuses the source inventory".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG active-content write policy refuses the source inventory",
+        )));
     }
     Ok(())
 }
 
-fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
+fn ensure_compact_rewrite_source(source: &Package) -> Result<()> {
     let archive = source.0.package.package();
     for path in source.files()? {
         let is_xml = Path::new(&path)
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"));
         if is_xml && path != "META-INF/manifest.xml" {
-            compact_xml::validate(&archive.get_file(&path)?).map_err(Error::from)?;
+            compact_xml::validate(&archive.get_file(&path)?, compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
     }
     Ok(())
@@ -9561,6 +11273,18 @@ fn stage_content_splice(
         return Ok(());
     }
 
+    // A markup edit touching an earlier markup edit (two pages appended at
+    // the same point, a removal next to an insertion) joins it: two
+    // publication edits may not share one source boundary.
+    if is_markup_splice(replacement)
+        && let Some(index) = splices.iter().position(|splice| {
+            is_markup_splice(&splice.replacement)
+                && (splice.current_range.end == range.start
+                    || splice.current_range.start == range.end)
+        })
+    {
+        return merge_content_splice(source, actual, splices, index, range, replacement);
+    }
     let (removed_before, added_before) = splices
         .iter()
         .filter(|splice| splice.current_range.end <= range.start)
@@ -9605,6 +11329,91 @@ fn stage_content_splice(
         replacement: replacement.to_vec(),
     });
     shift_current_splices(splices, insertion_index, range.end, new_end)?;
+    splices.sort_unstable_by_key(|splice| splice.current_range.start);
+    Ok(())
+}
+
+/// Whether a splice replacement is a deletion or balanced markup (not an
+/// escaped text or attribute value).
+fn is_markup_splice(replacement: &[u8]) -> bool {
+    replacement.first().is_none_or(|byte| *byte == b'<')
+}
+
+/// Join the markup edit of `range` with the adjacent staged splice `index`.
+fn merge_content_splice(
+    source: &[u8],
+    actual: &[u8],
+    splices: &mut [ContentSplice],
+    index: usize,
+    range: &Range<usize>,
+    replacement: &[u8],
+) -> Result<()> {
+    let overflow = || Error::InvalidFormat("ODG content splice size overflow".into());
+    let held = &splices[index];
+    let append = held.current_range.end == range.start;
+    let length = range.len();
+    let source_range = if append {
+        held.source_range.start
+            ..held
+                .source_range
+                .end
+                .checked_add(length)
+                .ok_or_else(overflow)?
+    } else {
+        held.source_range
+            .start
+            .checked_sub(length)
+            .ok_or_else(overflow)?..held.source_range.end
+    };
+    let expected = source
+        .get(source_range.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice source range is invalid".into()))?
+        .to_vec();
+    let mut joined = Vec::new();
+    joined
+        .try_reserve_exact(
+            held.replacement
+                .len()
+                .checked_add(replacement.len())
+                .ok_or_else(overflow)?,
+        )
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG content splice",
+            source: allocation_error,
+        })?;
+    let current_start = if append {
+        joined.extend_from_slice(&held.replacement);
+        joined.extend_from_slice(replacement);
+        held.current_range.start
+    } else {
+        joined.extend_from_slice(replacement);
+        joined.extend_from_slice(&held.replacement);
+        range.start
+    };
+    // The bytes the new edit removes must be the source bytes next to the
+    // held splice (no other edit rewrote them).
+    let removed = if append {
+        &expected[expected.len() - length..]
+    } else {
+        &expected[..length]
+    };
+    if removed != actual {
+        return invalid("ODG content splice lost exact source provenance");
+    }
+    let old_end = range.end;
+    let new_end = range
+        .start
+        .checked_add(replacement.len())
+        .ok_or_else(overflow)?;
+    let current_end = current_start
+        .checked_add(joined.len())
+        .ok_or_else(overflow)?;
+    let splice = &mut splices[index];
+    splice.source_range = source_range;
+    splice.expected = expected;
+    splice.replacement = joined;
+    splice.current_range = current_start..current_end;
+    shift_current_splices(splices, index, old_end, new_end)?;
     splices.sort_unstable_by_key(|splice| splice.current_range.start);
     Ok(())
 }
@@ -9752,6 +11561,53 @@ fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
     owner.push_str(style);
     owner.push_str(suffix);
     insert_xml(source, at, &owner)
+}
+
+/// The replaced range and balanced replacement markup that insert `child`
+/// at `at`: an insertion point, or the `/>` of an empty owner element, which
+/// is expanded whole (`<owner …/>` becomes `<owner …>child</owner>`) so the
+/// replacement is balanced markup the splice publication accepts.
+fn child_insertion(source: &str, at: usize, child: &str) -> Result<(Range<usize>, String)> {
+    if source.as_bytes().get(at..at.saturating_add(2)) != Some(b"/>") {
+        if at > source.len() || !source.is_char_boundary(at) {
+            return invalid("ODG XML insertion point is invalid");
+        }
+        return Ok((at..at, child.to_owned()));
+    }
+    let element_start = source
+        .get(..at)
+        .and_then(|prefix| prefix.rfind('<'))
+        .ok_or_else(|| Error::InvalidFormat("ODG empty owner start is missing".into()))?;
+    let name_start = element_start + 1;
+    let name_end = source
+        .as_bytes()
+        .get(name_start..at)
+        .and_then(|bytes| {
+            bytes
+                .iter()
+                .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+                .map(|offset| name_start + offset)
+        })
+        .unwrap_or(at);
+    let name = source
+        .get(name_start..name_end)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| Error::InvalidFormat("ODG empty owner name is missing".into()))?;
+    let open = source[element_start..at].trim_end();
+    let mut replacement = String::new();
+    replacement
+        .try_reserve_exact(open.len() + child.len() + name.len() + 4)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG edited content",
+            source: allocation_error,
+        })?;
+    replacement.push_str(open);
+    replacement.push('>');
+    replacement.push_str(child);
+    replacement.push_str("</");
+    replacement.push_str(name);
+    replacement.push('>');
+    Ok((element_start..at + 2, replacement))
 }
 
 fn insert_child_xml(source: &str, at: usize, child: &str) -> Result<String> {
@@ -10266,13 +12122,13 @@ fn clone_bounded_string(source: &str, maximum: usize, resource: &'static str) ->
 }
 
 fn own_bounded_cow<'a>(
-    value: std::borrow::Cow<'a, str>,
+    value: Cow<'a, str>,
     maximum: usize,
     resource: &'static str,
 ) -> Result<String> {
     match value {
-        std::borrow::Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
-        std::borrow::Cow::Owned(value) => {
+        Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
+        Cow::Owned(value) => {
             if value.len() > maximum {
                 return Err(Error::InvalidFormat(format!(
                     "{resource} exceeds the byte limit"
@@ -10641,7 +12497,7 @@ fn validate_shape_layer(page: &Page, global_layers: &[Layer], shape: &Shape) -> 
     Ok(())
 }
 
-fn resolve_transfer_layer(snapshot: &Snapshot, page: &Page, name: &str) -> Result<Layer> {
+fn resolve_transfer_layer(snapshot: &Package, page: &Page, name: &str) -> Result<Layer> {
     let visible = if page.has_layer_set() {
         page.layers()
     } else {
@@ -10670,7 +12526,7 @@ fn transfer_xml_references(xml: &str, href: &str) -> bool {
 /// must travel with an extracted shape or the destination document would have
 /// an unbound prefix.  Conflicting aliases are withheld and cause an explicit
 /// refusal below.
-fn transfer_source_namespaces(snapshot: &Snapshot) -> Result<BTreeMap<String, String>> {
+fn transfer_source_namespaces(snapshot: &Package) -> Result<BTreeMap<String, String>> {
     let mut namespaces = BTreeMap::new();
     let mut conflicts = BTreeSet::new();
     for xml in [Some(snapshot.content_xml()), snapshot.styles_xml()] {
@@ -10796,25 +12652,33 @@ fn validate_transfer_fragment_namespaces(xml: &str) -> Result<()> {
         let declared = declarations.get(&prefix).map(String::as_str);
         match (expected, declared) {
             (Some(expected), Some(declared)) if declared != expected => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment binds canonical prefix '{prefix}' to another namespace"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment binds canonical prefix to another namespace",
                 )));
             },
             (Some(_), _) => {},
             (None, Some(uri)) if transfer_namespace_uri_bytes(uri).is_some() => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment aliases known namespace '{uri}' with prefix '{prefix}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment aliases known namespace with prefix",
                 )));
             },
             (None, Some(_)) => {},
             (None, None) if sensitive_aliases.contains(&prefix) => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment cannot prove dependency namespace for prefix '{prefix}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment cannot prove dependency namespace for prefix",
                 )));
             },
             (None, None) => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment cannot prove namespace for prefix '{prefix}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment cannot prove namespace for prefix",
                 )));
             },
         }
@@ -10840,8 +12704,10 @@ fn close_transfer_fragment_namespaces(
             continue;
         }
         let uri = available.get(&prefix).ok_or_else(|| {
-            Error::Unsupported(format!(
-                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG transfer fragment cannot prove namespace closure for prefix",
             ))
         })?;
         missing.insert(prefix, uri.clone());
@@ -10862,8 +12728,10 @@ fn transfer_namespace_closure_bytes(
             return Ok(total);
         }
         let uri = available.get(&prefix).ok_or_else(|| {
-            Error::Unsupported(format!(
-                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG transfer fragment cannot prove namespace closure for prefix",
             ))
         })?;
         // `ensure_transfer_namespace_values` writes exactly:
@@ -11043,7 +12911,7 @@ fn transfer_namespace_uri_bytes(uri: &str) -> Option<&'static [u8]> {
     .find(|candidate| std::str::from_utf8(candidate).ok() == Some(uri))
 }
 
-fn declares_style(snapshot: &Snapshot, name: &str) -> Result<bool> {
+fn declares_style(snapshot: &Package, name: &str) -> Result<bool> {
     if declares_style_xml(snapshot.content_xml(), name)? {
         return Ok(true);
     }
@@ -11062,7 +12930,7 @@ fn declares_style_xml(xml: &str, name: &str) -> Result<bool> {
     })
 }
 
-fn find_style_definition(snapshot: &Snapshot, name: &str) -> Result<Option<ParsedStyleDefinition>> {
+fn find_style_definition(snapshot: &Package, name: &str) -> Result<Option<ParsedStyleDefinition>> {
     let mut matches = parse_style_definitions(snapshot.content_xml())?
         .into_iter()
         .filter(|definition| definition.style.name() == name)
@@ -11132,7 +13000,13 @@ fn xml_has_attribute(xml: &str, namespace: &[u8], local: &[u8], value: &str) -> 
                     return Ok(true);
                 }
             },
-            Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
+            // Character references and the predefined entities in text
+            // (LibreOffice writes `&apos;`) are inert; custom entities are
+            // refused by `reference_value`.
+            Event::GeneralRef(reference) => {
+                reference_value(&reference)?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
                 return invalid("active XML is prohibited in ODG dependencies");
             },
             Event::Eof => return Ok(false),
@@ -11215,7 +13089,7 @@ fn unique_collision_name(base: &str, bytes: &[u8], reserved: &[String]) -> Strin
 }
 
 fn unique_resource_path(
-    source: &Snapshot,
+    source: &Package,
     staged: &[ResourceEdit],
     path: &str,
     bytes: &[u8],
@@ -11531,6 +13405,26 @@ fn inverse_change(change: &Change) -> Change {
                 page: *page,
                 position: *position,
                 kind: *kind,
+            },
+            StructureChange::PageMoved { from, to } => StructureChange::PageMoved {
+                from: *to,
+                to: *from,
+            },
+            StructureChange::ShapeMoved { page, from, to } => StructureChange::ShapeMoved {
+                page: *page,
+                from: *to,
+                to: *from,
+            },
+            StructureChange::ShapeTransferred {
+                page,
+                from,
+                to_page,
+                to,
+            } => StructureChange::ShapeTransferred {
+                page: *to_page,
+                from: *to,
+                to_page: *page,
+                to: *from,
             },
             StructureChange::ShapeAdvancedGeometryChanged { page, shape } => {
                 StructureChange::ShapeAdvancedGeometryChanged {
@@ -12329,6 +14223,82 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
+/// Refuse a cross-page move of the subtree at `span` when an identity
+/// dependency would cross the page boundary: an `xml:id`/`draw:id` the
+/// subtree declares that any attribute outside it names, or a connector
+/// end (`draw:start-shape`/`draw:end-shape`) inside it that names an
+/// identity declared outside it.
+fn check_shape_identity(xml: &str, span: &Range<usize>) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG dependency event")?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut inside_ids = Vec::new();
+    let mut inside_refs = Vec::new();
+    let mut outside_values = Vec::new();
+    loop {
+        let start = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+        let (_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG dependency XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG dependency event")?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let inside = span.start <= start && start < span.end;
+                for raw in element.attributes() {
+                    let parsed = raw.map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG attribute: {error}"))
+                    })?;
+                    let value = String::from_utf8_lossy(parsed.value.as_ref()).into_owned();
+                    let (namespace, local) = reader.resolver().resolve_attribute(parsed.key);
+                    let is_id = (parsed.key.as_ref() == b"xml:id")
+                        || (resolved_bound(&namespace, DRAW) && local.as_ref() == b"id");
+                    let is_glue = resolved_bound(&namespace, DRAW)
+                        && matches!(local.as_ref(), b"start-shape" | b"end-shape");
+                    if inside {
+                        if is_id {
+                            inside_ids.push(value);
+                        } else if is_glue {
+                            inside_refs.push(value);
+                        }
+                    } else if !is_id {
+                        outside_values.push(value);
+                    }
+                }
+            },
+            Event::GeneralRef(reference) => {
+                reference_value(&reference)?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return invalid("active XML is prohibited in ODG dependencies");
+            },
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::End(_)
+            | Event::Text(_) => {},
+        }
+    }
+    if inside_ids
+        .iter()
+        .any(|id| outside_values.iter().any(|value| value == id))
+    {
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG shape move to another page is blocked by a reference to its identity",
+        )));
+    }
+    if inside_refs.iter().any(|value| !inside_ids.contains(value)) {
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG connector move to another page is blocked by its glued shapes",
+        )));
+    }
+    Ok(())
+}
+
 fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
 }
@@ -12337,10 +14307,80 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
 }
 
+fn joined_refusal(reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odg.edit.join",
+        reason,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use quick_xml::events::{BytesCData, BytesPI, BytesText};
+
+    fn lazy_source_package() -> Package {
+        let content = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"/></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
+        let styles = br#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles/></office:document-styles>"#;
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+        writer.set_mimetype(MIMETYPE).unwrap();
+        writer.add_file("content.xml", content).unwrap();
+        writer.add_file("styles.xml", styles).unwrap();
+        Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn edit_parts_stay_borrowed_for_noop_and_pure_replacement() {
+        let source = lazy_source_package();
+        let edit = source.edit();
+        assert!(edit.content.owned.is_none());
+        assert_eq!(edit.content.as_ptr(), source.content_xml().as_ptr());
+        let styles = edit.styles.as_ref().expect("fixture has styles.xml");
+        assert!(styles.owned.is_none());
+        assert_eq!(styles.as_ptr(), source.styles_xml().unwrap().as_ptr());
+        drop(edit);
+
+        let mut mutation = source.edit();
+        mutation.set_page_name(0, "Materialized page").unwrap();
+        assert!(mutation.content.owned.is_some());
+        assert!(
+            mutation
+                .styles
+                .as_ref()
+                .is_some_and(|part| part.owned.is_none())
+        );
+        drop(mutation);
+
+        let no_op = source.edit().commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+
+        let mut replacement_edit = source.edit();
+        replacement_edit
+            .add_page(Page::new("Replacement page"))
+            .unwrap();
+        let replacement = replacement_edit.commit().unwrap();
+        let limits = CompositionLimits::new(2, 2, 4, 2);
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(replacement.patch().prepare("replacement", limits).unwrap())
+            .unwrap();
+        let mut owner = source.edit();
+        owner.join(joined).unwrap();
+        owner.apply_pending_joined().unwrap();
+        assert!(owner.package_replacement.is_some());
+        assert!(owner.content.owned.is_none());
+        assert!(
+            owner
+                .styles
+                .as_ref()
+                .is_some_and(|part| part.owned.is_none())
+        );
+        let committed = owner.commit_core().unwrap();
+        assert!(committed.diagnostics().changed());
+    }
 
     #[test]
     fn borrowed_event_admission_rejects_oversized_ignored_inputs() {

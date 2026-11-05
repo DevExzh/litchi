@@ -9,17 +9,140 @@ use crate::comments::Record;
 use crate::conditional_formatting::Formatting;
 use crate::hyperlinks::Hyperlink;
 use crate::merged_cells::MergedCell;
+use crate::package::PackageError;
 use crate::package::cell::Cell;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::scenarios::Manager;
 use crate::package::web_extension_bindings::Binding;
 use crate::slicer;
-use litchi_core::sheet::{
-    Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet as SheetWorksheet,
-};
+use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
+
+type Result<T> = std::result::Result<T, PackageError>;
 use litchi_sheet::view::View;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
+
+/// Checked sparse worksheet reads over the zero-based XLSB grid.
+pub(crate) mod features;
+pub mod read;
+mod weight;
+
+pub use features::{FeatureSet, Features};
+pub use read::Cells;
+
+// Sheet metadata is shared by eager and source-backed workbook views.  Keep
+// the ordinary vocabulary under this public sheet namespace; native tab IDs,
+// relationship IDs, and part names stay in the raw layer.
+pub use crate::workbook::CellCursor;
+pub use crate::workbook::catalog::{Kind, Selector, State, Tab};
+pub use litchi_core::Position;
+pub use litchi_sheet::{Area, At, Rect};
+
+/// An immutable, cheaply cloned snapshot of one XLSB worksheet grid.
+///
+/// A grid owns an `Arc` to the fully decoded worksheet. It remains usable
+/// after the workbook's bounded worksheet cache evicts its entry and after a
+/// source-backed workbook is dropped. Grid methods operate only on this
+/// captured snapshot; source and execution fences belong to the owner method
+/// that created it.
+#[derive(Clone)]
+pub struct Grid {
+    worksheet: Arc<Worksheet>,
+}
+
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Grid>();
+};
+
+impl Grid {
+    pub(crate) fn from_arc(worksheet: Arc<Worksheet>) -> Self {
+        Self { worksheet }
+    }
+
+    /// Borrow the decoded worksheet snapshot retained by this grid.
+    ///
+    /// This accessor is intended for format adapters that need the existing
+    /// XLSB semantic worksheet methods. It does not expose package identity or
+    /// any source-backed owner.
+    pub fn worksheet(&self) -> &Worksheet {
+        &self.worksheet
+    }
+
+    /// Borrow one stored cell by a checked zero-based coordinate or A1 label.
+    pub fn cell_at<'a>(
+        &self,
+        at: impl Into<At<'a>>,
+    ) -> crate::package::error::Result<Option<&Cell>> {
+        self.worksheet.cell_at(at)
+    }
+
+    /// Lazily borrow stored cells inside a checked zero-based half-open range.
+    pub fn cells_in<'a>(
+        &self,
+        area: impl Into<Area<'a>>,
+    ) -> crate::package::error::Result<Cells<'_>> {
+        self.worksheet.cells_in(area)
+    }
+
+    /// Number of stored cell records in this snapshot.
+    #[must_use]
+    pub fn stored_cell_count(&self) -> usize {
+        self.worksheet.cells.len()
+    }
+
+    /// The worksheet name retained in this snapshot.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        SheetWorksheet::name(self.worksheet.as_ref())
+    }
+
+    /// The worksheet dimensions, if it contains stored cells.
+    #[must_use]
+    pub fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
+        SheetWorksheet::dimensions(self.worksheet.as_ref())
+    }
+
+    /// Number of logical rows represented by this worksheet.
+    #[must_use]
+    pub fn row_count(&self) -> usize {
+        SheetWorksheet::row_count(self.worksheet.as_ref())
+    }
+
+    /// Number of logical columns represented by this worksheet.
+    #[must_use]
+    pub fn column_count(&self) -> usize {
+        SheetWorksheet::column_count(self.worksheet.as_ref())
+    }
+
+    /// Repairs recorded while the worksheet stream and its adjuncts were read.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        self.worksheet.tolerance_report()
+    }
+
+    /// Compute the logical retained weight charged to the worksheet cache.
+    ///
+    /// Cache publication computes this value once, before publication. A
+    /// normal grid construction remains constant time with respect to the
+    /// worksheet size; callers that explicitly request accounting opt into
+    /// this traversal.
+    #[must_use]
+    pub fn retained_weight(&self) -> usize {
+        self.worksheet.retained_bytes()
+    }
+}
+
+impl std::fmt::Debug for Grid {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Grid")
+            .field("stored_cells", &self.stored_cell_count())
+            .field("dimensions", &self.dimensions())
+            .finish_non_exhaustive()
+    }
+}
 
 /// Width, style, visibility, and outline metadata for an XLSB column range.
 #[derive(Debug, Clone, PartialEq)]
@@ -122,7 +245,7 @@ pub struct StrongProtection {
 }
 
 /// XLSB worksheet implementation
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Worksheet {
     name: String,
     cells: BTreeMap<(u32, u32), Cell>,
@@ -147,6 +270,18 @@ pub struct Worksheet {
     timelines: Option<crate::timeline::Views>,
     sparkline_groups: Option<crate::sparkline::Groups>,
     tolerance: crate::leniency::ToleranceReport,
+}
+
+impl std::fmt::Debug for Worksheet {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Worksheet")
+            .field("stored_cells", &self.cells.len())
+            .field("max_row", &self.max_row)
+            .field("max_column", &self.max_col)
+            .field("merged_ranges", &self.merged_cells.len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Worksheet {
@@ -201,6 +336,18 @@ impl Worksheet {
     }
 
     /// Add a cell to the worksheet
+    /// The coordinate of the first stored cell after `after` in row-major
+    /// order (the first stored cell for `None`), in O(log n): the cell
+    /// cursor's walk of a complete grid (record 0267).
+    pub(crate) fn cell_after(&self, after: Option<(u32, u32)>) -> Option<(u32, u32)> {
+        use std::ops::Bound;
+        let start = after.map_or(Bound::Unbounded, Bound::Excluded);
+        self.cells
+            .range((start, Bound::Unbounded))
+            .next()
+            .map(|(at, _)| *at)
+    }
+
     pub fn add_cell(&mut self, cell: Cell) {
         let pos = (cell.row(), cell.column());
         self.max_row = self.max_row.max(cell.row());
@@ -209,6 +356,7 @@ impl Worksheet {
     }
 
     /// Get cell at position
+    #[inline]
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {
         self.cells.get(&(row, col))
     }
@@ -388,6 +536,13 @@ impl Worksheet {
 }
 
 impl SheetWorksheet for Worksheet {
+    /// Stored cells are borrowed; an absent position reads as an owned
+    /// empty cell.
+    type Error = PackageError;
+    type Cell<'a> = Cow<'a, Cell>;
+    type Cells<'a> = StoredCells<'a>;
+    type Rows<'a> = Rows<'a>;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -408,34 +563,30 @@ impl SheetWorksheet for Worksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> Result<Cow<'_, Cell>> {
         match self.cells.get(&(row, column)) {
-            Some(cell) => Ok(Box::new(cell.clone())),
-            None => {
-                // Return empty cell for missing positions
-                let empty_cell = Cell::new(row, column, CellValue::Empty);
-                Ok(Box::new(empty_cell))
-            },
+            Some(cell) => Ok(Cow::Borrowed(cell)),
+            // Return empty cell for missing positions
+            None => Ok(Cow::Owned(Cell::new(row, column, CellValue::Empty))),
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
-        let (row, col) = crate::package::utils::parse_cell_reference(coordinate)
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Cow<'_, Cell>> {
+        let (row, col) = crate::package::utils::parse_cell_reference(coordinate)?;
         self.cell(row, col)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(XlsbCellIterator {
+    fn cells(&self) -> StoredCells<'_> {
+        StoredCells {
             cells: self.cells.values(),
-        })
+        }
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(XlsbRowIterator {
+    fn rows(&self) -> Rows<'_> {
+        Rows {
             worksheet: self,
             current_row: 0,
-        })
+        }
     }
 
     fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
@@ -460,28 +611,32 @@ impl SheetWorksheet for Worksheet {
     }
 }
 
-/// Cell iterator for XLSB worksheets
-struct XlsbCellIterator<'a> {
+/// The stored cells of an eager XLSB worksheet, in row-major order: the
+/// iterator [`Worksheet::cells`](SheetWorksheet::cells) returns.
+pub struct StoredCells<'a> {
     cells: std::collections::btree_map::Values<'a, (u32, u32), Cell>,
 }
 
-impl<'a> CellIterator<'a> for XlsbCellIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
-        self.cells.next().map(|cell| {
-            let boxed: Box<dyn SheetCell + 'a> = Box::new(cell.clone());
-            Ok(boxed)
-        })
+impl<'a> Iterator for StoredCells<'a> {
+    type Item = Result<Cow<'a, Cell>>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cells.next().map(|cell| Ok(Cow::Borrowed(cell)))
     }
 }
 
-/// Row iterator for XLSB worksheets
-struct XlsbRowIterator<'a> {
+/// The rows of an eager XLSB worksheet: the iterator
+/// [`Worksheet::rows`](SheetWorksheet::rows) returns.
+pub struct Rows<'a> {
     worksheet: &'a Worksheet,
     current_row: usize,
 }
 
-impl<'a> RowIterator<'a> for XlsbRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for Rows<'a> {
+    type Item = Result<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

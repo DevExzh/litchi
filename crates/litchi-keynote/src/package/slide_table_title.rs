@@ -23,13 +23,11 @@ use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{numbers_table_title_codec, table_info_codec};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
@@ -54,7 +52,7 @@ const TITLE_OUTLINED_FIELD: u32 = 37;
 /// Finite resource categories enforced by a slide-table title transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideTableTitleLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -72,7 +70,7 @@ pub enum SlideTableTitleLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideTableTitleLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -95,9 +93,36 @@ impl fmt::Display for SlideTableTitleLimitKind {
 }
 
 /// Failure from a Keynote slide-table title read or transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideTableTitleError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table title source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table title {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table title transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table title failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table title patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical slide-table title edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table title graph is outside the supported scope")]
@@ -114,22 +139,32 @@ pub enum SlideTableTitleError {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table title source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table title {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: SlideTableTitleLimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table title transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table title failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table title patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -155,7 +190,7 @@ struct TitleBudget {
 }
 
 impl TitleBudget {
-    fn new(package: &Package) -> Result<Self, SlideTableTitleError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let source: usize = package
             .state
@@ -163,10 +198,8 @@ impl TitleBudget {
             .archive()
             .max_input_bytes()
             .try_into()
-            .map_err(|_| SlideTableTitleError::InvalidSource)?;
-        let aggregate = source
-            .checked_mul(4)
-            .ok_or(SlideTableTitleError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
+        let aggregate = source.checked_mul(4).ok_or(Error::InvalidSource)?;
         Ok(Self {
             max_input: aggregate,
             max_output: aggregate,
@@ -193,13 +226,11 @@ impl TitleBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: SlideTableTitleLimitKind,
-    ) -> Result<(), SlideTableTitleError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SlideTableTitleError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SlideTableTitleError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -209,70 +240,65 @@ impl TitleBudget {
         Ok(())
     }
 
-    fn input(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
+    fn input(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            SlideTableTitleLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            SlideTableTitleLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            SlideTableTitleLimitKind::WireWork,
-        )
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            SlideTableTitleLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            SlideTableTitleLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            SlideTableTitleLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn scratch(&mut self, amount: usize) -> Result<(), SlideTableTitleError> {
+    fn scratch(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.scratch,
             amount,
             self.max_scratch,
-            SlideTableTitleLimitKind::Scratch,
+            LimitKind::Scratch,
         )
     }
 
-    fn physical(&mut self, bytes: usize) -> Result<(), SlideTableTitleError> {
+    fn physical(&mut self, bytes: usize) -> Result<(), Error> {
         self.input(bytes)?;
         self.work(bytes)
     }
@@ -280,20 +306,20 @@ impl TitleBudget {
     fn codec_report(
         &mut self,
         report: numbers_table_title_codec::DecodeReport,
-    ) -> Result<(), SlideTableTitleError> {
+    ) -> Result<(), Error> {
         Self::add(
             &mut self.fields,
             report.fields(),
             self.max_fields,
-            SlideTableTitleLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         self.work(report.work_bytes())?;
         self.references(report.references())?;
         self.work(report.reference_bytes())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(SlideTableTitleError::LimitExceeded {
-                kind: SlideTableTitleLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -304,7 +330,7 @@ impl TitleBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), SlideTableTitleError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
         self.retained(requirements.retained_bytes())?;
@@ -312,7 +338,7 @@ impl TitleBudget {
         self.work(requirements.output_bytes())
     }
 
-    fn residual(&self, package: &Package) -> Result<WireLimits, SlideTableTitleError> {
+    fn residual(&self, package: &Package) -> Result<WireLimits, Error> {
         let base = package.wire_limits().map_err(map_wire_error)?;
         base.with_input_bytes(
             base.max_input_bytes()
@@ -336,16 +362,16 @@ impl TitleBudget {
 }
 
 /// One mutable title value staged against an immutable package snapshot.
-pub struct SlideTableTitleEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: TitleSelection,
     after: Settings,
 }
 
-impl fmt::Debug for SlideTableTitleEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableTitleEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("table_position", &self.selection.table_position)
             .field("before", &self.selection.before)
@@ -354,7 +380,7 @@ impl fmt::Debug for SlideTableTitleEdit<'_> {
     }
 }
 
-impl SlideTableTitleEdit<'_> {
+impl Edit<'_> {
     #[must_use]
     pub const fn slide_position(&self) -> Position {
         self.selection.slide_position
@@ -381,14 +407,14 @@ impl SlideTableTitleEdit<'_> {
         self
     }
 
-    pub fn commit(self) -> Result<SlideTableTitleCommit, SlideTableTitleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible slide-table title patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SlideTableTitlePatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: TitleSelection,
     before: Settings,
@@ -399,10 +425,10 @@ pub struct SlideTableTitlePatch {
     target_previews_absent: bool,
 }
 
-impl fmt::Debug for SlideTableTitlePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideTableTitlePatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.selection.slide_position)
             .field("table_position", &self.selection.table_position)
             .field("before", &self.before)
@@ -411,7 +437,7 @@ impl fmt::Debug for SlideTableTitlePatch {
     }
 }
 
-impl SlideTableTitlePatch {
+impl Patch {
     #[must_use]
     pub const fn before(&self) -> Settings {
         self.before
@@ -454,14 +480,14 @@ impl SlideTableTitlePatch {
 
 /// Compact slide-table title publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTableTitleDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideTableTitleDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -504,13 +530,13 @@ impl SlideTableTitleDiagnostics {
 /// Fully verified result of one slide-table title transaction.
 #[must_use = "a Keynote slide-table title commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideTableTitleCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideTableTitlePatch,
-    diagnostics: SlideTableTitleDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideTableTitleCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -521,13 +547,19 @@ impl SlideTableTitleCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideTableTitlePatch {
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideTableTitleDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -563,7 +595,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<Settings, SlideTableTitleError> {
+    ) -> Result<Settings, Error> {
         Ok(select_table(self, slide.into(), table.into())?.before)
     }
 
@@ -572,10 +604,10 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-    ) -> Result<SlideTableTitleEdit<'_>, SlideTableTitleError> {
+    ) -> Result<Edit<'_>, Error> {
         let selection = select_table(self, slide.into(), table.into())?;
         let after = selection.before;
-        Ok(SlideTableTitleEdit {
+        Ok(Edit {
             source: self,
             selection,
             after,
@@ -583,16 +615,13 @@ impl Package {
     }
 
     /// Apply an exact-source checked reversible slide-table title patch.
-    pub fn apply_slide_table_title(
-        &self,
-        patch: &SlideTableTitlePatch,
-    ) -> Result<SlideTableTitleCommit, SlideTableTitleError> {
+    pub fn apply_slide_table_title(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         if !patch.artifacts.authorizes_source(&catalog.shared_source()) {
-            return Err(SlideTableTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if previews_absent(self)? != patch.source_previews_absent {
-            return Err(SlideTableTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_table(
             self,
@@ -600,14 +629,14 @@ impl Package {
             TableSelector::position(patch.selection.table_position),
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SlideTableTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(SlideTableTitleCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideTableTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         reopen_patch(self, patch)
@@ -618,12 +647,12 @@ fn commit_edit(
     source: &Package,
     selection: &TitleSelection,
     after: Settings,
-) -> Result<SlideTableTitleCommit, SlideTableTitleError> {
+) -> Result<Commit, Error> {
     if selection.before == after {
         let bytes: Arc<[u8]> = Arc::from(source.source_bytes());
-        return Ok(SlideTableTitleCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideTableTitlePatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before: selection.before,
@@ -633,17 +662,17 @@ fn commit_edit(
                 source_previews_absent: previews_absent(source)?,
                 target_previews_absent: previews_absent(source)?,
             },
-            diagnostics: SlideTableTitleDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if selection.locked {
-        return Err(SlideTableTitleError::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let mut budget = TitleBudget::new(source)?;
     let (candidate, deleted_previews) = rewrite_title(source, selection, after, &mut budget)?;
     candidate.validate().map_err(map_read_error)?;
     if !previews_absent(&candidate)? {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_table(
         &candidate,
@@ -651,13 +680,13 @@ fn commit_edit(
         TableSelector::position(selection.table_position),
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, selection, true, &mut budget)?;
     let target = physical_catalog(&candidate)?.shared_source();
-    Ok(SlideTableTitleCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideTableTitlePatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(Arc::from(source.source_bytes()), target),
             selection: selection.clone(),
             before: selection.before,
@@ -667,20 +696,17 @@ fn commit_edit(
             source_previews_absent: previews_absent(source)?,
             target_previews_absent: true,
         },
-        diagnostics: SlideTableTitleDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
-fn reopen_patch(
-    source: &Package,
-    patch: &SlideTableTitlePatch,
-) -> Result<SlideTableTitleCommit, SlideTableTitleError> {
+fn reopen_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     let candidate =
         Package::from_source_with_options(patch.artifacts.target(), source.state.options)
             .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
     if previews_absent(&candidate)? != patch.target_previews_absent {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_table(
         &candidate,
@@ -688,7 +714,7 @@ fn reopen_patch(
         TableSelector::position(patch.selection.table_position),
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     let mut budget = TitleBudget::new(source)?;
     budget.input(patch.artifacts.target().len())?;
@@ -699,10 +725,10 @@ fn reopen_patch(
         patch.target_previews_absent,
         &mut budget,
     )?;
-    Ok(SlideTableTitleCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideTableTitleDiagnostics::published(patch.deleted_previews),
+        diagnostics: Diagnostics::published(patch.deleted_previews),
     })
 }
 
@@ -710,7 +736,7 @@ fn select_table(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     table_selector: TableSelector,
-) -> Result<TitleSelection, SlideTableTitleError> {
+) -> Result<TitleSelection, Error> {
     let mut budget = TitleBudget::new(package)?;
     let catalog = physical_catalog(package)?;
     budget.input(package.source_bytes().len())?;
@@ -719,12 +745,12 @@ fn select_table(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(SlideTableTitleError::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (slide_message_index, slide_payload) = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
     let wire_limits = budget.residual(package)?;
     let owned = repeated_references(slide_payload, SLIDE_OWNED_DRAWABLES_FIELD, wire_limits)?;
@@ -737,13 +763,13 @@ fn select_table(
     let mut tables = Vec::new();
     tables
         .try_reserve_exact(z_order.len())
-        .map_err(|_| SlideTableTitleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: z_order.len(),
         })?;
     budget.allocations(1)?;
     for identifier in z_order {
         let Some((_owner_component, object)) = package.object_with_component(identifier) else {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if object
             .messages
@@ -753,25 +779,25 @@ fn select_table(
             continue;
         }
         if !owned_set.contains(&identifier) {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let (info_index, info_payload) = unique_message(object, TABLE_INFO_MESSAGE_TYPE)?;
         let info = decode_table_info(info_payload, package, &mut budget)?;
         let parent = table_parent(info_payload, wire_limits)?;
         if parent != record.slide_identifier {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let model_identifier = info.table_model().identifier().get();
         validate_table_info_metadata(object, info_index, parent, model_identifier, &mut budget)?;
         let (model_component, model) = package
             .object_with_component(model_identifier)
-            .ok_or(SlideTableTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if model
             .messages
             .iter()
             .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
         {
-            return Err(SlideTableTitleError::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let (model_message_index, model_payload) = unique_message(model, TABLE_MODEL_MESSAGE_TYPE)?;
         let before_snapshot = decode_title(model_payload, package, &mut budget)?;
@@ -805,11 +831,12 @@ fn select_table(
         model_message_index,
         before,
         locked,
-    ) = tables.get(table_position.get()).cloned().ok_or(
-        SlideTableTitleError::TablePositionNotFound {
+    ) = tables
+        .get(table_position.get())
+        .cloned()
+        .ok_or(Error::Refused(Refusal::TablePositionNotFound {
             position: table_position,
-        },
-    )?;
+        }))?;
     ensure_unique_identity(package, table_info_identifier)?;
     ensure_unique_identity(package, model_identifier)?;
     ensure_unique_table_owner(
@@ -838,32 +865,30 @@ fn rewrite_title(
     selection: &TitleSelection,
     after: Settings,
     budget: &mut TitleBudget,
-) -> Result<(Package, usize), SlideTableTitleError> {
+) -> Result<(Package, usize), Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.component_name.as_ref())
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .object(selection.model_identifier)
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let original = object
         .messages
         .get(selection.model_message_index)
         .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
-        .ok_or(SlideTableTitleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
     let snapshot = decode_title(original, source, budget)?;
@@ -872,7 +897,7 @@ fn rewrite_title(
         snapshot.table_name_border_enabled(),
     ) != selection.before
     {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_visible_prerequisites(
         source,
@@ -902,10 +927,7 @@ fn rewrite_title(
             NestedFieldReplacement::Varint(after.outlined().map(u64::from)),
         ),
     ];
-    let output_bound = original
-        .len()
-        .checked_add(64)
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+    let output_bound = original.len().checked_add(64).ok_or(Error::InvalidSource)?;
     budget.output(output_bound)?;
     budget.work(original.len().saturating_mul(8).max(1))?;
     let limits = budget
@@ -913,20 +935,20 @@ fn rewrite_title(
         .with_output_bytes(output_bound)
         .and_then(|limits| limits.with_rewrite_work(original.len().saturating_mul(8).max(1)))
         .map_err(map_wire_error)?;
-    let rewritten = patch_nested_fields_batched_with_limits(original, &edits, limits)
-        .map_err(map_wire_error)?;
+    let rewritten =
+        patch_nested_fields_batched(original, &edits, limits).map_err(map_wire_error)?;
     let verified = decode_title(&rewritten, source, budget)?;
     if Settings::new(
         verified.table_name_enabled(),
         verified.table_name_border_enabled(),
     ) != after
     {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     archive
         .object_mut(selection.model_identifier)
-        .ok_or(SlideTableTitleError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             selection.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -936,27 +958,25 @@ fn rewrite_title(
         )
         .map_err(map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     budget.output(
         encoded_bound
             .checked_add(compressed_bound)
-            .ok_or(SlideTableTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_bound {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_| SlideTableTitleError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let edits = [EntryEdit::new(
         selection.component_name.as_ref(),
         &compressed,
@@ -979,10 +999,9 @@ fn decode_title(
     payload: &[u8],
     package: &Package,
     budget: &mut TitleBudget,
-) -> Result<numbers_table_title_codec::TableTitleSettingsSnapshot, SlideTableTitleError> {
+) -> Result<numbers_table_title_codec::TableTitleSettingsSnapshot, Error> {
     let limits = budget.residual(package)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_| SlideTableTitleError::InvalidSource)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
     let options = numbers_table_title_codec::DecodeOptions::new(
         limits.max_input_bytes().min(payload.len().max(1)),
         limits.max_fields(),
@@ -1004,16 +1023,10 @@ fn decode_table_info(
     payload: &[u8],
     package: &Package,
     budget: &mut TitleBudget,
-) -> Result<table_info_codec::TableInfoSnapshot, SlideTableTitleError> {
+) -> Result<table_info_codec::TableInfoSnapshot, Error> {
     let limits = budget.residual(package)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_| SlideTableTitleError::InvalidSource)?;
-    budget.work(
-        payload
-            .len()
-            .checked_mul(4)
-            .ok_or(SlideTableTitleError::InvalidSource)?,
-    )?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
+    budget.work(payload.len().checked_mul(4).ok_or(Error::InvalidSource)?)?;
     table_info_codec::decode_table_info(
         payload,
         table_info_codec::DecodeOptions::new(
@@ -1023,7 +1036,7 @@ fn decode_table_info(
             recursion,
         ),
     )
-    .map_err(|_| SlideTableTitleError::InvalidSource)
+    .map_err(|_| Error::InvalidSource)
 }
 
 fn validate_visible_prerequisites(
@@ -1032,21 +1045,19 @@ fn validate_visible_prerequisites(
     message_index: usize,
     snapshot: numbers_table_title_codec::TableTitleSettingsSnapshot,
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     let height = f64::from_bits(
         snapshot
             .table_name_height_bits()
-            .ok_or(SlideTableTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     );
     if !height.is_finite() || height < 0.0 {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let style = snapshot
-        .table_name_style()
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+    let style = snapshot.table_name_style().ok_or(Error::InvalidSource)?;
     let shape = snapshot
         .table_name_shape_style()
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if style.identifier() == 0
         || shape.identifier() == 0
         || style.identifier() == shape.identifier()
@@ -1055,7 +1066,7 @@ fn validate_visible_prerequisites(
         || style.deprecated_is_external().is_some()
         || shape.deprecated_is_external().is_some()
     {
-        return Err(SlideTableTitleError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_model_style_metadata(
         model,
@@ -1083,24 +1094,24 @@ fn require_style_object(
     identifier: u64,
     message_type: u32,
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     let mut matched = None;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             budget.work(1)?;
             if object.archive_info.identifier == Some(identifier) {
                 if matched.replace((component.name(), object)).is_some() {
-                    return Err(SlideTableTitleError::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
             }
         }
     }
-    let (_owner_component, object) = matched.ok_or(SlideTableTitleError::InvalidSource)?;
+    let (_owner_component, object) = matched.ok_or(Error::InvalidSource)?;
     if object.messages.len() != 1
         || object.archive_info.message_infos.len() != 1
         || object.messages[0].type_ != message_type
     {
-        return Err(SlideTableTitleError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_message_header(object, 0)
 }
@@ -1111,7 +1122,7 @@ fn validate_model_style_metadata(
     style: u64,
     shape: u64,
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = &object.archive_info.message_infos[message_index];
     if !info.object_references.is_empty() {
@@ -1119,7 +1130,7 @@ fn validate_model_style_metadata(
         if frequencies.get(&style).copied() != Some(1)
             || frequencies.get(&shape).copied() != Some(1)
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for (field_number, identifier) in [(TITLE_STYLE_FIELD, style), (TITLE_SHAPE_STYLE_FIELD, shape)]
@@ -1138,7 +1149,7 @@ fn validate_model_style_metadata(
                     || field.object_references.as_slice() != [identifier]
             })
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1150,17 +1161,17 @@ fn validate_slide_metadata(
     owned: &[u64],
     z_order: &[u64],
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = &object.archive_info.message_infos[message_index];
     if !info.object_references.is_empty() {
         let frequencies = reference_frequencies(&info.object_references, budget)?;
         if frequencies.len() != info.object_references.len() {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         for identifier in owned.iter().chain(z_order) {
             if frequencies.get(identifier).copied() != Some(1) {
-                return Err(SlideTableTitleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -1168,12 +1179,12 @@ fn validate_slide_metadata(
         if field.path.as_slice() == [SLIDE_OWNED_DRAWABLES_FIELD]
             && field.object_references.as_slice() != owned
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.path.as_slice() == [SLIDE_Z_ORDER_FIELD]
             && field.object_references.as_slice() != z_order
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1185,7 +1196,7 @@ fn validate_table_info_metadata(
     parent: u64,
     model: u64,
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     validate_message_header(object, message_index)?;
     let info = &object.archive_info.message_infos[message_index];
     if !info.object_references.is_empty() {
@@ -1193,35 +1204,32 @@ fn validate_table_info_metadata(
         if frequencies.get(&parent).copied() != Some(1)
             || frequencies.get(&model).copied() != Some(1)
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for field in &info.field_infos {
         if field.path.as_slice() == [TABLE_MODEL_FIELD]
             && field.object_references.as_slice() != [model]
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn validate_message_header(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), SlideTableTitleError> {
+fn validate_message_header(object: &ArchiveObject, message_index: usize) -> Result<(), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(message_index)
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != info.type_
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.archive_info.should_merge == Some(true)
@@ -1231,17 +1239,14 @@ fn validate_message_header(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn unique_message(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<(usize, &[u8]), SlideTableTitleError> {
+fn unique_message(object: &ArchiveObject, message_type: u32) -> Result<(usize, &[u8]), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1249,18 +1254,18 @@ fn unique_message(
         if message.type_ == message_type
             && selected.replace((index, message.data.as_slice())).is_some()
         {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(SlideTableTitleError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 fn repeated_references(
     payload: &[u8],
     field_number: u32,
     limits: WireLimits,
-) -> Result<Vec<u64>, SlideTableTitleError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<Vec<u64>, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut result = Vec::new();
     result
         .try_reserve_exact(
@@ -1269,7 +1274,7 @@ fn repeated_references(
                 .filter(|field| field.number() == field_number)
                 .count(),
         )
-        .map_err(|_| SlideTableTitleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: payload.len(),
         })?;
     for field in fields
@@ -1278,77 +1283,73 @@ fn repeated_references(
     {
         field.validate_canonical_key().map_err(map_wire_error)?;
         if field.wire_type() != 2 {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         result.push(strict_reference(field.payload(), limits)?);
     }
     Ok(result)
 }
 
-fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTableTitleError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_fields = fields
         .fields()
         .filter(|field| field.number() == TABLE_SUPER_FIELD)
         .collect::<Vec<_>>();
     if super_fields.len() != 1 || super_fields[0].wire_type() != 2 {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let drawable =
-        WireView::parse_with_limits(super_fields[0].payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_fields[0].payload(), limits).map_err(map_wire_error)?;
     let parents = drawable
         .fields()
         .filter(|field| field.number() == DRAWABLE_PARENT_FIELD)
         .collect::<Vec<_>>();
     if parents.len() != 1 || parents[0].wire_type() != 2 {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     strict_reference(parents[0].payload(), limits)
 }
 
-fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTableTitleError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;
         match field.number() {
             1 => {
                 if field.wire_type() != 0 || identifier.is_some() {
-                    return Err(SlideTableTitleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, width) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| SlideTableTitleError::InvalidSource)?;
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if value == 0 || width != encoded_len(value) {
-                    return Err(SlideTableTitleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(SlideTableTitleError::UnsupportedDependency),
+            2 | 3 => return Err(Error::Refused(Refusal::UnsupportedDependency)),
             _ => {},
         }
     }
-    identifier.ok_or(SlideTableTitleError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn checked_reference_set(
-    values: &[u64],
-    budget: &mut TitleBudget,
-) -> Result<HashSet<u64>, SlideTableTitleError> {
+fn checked_reference_set(values: &[u64], budget: &mut TitleBudget) -> Result<HashSet<u64>, Error> {
     budget.allocations(usize::from(!values.is_empty()))?;
     budget.retained(
         values
             .len()
             .checked_mul(size_of::<u64>())
-            .ok_or(SlideTableTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut set = HashSet::new();
     set.try_reserve(values.len())
-        .map_err(|_| SlideTableTitleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         if !set.insert(*value) {
-            return Err(SlideTableTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(set)
@@ -1357,30 +1358,28 @@ fn checked_reference_set(
 fn reference_frequencies(
     values: &[u64],
     budget: &mut TitleBudget,
-) -> Result<HashMap<u64, usize>, SlideTableTitleError> {
+) -> Result<HashMap<u64, usize>, Error> {
     budget.allocations(usize::from(!values.is_empty()))?;
     budget.retained(
         values
             .len()
             .checked_mul(size_of::<(u64, usize)>())
-            .ok_or(SlideTableTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut frequencies = HashMap::new();
     frequencies
         .try_reserve(values.len())
-        .map_err(|_| SlideTableTitleError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: values.len(),
         })?;
     for value in values {
         let count = frequencies.entry(*value).or_insert(0usize);
-        *count = count
-            .checked_add(1)
-            .ok_or(SlideTableTitleError::InvalidSource)?;
+        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     Ok(frequencies)
 }
 
-fn ensure_unique_identity(package: &Package, identifier: u64) -> Result<(), SlideTableTitleError> {
+fn ensure_unique_identity(package: &Package, identifier: u64) -> Result<(), Error> {
     let mut total = 0usize;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
@@ -1390,7 +1389,7 @@ fn ensure_unique_identity(package: &Package, identifier: u64) -> Result<(), Slid
         }
     }
     if total != 1 {
-        return Err(SlideTableTitleError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1402,7 +1401,7 @@ fn ensure_unique_table_owner(
     model_identifier: u64,
     limits: WireLimits,
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     let mut owned_count = 0usize;
     let mut z_order_count = 0usize;
     let mut selected_slide = false;
@@ -1422,15 +1421,15 @@ fn ensure_unique_table_owner(
                     });
                     owned_count = owned_count
                         .checked_add(owned_hits)
-                        .ok_or(SlideTableTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     z_order_count = z_order_count
                         .checked_add(z_hits)
-                        .ok_or(SlideTableTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     budget.work(
                         owned
                             .len()
                             .checked_add(z_order.len())
-                            .ok_or(SlideTableTitleError::InvalidSource)?,
+                            .ok_or(Error::InvalidSource)?,
                     )?;
                     if object.archive_info.identifier == Some(slide_identifier)
                         && owned_hits == 1
@@ -1458,7 +1457,7 @@ fn ensure_unique_table_owner(
         }
     }
     if owned_count != 1 || z_order_count != 1 || !selected_slide || model_owners != 1 {
-        return Err(SlideTableTitleError::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1469,11 +1468,11 @@ fn verify_locality(
     selection: &TitleSelection,
     target_previews_absent: bool,
     budget: &mut TitleBudget,
-) -> Result<(), SlideTableTitleError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let previews = super::rendering_invalidation::root_preview_deletions(source_catalog.package())
-        .map_err(|_| SlideTableTitleError::Verification)?;
+        .map_err(|_| Error::Verification)?;
     let source_entries = entry_index(source_catalog.package(), budget)?;
     let candidate_entries = entry_index(candidate_catalog.package(), budget)?;
     for entry in source_catalog.package().iter() {
@@ -1481,15 +1480,15 @@ fn verify_locality(
         let candidate_entry = candidate_entries.get(entry.name()).copied();
         if target_previews_absent && previews.names().contains(&entry.name()) {
             if candidate_entry.is_some() {
-                return Err(SlideTableTitleError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
-        let other = candidate_entry.ok_or(SlideTableTitleError::Verification)?;
+        let other = candidate_entry.ok_or(Error::Verification)?;
         if entry.name() != selection.component_name.as_ref()
             && (entry.data() != other.data() || entry.metadata() != other.metadata())
         {
-            return Err(SlideTableTitleError::Verification);
+            return Err(Error::Verification);
         }
     }
     for entry in candidate_catalog.package().iter() {
@@ -1497,14 +1496,14 @@ fn verify_locality(
             if target_previews_absent
                 || !super::rendering_invalidation::is_root_preview_name(entry.name())
             {
-                return Err(SlideTableTitleError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
     let source_archive = component_archive(source, selection.component_name.as_ref())?;
     let candidate_archive = component_archive(candidate, selection.component_name.as_ref())?;
     if source_archive.objects.len() != candidate_archive.objects.len() {
-        return Err(SlideTableTitleError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
@@ -1516,18 +1515,18 @@ fn verify_locality(
         let identifier = source_object
             .archive_info
             .identifier
-            .ok_or(SlideTableTitleError::Verification)?;
+            .ok_or(Error::Verification)?;
         let candidate_object = candidate_archive
             .object(identifier)
-            .ok_or(SlideTableTitleError::Verification)?;
+            .ok_or(Error::Verification)?;
         if identifier == selection.model_identifier {
             let candidate_message = candidate_object
                 .messages
                 .get(selection.model_message_index)
-                .ok_or(SlideTableTitleError::Verification)?;
+                .ok_or(Error::Verification)?;
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.model_message_index,
                     candidate_message.clone(),
                     archive_limits,
@@ -1536,10 +1535,10 @@ fn verify_locality(
             expected.header_length = candidate_object.header_length;
             expected.data_length = candidate_object.data_length;
             if !expected.same_content_ignoring_offsets(candidate_object) {
-                return Err(SlideTableTitleError::Verification);
+                return Err(Error::Verification);
             }
         } else if !source_object.same_content_ignoring_offsets(candidate_object) {
-            return Err(SlideTableTitleError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -1552,42 +1551,42 @@ fn verify_locality(
 fn entry_index<'a>(
     catalog: &'a Catalog,
     budget: &mut TitleBudget,
-) -> Result<HashMap<&'a str, &'a Entry>, SlideTableTitleError> {
+) -> Result<HashMap<&'a str, &'a Entry>, Error> {
     let count = catalog.iter().count();
     budget.allocations(usize::from(count != 0))?;
     budget.retained(
         count
             .checked_mul(size_of::<(&str, &Entry)>())
-            .ok_or(SlideTableTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut index = HashMap::new();
     index
         .try_reserve(count)
-        .map_err(|_| SlideTableTitleError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for entry in catalog.iter() {
         budget.work(
             entry
                 .name()
                 .len()
                 .checked_add(1)
-                .ok_or(SlideTableTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         if index.insert(entry.name(), entry).is_some() {
-            return Err(SlideTableTitleError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(index)
 }
 
-fn component_archive(package: &Package, name: &str) -> Result<Archive, SlideTableTitleError> {
+fn component_archive(package: &Package, name: &str) -> Result<Archive, Error> {
     let catalog = physical_catalog(package)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == name)
-        .ok_or(SlideTableTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SlideTableTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let snappy = package
         .state
@@ -1601,28 +1600,27 @@ fn component_archive(package: &Package, name: &str) -> Result<Archive, SlideTabl
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(map_core_error)?;
-    Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
+    Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)
 }
 
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
-) -> Result<Position, SlideTableTitleError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideTableTitleError::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
                 .map_err(map_read_error)?
                 .select_slide(selector)
-                .map_err(|_| SlideTableTitleError::AmbiguousSelector)?
+                .map_err(|_| Error::Refused(Refusal::AmbiguousSelector))?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideTableTitleError::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1637,138 +1635,122 @@ fn same_selection(left: &TitleSelection, right: &TitleSelection) -> bool {
         && left.component_name == right.component_name
 }
 
-fn physical_catalog(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, SlideTableTitleError> {
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(SlideTableTitleError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
-fn previews_absent(package: &Package) -> Result<bool, SlideTableTitleError> {
+fn previews_absent(package: &Package) -> Result<bool, Error> {
     super::rendering_invalidation::root_previews_absent(physical_catalog(package)?.package())
-        .map_err(|_| SlideTableTitleError::Verification)
+        .map_err(|_| Error::Verification)
 }
 
-fn map_read_error(error: ReadError) -> SlideTableTitleError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::References => SlideTableTitleLimitKind::References,
-                _ => SlideTableTitleLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableTitleError::Allocation { amount },
-        _ => SlideTableTitleError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_title_codec_error(error: numbers_table_title_codec::DecodeError) -> SlideTableTitleError {
+fn map_title_codec_error(error: numbers_table_title_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return SlideTableTitleError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
-        numbers_table_title_codec::DecodeLimit::Bytes { observed, maximum } => (
-            SlideTableTitleLimitKind::InputBytes,
-            observed as u64,
-            maximum as u64,
-        ),
-        numbers_table_title_codec::DecodeLimit::Fields { observed, maximum } => (
-            SlideTableTitleLimitKind::WireFields,
-            observed as u64,
-            maximum as u64,
-        ),
-        numbers_table_title_codec::DecodeLimit::Work { observed, maximum } => (
-            SlideTableTitleLimitKind::WireWork,
-            observed as u64,
-            maximum as u64,
-        ),
+        numbers_table_title_codec::DecodeLimit::Bytes { observed, maximum } => {
+            (LimitKind::InputBytes, observed as u64, maximum as u64)
+        },
+        numbers_table_title_codec::DecodeLimit::Fields { observed, maximum } => {
+            (LimitKind::WireFields, observed as u64, maximum as u64)
+        },
+        numbers_table_title_codec::DecodeLimit::Work { observed, maximum } => {
+            (LimitKind::WireWork, observed as u64, maximum as u64)
+        },
         numbers_table_title_codec::DecodeLimit::Nesting { observed, maximum } => (
-            SlideTableTitleLimitKind::WireNesting,
+            LimitKind::WireNesting,
             u64::from(observed),
             u64::from(maximum),
         ),
-        numbers_table_title_codec::DecodeLimit::References { observed, maximum } => (
-            SlideTableTitleLimitKind::References,
-            observed as u64,
-            maximum as u64,
-        ),
-        _ => return SlideTableTitleError::InvalidSource,
+        numbers_table_title_codec::DecodeLimit::References { observed, maximum } => {
+            (LimitKind::References, observed as u64, maximum as u64)
+        },
+        _ => return Error::InvalidSource,
     };
-    SlideTableTitleError::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
     }
 }
 
-fn map_wire_error(_error: litchi_iwa_common::Error) -> SlideTableTitleError {
-    SlideTableTitleError::InvalidSource
+fn map_wire_error(_error: litchi_iwa_common::Error) -> Error {
+    Error::InvalidSource
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SlideTableTitleError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SlideTableTitleLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => SlideTableTitleLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => SlideTableTitleLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
-                    SlideTableTitleLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => SlideTableTitleLimitKind::TotalBytes,
-                _ => SlideTableTitleLimitKind::WireWork,
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SlideTableTitleError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        _ => SlideTableTitleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableTitleError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableTitleError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => SlideTableTitleLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableTitleLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => SlideTableTitleLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => SlideTableTitleLimitKind::EntryBytes,
-                _ => SlideTableTitleLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SlideTableTitleError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SlideTableTitleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1804,7 +1786,7 @@ mod tests {
         let mut budget = unbounded_budget();
         assert!(matches!(
             checked_reference_set(&[11, 22, 11], &mut budget),
-            Err(SlideTableTitleError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 

@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bundle;
 mod catalog;
 mod directory;
 mod error;
@@ -22,6 +23,7 @@ mod logical;
 pub mod package;
 mod package_state;
 pub mod publication;
+mod raw_access;
 mod semantic;
 mod zip;
 
@@ -37,9 +39,10 @@ mod zip;
 pub mod iwa {
     pub use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
     pub use litchi_iwa_core::{
-        Archive, ArchiveInfo, ArchiveLimits, ArchiveObject, ArchiveReferenceOccurrence,
-        ArchiveReferencePolicy, ArchiveReferenceVisitor, Error, FieldInfo, FieldPath, FieldType,
-        LimitKind, MessageInfo, RawMessage, Result, SnappyLimits, SnappyStream, UnknownFieldRule,
+        Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+        ArchiveReferenceVisitor, Error, FieldInfo, FieldPath, FieldType, LimitKind, Limits,
+        MessageInfo, MessageInfoCollection, RawMessage, Result, SnappyLimits, SnappyStream,
+        UnknownFieldRule,
     };
 }
 
@@ -77,6 +80,13 @@ pub mod unstable {
     pub use crate::package::{
         EntryEdit, EntryInsertion, PreparedReassembly, ReassemblyExecutionRequirements,
         ReassemblyPreparationRequirements,
+    };
+    /// Raw member access, bounded component reads and message-type statistics
+    /// over the archive-owned package state (record 0363 D5).
+    pub use crate::raw_access::{
+        ComponentReadError, cached_component, count_message_types, entry, entry_names,
+        iwa_entry_names, message_type_summary, most_common_message_type, normalize_entry_name,
+        parse_component,
     };
 }
 
@@ -138,7 +148,7 @@ pub fn inspect_detection_root(bytes: &[u8], limits: Limits) -> Result<DetectionR
     let input_size = u64::try_from(bytes.len())
         .map_err(|_error| Error::InvalidBundle("ZIP input length does not fit u64".to_owned()))?;
     validated_limits.check_input_size(input_size, "ZIP input")?;
-    let archive = ArchiveReader::new_with_limits(bytes, validated_limits.zip_limits())?;
+    let archive = ArchiveReader::new(bytes, validated_limits.zip_limits())?;
     inspect_zip(&archive, validated_limits, true)
 }
 
@@ -218,8 +228,8 @@ fn detection_root_from_exact_document(
     let document = if let Some(entry) = document_entry {
         package::preflight_semantic_iwa(entry, entry.name())?;
         let compressed = archive.read_entry(entry)?;
-        let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
-        Some(Archive::parse_objects_with_identifier_with_limits(
+        let stream = SnappyStream::decompress(&compressed, limits.snappy_limits()?)?;
+        Some(Archive::parse_objects_with_identifier(
             stream.as_bytes(),
             1,
             limits.effective_archive_limits()?,
@@ -317,7 +327,7 @@ fn inspect_zip(
         Error::InvalidBundle("legacy iWork Index.zip length does not fit u64".to_owned())
     })?;
     limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-    let index = ArchiveReader::new_with_limits(&index_data, limits.zip_limits())?;
+    let index = ArchiveReader::new(&index_data, limits.zip_limits())?;
     inspect_zip(&index, limits, false)
 }
 
@@ -357,8 +367,8 @@ fn inspect_direct_zip(archive: &ArchiveReader<'_>, limits: Limits) -> Result<Det
 
 fn parse_document(archive: &ArchiveReader<'_>, name: &str, limits: Limits) -> Result<Archive> {
     let compressed = archive.read(name)?;
-    let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
-    Ok(Archive::parse_objects_with_identifier_with_limits(
+    let stream = SnappyStream::decompress(&compressed, limits.snappy_limits()?)?;
+    Ok(Archive::parse_objects_with_identifier(
         stream.as_bytes(),
         1,
         limits.effective_archive_limits()?,

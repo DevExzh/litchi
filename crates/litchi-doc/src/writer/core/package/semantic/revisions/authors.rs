@@ -1,10 +1,10 @@
 use crate::writer::core::{
-    Writer,
+    Builder,
     model::{RevisionWriterData, WriteError},
 };
 use crate::writer::fib::FibBuilder;
 use std::collections::HashMap;
-impl Writer {
+impl Builder {
     pub(in crate::writer::core::package) fn build_revision_writer_data(
         &self,
     ) -> Result<Option<RevisionWriterData>, WriteError> {

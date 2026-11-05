@@ -10,21 +10,23 @@ use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::numbers_names_codec;
 
-use super::super::{Components, Index, ReadOptions, read_source, validate_numbers_application};
+use super::super::{Components, Index, Profile, read_source, validate_numbers_application};
 use super::{
     Budget, DOCUMENT_MESSAGE_TYPE, FORM_BASED_SHEET_MESSAGE_TYPE, SHEET_MESSAGE_TYPE,
-    TableMergesError, TableMergesLimitKind, decode_model_merges, length_payload, limit,
-    map_package_error, read_reference, require_declared_reference, resolve_model_payload,
-    resolve_object, scan_fields, table_model_identifier, unique_message, unique_sheet_message,
-    unique_table_info, unique_table_model, validate_message_metadata,
+    decode_model_merges, length_payload, limit, map_package_error, read_reference,
+    require_declared_reference, resolve_model_payload, resolve_object, scan_fields,
+    table_model_identifier, unique_message, unique_sheet_message, unique_table_info,
+    unique_table_model, validate_message_metadata,
 };
+use crate::table::merge::transaction::Error as TableMergesError;
+use crate::table::merge::transaction::LimitKind as TableMergesLimitKind;
 use crate::{SheetSelector, TableSelector, table::merge::Region};
 
 /// A lazy, metadata-only Numbers merged-cell reader.
 ///
 /// `MergeReader` retains the validated physical component catalog and compact
 /// object index needed for one or more focused queries.  It deliberately does
-/// not construct the rooted [`Document`](crate::Document), semantic tables,
+/// not construct the rooted [`Workbook`](crate::Workbook), semantic tables,
 /// or decoded cell/BNC values.  Each query resolves the requested sheet and
 /// table through their visible names or checked positions, then decodes only
 /// the selected table model's borrowed merge payload.
@@ -58,7 +60,7 @@ pub struct MergeReader {
 struct MergeReaderState {
     components: Components,
     index: Index,
-    options: ReadOptions,
+    options: Profile,
 }
 
 impl fmt::Debug for MergeReader {
@@ -91,7 +93,7 @@ impl MergeReader {
     /// Returns a typed error when the path cannot be read, physical ingress is
     /// over budget, or the package is not a valid Numbers source.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, TableMergesError> {
-        Self::open_with_options(path, ReadOptions::default())
+        Self::open_with_options(path, crate::OpenOptions::new())
     }
 
     /// Open a Numbers package for lazy merged-cell queries under explicit
@@ -103,8 +105,9 @@ impl MergeReader {
     /// plus bounded filesystem ingress failures.
     pub fn open_with_options(
         path: impl AsRef<Path>,
-        options: ReadOptions,
+        options: crate::OpenOptions,
     ) -> Result<Self, TableMergesError> {
+        let options = Profile::from_options(options).map_err(map_package_error)?;
         let bytes = read_source(path.as_ref(), options.archive()).map_err(map_package_error)?;
         let components =
             Components::from_owned_bytes(bytes, options.archive()).map_err(map_package_error)?;
@@ -124,7 +127,7 @@ impl MergeReader {
     /// physical contents are malformed, or the compact object index exceeds
     /// the default semantic object ceiling.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, TableMergesError> {
-        Self::from_bytes_with_options(bytes, ReadOptions::default())
+        Self::from_bytes_with_options(bytes, crate::OpenOptions::new())
     }
 
     /// Parse a Numbers package for lazy merged-cell queries under explicit
@@ -140,8 +143,9 @@ impl MergeReader {
     /// validation, object indexing, or a selected limit fails.
     pub fn from_bytes_with_options(
         bytes: &[u8],
-        options: ReadOptions,
+        options: crate::OpenOptions,
     ) -> Result<Self, TableMergesError> {
+        let options = Profile::from_options(options).map_err(map_package_error)?;
         let components =
             Components::from_bytes(bytes, options.archive()).map_err(map_package_error)?;
         Self::from_components_with_options(components, options)
@@ -158,8 +162,9 @@ impl MergeReader {
     /// Returns the same typed failures as [`Self::from_bytes_with_options`].
     pub fn from_shared_bytes_with_options(
         bytes: Arc<[u8]>,
-        options: ReadOptions,
+        options: crate::OpenOptions,
     ) -> Result<Self, TableMergesError> {
+        let options = Profile::from_options(options).map_err(map_package_error)?;
         let components =
             Components::from_shared_bytes(bytes, options.archive()).map_err(map_package_error)?;
         Self::from_components_with_options(components, options)
@@ -171,7 +176,7 @@ impl MergeReader {
     ///
     /// Returns the same typed failures as [`Self::from_bytes`].
     pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, TableMergesError> {
-        Self::from_shared_bytes_with_options(bytes, ReadOptions::default())
+        Self::from_shared_bytes_with_options(bytes, crate::OpenOptions::new())
     }
 
     /// Build a reader from an already parsed component catalog.
@@ -191,14 +196,15 @@ impl MergeReader {
     #[doc(hidden)]
     pub fn __from_shared_catalog(
         catalog: Arc<ComponentCatalog>,
-        options: ReadOptions,
+        options: crate::OpenOptions,
     ) -> Result<Self, TableMergesError> {
+        let options = Profile::from_options(options).map_err(map_package_error)?;
         Self::from_components_with_options(Components::from_catalog(catalog), options)
     }
 
     fn from_components_with_options(
         components: Components,
-        options: ReadOptions,
+        options: Profile,
     ) -> Result<Self, TableMergesError> {
         validate_numbers_application(&components, options.archive()).map_err(map_package_error)?;
         let index = Index::from_components(&components, options.semantic().max_objects())
@@ -221,9 +227,9 @@ impl MergeReader {
     ///
     /// # Errors
     ///
-    /// Returns [`TableMergesError::SheetNotFound`],
-    /// [`TableMergesError::TableNotFound`], or
-    /// [`TableMergesError::AmbiguousSelector`] for selector failures, and a
+    /// Returns [`crate::table::merge::transaction::Refusal::SheetNotFound`],
+    /// [`crate::table::merge::transaction::Refusal::TableNotFound`], or
+    /// [`crate::table::merge::transaction::Refusal::AmbiguousSelector`] for selector failures, and a
     /// typed source or resource error for malformed selected metadata.
     pub fn table_merges<'sheet, 'table>(
         &self,
@@ -260,9 +266,12 @@ fn select_metadata_positions(
     table_selector: TableSelector<'_>,
     budget: &mut Budget,
 ) -> Result<(usize, usize), TableMergesError> {
-    let document_archive = components
-        .get_archive("Index/Document.iwa")
-        .ok_or(TableMergesError::UnsupportedSource)?;
+    let document_archive =
+        components
+            .get_archive("Index/Document.iwa")
+            .ok_or(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::UnsupportedSource,
+            ))?;
     budget.charge_work(document_archive.objects.len())?;
     let document = document_archive
         .object(1)
@@ -291,7 +300,10 @@ fn select_metadata_positions(
         budget.charge_sheets(1)?;
         let inspect = match sheet_selector {
             SheetSelector::Name(_) => true,
-            SheetSelector::Index(index) => index == sheet_position,
+            SheetSelector::Position(index) => {
+                let index = index.get();
+                index == sheet_position
+            },
         };
         if !inspect {
             return Ok(());
@@ -302,15 +314,18 @@ fn select_metadata_positions(
                 return Ok(());
             }
             if selected_sheet.is_some() {
-                return Err(TableMergesError::AmbiguousSelector);
+                return Err(TableMergesError::Refused(
+                    crate::package::table_merges::Refusal::AmbiguousSelector,
+                ));
             }
         }
         require_declared_reference(document, document_index, sheet_identifier, &[1], budget)?;
         selected_sheet = Some((sheet_position, sheet_identifier));
         Ok(())
     })?;
-    let (sheet_position, sheet_identifier) =
-        selected_sheet.ok_or(TableMergesError::SheetNotFound)?;
+    let (sheet_position, sheet_identifier) = selected_sheet.ok_or(TableMergesError::Refused(
+        crate::package::table_merges::Refusal::SheetNotFound,
+    ))?;
     ensure_single_document_sheet_edge(&document_message.data, sheet_identifier, budget)?;
 
     let table_position =
@@ -343,7 +358,7 @@ fn map_names_error(error: numbers_names_codec::DecodeError) -> TableMergesError 
             limit(TableMergesLimitKind::WireBytes, observed, maximum)
         },
         Some(numbers_names_codec::WireResourceLimit::Nesting { observed, maximum }) => {
-            TableMergesError::LimitExceeded {
+            TableMergesError::Limit {
                 kind: TableMergesLimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -398,7 +413,7 @@ fn select_metadata_table(
         &sheet_message.data,
         budget,
         |drawable_identifier, budget| {
-            if selected.is_some() && matches!(table_selector, TableSelector::Index(_)) {
+            if selected.is_some() && matches!(table_selector, TableSelector::Position(_)) {
                 return Ok(());
             }
             let info_object = resolve_object(components, index, drawable_identifier, budget)?;
@@ -415,7 +430,8 @@ fn select_metadata_table(
                 .ok_or(TableMergesError::InvalidSource)?;
             budget.charge_tables(1)?;
             match table_selector {
-                TableSelector::Index(expected) => {
+                TableSelector::Position(expected) => {
+                    let expected = expected.get();
                     if table_position == expected {
                         selected = Some(table_position);
                         selected_drawable = Some(drawable_identifier);
@@ -458,7 +474,9 @@ fn select_metadata_table(
                         return Ok(());
                     }
                     if selected.is_some() {
-                        return Err(TableMergesError::AmbiguousSelector);
+                        return Err(TableMergesError::Refused(
+                            crate::package::table_merges::Refusal::AmbiguousSelector,
+                        ));
                     }
                     selected = Some(table_position);
                     selected_drawable = Some(drawable_identifier);
@@ -467,7 +485,9 @@ fn select_metadata_table(
             Ok(())
         },
     )?;
-    let selected = selected.ok_or(TableMergesError::TableNotFound)?;
+    let selected = selected.ok_or(TableMergesError::Refused(
+        crate::package::table_merges::Refusal::TableNotFound,
+    ))?;
     let selected_drawable = selected_drawable.ok_or(TableMergesError::InvalidSource)?;
     ensure_single_table_info_edge(
         sheet_message.type_,

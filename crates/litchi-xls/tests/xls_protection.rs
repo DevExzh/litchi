@@ -1,11 +1,11 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
-use litchi_xls::writer::Writer;
+use litchi_xls::raw::Reader;
+use litchi_xls::writer::Builder;
 
 #[test]
 fn protection_records_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet_index = writer.add_worksheet("Protected").unwrap();
     writer.protect_workbook(Some("book"), true, false);
     writer.protect_revisions(Some("revision"));
@@ -17,8 +17,8 @@ fn protection_records_round_trip() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
 
     let protection = workbook.protection();
     assert!(protection.structure_protected());
@@ -41,7 +41,7 @@ fn protection_records_round_trip() {
 
 #[test]
 fn file_sharing_rejects_long_user_name() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let long_name = "a".repeat(55);
     assert!(
         writer

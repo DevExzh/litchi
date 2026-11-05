@@ -1,9 +1,9 @@
 //! Unified title and linked-section transactions.
 
 use litchi_core::{
-    BlobBundle, BlobId, BlobLimits, ConflictSet, Error, ForwardOnly, History as CoreHistory,
-    HistoryLimits, Patch as CorePatch, PatchLimits, PatchOperation, Position, Result, Reversible,
-    ReversibleOperation,
+    BlobBundle, BlobId, BlobLimits, ConflictSet, Error as CoreError, ForwardOnly,
+    History as CoreHistory, HistoryLimits, Patch as CorePatch, PatchLimits, PatchOperation,
+    Position, Result, Reversible, ReversibleOperation,
 };
 use serde_json::Value;
 use std::{
@@ -11,13 +11,26 @@ use std::{
     sync::Arc,
 };
 
-use crate::{Master, link::Selector};
+use crate::{Package, link::Selector};
 
 pub use crate::edit_ops::{
     ActiveContentPolicy, BodyItemChange, BodyItemProvenance, BodyItemSpec, GeneratedIndexChange,
     ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy, StyleChange,
     StyleSpec, SubdocumentSpec,
 };
+pub use litchi_core::edit::Diagnostics;
+pub use litchi_odf_common::{Error, LimitKind};
+
+type FamilyResult<T> = std::result::Result<T, Error>;
+
+/// A committed master package: the published package, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
+
+macro_rules! family_invalid {
+    ($($arg:tt)*) => {
+        Error::from(invalid($($arg)*))
+    };
+}
 
 const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
 const MAX_WIRE_JSON_BYTES: usize = 768 * 1024 * 1024;
@@ -78,7 +91,7 @@ impl Default for TransferOptions {
 
 /// One atomic edit derived from an immutable master snapshot.
 pub struct Edit<'source> {
-    source: &'source Master,
+    source: &'source Package,
     title_before: Option<String>,
     title_after: Option<String>,
     links: BTreeMap<usize, String>,
@@ -92,11 +105,11 @@ pub struct Edit<'source> {
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Master) -> Self {
+    pub(crate) fn new(source: &'source Package) -> Self {
         Self::with_policy(source, SecurityPolicy::default())
     }
 
-    pub(crate) fn with_policy(source: &'source Master, policy: SecurityPolicy) -> Self {
+    pub(crate) fn with_policy(source: &'source Package, policy: SecurityPolicy) -> Self {
         let title = source.title().map(str::to_owned);
         Self {
             source,
@@ -125,7 +138,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the title exceeds the limit or contains a
     /// character forbidden by XML 1.0.
-    pub fn set_title(&mut self, value: impl Into<String>) -> Result<&mut Self> {
+    pub fn set_title(&mut self, value: impl Into<String>) -> FamilyResult<&mut Self> {
         let title = value.into();
         crate::title::validate_title(&title)?;
         self.title_after = Some(title.clone());
@@ -156,12 +169,12 @@ impl<'source> Edit<'source> {
         &mut self,
         selector: impl Into<Selector<'selector>>,
         href: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let reference = resolve(self.source, selector.into())?;
         let href = href.into();
         crate::link::validate_href(&href)?;
         if !self.policy.allows_external_targets() && is_external_target(&href) {
-            return Err(invalid(
+            return Err(family_invalid!(
                 "ODM security policy refuses an external link target",
             ));
         }
@@ -175,17 +188,19 @@ impl<'source> Edit<'source> {
     /// # Errors
     ///
     /// Returns an error when a staged text field violates XML bounds.
-    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> FamilyResult<&mut Self> {
         for (value, scope) in [
             (metadata.title.as_deref(), "ODM metadata title"),
             (metadata.author.as_deref(), "ODM metadata author"),
             (metadata.subject.as_deref(), "ODM metadata subject"),
             (metadata.description.as_deref(), "ODM metadata description"),
-            (metadata.keywords.as_deref(), "ODM metadata keywords"),
         ] {
             if let Some(value) = value {
                 crate::edit_ops::validate_value(value, scope, true)?;
             }
+        }
+        for keyword in &metadata.keywords {
+            crate::edit_ops::validate_value(keyword, "ODM metadata keywords", true)?;
         }
         self.title_after.clone_from(&metadata.title);
         self.metadata = Some(metadata);
@@ -197,21 +212,23 @@ impl<'source> Edit<'source> {
     /// # Errors
     ///
     /// Returns an error for a duplicate section name or missing style.
-    pub fn add_section(&mut self, section: SectionSpec) -> Result<&mut Self> {
+    pub fn add_section(&mut self, section: SectionSpec) -> FamilyResult<&mut Self> {
         if section_name_exists(self.source, &self.sections, section.name()) {
-            return Err(invalid("ODM section destination name already exists"));
+            return Err(family_invalid!(
+                "ODM section destination name already exists"
+            ));
         }
         if let Some(style_name) = section.style_name()
             && !style_name_exists(self.source, &self.styles, style_name)
         {
-            return Err(invalid("ODM section style does not exist"));
+            return Err(family_invalid!("ODM section style does not exist"));
         }
         if section
             .subdocument()
             .is_some_and(|subdocument| is_external_target(subdocument.href()))
             && !self.policy.allows_external_targets()
         {
-            return Err(invalid(
+            return Err(family_invalid!(
                 "ODM security policy refuses an external linked section",
             ));
         }
@@ -232,11 +249,11 @@ impl<'source> Edit<'source> {
     /// style/resource dependency, or a policy violation.
     pub fn transfer_linked_section(
         &mut self,
-        source: &Master,
+        source: &Package,
         position: Position,
         destination_name: impl Into<String>,
         destination_path: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.transfer_linked_section_with_options(
             source,
             position,
@@ -255,16 +272,18 @@ impl<'source> Edit<'source> {
     /// a transaction security-policy violation.
     pub fn transfer_linked_section_with_options(
         &mut self,
-        source: &Master,
+        source: &Package,
         position: Position,
         destination_name: impl Into<String>,
         destination_path: impl Into<String>,
         options: TransferOptions,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let destination_name = destination_name.into();
         SectionSpec::new(&destination_name)?;
         if section_name_exists(self.source, &self.sections, &destination_name) {
-            return Err(invalid("ODM section destination name already exists"));
+            return Err(family_invalid!(
+                "ODM section destination name already exists"
+            ));
         }
         let node = source
             .section_tree()
@@ -278,7 +297,7 @@ impl<'source> Edit<'source> {
             .get(reference_position.get())
             .ok_or_else(|| invalid("ODM transfer subdocument dependency disappeared"))?;
         let crate::subdocument::Target::Package(source_path) = reference.target() else {
-            return Err(invalid(
+            return Err(family_invalid!(
                 "ODM linked-section transfer requires a package target",
             ));
         };
@@ -294,7 +313,7 @@ impl<'source> Edit<'source> {
             .unwrap_or("application/octet-stream");
         let bytes = source.resource_bytes(source_path)?;
         if bytes.len() > self.policy.max_resource_bytes() {
-            return Err(invalid(
+            return Err(family_invalid!(
                 "ODM resource exceeds the transaction security policy",
             ));
         }
@@ -340,7 +359,7 @@ impl<'source> Edit<'source> {
         &mut self,
         position: Position,
         name: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name = name.into();
         crate::edit_ops::validate_value(&name, "ODM section name", false)?;
         let before = self
@@ -351,7 +370,9 @@ impl<'source> Edit<'source> {
             .name()
             .to_owned();
         if before != name && section_name_exists(self.source, &self.sections, &name) {
-            return Err(invalid("ODM section destination name already exists"));
+            return Err(family_invalid!(
+                "ODM section destination name already exists"
+            ));
         }
         ensure_section_not_staged(&self.sections, position)?;
         self.sections.push(SectionChange::Rename {
@@ -372,7 +393,7 @@ impl<'source> Edit<'source> {
         &mut self,
         item: Position,
         name: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let index = self
             .source
             .structure()
@@ -387,7 +408,7 @@ impl<'source> Edit<'source> {
         if self.body_items.iter().any(
             |change| matches!(change, BodyItemChange::Remove { item: staged, .. } if *staged == item),
         ) {
-            return Err(invalid("ODM generated index is already staged for removal"));
+            return Err(family_invalid!("ODM generated index is already staged for removal"));
         }
         let after = name.into();
         crate::edit_ops::validate_value(&after, "ODM generated index name", false)?;
@@ -403,12 +424,12 @@ impl<'source> Edit<'source> {
                 matches!(change, BodyItemChange::Add(spec) if spec.generated_index_name() == Some(after.as_str()))
             }))
         {
-            return Err(invalid("ODM generated-index destination name already exists"));
+            return Err(family_invalid!("ODM generated-index destination name already exists"));
         }
         if self.generated_indexes.iter().any(|change| {
             matches!(change, GeneratedIndexChange::Rename { item: staged, .. } if *staged == item)
         }) {
-            return Err(invalid("ODM generated index already has a staged change"));
+            return Err(family_invalid!("ODM generated index already has a staged change"));
         }
         self.generated_indexes.push(GeneratedIndexChange::Rename {
             item,
@@ -430,7 +451,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error for a stale selector, an unsupported item kind, or an
     /// overlapping generated-index change.
-    pub fn remove_body_item(&mut self, item: Position) -> Result<&mut Self> {
+    pub fn remove_body_item(&mut self, item: Position) -> FamilyResult<&mut Self> {
         let kind = *self
             .source
             .structure()
@@ -439,12 +460,12 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| invalid("ODM master-body item selector is out of bounds"))?;
         match kind {
             crate::structure::Kind::Section(_) => {
-                return Err(invalid(
+                return Err(family_invalid!(
                     "ODM section removal requires dependency-aware remove_section",
                 ));
             },
             crate::structure::Kind::Declarations => {
-                return Err(invalid(
+                return Err(family_invalid!(
                     "ODM declaration containers are not generic body-item edits",
                 ));
             },
@@ -458,12 +479,12 @@ impl<'source> Edit<'source> {
         if self.generated_indexes.iter().any(
             |change| matches!(change, GeneratedIndexChange::Rename { item: staged, .. } if *staged == item),
         ) {
-            return Err(invalid("ODM master-body item already has a staged change"));
+            return Err(family_invalid!("ODM master-body item already has a staged change"));
         }
         if self.body_items.iter().any(
             |change| matches!(change, BodyItemChange::Remove { item: staged, .. } if *staged == item),
         ) {
-            return Err(invalid("ODM master-body item already has a staged change"));
+            return Err(family_invalid!("ODM master-body item already has a staged change"));
         }
         self.body_items.push(BodyItemChange::Remove { item, kind });
         Ok(self)
@@ -474,7 +495,7 @@ impl<'source> Edit<'source> {
     /// # Errors
     ///
     /// Returns an error for a duplicate generated-index identity.
-    pub fn add_body_item(&mut self, item: BodyItemSpec) -> Result<&mut Self> {
+    pub fn add_body_item(&mut self, item: BodyItemSpec) -> FamilyResult<&mut Self> {
         if let Some(name) = item.generated_index_name()
             && generated_index_name_exists(
                 self.source,
@@ -483,7 +504,7 @@ impl<'source> Edit<'source> {
                 name,
             )
         {
-            return Err(invalid(
+            return Err(family_invalid!(
                 "ODM generated-index destination name already exists",
             ));
         }
@@ -501,7 +522,11 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error for an unsupported selector, dependency, or identity
     /// collision.
-    pub fn transfer_body_item(&mut self, source: &Master, item: Position) -> Result<&mut Self> {
+    pub fn transfer_body_item(
+        &mut self,
+        source: &Package,
+        item: Position,
+    ) -> FamilyResult<&mut Self> {
         self.add_body_item(BodyItemSpec::imported(source, item)?)
     }
 
@@ -511,7 +536,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error for a stale selector, overlapping intent, or incoming
     /// local-section dependency.
-    pub fn remove_section(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_section(&mut self, position: Position) -> FamilyResult<&mut Self> {
         let before = self
             .source
             .section_tree()
@@ -536,7 +561,7 @@ impl<'source> Edit<'source> {
     pub fn remove_section_with_orphaned_resources(
         &mut self,
         position: Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let root = self
             .source
             .section_tree()
@@ -545,7 +570,7 @@ impl<'source> Edit<'source> {
         let mut orphaned = Vec::new();
         orphaned
             .try_reserve(self.source.resources().resources().len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODM orphaned section resources",
                 source,
             })?;
@@ -584,9 +609,9 @@ impl<'source> Edit<'source> {
     /// # Errors
     ///
     /// Returns an error for a duplicate style identity.
-    pub fn add_style(&mut self, style: StyleSpec) -> Result<&mut Self> {
+    pub fn add_style(&mut self, style: StyleSpec) -> FamilyResult<&mut Self> {
         if style_name_exists(self.source, &self.styles, style.name()) {
-            return Err(invalid("ODM style destination name already exists"));
+            return Err(family_invalid!("ODM style destination name already exists"));
         }
         self.styles.push(StyleChange::Add(style));
         Ok(self)
@@ -602,13 +627,13 @@ impl<'source> Edit<'source> {
         origin: crate::style::Origin,
         before: impl Into<String>,
         after: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let before = before.into();
         let after = after.into();
         crate::edit_ops::validate_value(&after, "ODM style name", false)?;
         resolve_style(self.source, origin, &before)?;
         if before != after && style_name_exists(self.source, &self.styles, &after) {
-            return Err(invalid("ODM style destination name already exists"));
+            return Err(family_invalid!("ODM style destination name already exists"));
         }
         self.styles.push(StyleChange::Rename {
             origin,
@@ -627,7 +652,7 @@ impl<'source> Edit<'source> {
         &mut self,
         origin: crate::style::Origin,
         name: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name = name.into();
         resolve_style(self.source, origin, &name)?;
         self.styles.push(StyleChange::Remove { origin, name });
@@ -639,9 +664,9 @@ impl<'source> Edit<'source> {
     /// # Errors
     ///
     /// Returns an error when the explicit resource byte policy is exceeded.
-    pub fn put_resource(&mut self, resource: ResourceSpec) -> Result<&mut Self> {
+    pub fn put_resource(&mut self, resource: ResourceSpec) -> FamilyResult<&mut Self> {
         if resource.bytes().len() > self.policy.max_resource_bytes() {
-            return Err(invalid(
+            return Err(family_invalid!(
                 "ODM resource exceeds the transaction security policy",
             ));
         }
@@ -656,7 +681,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the path is absent. Final dependency validation
     /// also refuses a resource still targeted by a linked section.
-    pub fn remove_resource(&mut self, path: impl Into<String>) -> Result<&mut Self> {
+    pub fn remove_resource(&mut self, path: impl Into<String>) -> FamilyResult<&mut Self> {
         let path = path.into();
         if !self
             .source
@@ -665,7 +690,7 @@ impl<'source> Edit<'source> {
             .iter()
             .any(|resource| resource.path() == path)
         {
-            return Err(invalid("ODM resource path was not found"));
+            return Err(family_invalid!("ODM resource path was not found"));
         }
         let resource = self
             .source
@@ -691,10 +716,10 @@ impl<'source> Edit<'source> {
     /// Returns an error for an absent source path or policy violation.
     pub fn transfer_resource(
         &mut self,
-        source: &Master,
+        source: &Package,
         source_path: &str,
         destination_path: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.transfer_resource_with_collision(
             source,
             source_path,
@@ -711,11 +736,11 @@ impl<'source> Edit<'source> {
     /// violation.
     pub fn transfer_resource_with_collision(
         &mut self,
-        source: &Master,
+        source: &Package,
         source_path: &str,
         destination_path: impl Into<String>,
         collision: CollisionPolicy,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let resource = source
             .resources()
             .resources()
@@ -745,7 +770,11 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error for signed/encrypted input, invalid staged data, or
     /// semantic readback which differs from the request.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
         let title_changed = self.title_before != self.title_after;
         let explicit_metadata = self.metadata.is_some();
         let link_changes = collect_link_changes(self.source, &self.links)?;
@@ -756,10 +785,15 @@ impl<'source> Edit<'source> {
             || !self.styles.is_empty()
             || !self.resources.is_empty();
         if !title_changed && link_changes.is_empty() && !extended_changed {
+            let patch = Patch {
+                before: self.source.shared_bytes(),
+                after: self.source.shared_bytes(),
+                changes: ChangeSet::default(),
+            };
             return Ok(Commit::new(
-                self.source,
                 self.source.clone(),
-                ChangeSet::default(),
+                patch,
+                Diagnostics::UNCHANGED,
             ));
         }
 
@@ -792,13 +826,13 @@ impl<'source> Edit<'source> {
         let mut resource_writes = Vec::new();
         removed_resources
             .try_reserve(self.resources.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODM removed resources",
                 source,
             })?;
         resource_writes
             .try_reserve(self.resources.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODM resource writes",
                 source,
             })?;
@@ -864,10 +898,10 @@ impl<'source> Edit<'source> {
             before: self.title_before,
             after: self.title_after,
         });
-        Ok(Commit::new(
-            self.source,
-            snapshot,
-            ChangeSet {
+        let patch = Patch {
+            before: self.source.shared_bytes(),
+            after: snapshot.shared_bytes(),
+            changes: ChangeSet {
                 title,
                 links: link_changes,
                 metadata: if explicit_metadata {
@@ -884,7 +918,9 @@ impl<'source> Edit<'source> {
                 styles: self.styles,
                 resources: self.resources.into_values().collect(),
             },
-        ))
+        };
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 }
 
@@ -1034,43 +1070,6 @@ impl MetadataChange {
     }
 }
 
-/// A fully validated unified transaction result.
-pub struct Commit {
-    snapshot: Master,
-    patch: Patch,
-}
-
-impl Commit {
-    fn new(source: &Master, snapshot: Master, changes: ChangeSet) -> Self {
-        Self {
-            patch: Patch {
-                before: source.shared_bytes(),
-                after: snapshot.shared_bytes(),
-                changes,
-            },
-            snapshot,
-        }
-    }
-
-    /// Returns the published immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Master {
-        &self.snapshot
-    }
-
-    /// Returns the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit and returns its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Master {
-        self.snapshot
-    }
-}
-
 /// An exact-source-checked reversible unified patch.
 #[derive(Clone)]
 pub struct Patch {
@@ -1088,7 +1087,7 @@ impl Patch {
 
     /// Returns whether this patch applies to the exact source artifact.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Master) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         source.as_bytes() == self.before.as_slice()
     }
 
@@ -1097,11 +1096,11 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when `source` differs byte-for-byte.
-    pub fn apply(&self, source: &Master) -> Result<Master> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return Err(invalid("ODM unified patch source does not match"));
         }
-        Master::from_shared_bytes(Arc::clone(&self.after))
+        Package::from_shared_bytes(Arc::clone(&self.after))
     }
 
     /// Returns a patch restoring the exact source package.
@@ -1131,7 +1130,7 @@ impl Patch {
             return Err(MergeError::DifferentSource);
         }
         let source =
-            Master::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
+            Package::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
         let conflicts = find_conflicts(&self.changes, &other.changes, source.section_tree())
             .map_err(MergeError::Invalid)?;
         if !conflicts.is_empty() {
@@ -1145,8 +1144,8 @@ impl Patch {
         let mut edit = source.edit_with_policy(merge_policy);
         stage_changes(&mut edit, &self.changes).map_err(MergeError::Invalid)?;
         stage_changes(&mut edit, &other.changes).map_err(MergeError::Invalid)?;
-        edit.commit()
-            .map(|commit| commit.patch)
+        edit.commit_core()
+            .map(|commit| commit.into_parts().1)
             .map_err(MergeError::Invalid)
     }
 
@@ -1164,7 +1163,7 @@ impl Patch {
             return Err(MergeError::DifferentSource);
         }
         let source =
-            Master::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
+            Package::from_shared_bytes(Arc::clone(&self.before)).map_err(MergeError::Invalid)?;
         let conflicts = find_conflicts(&self.changes, &other.changes, source.section_tree())
             .map_err(MergeError::Invalid)?;
         Ok(MergePlan {
@@ -1180,8 +1179,9 @@ impl Patch {
     ///
     /// Returns an error if either exact package exceeds the durable bounds or
     /// cannot be reopened without credentials.
-    pub fn durable(&self) -> Result<DurablePatch> {
+    pub fn durable(&self) -> FamilyResult<DurablePatch> {
         DurablePatch::from_artifacts(self.before.as_slice(), self.after.as_slice())
+            .map_err(Error::from)
     }
 }
 
@@ -1257,16 +1257,16 @@ pub enum MergeError {
     /// Divergent writes overlap.
     Conflicts(ConflictSet<Conflict>),
     /// The merged candidate failed validation.
-    Invalid(Error),
+    Invalid(CoreError),
 }
 
 /// Explicit bounded undo/redo history for master snapshots.
 pub struct History {
-    inner: CoreHistory<Master>,
+    inner: CoreHistory<Package>,
 }
 
 impl History {
-    pub(crate) fn new(current: Master, limits: HistoryLimits) -> Self {
+    pub(crate) fn new(current: Package, limits: HistoryLimits) -> Self {
         Self {
             inner: CoreHistory::new(current, limits),
         }
@@ -1274,7 +1274,7 @@ impl History {
 
     /// Returns the current immutable snapshot.
     #[must_use]
-    pub const fn current(&self) -> &Master {
+    pub const fn current(&self) -> &Package {
         self.inner.current()
     }
 
@@ -1283,23 +1283,25 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for stale lineage, size overflow, or exceeded bounds.
-    pub fn record(&mut self, commit: &Commit) -> Result<Vec<Master>> {
-        if !commit.patch.is_applicable_to(self.current()) {
-            return Err(invalid(
-                "ODM history commit source does not match current state",
+    pub fn record(&mut self, commit: &Commit) -> FamilyResult<Vec<Package>> {
+        if !commit.patch().is_applicable_to(self.current()) {
+            return Err(Error::patch_conflict(
+                "odm.history.record",
+                "the patch source does not match the package",
             ));
         }
-        let weight = u64::try_from(commit.patch.before.len())
+        let weight = u64::try_from(commit.patch().before.len())
             .ok()
             .and_then(|before| {
-                u64::try_from(commit.patch.after.len())
+                u64::try_from(commit.patch().after.len())
                     .ok()
                     .and_then(|after| before.checked_add(after))
             })
             .ok_or_else(|| invalid("ODM history transition weight overflow"))?;
         self.inner
-            .record(commit.snapshot.clone(), weight)
+            .record(commit.package().clone(), weight)
             .map_err(patch_wire_error)
+            .map_err(Error::from)
     }
 
     /// Moves to the previous retained snapshot.
@@ -1333,8 +1335,8 @@ pub struct DurablePatch {
 
 impl DurablePatch {
     fn from_artifacts(before: &[u8], after: &[u8]) -> Result<Self> {
-        Master::from_bytes(copy_bytes(before)?)?;
-        Master::from_bytes(copy_bytes(after)?)?;
+        Package::from_vec(copy_bytes(before)?)?;
+        Package::from_vec(copy_bytes(after)?)?;
         let limits = durable_limits();
         let mut forward_blobs = BlobBundle::new(limits.blobs());
         let after_id = forward_blobs.insert(after).map_err(patch_wire_error)?;
@@ -1358,7 +1360,7 @@ impl DurablePatch {
     /// # Errors
     ///
     /// Returns an error for non-canonical, foreign, excessive, or invalid data.
-    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+    pub fn from_deterministic_json(bytes: &[u8]) -> FamilyResult<Self> {
         let inner = CorePatch::<Reversible>::from_deterministic_json(bytes, durable_limits())
             .map_err(patch_wire_error)?;
         validate_reversible(&inner)?;
@@ -1370,8 +1372,11 @@ impl DurablePatch {
     /// # Errors
     ///
     /// Returns an error when bounded serialization fails.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        self.inner.to_deterministic_json().map_err(patch_wire_error)
+    pub fn to_deterministic_json(&self) -> FamilyResult<Vec<u8>> {
+        self.inner
+            .to_deterministic_json()
+            .map_err(patch_wire_error)
+            .map_err(Error::from)
     }
 
     /// Applies this durable patch to its exact source artifact.
@@ -1379,12 +1384,15 @@ impl DurablePatch {
     /// # Errors
     ///
     /// Returns an error for stale source bytes or invalid target bytes.
-    pub fn apply(&self, source: &Master) -> Result<Master> {
+    pub fn apply(&self, source: &Package) -> FamilyResult<Package> {
         let inverse = self.inner.inverse();
         if source.as_bytes() != durable_direction(&inverse)?.target_bytes {
-            return Err(invalid("ODM durable patch source does not match"));
+            return Err(Error::patch_conflict(
+                "odm.durable.apply",
+                "the patch source does not match the package",
+            ));
         }
-        master_from_target(&self.inner)
+        master_from_target(&self.inner).map_err(Error::from)
     }
 
     /// Returns the exact durable inverse.
@@ -1416,7 +1424,7 @@ impl SealedPatch {
     /// # Errors
     ///
     /// Returns an error for non-canonical, foreign, excessive, or invalid data.
-    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
+    pub fn from_deterministic_json(bytes: &[u8]) -> FamilyResult<Self> {
         let inner = CorePatch::<ForwardOnly>::from_deterministic_json(bytes, durable_limits())
             .map_err(patch_wire_error)?;
         validate_sealed(&inner)?;
@@ -1428,8 +1436,11 @@ impl SealedPatch {
     /// # Errors
     ///
     /// Returns an error when bounded serialization fails.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        self.inner.to_deterministic_json().map_err(patch_wire_error)
+    pub fn to_deterministic_json(&self) -> FamilyResult<Vec<u8>> {
+        self.inner
+            .to_deterministic_json()
+            .map_err(patch_wire_error)
+            .map_err(Error::from)
     }
 
     /// Applies after checking the retained SHA-256 source precondition.
@@ -1437,16 +1448,19 @@ impl SealedPatch {
     /// # Errors
     ///
     /// Returns an error for stale source bytes or invalid target bytes.
-    pub fn apply(&self, source: &Master) -> Result<Master> {
+    pub fn apply(&self, source: &Package) -> FamilyResult<Package> {
         let direction = durable_direction(&self.inner)?;
         if BlobId::of(source.as_bytes()).as_hex() != direction.source_id {
-            return Err(invalid("ODM durable patch source does not match"));
+            return Err(Error::patch_conflict(
+                "odm.sealed.apply",
+                "the patch source does not match the package",
+            ));
         }
-        Master::from_bytes(copy_bytes(direction.target_bytes)?)
+        Package::from_vec(copy_bytes(direction.target_bytes)?).map_err(Error::from)
     }
 }
 
-fn resolve(source: &Master, selector: Selector<'_>) -> Result<Position> {
+fn resolve(source: &Package, selector: Selector<'_>) -> Result<Position> {
     match selector {
         Selector::Position(position) => source
             .subdocuments()
@@ -1473,7 +1487,7 @@ fn is_external_target(href: &str) -> bool {
             .any(|segment| segment.is_empty() || matches!(segment, "." | ".."))
 }
 
-fn section_name_exists(source: &Master, staged: &[SectionChange], name: &str) -> bool {
+fn section_name_exists(source: &Package, staged: &[SectionChange], name: &str) -> bool {
     source
         .section_tree()
         .sections()
@@ -1487,7 +1501,7 @@ fn section_name_exists(source: &Master, staged: &[SectionChange], name: &str) ->
 }
 
 fn generated_index_name_exists(
-    source: &Master,
+    source: &Package,
     generated_indexes: &[GeneratedIndexChange],
     body_items: &[BodyItemChange],
     name: &str,
@@ -1522,7 +1536,7 @@ fn ensure_section_not_staged(staged: &[SectionChange], position: Position) -> Re
     Ok(())
 }
 
-fn style_name_exists(source: &Master, staged: &[StyleChange], name: &str) -> bool {
+fn style_name_exists(source: &Package, staged: &[StyleChange], name: &str) -> bool {
     source.styles().iter().any(|style| style.name() == name)
         || staged.iter().any(|change| match change {
             StyleChange::Add(style) => style.name() == name,
@@ -1533,7 +1547,7 @@ fn style_name_exists(source: &Master, staged: &[StyleChange], name: &str) -> boo
 
 fn transfer_style_closure(
     edit: &mut Edit<'_>,
-    source: &Master,
+    source: &Package,
     leaf_name: &str,
     collision: CollisionPolicy,
 ) -> Result<String> {
@@ -1614,7 +1628,7 @@ fn transfer_style_closure(
 }
 
 fn style_owner_xml<'source>(
-    source: &'source Master,
+    source: &'source Package,
     definition: &crate::style::Definition,
 ) -> Result<&'source str> {
     match definition.origin() {
@@ -1626,9 +1640,9 @@ fn style_owner_xml<'source>(
 }
 
 fn transferred_style_is_identical(
-    destination: &Master,
+    destination: &Package,
     staged: &[StyleChange],
-    source: &Master,
+    source: &Package,
     source_definition: &crate::style::Definition,
     desired_spec: &StyleSpec,
 ) -> Result<bool> {
@@ -1665,7 +1679,7 @@ fn transferred_style_is_identical(
     Ok(source_fragment == destination_fragment)
 }
 
-fn unique_style_name(source: &Master, staged: &[StyleChange], base: &str) -> Result<String> {
+fn unique_style_name(source: &Package, staged: &[StyleChange], base: &str) -> Result<String> {
     for sequence in 1..=1_000_000usize {
         let candidate = format!("{base}__import{sequence}");
         crate::edit_ops::validate_value(&candidate, "ODM imported style name", false)?;
@@ -1679,7 +1693,7 @@ fn unique_style_name(source: &Master, staged: &[StyleChange], base: &str) -> Res
 }
 
 fn resolve_resource_collision(
-    destination: &Master,
+    destination: &Package,
     staged: &BTreeMap<String, ResourceChange>,
     desired: &str,
     media_type: &str,
@@ -1752,7 +1766,7 @@ fn imported_resource_path(path: &str, sequence: usize) -> Result<String> {
     Ok(candidate)
 }
 
-fn resolve_style(source: &Master, origin: crate::style::Origin, name: &str) -> Result<()> {
+fn resolve_style(source: &Package, origin: crate::style::Origin, name: &str) -> Result<()> {
     let count = source
         .styles()
         .iter()
@@ -1782,7 +1796,7 @@ fn ensure_removed_resources_are_unreferenced(content: &str, removed: &[String]) 
     Ok(())
 }
 
-fn validate_security_policy(snapshot: &Master, policy: SecurityPolicy) -> Result<()> {
+fn validate_security_policy(snapshot: &Package, policy: SecurityPolicy) -> Result<()> {
     if policy.active_content() == ActiveContentPolicy::Refuse
         && !snapshot.security().active_content().is_empty()
     {
@@ -1817,8 +1831,8 @@ fn simple_metadata_equal(left: &litchi_core::Metadata, right: &litchi_core::Meta
 }
 
 fn verify_extended_readback(
-    source: &Master,
-    snapshot: &Master,
+    source: &Package,
+    snapshot: &Package,
     sections: &[SectionChange],
     generated_indexes: &[GeneratedIndexChange],
     body_items: &[BodyItemChange],
@@ -2000,13 +2014,13 @@ fn verify_extended_readback(
 }
 
 fn collect_link_changes(
-    source: &Master,
+    source: &Package,
     staged: &BTreeMap<usize, String>,
 ) -> Result<Vec<LinkChange>> {
     let mut changes = Vec::new();
     changes
         .try_reserve(staged.len())
-        .map_err(|allocation| Error::Allocation {
+        .map_err(|allocation| CoreError::Allocation {
             resource: "ODM unified link changes",
             source: allocation,
         })?;
@@ -2138,7 +2152,7 @@ fn find_conflicts(
         .saturating_add(left.resources.len().saturating_mul(right.resources.len()));
     conflicts
         .try_reserve(capacity)
-        .map_err(|allocation| Error::Allocation {
+        .map_err(|allocation| CoreError::Allocation {
             resource: "ODM merge conflicts",
             source: allocation,
         })?;
@@ -2150,7 +2164,7 @@ fn find_conflicts(
     let mut right_links = HashMap::new();
     right_links
         .try_reserve(right.links.len())
-        .map_err(|allocation| Error::Allocation {
+        .map_err(|allocation| CoreError::Allocation {
             resource: "ODM merge link index",
             source: allocation,
         })?;
@@ -2329,17 +2343,16 @@ fn collect_metadata_conflicts(
             right.before.description.as_deref(),
             right.after.description.as_deref(),
         ),
-        (
-            "keywords",
-            left.before.keywords.as_deref(),
-            left.after.keywords.as_deref(),
-            right.before.keywords.as_deref(),
-            right.after.keywords.as_deref(),
-        ),
     ] {
         if left_before != left_after && right_before != right_after && left_after != right_after {
             conflicts.push(Conflict::MetadataField(field));
         }
+    }
+    if left.before.keywords != left.after.keywords
+        && right.before.keywords != right.after.keywords
+        && left.after.keywords != right.after.keywords
+    {
+        conflicts.push(Conflict::MetadataField("keywords"));
     }
 }
 
@@ -2603,18 +2616,18 @@ fn validate_reversible(patch: &CorePatch<Reversible>) -> Result<()> {
     if forward.source_id != reverse.target_id || forward.target_id != reverse.source_id {
         return Err(invalid("invalid ODM durable patch vocabulary"));
     }
-    Master::from_bytes(copy_bytes(forward.target_bytes)?)?;
-    Master::from_bytes(copy_bytes(reverse.target_bytes)?)?;
+    Package::from_vec(copy_bytes(forward.target_bytes)?)?;
+    Package::from_vec(copy_bytes(reverse.target_bytes)?)?;
     Ok(())
 }
 
 fn validate_sealed(patch: &CorePatch<ForwardOnly>) -> Result<()> {
-    Master::from_bytes(copy_bytes(durable_direction(patch)?.target_bytes)?)?;
+    Package::from_vec(copy_bytes(durable_direction(patch)?.target_bytes)?)?;
     Ok(())
 }
 
-fn master_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<Master> {
-    Master::from_bytes(copy_bytes(durable_direction(patch)?.target_bytes)?)
+fn master_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<Package> {
+    Package::from_vec(copy_bytes(durable_direction(patch)?.target_bytes)?)
 }
 
 fn is_digest(value: &str) -> bool {
@@ -2631,7 +2644,7 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|allocation| Error::Allocation {
+        .map_err(|allocation| CoreError::Allocation {
             resource: "ODM durable package",
             source: allocation,
         })?;
@@ -2639,12 +2652,12 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn patch_wire_error(source: litchi_core::PatchError) -> Error {
+fn patch_wire_error(source: litchi_core::PatchError) -> CoreError {
     let message = format!("invalid ODM durable patch: {source}");
     drop(source);
-    Error::InvalidFormat(message)
+    CoreError::InvalidFormat(message)
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(message.to_owned())
+fn invalid(message: &str) -> CoreError {
+    CoreError::InvalidFormat(message.to_owned())
 }

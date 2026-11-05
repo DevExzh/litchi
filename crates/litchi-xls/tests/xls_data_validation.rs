@@ -1,11 +1,13 @@
 use std::io::Cursor;
 
 use litchi_xls::writer::{
-    DataValidation, DataValidationErrorStyle as WriterErrorStyle, DataValidationFormulaKind,
-    DataValidationImeMode as WriterImeMode, DataValidationOperator, DataValidationOptions,
-    DataValidationRange, DataValidationTableOptions, DataValidationType, Writer,
+    Builder, DataValidation, DataValidationErrorStyle as WriterErrorStyle,
+    DataValidationFormulaKind, DataValidationImeMode as WriterImeMode, DataValidationOperator,
+    DataValidationOptions, DataValidationRange, DataValidationTableOptions, DataValidationType,
 };
-use litchi_xls::{DataValidationErrorStyle, DataValidationImeMode, DataValidationKind, Workbook};
+use litchi_xls::{
+    DataValidationErrorStyle, DataValidationImeMode, DataValidationKind, raw::Reader,
+};
 
 fn validation(row: u32, validation_type: DataValidationType) -> DataValidation {
     DataValidation {
@@ -22,7 +24,7 @@ fn validation(row: u32, validation_type: DataValidationType) -> DataValidation {
 
 #[test]
 fn complete_validation_family_round_trips_as_inert_metadata() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Validation").unwrap();
     writer
         .set_data_validation_table_options(
@@ -141,8 +143,8 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let sheet = workbook.xls_worksheet(0).unwrap();
     let settings = sheet.data_validation_settings().unwrap();
     assert!(settings.window_closed());
@@ -177,7 +179,7 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
 
 #[test]
 fn malformed_writer_metadata_is_rejected() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Validation").unwrap();
     assert!(
         writer
@@ -204,8 +206,8 @@ fn malformed_writer_metadata_is_rejected() {
             .is_err()
     );
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(
         workbook
             .xls_worksheet(0)
@@ -217,7 +219,7 @@ fn malformed_writer_metadata_is_rejected() {
 
 #[test]
 fn validation_surrogate_pair_messages_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Validation").unwrap();
     let mut rule = validation(0, DataValidationType::Any);
     rule.input_title = Some("😀".to_string());
@@ -227,8 +229,8 @@ fn validation_surrogate_pair_messages_round_trip() {
     writer.add_data_validation(sheet, rule).unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let rule = &workbook.xls_worksheet(0).unwrap().data_validations()[0];
     assert_eq!(rule.prompt_title(), Some("😀"));
     assert_eq!(rule.prompt(), Some("😀"));
@@ -238,7 +240,7 @@ fn validation_surrogate_pair_messages_round_trip() {
 
 #[test]
 fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("EmptyValidation").unwrap();
     writer
         .set_data_validation_table_options(
@@ -252,8 +254,8 @@ fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
         )
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let settings = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -262,7 +264,7 @@ fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
     assert_eq!(settings.declared_rule_count(), 0);
     assert_eq!((settings.x_left(), settings.y_top()), (7, 9));
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Oversized").unwrap();
     writer
         .add_data_validation(
@@ -275,6 +277,8 @@ fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
             ),
         )
         .unwrap();
-    let mut bytes = Cursor::new(Vec::new());
-    assert!(writer.write_to(&mut bytes).is_err());
+    assert!(matches!(
+        writer.build(),
+        Err(litchi_xls::package::Error::Reader(_))
+    ));
 }

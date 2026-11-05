@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use litchi_core::sheet::Result;
+use crate::error::Result;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -182,7 +182,7 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
     let mut capture: Option<(usize, Writer<Vec<u8>>)> = None;
     loop {
         let decoder = reader.decoder();
-        let event = reader.read_event()?.into_owned();
+        let event = reader.read_event().map_err(xml_error)?.into_owned();
         if let Some((depth, writer)) = capture.as_mut() {
             match &event {
                 Event::Start(_) => {
@@ -788,6 +788,6 @@ fn escape_text(o: &mut BoundedXml, v: &str) -> Result<()> {
     Ok(())
 }
 
-fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
+fn xml_error(e: impl std::fmt::Display) -> crate::Error {
     invalid(e.to_string())
 }

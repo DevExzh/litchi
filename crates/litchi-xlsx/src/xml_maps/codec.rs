@@ -1,6 +1,6 @@
 //! XLSX compatibility forwarding for the shared XML Maps codec.
 
-use litchi_core::sheet::Result;
+use crate::error::Result;
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
@@ -10,7 +10,10 @@ use super::model::{XmlMapConformance, XmlMapInfo};
 impl XmlMapInfo {
     /// Parse a bounded `SpreadsheetML` XML Maps part.
     pub fn parse(xml: &[u8]) -> Result<Self> {
-        match litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info(xml) {
+        match litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info(
+            xml,
+            &litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits::DEFAULT,
+        ) {
             Ok(value) => Ok(value.into()),
             Err(error) if error.to_string().starts_with("invalid boolean attribute '") => {
                 // Excel producers historically emitted the XML Schema-compatible
@@ -20,8 +23,11 @@ impl XmlMapInfo {
                     return Err(error.into());
                 };
                 Ok(
-                    litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info(&normalized)?
-                        .into(),
+                    litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info(
+                        &normalized,
+                        &litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits::DEFAULT,
+                    )?
+                    .into(),
                 )
             },
             Err(error) => Err(error.into()),
@@ -39,6 +45,7 @@ impl XmlMapInfo {
             litchi_ooxml_common::spreadsheet_xml_maps::serialize_xml_map_info_ref(
                 &self.to_common_ref()?,
                 conformance,
+                &litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits::DEFAULT,
             )?,
         )
     }
@@ -274,6 +281,7 @@ pub(super) fn patch_source(
             &after.to_common_ref()?,
             before_conformance,
             after_conformance,
+            &litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits::DEFAULT,
         )?,
     )
 }

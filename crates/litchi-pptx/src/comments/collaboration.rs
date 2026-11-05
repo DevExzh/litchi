@@ -14,16 +14,13 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
-pub use package::{
-    apply_presence_commit, apply_presence_patch, apply_threading_commit, apply_threading_patch,
-    load_presence, load_presence_snapshot, load_threading, load_threading_snapshot, put_presence,
-    put_threading, remove_presence, remove_threading,
-};
-pub use transaction::{
-    AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, AuthorPresenceTransaction,
-    CommentThreadingCommit, CommentThreadingPatch, CommentThreadingSnapshot,
-    CommentThreadingTransaction, Revision,
-};
+pub(crate) use codec::{validate_presence_replay, validate_threading_replay};
+
+pub mod presence;
+pub mod threading;
+
+pub use package::{load_presence, load_presence_snapshot, load_threading, load_threading_snapshot};
+pub use transaction::{AuthorPresenceSnapshot, CommentThreadingSnapshot, Revision};
 
 /// The namespace introduced by [MS-PPTX] 2.4 for these extensions.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";

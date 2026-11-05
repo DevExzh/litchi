@@ -7,6 +7,337 @@ use thiserror::Error;
 /// Result of a PPTX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A bounded resource dimension used by a PresentationML error.
+///
+/// The primary opened-presentation edit dimensions remain direct variants so
+/// callers can select them through [`crate::opened::Limits`].  Codec and
+/// shared-OOXML dimensions are nested to keep their ownership explicit: a
+/// codec limit is not an edit limit, and a shared service keeps its own
+/// vocabulary.  No untyped resource string crosses the public error boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Changed parts in one primary patch.
+    Parts,
+    /// Encoded durable-patch bytes.
+    PatchBytes,
+    /// Replacement text bytes.
+    TextBytes,
+    /// Retained history entries.
+    HistoryEntries,
+    /// Aggregate encoded history bytes.
+    HistoryBytes,
+    /// Retained candidate bytes.
+    RetainedCandidateBytes,
+    /// Retained markup-compatibility bytes.
+    RetainedMceBytes,
+    /// A bounded PresentationML codec dimension.
+    Codec(CodecLimitKind),
+    /// A bounded host-neutral OOXML service dimension.
+    Common(litchi_ooxml_common::LimitKind),
+}
+
+/// Semantic resource dimensions used by the PPTX codecs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CodecLimitKind {
+    /// Bytes admitted from an input buffer.
+    InputBytes,
+    /// Bytes produced by a codec or writer.
+    OutputBytes,
+    /// PresentationML or DrawingML XML bytes.
+    XmlBytes,
+    /// XML nesting depth.
+    XmlDepth,
+    /// XML elements, nodes, or frames.
+    XmlNodes,
+    /// XML parser events.
+    XmlEvents,
+    /// XML attributes.
+    XmlAttributes,
+    /// XML attribute bytes.
+    XmlAttributeBytes,
+    /// Decoded string bytes.
+    StringBytes,
+    /// Text bytes.
+    TextBytes,
+    /// OPC part bytes.
+    PartBytes,
+    /// OPC part count.
+    Parts,
+    /// Relationship count or relationship graph edges.
+    Relationships,
+    /// Relationship identifier or target bytes.
+    RelationshipBytes,
+    /// XML entity-reference bytes.
+    ReferenceBytes,
+    /// Names or name-bearing selectors.
+    Names,
+    /// Name bytes.
+    NameBytes,
+    /// Slides or slide references.
+    Slides,
+    /// Slide references retained by presentation metadata.
+    SlideReferences,
+    /// Custom presentation shows.
+    CustomShows,
+    /// Presentation sections.
+    Sections,
+    /// Document change lists.
+    ChangeLists,
+    /// Document changes.
+    Changes,
+    /// Presentation event records.
+    Events,
+    /// Animation records.
+    Animations,
+    /// Animation build records.
+    AnimationBuilds,
+    /// Animation paragraph templates.
+    ParagraphTemplates,
+    /// Animation time-filter points.
+    TimeFilterPoints,
+    /// Shapes or shape records.
+    Shapes,
+    /// Placeholder shape records in a newly authored slide.
+    Placeholders,
+    /// Shape-property replacement selections.
+    ShapeProperties,
+    /// Office Math equations discovered in a slide.
+    Equations,
+    /// Text-box shape records in a streaming slide.
+    TextBoxes,
+    /// Text replacement selections staged in one edit.
+    TextReplacements,
+    /// Ink annotation records.
+    Annotations,
+    /// Ink trace records.
+    Traces,
+    /// Ink trace groups.
+    TraceGroups,
+    /// Ink trace points.
+    TracePoints,
+    /// Ink action anchors.
+    InkAnchors,
+    /// Ink action picture children.
+    PictureChildren,
+    /// Picture records carrying media resources.
+    MediaPictures,
+    /// Media bookmark records.
+    Bookmarks,
+    /// Embedded chart series.
+    ChartSeries,
+    /// Embedded chart points.
+    ChartPoints,
+    /// Embedded controls.
+    Controls,
+    /// Embedded OLE objects.
+    OleObjects,
+    /// Content-part anchors.
+    ContentParts,
+    /// Table rows.
+    TableRows,
+    /// Table cells.
+    TableCells,
+    /// Table style definitions.
+    TableStyles,
+    /// Modern comment records and replies.
+    CommentEntries,
+    /// Modern comment replies.
+    CommentReplies,
+    /// Modern comment author records.
+    Authors,
+    /// Action setting records.
+    ActionSettings,
+    /// Shape designer tag records.
+    DesignerTags,
+    /// Text objects in a slide.
+    TextObjects,
+    /// Text runs in a slide.
+    TextRuns,
+    /// Zoom entries.
+    ZoomEntries,
+    /// Caption tracks.
+    CaptionTracks,
+    /// Caption text lines.
+    CaptionLines,
+    /// Caption text blocks.
+    CaptionBlocks,
+    /// Caption cue settings.
+    CaptionSettings,
+    /// Presentation tags.
+    Tags,
+    /// References or identities.
+    References,
+    /// Payload bytes.
+    PayloadBytes,
+    /// Serialized archive bytes.
+    ArchiveBytes,
+    /// Durable patch bytes.
+    PatchBytes,
+    /// Source bytes.
+    SourceBytes,
+    /// Retained bytes.
+    RetainedBytes,
+    /// A bounded index or position.
+    Index,
+    /// A bounded namespace byte sequence.
+    NamespaceBytes,
+    /// Namespace bindings or declarations.
+    NamespaceBindings,
+    /// Namespace prefixes.
+    NamespacePrefixes,
+    /// Extension count or extension list.
+    Extensions,
+    /// Extension payload bytes.
+    ExtensionBytes,
+    /// Aggregate Designer tag name and value bytes.
+    DesignerTagBytes,
+    /// Password/verifier bytes.
+    PasswordBytes,
+    /// Shape identifier values.
+    ShapeIds,
+    /// Slide identifier values.
+    SlideIds,
+    /// Snapshot entries or their bounded aggregate.
+    Snapshots,
+    /// Proof bytes used by a source-backed plan.
+    ProofBytes,
+    /// Bounded transient memory admission bytes.
+    MemoryBytes,
+    /// Embedded font count.
+    Fonts,
+    /// Presentation view guide entries.
+    Guides,
+    /// Presentation property recent-color entries.
+    Colors,
+    /// Model3D child entries.
+    ModelEntries,
+    /// One embedded font payload.
+    FontBytes,
+    /// Aggregate embedded-font payload bytes.
+    TotalFontBytes,
+}
+
+impl CodecLimitKind {
+    /// A content-free diagnostic label.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
+            Self::XmlBytes => "XML bytes",
+            Self::XmlDepth => "XML depth",
+            Self::XmlNodes => "XML nodes",
+            Self::XmlEvents => "XML events",
+            Self::XmlAttributes => "XML attributes",
+            Self::XmlAttributeBytes => "XML attribute bytes",
+            Self::StringBytes => "string bytes",
+            Self::TextBytes => "text bytes",
+            Self::PartBytes => "part bytes",
+            Self::Parts => "parts",
+            Self::Relationships => "relationships",
+            Self::RelationshipBytes => "relationship bytes",
+            Self::ReferenceBytes => "reference bytes",
+            Self::Names => "names",
+            Self::NameBytes => "name bytes",
+            Self::Slides => "slides",
+            Self::SlideReferences => "slide references",
+            Self::CustomShows => "custom shows",
+            Self::Sections => "sections",
+            Self::ChangeLists => "change lists",
+            Self::Changes => "changes",
+            Self::Events => "events",
+            Self::Animations => "animations",
+            Self::AnimationBuilds => "animation builds",
+            Self::ParagraphTemplates => "paragraph templates",
+            Self::TimeFilterPoints => "time-filter points",
+            Self::Shapes => "shapes",
+            Self::Placeholders => "placeholders",
+            Self::ShapeProperties => "shape properties",
+            Self::Equations => "equations",
+            Self::TextBoxes => "text boxes",
+            Self::TextReplacements => "text replacements",
+            Self::Annotations => "annotations",
+            Self::Traces => "traces",
+            Self::TraceGroups => "trace groups",
+            Self::TracePoints => "trace points",
+            Self::InkAnchors => "ink anchors",
+            Self::PictureChildren => "picture children",
+            Self::MediaPictures => "media pictures",
+            Self::Bookmarks => "bookmarks",
+            Self::ChartSeries => "chart series",
+            Self::ChartPoints => "chart points",
+            Self::Controls => "controls",
+            Self::OleObjects => "OLE objects",
+            Self::ContentParts => "content parts",
+            Self::TableRows => "table rows",
+            Self::TableCells => "table cells",
+            Self::TableStyles => "table styles",
+            Self::CommentEntries => "comment entries",
+            Self::CommentReplies => "comment replies",
+            Self::Authors => "authors",
+            Self::ActionSettings => "action settings",
+            Self::DesignerTags => "designer tags",
+            Self::TextObjects => "text objects",
+            Self::TextRuns => "text runs",
+            Self::ZoomEntries => "zoom entries",
+            Self::CaptionTracks => "caption tracks",
+            Self::CaptionLines => "caption lines",
+            Self::CaptionBlocks => "caption blocks",
+            Self::CaptionSettings => "caption settings",
+            Self::Tags => "tags",
+            Self::References => "references",
+            Self::PayloadBytes => "payload bytes",
+            Self::ArchiveBytes => "archive bytes",
+            Self::PatchBytes => "patch bytes",
+            Self::SourceBytes => "source bytes",
+            Self::RetainedBytes => "retained bytes",
+            Self::Index => "index",
+            Self::NamespaceBytes => "namespace bytes",
+            Self::NamespaceBindings => "namespace bindings",
+            Self::NamespacePrefixes => "namespace prefixes",
+            Self::Extensions => "extensions",
+            Self::ExtensionBytes => "extension bytes",
+            Self::DesignerTagBytes => "Designer tag bytes",
+            Self::PasswordBytes => "password bytes",
+            Self::ShapeIds => "shape identifiers",
+            Self::SlideIds => "slide identifiers",
+            Self::Snapshots => "snapshots",
+            Self::ProofBytes => "proof bytes",
+            Self::MemoryBytes => "memory bytes",
+            Self::Fonts => "fonts",
+            Self::Guides => "guides",
+            Self::Colors => "colors",
+            Self::ModelEntries => "model entries",
+            Self::FontBytes => "font bytes",
+            Self::TotalFontBytes => "total font bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for CodecLimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parts => formatter.write_str("changed parts"),
+            Self::PatchBytes => formatter.write_str("durable patch bytes"),
+            Self::TextBytes => formatter.write_str("replacement text bytes"),
+            Self::HistoryEntries => formatter.write_str("history entries"),
+            Self::HistoryBytes => formatter.write_str("history bytes"),
+            Self::RetainedCandidateBytes => formatter.write_str("retained candidate bytes"),
+            Self::RetainedMceBytes => formatter.write_str("retained markup-compatibility bytes"),
+            Self::Codec(kind) => kind.fmt(formatter),
+            Self::Common(kind) => kind.fmt(formatter),
+        }
+    }
+}
+
 /// Stable classification for a shape-transfer refusal that would otherwise
 /// publish a lossy or dangling shape graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,7 +403,7 @@ pub enum SlideCopyRefusal {
 /// encodes copied image members, which the header now records; `LPCP0003`
 /// carries no such field, so it is superseded by `LPCP0004` and refused by
 /// name rather than read implicitly as either encoding. See
-/// [`Error::DurablePatchRevisionFormat`].
+/// [`Error::PatchConflict`].
 ///
 /// This enum never carries attacker-supplied bytes: an unrecognized magic is
 /// not classified here at all and keeps the existing
@@ -154,16 +485,10 @@ pub enum SlideRemovalRefusal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SlideOrderRefusal {
-    /// No positional move was staged before commit.
-    NoMove,
-    /// More than one positional move was requested from one snapshot.
-    MultipleMoves,
     /// Markup-compatibility input would require choosing or rewriting a branch.
     MarkupCompatibility,
     /// PowerPoint section metadata would retain the old slide positions.
     Sections,
-    /// Custom-show metadata could not be retained as stable relationship selections.
-    CustomShows,
     /// The presentation view-properties part owns positional state.
     ViewProperties,
     /// The presentation-properties part owns positional state.
@@ -174,6 +499,26 @@ pub enum SlideOrderRefusal {
     AmbiguousBindings,
     /// A direct presentation-root modify verifier is not safe to preserve through reordering.
     ModifyVerifier,
+}
+
+impl SlideCopyRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SignedPackage | Self::ProtectedPresentation => RefusalKind::Protected,
+            Self::CallerDefinedPart => RefusalKind::UnsupportedOperation,
+            Self::MarkupCompatibility
+            | Self::UnknownSemanticSurface
+            | Self::SharedOwner
+            | Self::UnsupportedRelationship
+            | Self::DependencyCycle
+            | Self::AmbiguousTopology
+            | Self::GlobalTableStyle
+            | Self::UnknownPhysicalMember => RefusalKind::UnsupportedContent,
+        }
+    }
 }
 
 impl std::fmt::Display for SlideCopyRefusal {
@@ -194,6 +539,29 @@ impl std::fmt::Display for SlideCopyRefusal {
     }
 }
 
+impl SlideRemovalRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    ///
+    /// [`Self::FinalSlide`] is an invalid value: the selection would leave
+    /// the presentation without slides. litchi-ops reports it as
+    /// `invalid_value`, by the shared refusal-kind contract.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SignedPackage | Self::ProtectedPresentation => RefusalKind::Protected,
+            Self::FinalSlide => RefusalKind::InvalidValue,
+            Self::MacroEnabledPackage
+            | Self::MarkupCompatibility
+            | Self::UnknownSemanticSurface
+            | Self::SharedOwner
+            | Self::UnsupportedRelationship
+            | Self::AmbiguousTopology
+            | Self::UnknownPhysicalMember => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for SlideRemovalRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -211,20 +579,54 @@ impl std::fmt::Display for SlideRemovalRefusal {
     }
 }
 
+impl SlideOrderRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    ///
+    /// [`Self::AmbiguousBindings`] is unsupported content; litchi-ops
+    /// reports it as `corrupt_file`, because ambiguous slide bindings are a
+    /// malformed source rather than a route limitation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ModifyVerifier => RefusalKind::Protected,
+            Self::MarkupCompatibility
+            | Self::Sections
+            | Self::ViewProperties
+            | Self::PresentationProperties
+            | Self::PositionalOwner
+            | Self::AmbiguousBindings => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for SlideOrderRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
-            Self::NoMove => "no slide-order move",
-            Self::MultipleMoves => "multiple slide-order moves",
             Self::MarkupCompatibility => "markup-compatibility surface",
             Self::Sections => "presentation sections",
-            Self::CustomShows => "custom shows",
             Self::ViewProperties => "presentation view properties",
             Self::PresentationProperties => "presentation properties",
             Self::PositionalOwner => "positional semantic owner",
             Self::AmbiguousBindings => "ambiguous slide-order bindings",
             Self::ModifyVerifier => "presentation modify verifier",
         })
+    }
+}
+
+impl ShapeTransferRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::NestedShape | Self::MissingIdentity | Self::UnresolvedConnectorEndpoint => {
+                RefusalKind::UnsupportedTarget
+            },
+            Self::ContentPart | Self::UnknownExtensionShape | Self::UnclassifiedGraphicFrame => {
+                RefusalKind::UnsupportedContent
+            },
+        }
     }
 }
 
@@ -245,50 +647,6 @@ impl std::fmt::Display for ShapeTransferRefusal {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// A whole-slide removal prerequisite was classified and refused without mutation.
-    #[error("unsupported PresentationML slide removal plan ({kind}): {detail}")]
-    SlideRemovalPlan {
-        /// Machine-readable refusal family.
-        kind: SlideRemovalRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// A source-backed slide-order prerequisite was classified and refused
-    /// without mutation.
-    #[error("unsupported PresentationML slide-order edit ({kind}): {detail}")]
-    SlideOrderPlan {
-        /// Machine-readable refusal family.
-        kind: SlideOrderRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// A whole-slide copy prerequisite was classified and refused without mutation.
-    #[error("unsupported PresentationML slide copy plan ({kind}): {detail}")]
-    SlideCopyPlan {
-        /// Machine-readable refusal family.
-        kind: SlideCopyRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// A common-shape transfer was classified and refused before publication.
-    #[error("unsupported PresentationML shape transfer ({kind}): {detail}")]
-    ShapeTransfer {
-        /// Machine-readable refusal family.
-        kind: ShapeTransferRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// One atomic shape-text batch selected the same semantic shape twice.
-    #[error("shape-text batch selects shape index {index} more than once")]
-    DuplicateShapeTextSelection {
-        /// Repeated zero-based pre-order shape index.
-        index: usize,
-    },
-
     /// Filesystem access or atomic output replacement failed.
     #[error("PPTX I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -305,13 +663,29 @@ pub enum Error {
     #[error("invalid PresentationML: {0}")]
     Invalid(String),
 
-    /// A bounded codec resource was exhausted.
-    #[error("PresentationML {resource} exceeds the limit of {limit}")]
+    /// A bounded PresentationML resource was exhausted.
+    ///
+    /// `observed` is the measured charge.  Arithmetic overflow is represented
+    /// by `usize::MAX`, never by a fabricated `maximum + 1` value.
+    #[error("PresentationML {kind} exceeds the limit of {maximum} (observed {observed})")]
     Limit {
-        /// Resource that exceeded its configured limit.
-        resource: &'static str,
+        /// Dimension that exceeded its configured limit.
+        kind: LimitKind,
+        /// Measured charge, or `usize::MAX` when the charge overflowed.
+        observed: usize,
         /// Active upper bound.
-        limit: usize,
+        maximum: usize,
+    },
+
+    /// A caller-selected PresentationML limit was invalid.
+    #[error("invalid PresentationML {kind} limit: {value} (maximum {maximum})")]
+    InvalidLimit {
+        /// Dimension whose value was invalid.
+        kind: LimitKind,
+        /// Supplied value.
+        value: usize,
+        /// Hard maximum permitted for this dimension.
+        maximum: usize,
     },
 
     /// A bounded `PresentationML` operation could not reserve required memory.
@@ -322,6 +696,16 @@ pub enum Error {
         /// Original allocator failure.
         #[source]
         source: TryReserveError,
+    },
+
+    /// A bounded structural byte count overflowed before publication.
+    ///
+    /// This carries no fabricated observed or configured value: the
+    /// operation could not represent the count in its structural type.
+    #[error("PPTX {resource} capacity overflow")]
+    CapacityOverflow {
+        /// Structural byte count that overflowed.
+        resource: &'static str,
     },
 
     /// A related part has a content type forbidden by `PresentationML`.
@@ -373,6 +757,19 @@ pub enum Error {
         /// Selector spelling supplied by the caller.
         name: String,
         /// Number of matching slides.
+        matches: usize,
+    },
+
+    /// No registered slide layout has the requested exact name.
+    #[error("slide layout name '{0}' was not found")]
+    SlideLayoutNameNotFound(String),
+
+    /// Multiple registered slide layouts have the requested exact name.
+    #[error("slide layout name '{name}' is ambiguous ({matches} matches)")]
+    AmbiguousSlideLayoutName {
+        /// Selector spelling supplied by the caller.
+        name: String,
+        /// Number of matching layouts.
         matches: usize,
     },
 
@@ -461,35 +858,46 @@ pub enum Error {
     #[error("invalid PresentationML URI: {0}")]
     Uri(String),
 
-    /// A lossless facade operation cannot safely expose or replace a graph.
-    #[error("unsafe PPTX edit during {operation}: {reason}")]
-    UnsafeEdit {
-        /// Operation that requested the edit.
+    /// A well-formed request this route refuses (record 0351): the kind
+    /// classifies it, the operation and reason are static text.
+    #[error("PPTX {0}")]
+    Refused(litchi_core::edit::Refusal),
+
+    /// A patch or staged plan does not match the package it is applied to:
+    /// it was made against different exact source bytes or another revision
+    /// (record 0351).
+    #[error("PPTX patch base does not match the target package")]
+    PatchConflict,
+
+    /// A changed package still carries signature infrastructure.
+    #[error("PPTX signed package requires an explicit signature disposition")]
+    Signed,
+
+    /// A source-backed package changed while the operation was in progress.
+    #[error("PPTX source changed while the operation was in progress")]
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+
+    /// A broken internal invariant: state the crate itself should have
+    /// provided is missing or inconsistent.
+    #[error("PPTX {operation} internal invariant failed: {reason}")]
+    Internal {
+        /// Operation that detected the broken invariant.
         operation: &'static str,
-        /// Reason the bounded facade rejected it.
+        /// The invariant that failed.
         reason: &'static str,
     },
 
-    /// A source-backed slide patch was created against different exact slide bytes.
-    #[error("source-backed PPTX slide patch source is stale")]
-    StaleSource,
-
-    /// A durable patch carries a superseded revision proof: a complete-package
-    /// revision from a superseded algebra, or serialized-archive revisions of
-    /// a superseded candidate encoding.
-    ///
-    /// Refused while parsing the durable header, before any package is read or
-    /// mutated, so no caller ever holds a patch whose public revision
-    /// accessors return values no current application can reproduce.
-    #[error(
-        "PresentationML durable patch carries the superseded revision proof of format {found}; \
-         this build reads {expected}. Re-plan the edit against the source package."
-    )]
-    DurablePatchRevisionFormat {
-        /// Recognized but superseded durable format found in the input.
-        found: DurablePatchFormat,
-        /// Durable format this build reads for that patch family.
-        expected: DurablePatchFormat,
+    /// An owning ingress route was given a policy only a positional-source
+    /// owner can honor.
+    #[error("owning PPTX ingress does not support the {policy} open policy")]
+    UnsupportedOpenPolicy {
+        /// The refused policy.
+        policy: crate::OpenPolicy,
     },
 
     /// Managed package encryption or decryption failed.
@@ -526,7 +934,7 @@ pub enum Error {
 
     /// Shared custom document-property graph or value validation failed.
     #[error("PPTX custom document-property error: {0}")]
-    CustomProperties(#[from] litchi_ooxml_common::Error),
+    CustomProperties(#[source] litchi_ooxml_common::Error),
 
     /// Optional system-font discovery, subsetting, or EOT preparation failed.
     #[cfg(feature = "automatic-fonts")]
@@ -538,8 +946,223 @@ pub enum Error {
     Write,
 }
 
+impl Error {
+    /// A refusal of `operation` for `reason`, classified by `kind`.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+
+    /// A broken internal invariant.
+    pub(crate) const fn internal(operation: &'static str, reason: &'static str) -> Self {
+        Self::Internal { operation, reason }
+    }
+
+    /// A whole-slide removal refusal with a stable operation and reason.
+    pub(crate) const fn slide_removal_refused(kind: SlideRemovalRefusal) -> Self {
+        let reason = match kind {
+            SlideRemovalRefusal::SignedPackage => "the package is signed",
+            SlideRemovalRefusal::MacroEnabledPackage => {
+                "macro infrastructure is outside dependency-free slide removal"
+            },
+            SlideRemovalRefusal::ProtectedPresentation => {
+                "the presentation has an active modify-password verifier"
+            },
+            SlideRemovalRefusal::MarkupCompatibility => {
+                "slide removal cannot preserve markup-compatibility content"
+            },
+            SlideRemovalRefusal::UnknownSemanticSurface => {
+                "slide removal cannot preserve an unsupported semantic surface"
+            },
+            SlideRemovalRefusal::SharedOwner => "the selected slide has a shared owner",
+            SlideRemovalRefusal::UnsupportedRelationship => {
+                "the selected slide has an unsupported relationship"
+            },
+            SlideRemovalRefusal::AmbiguousTopology => "the selected slide has ambiguous topology",
+            SlideRemovalRefusal::UnknownPhysicalMember => {
+                "the package contains an unknown physical member"
+            },
+            SlideRemovalRefusal::FinalSlide => "a presentation must retain at least one slide",
+        };
+        Self::refused(kind.kind(), "slide_removal", reason)
+    }
+
+    /// A source-backed slide-order refusal with a stable operation and reason.
+    /// Ambiguous bindings are malformed source data, so they retain the
+    /// corrupt-file route rather than becoming a well-formed refusal.
+    pub(crate) fn slide_order_refused(kind: SlideOrderRefusal) -> Self {
+        match kind {
+            SlideOrderRefusal::AmbiguousBindings => {
+                Self::Invalid("slide-order bindings are ambiguous".to_owned())
+            },
+            _ => Self::refused(
+                kind.kind(),
+                "slide_order",
+                match kind {
+                    SlideOrderRefusal::ModifyVerifier => {
+                        "the presentation has an active modify-password verifier"
+                    },
+                    SlideOrderRefusal::MarkupCompatibility => {
+                        "slide order cannot preserve markup-compatibility content"
+                    },
+                    SlideOrderRefusal::Sections => {
+                        "slide order cannot preserve presentation sections"
+                    },
+                    SlideOrderRefusal::ViewProperties => {
+                        "slide order cannot preserve presentation view properties"
+                    },
+                    SlideOrderRefusal::PresentationProperties => {
+                        "slide order cannot preserve presentation properties"
+                    },
+                    SlideOrderRefusal::PositionalOwner => {
+                        "slide order cannot preserve positional metadata"
+                    },
+                    SlideOrderRefusal::AmbiguousBindings => "slide-order bindings are ambiguous",
+                },
+            ),
+        }
+    }
+
+    /// A whole-slide copy refusal with a stable operation and reason.
+    pub(crate) const fn slide_copy_refused(kind: SlideCopyRefusal) -> Self {
+        let reason = match kind {
+            SlideCopyRefusal::SignedPackage => {
+                "the selected slide cannot be copied losslessly because the package is signed"
+            },
+            SlideCopyRefusal::ProtectedPresentation => {
+                "the selected slide cannot be copied losslessly because the presentation is protected"
+            },
+            SlideCopyRefusal::MarkupCompatibility => {
+                "the selected slide cannot be copied losslessly because it contains markup-compatibility content"
+            },
+            SlideCopyRefusal::UnknownSemanticSurface => {
+                "the selected slide cannot be copied losslessly because its semantic surface is unsupported"
+            },
+            SlideCopyRefusal::SharedOwner => {
+                "the selected slide cannot be copied losslessly because it has a shared owner"
+            },
+            SlideCopyRefusal::UnsupportedRelationship => {
+                "the selected slide cannot be copied losslessly because it has an unsupported relationship"
+            },
+            SlideCopyRefusal::DependencyCycle => {
+                "the selected slide cannot be copied losslessly because its dependency graph has a cycle"
+            },
+            SlideCopyRefusal::AmbiguousTopology => {
+                "the selected slide cannot be copied losslessly because its topology is ambiguous"
+            },
+            SlideCopyRefusal::GlobalTableStyle => {
+                "the selected slide cannot be copied losslessly because it uses a presentation-global table style"
+            },
+            SlideCopyRefusal::UnknownPhysicalMember => {
+                "the selected slide cannot be copied losslessly because the package has an unknown physical member"
+            },
+            SlideCopyRefusal::CallerDefinedPart => {
+                "the selected slide cannot be copied losslessly because the destination has caller-defined parts"
+            },
+        };
+        Self::refused(kind.kind(), "slide_copy", reason)
+    }
+
+    /// A shape-transfer refusal with a stable operation and reason.
+    pub(crate) const fn shape_transfer_refused(kind: ShapeTransferRefusal) -> Self {
+        let reason = match kind {
+            ShapeTransferRefusal::NestedShape => {
+                "the selected shape is nested inside another shape"
+            },
+            ShapeTransferRefusal::ContentPart => "the selected shape is a content part",
+            ShapeTransferRefusal::UnknownExtensionShape => {
+                "the selected shape has an unknown extension"
+            },
+            ShapeTransferRefusal::UnclassifiedGraphicFrame => {
+                "the selected graphic frame is not classified"
+            },
+            ShapeTransferRefusal::MissingIdentity => {
+                "the selected shape has no non-visual identity"
+            },
+            ShapeTransferRefusal::UnresolvedConnectorEndpoint => {
+                "the selected connector endpoint is unresolved"
+            },
+        };
+        Self::refused(kind.kind(), "shape_transfer", reason)
+    }
+
+    /// The refusal this error carries, when it is one.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&litchi_core::edit::Refusal> {
+        match self {
+            Self::Refused(refusal) => Some(refusal),
+            _ => None,
+        }
+    }
+}
+
+impl From<litchi_ooxml_common::Error> for Error {
+    fn from(error: litchi_ooxml_common::Error) -> Self {
+        match error {
+            litchi_ooxml_common::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ooxml_common::Error::PatchConflict => Self::PatchConflict,
+            litchi_ooxml_common::Error::Signed => Self::Signed,
+            litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            litchi_ooxml_common::Error::Internal(reason) => Self::internal("shared OOXML", reason),
+            other => Self::CustomProperties(other),
+        }
+    }
+}
+
 impl From<quick_xml::Error> for Error {
     fn from(error: quick_xml::Error) -> Self {
         Self::Xml(error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CodecLimitKind, Error, LimitKind};
+
+    #[test]
+    fn typed_limit_keeps_dimension_and_exact_observation() {
+        let error = Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::TracePoints),
+            observed: 17,
+            maximum: 16,
+        };
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Codec(CodecLimitKind::TracePoints),
+                observed: 17,
+                maximum: 16,
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "PresentationML trace points exceeds the limit of 16 (observed 17)"
+        );
+    }
+
+    #[test]
+    fn invalid_limit_reports_the_supplied_value_without_resource_strings() {
+        let error = Error::InvalidLimit {
+            kind: LimitKind::Codec(CodecLimitKind::Annotations),
+            value: 0,
+            maximum: 4096,
+        };
+        assert!(matches!(
+            error,
+            Error::InvalidLimit {
+                kind: LimitKind::Codec(CodecLimitKind::Annotations),
+                value: 0,
+                maximum: 4096,
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "invalid PresentationML annotations limit: 0 (maximum 4096)"
+        );
     }
 }

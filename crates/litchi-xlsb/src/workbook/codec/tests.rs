@@ -6,9 +6,9 @@
 //! Focused tests for the private workbook codec owners.
 
 use super::super::super::Workbook;
-use crate::package::error::Result;
+use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
-use crate::raw::{Kind, Records, Writer, kind};
+use crate::raw::{Encoder, Kind, Records, kind};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -19,9 +19,17 @@ fn wide_string(value: &str) -> Vec<u8> {
     data
 }
 
+fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
+    let mut data = 0_u32.to_le_bytes().to_vec();
+    data.extend_from_slice(&id.to_le_bytes());
+    data.extend_from_slice(&wide_string(relationship_id));
+    data.extend_from_slice(&wide_string(name));
+    data
+}
+
 fn record_stream(records: &[(Kind, Vec<u8>)]) -> Result<Vec<u8>> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer.write_record(*record_kind, payload)?;
     }
@@ -124,9 +132,15 @@ fn shared_string_owner_validates_declared_count() {
         (kind::END_SST, Vec::new()),
     ])
     .unwrap();
-    let mut records = Records::new(&data);
+    let mut records = Records::new(&data, crate::raw::Limits::DEFAULT);
     let mut strings: Vec<SharedString> = Vec::new();
-    Workbook::read_shared_strings(&mut records, &mut strings, &mut Default::default()).unwrap();
+    Workbook::read_shared_strings(
+        &mut records,
+        &mut strings,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(strings.len(), 1);
     assert_eq!(strings[0].text, "value");
 }
@@ -143,7 +157,7 @@ fn pivot_cache_record_owner_preserves_relationship_identity() {
     ])
     .unwrap();
     assert_eq!(
-        Workbook::parse_pivot_cache_ids(&data).unwrap(),
+        Workbook::parse_pivot_cache_ids(&data, crate::raw::Limits::DEFAULT).unwrap(),
         vec![(12, "rIdCache".to_string())]
     );
 }
@@ -172,9 +186,13 @@ fn ordinary_table_owner_ignores_opaque_balanced_xml_map_extensions() {
     push_independent_record(&mut data, kind::END_LIST_COLS, &[]);
     push_independent_record(&mut data, kind::END_LIST, &[]);
 
-    let table =
-        Workbook::parse_table_definition(&data, 3, &mut crate::leniency::Tolerance::refusing())
-            .unwrap();
+    let table = Workbook::parse_table_definition(
+        &data,
+        3,
+        &mut crate::leniency::Tolerance::refusing(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(table.table_id(), 7);
     assert_eq!(table.sheet_index(), 3);
     assert_eq!(table.display_name(), "MappedTable");
@@ -196,7 +214,66 @@ fn ordinary_table_owner_rejects_mismatched_xml_map_extensions() {
     push_independent_record(&mut data, kind::AC_END, &[]);
 
     assert!(
-        Workbook::parse_table_definition(&data, 0, &mut crate::leniency::Tolerance::refusing())
-            .is_err()
+        Workbook::parse_table_definition(
+            &data,
+            0,
+            &mut crate::leniency::Tolerance::refusing(),
+            crate::raw::Limits::DEFAULT,
+        )
+        .is_err()
     );
+}
+
+#[test]
+fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
+    let duplicate_names = ["\u{0130}", "i\u{0307}"];
+    let duplicate_records = duplicate_names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            (
+                kind::BUNDLE_SH,
+                bundle_sheet_payload(
+                    u32::try_from(index + 1).unwrap(),
+                    &format!("rId{}", index + 1),
+                    name,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let duplicate_data = record_stream(&duplicate_records).unwrap();
+    let mut duplicate_iter = Records::new(&duplicate_data, crate::raw::Limits::DEFAULT);
+    assert!(matches!(
+        Workbook::read_workbook(
+            &mut duplicate_iter,
+            &mut Default::default(),
+            crate::raw::Limits::DEFAULT,
+        ),
+        Err(Error::Unrecognized { typ, .. }) if typ == "BrtBundleSh strName"
+    ));
+
+    let canonically_equivalent_names = ["é", "e\u{301}"];
+    let distinct_records = canonically_equivalent_names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            (
+                kind::BUNDLE_SH,
+                bundle_sheet_payload(
+                    u32::try_from(index + 1).unwrap(),
+                    &format!("rId{}", index + 1),
+                    name,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let distinct_data = record_stream(&distinct_records).unwrap();
+    let mut distinct_iter = Records::new(&distinct_data, crate::raw::Limits::DEFAULT);
+    let info = Workbook::read_workbook(
+        &mut distinct_iter,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(info.worksheet_names, canonically_equivalent_names);
 }

@@ -1,9 +1,21 @@
 //! Bounded Pages movie-playback projection and source-preserving rewrite.
 //!
-//! This module is an internal bridge for the legacy `litchi-iwa` host.  The
-//! host borrows one MovieArchive payload from its parsed-archive cache and
-//! delegates scalar semantics to the focused Pages package.  No generated
+//! This module was an internal bridge for the retired migration host
+//! (deleted by record 0429; last present at commit `4d8a3e161f`), which
+//! borrowed one MovieArchive payload from its parsed-archive cache and
+//! delegated scalar semantics to the focused Pages package.  No generated
 //! MovieArchive or package-wide source is retained by this seam.
+//!
+//! The body-media properties family uses the same projection and rewrite,
+//! so the module is compiled without the host seam feature as well.
+
+#![cfg_attr(
+    not(feature = "internal-iwork-source"),
+    allow(
+        unreachable_pub,
+        reason = "The items are re-exported only for the host seam feature."
+    )
+)]
 
 use std::time::Duration;
 

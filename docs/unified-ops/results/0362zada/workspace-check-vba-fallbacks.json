@@ -1,0 +1,25 @@
+{
+  "source_phase": "resolved CFB merge with two extensible VBA fallback repairs",
+  "head": "2021a41c4cb217844131892138a7d0452a81d6c1",
+  "merge_head": "bf7f48741bc02d1f5e736a7a732c25808d28af36",
+  "tree": "de139650d80d513854c81a60df649fb7b26dd883",
+  "command": [
+    "cargo",
+    "check",
+    "--workspace",
+    "--offline",
+    "--locked",
+    "--all-features",
+    "--all-targets",
+    "--message-format=short"
+  ],
+  "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/target-cfb-explicit-limits",
+  "started_utc": "2026-10-24T10:55:39.673118+00:00",
+  "exit_code": 101,
+  "wall_seconds": 219.5823264470091,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed/workspace-check-vba-fallbacks.log",
+  "log_bytes": 8803,
+  "log_sha256": "40cdc4a5e38c2ba538b36558b589dc21b1e6d2667f3613c135d662ac16899333",
+  "lock_unchanged": true
+}

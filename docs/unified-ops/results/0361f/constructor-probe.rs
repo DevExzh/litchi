@@ -1,0 +1,405 @@
+//! Matched raw IWA metadata-constructor qualification probe.
+//!
+//! The build script compiles this exact source against the pre-constructor
+//! base core and the bounded-constructor core.  `before` adapts only
+//! the constructor signatures; the fixture, route bodies, allocator and
+//! output schema stay identical.  The timed routes reuse moved input buffers
+//! where the public API permits it, so allocation counters describe the
+//! constructor's own work rather than a freshly rebuilt fixture.
+
+use std::hint::black_box;
+use std::time::Instant;
+
+use litchi_iwa_core::{
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, Limits, MessageInfo, RawMessage,
+};
+use sha2::{Digest, Sha256};
+
+#[cfg(feature = "allocations")]
+mod allocation {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    pub static CURRENT: AtomicUsize = AtomicUsize::new(0);
+    pub static PEAK: AtomicUsize = AtomicUsize::new(0);
+    pub static BYTES: AtomicUsize = AtomicUsize::new(0);
+    pub static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    pub struct Counting;
+
+    // SAFETY: every operation forwards to the system allocator with the
+    // caller's layout and pointer; the atomics only observe sizes.
+    unsafe impl GlobalAlloc for Counting {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: the system allocator receives the original layout.
+            let pointer = unsafe { System.alloc(layout) };
+            if !pointer.is_null() {
+                add(layout.size());
+            }
+            pointer
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            // SAFETY: the pointer and layout came from this allocator.
+            unsafe { System.dealloc(pointer, layout) };
+            CURRENT.fetch_sub(layout.size(), Ordering::Relaxed);
+        }
+
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            // SAFETY: the pointer and old layout came from this allocator.
+            let moved = unsafe { System.realloc(pointer, layout, size) };
+            if !moved.is_null() {
+                let live = if size >= layout.size() {
+                    CURRENT.fetch_add(size - layout.size(), Ordering::Relaxed) + size
+                        - layout.size()
+                } else {
+                    CURRENT.fetch_sub(layout.size() - size, Ordering::Relaxed)
+                        - (layout.size() - size)
+                };
+                PEAK.fetch_max(live, Ordering::Relaxed);
+                BYTES.fetch_add(size, Ordering::Relaxed);
+                CALLS.fetch_add(1, Ordering::Relaxed);
+            }
+            moved
+        }
+    }
+
+    fn add(size: usize) {
+        let live = CURRENT.fetch_add(size, Ordering::Relaxed) + size;
+        PEAK.fetch_max(live, Ordering::Relaxed);
+        BYTES.fetch_add(size, Ordering::Relaxed);
+        CALLS.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn start() -> usize {
+        let live = CURRENT.load(Ordering::Relaxed);
+        PEAK.store(live, Ordering::Relaxed);
+        BYTES.store(0, Ordering::Relaxed);
+        CALLS.store(0, Ordering::Relaxed);
+        live
+    }
+
+    pub fn result(base: usize) -> (usize, usize, usize, usize) {
+        (
+            PEAK.load(Ordering::Relaxed).saturating_sub(base),
+            CURRENT.load(Ordering::Relaxed).saturating_sub(base),
+            BYTES.load(Ordering::Relaxed),
+            CALLS.load(Ordering::Relaxed),
+        )
+    }
+}
+
+#[cfg(feature = "allocations")]
+#[global_allocator]
+static ALLOCATOR: allocation::Counting = allocation::Counting;
+
+const OBJECT_ID: u64 = 17;
+const MESSAGE_COUNT: usize = 8;
+const MESSAGE_LENGTH: usize = 1_024;
+const PATH: [u32; 8] = [1, 7, 4, 2, 9, 3, 6, 5];
+
+fn limits() -> Limits {
+    Limits::default()
+}
+
+#[cfg(feature = "before")]
+fn make_path(path: Vec<u32>) -> FieldPath {
+    FieldPath::new(path)
+}
+
+#[cfg(not(feature = "before"))]
+fn make_path(path: Vec<u32>) -> FieldPath {
+    FieldPath::new(path, limits()).expect("bounded field path fixture")
+}
+
+#[cfg(feature = "before")]
+fn make_field(path: FieldPath) -> FieldInfo {
+    FieldInfo::new(path)
+}
+
+#[cfg(not(feature = "before"))]
+fn make_field(path: FieldPath) -> FieldInfo {
+    FieldInfo::new(path, limits()).expect("bounded field metadata fixture")
+}
+
+#[cfg(feature = "before")]
+fn make_message(type_: u32, length: usize) -> MessageInfo {
+    MessageInfo::new(
+        type_,
+        u32::try_from(length).expect("fixture length fits u32"),
+    )
+}
+
+#[cfg(not(feature = "before"))]
+fn make_message(type_: u32, length: usize) -> MessageInfo {
+    MessageInfo::new(type_, length, limits()).expect("bounded message metadata fixture")
+}
+
+#[cfg(feature = "before")]
+fn make_info(identifier: u64, message_infos: Vec<MessageInfo>) -> ArchiveInfo {
+    ArchiveInfo::new(identifier, message_infos)
+}
+
+#[cfg(not(feature = "before"))]
+fn make_info(identifier: u64, message_infos: Vec<MessageInfo>) -> ArchiveInfo {
+    ArchiveInfo::new(identifier, message_infos, limits()).expect("bounded archive metadata fixture")
+}
+
+fn make_messages() -> Vec<RawMessage> {
+    (0..MESSAGE_COUNT)
+        .map(|index| RawMessage {
+            type_: 1_000 + u32::try_from(index).expect("fixture index fits u32"),
+            data: vec![u8::try_from(index).expect("fixture byte fits u8"); MESSAGE_LENGTH],
+        })
+        .collect()
+}
+
+fn make_metadata_messages() -> Vec<MessageInfo> {
+    (0..MESSAGE_COUNT)
+        .map(|index| {
+            make_message(
+                1_000 + u32::try_from(index).expect("fixture index fits u32"),
+                MESSAGE_LENGTH,
+            )
+        })
+        .collect()
+}
+
+fn make_archive_bytes() -> Vec<u8> {
+    let object = ArchiveObject::new(OBJECT_ID, make_messages(), limits())
+        .expect("archive object fixture must be admitted");
+    Archive {
+        objects: vec![object],
+    }
+    .to_bytes(limits())
+    .expect("archive fixture must encode")
+}
+
+fn parse(data: &[u8]) -> Archive {
+    Archive::parse(data, limits()).expect("archive fixture must parse")
+}
+
+fn encode(archive: &Archive) -> Vec<u8> {
+    archive
+        .to_bytes(limits())
+        .expect("archive fixture must encode")
+}
+
+fn validate(archive: &Archive) {
+    archive
+        .validate(limits())
+        .expect("archive fixture must validate")
+}
+
+fn digest(data: &[u8]) -> String {
+    Sha256::digest(data)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Metrics {
+    ns: u128,
+    checksum: u64,
+    output_bytes: usize,
+    peak: usize,
+    retained: usize,
+    allocated: usize,
+    allocations: usize,
+}
+
+fn run(route: &str, iterations: usize) -> Metrics {
+    let source = make_archive_bytes();
+    let archive = parse(&source);
+    validate(&archive);
+    let expected = encode(&archive);
+    let output_bytes = expected.len();
+    let output_digest = Sha256::digest(&expected);
+
+    // These buffers are moved through each constructor route.  Reusing them
+    // keeps caller setup outside the measured region while retaining the
+    // exact ownership semantics of each public constructor.
+    let mut path = PATH.to_vec();
+    let mut message_infos = make_metadata_messages();
+    let mut messages = make_messages();
+    let rejected_limits = limits()
+        .with_header_bytes(1)
+        .expect("the one-byte rejection profile is valid");
+    #[cfg(feature = "allocations")]
+    let before = allocation::start();
+    let started = Instant::now();
+    let mut checksum = 0u64;
+    for _ in 0..iterations {
+        match route {
+            "field_path" => {
+                let value = black_box(make_path(black_box(path)));
+                checksum = checksum.wrapping_add(value.path.len() as u64);
+                path = value.path;
+            },
+            "field_info" => {
+                let value = black_box(make_field(make_path(black_box(path))));
+                checksum = checksum.wrapping_add(value.path.path.len() as u64);
+                path = value.path.path;
+            },
+            "message_info" => {
+                let value = black_box(make_message(black_box(1_001), black_box(MESSAGE_LENGTH)));
+                checksum = checksum
+                    .wrapping_add(u64::from(value.type_))
+                    .wrapping_add(u64::from(value.length))
+                    .wrapping_add(value.versions.len() as u64);
+            },
+            "archive_info" => {
+                let value = black_box(make_info(black_box(OBJECT_ID), black_box(message_infos)));
+                checksum = checksum
+                    .wrapping_add(value.message_infos.len() as u64)
+                    .wrapping_add(value.identifier.unwrap_or_default());
+                message_infos = value.message_infos;
+            },
+            "archive_object" => {
+                let value = black_box(
+                    ArchiveObject::new(black_box(OBJECT_ID), black_box(messages), limits())
+                        .expect("archive object fixture must be admitted"),
+                );
+                checksum = checksum
+                    .wrapping_add(value.messages.len() as u64)
+                    .wrapping_add(value.archive_info.message_infos.len() as u64);
+                messages = value.messages;
+            },
+            "archive_object_reject" => {
+                let result = ArchiveObject::new(
+                    OBJECT_ID,
+                    vec![
+                        RawMessage {
+                            type_: 1_000,
+                            data: Vec::new(),
+                        },
+                        RawMessage {
+                            type_: 1_001,
+                            data: Vec::new(),
+                        },
+                    ],
+                    rejected_limits,
+                );
+                assert!(result.is_err(), "tight header profile must refuse");
+                checksum = checksum.wrapping_add(1);
+            },
+            "parse" => {
+                let value = parse(black_box(&source));
+                checksum = checksum.wrapping_add(value.objects.len() as u64);
+            },
+            "validate" => {
+                validate(black_box(&archive));
+                checksum = checksum.wrapping_add(archive.objects.len() as u64);
+            },
+            "encode" => {
+                let value = encode(black_box(&archive));
+                checksum = checksum.wrapping_add(value.len() as u64);
+                black_box(value);
+            },
+            _ => panic!("unknown constructor route: {route}"),
+        }
+    }
+    let ns = started.elapsed().as_nanos();
+    let (peak, retained, allocated, allocations) = {
+        #[cfg(feature = "allocations")]
+        {
+            allocation::result(before)
+        }
+        #[cfg(not(feature = "allocations"))]
+        {
+            (0, 0, 0, 0)
+        }
+    };
+    black_box(path);
+    black_box(message_infos);
+    black_box(messages);
+    Metrics {
+        ns,
+        checksum: checksum ^ u64::try_from(output_digest[0]).expect("digest byte fits u64"),
+        output_bytes,
+        peak,
+        retained,
+        allocated,
+        allocations,
+    }
+}
+
+fn validate_outputs(directory: &std::path::Path) {
+    std::fs::create_dir_all(directory).expect("validation directory");
+    let path = make_path(PATH.to_vec());
+    assert_eq!(path.path, PATH);
+    std::fs::write(directory.join("path.txt"), format!("{path:?}")).unwrap();
+    let field = make_field(path);
+    assert_eq!(field.path.path, PATH);
+    std::fs::write(directory.join("field.txt"), format!("{field:?}")).unwrap();
+    let message = make_message(1_001, MESSAGE_LENGTH);
+    assert_eq!(
+        (message.type_, message.length),
+        (1_001, MESSAGE_LENGTH as u32)
+    );
+    assert_eq!(message.versions.as_slice(), [1, 0, 5]);
+    std::fs::write(directory.join("message.txt"), format!("{message:?}")).unwrap();
+    let info = make_info(OBJECT_ID, make_metadata_messages());
+    assert_eq!(info.identifier, Some(OBJECT_ID));
+    assert_eq!(info.message_infos.len(), MESSAGE_COUNT);
+    std::fs::write(directory.join("info.txt"), format!("{info:?}")).unwrap();
+    let object = ArchiveObject::new(OBJECT_ID, make_messages(), limits()).unwrap();
+    assert_eq!(object.archive_info, info);
+    let bytes = Archive {
+        objects: vec![object],
+    }
+    .to_bytes(limits())
+    .unwrap();
+    let parsed = parse(&bytes);
+    validate(&parsed);
+    let encoded = encode(&parsed);
+    assert_eq!(encoded, bytes);
+    std::fs::write(directory.join("source.iwa"), &bytes).unwrap();
+    std::fs::write(directory.join("encoded.iwa"), encoded).unwrap();
+    let rejected = ArchiveObject::new(
+        OBJECT_ID,
+        make_messages(),
+        limits().with_header_bytes(1).unwrap(),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        rejected,
+        litchi_iwa_core::Error::Limit {
+            kind: litchi_iwa_core::LimitKind::HeaderBytes,
+            ..
+        }
+    ));
+}
+
+fn main() {
+    let mut args = std::env::args();
+    let _program = args.next();
+    let route = args.next().expect("route argument");
+    if route == "validate_outputs" {
+        validate_outputs(std::path::Path::new(
+            &args.next().expect("output directory"),
+        ));
+        return;
+    }
+    let iterations = args
+        .next()
+        .expect("iteration argument")
+        .parse::<usize>()
+        .expect("iterations must be an integer");
+    let source = make_archive_bytes();
+    let expected = parse(&source);
+    let encoded = encode(&expected);
+    let expected_digest = digest(&encoded);
+    let metrics = run(&route, iterations);
+    println!(
+        "{{\"schema\":\"litchi.iwa-constructor-probe.v1\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{},\"checksum\":{},\"output_bytes\":{},\"output_sha256\":\"{expected_digest}\",\"peak\":{},\"retained\":{},\"allocated\":{},\"allocations\":{}}}",
+        metrics.ns,
+        metrics.checksum,
+        metrics.output_bytes,
+        metrics.peak,
+        metrics.retained,
+        metrics.allocated,
+        metrics.allocations,
+    );
+}

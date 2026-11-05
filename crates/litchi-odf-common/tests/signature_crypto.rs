@@ -31,7 +31,7 @@ fn signed_package(
     canonicalization: CanonicalizationAlgorithm,
     encrypted: bool,
 ) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_document_signer(signer(algorithm).with_canonicalization(canonicalization))
@@ -133,8 +133,14 @@ fn rewrite_entry(
     target: &str,
     replacement: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let archive = soapberry_zip::office::ArchiveReader::new(bytes).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     let mut pending_replacement = Some(replacement);
     for name in archive.file_names() {
         let mut content = archive.read(name).unwrap();
@@ -240,7 +246,7 @@ fn rejects_spoofed_and_duplicate_package_reference_paths() {
 
 #[test]
 fn late_signing_configuration_failure_is_atomic() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", b"<root/>").unwrap();
     assert!(

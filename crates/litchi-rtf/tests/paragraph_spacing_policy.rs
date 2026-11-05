@@ -9,14 +9,15 @@
 
 mod repair_support;
 
-use litchi_rtf::{ParagraphSpacingPolicy, RtfDocument, RtfWriter, StyleBlock};
-fn block<'a>(d: &'a RtfDocument<'a>, s: &str) -> &'a StyleBlock<'a> {
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ParagraphSpacingPolicy, StyleBlock, write::Writer};
+fn block<'a>(d: &'a Tree<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
 }
 
 #[test]
 fn parses_inherits_resets_and_keeps_destinations_inert() {
-    let d=RtfDocument::parse(concat!(r#"{\rtf1\ansi\pard\sb120\sa240\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Outer\par "#,r#"{\sbauto0\saauto0\lisb0\lisa0 Inner\par }Tail\par "#,r#"{\pard Reset\par }{\*\unknown\sbauto0\saauto0\lisb1\lisa1 Ignored}Visible\par}"#)).unwrap();
+    let d=Tree::parse(concat!(r#"{\rtf1\ansi\pard\sb120\sa240\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Outer\par "#,r#"{\sbauto0\saauto0\lisb0\lisa0 Inner\par }Tail\par "#,r#"{\pard Reset\par }{\*\unknown\sbauto0\saauto0\lisb1\lisa1 Ignored}Visible\par}"#), litchi_rtf::read::OpenOptions::default()).unwrap();
     let outer = block(&d, "Outer").paragraph.spacing_policy;
     assert_eq!(
         outer,
@@ -42,7 +43,7 @@ fn parses_inherits_resets_and_keeps_destinations_inert() {
 
 #[test]
 fn stylesheet_and_deterministic_writer_round_trip() {
-    let d=RtfDocument::parse(r"{\rtf1{\stylesheet{\s8\sb100\sa200\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Spaced;}}\pard\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Body\par}").unwrap();
+    let d=Tree::parse(r"{\rtf1{\stylesheet{\s8\sb100\sa200\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Spaced;}}\pard\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace Body\par}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let expected = d
         .stylesheet()
         .get(8)
@@ -51,10 +52,10 @@ fn stylesheet_and_deterministic_writer_round_trip() {
         .unwrap()
         .spacing_policy;
     let mut first = Vec::new();
-    RtfWriter::new(&mut first).write_document(&d).unwrap();
+    Writer::new(&mut first).write_document(&d).unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r"\lisb25\lisa50\sbauto1\saauto1\nosnaplinegrid\contextualspace"));
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed
             .stylesheet()
@@ -66,9 +67,7 @@ fn stylesheet_and_deterministic_writer_round_trip() {
         expected
     );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -100,7 +99,7 @@ fn parses_real_libreoffice_stylesheet_fixture() {
     let mut isolated = br"{\rtf1\ansi".to_vec();
     isolated.extend_from_slice(&bytes[start..end.unwrap()]);
     isolated.push(b'}');
-    let d = RtfDocument::parse_bytes(&isolated).unwrap();
+    let d = Tree::parse_bytes(&isolated, litchi_rtf::read::OpenOptions::default()).unwrap();
     let p = d
         .stylesheet()
         .get(3)
@@ -133,7 +132,10 @@ fn rejects_missing_out_of_range_and_selector_parameters() {
         r"{\rtf1\contextualspace1 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(s)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                s,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {s}"
         );
     }

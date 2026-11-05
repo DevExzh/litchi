@@ -6,7 +6,7 @@ use super::model::{
 };
 use super::{invalid, invalid_error};
 use litchi_core::{Error, Result};
-use litchi_odf_common::annotation::Builder;
+use litchi_odf_common::{XmlStreamLimits, annotation::Builder};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -22,8 +22,8 @@ const MAX_DEPTH: usize = 128;
 const MAX_ANNOTATIONS: usize = 65_536;
 const MAX_EVENTS: usize = 1_000_000;
 
-pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
-    if xml.len() > MAX_XML {
+pub(crate) fn scan(xml: &str, host: AnnotationHost, limits: &XmlStreamLimits) -> Result<Scan> {
+    if xml.len() > MAX_XML || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
         return invalid("annotation host XML exceeds size limit");
     }
     let mut reader = NsReader::from_str(xml);
@@ -38,6 +38,7 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
     let mut next_page = 0usize;
     let mut next_paragraph = 0usize;
     let mut events = 0usize;
+    let mut attributes = 0usize;
     loop {
         let start = position(&reader)?;
         let (resolved, event) = reader
@@ -47,10 +48,11 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
             })?;
         let ns = namespace(&resolved);
         let end = position(&reader)?;
+        check_event_budget(&event, start, end, &mut attributes, limits)?;
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid_error("annotation event overflow"))?;
-        if events > MAX_EVENTS {
+        if events > MAX_EVENTS.min(limits.max_events()) {
             return invalid("annotation host exceeds event limit");
         }
         match event {
@@ -85,7 +87,12 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
                     });
                     builders.push(ActiveBuilder {
                         record,
-                        builder: Builder::new(&element, reader.decoder(), namespaces.clone())?,
+                        builder: Builder::new(
+                            &element,
+                            reader.decoder(),
+                            namespaces.clone(),
+                            limits,
+                        )?,
                     });
                     frames.push(Frame {
                         start,
@@ -116,7 +123,7 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
                         namespace_changes: changes,
                     });
                 }
-                if frames.len() > MAX_DEPTH {
+                if frames.len() > MAX_DEPTH.min(limits.max_depth()) {
                     return invalid("annotation XML nesting exceeds limit");
                 }
             },
@@ -133,7 +140,8 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
                         return invalid("document exceeds annotation limit");
                     }
                     let anchor = current_position(&frames, &sites, host)?;
-                    let builder = Builder::new(&element, reader.decoder(), namespaces.clone())?;
+                    let builder =
+                        Builder::new(&element, reader.decoder(), namespaces.clone(), limits)?;
                     records.push(Record {
                         span: Span {
                             start,
@@ -249,6 +257,34 @@ pub(crate) fn scan(xml: &str, host: AnnotationHost) -> Result<Scan> {
     pair_ranges(&mut records, ends)?;
     sites.sort_by_key(|site| site.span.start);
     Ok(Scan { records, sites })
+}
+
+fn check_event_budget(
+    event: &Event<'_>,
+    start: usize,
+    end: usize,
+    attributes: &mut usize,
+    limits: &XmlStreamLimits,
+) -> Result<()> {
+    let token_bytes = end
+        .checked_sub(start)
+        .ok_or_else(|| invalid_error("annotation XML token position overflow"))?;
+    if token_bytes > limits.max_token_bytes() {
+        return invalid("annotation host XML token exceeds limit");
+    }
+    if let Event::Start(element) | Event::Empty(element) = event {
+        for attribute in element.attributes().with_checks(true) {
+            attribute
+                .map_err(|error| invalid_error(format!("invalid annotation attribute: {error}")))?;
+            *attributes = (*attributes)
+                .checked_add(1)
+                .ok_or_else(|| invalid_error("annotation XML attribute count overflow"))?;
+            if *attributes > limits.max_attributes() {
+                return invalid("annotation host XML exceeds the attribute limit");
+            }
+        }
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]

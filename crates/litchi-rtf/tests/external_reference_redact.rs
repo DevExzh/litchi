@@ -4,7 +4,7 @@
     reason = "redaction fixtures intentionally panic on malformed test setup"
 )]
 
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 use litchi_rtf::edit::Error as EditError;
 use litchi_rtf::redact::{Mode, ReferenceKind, UnsupportedReference};
 use serde_json::Value;
@@ -22,7 +22,7 @@ fn patch_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 
 #[test]
 fn inventories_exact_top_level_groups_and_redacts_forward_only() {
-    let source = Document::parse(
+    let source = Package::parse(
         r#"{\rtf1\ansi{\*\template C:\\Templates\\base.dot}{\*\nextfile queue\\next.rtf}Body\par}"#,
     )
     .unwrap();
@@ -44,9 +44,9 @@ fn inventories_exact_top_level_groups_and_redacts_forward_only() {
         .unwrap();
     assert_eq!(commit.diagnostics().removed_references(), 2);
     assert!(commit.diagnostics().is_complete());
-    assert_eq!(commit.document().text(), source.text());
-    assert!(commit.document().external_references().is_empty());
-    let output = commit.document().to_bytes().unwrap();
+    assert_eq!(commit.package().text(), source.text());
+    assert!(commit.package().external_references().is_empty());
+    let output = commit.package().to_bytes().unwrap();
     assert!(
         !output
             .windows(b"\\template".len())
@@ -63,9 +63,12 @@ fn inventories_exact_top_level_groups_and_redacts_forward_only() {
             .any(|window| window == b"\\ansi Body")
     );
 
-    let replayed = source
+    let replayed_commit = source
         .apply_external_reference_redaction(commit.patch())
         .unwrap();
+    assert!(replayed_commit.diagnostics().is_complete());
+    assert_eq!(replayed_commit.patch().format(), "litchi-rtf");
+    let replayed = replayed_commit.into_package();
     assert_eq!(replayed.to_bytes().unwrap(), output);
     assert!(
         matches!(commit.patch().operations().first(), Some(operation) if operation.op == "external-reference.remove")
@@ -74,7 +77,7 @@ fn inventories_exact_top_level_groups_and_redacts_forward_only() {
 
 #[test]
 fn strict_refuses_external_fields_but_best_effort_is_explicitly_incomplete() {
-    let source = Document::parse(
+    let source = Package::parse(
         r#"{\rtf1\ansi{\*\template template.dot}{\field{\*\fldinst HYPERLINK "https://example.invalid"}{\fldrslt Link}}Body}"#,
     )
     .unwrap();
@@ -98,14 +101,14 @@ fn strict_refuses_external_fields_but_best_effort_is_explicitly_incomplete() {
             .unsupported()
             .contains(&UnsupportedReference::Field)
     );
-    assert!(commit.document().external_references().is_empty());
-    assert_eq!(commit.document().text(), source.text());
+    assert!(commit.package().external_references().is_empty());
+    assert_eq!(commit.package().text(), source.text());
 }
 
 #[test]
 fn strict_refuses_opaque_and_protected_surfaces() {
     let opaque =
-        Document::parse(r#"{\rtf1\ansi{\*\unknown opaque}{\*\template t.dot}Body}"#).unwrap();
+        Package::parse(r#"{\rtf1\ansi{\*\unknown opaque}{\*\template t.dot}Body}"#).unwrap();
     let inventory = opaque.external_reference_redaction_snapshot().unwrap();
     assert!(
         inventory
@@ -115,7 +118,7 @@ fn strict_refuses_opaque_and_protected_surfaces() {
     assert!(inventory.plan(Mode::Strict, patch_limits(2)).is_err());
 
     let protected =
-        Document::parse(r#"{\rtf1\ansi\readprot\enforceprot1{\*\template t.dot}Body}"#).unwrap();
+        Package::parse(r#"{\rtf1\ansi\readprot\enforceprot1{\*\template t.dot}Body}"#).unwrap();
     let inventory = protected.external_reference_redaction_snapshot().unwrap();
     assert!(
         inventory
@@ -131,7 +134,7 @@ fn strict_refuses_every_object_kind_including_embedded_ole_and_linkself() {
         r#"{\rtf1\ansi{\object\objemb{\*\objdata 00}}{\*\template t.dot}Body}"#,
         r#"{\rtf1\ansi{\object\objocx\linkself{\*\objdata 00}}{\*\template t.dot}Body}"#,
     ] {
-        let document = Document::parse(source).unwrap();
+        let document = Package::parse(source).unwrap();
         let inventory = document.external_reference_redaction_snapshot().unwrap();
         assert!(
             inventory
@@ -154,7 +157,7 @@ fn strict_refuses_valid_legacy_formfield_destinations() {
         // A fully modeled checkbox destination is covered as well.
         r#"{\rtf1\ansi{\field{\*\fldinst FORMCHECKBOX{\*\formfield{\fftype1\fftypetxt0\ffhps20\ffdefres0\ffres0}}}{\fldrslt }}}"#,
     ] {
-        let source = Document::parse(source).unwrap();
+        let source = Package::parse(source).unwrap();
         let inventory = source.external_reference_redaction_snapshot().unwrap();
         assert!(
             inventory
@@ -167,7 +170,7 @@ fn strict_refuses_valid_legacy_formfield_destinations() {
 
 #[test]
 fn external_reference_unicode_fallback_rejects_active_control_words() {
-    assert!(Document::parse(r#"{\rtf1\ansi{\*\template \u65\par}}"#).is_err());
+    assert!(Package::parse(r#"{\rtf1\ansi{\*\template \u65\par}}"#).is_err());
 }
 
 #[test]
@@ -176,7 +179,7 @@ fn strict_shape_text_unicode_fallback_does_not_consume_active_controls() {
         r#"{\rtf1\ansi{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
         r#"{\shptxt {\u65\par}}}}}"#,
     );
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     // `\par` is a supported shape-text control, but it is not a Unicode
     // fallback character.  The owner must see it after the finite fallback
     // scanner stops, preserving the paragraph break.
@@ -199,7 +202,7 @@ fn strict_refuses_annotation_skipped_destinations() {
             r#"}}"#,
         ]
         .concat();
-        let document = Document::parse(&source)
+        let document = Package::parse(&source)
             .unwrap_or_else(|error| panic!("annotation hidden destination {hidden}: {error:?}"));
         let inventory = document.external_reference_redaction_snapshot().unwrap();
         assert!(
@@ -225,7 +228,7 @@ fn strict_refuses_unretained_upr_ansi_fallbacks() {
             r#"}{\*\ud\uc0 Unicode}}Body}"#,
         ]
         .concat();
-        let document = Document::parse(&source)
+        let document = Package::parse(&source)
             .unwrap_or_else(|error| panic!("upr hidden destination {hidden}: {error:?}"));
         let inventory = document.external_reference_redaction_snapshot().unwrap();
         assert!(
@@ -243,7 +246,7 @@ fn external_reference_decoder_caps_transport_and_unicode_intermediates() {
     let mut transport = String::from(r#"{\rtf1\ansi{\*\template "#);
     transport.push_str(&"x".repeat(65_537));
     transport.push_str("}}");
-    assert!(Document::parse(&transport).is_err());
+    assert!(Package::parse(&transport).is_err());
 
     // The encoded transport is below 64 KiB, but a non-ASCII code page byte
     // can expand to up to four UTF-8 bytes.  The parser must reject before
@@ -251,16 +254,16 @@ fn external_reference_decoder_caps_transport_and_unicode_intermediates() {
     let mut decoded_intermediate = String::from(r#"{\rtf1\ansi{\*\template "#);
     decoded_intermediate.push_str(&"é".repeat(16_385));
     decoded_intermediate.push_str("}}");
-    assert!(Document::parse(&decoded_intermediate).is_err());
+    assert!(Package::parse(&decoded_intermediate).is_err());
 
     let mut unicode_fallback = String::from(r#"{\rtf1\ansi{\*\template \u65"#);
     unicode_fallback.push_str(&"a".repeat(65_538));
     unicode_fallback.push_str("}}");
-    assert!(Document::parse(&unicode_fallback).is_err());
+    assert!(Package::parse(&unicode_fallback).is_err());
 }
 
 fn assert_strict_refuses_shape_hyperlink(source: &str) {
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     let inventory = document.external_reference_redaction_snapshot().unwrap();
     assert!(
         inventory
@@ -311,7 +314,7 @@ fn strict_shape_text_diagnostics_refuse_skipped_active_destinations() {
         r#"{\pict\pngblip 89504e470d0a1a0a}"#,
     ] {
         let source = [prefix, nested, suffix].concat();
-        let document = Document::parse(&source)
+        let document = Package::parse(&source)
             .unwrap_or_else(|error| panic!("nested destination {nested} failed: {error:?}"));
         let inventory = document.external_reference_redaction_snapshot().unwrap();
         assert!(
@@ -327,8 +330,9 @@ fn strict_shape_text_diagnostics_refuse_skipped_active_destinations() {
 #[test]
 fn compressed_transport_has_inventory_but_no_source_span_and_best_effort_noop() {
     let source = br#"{\rtf1\ansi{\*\template t.dot}Body}"#;
-    let compressed = litchi_rtf::compress(source, true).unwrap();
-    let document = Document::from_bytes(&compressed).unwrap();
+    let compressed =
+        litchi_rtf::compress(source, true, litchi_rtf::CompressionLimits::default()).unwrap();
+    let document = Package::from_bytes(&compressed).unwrap();
     let inventory = document.external_reference_redaction_snapshot().unwrap();
     assert!(
         inventory
@@ -346,12 +350,12 @@ fn compressed_transport_has_inventory_but_no_source_span_and_best_effort_noop() 
         .unwrap();
     assert!(commit.diagnostics().is_incomplete());
     assert_eq!(commit.diagnostics().removed_references(), 0);
-    assert_eq!(commit.document().to_bytes().unwrap(), compressed);
+    assert_eq!(commit.package().to_bytes().unwrap(), compressed);
 }
 
 #[test]
 fn foreign_and_stale_artifacts_are_rejected_before_candidate_publication() {
-    let source = Document::parse(r#"{\rtf1\ansi{\*\template t.dot}Body}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi{\*\template t.dot}Body}"#).unwrap();
     let commit = source
         .external_reference_redaction_snapshot()
         .unwrap()
@@ -359,12 +363,12 @@ fn foreign_and_stale_artifacts_are_rejected_before_candidate_publication() {
         .unwrap()
         .apply()
         .unwrap();
-    let foreign = Document::parse(r#"{\rtf1\ansi{\*\template other.dot}Body}"#).unwrap();
+    let foreign = Package::parse(r#"{\rtf1\ansi{\*\template other.dot}Body}"#).unwrap();
     assert!(matches!(
         foreign.apply_external_reference_redaction(commit.patch()),
         Err(EditError::PatchConflict)
     ));
-    let stale = Document::parse(r#"{\rtf1\ansi{\*\template t.dot}Changed}"#).unwrap();
+    let stale = Package::parse(r#"{\rtf1\ansi{\*\template t.dot}Changed}"#).unwrap();
     assert!(matches!(
         stale.apply_external_reference_redaction(commit.patch()),
         Err(EditError::PatchConflict)
@@ -373,7 +377,7 @@ fn foreign_and_stale_artifacts_are_rejected_before_candidate_publication() {
 
 #[test]
 fn exact_raw_span_is_authenticated_before_redaction() {
-    let source = Document::parse(r#"{\rtf1\ansi{\*\template t.dot}Body}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi{\*\template t.dot}Body}"#).unwrap();
     let inventory = source.external_reference_redaction_snapshot().unwrap();
     let occurrence = inventory
         .references()
@@ -408,7 +412,7 @@ fn exact_raw_span_is_authenticated_before_redaction() {
 
 #[test]
 fn forged_oversized_operation_batch_is_rejected_before_selection_allocation() {
-    let source = Document::parse(r#"{\rtf1\ansi{\*\template t.dot}Body}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi{\*\template t.dot}Body}"#).unwrap();
     let commit = source
         .external_reference_redaction_snapshot()
         .unwrap()
@@ -427,7 +431,7 @@ fn forged_oversized_operation_batch_is_rejected_before_selection_allocation() {
     .unwrap();
     assert!(matches!(
         source.apply_external_reference_redaction(&forged),
-        Err(EditError::Rtf(litchi_rtf::RtfError::LimitExceeded {
+        Err(EditError::Rtf(litchi_rtf::Error::LimitExceeded {
             resource: "external-reference patch operations",
             observed: 3,
             limit: 2,
@@ -437,8 +441,8 @@ fn forged_oversized_operation_batch_is_rejected_before_selection_allocation() {
 
 #[test]
 fn zero_operation_patch_has_no_cross_document_authority_and_is_exact_noop() {
-    let source = Document::parse(r#"{\rtf1\ansi Plain}"#).unwrap();
-    let foreign = Document::parse(r#"{\rtf1\ansi{\*\template t.dot}Foreign}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi Plain}"#).unwrap();
+    let foreign = Package::parse(r#"{\rtf1\ansi{\*\template t.dot}Foreign}"#).unwrap();
     let limits = patch_limits(0);
     let patch = litchi_core::patch::Patch::<litchi_core::patch::ForwardOnly>::new(
         limits,
@@ -447,7 +451,10 @@ fn zero_operation_patch_has_no_cross_document_authority_and_is_exact_noop() {
         litchi_core::patch::BlobBundle::new(limits.blobs()),
     )
     .unwrap();
-    let applied = foreign.apply_external_reference_redaction(&patch).unwrap();
+    let applied = foreign
+        .apply_external_reference_redaction(&patch)
+        .unwrap()
+        .into_package();
     assert_eq!(applied.to_bytes().unwrap(), foreign.to_bytes().unwrap());
     assert_eq!(applied.text(), foreign.text());
     assert!(source.apply_external_reference_redaction(&patch).is_ok());

@@ -1,0 +1,33 @@
+{
+  "source": "42b1c5a3c22deae4f8ca3b1d5a850ed5a13c1176",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-opc",
+        "--lib"
+      ],
+      "exit": 101,
+      "seconds": 50.33704752700032,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/artifact-stream-semantic-v1/check-0.log",
+      "bytes": 187109,
+      "sha256": "381199955ad02a07b26d86490a23906d491fcd33f871fa6b4335f76dd1dcf95f",
+      "target_bytes_before": 18588095461,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/debug/deps/litchi_opc-c2255f1aaca05df0",
+          "bytes": 28333896,
+          "sha256": "bd3cf149da77c727ad590f38612624471fb57aa80008ae093b28c386e657db21"
+        }
+      ]
+    }
+  ],
+  "note": "OPC lib runtime: 710 passed, 4 failed. Two failures isolate fixture owner/recipient limits; two identify omitted-base/appended-replacement census bypass. ZIP group not reached."
+}

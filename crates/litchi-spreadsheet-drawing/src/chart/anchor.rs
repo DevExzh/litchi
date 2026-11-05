@@ -9,7 +9,7 @@ const WORKSHEET_COLUMN_COUNT: u32 = 16_384;
 /// Chart anchor position in a worksheet.
 ///
 /// Specifies the position and size of a chart using cell anchors and offsets.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Anchor {
     /// Starting column (0-based)
     pub from_col: u32,

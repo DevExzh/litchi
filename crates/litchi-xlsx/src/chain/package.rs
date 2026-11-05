@@ -43,7 +43,11 @@ pub(crate) fn validate_package(package: &OpcPackage) -> Result<()> {
 /// dependencies. Existing calculation-chain graph violations are rejected
 /// before any package part is changed. The requested conformance is applied to
 /// both the part XML and its workbook relationship.
-pub fn put(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) -> Result<bool> {
+pub(crate) fn put(
+    package: &mut OpcPackage,
+    chain: &Chain,
+    conformance: Conformance,
+) -> Result<bool> {
     let mut staged = package.clone();
     let changed = put_staged(&mut staged, chain, conformance)?;
     if changed {
@@ -122,7 +126,7 @@ fn put_staged(package: &mut OpcPackage, chain: &Chain, conformance: Conformance)
 ///
 /// No formulas are changed. A target that is also referenced elsewhere in the
 /// package is retained.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
     let mut staged = package.clone();
     let changed = remove_staged(&mut staged)?;
     if changed {
@@ -267,7 +271,7 @@ pub(super) fn process_workbook_mce_with_limit(
         &limits,
     )
     .map(|output| output.xml)
-    .map_err(|error| invalid(format!("workbook MCE error: {error}")))
+    .map_err(Error::MarkupCompatibility)
 }
 
 fn load_for_workbook(

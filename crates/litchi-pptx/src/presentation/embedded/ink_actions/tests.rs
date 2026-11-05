@@ -6,7 +6,7 @@
 
 use super::{Limits, apply_patch, load_snapshot};
 use crate::Error;
-use litchi_drawingml::ink::actions::ActionSelector;
+use litchi_drawingml::ink::actions::builder::ActionSelector;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
@@ -85,7 +85,7 @@ fn shared_edit_replaces_only_target_and_inverse_restores_bytes() {
     })
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     apply_patch(&mut package, commit.patch()).unwrap();
     let changed = {
         let slide = package.get_part(&slide_name).unwrap();

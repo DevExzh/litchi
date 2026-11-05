@@ -367,8 +367,8 @@ pub struct Alignment {
     pub indent: Option<Indent>,
     /// Signed relative indent.
     pub relative_indent: Option<i32>,
-    /// Justify the final line of text.
-    pub justify_last_line: bool,
+    /// Authored final-line justification; absent and explicit false remain distinct.
+    pub justify_last_line: Option<bool>,
     /// Reduce the font size to fit the cell.
     pub shrink_to_fit: bool,
     /// Text reading direction.
@@ -387,7 +387,7 @@ impl Alignment {
             wrap_text: false,
             indent: None,
             relative_indent: None,
-            justify_last_line: false,
+            justify_last_line: None,
             shrink_to_fit: false,
             reading_order: None,
         }
@@ -434,7 +434,7 @@ impl Alignment {
             || self.wrap_text
             || self.indent.is_some()
             || self.relative_indent.is_some()
-            || self.justify_last_line
+            || self.justify_last_line.is_some()
             || self.shrink_to_fit
             || self.reading_order.is_some()
     }

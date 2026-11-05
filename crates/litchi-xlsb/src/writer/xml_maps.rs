@@ -1,7 +1,7 @@
 //! Failure-atomic planning for fresh XLSB XML Maps authoring.
 
 use crate::package::error::{Error, Result};
-use crate::writer::MutableWorksheet;
+use crate::writer::Worksheet;
 use std::collections::HashSet;
 
 const MAX_ROW: u32 = 1_048_575;
@@ -17,14 +17,14 @@ pub(super) struct WorksheetXmlMapsWritePlan {
     pub(super) single_cells: Option<Vec<u8>>,
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormula(format!("Custom XML Maps: {}", message.into()))
+fn invalid(_message: impl Into<String>) -> Error {
+    Error::InvalidFormula("Custom XML Maps")
 }
 
 pub(super) fn stage(
     catalog: Option<&crate::xml_maps::XmlMapInfo>,
     connections: Option<&crate::package::connections::Connections>,
-    worksheets: &[MutableWorksheet],
+    worksheets: &[Worksheet],
 ) -> Result<XmlMapsWritePlan> {
     let has_bindings = worksheets
         .iter()
@@ -39,6 +39,7 @@ pub(super) fn stage(
             Ok(crate::xml_maps::serialize_xml_map_info(
                 value,
                 crate::xml_maps::XmlMapConformance::Transitional,
+                &crate::xml_maps::XmlMapLimits::DEFAULT,
             )?)
         })
         .transpose()?;
@@ -293,7 +294,7 @@ fn validate_column_dependencies(
 mod tests {
     use super::*;
     use crate::package::table::{Column, Range, Table, Type};
-    use crate::writer::WorkbookWriter;
+    use crate::writer::Builder;
     use litchi_opc::constants::relationship_type as rel;
     use litchi_opc::{OpcPackage, PackURI};
     use std::io::Cursor;
@@ -344,7 +345,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut sheet = MutableWorksheet::new("Mapped");
+        let mut sheet = Worksheet::new("Mapped");
         sheet
             .add_table(Table {
                 id: 2,
@@ -368,13 +369,15 @@ mod tests {
         sheet.set_mapped_table(mapped_table.clone()).unwrap();
         sheet.set_single_cell_mapping(single.clone()).unwrap();
 
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         workbook.add_worksheet(sheet);
         let mut bytes = Cursor::new(Vec::new());
-        workbook.save(&mut bytes).unwrap();
+        workbook.build().unwrap().write_to(&mut bytes).unwrap();
 
-        let package = OpcPackage::from_bytes(&bytes.into_inner()).unwrap();
+        let package =
+            OpcPackage::from_bytes(&bytes.into_inner(), litchi_opc::SourceLimits::default())
+                .unwrap();
         let workbook_part = package
             .get_part(&PackURI::new("/xl/workbook.bin").unwrap())
             .unwrap();
@@ -389,7 +392,11 @@ mod tests {
             .get_part(&maps_rel.target_partname().unwrap())
             .unwrap();
         assert_eq!(
-            crate::xml_maps::parse_xml_map_info(maps_part.blob()).unwrap(),
+            crate::xml_maps::parse_xml_map_info(
+                maps_part.blob(),
+                &crate::xml_maps::XmlMapLimits::DEFAULT
+            )
+            .unwrap(),
             catalog()
         );
 
@@ -438,7 +445,7 @@ mod tests {
 
     #[test]
     fn reserved_single_cell_list_id_fails_before_worksheet_mutation() {
-        let mut sheet = MutableWorksheet::new("Mapped");
+        let mut sheet = Worksheet::new("Mapped");
         let mapping = crate::xml_maps::SingleCellBinding::new(
             u32::MAX,
             1,
@@ -497,25 +504,20 @@ mod tests {
         .unwrap()
     }
 
-    fn authored(sheet: MutableWorksheet) -> WorkbookWriter {
-        let mut workbook = WorkbookWriter::new();
+    fn authored(sheet: Worksheet) -> Builder {
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         workbook.add_worksheet(sheet);
         workbook
     }
 
-    fn assert_save_failure_is_atomic(
-        mut workbook: WorkbookWriter,
-        expected: &[(usize, usize, usize)],
-    ) {
+    fn assert_build_failure_is_atomic(mut workbook: Builder, expected: &[(usize, usize, usize)]) {
         let before_catalog = workbook.xml_maps().cloned();
-        let mut output = Cursor::new(Vec::new());
-        assert!(workbook.save(&mut output).is_err());
-        assert!(output.get_ref().is_empty());
+        assert!(workbook.build().is_err());
         assert_eq!(workbook.xml_maps(), before_catalog.as_ref());
         assert_eq!(workbook.worksheet_count(), expected.len());
         for (index, &(tables, mapped, single)) in expected.iter().enumerate() {
-            let sheet = workbook.get_worksheet_mut(index).unwrap();
+            let sheet = workbook.worksheet_mut(index).unwrap();
             assert_eq!(sheet.tables().len(), tables);
             assert_eq!(sheet.mapped_tables().len(), mapped);
             assert_eq!(sheet.single_cell_mappings().len(), single);
@@ -532,27 +534,27 @@ mod tests {
         };
         let mut cases = Vec::new();
 
-        let mut unknown_map = MutableWorksheet::new("Unknown Map");
+        let mut unknown_map = Worksheet::new("Unknown Map");
         unknown_map
             .add_table(xml_table(2, Type::Xml, 1, range))
             .unwrap();
         unknown_map.set_mapped_table(mapped_table(2, 1, 8)).unwrap();
         cases.push(("unknown map", authored(unknown_map), vec![(1, 1, 0)]));
 
-        let mut missing_table = MutableWorksheet::new("Missing Table");
+        let mut missing_table = Worksheet::new("Missing Table");
         missing_table
             .set_mapped_table(mapped_table(9, 1, 7))
             .unwrap();
         cases.push(("missing table", authored(missing_table), vec![(0, 1, 0)]));
 
-        let mut non_xml = MutableWorksheet::new("Non XML");
+        let mut non_xml = Worksheet::new("Non XML");
         non_xml
             .add_table(xml_table(2, Type::Range, 1, range))
             .unwrap();
         non_xml.set_mapped_table(mapped_table(2, 1, 7)).unwrap();
         cases.push(("non-XML table", authored(non_xml), vec![(1, 1, 0)]));
 
-        let mut missing_column = MutableWorksheet::new("Missing Column");
+        let mut missing_column = Worksheet::new("Missing Column");
         missing_column
             .add_table(xml_table(2, Type::Xml, 1, range))
             .unwrap();
@@ -561,16 +563,16 @@ mod tests {
             .unwrap();
         cases.push(("missing column", authored(missing_column), vec![(1, 1, 0)]));
 
-        let mut duplicate = WorkbookWriter::new();
+        let mut duplicate = Builder::new();
         duplicate.set_xml_maps(catalog()).unwrap();
         for name in ["Duplicate One", "Duplicate Two"] {
-            let mut sheet = MutableWorksheet::new(name);
+            let mut sheet = Worksheet::new(name);
             sheet.add_table(xml_table(2, Type::Xml, 1, range)).unwrap();
             duplicate.add_worksheet(sheet);
         }
         cases.push(("duplicate list ID", duplicate, vec![(1, 0, 0), (1, 0, 0)]));
 
-        let mut invalid_range = MutableWorksheet::new("Invalid Range");
+        let mut invalid_range = Worksheet::new("Invalid Range");
         invalid_range.tables.push(xml_table(
             2,
             Type::Xml,
@@ -584,7 +586,7 @@ mod tests {
         ));
         cases.push(("invalid range", authored(invalid_range), vec![(1, 0, 0)]));
 
-        let mut table_overlap = MutableWorksheet::new("Table Overlap");
+        let mut table_overlap = Worksheet::new("Table Overlap");
         table_overlap
             .add_table(xml_table(2, Type::Xml, 1, range))
             .unwrap();
@@ -593,7 +595,7 @@ mod tests {
             .unwrap();
         cases.push(("table overlap", authored(table_overlap), vec![(1, 0, 1)]));
 
-        let mut filter_overlap = MutableWorksheet::new("Filter Overlap");
+        let mut filter_overlap = Worksheet::new("Filter Overlap");
         filter_overlap.set_auto_filter(0, 2, 0, 2);
         filter_overlap
             .set_single_cell_mapping(single_cell(3, 1, 1))
@@ -604,7 +606,7 @@ mod tests {
             vec![(0, 0, 1)],
         ));
 
-        let mut overlapping_tables = MutableWorksheet::new("Overlapping Tables");
+        let mut overlapping_tables = Worksheet::new("Overlapping Tables");
         overlapping_tables
             .add_table(xml_table(2, Type::Xml, 1, range))
             .unwrap();
@@ -627,7 +629,7 @@ mod tests {
             vec![(2, 0, 0)],
         ));
 
-        let mut table_filter_overlap = MutableWorksheet::new("Table Filter Overlap");
+        let mut table_filter_overlap = Worksheet::new("Table Filter Overlap");
         table_filter_overlap.set_auto_filter(0, 3, 0, 1);
         table_filter_overlap
             .add_table(xml_table(2, Type::Xml, 1, range))
@@ -638,7 +640,7 @@ mod tests {
             vec![(1, 0, 0)],
         ));
 
-        let mut no_data_rows = MutableWorksheet::new("No Data Rows");
+        let mut no_data_rows = Worksheet::new("No Data Rows");
         no_data_rows
             .add_table(xml_table(
                 2,
@@ -662,7 +664,7 @@ mod tests {
             ("non-Boolean header rows", 2, 0),
             ("non-Boolean totals rows", 0, 2),
         ] {
-            let mut invalid_boolean = MutableWorksheet::new(name);
+            let mut invalid_boolean = Worksheet::new(name);
             let mut table = xml_table(2, Type::Xml, 1, range);
             table.header_row_count = header_row_count;
             table.totals_row_count = totals_row_count;
@@ -670,7 +672,7 @@ mod tests {
             cases.push((name, authored(invalid_boolean), vec![(1, 0, 0)]));
         }
 
-        let mut non_xml_connection = MutableWorksheet::new("Non XML Connection");
+        let mut non_xml_connection = Worksheet::new("Non XML Connection");
         let mut table = xml_table(2, Type::Range, 1, range);
         table.connection_id = Some(91);
         non_xml_connection.add_table(table).unwrap();
@@ -680,7 +682,7 @@ mod tests {
             vec![(1, 0, 0)],
         ));
 
-        let mut missing_table_connection = MutableWorksheet::new("Missing Table Connection");
+        let mut missing_table_connection = Worksheet::new("Missing Table Connection");
         let mut table = xml_table(2, Type::Xml, 1, range);
         table.connection_id = Some(91);
         missing_table_connection.add_table(table).unwrap();
@@ -699,11 +701,11 @@ mod tests {
             load_mode: 0,
             payload_xml: None,
         });
-        let mut missing_connection = WorkbookWriter::new();
+        let mut missing_connection = Builder::new();
         missing_connection
             .set_xml_maps(missing_connection_catalog)
             .unwrap();
-        missing_connection.add_worksheet(MutableWorksheet::new("Missing Connection"));
+        missing_connection.add_worksheet(Worksheet::new("Missing Connection"));
         cases.push((
             "missing inert connection",
             missing_connection,
@@ -711,7 +713,7 @@ mod tests {
         ));
 
         for (name, workbook, expected) in cases {
-            assert_save_failure_is_atomic(workbook, &expected);
+            assert_build_failure_is_atomic(workbook, &expected);
             assert!(!name.is_empty());
         }
     }
@@ -721,7 +723,7 @@ mod tests {
         let mut oversized = catalog();
         oversized.selection_namespaces =
             "x".repeat(litchi_ooxml_common::spreadsheet_xml_maps::MAX_STRING_BYTES + 1);
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         assert!(workbook.set_xml_maps(oversized).is_err());
         assert!(workbook.xml_maps().is_none());
     }
@@ -737,7 +739,7 @@ mod tests {
             load_mode: 0,
             payload_xml: None,
         });
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(value).unwrap();
         workbook
             .set_connections(crate::package::connections::Connections {
@@ -748,15 +750,15 @@ mod tests {
                 }],
             })
             .unwrap();
-        workbook.add_worksheet(MutableWorksheet::new("Mapped"));
+        workbook.add_worksheet(Worksheet::new("Mapped"));
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).unwrap();
+        workbook.build().unwrap().write_to(&mut output).unwrap();
         assert!(!output.get_ref().is_empty());
     }
 
     #[test]
     fn table_connection_rules_accept_xml_id_and_non_xml_zero() {
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         workbook
             .set_connections(crate::package::connections::Connections {
@@ -767,7 +769,7 @@ mod tests {
                 }],
             })
             .unwrap();
-        let mut sheet = MutableWorksheet::new("Connections");
+        let mut sheet = Worksheet::new("Connections");
         let mut xml = xml_table(
             2,
             Type::Xml,
@@ -796,7 +798,7 @@ mod tests {
         sheet.add_table(range).unwrap();
         workbook.add_worksheet(sheet);
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).unwrap();
+        workbook.build().unwrap().write_to(&mut output).unwrap();
         assert!(!output.get_ref().is_empty());
     }
 
@@ -808,11 +810,11 @@ mod tests {
             first_column: 0,
             last_column: 0,
         };
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         for (ordinal, name) in ["First", "Second"].into_iter().enumerate() {
             let table_id = 2 + ordinal as u32 * 2;
-            let mut sheet = MutableWorksheet::new(name);
+            let mut sheet = Worksheet::new(name);
             sheet
                 .add_table(xml_table(table_id, Type::Xml, 1, range))
                 .unwrap();
@@ -825,8 +827,10 @@ mod tests {
             workbook.add_worksheet(sheet);
         }
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).unwrap();
-        let package = OpcPackage::from_bytes(&output.into_inner()).unwrap();
+        workbook.build().unwrap().write_to(&mut output).unwrap();
+        let package =
+            OpcPackage::from_bytes(&output.into_inner(), litchi_opc::SourceLimits::default())
+                .unwrap();
         let mut targets = HashSet::new();
         for sheet_index in 1..=2 {
             let sheet = package

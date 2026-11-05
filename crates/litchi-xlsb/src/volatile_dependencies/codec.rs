@@ -3,10 +3,10 @@
 use std::char;
 
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Records, kind};
 
 use super::model::{
-    CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, MainTopic, ReadLimits,
+    CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, MainTopic, SemanticLimits,
     Topic, VolatileType,
 };
 
@@ -21,20 +21,20 @@ pub(crate) struct Parsed {
 
 /// Parse one complete Volatile Dependencies stream and bind references to the
 /// Workbook sheet catalog cardinality.
-pub(crate) fn read(data: &[u8], limits: ReadLimits, sheet_count: usize) -> Result<Parsed> {
+pub(crate) fn read(data: &[u8], limits: SemanticLimits, sheet_count: usize) -> Result<Parsed> {
     let limits = limits.validate()?;
     if data.is_empty() {
         return Err(invalid("Volatile Dependencies stream is empty"));
     }
     if data.len() > limits.max_part_bytes {
         return Err(limit(
-            "Volatile Dependencies part bytes",
+            crate::volatile_dependencies::LimitKind::PartBytes,
             data.len(),
             limits.max_part_bytes,
         ));
     }
     let raw_limits = crate::raw::Limits::new(limits.max_part_bytes, limits.max_string_units);
-    let mut iterator = Records::try_with_limits(data, raw_limits)?;
+    let mut iterator = Records::bounded(data, raw_limits)?;
     let mut parser = Parser::new(limits);
     while let Some(record) = iterator.next() {
         let record = record?;
@@ -46,7 +46,7 @@ pub(crate) fn read(data: &[u8], limits: ReadLimits, sheet_count: usize) -> Resul
             })?;
         if parser.records > limits.max_records {
             return Err(limit(
-                "Volatile Dependencies records",
+                crate::volatile_dependencies::LimitKind::Records,
                 parser.records,
                 limits.max_records,
             ));
@@ -57,7 +57,7 @@ pub(crate) fn read(data: &[u8], limits: ReadLimits, sheet_count: usize) -> Resul
 }
 
 struct Parser {
-    limits: ReadLimits,
+    limits: SemanticLimits,
     records: usize,
     strings: usize,
     mains: usize,
@@ -75,7 +75,7 @@ struct Parser {
 }
 
 impl Parser {
-    fn new(limits: ReadLimits) -> Self {
+    fn new(limits: SemanticLimits) -> Self {
         Self {
             limits,
             records: 0,
@@ -175,12 +175,12 @@ impl Parser {
         }
         if self.dependencies.len() >= self.limits.max_types {
             return Err(limit(
-                "Volatile Dependencies type collections",
+                crate::volatile_dependencies::LimitKind::TypeCollections,
                 self.dependencies.len() + 1,
                 self.limits.max_types,
             ));
         }
-        let mut cursor = Cursor::new(payload, "BrtBeginVolType");
+        let mut cursor = Cursor::new(payload, "BrtBeginVolType", crate::raw::Limits::DEFAULT);
         let flags = cursor.read_u32()?;
         // The low bit selects the dependency kind.  The remaining bits are
         // reserved by the record grammar and must not be interpreted.  Keep
@@ -213,7 +213,7 @@ impl Parser {
             .ok_or_else(|| invalid("BrtEndVolType has no matching begin"))?;
         if self.dependencies.len() >= self.limits.max_types {
             return Err(limit(
-                "Volatile Dependencies type collections",
+                crate::volatile_dependencies::LimitKind::TypeCollections,
                 self.dependencies.len() + 1,
                 self.limits.max_types,
             ));
@@ -234,7 +234,7 @@ impl Parser {
         })?;
         if self.mains > self.limits.max_mains {
             return Err(limit(
-                "Volatile main collections",
+                crate::volatile_dependencies::LimitKind::MainCollections,
                 self.mains,
                 self.limits.max_mains,
             ));
@@ -271,7 +271,7 @@ impl Parser {
             .ok_or_else(|| invalid("BrtEndVolMain has no enclosing type"))?;
         if current_type.mains.len() >= self.limits.max_mains {
             return Err(limit(
-                "Volatile main collections",
+                crate::volatile_dependencies::LimitKind::MainCollections,
                 current_type.mains.len() + 1,
                 self.limits.max_mains,
             ));
@@ -290,7 +290,7 @@ impl Parser {
         })?;
         if self.topics > self.limits.max_topics {
             return Err(limit(
-                "Volatile topic collections",
+                crate::volatile_dependencies::LimitKind::TopicCollections,
                 self.topics,
                 self.limits.max_topics,
             ));
@@ -330,7 +330,7 @@ impl Parser {
             .ok_or_else(|| invalid("BrtEndVolTopic has no enclosing main"))?;
         if main.topics.len() >= self.limits.max_topics {
             return Err(limit(
-                "Volatile topic collections",
+                crate::volatile_dependencies::LimitKind::TopicCollections,
                 main.topics.len() + 1,
                 self.limits.max_topics,
             ));
@@ -354,7 +354,7 @@ impl Parser {
             })?;
         if self.subtopics > self.limits.max_subtopics {
             return Err(limit(
-                "Volatile subtopic records",
+                crate::volatile_dependencies::LimitKind::SubtopicRecords,
                 self.subtopics,
                 self.limits.max_subtopics,
             ));
@@ -375,7 +375,7 @@ impl Parser {
             .ok_or_else(|| invalid("BrtVolSubtopic has no enclosing topic"))?;
         if topic.subtopics.len() >= self.limits.max_subtopics {
             return Err(limit(
-                "Volatile subtopic records",
+                crate::volatile_dependencies::LimitKind::SubtopicRecords,
                 topic.subtopics.len() + 1,
                 self.limits.max_subtopics,
             ));
@@ -392,14 +392,14 @@ impl Parser {
         }
         let value = match record_kind {
             value_kind if value_kind == kind::VOL_NUM => {
-                let mut cursor = Cursor::new(payload, "BrtVolNum");
+                let mut cursor = Cursor::new(payload, "BrtVolNum", crate::raw::Limits::DEFAULT);
                 let value = cursor.read_f64()?;
                 super::model::validate_xnum(value)?;
                 cursor.finish()?;
                 CachedValue::Number(value)
             },
             value_kind if value_kind == kind::VOL_ERR => {
-                let mut cursor = Cursor::new(payload, "BrtVolErr");
+                let mut cursor = Cursor::new(payload, "BrtVolErr", crate::raw::Limits::DEFAULT);
                 let value = ErrorCode::from_wire(cursor.read_u8()?)?;
                 cursor.finish()?;
                 CachedValue::Error(value)
@@ -408,7 +408,7 @@ impl Parser {
                 CachedValue::String(self.read_string(payload, "BrtVolStr")?)
             },
             value_kind if value_kind == kind::VOL_BOOL => {
-                let mut cursor = Cursor::new(payload, "BrtVolBool");
+                let mut cursor = Cursor::new(payload, "BrtVolBool", crate::raw::Limits::DEFAULT);
                 let value = cursor.read_bool8()?;
                 cursor.finish()?;
                 CachedValue::Bool(value)
@@ -436,7 +436,7 @@ impl Parser {
             })?;
         if self.references > self.limits.max_references {
             return Err(limit(
-                "Volatile cell references",
+                crate::volatile_dependencies::LimitKind::CellReferences,
                 self.references,
                 self.limits.max_references,
             ));
@@ -450,7 +450,7 @@ impl Parser {
                 resource: "Volatile cell references",
                 source,
             })?;
-        let mut cursor = Cursor::new(payload, "BrtVolRef");
+        let mut cursor = Cursor::new(payload, "BrtVolRef", crate::raw::Limits::DEFAULT);
         let row = cursor.read_i32()?;
         let column = cursor.read_i32()?;
         let sheet_index = cursor.read_u32()?;
@@ -468,7 +468,7 @@ impl Parser {
             .ok_or_else(|| invalid("BrtVolRef has no enclosing topic"))?;
         if topic.references.len() >= self.limits.max_references {
             return Err(limit(
-                "Volatile cell references",
+                crate::volatile_dependencies::LimitKind::CellReferences,
                 topic.references.len() + 1,
                 self.limits.max_references,
             ));
@@ -478,14 +478,14 @@ impl Parser {
     }
 
     fn read_string(&mut self, payload: &[u8], context: &'static str) -> Result<String> {
-        let mut cursor = Cursor::new(payload, context);
+        let mut cursor = Cursor::new(payload, context, crate::raw::Limits::DEFAULT);
         let units =
             usize::try_from(cursor.read_u32()?).map_err(|_error| Error::CapacityOverflow {
                 resource: "Volatile Dependencies UTF-16 string",
             })?;
         if units > self.limits.max_string_units {
             return Err(limit(
-                "Volatile UTF-16 string",
+                crate::volatile_dependencies::LimitKind::StringUnits,
                 units,
                 self.limits.max_string_units,
             ));
@@ -498,7 +498,7 @@ impl Parser {
             })?;
         if self.strings > self.limits.max_total_string_units {
             return Err(limit(
-                "Volatile UTF-16 strings",
+                crate::volatile_dependencies::LimitKind::TotalStringUnits,
                 self.strings,
                 self.limits.max_total_string_units,
             ));
@@ -522,11 +522,7 @@ impl Parser {
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
         ) {
-            value.push(
-                decoded.map_err(|_error| {
-                    Error::InvalidFormat(format!("invalid UTF-16 in {context}"))
-                })?,
-            );
+            value.push(decoded.map_err(|_error| Error::InvalidFormat("invalid UTF-16"))?);
         }
         cursor.finish()?;
         Ok(value)
@@ -540,7 +536,7 @@ impl Parser {
             || self.current_topic.is_some()
         {
             return Err(Error::UnexpectedEndOfStream(
-                "Volatile Dependencies record hierarchy".to_string(),
+                "Volatile Dependencies record hierarchy",
             ));
         }
         let dependencies = Dependencies {
@@ -560,13 +556,15 @@ impl Parser {
 /// because their original positions cannot be proven from the typed model.
 pub(crate) fn write(
     value: &Dependencies,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     sheet_count: usize,
 ) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     if value.has_unsupported_records {
-        return Err(Error::UnsupportedFeature(
-            "typed Volatile Dependencies edits cannot rewrite a stream containing unsupported records".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_volatile_dependencies",
+            "the Volatile Dependencies source contains records this edit cannot preserve",
         ));
     }
     value.validate(limits)?;
@@ -574,7 +572,7 @@ pub(crate) fn write(
     let record_count = encoded_record_count(value)?;
     if record_count > limits.max_records {
         return Err(limit(
-            "Volatile Dependencies records",
+            crate::volatile_dependencies::LimitKind::Records,
             record_count,
             limits.max_records,
         ));
@@ -582,7 +580,7 @@ pub(crate) fn write(
     let capacity = encoded_size(value)?;
     if capacity > limits.max_part_bytes {
         return Err(limit(
-            "Volatile Dependencies output bytes",
+            crate::volatile_dependencies::LimitKind::OutputBytes,
             capacity,
             limits.max_part_bytes,
         ));
@@ -594,7 +592,7 @@ pub(crate) fn write(
             resource: "Volatile Dependencies output",
             source,
         })?;
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_VOL_DEPS, &[])?;
     for volatile_type in &value.types {
         writer.write_record(
@@ -654,17 +652,17 @@ pub(crate) fn write(
     writer.write_record(kind::END_VOL_DEPS, &[])?;
     if output.len() != capacity {
         return Err(Error::InvalidFormat(
-            "Volatile Dependencies writer size preflight disagreed with output".to_string(),
+            "Volatile Dependencies writer size preflight disagreed with output",
         ));
     }
     Ok(output)
 }
 
-fn wide_string_payload(value: &str, limits: ReadLimits) -> Result<Vec<u8>> {
+fn wide_string_payload(value: &str, limits: SemanticLimits) -> Result<Vec<u8>> {
     let units = value.encode_utf16().count();
     if units > limits.max_string_units {
         return Err(limit(
-            "Volatile UTF-16 string",
+            crate::volatile_dependencies::LimitKind::StringUnits,
             units,
             limits.max_string_units,
         ));
@@ -798,14 +796,11 @@ fn add_record_count(left: usize, right: usize) -> Result<usize> {
     })
 }
 
-fn empty(payload: &[u8], record: &'static str) -> Result<()> {
+fn empty(payload: &[u8], _record: &'static str) -> Result<()> {
     if payload.is_empty() {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "{record} has {} unexpected payload bytes",
-            payload.len()
-        )))
+        Err(invalid("has unexpected payload bytes"))
     }
 }
 
@@ -826,14 +821,14 @@ fn is_known(record_kind: crate::raw::Kind) -> bool {
         || record_kind == kind::VOL_BOOL
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
-        resource,
-        actual,
+const fn limit(kind: super::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::package::LimitKind::VolatileDependencies(kind),
+        observed: actual,
         maximum,
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

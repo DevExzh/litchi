@@ -5,14 +5,14 @@
 // are wrapped in the container elements the parser expects, so a
 // serialize/parse round-trip preserves the AST.
 
-use super::OmmlWriter;
+use super::Output;
 use super::chars::*;
 use super::names::*;
 use crate::ast::{BorderBoxStyle, EqArrayProperties, Fence, MathNode, MatrixProperties, StyleType};
 use crate::omml::error::OmmlError;
 use std::borrow::Cow;
 
-impl OmmlWriter {
+impl Output {
     /// Serialize a single AST node
     pub(super) fn write_node(&mut self, node: &MathNode) -> Result<(), OmmlError> {
         match node {

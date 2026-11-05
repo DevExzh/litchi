@@ -17,6 +17,7 @@ const ENHANCEMENT_PRESENT: u8 = 1 << 2;
 
 /// Validation failures for normalized image-adjustment values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The supplied adjustment was NaN or infinite.
     #[error("image adjustment must be finite")]
@@ -50,8 +51,8 @@ impl ImageAdjustment {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NonFinite`] for NaN or infinity and
-    /// [`Error::OutOfRange`] outside the inclusive `-1.0..=1.0` domain.
+    /// Returns [`Error::AdjustmentNonFinite`] for NaN or infinity and
+    /// [`Error::AdjustmentOutOfRange`] outside the inclusive `-1.0..=1.0` domain.
     #[must_use = "use the validated adjustment or handle its validation error"]
     pub fn new(value: f32) -> Result<Self> {
         if !value.is_finite() {

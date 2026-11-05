@@ -9,17 +9,16 @@
 
 use std::borrow::Cow;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    BodyStoryEvent, RtfDocument, RtfWriter, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild,
-    ShapeGroupInfo, ShapeHorizontalAnchor, ShapeProperty, ShapeRotationDegrees, ShapeTwips,
-    ShapeType, ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing,
+    BodyStoryEvent, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
+    ShapeHorizontalAnchor, ShapeProperty, ShapeRotationDegrees, ShapeTwips, ShapeType,
+    ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing, write::Writer,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -43,7 +42,11 @@ fn named_group(name: &'static str, id: i32) -> ShapeGroup<'static> {
 
 #[test]
 fn document_shape_find_replace_remove_and_reorder_are_atomic() {
-    let mut document = RtfDocument::parse(r"{\rtf1\ansi\ansicpg1252 Caf\'e9}").unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1\ansi\ansicpg1252 Caf\'e9}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let mut first = named("first", 41);
     first.position = document.text().len();
     let mut second = named("second", 42);
@@ -87,14 +90,16 @@ fn document_shape_find_replace_remove_and_reorder_are_atomic() {
     document.remove_shape(1).unwrap();
     assert_eq!(document.drawing_order(), &[StoryDrawing::Shape(0)]);
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Café");
     assert!(reparsed.find_shape_by_name("updated").is_some());
 }
 
 #[test]
 fn document_group_crud_repairs_root_order_without_tree_clones() {
-    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let anchor = document.text().len();
 
     let mut first = named_group("first group", 1);
@@ -150,7 +155,8 @@ fn document_group_crud_repairs_root_order_without_tree_clones() {
         .collect();
     assert_eq!(event_drawings, document.drawing_order());
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(reparsed.shape_groups()[0].find_shape_by_id(3).is_some());
     assert!(reparsed.find_shape_by_name("standalone").is_some());
 }
@@ -190,10 +196,12 @@ fn typed_units_anchors_and_nested_group_mutation_round_trip() {
     assert_eq!(root.info[2].as_wrap(), Some(ShapeWrapStyle::Tight));
     assert_eq!(root.info[3].as_wrap_side(), Some(ShapeWrapSide::Right));
 
-    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     root.position = document.text().len();
     document.add_shape_group(root).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.shape_groups()[0]
             .find_shape_by_name("replacement")
@@ -208,7 +216,7 @@ fn libreoffice_fixture_mutates_without_interpreting_picture_or_ole_payloads() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/shpz-dhgt.rtf"
     );
-    let mut document = RtfDocument::parse_bytes(source).unwrap();
+    let mut document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let index = document
         .shapes()
         .iter()
@@ -222,7 +230,8 @@ fn libreoffice_fixture_mutates_without_interpreting_picture_or_ole_payloads() {
         ))
         .unwrap();
     document.replace_shape(index, replacement).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.shapes()[index].property("litchiUnknownProperty"),
         Some("opaque")
@@ -231,7 +240,8 @@ fn libreoffice_fixture_mutates_without_interpreting_picture_or_ole_payloads() {
 
 #[test]
 fn reorder_across_body_anchors_and_invalid_group_indices_roll_back() {
-    let mut document = RtfDocument::parse(r"{\rtf1 AB}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 AB}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut first = named("a", 1);
     first.position = 0;
     let mut second = named("b", 2);

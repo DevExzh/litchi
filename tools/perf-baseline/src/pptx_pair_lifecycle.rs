@@ -23,7 +23,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource,
 };
-use litchi_opc::{ReadLimits, SourceCacheDiagnostics, SourceCacheLimits};
+use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimits};
 use serde::{Deserialize, Serialize};
 use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
 use soapberry_zip::{PreservationIndex, ZipArchive};
@@ -846,19 +846,19 @@ fn owner_context(
     Ok(OwnerContext { budget, context })
 }
 
-fn read_limits(input_limit: u64, expansion_limit: u64) -> Result<ReadLimits, Box<dyn Error>> {
+fn read_limits(input_limit: u64, expansion_limit: u64) -> Result<SourceLimits, Box<dyn Error>> {
     let expansion_limit = expansion_limit.max(1);
     let metadata_limit = (64 * 1024 * 1024).min(expansion_limit);
     let expansion_usize = usize::try_from(expansion_limit)?;
     let xml_limit = (8 * 1024 * 1024).min(expansion_usize).max(1);
     let attribute_limit = (64 * 1024).min(xml_limit).max(1);
-    Ok(ReadLimits::builder()
+    Ok(SourceLimits::builder()
         .max_input_bytes(input_limit)?
         .max_archive_member_name_bytes(4 * 1024)?
         .max_archive_metadata_bytes(metadata_limit)?
         .max_archive_compressed_bytes(input_limit)?
-        .max_archive_entry_bytes(expansion_limit)?
-        .max_archive_total_bytes(expansion_limit)?
+        .max_entry_bytes(expansion_limit)?
+        .max_aggregate_bytes(expansion_limit)?
         .max_part_bytes(expansion_limit)?
         .max_total_part_bytes(expansion_limit)?
         .max_content_types_bytes(xml_limit)?
@@ -906,7 +906,7 @@ fn read_point(
 fn phase(
     label: &'static str,
     source_view: Option<&litchi_pptx::SourceBackedPresentation>,
-    destination_editor: Option<&litchi_pptx::SourceBackedPresentationEditor>,
+    destination_editor: Option<&litchi_pptx::SourceBackedPresentation>,
     source_provider: Option<&ProviderSource>,
     destination_provider: Option<&ProviderSource>,
     source_before: &mut Option<pptx_range_source::PptxRangeSourceSnapshot>,
@@ -993,9 +993,10 @@ fn semantic_expectation(
     bytes: &[u8],
     expansion_limit: u64,
 ) -> Result<Vec<SlideExpectation>, Box<dyn Error>> {
-    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits(
+    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes.to_vec())),
-        read_limits(u64::try_from(bytes.len())?, expansion_limit)?,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(read_limits(u64::try_from(bytes.len())?, expansion_limit)?),
     )?;
     presentation
         .slides()
@@ -1045,8 +1046,8 @@ fn raw_members(
     let limits = archive_limits(compressed_limit, expansion_limit);
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new_with_limits(&archive, &mut scratch, limits)?;
-    let reader = ArchiveReader::new_with_limits(bytes, limits)?;
+    let index = PreservationIndex::new(&archive, &mut scratch, limits)?;
+    let reader = ArchiveReader::new(bytes, limits)?;
     let mut members = BTreeMap::new();
     for entry in index.entries() {
         let name = std::str::from_utf8(entry.raw_name_bytes())?.to_owned();
@@ -1213,11 +1214,12 @@ fn run_iteration(
 
     let source_allocation_region = crate::allocation_metrics::begin();
     let source_started = std::time::Instant::now();
-    let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         source_read,
-        read_limits,
-        cache_limits,
-        source_context.context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(read_limits)
+            .cache_limits(cache_limits)
+            .execution_context(source_context.context.clone()),
     )?;
     let open_source_ns = crate::elapsed_ns(source_started.elapsed())?;
     let open_source_allocation_metrics = source_allocation_region.finish();
@@ -1225,13 +1227,19 @@ fn run_iteration(
     let destination_allocation_region = crate::allocation_metrics::begin();
     let destination_started = std::time::Instant::now();
     let mut destination_editor = Some(
-        litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
             destination_read,
-            read_limits,
-            cache_limits,
-            destination_context.context.clone(),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(read_limits)
+                .cache_limits(cache_limits)
+                .execution_context(destination_context.context.clone()),
         )?,
     );
+    let destination_package = litchi_pptx::source::Package::from_presentation(
+        destination_editor
+            .as_ref()
+            .ok_or("destination presentation is open")?,
+    )?;
     let open_destination_ns = crate::elapsed_ns(destination_started.elapsed())?;
     let open_destination_allocation_metrics = destination_allocation_region.finish();
     if source_view.slide_count() <= inputs.manifest.source_slide
@@ -1259,15 +1267,12 @@ fn run_iteration(
 
     let plan_allocation_region = crate::allocation_metrics::begin();
     let plan_started = std::time::Instant::now();
-    let plan = destination_editor
-        .as_ref()
-        .ok_or("destination editor was consumed before planning")?
-        .plan_cross_slide_copy(
-            &source_view,
-            inputs.manifest.source_slide,
-            inputs.manifest.destination_slide,
-            inputs.manifest.insertion_position,
-        )?;
+    let plan = destination_package.plan_cross_slide_copy(
+        &source_view,
+        inputs.manifest.source_slide,
+        inputs.manifest.destination_slide,
+        inputs.manifest.insertion_position,
+    )?;
     let plan_ns = crate::elapsed_ns(plan_started.elapsed())?;
     let plan_allocation_metrics = plan_allocation_region.finish();
     if plan.source_position() != inputs.manifest.source_slide
@@ -1294,10 +1299,10 @@ fn run_iteration(
 
     let publication_allocation_region = crate::allocation_metrics::begin();
     let publication_started = std::time::Instant::now();
-    let published = destination_editor
-        .take()
-        .ok_or("destination editor was consumed before publication")?
-        .publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    drop(destination_editor.take());
+    let mut cross_copy = destination_package.edit_cross_slide_copy()?;
+    let published = cross_copy.stage(&plan)?;
+    cross_copy.commit()?.package().write_to(&mut sink)?;
     let publication_ns = crate::elapsed_ns(publication_started.elapsed())?;
     let publication_allocation_metrics = publication_allocation_region.finish();
     let publication_sink = sink.summary();

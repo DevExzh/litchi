@@ -1,0 +1,3514 @@
+{
+  "format": "xlsb",
+  "elements": [
+    {
+      "format": "xlsb",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "<sheet>"
+        },
+        {
+          "element": "namedrange",
+          "pathSegment": "namedrange"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "list",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "workbook.date1904": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "activeTab": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.template": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.manager": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.company": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.application": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.pages": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.words": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.characters": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.totalTime": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "calc.mode": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB calculation properties are retained by the leaf but not projected into the workbook node"
+        },
+        "firstSheet": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "the XLSB workbook node does not expose the authored first-sheet setting yet"
+        }
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>",
+          "<sheet>!<A1>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "column",
+          "pathSegment": "col"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "pivottable",
+          "pathSegment": "pivottable"
+        },
+        {
+          "element": "slicer",
+          "pathSegment": "slicer"
+        },
+        {
+          "element": "sparkline",
+          "pathSegment": "sparkline"
+        },
+        {
+          "element": "dataValidation",
+          "pathSegment": "dataValidation"
+        },
+        {
+          "element": "conditionalFormatting",
+          "pathSegment": "cf"
+        },
+        {
+          "element": "autofilter",
+          "pathSegment": "autofilter"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "rowbreak",
+          "pathSegment": "rowbreak"
+        },
+        {
+          "element": "colbreak",
+          "pathSegment": "colbreak"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "visibility": {
+          "type": "enum",
+          "values": [
+            "visible",
+            "hidden",
+            "veryHidden"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "freeze": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB sheet views are retained by the leaf but freeze panes are not projected yet"
+        },
+        "zoom": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB sheet views are retained by the leaf but zoom is not projected yet"
+        },
+        "autoFilter": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB auto-filter metadata is retained by the leaf but not projected into a sheet node yet"
+        },
+        "tabColor": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB sheet tab color is not projected into the sheet node yet"
+        },
+        "protect": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB sheet protection metadata is retained by the leaf but not projected yet"
+        },
+        "printArea": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB print settings are not projected into the sheet node yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "cell",
+      "parent": [
+        "sheet",
+        "range"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "Number",
+            "String",
+            "SharedString",
+            "Boolean",
+            "Error",
+            "InlineString",
+            "Date",
+            "Unknown"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "evaluated": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "arrayformula": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "arrayref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "empty": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "aliases": [
+            "bold"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "aliases": [
+            "italic"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "aliases": [
+            "font.strike",
+            "strikethrough"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
+          "values": [
+            "single",
+            "none"
+          ],
+          "valueAliases": {
+            "false": "none",
+            "true": "single"
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "aliases": [
+            "color"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "aliases": [
+            "size",
+            "fontsize"
+          ],
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 12700,
+            "maxEmu": 5194300
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "aliases": [
+            "font",
+            "fontname"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "aliases": [
+            "bgcolor",
+            "bg"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "aliases": [
+            "wrap",
+            "wraptext"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "aliases": [
+            "halign",
+            "align"
+          ],
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "valueAliases": {
+            "centeracrossselection": "centerContinuous"
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "aliases": [
+            "valign"
+          ],
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.textRotation": {
+          "type": "int",
+          "aliases": [
+            "rotation"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.indent": {
+          "type": "int",
+          "aliases": [
+            "indent"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 250
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.readingOrder": {
+          "type": "enum",
+          "aliases": [
+            "readingorder"
+          ],
+          "values": [
+            "context",
+            "ltr",
+            "rtl"
+          ],
+          "valueAliases": {
+            "0": "context",
+            "1": "ltr",
+            "2": "rtl",
+            "contextdependent": "context",
+            "lefttoright": "ltr",
+            "righttoleft": "rtl"
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "numberformat": {
+          "type": "string",
+          "aliases": [
+            "numfmt",
+            "format"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "merge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mergeAnchor": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "aliases": [
+            "text"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "aliases": [
+            "border"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "aliases": [
+            "border.color"
+          ],
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "computedValue": {
+          "code": "unsupported_capability",
+          "followUp": "M4 follow-up: project computed values in cell views",
+          "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid (record 0266); the source cached-value fallback has no formula text"
+        },
+        "superscript": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "subscript": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "font.outline": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "font.shadow": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "font.condense": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "font.extend": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "font.charset": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "font.family": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "alignment.relativeIndent": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project this alignment attribute into cell properties"
+        },
+        "alignment.justifyLastLine": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project this alignment attribute into cell properties"
+        },
+        "font.scheme": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project font records into cell properties"
+        },
+        "fillPattern": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project fill records into cell properties"
+        },
+        "fillBg": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project fill records into cell properties"
+        },
+        "border.diagonal": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project border records into cell properties"
+        },
+        "border.diagonal.color": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project border records into cell properties"
+        },
+        "border.diagonalUp": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project border records into cell properties"
+        },
+        "border.diagonalDown": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project border records into cell properties"
+        },
+        "protection.locked": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project cell protection metadata"
+        },
+        "protection.hidden": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project cell protection metadata"
+        },
+        "quotePrefix": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB node does not project quote-prefix metadata into cell properties"
+        },
+        "numFmtId": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "native number-format IDs remain in the XLSB style table and are not admitted as unified properties"
+        },
+        "link": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB hyperlink targets are retained by the leaf but not resolved into cell properties yet"
+        },
+        "tooltip": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB hyperlink tooltips are not resolved into cell properties yet"
+        },
+        "display": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB cells expose stored values, not a separately formatted display string"
+        },
+        "phonetic": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB phonetic runs are retained by the leaf but not projected into cell properties yet"
+        },
+        "richtext": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "the XLSB cell model exposes a flattened value and no unified rich-text run node"
+        },
+        "alt": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB in-cell pictures are not read by the unified adapter"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "range",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>:<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        }
+      ],
+      "properties": {
+        "value": {
+          "type": "scalar",
+          "aliases": [
+            "text"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "formula": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.bold": {
+          "type": "bool",
+          "aliases": [
+            "bold"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "aliases": [
+            "italic"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "bool",
+          "aliases": [
+            "font.strike",
+            "strikethrough"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
+          "values": [
+            "single",
+            "none"
+          ],
+          "valueAliases": {
+            "false": "none",
+            "true": "single"
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "aliases": [
+            "font",
+            "fontname"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "aliases": [
+            "size",
+            "fontsize"
+          ],
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 12700,
+            "maxEmu": 5194300
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "aliases": [
+            "color"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "color",
+          "aliases": [
+            "bgcolor",
+            "bg"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "aliases": [
+            "border"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "aliases": [
+            "border.color"
+          ],
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.left.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.right.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.top.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.bottom.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "numberformat": {
+          "type": "string",
+          "aliases": [
+            "numfmt",
+            "format"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "aliases": [
+            "halign",
+            "align"
+          ],
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "valueAliases": {
+            "centeracrossselection": "centerContinuous"
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "aliases": [
+            "valign"
+          ],
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "aliases": [
+            "wrap",
+            "wraptext"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.textRotation": {
+          "type": "int",
+          "aliases": [
+            "rotation"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.indent": {
+          "type": "int",
+          "aliases": [
+            "indent"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 250
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.readingOrder": {
+          "type": "enum",
+          "aliases": [
+            "readingorder"
+          ],
+          "values": [
+            "context",
+            "ltr",
+            "rtl"
+          ],
+          "valueAliases": {
+            "0": "context",
+            "1": "ltr",
+            "2": "rtl",
+            "contextdependent": "context",
+            "lefttoright": "ltr",
+            "righttoleft": "rtl"
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "merge": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "row",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "<sheet>!N:N"
+        ],
+        "positional": [
+          "/<sheet>/row[N]"
+        ]
+      },
+      "properties": {
+        "height": {
+          "type": "length",
+          "unit": "pt",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "customHeight": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ],
+        "headerColumns": true
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "column",
+      "parent": "sheet",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/col[<letters>]",
+          "<sheet>!B:B"
+        ],
+        "positional": [
+          "/<sheet>/col[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "customWidth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "numberformat": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "XLSB column styles are not projected into column nodes yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "table",
+      "parent": [
+        "sheet",
+        "workbook"
+      ],
+      "elementAliases": [
+        "listobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/table[@name=<name>]",
+          "/table[@name=<name>]"
+        ],
+        "positional": [
+          "/<sheet>/table[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "displayName": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedRows": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedCols": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headerRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "totalRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "columns": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "namedrange",
+      "parent": "workbook",
+      "elementAliases": [
+        "definedname"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/namedrange[<name>]",
+          "/namedrange[@name=<name>]"
+        ],
+        "positional": [
+          "/namedrange[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "comment": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB defined-name projection reads name, ref and scope; BrtName comments are not projected yet"
+        },
+        "volatile": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB defined-name projection reads name, ref and scope; macro and volatile flags are not projected yet"
+        },
+        "hidden": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4d)",
+          "reason": "the XLSB defined-name projection reads name, ref and scope; the hidden flag is not projected yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "comment",
+      "parent": "sheet",
+      "elementAliases": [
+        "note"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/comment[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "legend": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "catTitle": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/series[K]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/axis[@role=<role>]",
+          "/<sheet>/chart[N]/axis[N]"
+        ]
+      },
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "min": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "max": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "pivottable",
+      "parent": "sheet",
+      "elementAliases": [
+        "pivot"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/pivottable[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB pivot tables are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "slicer",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/slicer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB slicers are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "sparkline",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/sparkline[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "dataValidation",
+      "parent": "sheet",
+      "elementAliases": [
+        "validation"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/dataValidation[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula1": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula2": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "allowBlank": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showError": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showInput": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "promptTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "prompt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "inCellDropdown": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "conditionalFormatting",
+      "parent": "sheet",
+      "elementAliases": [
+        "cf"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/cf[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "priority": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "stopIfTrue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dxfId": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rank": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "percent": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bottom": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "aboveAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "equalAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "stdDev": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "period": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showValue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midpoint": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "iconset": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "reverse": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "negativeColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: XLSB Office 2010 conditional-format extensions",
+            "reason": "the XLSB editor authors classic conditional-format records; data-bar negative and axis styling live in BrtBeginCFRule14 future records, which are not authored yet"
+          }
+        },
+        "axisColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: XLSB Office 2010 conditional-format extensions",
+            "reason": "the XLSB editor authors classic conditional-format records; data-bar negative and axis styling live in BrtBeginCFRule14 future records, which are not authored yet"
+          }
+        },
+        "axisPosition": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: XLSB Office 2010 conditional-format extensions",
+            "reason": "the XLSB editor authors classic conditional-format records; data-bar negative and axis styling live in BrtBeginCFRule14 future records, which are not authored yet"
+          }
+        },
+        "direction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: XLSB Office 2010 conditional-format extensions",
+            "reason": "the XLSB editor authors classic conditional-format records; data-bar negative and axis styling live in BrtBeginCFRule14 future records, which are not authored yet"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "autofilter",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/autofilter"
+        ]
+      },
+      "properties": {
+        "range": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "criteria0": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: XLSB auto-filter criteria",
+            "reason": "XLSB auto-filter column criteria (`criteriaN.op`, BrtBeginFilterColumn) are not authored yet; the filter range is"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "hyperlink",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/hyperlink[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "location": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "mergeCell",
+      "parent": "sheet",
+      "elementAliases": [
+        "merge",
+        "mergedrange"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/mergeCell[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB merged ranges are retained by the leaf but are not listed as nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "picture",
+      "parent": "sheet",
+      "elementAliases": [
+        "image",
+        "media"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "decorative": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchorMode": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contentType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fileSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "crop": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "shape",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/shape[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "line": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "drawing",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "align": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "valign": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "margin": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "gradientFill": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0322 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "ole",
+      "parent": "sheet",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/ole[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB OLE objects are retained by the leaf but are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "rowbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/rowbreak[N]"
+        ]
+      },
+      "properties": {
+        "row": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "colbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/colbreak[N]"
+        ]
+      },
+      "properties": {
+        "col": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "run",
+      "parent": "cell",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/<A1>/run[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "0339-F5 (deferred-P1): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "namedrange",
+      "context": "earlier-name",
+      "code": "unsupported_capability",
+      "followUp": "XLSB defined-name index renumbering (record 0330)",
+      "reason": "only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 XLSB template creation",
+      "reason": "the XLSB creator currently authors ordinary workbooks and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the XLSB creator emits Transitional packages and refuses Strict requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "unrepresentable-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (OOXML document properties, record 0253)",
+      "reason": "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "workbook",
+      "context": "non-sheet-elements",
+      "code": "unsupported_element",
+      "followUp": "M2 XLSB structural add handlers for non-sheet elements",
+      "reason": "XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet insertion",
+      "reason": "sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "vba-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet insertion",
+      "reason": "sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "calculation-chain-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware sheet insertion",
+      "reason": "sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "noncontiguous-3d-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB 3-D dependency-aware sheet insertion",
+      "reason": "sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "workbook",
+      "context": "non-sheet-elements",
+      "code": "unsupported_element",
+      "followUp": "M2 XLSB non-cell removal handlers",
+      "reason": "XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet removal",
+      "reason": "sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "removed-scoped-names",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware scoped-name removal",
+      "reason": "sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "textual-references",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware textual-reference removal",
+      "reason": "sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "formula-groups",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware formula-group removal",
+      "reason": "array, shared and data-table formula-group members require native group lifecycle support before removal"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "calculation-chain",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware formula removal",
+      "reason": "stored formulas cannot be removed while an opaque calculation chain is present"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "unmodeled-cell-records",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB additional native cell-record families",
+      "reason": "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "unbound-tab-visibility",
+      "code": "unsupported_capability",
+      "followUp": "bind a physical sheet before revealing an unbound tab",
+      "reason": "an unbound XLSB tab has no sheet payload and must remain veryHidden"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "unmodeled-tab-views",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB multi-window and additional tab-kind view mutation",
+      "reason": "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "sheet-name-markup-compatibility",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB markup-compatibility-aware sheet-name dependency rewrites",
+      "reason": "sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "sheet-name-unmodeled-reference",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB additional sheet-name reference carriers",
+      "reason": "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "vba-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "vba-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "calculation-chain-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "calculation-chain-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "noncontiguous-3d-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB 3-D dependency-aware sheet ordering",
+      "reason": "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "noncontiguous-3d-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB 3-D dependency-aware sheet ordering",
+      "reason": "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": true
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
+}

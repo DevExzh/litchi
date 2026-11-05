@@ -38,7 +38,7 @@ fn scans_inline_and_anchor_with_borrowed_source_and_ranges() {
         drawing("inline", &admitted("rIdSvgInline")),
         drawing("anchor", &admitted("rIdSvgAnchor")),
     ));
-    let source = SourceDrawing::scan_with_ordinal(&xml, 4).expect("scan direct pictures");
+    let source = SourceDrawing::scan(&xml, 4, Default::default()).expect("scan direct pictures");
     assert_eq!(source.drawing_ordinal(), 4);
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
     assert_eq!(source.pictures().len(), 2);
@@ -102,7 +102,8 @@ fn encoded_namespace_uris_resolve_across_owner_profiles_and_export_canonically()
         xml = xml.replace(uri, &encoded);
     }
 
-    let source = SourceDrawing::scan(xml.as_bytes()).expect("encoded namespace aliases scan");
+    let source = SourceDrawing::scan(xml.as_bytes(), Default::default(), Default::default())
+        .expect("encoded namespace aliases scan");
     let owner = source
         .picture(0)
         .expect("encoded picture")
@@ -134,7 +135,7 @@ fn unknown_duplicate_and_mce_owners_are_inert_or_refused() {
         "inline",
         r#"<a:ext uri="urn:future"><future:payload xmlns:future="urn:future"/></a:ext>"#,
     ));
-    let unknown = SourceDrawing::scan(&unknown).unwrap();
+    let unknown = SourceDrawing::scan(&unknown, Default::default(), Default::default()).unwrap();
     assert!(matches!(
         unknown.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Opaque
@@ -144,7 +145,8 @@ fn unknown_duplicate_and_mce_owners_are_inert_or_refused() {
         "inline",
         &format!("{}{}", admitted("rIdOne"), admitted("rIdTwo")),
     ));
-    let duplicate = SourceDrawing::scan(&duplicate).unwrap();
+    let duplicate =
+        SourceDrawing::scan(&duplicate, Default::default(), Default::default()).unwrap();
     assert!(matches!(
         duplicate.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Ambiguous
@@ -154,7 +156,7 @@ fn unknown_duplicate_and_mce_owners_are_inert_or_refused() {
         r#"<mc:AlternateContent><mc:Choice Requires="w14">{}</mc:Choice><mc:Fallback/></mc:AlternateContent>"#,
         drawing("inline", &admitted("rIdHidden")),
     ));
-    let mce = SourceDrawing::scan(&mce).unwrap();
+    let mce = SourceDrawing::scan(&mce, Default::default(), Default::default()).unwrap();
     assert!(matches!(
         mce.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -169,7 +171,8 @@ fn strict_core_uses_strict_picture_uri_and_transitional_svg_relationship() {
         r#"<w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:wp="http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" xmlns:a="http://purl.oclc.org/ooxml/drawingml/main" xmlns:pic="http://purl.oclc.org/ooxml/drawingml/picture" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships" xmlns:trans="{R}" xmlns:asvg="{ASVG}"><w:body>{}</w:body></w:document>"#,
         body
     );
-    let source = SourceDrawing::scan(xml.as_bytes()).unwrap();
+    let source =
+        SourceDrawing::scan(xml.as_bytes(), Default::default(), Default::default()).unwrap();
     assert_eq!(source.dialect(), DrawingDialect::Strict);
     assert_eq!(
         source
@@ -189,16 +192,24 @@ fn recognized_container_text_and_missing_raster_fail_closed() {
         "inline",
         &format!(r#"<a:ext uri="{SVG_URI}">bad<asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#),
     ));
-    assert!(SourceDrawing::scan(&text).is_err());
+    assert!(SourceDrawing::scan(&text, Default::default(), Default::default()).is_err());
 
     let foreign_ext_list_child = document(&drawing("inline", r#"<a:foreign/>"#));
-    assert!(SourceDrawing::scan(&foreign_ext_list_child).is_err());
+    assert!(
+        SourceDrawing::scan(
+            &foreign_ext_list_child,
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let missing_raster = document(&format!(
         r#"<w:r><w:drawing><wp:inline><a:graphic><a:graphicData uri="{PICTURE_URI}"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="p"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip><a:extLst>{}</a:extLst></a:blip></pic:blipFill><pic:spPr/></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>"#,
         admitted("rIdSvg"),
     ));
-    let source = SourceDrawing::scan(&missing_raster).unwrap();
+    let source =
+        SourceDrawing::scan(&missing_raster, Default::default(), Default::default()).unwrap();
     assert!(matches!(
         source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -208,14 +219,14 @@ fn recognized_container_text_and_missing_raster_fail_closed() {
 #[test]
 fn invalid_xml_namespace_and_declaration_forms_fail_closed() {
     let empty_prefix = document(r#"<w:p xmlns:x="" x:value="bad"/>"#);
-    assert!(SourceDrawing::scan(&empty_prefix).is_err());
+    assert!(SourceDrawing::scan(&empty_prefix, Default::default(), Default::default()).is_err());
 
     let invalid_default = document(r#"<w:p xmlns="http://www.w3.org/XML/1998/namespace"/>"#);
-    assert!(SourceDrawing::scan(&invalid_default).is_err());
+    assert!(SourceDrawing::scan(&invalid_default, Default::default(), Default::default()).is_err());
 
     let mut invalid_version = b"<?xml version=".to_vec();
     invalid_version.extend_from_slice(br#"1.1"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#);
-    assert!(SourceDrawing::scan(&invalid_version).is_err());
+    assert!(SourceDrawing::scan(&invalid_version, Default::default(), Default::default()).is_err());
 }
 
 #[test]
@@ -231,12 +242,12 @@ fn namespace_context_budget_is_precharged_across_scope_nodes() {
         max_namespace_bytes: below_aggregate,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(xml.as_bytes(), 0, limits).is_err());
+    assert!(SourceDrawing::scan(xml.as_bytes(), 0, limits).is_err());
     let exact = ScanLimits {
         max_namespace_bytes: below_aggregate + 1,
         ..limits
     };
-    assert!(SourceDrawing::scan_with_limits(xml.as_bytes(), 0, exact).is_ok());
+    assert!(SourceDrawing::scan(xml.as_bytes(), 0, exact).is_ok());
 }
 
 #[test]
@@ -244,19 +255,34 @@ fn ordinary_owner_rejects_foreign_root_and_ignores_legacy_picture_payload() {
     let foreign_before_root = format!(
         r#"<f:pre xmlns:f="urn:foreign"/><w:document xmlns:w="{W}"><w:body/></w:document>"#
     );
-    assert!(SourceDrawing::scan(foreign_before_root.as_bytes()).is_err());
+    assert!(
+        SourceDrawing::scan(
+            foreign_before_root.as_bytes(),
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let foreign_root = format!(
         r#"<f:outer xmlns:f="urn:foreign" xmlns:w="{W}"><w:document><w:body/></w:document></f:outer>"#
     );
-    assert!(SourceDrawing::scan(foreign_root.as_bytes()).is_err());
+    assert!(
+        SourceDrawing::scan(
+            foreign_root.as_bytes(),
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let legacy = document(&format!(
         r#"<w:pict>{}<w:object>{}</w:object></w:pict>"#,
         drawing("inline", &admitted("rIdHidden")),
         drawing("anchor", &admitted("rIdHidden2")),
     ));
-    let source = SourceDrawing::scan(&legacy).expect("legacy payload remains opaque");
+    let source = SourceDrawing::scan(&legacy, Default::default(), Default::default())
+        .expect("legacy payload remains opaque");
     assert!(source.pictures().is_empty());
 
     let opaque = String::from_utf8(document(&format!(
@@ -269,11 +295,16 @@ fn ordinary_owner_rejects_foreign_root_and_ignores_legacy_picture_payload() {
             r#"xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:f="urn:foreign"#,
         )
         .into_bytes();
-    assert!(SourceDrawing::scan(&opaque).unwrap().pictures().is_empty());
+    assert!(
+        SourceDrawing::scan(&opaque, Default::default(), Default::default())
+            .unwrap()
+            .pictures()
+            .is_empty()
+    );
 
     let nested_run = document(&format!(r#"<w:r>{}</w:r>"#, drawing("inline", "")));
     assert!(
-        SourceDrawing::scan(&nested_run)
+        SourceDrawing::scan(&nested_run, Default::default(), Default::default())
             .unwrap()
             .pictures()
             .is_empty()
@@ -283,10 +314,15 @@ fn ordinary_owner_rejects_foreign_root_and_ignores_legacy_picture_payload() {
         r#"<a:grpSp>{}</a:grpSp>"#,
         drawing("inline", &admitted("rIdGroup")),
     ));
-    assert!(SourceDrawing::scan(&group).unwrap().pictures().is_empty());
+    assert!(
+        SourceDrawing::scan(&group, Default::default(), Default::default())
+            .unwrap()
+            .pictures()
+            .is_empty()
+    );
 
     let unbound = document(r#"<x:opaque/>"#);
-    assert!(SourceDrawing::scan(&unbound).is_err());
+    assert!(SourceDrawing::scan(&unbound, Default::default(), Default::default()).is_err());
 }
 
 #[test]
@@ -298,16 +334,23 @@ fn direct_picture_shape_and_raster_choice_are_checked() {
         )
         .replace("<pic:blipFill>", "<pic:spPr/><pic:blipFill>"),
     );
-    assert!(SourceDrawing::scan(&out_of_order).is_err());
+    assert!(SourceDrawing::scan(&out_of_order, Default::default(), Default::default()).is_err());
 
     let invalid_id = document(&drawing("inline", "").replace("id=\"7\"", "id=\"4294967296\""));
-    assert!(SourceDrawing::scan(&invalid_id).is_err());
+    assert!(SourceDrawing::scan(&invalid_id, Default::default(), Default::default()).is_err());
 
     let both_raster_relations = document(&drawing("inline", "").replace(
         "r:embed=\"rIdRaster\"",
         "r:embed=\"rIdRaster\" r:link=\"rIdOther\"",
     ));
-    assert!(SourceDrawing::scan(&both_raster_relations).is_err());
+    assert!(
+        SourceDrawing::scan(
+            &both_raster_relations,
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let unknown_ext_attribute = document(&drawing(
         "inline",
@@ -315,7 +358,12 @@ fn direct_picture_shape_and_raster_choice_are_checked() {
             r#"<a:ext uri="{SVG_URI}" future="opaque"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#
         ),
     ));
-    let source = SourceDrawing::scan(&unknown_ext_attribute).unwrap();
+    let source = SourceDrawing::scan(
+        &unknown_ext_attribute,
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert!(matches!(
         source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -325,16 +373,25 @@ fn direct_picture_shape_and_raster_choice_are_checked() {
         "<pic:cNvPr id=\"7\" name=\"picture\"/><pic:cNvPicPr/>",
         "<pic:cNvPicPr/><pic:cNvPr id=\"7\" name=\"picture\"/>",
     ));
-    assert!(SourceDrawing::scan(&c_nv_pic_pr_first).is_err());
+    assert!(
+        SourceDrawing::scan(&c_nv_pic_pr_first, Default::default(), Default::default()).is_err()
+    );
 
     let missing_name = document(&drawing("inline", "").replace(" name=\"picture\"", ""));
-    assert!(SourceDrawing::scan(&missing_name).is_err());
+    assert!(SourceDrawing::scan(&missing_name, Default::default(), Default::default()).is_err());
 
     let style_after_ext_list = document(&drawing("inline", "").replace(
         "<pic:spPr/></pic:pic>",
         "<pic:spPr/><pic:extLst/><pic:style/></pic:pic>",
     ));
-    assert!(SourceDrawing::scan(&style_after_ext_list).is_err());
+    assert!(
+        SourceDrawing::scan(
+            &style_after_ext_list,
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let duplicate_expanded_attribute = document(&drawing("inline", "").replace(
         "name=\"picture\"",
@@ -343,15 +400,30 @@ fn direct_picture_shape_and_raster_choice_are_checked() {
             encoded_slashes(PIC)
         ),
     ));
-    assert!(SourceDrawing::scan(&duplicate_expanded_attribute).is_err());
+    assert!(
+        SourceDrawing::scan(
+            &duplicate_expanded_attribute,
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let unknown_graphic_data_child =
         document(&drawing("inline", "").replace("<pic:pic>", "<a:foreign/><pic:pic>"));
-    assert!(SourceDrawing::scan(&unknown_graphic_data_child).is_err());
+    assert!(
+        SourceDrawing::scan(
+            &unknown_graphic_data_child,
+            Default::default(),
+            Default::default()
+        )
+        .is_err()
+    );
 
     let raster_link =
         document(&drawing("inline", "").replace("r:embed=\"rIdRaster\"", "r:link=\"rIdRaster\""));
-    let raster_link = SourceDrawing::scan(&raster_link).unwrap();
+    let raster_link =
+        SourceDrawing::scan(&raster_link, Default::default(), Default::default()).unwrap();
     let link_picture = raster_link.picture(0).unwrap();
     assert!(link_picture.raster_relationship_is_link());
     assert!(matches!(link_picture.svg_owner(), SvgOwnerState::Refused));
@@ -366,7 +438,7 @@ fn one_anchor_cannot_publish_multiple_direct_pictures_and_limits_are_clamped() {
     let insert_at = one.find("</a:graphicData>").unwrap();
     let duplicate = format!("{}{}{}", &one[..insert_at], pic, &one[insert_at..]);
     let duplicate = document(&duplicate);
-    assert!(SourceDrawing::scan(&duplicate).is_err());
+    assert!(SourceDrawing::scan(&duplicate, Default::default(), Default::default()).is_err());
 
     let two = document(&format!(
         "{}{}",
@@ -377,7 +449,7 @@ fn one_anchor_cannot_publish_multiple_direct_pictures_and_limits_are_clamped() {
         max_pictures: 1,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&two, 0, limits).is_err());
+    assert!(SourceDrawing::scan(&two, 0, limits).is_err());
 }
 
 #[test]
@@ -386,7 +458,8 @@ fn relationship_dialect_comes_from_host_profile_not_first_opaque_reference() {
         r#"<w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:wp="http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" xmlns:a="http://purl.oclc.org/ooxml/drawingml/main" xmlns:pic="http://purl.oclc.org/ooxml/drawingml/picture" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships" xmlns:trans="{R}" xmlns:asvg="{ASVG}"><w:body><w:hyperlink trans:id="rIdOpaque"/>{}</w:body></w:document>"#,
         drawing("inline", &admitted("rIdSvg")),
     );
-    let source = SourceDrawing::scan(xml.as_bytes()).unwrap();
+    let source =
+        SourceDrawing::scan(xml.as_bytes(), Default::default(), Default::default()).unwrap();
     assert_eq!(
         source.relationship_dialect(),
         super::source::RelationshipDialect::Strict

@@ -122,7 +122,7 @@ impl CommentsTable {
     /// Parse all Word 97+ comment references and text ranges.
     ///
     /// Word-compatible per-comment repairs are applied but their record is
-    /// discarded; use [`Self::parse_recording`] to enumerate them.
+    /// discarded by this convenience parser.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         Self::parse_recording(fib, table_stream).map(|(table, _)| table)
     }

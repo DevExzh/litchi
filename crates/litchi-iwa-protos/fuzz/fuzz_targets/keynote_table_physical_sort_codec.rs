@@ -145,8 +145,8 @@ fn assert_unknown_mutations_reject_atomically(tile: &[u8], header: &[u8], uid_ma
 
     let header_before = header.to_vec();
     let header_moves = [
-        codec::HeaderRowMove::new(0, 2),
-        codec::HeaderRowMove::new(2, 0),
+        codec::RowMove::new(0, 2),
+        codec::RowMove::new(2, 0),
     ];
     assert!(
         codec::plan_header_storage_bucket_rows(header, u32::MAX, &header_moves, options(header),)
@@ -408,8 +408,8 @@ fn exercise_headers(source: &[u8], data: &[u8]) {
         return;
     };
     let moves = [
-        codec::HeaderRowMove::new(first, second),
-        codec::HeaderRowMove::new(second, first),
+        codec::RowMove::new(first, second),
+        codec::RowMove::new(second, first),
     ];
     let planned = codec::plan_header_storage_bucket_rows(source, u32::MAX, &moves, generous);
     assert_eq!(
@@ -457,7 +457,7 @@ fn exercise_headers(source: &[u8], data: &[u8]) {
     black_box(data);
 }
 
-fn exercise_header_limits(source: &[u8], moves: &[codec::HeaderRowMove]) {
+fn exercise_header_limits(source: &[u8], moves: &[codec::RowMove]) {
     let generous = options(source);
     let plan = match codec::plan_header_storage_bucket_rows(source, u32::MAX, moves, generous) {
         Ok(plan) => plan,

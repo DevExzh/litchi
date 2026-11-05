@@ -17,7 +17,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, 
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
 use litchi_numbers::{
     Package, SheetSelector, TableSelector,
-    table::relocation::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
+    table::relocation::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
 use prost::Message as _;
 
@@ -74,6 +74,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -115,7 +116,11 @@ fn table_info(
     let mut result = object(identifier, TABLE_INFO_MESSAGE_TYPE, payload)?;
     result.archive_info.message_infos[0].object_references =
         vec![parent_identifier, model_identifier];
-    let mut parent_path = FieldInfo::new(vec![1, 2]);
+    let mut parent_path = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     parent_path.object_references = vec![parent_identifier];
     result.archive_info.message_infos[0].field_infos = vec![parent_path];
     Ok(result)
@@ -139,6 +144,7 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -162,7 +168,11 @@ fn sheet(
 
     let mut result = object(identifier, SHEET_MESSAGE_TYPE, payload)?;
     result.archive_info.message_infos[0].object_references = drawable_identifiers.to_vec();
-    let mut drawable_path = FieldInfo::new(vec![2]);
+    let mut drawable_path = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     drawable_path.object_references = drawable_identifiers.to_vec();
     result.archive_info.message_infos[0].field_infos = vec![drawable_path];
     Ok(result)
@@ -172,6 +182,11 @@ fn sheet(
 /// table.  The selected table has a stable parent edge and the destination is
 /// non-empty so append order is observable.
 fn fixture() -> TestResult<Vec<u8>> {
+    fixture_with_destination_table(GAMMA_TABLE_NAME)
+}
+
+/// The fixture, with `gamma` naming the destination sheet's table.
+fn fixture_with_destination_table(gamma: &str) -> TestResult<Vec<u8>> {
     let mut document = object(
         DOCUMENT_ID,
         1,
@@ -202,7 +217,8 @@ fn fixture() -> TestResult<Vec<u8>> {
                 )?,
             ],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let tables_component = SnappyStream::compress(
@@ -220,12 +236,7 @@ fn fixture() -> TestResult<Vec<u8>> {
                     SOURCE_SHEET_ID,
                     BETA_TABLE_NAME,
                 )?,
-                table_info(
-                    GAMMA_INFO_ID,
-                    GAMMA_MODEL_ID,
-                    DESTINATION_SHEET_ID,
-                    GAMMA_TABLE_NAME,
-                )?,
+                table_info(GAMMA_INFO_ID, GAMMA_MODEL_ID, DESTINATION_SHEET_ID, gamma)?,
                 object(
                     ALPHA_MODEL_ID,
                     TABLE_MODEL_MESSAGE_TYPE,
@@ -239,12 +250,13 @@ fn fixture() -> TestResult<Vec<u8>> {
                 object(
                     GAMMA_MODEL_ID,
                     TABLE_MODEL_MESSAGE_TYPE,
-                    table_model(GAMMA_MODEL_ID, GAMMA_TABLE_NAME).encode_to_vec(),
+                    table_model(GAMMA_MODEL_ID, gamma).encode_to_vec(),
                 )?,
                 sidecars()?,
             ],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let unrelated_component = SnappyStream::compress(
@@ -255,9 +267,11 @@ fn fixture() -> TestResult<Vec<u8>> {
                     type_: 99_999,
                     data: b"unrelated Numbers component".to_vec(),
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     Ok(litchi_iwa_archive::package::to_bytes(
@@ -272,12 +286,12 @@ fn fixture() -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(source: &[u8], member_name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("missing component {member_name}")))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -285,13 +299,16 @@ fn rewrite_component(
     member_name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&component_stream(source, member_name)?)?;
+    let mut archive = Archive::parse(&component_stream(source, member_name)?, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[EntryEdit::new(member_name, &compressed)],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[EntryEdit::new(member_name, &compressed)],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn with_duplicate_owner(source: &[u8]) -> TestResult<Vec<u8>> {
@@ -312,6 +329,7 @@ fn with_duplicate_owner(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         target.archive_info.message_infos[0]
             .object_references
@@ -338,11 +356,13 @@ fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn with_missing_parent(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_component(source, TABLES_MEMBER, |archive| {
         let table_info = archive
@@ -361,6 +381,7 @@ fn with_missing_parent(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         let info = table_info
             .archive_info
@@ -392,11 +413,13 @@ fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
                 // fixture builder, gets to reject the malformed graph.
                 data: vec![0x0a, 0x80],
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn with_projection_unsupported_model(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_component(source, TABLES_MEMBER, |archive| {
         let model = archive
@@ -420,6 +443,7 @@ fn with_projection_unsupported_model(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -459,7 +483,7 @@ fn object_message(
     identifier: u64,
     message_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(source, member_name)?)?;
+    let archive = Archive::parse(&component_stream(source, member_name)?, Default::default())?;
     archive
         .object(identifier)
         .and_then(|object| {
@@ -478,11 +502,13 @@ fn object_message(
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn sheet_drawable_ids(source: &[u8], sheet_identifier: u64) -> TestResult<Vec<u64>> {
@@ -517,6 +543,7 @@ fn table_parent(source: &[u8], table_identifier: u64) -> TestResult<u64> {
     .ok_or_else(|| io::Error::other("table-info parent reference is missing").into())
 }
 
+#[cfg(feature = "internal-iwork-source")]
 fn optional_table_parent(source: &[u8], table_identifier: u64) -> TestResult<Option<u64>> {
     Ok(tst::TableInfoArchive::decode(
         object_message(
@@ -533,8 +560,8 @@ fn optional_table_parent(source: &[u8], table_identifier: u64) -> TestResult<Opt
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let expected_changed = [DOCUMENT_MEMBER, TABLES_MEMBER];
     let mut changed = Vec::new();
     for before in source_catalog.iter() {
@@ -632,7 +659,7 @@ fn same_sheet_move_is_an_exact_noop_and_replays_without_writing() -> TestResult 
         table_names(commit.package(), 0),
         vec![ALPHA_TABLE_NAME.to_owned(), BETA_TABLE_NAME.to_owned()]
     );
-    let replay = package.apply_table_move(commit.patch())?;
+    let replay = package.apply_table_relocation(commit.patch())?;
     assert!(replay.patch().is_noop());
     assert_eq!(replay.package().exact_bytes(), before);
     let indexed = package.move_table(
@@ -779,8 +806,8 @@ fn changed_move_appends_in_order_preserves_content_unknowns_and_locality() -> Te
         beta_model
     );
     assert_locality(&bytes, &target)?;
-    let source_catalog = Catalog::from_bytes(&bytes)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     let source_sentinel = source_catalog
         .iter()
         .find(|entry| entry.name() == SENTINEL_MEMBER)
@@ -806,6 +833,42 @@ fn selectors_fail_atomically_for_missing_source_table_and_destination() -> TestR
         assert!(package.move_table(source, table, destination).is_err());
         assert_eq!(package.exact_bytes(), before);
     }
+    Ok(())
+}
+
+/// Table names are unique within a sheet: a destination sheet that holds
+/// the relocated table's name refuses the move, typed and before any
+/// rewrite (record 0347).
+#[test]
+fn a_destination_name_collision_is_refused_typed() -> TestResult {
+    let bytes = fixture_with_destination_table(BETA_TABLE_NAME)?;
+    let package = Package::from_bytes(&bytes)?;
+    let before = package.exact_bytes();
+    let error = package
+        .move_table(SOURCE_SHEET_NAME, BETA_TABLE_NAME, DESTINATION_SHEET_NAME)
+        .expect_err("a duplicate name in the destination sheet");
+    assert!(
+        matches!(
+            error,
+            Error::Refused(
+                litchi_numbers::table::relocation::Refusal::DuplicateTableName {
+                    path: Path::Table {
+                        source_sheet: 0,
+                        table: 1,
+                        destination_sheet: 1
+                    }
+                }
+            )
+        ),
+        "{error:?}"
+    );
+    assert_eq!(package.exact_bytes(), before);
+    // The other table, whose name the destination does not hold, moves.
+    let commit = package.move_table(SOURCE_SHEET_NAME, ALPHA_TABLE_NAME, DESTINATION_SHEET_NAME)?;
+    assert_eq!(
+        table_names(commit.package(), 1),
+        vec![BETA_TABLE_NAME.to_owned(), ALPHA_TABLE_NAME.to_owned()]
+    );
     Ok(())
 }
 
@@ -877,8 +940,8 @@ fn physical_compatibility_preserves_missing_parent_and_round_trips() -> TestResu
         vec![GAMMA_INFO_ID, BETA_INFO_ID]
     );
     assert_eq!(optional_table_parent(&target, BETA_INFO_ID)?, None);
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     let source_tables = source_catalog
         .iter()
         .find(|entry| entry.name() == TABLES_MEMBER)
@@ -907,7 +970,7 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
     let target = commit.package().exact_bytes();
     assert_eq!(
         package
-            .apply_table_move(commit.patch())?
+            .apply_table_relocation(commit.patch())?
             .package()
             .exact_bytes(),
         target
@@ -917,13 +980,13 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
     assert_eq!(inverse.inverse(), *commit.patch());
     assert_eq!(
         Package::from_bytes(&target)?
-            .apply_table_move(&inverse)?
+            .apply_table_relocation(&inverse)?
             .package()
             .exact_bytes(),
         bytes
     );
 
-    let tampered = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let tampered = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new(
             SENTINEL_MEMBER,
             b"tampered unrelated sentinel",
@@ -932,8 +995,8 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
     )?;
     let tampered = Package::from_bytes(&tampered)?;
     let tampered_before = tampered.exact_bytes();
-    assert!(tampered.apply_table_move(commit.patch()).is_err());
+    assert!(tampered.apply_table_relocation(commit.patch()).is_err());
     assert_eq!(tampered.exact_bytes(), tampered_before);
-    assert!(package.apply_table_move(&inverse).is_err());
+    assert!(package.apply_table_relocation(&inverse).is_err());
     Ok(())
 }

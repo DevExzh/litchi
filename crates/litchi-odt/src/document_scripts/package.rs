@@ -1,6 +1,7 @@
 //! Package-facing boundary for document script content.
 
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 
 use super::{Scripts, codec::parse_scripts};
 
@@ -8,6 +9,6 @@ use super::{Scripts, codec::parse_scripts};
 ///
 /// Package mutation and resource CRUD remain owned by the existing package host;
 /// this boundary keeps document XML decoding local to the semantic owner.
-pub(crate) fn read(content: &str) -> Result<Option<Scripts>> {
-    parse_scripts(content)
+pub(crate) fn read(content: &str, limits: &XmlStreamLimits) -> Result<Option<Scripts>> {
+    parse_scripts(content, limits)
 }

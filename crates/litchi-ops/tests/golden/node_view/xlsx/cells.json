@@ -1,0 +1,261 @@
+[
+{
+  "path": "/sheet[1]/A1",
+  "type": "cell",
+  "text": "Region",
+  "preview": "A1",
+  "childCount": 0,
+  "format": {
+    "type": "SharedString",
+    "font.bold": true,
+    "font.color": "dk1",
+    "font.size": "11pt",
+    "font.name": "Calibri"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/B2",
+  "type": "cell",
+  "text": "1200",
+  "preview": "B2",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "font.italic": true,
+    "underline": "single",
+    "font.color": "#FF0000",
+    "font.size": "14pt",
+    "font.name": "Arial",
+    "fill": "#FFFF00",
+    "border.left": "thin",
+    "border.left.color": "#000000",
+    "border.right": "thin",
+    "border.right.color": "#000000",
+    "border.top": "medium",
+    "border.bottom": "double",
+    "border.diagonal": "thin",
+    "border.diagonalUp": true,
+    "alignment.wrapText": true,
+    "alignment.horizontal": "center",
+    "alignment.vertical": "top",
+    "numberformat": "0.00%"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/C3",
+  "type": "cell",
+  "text": "closed",
+  "preview": "C3",
+  "childCount": 0,
+  "format": {
+    "type": "SharedString"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/D2",
+  "type": "cell",
+  "text": "",
+  "preview": "D2",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "empty": true,
+    "font.italic": true,
+    "underline": "single",
+    "font.color": "#FF0000",
+    "font.size": "14pt",
+    "font.name": "Arial",
+    "fill": "#FFFF00",
+    "border.left": "thin",
+    "border.left.color": "#000000",
+    "border.right": "thin",
+    "border.right.color": "#000000",
+    "border.top": "medium",
+    "border.bottom": "double",
+    "border.diagonal": "thin",
+    "border.diagonalUp": true,
+    "alignment.wrapText": true,
+    "alignment.horizontal": "center",
+    "alignment.vertical": "top",
+    "numberformat": "0.00%"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/D3",
+  "type": "cell",
+  "text": "TRUE",
+  "preview": "D3",
+  "childCount": 0,
+  "format": {
+    "type": "Boolean"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/D4",
+  "type": "cell",
+  "text": "#DIV/0!",
+  "preview": "D4",
+  "childCount": 0,
+  "format": {
+    "type": "Error"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/B4",
+  "type": "cell",
+  "text": "450.5",
+  "preview": "B4",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "numberformat": "mm-dd-yy"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/B5",
+  "type": "cell",
+  "text": "2000",
+  "preview": "B5",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "strike": true,
+    "font.color": "accent1+tint40",
+    "superscript": true,
+    "font.size": "10.5pt",
+    "font.name": "Calibri",
+    "fill": "accent1+tint40",
+    "fillPattern": "lightGray",
+    "fillBg": "#0000FF",
+    "alignment.textRotation": 45,
+    "alignment.indent": 2,
+    "alignment.shrinkToFit": true,
+    "alignment.readingOrder": "rtl",
+    "protection.locked": false,
+    "protection.hidden": true,
+    "quotePrefix": true
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/D5",
+  "type": "cell",
+  "text": "South!",
+  "preview": "D5",
+  "childCount": 0,
+  "format": {
+    "type": "String",
+    "formula": "A5&\"!\"",
+    "cachedValue": "South!",
+    "evaluated": true
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/B6",
+  "type": "cell",
+  "text": "4450.5",
+  "preview": "B6",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "formula": "SUM(B2:B5)",
+    "cachedValue": "4450.5",
+    "evaluated": true
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/C6",
+  "type": "cell",
+  "text": "",
+  "preview": "C6",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "formula": "B6*2",
+    "evaluated": false
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/D6",
+  "type": "cell",
+  "text": "2000",
+  "preview": "D6",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "formula": "MAX(B2:B5)",
+    "cachedValue": "2000",
+    "evaluated": true,
+    "arrayformula": true,
+    "arrayref": "D6"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/E1",
+  "type": "cell",
+  "text": "Merged",
+  "preview": "E1",
+  "childCount": 0,
+  "format": {
+    "type": "SharedString",
+    "merge": "E1:F2",
+    "mergeAnchor": true
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/F2",
+  "type": "cell",
+  "text": "",
+  "preview": "F2",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "empty": true,
+    "merge": "E1:F2"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/E2",
+  "type": "cell",
+  "text": "(empty)",
+  "preview": "E2",
+  "childCount": 0,
+  "format": {
+    "merge": "E1:F2"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/Z99",
+  "type": "cell",
+  "text": "(empty)",
+  "preview": "Z99",
+  "childCount": 0,
+  "format": {},
+  "children": []
+},
+{
+  "path": "/sheet[4]/A1",
+  "type": "cell",
+  "text": "ä",
+  "preview": "A1",
+  "childCount": 0,
+  "format": {
+    "type": "SharedString"
+  },
+  "children": []
+}
+]

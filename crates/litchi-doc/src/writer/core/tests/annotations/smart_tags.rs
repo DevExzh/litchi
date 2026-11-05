@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn smart_tags_round_trip_through_both_output_paths() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("abcdefghijklmnopqrst").unwrap();
     writer.add_smart_tag(
         SmartTagEntry::new(0, 10, "urn:example:geo", "place")
@@ -28,8 +28,8 @@ fn smart_tags_round_trip_through_both_output_paths() {
     });
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     for index in [114usize, 115, 117, 118, 132] {
         assert!(document.fib().get_table_pointer(index).unwrap().1 > 0);
@@ -64,8 +64,8 @@ fn smart_tags_round_trip_through_both_output_paths() {
             .unwrap()
             .as_nanos()
     ));
-    writer.save(&path).unwrap();
-    let mut package = crate::Package::open(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
+    let mut package = crate::raw::Reader::open(&path).unwrap();
     assert_eq!(package.document().unwrap().smart_tags(), Some(&smart_tags));
     std::fs::remove_file(path).unwrap();
 }

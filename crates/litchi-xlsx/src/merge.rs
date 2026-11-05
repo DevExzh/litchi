@@ -8,6 +8,8 @@ use litchi_sheet::{Cell as Address, Rect};
 
 use crate::error::{Result, allocation, invalid};
 
+pub mod source;
+
 /// One valid merged-range membership transition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {
@@ -170,6 +172,15 @@ impl Index {
 
     pub(crate) fn iter(&self) -> Merges<'_> {
         Merges::new(&self.ranges)
+    }
+
+    /// Logical heap weight of the index arrays, in bytes.
+    pub(crate) fn weight_bytes(&self) -> usize {
+        self.ranges
+            .len()
+            .saturating_mul(size_of::<Rect>())
+            .saturating_add(self.nodes.len().saturating_mul(size_of::<Node>()))
+            .saturating_add(self.spans.len().saturating_mul(size_of::<u32>()))
     }
 }
 

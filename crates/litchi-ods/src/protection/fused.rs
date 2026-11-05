@@ -15,6 +15,7 @@
 //! disagreement check.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -31,17 +32,26 @@ use crate::model::protection::{self, Protection, ProtectionHandler, Sheet};
 pub(crate) fn parse(
     source: &str,
     styles_xml: Option<&str>,
+    limits: &XmlStreamLimits,
 ) -> Result<(Location, Protection, Vec<Sheet>)> {
     // The locator is the first pass of the sequential parse, so its size
     // limit runs up front; the semantic pass has no size limit of its own.
     codec::validate_size(source)?;
+    if u64::try_from(source.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(Error::InvalidFormat(
+            "ODS protection content.xml exceeds the configured XML limit".to_string(),
+        ));
+    }
 
     let mut reader = NsReader::from_str(source);
     let mut buffer = Vec::new();
-    let mut location = LocationHandler::new(source, styles_xml);
+    let mut location = LocationHandler::new(source, styles_xml, limits);
     let mut protection = ProtectionHandler::default();
     let mut location_error = None;
     let mut protection_error = None;
+    let mut events = 0usize;
+    let mut depth = 0usize;
+    let mut attributes = 0usize;
 
     loop {
         let pos_before = reader.buffer_position();
@@ -69,6 +79,15 @@ pub(crate) fn parse(
         let location_namespace = codec::location_namespace(&namespace);
         let protection_namespace = protection::classify(&namespace);
         let pos_after = reader.buffer_position();
+        codec::validate_event_budget(
+            &event,
+            pos_before,
+            pos_after,
+            limits,
+            &mut events,
+            &mut depth,
+            &mut attributes,
+        )?;
         let is_eof = matches!(event, Event::Eof);
         if location_error.is_none()
             && let Err(error) = location.on_event(
@@ -118,6 +137,7 @@ mod tests {
     use crate::model::protection::{Protection, Sheet, parse_protection};
     use crate::protection::codec::Location;
     use litchi_core::{Error, Result};
+    use litchi_odf_common::XmlStreamLimits;
     use std::io::Read as _;
     use std::path::{Path, PathBuf};
 
@@ -134,7 +154,8 @@ mod tests {
 
     /// The original sequential passes with their exact error precedence.
     fn sequential(source: &str, styles_xml: Option<&str>) -> Result<Compared> {
-        let location = Location::parse(source, styles_xml)?;
+        let location =
+            Location::parse(source, styles_xml, &XmlStreamLimits::owner_default_value())?;
         let (document, sheets) = parse_protection(source)?;
         if sheets.len() != location.sheets().len() {
             return Err(Error::InvalidFormat(DISAGREE.to_string()));
@@ -144,7 +165,8 @@ mod tests {
 
     /// The fused parse with the same comparison projection.
     fn fused(source: &str, styles_xml: Option<&str>) -> Result<Compared> {
-        let (location, document, sheets) = parse(source, styles_xml)?;
+        let (location, document, sheets) =
+            parse(source, styles_xml, &XmlStreamLimits::owner_default_value())?;
         if sheets.len() != location.sheets().len() {
             return Err(Error::InvalidFormat(DISAGREE.to_string()));
         }
@@ -224,7 +246,8 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:loext="{LOEXT}" xmlns:style="{STYLE}"><office:automatic-styles><style:style style:name="ce1" style:family="table-cell"/></office:automatic-styles><office:body><office:spreadsheet table:structure-protected="true" table:protection-key="key" table:protection-key-digest-algorithm="urn:sha256"><table:table table:name="Sheet1" table:protected="true" table:protection-key="abc" loext:protection-key-digest-algorithm-2="urn:sha1"><loext:table-protection loext:select-protected-cells="false" loext:insert-rows="true"/></table:table><table:table table:name="Sheet2"/></office:spreadsheet></office:body></office:document-content>"#
         );
         let (location, document, sheets) =
-            parse(&xml, Some(STYLES)).expect("minimal document parses");
+            parse(&xml, Some(STYLES), &XmlStreamLimits::owner_default_value())
+                .expect("minimal document parses");
         assert_eq!(document.structure_protected, Some(true));
         assert_eq!(document.key.digest_algorithm.as_deref(), Some("urn:sha256"));
         assert_eq!(sheets.len(), 2);
@@ -249,7 +272,8 @@ mod tests {
         let xml = format!(
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}" xmlns:l="{LOEXT}"><o:body><o:spreadsheet><t:table t:name="S" t:protected="1"><l:table-protection l:use-pivot="true"/></t:table></o:spreadsheet></o:body></o:document-content>"#
         );
-        let (location, _, sheets) = parse(&xml, None).expect("prefixed document parses");
+        let (location, _, sheets) = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect("prefixed document parses");
         assert_eq!(location.table_prefix(), "t");
         assert_eq!(location.loext_prefix(), Some("l"));
         assert_eq!(sheets[0].protected, Some(true));
@@ -268,7 +292,8 @@ mod tests {
             r#"<loext:table-protection loext:use-pivot="true"/>"#,
             r#"<table:dde-links><table:dde-link><table:table table:name="Cache" table:protected="true"/></table:dde-link></table:dde-links>"#,
         ));
-        let (location, _, sheets) = parse(&xml, None).expect("mixed document parses");
+        let (location, _, sheets) = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect("mixed document parses");
         let names = location
             .sheets()
             .iter()
@@ -287,7 +312,8 @@ mod tests {
         // invalid Boolean (semantic failure) at the same event; the locator
         // pass runs first.
         let xml = document(r#"<table:table table:protected="yes"></table:table>"#);
-        let located = Location::parse(&xml, None).expect_err("locator must fail");
+        let located = Location::parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("locator must fail");
         assert_eq!(
             located.to_string(),
             "Invalid format: ODS protected table is missing table:name"
@@ -297,7 +323,8 @@ mod tests {
             wire.to_string(),
             "Invalid format: invalid protection Boolean value 'yes'"
         );
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(fused.to_string(), located.to_string());
         assert_equivalent("location-beats-protection", &xml, None);
     }
@@ -305,8 +332,10 @@ mod tests {
     #[test]
     fn protection_error_surfaces_when_locator_passes() {
         let xml = document(r#"<table:table table:name="S" table:protected="yes"/>"#);
-        Location::parse(&xml, None).expect("locator accepts the sheet");
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        Location::parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect("locator accepts the sheet");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: invalid protection Boolean value 'yes'"
@@ -326,7 +355,8 @@ mod tests {
             wire.to_string(),
             "Invalid format: duplicate sheet table-protection element"
         );
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: duplicate ODS table-protection element"
@@ -344,7 +374,8 @@ mod tests {
             wire.to_string(),
             "Invalid format: unterminated protected sheet"
         );
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: unterminated ODS protection XML element"
@@ -358,7 +389,8 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE}"><office:body/></office:document-content>"#
         );
         parse_protection(&xml).expect("semantic pass accepts a missing host");
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: missing office:spreadsheet element"
@@ -372,7 +404,12 @@ mod tests {
         let dup_spreadsheet = format!(
             r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:spreadsheet/><office:spreadsheet/></office:body></office:document-content>"#
         );
-        let fused = parse(&dup_spreadsheet, None).expect_err("fused parse must fail");
+        let fused = parse(
+            &dup_spreadsheet,
+            None,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: duplicate office:spreadsheet element"
@@ -384,7 +421,12 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE}"><office:automatic-styles/><office:automatic-styles/><office:body><office:spreadsheet/></office:body></office:document-content>"#
         );
         parse_protection(&dup_automatic).expect("semantic pass ignores automatic-styles");
-        let fused = parse(&dup_automatic, None).expect_err("fused parse must fail");
+        let fused = parse(
+            &dup_automatic,
+            None,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: duplicate office:automatic-styles element"
@@ -399,8 +441,10 @@ mod tests {
         let xml = format!(
             r#"<office:document-content xmlns:office="{OFFICE}"><office:body></office:document-content>"#
         );
-        let located = Location::parse(&xml, None).expect_err("locator must fail");
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        let located = Location::parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("locator must fail");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(fused.to_string(), located.to_string());
         assert!(
             fused
@@ -416,7 +460,8 @@ mod tests {
         let xml = format!(
             r#"<office:document-content xmlns:office="{OFFICE}"><!--{padding}--><office:body><office:spreadsheet/></office:body></office:document-content>"#
         );
-        let fused = parse(&xml, None).expect_err("fused parse must fail");
+        let fused = parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect_err("fused parse must fail");
         assert_eq!(
             fused.to_string(),
             "Invalid format: ODS protection content.xml exceeds the snapshot limit"
@@ -429,12 +474,27 @@ mod tests {
         // The thin standalone shells drive the same checks as the fused
         // driver, so pin shell behavior against the fused result here.
         let xml = document(r#"<table:table table:name="S" table:protected="true"/>"#);
-        let location = Location::parse(&xml, None).expect("locator shell");
+        let location = Location::parse(&xml, None, &XmlStreamLimits::owner_default_value())
+            .expect("locator shell");
         assert_eq!(location.sheets().len(), 1);
         assert_eq!(location.table_prefix(), "table");
         let (document, sheets) = parse_protection(&xml).expect("semantic shell");
         assert_eq!(document.structure_protected, None);
         assert_eq!(sheets[0].protected, Some(true));
         assert_equivalent("shells", &xml, None);
+    }
+
+    #[test]
+    fn caller_xml_budget_rejects_tiny_event_depth_and_attribute_profiles() {
+        let xml = document(r#"<table:table table:name="S" table:protected="true"/>"#);
+        let events =
+            XmlStreamLimits::new(xml.len() as u64 + 1, 256, 1, 100_000, 64 * 1024).unwrap();
+        assert!(parse(&xml, None, &events).is_err());
+        let depth =
+            XmlStreamLimits::new(xml.len() as u64 + 1, 2, 100_000, 100_000, 64 * 1024).unwrap();
+        assert!(parse(&xml, None, &depth).is_err());
+        let attributes =
+            XmlStreamLimits::new(xml.len() as u64 + 1, 256, 100_000, 1, 64 * 1024).unwrap();
+        assert!(parse(&xml, None, &attributes).is_err());
     }
 }

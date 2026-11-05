@@ -15,7 +15,7 @@ use super::model::{
     OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
     OleObjectRelationshipKind, OleObjectUpdate, OleObjects, SML, STRICT_SML, X14, validate_value,
 };
-use super::{invalid, limit, xml_error};
+use super::{LimitKind, invalid, limit, xml_error};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Clone)]
@@ -49,7 +49,7 @@ pub fn parse_ole_objects(xml: &[u8]) -> Result<Option<OleObjects>> {
     no_attributes(list, &[])?;
     whitespace(list)?;
     if list.children.len() > MAX_OBJECTS {
-        return Err(limit("object count"));
+        return Err(limit(LimitKind::Objects, list.children.len(), MAX_OBJECTS));
     }
     let mut objects = Vec::with_capacity(list.children.len());
     for child in &list.children {
@@ -300,7 +300,7 @@ pub fn write_ole_objects(value: &OleObjects, conformance: OleObjectConformance) 
     }
     output.extend_from_slice(b"</x:oleObjects>");
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("serialized XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, output.len(), MAX_XML_BYTES));
     }
     Ok(output)
 }
@@ -611,7 +611,7 @@ struct RawSource {
 
 fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Result<RawSource> {
     if source.len() > MAX_XML_BYTES {
-        return Err(limit("input XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, source.len(), MAX_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
@@ -626,9 +626,15 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Nodes, usize::MAX, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(LimitKind::Nodes, nodes, MAX_NODES));
+                }
+                let prospective_depth = stack.len().checked_add(1).unwrap_or(usize::MAX);
+                if prospective_depth > MAX_DEPTH {
+                    return Err(limit(LimitKind::Depth, prospective_depth, MAX_DEPTH));
                 }
                 let empty = matches!(&event, Event::Empty(_));
                 let namespace = resolved(namespace)?;
@@ -1051,25 +1057,27 @@ fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
     let mut delta = 0isize;
     for edit in &edits {
         let replacement = isize::try_from(edit.replacement.len())
-            .map_err(|_source| limit("updated XML bytes"))?;
-        let removed =
-            isize::try_from(edit.end - edit.start).map_err(|_source| limit("updated XML bytes"))?;
+            .map_err(|_source| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?;
+        let removed = isize::try_from(edit.end - edit.start)
+            .map_err(|_source| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?;
         delta = delta
             .checked_add(replacement - removed)
-            .ok_or_else(|| limit("updated XML bytes"))?;
+            .ok_or_else(|| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?;
     }
     let size = if delta >= 0 {
-        source
-            .len()
-            .checked_add(usize::try_from(delta).map_err(|_source| limit("updated XML bytes"))?)
+        source.len().checked_add(
+            usize::try_from(delta)
+                .map_err(|_source| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?,
+        )
     } else {
-        source
-            .len()
-            .checked_sub(usize::try_from(-delta).map_err(|_source| limit("updated XML bytes"))?)
+        source.len().checked_sub(
+            usize::try_from(-delta)
+                .map_err(|_source| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?,
+        )
     }
-    .ok_or_else(|| limit("updated XML bytes"))?;
+    .ok_or_else(|| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?;
     if size > MAX_XML_BYTES {
-        return Err(limit("updated XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, size, MAX_XML_BYTES));
     }
 
     let mut output = Vec::with_capacity(size);
@@ -1128,7 +1136,7 @@ fn write_marker(output: &mut Vec<u8>, name: &str, marker: &OleObjectMarker) {
 /// Loads OLE anchors and validates all payload and preview relationships for one worksheet.
 pub(super) fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("input XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let mut caps = Capabilities::ooxml_baseline();
     caps.understand_namespace(X14);
@@ -1153,9 +1161,15 @@ pub(super) fn parse_document(xml: &[u8]) -> Result<Node> {
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Nodes, usize::MAX, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(LimitKind::Nodes, nodes, MAX_NODES));
+                }
+                let prospective_depth = stack.len().checked_add(1).unwrap_or(usize::MAX);
+                if prospective_depth > MAX_DEPTH {
+                    return Err(limit(LimitKind::Depth, prospective_depth, MAX_DEPTH));
                 }
                 let empty = matches!(&event, Event::Empty(_));
                 let node = make_node(&reader, element, reader.decoder(), &mut strings)?;
@@ -1324,7 +1338,7 @@ pub(super) fn insert_collection(
                 }
                 depth += 1;
                 if depth > MAX_DEPTH {
-                    return Err(limit("XML depth"));
+                    return Err(limit(LimitKind::Depth, depth, MAX_DEPTH));
                 }
             },
             Event::Empty(element) => {
@@ -1360,9 +1374,9 @@ pub(super) fn insert_collection(
     let size = xml
         .len()
         .checked_add(fragment.len())
-        .ok_or_else(|| limit("updated XML bytes"))?;
+        .ok_or_else(|| limit(LimitKind::XmlBytes, usize::MAX, MAX_XML_BYTES))?;
     if size > MAX_XML_BYTES {
-        return Err(limit("updated XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, size, MAX_XML_BYTES));
     }
     let mut output = Vec::with_capacity(size);
     output.extend_from_slice(&xml[..position]);
@@ -1424,9 +1438,9 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
 fn add_strings(total: &mut usize, size: usize) -> Result<()> {
     *total = total
         .checked_add(size)
-        .ok_or_else(|| limit("XML string bytes"))?;
+        .ok_or_else(|| limit(LimitKind::StringBytes, usize::MAX, MAX_STRING_BYTES))?;
     if *total > MAX_STRING_BYTES {
-        Err(limit("XML string bytes"))
+        Err(limit(LimitKind::StringBytes, *total, MAX_STRING_BYTES))
     } else {
         Ok(())
     }
@@ -1614,5 +1628,46 @@ mod tests {
                 index.to_string()
             );
         }
+    }
+
+    #[test]
+    fn raw_source_reports_depth_separately_from_node_count() {
+        let mut xml = String::with_capacity((MAX_DEPTH + 1) * 7);
+        for _ in 0..=MAX_DEPTH {
+            xml.push_str("<n>");
+        }
+        for _ in 0..=MAX_DEPTH {
+            xml.push_str("</n>");
+        }
+
+        let error = collect_raw_source(xml.as_bytes(), OleObjectConformance::Transitional);
+        assert!(matches!(
+            error,
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::OleObjects(LimitKind::Depth),
+                observed,
+                maximum,
+            }) if observed == (MAX_DEPTH + 1) as u64 && maximum == MAX_DEPTH as u64
+        ));
+    }
+
+    #[test]
+    fn raw_source_reports_node_count_separately_from_depth() {
+        let mut xml = String::with_capacity(7 + MAX_NODES * 4);
+        xml.push_str("<root>");
+        for _ in 0..MAX_NODES {
+            xml.push_str("<n/>");
+        }
+        xml.push_str("</root>");
+
+        let error = collect_raw_source(xml.as_bytes(), OleObjectConformance::Transitional);
+        assert!(matches!(
+            error,
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::OleObjects(LimitKind::Nodes),
+                observed,
+                maximum,
+            }) if observed == (MAX_NODES + 1) as u64 && maximum == MAX_NODES as u64
+        ));
     }
 }

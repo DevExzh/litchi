@@ -545,7 +545,9 @@ fn zip_package(
 }
 
 fn streaming_package() -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer.write_stored("mimetype", MIME.as_bytes()).unwrap();
     writer
         .write_deflated("content.xml", SOURCE_CONTENT)
@@ -563,7 +565,7 @@ fn streaming_package() -> Vec<u8> {
 }
 
 fn encrypted_package() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption("test-password", Profile::compatible())
@@ -629,7 +631,12 @@ fn media_range(bytes: &[u8]) -> Range<u64> {
 fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     index
         .entries()
         .iter()
@@ -655,7 +662,12 @@ fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
 fn physical_and_central_order(bytes: &[u8]) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let central = index
         .entries()
         .iter()
@@ -853,7 +865,12 @@ fn member_layout(bytes: &[u8], member: &[u8]) -> (usize, usize, usize, usize) {
         .unwrap();
     let archive = archive.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let entry = index
         .entries()
         .iter()

@@ -5,7 +5,9 @@
 use std::fs::File;
 use std::path::PathBuf;
 
-use litchi_xls::{QuerySource, QueryTable, TextCodePage, TextDelimiter, TextFieldFormat, Workbook};
+use litchi_xls::{
+    QuerySource, QueryTable, TextCodePage, TextDelimiter, TextFieldFormat, raw::Reader,
+};
 
 fn poi_fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -13,12 +15,12 @@ fn poi_fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn open(name: &str) -> Workbook<File> {
-    Workbook::new(File::open(poi_fixture(name)).unwrap()).unwrap()
+fn open(name: &str) -> Reader<File> {
+    Reader::new(File::open(poi_fixture(name)).unwrap()).unwrap()
 }
 
 /// The single query table expected anywhere in the workbook.
-fn only_query_table(workbook: &Workbook<File>) -> QueryTable {
+fn only_query_table(workbook: &Reader<File>) -> QueryTable {
     let tables: Vec<QueryTable> = (0..workbook.sheets().len())
         .filter_map(|index| workbook.xls_worksheet(index).ok())
         .flat_map(|worksheet| worksheet.query_tables().to_vec())
@@ -105,7 +107,7 @@ fn web_query_57456_is_blocked_by_an_unrelated_sst_defect() {
     // record-level test inside the crate (query_table::tests). This test
     // documents the pre-existing boundary so a future SST-leniency change
     // can promote the fixture to a full read test.
-    let result = Workbook::new(File::open(poi_fixture("57456.xls")).unwrap());
+    let result = Reader::new(File::open(poi_fixture("57456.xls")).unwrap());
     assert!(result.is_err());
 }
 
@@ -116,7 +118,7 @@ fn pivot_table_fixture_yields_no_query_tables() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
         "../../test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls",
     );
-    let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(path).unwrap()).unwrap();
     for index in 0..workbook.sheets().len() {
         let worksheet = workbook.xls_worksheet(index).unwrap();
         assert!(

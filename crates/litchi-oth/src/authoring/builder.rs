@@ -360,13 +360,18 @@ impl Builder {
         self
     }
 
-    /// Validates, packages, reopens, and publishes the document bytes.
+    /// Validates, packages and reopens the document as an immutable
+    /// [`crate::Package`].
     ///
     /// # Errors
     ///
     /// Returns an error if content validation, package writing, or semantic
     /// readback fails, or raw and typed content were both supplied.
-    pub fn build(self) -> Result<Vec<u8>> {
+    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(self.build_package()?)
+    }
+
+    fn build_package(self) -> Result<crate::Package> {
         if self.content_xml.is_some()
             && (!self.blocks.is_empty() || !self.forms.is_empty() || !self.resources.is_empty())
         {
@@ -389,7 +394,8 @@ impl Builder {
             None => render_document(&self.blocks, &self.forms, &self.resources)?,
         };
         crate::codec::validate_authored(&content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         let typed_meta_xml = self.metadata.as_ref().map(render_metadata).transpose()?;
@@ -407,7 +413,8 @@ impl Builder {
             ("styles.xml", self.styles_xml.or(typed_styles_xml)),
         ] {
             if let Some(part_xml) = optional_xml {
-                compact_xml::validate(part_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(part_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 writer.add_file(path, part_xml.as_bytes())?;
                 paths.push(path.to_string());
             }
@@ -423,12 +430,13 @@ impl Builder {
                 writer.add_file_with_media_type(&member.path, &member.bytes, &member.media_type)?;
             }
         }
-        let bytes = crate::package::Snapshot::from_bytes(writer.finish_to_bytes()?)?.into_bytes();
+        let package = crate::facade::Package::from_snapshot(crate::package::Snapshot::from_bytes(
+            writer.finish_to_bytes()?,
+        )?);
         if self.inline_changes.is_empty() {
-            return Ok(bytes);
+            return Ok(package);
         }
-        let template = crate::facade::Template::from_bytes(bytes)?;
-        let mut edit = template.edit();
+        let mut edit = package.edit();
         for (block, content) in &self.inline_changes {
             match *block {
                 crate::facade::InlineBlock::Paragraph(position) => {
@@ -439,7 +447,7 @@ impl Builder {
                 },
             }
         }
-        Ok(edit.commit()?.into_template().into_bytes())
+        Ok(edit.commit()?.into_package())
     }
 }
 
@@ -858,7 +866,7 @@ pub(crate) fn render_styles(styles: &[crate::style::Style]) -> Result<String> {
         }
     }
     output.push_str("</office:styles></office:document-styles>");
-    compact_xml::validate(output.as_bytes())?;
+    compact_xml::validate(output.as_bytes(), compact_xml::Limits::default())?;
     Ok(output)
 }
 
@@ -866,17 +874,24 @@ pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String
     let mut output = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-meta xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:meta=\"urn:oasis:names:tc:opendocument:xmlns:meta:1.0\"><office:meta>",
     );
-    for (tag, optional_text) in [
+    let leading = [
         ("dc:title", metadata.title.as_deref()),
         ("dc:subject", metadata.subject.as_deref()),
         ("dc:creator", metadata.author.as_deref()),
         ("dc:description", metadata.description.as_deref()),
         ("dc:identifier", metadata.identifier.as_deref()),
         ("dc:language", metadata.language.as_deref()),
-        ("meta:keyword", metadata.keywords.as_deref()),
+    ];
+    // One `meta:keyword` per keyword.
+    let keywords = metadata
+        .keywords
+        .iter()
+        .map(|keyword| ("meta:keyword", Some(keyword.as_str())));
+    let trailing = [
         ("meta:generator", metadata.application.as_deref()),
         ("meta:category", metadata.category.as_deref()),
-    ] {
+    ];
+    for (tag, optional_text) in leading.into_iter().chain(keywords).chain(trailing) {
         if let Some(text) = optional_text {
             output.push('<');
             output.push_str(tag);
@@ -889,12 +904,20 @@ pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String
     }
     if let Some(created) = metadata.created {
         output.push_str("<meta:creation-date>");
-        output.push_str(&created.to_rfc3339());
+        output.push_str(
+            &created
+                .utc()
+                .map_or_else(|| created.to_string(), |at| at.to_rfc3339()),
+        );
         output.push_str("</meta:creation-date>");
     }
     if let Some(modified) = metadata.modified {
         output.push_str("<dc:date>");
-        output.push_str(&modified.to_rfc3339());
+        output.push_str(
+            &modified
+                .utc()
+                .map_or_else(|| modified.to_string(), |at| at.to_rfc3339()),
+        );
         output.push_str("</dc:date>");
     }
     if metadata.page_count.is_some()
@@ -918,6 +941,6 @@ pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String
         output.push_str("/>");
     }
     output.push_str("</office:meta></office:document-meta>");
-    compact_xml::validate(output.as_bytes())?;
+    compact_xml::validate(output.as_bytes(), compact_xml::Limits::default())?;
     Ok(output)
 }

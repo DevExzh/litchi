@@ -4,6 +4,7 @@
 //! `source_backed_cell_values/public_exact_output.rs`.
 
 use super::*;
+use litchi_opc::SourceLimits;
 
 #[test]
 fn public_multi_edit_matches_baseline_whole_worksheet_output() {
@@ -18,7 +19,7 @@ fn public_multi_edit_matches_baseline_whole_worksheet_output() {
     edit.set("Sheet1", address("A1"), 10u32).unwrap();
     edit.set("Sheet1", address("C2"), 30u32).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().changed_cells(), 2);
     assert_eq!(commit.diagnostics().touched_worksheets(), 1);
 
@@ -41,11 +42,11 @@ fn public_multi_edit_matches_baseline_whole_worksheet_output() {
 
     // The public commit snapshot must agree with the exact worksheet oracle.
     assert_eq!(
-        commit.snapshot().value(0, address("A1")),
+        commit.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("10").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().value(0, address("C2")),
+        commit.patch().after().value(0, address("C2")),
         Some(&Value::Number(Number::new("30").unwrap()))
     );
 }
@@ -54,8 +55,11 @@ fn source_with_worksheet_xml(source_xml: &str) -> Vec<u8> {
     // Build a ZIP source fixture so the public source-backed path owns
     // worksheet validation. Changed publication requires compact element spacing.
     let base = two_sheets();
-    let archive = ArchiveReader::new(&base).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let content = if member == "xl/worksheets/sheet1.xml" {
             source_xml.as_bytes().to_vec()
@@ -87,12 +91,13 @@ fn public_multi_edit_publishes_a_producer_formatted_worksheet_verbatim() {
         let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
         edit.set("Sheet1", address("A1"), 10u32).unwrap();
         let commit = edit.commit().unwrap();
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         let mut published = Vec::new();
         editor
             .publish_multi_commit_to_stream(&mut published, &commit)
             .expect("a source-derived replacement publishes");
-        let package = OpcPackage::from_bytes(&published).expect("published package");
+        let package =
+            OpcPackage::from_bytes(&published, SourceLimits::default()).expect("published package");
         let worksheet = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .expect("published worksheet");
@@ -131,9 +136,14 @@ fn a_source_backed_replacement_still_fails_closed_on_malformed_xml() {
             format!("<!DOCTYPE worksheet><worksheet xmlns=\"{SML}\"/>"),
         ),
     ] {
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(VersionedSource::new(bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(VersionedSource::new(bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_part(target.clone(), replacement.into_bytes())
             .unwrap();

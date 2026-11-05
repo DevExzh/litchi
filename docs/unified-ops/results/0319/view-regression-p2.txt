@@ -1,0 +1,54 @@
+## heading123.docx /body/p[2] before
+source_paragraph_format	14876
+source_query_paragraphs_format	46943
+source_view_text	20894
+source_root_children	75858
+eager_paragraph_format	14149
+eager_query_paragraphs_format	46178
+eager_view_text	20366
+eager_root_children	75661
+## heading123.docx /body/p[2] after
+source_paragraph_format	14138
+source_query_paragraphs_format	45508
+source_view_text	20739
+source_root_children	74450
+eager_paragraph_format	14060
+eager_query_paragraphs_format	46117
+eager_view_text	20337
+eager_root_children	73511
+## heading123.docx /body/p[2] after
+source_paragraph_format	14029
+source_query_paragraphs_format	44965
+source_view_text	20870
+source_root_children	75030
+eager_paragraph_format	13576
+eager_query_paragraphs_format	45124
+eager_view_text	20780
+eager_root_children	74407
+## heading123.docx /body/p[2] before
+source_paragraph_format	14515
+source_query_paragraphs_format	46428
+source_view_text	21259
+source_root_children	78046
+eager_paragraph_format	14006
+eager_query_paragraphs_format	44927
+eager_view_text	20514
+eager_root_children	77648
+## heading123.docx /body/p[2] before
+source_paragraph_format	13888
+source_query_paragraphs_format	44571
+source_view_text	20876
+source_root_children	78521
+eager_paragraph_format	13878
+eager_query_paragraphs_format	45017
+eager_view_text	20290
+eager_root_children	77308
+## heading123.docx /body/p[2] after
+source_paragraph_format	14376
+source_query_paragraphs_format	46457
+source_view_text	20889
+source_root_children	74511
+eager_paragraph_format	13359
+eager_query_paragraphs_format	44379
+eager_view_text	20731
+eager_root_children	74592

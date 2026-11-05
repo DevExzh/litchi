@@ -3,7 +3,7 @@
 //! Based on Apache POI's `HSLFSlideShow` and `QuickButCruddyTextExtractor`.
 
 use crate::consts::RecordType;
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 use crate::records::record::ParseBudget;
 use std::sync::{Arc, OnceLock};
@@ -38,23 +38,16 @@ impl RecordParser {
     /// 2. Find the Document record
     /// 3. Extract text from all records
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_document(&mut self, data: &[u8]) -> Result<()> {
-        self.parse_document_with_limits(data, RecordLimits::default())
-    }
-
     /// Parse a complete PPT document with a shared finite record budget.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_document_with_limits(&mut self, data: &[u8], limits: RecordLimits) -> Result<()> {
+    pub fn parse_document(&mut self, data: &[u8], limits: &SourceLimits) -> Result<()> {
         if data.is_empty() {
             return Ok(());
         }
-        let mut budget = ParseBudget::new(limits, data.len())?;
+        let mut budget = ParseBudget::new(*limits, data.len())?;
         self.parse_top_level(data.len(), &mut budget, |offset, budget| {
             Record::parse_with_budget(data, offset, false, budget)
         })
@@ -62,7 +55,7 @@ impl RecordParser {
 
     /// Parse a complete PPT document whose record payloads borrow `data`.
     ///
-    /// The record tree is value-identical to [`Self::parse_document_with_limits`]
+    /// The record tree is value-identical to [`Self::parse_document`]
     /// on the same bytes; only the payload storage differs, so no payload byte
     /// is copied at any nesting level.
     ///
@@ -72,7 +65,7 @@ impl RecordParser {
     pub(crate) fn parse_shared_document_with_limits(
         &mut self,
         data: &Arc<Vec<u8>>,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         if data.is_empty() {
             return Ok(());
@@ -104,7 +97,12 @@ impl RecordParser {
                         break;
                     }
                 },
-                Err(error @ (Error::ResourceLimit(_) | Error::AllocationFailed(_))) => {
+                Err(
+                    error @ (Error::Limit { .. }
+                    | Error::InvalidLimit { .. }
+                    | Error::ResourceLimit(_)
+                    | Error::AllocationFailed(_)),
+                ) => {
                     return Err(error);
                 },
                 Err(_) => {
@@ -126,7 +124,7 @@ impl RecordParser {
         &mut self,
         data: &Arc<Vec<u8>>,
         offsets: &[usize],
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         let mut budget = ParseBudget::new(limits, data.len())?;
         for &offset in offsets {
@@ -180,20 +178,13 @@ impl RecordParser {
             .find(|record| record.record_type == record_type)
     }
 
-    /// Get all records recursively (for building persist mapping).
+    /// Get all records recursively as owned clones.
     ///
-    /// # Deprecated
-    ///
-    /// This method clones all records including their data. Use `find_records_ref()` instead
-    /// for zero-copy access.
-    #[deprecated(note = "Use find_records_ref() instead to avoid expensive cloning")]
-    #[allow(dead_code, reason = "deprecated API retained for compatibility")]
-    #[allow(
-        deprecated,
-        reason = "the deprecated shim may reference deprecated internals"
-    )]
+    /// This explicit copying view preserves the complete record tree for
+    /// callers that need ownership. Use [`Self::find_records_ref`] when a
+    /// zero-copy borrowed view is sufficient.
     #[must_use]
-    pub fn find_records(&self, _record_type: RecordType) -> Vec<Record> {
+    pub fn find_records_owned(&self) -> Vec<Record> {
         // Collect all records recursively
         let mut all_records = Vec::new();
         Self::collect_records_recursive(&self.records, &mut all_records);
@@ -205,7 +196,7 @@ impl RecordParser {
     /// # Performance
     ///
     /// - Zero-copy: returns references instead of cloning records
-    /// - Significantly faster than `find_records()` for large presentations
+    /// - Significantly faster than `find_records_owned()` for large presentations
     /// - Preferred method for building persist mappings and iterating records
     #[must_use]
     pub fn find_records_ref(&self) -> Vec<&Record> {
@@ -236,17 +227,6 @@ impl RecordParser {
     }
 
     /// Recursively collect all records including children (cloning version).
-    ///
-    /// # Deprecated
-    ///
-    /// This clones all records including their Vec<u8> data, causing expensive memory copies.
-    /// Use `collect_records_recursive_ref` instead for zero-copy collection.
-    #[deprecated(note = "Use collect_records_recursive_ref instead to avoid expensive cloning")]
-    #[allow(dead_code, reason = "deprecated API retained for compatibility")]
-    #[allow(
-        deprecated,
-        reason = "the deprecated shim may reference deprecated internals"
-    )]
     fn collect_records_recursive(records: &[Record], collector: &mut Vec<Record>) {
         for record in records {
             collector.push(record.clone());
@@ -338,6 +318,60 @@ mod tests {
     }
 
     #[test]
+    fn owned_record_view_preserves_the_complete_clone_traversal() {
+        fn record(
+            record_type: RecordType,
+            version: u16,
+            instance: u16,
+            data: &[u8],
+            children: Vec<Record>,
+        ) -> Record {
+            Record {
+                record_type,
+                record_type_raw: record_type.as_u16(),
+                version,
+                instance,
+                data_length: u32::try_from(data.len()).expect("small test payload"),
+                data: data.into(),
+                children,
+            }
+        }
+
+        let text = record(RecordType::TextCharsAtom, 0, 0, &[0x41, 0x00], Vec::new());
+        let slide = record(RecordType::Slide, 0x0f, 2, &[], vec![text.clone()]);
+        let metadata = record(
+            RecordType::TextHeaderAtom,
+            0,
+            0,
+            &[0x09, 0x00, 0x00, 0x00],
+            Vec::new(),
+        );
+        let document = record(
+            RecordType::Document,
+            0x0f,
+            1,
+            &[],
+            vec![slide.clone(), metadata.clone()],
+        );
+        let expected = vec![document.clone(), slide, text, metadata];
+        let parser = RecordParser {
+            records: vec![document],
+            slide_atoms_sets: OnceLock::new(),
+        };
+
+        let owned = parser.find_records_owned();
+        drop(parser);
+
+        assert_eq!(owned, expected);
+        assert_eq!(owned[0].record_type, RecordType::Document);
+        assert_eq!(owned[0].children[0].record_type, RecordType::Slide);
+        assert_eq!(owned[2].record_type, RecordType::TextCharsAtom);
+        assert_eq!(owned[2].data.as_slice(), &[0x41, 0x00]);
+        assert_eq!(owned[3].record_type, RecordType::TextHeaderAtom);
+        assert_eq!(owned[3].data.as_slice(), &[0x09, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
     fn document_parser_shares_count_across_top_level_records() {
         let mut data = Vec::new();
         for _ in 0..2 {
@@ -347,14 +381,20 @@ mod tests {
         }
         let mut parser = RecordParser::new();
         let error = parser
-            .parse_document_with_limits(
+            .parse_document(
                 &data,
-                RecordLimits {
+                &SourceLimits {
                     max_records: 1,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 },
             )
             .unwrap_err();
-        assert!(matches!(error, Error::ResourceLimit(message) if message.contains("record count")));
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            }
+        ));
     }
 }

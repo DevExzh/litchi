@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use super::Limits;
 use super::codec;
 use super::model::{Map, Override, Role, Slot, Value};
 use crate::{Error, Result};
@@ -15,6 +16,7 @@ pub struct Snapshot {
     source_xml: Arc<Vec<u8>>,
     located: codec::Located,
     revision: Revision,
+    limits: Limits,
 }
 
 impl Snapshot {
@@ -23,8 +25,13 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_master(source: impl AsRef<[u8]>) -> Result<Self> {
-        Self::from_master_owned(source.as_ref().to_vec())
+    pub fn from_master(source: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+        let source = source.as_ref();
+        // Locate and validate the borrowed source first.  Retention is only
+        // needed after the selected input policy admits the bytes.
+        let located = codec::locate_master(source, limits)?;
+        let source_xml = Arc::new(source.to_vec());
+        Ok(Self::from_located(source_xml, located, limits))
     }
 
     /// Parse an owned slide-master color map without another source copy.
@@ -32,10 +39,10 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_master_owned(source: Vec<u8>) -> Result<Self> {
+    pub fn from_master_owned(source: Vec<u8>, limits: Limits) -> Result<Self> {
         let source_xml = Arc::new(source);
-        let located = codec::locate_master(source_xml.as_slice())?;
-        Ok(Self::from_located(source_xml, located))
+        let located = codec::locate_master(source_xml.as_slice(), limits)?;
+        Ok(Self::from_located(source_xml, located, limits))
     }
 
     /// Parse a slide or slide-layout color-map override and retain its exact
@@ -48,8 +55,15 @@ impl Snapshot {
         source: impl AsRef<[u8]>,
         root_name: impl AsRef<[u8]>,
         root_label: impl Into<String>,
+        limits: Limits,
     ) -> Result<Self> {
-        Self::from_override_owned(source.as_ref().to_vec(), root_name, root_label)
+        let source = source.as_ref();
+        let root_label = root_label.into();
+        // As with the master source, admit the borrowed XML before copying
+        // it into the source-bound snapshot.
+        let located = codec::locate_override(source, root_name.as_ref(), &root_label, limits)?;
+        let source_xml = Arc::new(source.to_vec());
+        Ok(Self::from_located(source_xml, located, limits))
     }
 
     /// Parse an owned color-map override without another source copy.
@@ -61,12 +75,17 @@ impl Snapshot {
         source: Vec<u8>,
         root_name: impl AsRef<[u8]>,
         root_label: impl Into<String>,
+        limits: Limits,
     ) -> Result<Self> {
         let source_xml = Arc::new(source);
         let root_label = root_label.into();
-        let located =
-            codec::locate_override(source_xml.as_slice(), root_name.as_ref(), &root_label)?;
-        Ok(Self::from_located(source_xml, located))
+        let located = codec::locate_override(
+            source_xml.as_slice(),
+            root_name.as_ref(),
+            &root_label,
+            limits,
+        )?;
+        Ok(Self::from_located(source_xml, located, limits))
     }
 
     /// Return the typed value represented by this source.
@@ -114,19 +133,20 @@ impl Snapshot {
     /// Start an atomic detached edit over this typed color-map value.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.located.value,
         }
     }
 
-    fn from_located(source_xml: Arc<Vec<u8>>, located: codec::Located) -> Self {
+    fn from_located(source_xml: Arc<Vec<u8>>, located: codec::Located, limits: Limits) -> Self {
         let revision = fingerprint(source_xml.as_slice());
         Self {
             source_xml,
             located,
             revision,
+            limits,
         }
     }
 
@@ -139,19 +159,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one color-map source.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Draft {
     original: Snapshot,
     working: Value,
 }
 
-impl Transaction {
-    /// Borrow the projected typed value.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Value {
-        &self.working
-    }
-
+impl Draft {
     /// Return the projected typed value by copy.
     #[inline]
     #[must_use]
@@ -166,11 +179,14 @@ impl Transaction {
         mapped_value(&self.working)
     }
 
-    /// Return whether the staged value differs from the source value.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.original.value() != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Set one mapped color role without touching any other source bytes.
@@ -224,10 +240,10 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+    pub(crate) fn commit(self) -> Result<Prepared> {
+        if !self.has_changes() {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -238,15 +254,20 @@ impl Transaction {
             self.original.source_xml.as_slice(),
             &self.original.located,
             self.working,
+            self.original.limits,
         )?;
         let updated = Arc::new(updated);
-        let located = codec::locate_source(updated.as_slice(), &self.original.located.source)?;
+        let located = codec::locate_source(
+            updated.as_slice(),
+            &self.original.located.source,
+            self.original.limits,
+        )?;
         if located.value != self.working {
             return Err(invalid("color-map serialization changed the typed value"));
         }
-        let snapshot = Snapshot::from_located(Arc::clone(&updated), located);
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let snapshot = Snapshot::from_located(Arc::clone(&updated), located, self.original.limits);
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -265,103 +286,84 @@ impl Transaction {
 
 /// A committed color-map snapshot and its reversible source patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
-    /// Return whether publication changes the exact source bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+impl Prepared {
+    #[cfg(test)]
+    fn has_changes(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
     /// Consume the commit into its patch.
     #[inline]
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible, source-checked replacement of one color-map XML source.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
-    }
-
-    /// Borrow the exact source context required before publication.
-    #[inline]
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Borrow the exact source context produced by publication.
-    #[inline]
-    #[must_use]
-    pub fn after(&self) -> &Snapshot {
-        &self.after
     }
 
     /// Return whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Return whether this patch changes the source bytes.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// Return the source fingerprint required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
     }
 
     /// Apply this patch atomically to an exact XML source buffer.
@@ -369,41 +371,38 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, target: &mut Vec<u8>, limits: Limits) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("color-map source is stale"));
         }
-        let current = codec::locate_source(target.as_slice(), &self.before.located.source)
+        let current = codec::locate_source(target.as_slice(), &self.before.located.source, limits)
             .map_err(|_err| invalid("color-map source is stale"))?;
         if current.value != self.before.value() {
             return Err(invalid("color-map source is stale"));
         }
-        if self.is_empty() {
-            return Ok(self.before.clone());
+        if self.is_noop() {
+            return Ok(Snapshot::from_located(
+                Arc::clone(&self.before.source_xml),
+                current,
+                limits,
+            ));
         }
 
-        let located =
-            codec::locate_source(self.after.source_xml.as_slice(), &self.after.located.source)?;
+        let located = codec::locate_source(
+            self.after.source_xml.as_slice(),
+            &self.after.located.source,
+            limits,
+        )?;
         if located.value != self.after.value() {
             return Err(invalid("published color-map source differs from the patch"));
         }
-        let result = Snapshot::from_located(Arc::clone(&self.after.source_xml), located);
+        let result = Snapshot::from_located(Arc::clone(&self.after.source_xml), located, limits);
         if !result.same_source(&self.after) {
             return Err(invalid("published color-map source differs from the patch"));
         }
         let replacement = self.after.source_xml.as_ref().clone();
         *target = replacement;
         Ok(result)
-    }
-
-    /// Alias for [`Self::apply`] emphasizing the detached source target.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    #[inline]
-    pub fn apply_to(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
-        self.apply(target)
     }
 }
 
@@ -486,23 +485,27 @@ mod tests {
     #[test]
     fn no_op_commit_and_patch_preserve_exact_source() {
         let source = master_source();
-        let snapshot = Snapshot::from_master(&source).unwrap();
+        let snapshot = Snapshot::from_master(&source, Limits::DEFAULT).unwrap();
         let commit = snapshot.edit().commit().unwrap();
 
-        assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
         assert_eq!(commit.snapshot().source_xml(), source.as_slice());
 
         let mut target = source.clone();
-        let applied = commit.patch().apply(&mut target).unwrap();
+        let recipient_limits = Limits::DEFAULT
+            .with_output_bytes(Limits::DEFAULT.max_output_bytes() - 1)
+            .expect("a finite recipient profile");
+        let applied = commit.patch().apply(&mut target, recipient_limits).unwrap();
         assert_eq!(target, source);
         assert_eq!(applied.source_xml(), source.as_slice());
+        assert_eq!(applied.limits, recipient_limits);
     }
 
     #[test]
     fn typed_edits_preserve_unknown_xml_and_apply_to_override_sources() {
         let source = master_source();
-        let snapshot = Snapshot::from_master(&source).unwrap();
+        let snapshot = Snapshot::from_master(&source, Limits::DEFAULT).unwrap();
         let mut edit = snapshot.edit();
         assert!(edit.set_color(Slot::Accent1, Role::Accent2).unwrap());
         let commit = edit.commit().unwrap();
@@ -524,8 +527,13 @@ mod tests {
         );
 
         let override_bytes = override_source();
-        let override_snapshot =
-            Snapshot::from_override(&override_bytes, b"sldLayout", "slide layout").unwrap();
+        let override_snapshot = Snapshot::from_override(
+            &override_bytes,
+            b"sldLayout",
+            "slide layout",
+            Limits::DEFAULT,
+        )
+        .unwrap();
         let mut override_edit = override_snapshot.edit();
         override_edit
             .set_color(Slot::FollowedHyperlink, Role::Accent6)
@@ -553,7 +561,7 @@ mod tests {
             .unwrap()
             .replace("><v:extra/></p:clrMap>", "/>")
             .into_bytes();
-        let snapshot = Snapshot::from_master(&source).unwrap();
+        let snapshot = Snapshot::from_master(&source, Limits::DEFAULT).unwrap();
         let mut edit = snapshot.edit();
         edit.set_color(Slot::Accent2, Role::Accent3).unwrap();
         let commit = edit.commit().unwrap();
@@ -569,7 +577,7 @@ mod tests {
     #[test]
     fn stale_replay_is_atomic_and_inverse_restores_exact_bytes() {
         let source = master_source();
-        let snapshot = Snapshot::from_master(&source).unwrap();
+        let snapshot = Snapshot::from_master(&source, Limits::DEFAULT).unwrap();
         let mut edit = snapshot.edit();
         edit.set_color(Slot::Text1, Role::Light1).unwrap();
         let patch = edit.commit().unwrap().into_patch();
@@ -577,13 +585,13 @@ mod tests {
         let mut stale = source.clone();
         stale.extend_from_slice(b" ");
         let stale_before = stale.clone();
-        assert!(patch.apply(&mut stale).is_err());
+        assert!(patch.apply(&mut stale, Limits::DEFAULT).is_err());
         assert_eq!(stale, stale_before);
 
         let mut target = source.clone();
-        patch.apply(&mut target).unwrap();
+        patch.apply(&mut target, Limits::DEFAULT).unwrap();
         assert_ne!(target, source);
-        patch.inverse().apply(&mut target).unwrap();
+        patch.inverse().apply(&mut target, Limits::DEFAULT).unwrap();
         assert_eq!(target, source);
     }
 
@@ -594,14 +602,15 @@ mod tests {
               <a:masterClrMapping/>
             </p:clrMapOvr></p:sld>"#
         );
-        let snapshot = Snapshot::from_override(source.as_bytes(), b"sld", "slide").unwrap();
+        let snapshot =
+            Snapshot::from_override(source.as_bytes(), b"sld", "slide", Limits::DEFAULT).unwrap();
         assert_eq!(snapshot.value(), Value::Override(Some(Override::Master)));
 
         let mut edit = snapshot.edit();
-        let before = *edit.snapshot();
+        let before = edit.value();
         assert!(edit.set_color(Slot::Accent1, Role::Accent2).is_err());
-        assert_eq!(*edit.snapshot(), before);
+        assert_eq!(edit.value(), before);
         assert!(edit.replace(Value::Override(None)).is_err());
-        assert_eq!(*edit.snapshot(), before);
+        assert_eq!(edit.value(), before);
     }
 }

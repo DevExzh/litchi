@@ -2,13 +2,14 @@
 
 use super::{codec, model, validation};
 use litchi_core::{Error, Result};
-use litchi_odf_common::annotation::Annotation;
+use litchi_odf_common::{XmlStreamLimits, annotation::Annotation};
 
 /// An immutable, source-checked ODS cell-annotation snapshot.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     pub(super) source: String,
     pub(super) entries: Vec<model::Entry>,
+    pub(super) xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -16,13 +17,14 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(source: impl Into<String>) -> Result<Self> {
+    pub fn parse(source: impl Into<String>, limits: &XmlStreamLimits) -> Result<Self> {
         let source = source.into();
-        let parsed = codec::parse(&source)?;
+        let parsed = codec::parse(&source, limits)?;
         validation::validate_entries(&parsed.entries)?;
         Ok(Self {
             source,
             entries: parsed.entries,
+            xml_limits: *limits,
         })
     }
 
@@ -86,136 +88,27 @@ impl Snapshot {
 
     /// Begin a failure-atomic transaction derived from this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             draft: self.clone(),
-            operations: Vec::new(),
         }
     }
 }
 
-/// One semantic change recorded by an annotation transaction.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Operation {
-    /// Insert an annotation at an otherwise unannotated cell.
-    Add {
-        cell: model::Cell,
-        annotation: Annotation,
-    },
-    /// Replace the complete common annotation value at a cell.
-    Replace {
-        cell: model::Cell,
-        before: Annotation,
-        after: Annotation,
-    },
-    /// Remove the annotation at a cell.
-    Remove {
-        cell: model::Cell,
-        annotation: Annotation,
-    },
-}
-
-/// A source-checked, reversible sequence of semantic annotation operations.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
-    source_fingerprint: u64,
-    target_fingerprint: u64,
-    operations: Vec<Operation>,
-}
-
-impl Patch {
-    /// Operations in transaction order.
-    #[must_use]
-    pub fn operations(&self) -> &[Operation] {
-        &self.operations
-    }
-
-    /// Whether the patch contains no semantic changes.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.operations.is_empty()
-    }
-
-    /// Fingerprint of the source XML this patch expects.
-    #[must_use]
-    pub const fn source_fingerprint(&self) -> u64 {
-        self.source_fingerprint
-    }
-
-    /// Return the inverse patch, checked against the committed target source.
-    pub fn inverse(&self) -> Self {
-        Self {
-            source_fingerprint: self.target_fingerprint,
-            target_fingerprint: self.source_fingerprint,
-            operations: self
-                .operations
-                .iter()
-                .rev()
-                .map(Operation::inverse)
-                .collect(),
-        }
-    }
-
-    /// Apply this patch only to the exact source snapshot from which it came.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if codec::fingerprint(snapshot.source_xml()) != self.source_fingerprint {
-            return Err(Error::InvalidFormat(
-                "ODS annotation patch source snapshot does not match".to_string(),
-            ));
-        }
-        let mut transaction = snapshot.edit();
-        for operation in &self.operations {
-            transaction.apply_operation(operation)?;
-        }
-        transaction.commit()
-    }
-}
-
-impl Operation {
-    fn inverse(&self) -> Self {
-        match self {
-            Self::Add { cell, annotation } => Self::Remove {
-                cell: cell.clone(),
-                annotation: annotation.clone(),
-            },
-            Self::Replace {
-                cell,
-                before,
-                after,
-            } => Self::Replace {
-                cell: cell.clone(),
-                before: after.clone(),
-                after: before.clone(),
-            },
-            Self::Remove { cell, annotation } => Self::Add {
-                cell: cell.clone(),
-                annotation: annotation.clone(),
-            },
-        }
-    }
-}
-
-/// A staged annotation edit. The source snapshot is never mutated.
-pub struct Transaction {
+/// A staged annotation edit, handed to the closure of
+/// [`crate::document::Edit::annotations`] and
+/// [`crate::builder::Workbook::edit_annotations`]. The source snapshot is
+/// never mutated.
+pub struct Edit {
     before: Snapshot,
     draft: Snapshot,
-    operations: Vec<Operation>,
 }
 
-impl Transaction {
-    /// Create a transaction from an owned snapshot.
-    #[must_use]
-    pub fn new(snapshot: Snapshot) -> Self {
-        snapshot.edit()
-    }
-
+impl Edit {
     /// Current candidate snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn current(&self) -> &Snapshot {
         &self.draft
     }
 
@@ -258,12 +151,12 @@ impl Transaction {
                 cell.column().saturating_add(1)
             )));
         }
-        let parsed = codec::parse(self.draft.source_xml())?;
+        let parsed = codec::parse(self.draft.source_xml(), &self.draft.xml_limits)?;
         let site = codec::find_site(&parsed.sites, &cell).ok_or_else(|| model::not_found(&cell))?;
         ensure_unique_site(site, &cell)?;
-        let fragment = codec::serialize(&annotation)?;
+        let fragment = codec::serialize(&annotation, &self.draft.xml_limits)?;
         let source = codec::insert(self.draft.source_xml(), site, &fragment)?;
-        self.publish(source, Operation::Add { cell, annotation })
+        self.publish(source, Some(&cell))
     }
 
     /// Set a cell annotation, adding it when absent or replacing it in place.
@@ -309,25 +202,16 @@ impl Transaction {
     /// Returns an error when the operation cannot be completed.
     pub fn replace_at(&mut self, cell: model::Cell, annotation: Annotation) -> Result<()> {
         validation::validate_annotation(&annotation)?;
-        let entry = self
-            .draft
+        self.draft
             .cell(cell.sheet(), cell.row(), cell.column())?
-            .ok_or_else(|| model::not_found(&cell))?
-            .clone();
-        let parsed = codec::parse(self.draft.source_xml())?;
+            .ok_or_else(|| model::not_found(&cell))?;
+        let parsed = codec::parse(self.draft.source_xml(), &self.draft.xml_limits)?;
         let site = codec::find_site(&parsed.sites, &cell).ok_or_else(|| model::not_found(&cell))?;
         ensure_unique_site(site, &cell)?;
-        let fragment = codec::serialize(&annotation)?;
+        let fragment = codec::serialize(&annotation, &self.draft.xml_limits)?;
         let span = annotation_span(&parsed, &cell)?;
         let source = codec::replace(self.draft.source_xml(), span, &fragment)?;
-        self.publish(
-            source,
-            Operation::Replace {
-                cell,
-                before: entry.annotation().clone(),
-                after: annotation,
-            },
-        )
+        self.publish(source, Some(&cell))
     }
 
     /// Remove an annotation by source-order index and return its value.
@@ -351,17 +235,11 @@ impl Transaction {
             .cell(cell.sheet(), cell.row(), cell.column())?
             .ok_or_else(|| model::not_found(&cell))?
             .clone();
-        let parsed = codec::parse(self.draft.source_xml())?;
+        let parsed = codec::parse(self.draft.source_xml(), &self.draft.xml_limits)?;
         let span = annotation_span(&parsed, &cell)?;
         let source = codec::remove(self.draft.source_xml(), span)?;
         let annotation = entry.annotation().clone();
-        self.publish(
-            source,
-            Operation::Remove {
-                cell,
-                annotation: annotation.clone(),
-            },
-        )?;
+        self.publish(source, None)?;
         Ok(annotation)
     }
 
@@ -374,167 +252,64 @@ impl Transaction {
         self.remove_at(cell)
     }
 
-    /// Restore the transaction's original source and semantic inventory.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.clone();
-        self.operations.clear();
     }
 
     /// Validate and atomically materialize the candidate.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         validation::validate_entries(&self.draft.entries)?;
         let changed = self.before.source != self.draft.source;
-        let patch = if changed {
-            Patch {
-                source_fingerprint: codec::fingerprint(self.before.source_xml()),
-                target_fingerprint: codec::fingerprint(self.draft.source_xml()),
-                operations: self.operations,
-            }
-        } else {
-            Patch {
-                source_fingerprint: codec::fingerprint(self.before.source_xml()),
-                target_fingerprint: codec::fingerprint(self.before.source_xml()),
-                operations: Vec::new(),
-            }
-        };
         Ok(Commit {
             snapshot: self.draft,
-            patch,
             changed,
         })
     }
 
-    fn apply_operation(&mut self, operation: &Operation) -> Result<()> {
-        match operation {
-            Operation::Add { cell, annotation } => self.add_at(cell.clone(), annotation.clone()),
-            Operation::Replace {
-                cell,
-                before,
-                after,
-            } => {
-                let current = self
-                    .draft
-                    .cell(cell.sheet(), cell.row(), cell.column())?
-                    .ok_or_else(|| model::not_found(cell))?;
-                if current.annotation() != before {
-                    return Err(Error::InvalidFormat(
-                        "ODS annotation patch expected-state conflict".to_string(),
-                    ));
-                }
-                self.replace_at(cell.clone(), after.clone())
-            },
-            Operation::Remove { cell, annotation } => {
-                let current = self
-                    .draft
-                    .cell(cell.sheet(), cell.row(), cell.column())?
-                    .ok_or_else(|| model::not_found(cell))?;
-                if current.annotation() != annotation {
-                    return Err(Error::InvalidFormat(
-                        "ODS annotation patch expected-state conflict".to_string(),
-                    ));
-                }
-                self.remove_at(cell.clone()).map(|_| ())
-            },
+    /// Adopt `source` as the candidate; an added or replaced annotation must
+    /// read back at `written`.
+    fn publish(&mut self, source: String, written: Option<&model::Cell>) -> Result<()> {
+        let draft = Snapshot::parse(source, &self.before.xml_limits)?;
+        if let Some(cell) = written {
+            draft
+                .cell(cell.sheet(), cell.row(), cell.column())?
+                .ok_or_else(|| model::not_found(cell))?;
         }
-    }
-
-    fn publish(&mut self, source: String, operation: Operation) -> Result<()> {
-        let draft = Snapshot::parse(source)?;
-        let operation = match operation {
-            Operation::Add { cell, .. } => {
-                let annotation = draft
-                    .cell(cell.sheet(), cell.row(), cell.column())?
-                    .ok_or_else(|| model::not_found(&cell))?
-                    .annotation()
-                    .clone();
-                Operation::Add { cell, annotation }
-            },
-            Operation::Replace { cell, before, .. } => {
-                let after = draft
-                    .cell(cell.sheet(), cell.row(), cell.column())?
-                    .ok_or_else(|| model::not_found(&cell))?
-                    .annotation()
-                    .clone();
-                Operation::Replace {
-                    cell,
-                    before,
-                    after,
-                }
-            },
-            operation @ Operation::Remove { .. } => operation,
-        };
         self.draft = draft;
-        self.operations.push(operation);
         Ok(())
     }
 }
 
 /// A validated annotation publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
 impl Commit {
     /// Whether the source XML changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
+    #[cfg(test)]
     /// Resulting immutable annotation snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Resulting source XML.
     #[must_use]
-    pub fn content_xml(&self) -> &str {
+    pub(crate) fn content_xml(&self) -> &str {
         self.snapshot.source_xml()
     }
-
-    /// Reversible semantic patch produced by this commit.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its resulting snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume the commit into its resulting XML source.
-    #[must_use]
-    pub fn into_owned_xml(self) -> String {
-        self.snapshot.source
-    }
-
-    /// Consume the commit into its resulting patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
-
-/// Apply one concise closure-based annotation edit.
-///
-/// # Errors
-/// Returns an error when the operation cannot be completed.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
-where
-    F: FnOnce(&mut Transaction) -> Result<()>,
-{
-    let mut transaction = snapshot.edit();
-    edit(&mut transaction)?;
-    transaction.commit()
 }
 
 fn ensure_unique_site(site: &codec::Site, cell: &model::Cell) -> Result<()> {

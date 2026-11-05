@@ -19,7 +19,7 @@ use litchi_iwa_common::wire::{
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
 use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits,
+    Package,
     table::{
         lock::State as LockState,
         sort::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
@@ -71,14 +71,14 @@ fn rewrite_native_table_model(
     source: &[u8],
     mutate: impl FnOnce(&mut ArchiveObject, usize, &mut Vec<u8>) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         if archive.objects.iter().any(|object| {
             object
                 .messages
@@ -115,8 +115,10 @@ fn rewrite_native_table_model(
             type_: TABLE_MODEL_TYPE,
             data: model,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&member, &compressed)],
         ArchiveLimits::default(),
@@ -124,13 +126,13 @@ fn rewrite_native_table_model(
 }
 
 fn model_payload(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in archive.objects {
             for message in object.messages {
                 if message.type_ == TABLE_MODEL_TYPE && table_one_model(&message.data) {
@@ -176,6 +178,7 @@ fn sort_payload(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult
                 &mut rewritten,
                 SORT_RULES_FIELD,
                 if index == 0 { &first } else { raw },
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
         let mut fields = rewrite_repeated_length_delimited_fields(&payload, SORT_RULES_FIELD, &[])?;
@@ -198,13 +201,23 @@ fn with_sort(
     rewrite_native_table_model(source, |_object, _message_index, model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
         data = rewrite_repeated_length_delimited_fields(&data, SORT_TRACKER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         if tracker {
             let tracker = tst::SortRuleReferenceTrackerArchive {
                 reference_tracker: reference(91),
             }
             .encode_to_vec();
-            append_length_delimited_field(&mut data, SORT_TRACKER_FIELD, &tracker)?;
+            append_length_delimited_field(
+                &mut data,
+                SORT_TRACKER_FIELD,
+                &tracker,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *model = data;
         Ok(())
@@ -219,8 +232,18 @@ fn with_duplicate_sort_field(source: &[u8]) -> TestResult<Vec<u8>> {
     )?;
     rewrite_native_table_model(source, |_object, _message_index, model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *model = data;
         Ok(())
     })
@@ -248,7 +271,12 @@ fn with_malformed_sort_payload(
     mutate(&mut payload);
     rewrite_native_table_model(source, |_object, _message_index, model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *model = data;
         Ok(())
     })
@@ -290,8 +318,8 @@ fn assert_model_field45_equal(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source_catalog.iter() {
         let after = target_catalog
@@ -535,7 +563,10 @@ fn changed_sort_rejects_locked_table_atomically() -> TestResult {
         .set(order(1, Direction::Ascending)?)
         .commit()
         .expect_err("changed persisted sort must reject a locked table");
-    assert!(matches!(error, Error::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_numbers::table::sort::transaction::Refusal::TableLocked { .. })
+    ));
     assert_eq!(locked.exact_bytes(), before);
     Ok(())
 }
@@ -572,8 +603,13 @@ fn malformed_sort_wire_rejects_duplicate_known_nested_fields_and_unknown_enums()
         let mut rewritten =
             rewrite_repeated_length_delimited_fields(payload, SORT_RULES_FIELD, &[])
                 .expect("clear sort rule");
-        append_length_delimited_field(&mut rewritten, SORT_RULES_FIELD, &malformed)
-            .expect("append malformed rule");
+        append_length_delimited_field(
+            &mut rewritten,
+            SORT_RULES_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("append malformed rule");
         *payload = rewritten;
     })?;
     let duplicate_rule_direction = with_malformed_sort_payload(&fixture, |payload| {
@@ -586,8 +622,13 @@ fn malformed_sort_wire_rejects_duplicate_known_nested_fields_and_unknown_enums()
         let mut rewritten =
             rewrite_repeated_length_delimited_fields(payload, SORT_RULES_FIELD, &[])
                 .expect("clear sort rule");
-        append_length_delimited_field(&mut rewritten, SORT_RULES_FIELD, &malformed)
-            .expect("append malformed rule");
+        append_length_delimited_field(
+            &mut rewritten,
+            SORT_RULES_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("append malformed rule");
         *payload = rewritten;
     })?;
     let unknown_scope = with_malformed_sort_payload(&fixture, |payload| {
@@ -651,31 +692,37 @@ fn unknown_overlong_scalar_and_balanced_group_bytes_survive_set_and_clear() -> T
 fn public_limits_reject_input_and_reference_ingress_before_publication() -> TestResult {
     let fixture = std::fs::read(fixture_path())?;
     let source = without_sort(&fixture)?;
-    let too_small_input = PackageLimits::new(
-        source.len().saturating_sub(1) as u64,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let too_small_input = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(source.len().saturating_sub(1) as u64)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(too_small_input, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(too_small_input)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
 
-    let too_few_references = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
+    let too_few_references = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), too_few_references),
+            litchi_numbers::OpenOptions::new().semantic_limits(too_few_references),
         )
         .is_err()
     );
@@ -687,11 +734,15 @@ fn selector_errors_are_redacted_and_public_values_are_archive_free() -> TestResu
     let package = Package::from_bytes(&without_sort(&std::fs::read(fixture_path())?)?)?;
     assert!(matches!(
         package.table_sort_order("missing sheet", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::sort::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_sort_order(0usize, "missing table"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::sort::transaction::Refusal::TableNotFound
+        ))
     ));
     let order = order(1, Direction::Ascending)?;
     let rendered = format!("{order:?}");

@@ -488,7 +488,14 @@ impl<'a> SvgOwner<'a> {
     /// codec retains the raw contextual fragment and performs this completion
     /// lazily, so the host never stores a flattened copy per owner.
     pub fn namespace_complete(&self, max_output_bytes: usize) -> Result<Vec<u8>> {
-        svg_blip::write_contextual(&self.value, max_output_bytes).map_err(Into::into)
+        svg_blip::write_contextual(
+            &self.value,
+            svg_blip::Limits::new(
+                svg_blip::MAX_XML_BYTES,
+                max_output_bytes.min(svg_blip::MAX_XML_BYTES),
+            ),
+        )
+        .map_err(Into::into)
     }
 }
 
@@ -859,22 +866,8 @@ impl PartialEq for SourceDrawing<'_> {
 impl Eq for SourceDrawing<'_> {}
 
 impl<'a> SourceDrawing<'a> {
-    /// Scan a complete main-story XML member.
-    pub fn scan(source: &'a [u8]) -> Result<Self> {
-        Self::scan_with_limits(source, 0, ScanLimits::default())
-    }
-
-    /// Scan with a caller-supplied semantic drawing ordinal.
-    pub fn scan_with_ordinal(source: &'a [u8], drawing_ordinal: usize) -> Result<Self> {
-        Self::scan_with_limits(source, drawing_ordinal, ScanLimits::default())
-    }
-
     /// Scan with explicit finite bounds.
-    pub fn scan_with_limits(
-        source: &'a [u8],
-        drawing_ordinal: usize,
-        limits: ScanLimits,
-    ) -> Result<Self> {
+    pub fn scan(source: &'a [u8], drawing_ordinal: usize, limits: ScanLimits) -> Result<Self> {
         Scanner::new(source, drawing_ordinal, limits)?.run()
     }
 
@@ -2482,7 +2475,14 @@ fn project_svg_owner<'a>(
     if raw.len() > maximum {
         return Err(limit("DOCX SVG fragment bytes", raw.len(), maximum));
     }
-    let value = match svg_blip::read_contextual(raw, context) {
+    let value = match svg_blip::read_contextual(
+        raw,
+        context,
+        svg_blip::Limits::new(
+            maximum.min(svg_blip::MAX_XML_BYTES),
+            svg_blip::MAX_XML_BYTES,
+        ),
+    ) {
         Ok(value) => value,
         Err(_) => return Ok(SvgOwnerState::Refused),
     };

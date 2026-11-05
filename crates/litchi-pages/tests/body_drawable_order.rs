@@ -1,10 +1,13 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsp};
-use litchi_pages::{BodyDrawableOrderError, DrawableLayerMove, Limits, Package, Position};
+use litchi_pages::{
+    DrawableLayerMove, Package, Position, drawable::order::Error as BodyDrawableOrderError,
+};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -33,7 +36,12 @@ fn order_payload(order: &[u64]) -> TestResult<Vec<u8>> {
             99,
             u64::try_from(index)?.saturating_add(700),
         )?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 1, &nested)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            1,
+            &nested,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     // The root unknown field must remain byte-for-byte untouched by a reorder.
     litchi_iwa_common::wire::append_varint_field(&mut payload, 77, 0xfeed)?;
@@ -44,6 +52,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -61,7 +70,8 @@ fn fixture_bytes(order: &[u64], sentinel: &[u8]) -> TestResult<Vec<u8>> {
         object(DRAWABLE_IDENTIFIERS[2], 9_000, b"front".to_vec())?,
     ];
     let archive = Archive { objects };
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             (SENTINEL_MEMBER, sentinel),
@@ -92,7 +102,8 @@ fn fixture_bytes_with_native_body_slot(sentinel: &[u8]) -> TestResult<Vec<u8>> {
         object(DRAWABLE_IDENTIFIERS[2], 9_000, b"front".to_vec())?,
     ];
     let archive = Archive { objects };
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             (SENTINEL_MEMBER, sentinel),
@@ -110,7 +121,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 
 fn member_payload(package: &Package, member: &str) -> TestResult<Vec<u8>> {
     let bytes = exact_bytes(package)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
@@ -120,7 +131,10 @@ fn member_payload(package: &Package, member: &str) -> TestResult<Vec<u8>> {
 
 fn zorder_payload_from_package(package: &Package) -> TestResult<Vec<u8>> {
     let bytes = member_payload(package, DOCUMENT_MEMBER)?;
-    let archive = Archive::parse(&SnappyStream::decompress(&bytes)?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(&bytes, Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object(ZORDER_IDENTIFIER)
         .ok_or_else(|| io::Error::other("fixture z-order object is missing"))?;
@@ -161,7 +175,7 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
     );
 
     let rewritten = zorder_payload_from_package(commit.package())?;
-    let view = WireView::parse(&rewritten)?;
+    let view = WireView::parse(&rewritten, litchi_iwa_common::WireLimits::DEFAULT)?;
     let (snapshot, _report) =
         litchi_iwa_protos::pages_drawable_order_codec::decode_drawable_order_with_report(
             &rewritten,
@@ -181,7 +195,7 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
     );
     for field in view.fields().filter(|field| field.number() == 1) {
         assert!(
-            WireView::parse(field.payload())?
+            WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|nested| nested.number() == 99)
         );
@@ -190,7 +204,8 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
         member_payload(commit.package(), SENTINEL_MEMBER)?,
         b"unchanged sentinel"
     );
-    let candidate_catalog = Catalog::from_bytes(&exact_bytes(commit.package())?)?;
+    let candidate_catalog =
+        Catalog::from_bytes(&exact_bytes(commit.package())?, Default::default())?;
     assert!(
         PREVIEW_MEMBERS
             .iter()
@@ -276,13 +291,17 @@ fn positions_handles_and_patches_fail_closed() -> TestResult<()> {
     let handles = source.body_drawable_order()?;
     assert!(matches!(
         source.body_drawable(Position::new(99)),
-        Err(BodyDrawableOrderError::PositionNotFound { .. })
+        Err(BodyDrawableOrderError::Refused(
+            litchi_pages::drawable::order::Refusal::PositionNotFound { .. }
+        ))
     ));
 
     let mut duplicate = source.edit_body_drawable_order()?;
     assert!(matches!(
         duplicate.set_order(&[handles[0].clone(), handles[0].clone(), handles[2].clone()]),
-        Err(BodyDrawableOrderError::InvalidOrder)
+        Err(BodyDrawableOrderError::Refused(
+            litchi_pages::drawable::order::Refusal::InvalidOrder
+        ))
     ));
 
     let foreign = Package::from_bytes(&fixture_bytes(&DRAWABLE_IDENTIFIERS, b"foreign")?)?;
@@ -290,7 +309,9 @@ fn positions_handles_and_patches_fail_closed() -> TestResult<()> {
     let mut foreign_edit = source.edit_body_drawable_order()?;
     assert!(matches!(
         foreign_edit.set_order(&foreign_handles),
-        Err(BodyDrawableOrderError::HandleSourceMismatch)
+        Err(BodyDrawableOrderError::Refused(
+            litchi_pages::drawable::order::Refusal::HandleSourceMismatch
+        ))
     ));
 
     let mut changed = source.edit_body_drawable_order()?;

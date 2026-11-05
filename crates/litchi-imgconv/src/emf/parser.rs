@@ -325,8 +325,8 @@ impl EmfRecord {
     /// Parse an EMF record from data (creates owned copy)
     ///
     /// For high-performance scenarios, consider using `EmfRecordRef::parse_ref` instead
-    pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
-        let (record_ref, consumed) = EmfRecordRef::parse_ref(data, offset)?;
+    pub fn parse(data: &[u8], offset: usize, limits: &crate::Limits) -> Result<(Self, usize)> {
+        let (record_ref, consumed) = EmfRecordRef::parse_ref(data, offset, limits)?;
 
         Ok((
             Self {
@@ -345,7 +345,22 @@ impl<'a> EmfRecordRef<'a> {
     /// This is the most efficient way to parse records, returning a borrowed view
     /// into the original data without any allocations.
     #[inline]
-    pub fn parse_ref(data: &'a [u8], offset: usize) -> Result<(Self, usize)> {
+    pub fn parse_ref(
+        data: &'a [u8],
+        offset: usize,
+        limits: &crate::Limits,
+    ) -> Result<(Self, usize)> {
+        if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
+            return Err(Error::ParseError(
+                "EMF record parser limits must be greater than zero".into(),
+            ));
+        }
+        if data.len() > limits.max_uncompressed_bytes {
+            return Err(Error::ParseError(format!(
+                "EMF record input exceeds limit {} bytes",
+                limits.max_uncompressed_bytes
+            )));
+        }
         if offset % 4 != 0 {
             return Err(Error::ParseError(format!(
                 "Unaligned EMF record offset: {}",
@@ -374,8 +389,17 @@ impl<'a> EmfRecordRef<'a> {
             )));
         }
 
+        let size = usize::try_from(size)
+            .map_err(|_| Error::ParseError("EMF record size does not fit in memory".into()))?;
+        if size > limits.max_uncompressed_bytes {
+            return Err(Error::ParseError(format!(
+                "EMF record size {} exceeds limit {}",
+                size, limits.max_uncompressed_bytes
+            )));
+        }
+
         let end_offset = offset
-            .checked_add(size as usize)
+            .checked_add(size)
             .ok_or_else(|| Error::ParseError("EMF record size overflow".into()))?;
 
         if end_offset > data.len() {
@@ -393,21 +417,38 @@ impl<'a> EmfRecordRef<'a> {
         Ok((
             Self {
                 record_type,
-                size,
+                size: u32::try_from(size)
+                    .map_err(|_| Error::ParseError("EMF record size overflow".into()))?,
                 data: record_data,
             },
-            size as usize,
+            size,
         ))
     }
 
     /// Convert to owned record (requires allocation)
     #[inline]
-    pub fn to_owned(&self) -> EmfRecord {
-        EmfRecord {
+    pub fn to_owned(&self, limits: &crate::Limits) -> Result<EmfRecord> {
+        if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
+            return Err(Error::ParseError(
+                "EMF record parser limits must be greater than zero".into(),
+            ));
+        }
+        let record_bytes = usize::try_from(self.size)
+            .map_err(|_| Error::ParseError("EMF record size does not fit in memory".into()))?;
+        if record_bytes > limits.max_uncompressed_bytes
+            || self.data.len() > limits.max_uncompressed_bytes
+        {
+            return Err(Error::ParseError(format!(
+                "EMF record size {} exceeds limit {}",
+                record_bytes.max(self.data.len()),
+                limits.max_uncompressed_bytes
+            )));
+        }
+        Ok(EmfRecord {
             record_type: self.record_type,
             size: self.size,
             data: Bytes::copy_from_slice(self.data),
-        }
+        })
     }
 }
 
@@ -427,6 +468,8 @@ pub struct EmfParser {
     warnings: Vec<EmfParserWarning>,
     /// Raw EMF data - kept for zero-copy access
     data: Bytes,
+    /// Caller-selected raw parser policy retained for zero-copy iteration.
+    limits: crate::Limits,
     /// Offset to first record after header (cached for performance)
     first_record_offset: usize,
 }
@@ -440,7 +483,27 @@ impl EmfParser {
         data: &[u8],
         header: &EmfHeader,
         allow_legacy_size_last: bool,
+        limits: &crate::Limits,
     ) -> Result<(usize, Vec<EmfParserWarning>)> {
+        if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
+            return Err(Error::ParseError(
+                "EMF parser limits must be greater than zero".into(),
+            ));
+        }
+        if data.len() > limits.max_uncompressed_bytes {
+            return Err(Error::ParseError(format!(
+                "EMF input exceeds limit {} bytes",
+                limits.max_uncompressed_bytes
+            )));
+        }
+        let declared_records = usize::try_from(header.num_records)
+            .map_err(|_| Error::ParseError("EMF record count does not fit in memory".into()))?;
+        if declared_records > limits.max_records {
+            return Err(Error::ParseError(format!(
+                "EMF record count {} exceeds limit {}",
+                declared_records, limits.max_records
+            )));
+        }
         let declared_size = usize::try_from(header.size)
             .map_err(|_| Error::ParseError("EMF declared size does not fit in memory".into()))?;
         if declared_size != data.len() {
@@ -472,7 +535,7 @@ impl EmfParser {
         let mut saw_eof = false;
         let mut warnings = Vec::new();
         while offset < declared_size {
-            let (record, consumed) = EmfRecordRef::parse_ref(data, offset)?;
+            let (record, consumed) = EmfRecordRef::parse_ref(data, offset, limits)?;
             records_seen = records_seen
                 .checked_add(1)
                 .ok_or_else(|| Error::ParseError("EMF record count overflow".into()))?;
@@ -572,34 +635,58 @@ impl EmfParser {
     ///
     /// This eagerly parses all records. For large files or streaming scenarios,
     /// consider using `new_lazy()` or iterating with `iter_record_refs()`.
-    pub fn new(data: &[u8]) -> Result<Self> {
-        Self::parse_internal(Bytes::copy_from_slice(data), true, false)
+    pub fn new(data: &[u8], limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(data, limits)?;
+        Self::parse_internal(Bytes::copy_from_slice(data), true, false, *limits)
     }
 
     /// Create an eager parser that accepts the known legacy `SizeLast`
     /// mismatch while keeping all structural validation strict.
-    pub fn new_compatible(data: &[u8]) -> Result<Self> {
-        Self::parse_internal(Bytes::copy_from_slice(data), true, true)
+    pub fn new_compatible(data: &[u8], limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(data, limits)?;
+        Self::parse_internal(Bytes::copy_from_slice(data), true, true, *limits)
     }
 
     /// Create an eager parser from an owned input buffer without copying it.
-    pub fn from_owned(data: Vec<u8>) -> Result<Self> {
-        Self::parse_internal(Bytes::from(data), true, false)
+    pub fn from_owned(data: Vec<u8>, limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(&data, limits)?;
+        Self::parse_internal(Bytes::from(data), true, false, *limits)
     }
 
     /// Create a compatible eager parser from an owned buffer without copying.
-    pub fn from_owned_compatible(data: Vec<u8>) -> Result<Self> {
-        Self::parse_internal(Bytes::from(data), true, true)
+    pub fn from_owned_compatible(data: Vec<u8>, limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(&data, limits)?;
+        Self::parse_internal(Bytes::from(data), true, true, *limits)
     }
 
-    fn parse_internal(data: Bytes, eager: bool, allow_legacy_size_last: bool) -> Result<Self> {
+    pub(crate) fn check_input(data: &[u8], limits: &crate::Limits) -> Result<()> {
+        if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
+            return Err(Error::ParseError(
+                "EMF parser limits must be greater than zero".into(),
+            ));
+        }
+        if data.len() > limits.max_uncompressed_bytes {
+            return Err(Error::ParseError(format!(
+                "EMF input exceeds limit {} bytes",
+                limits.max_uncompressed_bytes
+            )));
+        }
+        Ok(())
+    }
+
+    fn parse_internal(
+        data: Bytes,
+        eager: bool,
+        allow_legacy_size_last: bool,
+        limits: crate::Limits,
+    ) -> Result<Self> {
         if data.len() < 88 {
             return Err(Error::ParseError("EMF data too short".into()));
         }
 
         let header = EmfHeader::parse(&data)?;
         let (header_record_size, warnings) =
-            Self::validate(&data, &header, allow_legacy_size_last)?;
+            Self::validate(&data, &header, allow_legacy_size_last, &limits)?;
 
         if !eager {
             return Ok(Self {
@@ -608,6 +695,7 @@ impl EmfParser {
                 warnings,
                 data,
                 first_record_offset: header_record_size,
+                limits,
             });
         }
 
@@ -621,14 +709,15 @@ impl EmfParser {
         let mut records = Vec::with_capacity(
             expected_records
                 .min(byte_bound)
-                .min(Self::MAX_PREALLOCATED_RECORDS),
+                .min(Self::MAX_PREALLOCATED_RECORDS)
+                .min(limits.max_records),
         );
 
         let mut offset = header_record_size;
 
         // Parse remaining records with optimized loop
         while offset < data.len() {
-            let (record_ref, consumed) = EmfRecordRef::parse_ref(&data, offset)?;
+            let (record_ref, consumed) = EmfRecordRef::parse_ref(&data, offset, &limits)?;
             let is_eof = record_ref.record_type == EmfRecordType::Eof as u32;
             let end = offset
                 .checked_add(consumed)
@@ -653,6 +742,7 @@ impl EmfParser {
             warnings,
             data,
             first_record_offset: header_record_size,
+            limits,
         })
     }
 
@@ -660,14 +750,20 @@ impl EmfParser {
     ///
     /// Records are not parsed until accessed. Use `iter_record_refs()` for
     /// zero-copy iteration.
-    pub fn new_lazy(data: &[u8]) -> Result<Self> {
-        Self::parse_internal(Bytes::copy_from_slice(data), false, false)
+    pub fn new_lazy(data: &[u8], limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(data, limits)?;
+        Self::parse_internal(Bytes::copy_from_slice(data), false, false, *limits)
     }
 
     /// Return compatibility diagnostics recorded while parsing.
     #[inline]
     pub fn warnings(&self) -> &[EmfParserWarning] {
         &self.warnings
+    }
+
+    /// Returns the caller-selected policy retained at raw admission.
+    pub(crate) const fn limits(&self) -> crate::Limits {
+        self.limits
     }
 
     /// Get an iterator over record references (zero-copy, most efficient)
@@ -679,7 +775,7 @@ impl EmfParser {
     /// ```no_run
     /// # use litchi_imgconv::emf::parser::EmfParser;
     /// # let data = &[0u8; 100];
-    /// let parser = EmfParser::new_lazy(data)?;
+    /// let parser = EmfParser::new_lazy(data, &litchi_imgconv::Limits::default())?;
     /// for record_ref in parser.iter_record_refs() {
     ///     // Process record without any allocations
     ///     match record_ref.record_type {
@@ -693,6 +789,7 @@ impl EmfParser {
         RecordRefIterator {
             data: &self.data,
             offset: self.first_record_offset,
+            limits: self.limits,
         }
     }
 
@@ -740,6 +837,7 @@ impl EmfParser {
 pub struct RecordRefIterator<'a> {
     data: &'a [u8],
     offset: usize,
+    limits: crate::Limits,
 }
 
 impl<'a> Iterator for RecordRefIterator<'a> {
@@ -751,7 +849,7 @@ impl<'a> Iterator for RecordRefIterator<'a> {
             return None;
         }
 
-        match EmfRecordRef::parse_ref(self.data, self.offset) {
+        match EmfRecordRef::parse_ref(self.data, self.offset, &self.limits) {
             Ok((record, consumed)) => {
                 let is_eof = record.record_type == 0x0000000E;
                 self.offset += consumed;
@@ -828,9 +926,10 @@ mod tests {
     #[test]
     fn parses_valid_eager_and_lazy_streams() {
         let data = valid_emf();
-        let eager = EmfParser::new(&data).unwrap();
-        let lazy = EmfParser::new_lazy(&data).unwrap();
-        let owned = EmfParser::from_owned(data).unwrap();
+        let limits = crate::Limits::default();
+        let eager = EmfParser::new(&data, &limits).unwrap();
+        let lazy = EmfParser::new_lazy(&data, &limits).unwrap();
+        let owned = EmfParser::from_owned(data, &limits).unwrap();
         assert_eq!(eager.records.len(), 2);
         assert_eq!(lazy.iter_record_refs().count(), 2);
         assert_eq!(lazy.count_records().unwrap(), 2);
@@ -848,7 +947,7 @@ mod tests {
         let len = data.len() as u32;
         put_u32(&mut data, 48, len);
         put_u32(&mut data, 52, 2);
-        let parsed = EmfParser::new(&data).unwrap();
+        let parsed = EmfParser::new(&data, &crate::Limits::default()).unwrap();
         assert_eq!(parsed.records.len(), 1);
         assert_eq!(parsed.records[0].record_type, EmfRecordType::Eof as u32);
     }
@@ -867,12 +966,15 @@ mod tests {
         for &(offset, value) in cases {
             let mut data = valid_emf();
             put_u32(&mut data, offset, value);
-            assert!(EmfParser::new(&data).is_err(), "offset {offset}");
+            assert!(
+                EmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "offset {offset}"
+            );
         }
 
         let mut reserved = valid_emf();
         put_u16(&mut reserved, 58, 1);
-        assert!(EmfParser::new(&reserved).is_err());
+        assert!(EmfParser::new(&reserved, &crate::Limits::default()).is_err());
     }
 
     #[test]
@@ -880,12 +982,38 @@ mod tests {
         let mut data = valid_emf();
         put_u32(&mut data, 60, 1);
         put_u32(&mut data, 64, 87);
-        assert!(EmfParser::new(&data).is_err());
+        assert!(EmfParser::new(&data, &crate::Limits::default()).is_err());
 
         let mut data = valid_emf();
         put_u32(&mut data, 60, u32::MAX);
         put_u32(&mut data, 64, 88);
-        assert!(EmfParser::new(&data).is_err());
+        assert!(EmfParser::new(&data, &crate::Limits::default()).is_err());
+    }
+
+    #[test]
+    fn parser_requires_and_enforces_caller_limits() {
+        let data = valid_emf();
+        let mut limits = crate::Limits {
+            max_uncompressed_bytes: data.len(),
+            max_records: 3,
+            ..crate::Limits::default()
+        };
+        assert_eq!(EmfParser::new(&data, &limits).unwrap().records.len(), 2);
+
+        limits.max_uncompressed_bytes = data.len() - 1;
+        assert!(EmfParser::new(&data, &limits).is_err());
+
+        limits.max_uncompressed_bytes = data.len();
+        limits.max_records = 2;
+        assert!(EmfParser::new(&data, &limits).is_err());
+
+        limits.max_uncompressed_bytes = 15;
+        assert!(EmfRecordRef::parse_ref(&data, 88, &limits).is_err());
+        limits.max_uncompressed_bytes = 0;
+        assert!(EmfRecordRef::parse_ref(&data, 88, &limits).is_err());
+        limits.max_uncompressed_bytes = data.len();
+        limits.max_records = 0;
+        assert!(EmfRecordRef::parse_ref(&data, 88, &limits).is_err());
     }
 
     #[test]
@@ -893,16 +1021,19 @@ mod tests {
         for size in [7, 10, u32::MAX] {
             let mut data = valid_emf();
             put_u32(&mut data, 92, size);
-            assert!(EmfParser::new(&data).is_err(), "size {size}");
+            assert!(
+                EmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "size {size}"
+            );
         }
 
         let mut count = valid_emf();
         put_u32(&mut count, 52, 4);
-        assert!(EmfParser::new(&count).is_err());
+        assert!(EmfParser::new(&count, &crate::Limits::default()).is_err());
 
         let mut truncated = valid_emf();
         truncated.pop();
-        assert!(EmfParser::new(&truncated).is_err());
+        assert!(EmfParser::new(&truncated, &crate::Limits::default()).is_err());
     }
 
     #[test]
@@ -910,29 +1041,30 @@ mod tests {
         let eof = 88 + 16;
         let mut missing = valid_emf();
         put_u32(&mut missing, eof, 15);
-        assert!(EmfParser::new(&missing).is_err());
+        assert!(EmfParser::new(&missing, &crate::Limits::default()).is_err());
 
         let mut malformed = valid_emf();
         put_u32(&mut malformed, eof + 16, 0);
-        assert!(EmfParser::new(&malformed).is_err());
+        assert!(EmfParser::new(&malformed, &crate::Limits::default()).is_err());
 
         let mut trailing = valid_emf();
         trailing.extend_from_slice(&[15, 0, 0, 0, 8, 0, 0, 0]);
         let len = trailing.len() as u32;
         put_u32(&mut trailing, 48, len);
         put_u32(&mut trailing, 52, 4);
-        assert!(EmfParser::new(&trailing).is_err());
+        assert!(EmfParser::new(&trailing, &crate::Limits::default()).is_err());
 
         let mut palette_mismatch = valid_emf();
         put_u32(&mut palette_mismatch, 68, 1);
-        assert!(EmfParser::new(&palette_mismatch).is_err());
+        assert!(EmfParser::new(&palette_mismatch, &crate::Limits::default()).is_err());
     }
 
     #[test]
     fn record_ref_checks_offset_arithmetic_and_alignment() {
         let data = valid_emf();
-        assert!(EmfRecordRef::parse_ref(&data, 1).is_err());
-        assert!(EmfRecordRef::parse_ref(&data, usize::MAX).is_err());
+        let limits = crate::Limits::default();
+        assert!(EmfRecordRef::parse_ref(&data, 1, &limits).is_err());
+        assert!(EmfRecordRef::parse_ref(&data, usize::MAX, &limits).is_err());
     }
 
     #[test]
@@ -949,16 +1081,16 @@ mod tests {
             ))
             .as_slice(),
         ] {
-            EmfParser::new(data).unwrap();
+            EmfParser::new(data, &crate::Limits::default()).unwrap();
         }
 
         let legacy = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/images/emf/jack-sign.emf"
         ));
-        assert!(EmfParser::new(legacy).is_err());
+        assert!(EmfParser::new(legacy, &crate::Limits::default()).is_err());
 
-        let compatible = EmfParser::new_compatible(legacy).unwrap();
+        let compatible = EmfParser::new_compatible(legacy, &crate::Limits::default()).unwrap();
         assert_eq!(
             compatible.warnings(),
             &[EmfParserWarning::EofSizeLastMismatch {
@@ -966,7 +1098,8 @@ mod tests {
                 found: 29_868,
             }]
         );
-        let owned = EmfParser::from_owned_compatible(legacy.to_vec()).unwrap();
+        let owned =
+            EmfParser::from_owned_compatible(legacy.to_vec(), &crate::Limits::default()).unwrap();
         assert_eq!(owned.records.len(), compatible.records.len());
     }
 
@@ -976,9 +1109,11 @@ mod tests {
         let mut legacy = valid_emf();
         let file_size = legacy.len() as u32;
         put_u32(&mut legacy, eof + 16, file_size);
-        assert!(EmfParser::new(&legacy).is_err());
+        assert!(EmfParser::new(&legacy, &crate::Limits::default()).is_err());
         assert_eq!(
-            EmfParser::new_compatible(&legacy).unwrap().warnings(),
+            EmfParser::new_compatible(&legacy, &crate::Limits::default())
+                .unwrap()
+                .warnings(),
             &[EmfParserWarning::EofSizeLastMismatch {
                 expected: 20,
                 found: file_size,
@@ -987,21 +1122,21 @@ mod tests {
 
         let mut missing_eof = legacy.clone();
         put_u32(&mut missing_eof, eof, 15);
-        assert!(EmfParser::new_compatible(&missing_eof).is_err());
+        assert!(EmfParser::new_compatible(&missing_eof, &crate::Limits::default()).is_err());
 
         let mut wrong_count = legacy.clone();
         put_u32(&mut wrong_count, 52, 4);
-        assert!(EmfParser::new_compatible(&wrong_count).is_err());
+        assert!(EmfParser::new_compatible(&wrong_count, &crate::Limits::default()).is_err());
 
         let mut palette_mismatch = legacy.clone();
         put_u32(&mut palette_mismatch, 68, 1);
-        assert!(EmfParser::new_compatible(&palette_mismatch).is_err());
+        assert!(EmfParser::new_compatible(&palette_mismatch, &crate::Limits::default()).is_err());
 
         let mut trailing = legacy;
         trailing.extend_from_slice(&[15, 0, 0, 0, 8, 0, 0, 0]);
         let length = trailing.len() as u32;
         put_u32(&mut trailing, 48, length);
         put_u32(&mut trailing, 52, 4);
-        assert!(EmfParser::new_compatible(&trailing).is_err());
+        assert!(EmfParser::new_compatible(&trailing, &crate::Limits::default()).is_err());
     }
 }

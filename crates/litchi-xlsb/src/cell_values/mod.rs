@@ -8,25 +8,44 @@
 //! selected records; unknown records remain byte-exact. Row spans and worksheet
 //! dimensions expand with structural insertions, and whole-workbook publication
 //! validates style, shared-string, formula, and package dependency closure.
-//! Patches carry deterministic semantic deltas, exact before/after images,
+//! The worksheet and structural families carry deterministic semantic deltas,
 //! bounded durable transfer (including ordinary drawing graphs), three-way
-//! conflict reporting, and undo/redo.
+//! conflict reporting, and undo/redo. Package-owned cell-value patches carry
+//! exact whole-package images and their exact inverse.
+//!
+//! Package-owned cell edits use the canonical commit triad:
+//!
+//! ```
+//! # fn main() -> litchi_xlsb::package::PackageResult<()> {
+//! use litchi_xlsb::Package;
+//!
+//! let source = Package::new()?;
+//! let edit = source.edit_cell_values(0usize)?.resolve()?.expect("worksheet");
+//! let commit = edit.commit()?;
+//! assert_eq!(commit.package().to_bytes()?, commit.patch().after());
+//! assert_eq!(commit.diagnostics().changed(), !commit.patch().is_noop());
+//! let _package = commit.into_package();
+//! # Ok(())
+//! # }
+//! ```
 
 mod drawing_transfer;
+mod format;
 mod formula_transfer;
-mod resources;
-mod root;
-pub mod workbook;
-mod worksheet;
+mod names;
+mod package;
+pub(crate) mod resources;
+mod scalar_sst;
+pub mod structure;
+pub(crate) mod workbook;
+pub mod worksheet;
 
 pub use drawing_transfer::DrawingTransferRefusal;
-pub use root::{
-    AuthoredStyle, WorkbookCommit, WorkbookEdit, WorkbookHistory, WorkbookMergeConflict,
-    WorkbookMergeOutcome, WorkbookPatch,
-};
+pub use format::{BorderLine, Format};
+pub use package::{Commit, Diagnostics, Edit, EditOptions, Patch, Scalar};
 pub use worksheet::{
-    CellError, CellFormula, Change, Commit, Edit, History, Limits, MergeConflict, MergeOutcome,
-    Number, Patch, Reference, Snapshot, StoredCell, StyleIndex, TransferLimits, Value,
+    CellError, CellFormula, Change, LimitKind, Limits, Number, Reference, Snapshot, StoredCell,
+    StyleIndex, TransferLimits, Value,
 };
 
 pub use crate::package::error::{Error, Result};

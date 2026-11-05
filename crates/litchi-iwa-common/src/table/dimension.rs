@@ -99,6 +99,7 @@ impl Size {
 
 /// Errors returned while constructing a dimension value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// A point measurement was zero, negative, infinite, or NaN.
     Invalid,

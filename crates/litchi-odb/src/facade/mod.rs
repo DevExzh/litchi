@@ -1,6 +1,6 @@
 //! Concise family entry points.
 
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error as CoreError, Metadata, Result as CoreResult};
 use std::{
     path::Path,
     sync::{Arc, OnceLock},
@@ -8,30 +8,108 @@ use std::{
 
 pub use crate::authoring::Builder;
 
-/// Immutable document snapshot.
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
+
+/// The immutable, cheap-to-clone database package owner.
+///
+/// It owns every state verb (open, edit, apply, save); its read-only semantic
+/// projection is [`Database`], obtained from [`Package::database`].
 #[derive(Clone)]
-pub struct Database {
-    pub(crate) package: crate::package::Snapshot,
-    pub(crate) settings: Arc<OnceLock<crate::DatabaseSettings>>,
+pub struct Package {
+    pub(crate) database: Database,
 }
 
-impl Database {
-    /// Opens a database package from a file path.
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.database.package.owned_package()
+    }
+
+    /// Creates the minimal valid database package (an empty data source).
+    ///
+    /// Creation is deterministic: no clock or randomness is consulted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if package writing fails.
+    pub fn new() -> Result<Self, litchi_odf_common::Error> {
+        Builder::new().build()
+    }
+
+    /// Opens a database package from a file path under the default limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or is not a valid package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(Self::from_package)
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, litchi_odf_common::Error> {
+        Self::open_with_options(path, litchi_odf_common::OpenOptions::new())
     }
 
-    /// Opens a database package from in-memory bytes.
+    /// Opens a database package from a file path under caller-selected
+    /// source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] when a selected limit is
+    /// exceeded, and another error for an unreadable or invalid package.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::open_with_options(path, options).map(Self::from_snapshot)
+    }
+
+    /// Opens a database package from in-memory bytes (copied once).
     ///
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid package.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(Self::from_package)
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_bytes_with_options(bytes, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Opens a database package from in-memory bytes under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_bytes_with_options(copy_input(bytes)?, options)
+            .map(Self::from_snapshot)
+    }
+
+    /// Reads a database package from a stream under the default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream cannot be read or is not a valid package.
+    pub fn from_reader(reader: impl std::io::Read) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_reader_with_options(reader, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Reads a database package from a stream under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_reader_with_options(reader, options).map(Self::from_snapshot)
     }
 
     /// Opens a password-encrypted database package from a file path.
@@ -43,8 +121,26 @@ impl Database {
     ///
     /// Returns an error if the file cannot be read, the password is incorrect,
     /// or the decrypted package is invalid.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::open_with_password(path, password).map(Self::from_package)
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        Self::open_with_password_and_options(path, password, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Opens a password-encrypted database package from a file path under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_password`] and [`Self::open_with_options`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::open_with_password_and_options(path, password, options)
+            .map(Self::from_snapshot)
     }
 
     /// Opens a password-encrypted database package from in-memory bytes.
@@ -52,17 +148,205 @@ impl Database {
     /// # Errors
     ///
     /// Returns an error for an incorrect password or invalid decrypted package.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes_with_password(bytes, password).map(Self::from_package)
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_bytes_with_password_and_options(
+            bytes,
+            password,
+            litchi_odf_common::OpenOptions::new(),
+        )
     }
 
-    fn from_package(package: crate::package::Snapshot) -> Self {
+    /// Opens a password-encrypted database package from in-memory bytes
+    /// under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::from_bytes_with_password`] and
+    /// [`Self::open_with_options`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_bytes_with_password_and_options(
+            copy_input(bytes)?,
+            password,
+            options,
+        )
+        .map(Self::from_snapshot)
+    }
+
+    /// Adopts the packaged ODF detection result without a second ZIP index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when detection classified another format or the
+    /// package is not a valid database.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_prepared_package_with_options(prepared, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// The source limits were applied when the archive was prepared; its
+    /// existing index and source allocation are reused.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odb {
+            return Err(CoreError::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        crate::package::Snapshot::from_owned_package_with_options(prepared.into_package(), options)
+            .map(Self::from_snapshot)
+    }
+
+    pub(crate) fn from_snapshot(package: crate::package::Snapshot) -> Self {
         Self {
-            package,
-            settings: Arc::new(OnceLock::new()),
+            database: Database {
+                package,
+                settings: Arc::new(OnceLock::new()),
+            },
         }
     }
 
+    /// Reopens bytes this crate published (default limits).
+    pub(crate) fn from_published(bytes: Vec<u8>) -> CoreResult<Self> {
+        crate::package::Snapshot::from_bytes(bytes).map(Self::from_snapshot)
+    }
+
+    /// Returns the tolerated deviations recorded while opening the package.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.database.package.tolerance_report()
+    }
+
+    /// Borrows the read-only semantic projection; clone it for an owned,
+    /// cheap handle.
+    #[must_use]
+    pub const fn database(&self) -> &Database {
+        &self.database
+    }
+
+    /// Returns the exact package bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.database.package.as_bytes()
+    }
+
+    /// Starts a source-bound unified database-front-end transaction.
+    ///
+    /// Connection targets, query commands, component links, and producer
+    /// extensions remain inert data and are never opened or executed.
+    #[must_use]
+    pub fn edit(&self) -> crate::Edit<'_> {
+        crate::Edit::new(self, crate::EditPolicy::default())
+    }
+
+    /// Starts a unified transaction with explicit protected-package policy.
+    #[must_use]
+    pub fn edit_with_policy(&self, policy: crate::EditPolicy) -> crate::Edit<'_> {
+        crate::Edit::new(self, policy)
+    }
+
+    /// Replays a committed patch onto this exact source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not the patch's source.
+    pub fn apply(&self, patch: &crate::Patch) -> Result<crate::Commit, litchi_odf_common::Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(litchi_odf_common::Error::patch_conflict(
+                "odb.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(crate::Commit::replayed(patch.apply(self)?, patch.clone()))
+    }
+
+    /// Atomically saves the package (sibling temporary file, then rename,
+    /// with file and directory synchronization).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staging file cannot be written or renamed;
+    /// the destination is then unchanged.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), litchi_odf_common::Error> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically saves the package with an explicit durability level.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<(), litchi_odf_common::Error> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Returns a copy of the package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the copy cannot be allocated.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, litchi_odf_common::Error> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Writes the package bytes to `sink`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sink fails.
+    pub fn write_to(&self, mut sink: impl std::io::Write) -> Result<(), litchi_odf_common::Error> {
+        sink.write_all(self.as_bytes())
+            .map_err(litchi_odf_common::Error::from)?;
+        Ok(())
+    }
+}
+
+fn copy_input(bytes: &[u8]) -> CoreResult<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODB package bytes",
+            source,
+        })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
+}
+
+/// The read-only semantic projection of a database [`Package`].
+///
+/// Cheap to clone; it carries no state verbs.
+#[derive(Clone)]
+pub struct Database {
+    pub(crate) package: crate::package::Snapshot,
+    pub(crate) settings: Arc<OnceLock<crate::DatabaseSettings>>,
+}
+
+impl std::fmt::Debug for Database {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Database").finish_non_exhaustive()
+    }
+}
+
+impl Database {
     /// Returns the `content.xml` document.
     #[must_use]
     pub fn content_xml(&self) -> &str {
@@ -92,8 +376,8 @@ impl Database {
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be enumerated.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        Ok(self.package.files()?)
     }
 
     /// Reads a bounded, source-bound inert schema and query catalog.
@@ -105,7 +389,7 @@ impl Database {
     ///
     /// Returns an error when the content part is structurally invalid or
     /// exceeds the default semantic discovery limits.
-    pub fn catalog(&self) -> Result<crate::Catalog<'_>> {
+    pub fn catalog(&self) -> FamilyResult<crate::Catalog<'_>> {
         self.catalog_with(crate::Limits::default())
     }
 
@@ -116,13 +400,17 @@ impl Database {
     /// Returns an error when the content part is structurally invalid or
     /// exceeds the mandatory catalog limits. Optional settings limits are
     /// checked when [`crate::Catalog::settings`] is first requested.
-    pub fn catalog_with(&self, limits: crate::Limits) -> Result<crate::Catalog<'_>> {
+    pub fn catalog_with(&self, limits: crate::Limits) -> FamilyResult<crate::Catalog<'_>> {
         let settings_cache = if limits == crate::Limits::default() {
             self.settings.clone()
         } else {
             Arc::new(OnceLock::new())
         };
-        crate::Catalog::parse_with_settings(self.content_xml(), limits, settings_cache)
+        Ok(crate::Catalog::parse_with_settings(
+            self.content_xml(),
+            limits,
+            settings_cache,
+        )?)
     }
 
     /// Reads bounded inert login, driver, application, and table-filter
@@ -139,14 +427,16 @@ impl Database {
     ///
     /// Returns a typed error when the optional settings XML is malformed or
     /// exceeds its finite limits.
-    pub fn settings(&self) -> Result<&crate::DatabaseSettings> {
+    pub fn settings(&self) -> FamilyResult<&crate::DatabaseSettings> {
         if let Some(settings) = self.settings.get() {
             return Ok(settings);
         }
         let settings = self.catalog()?.settings()?.clone();
         let _ = self.settings.set(settings);
         self.settings.get().ok_or_else(|| {
-            Error::InvalidFormat("ODB settings projection was not materialized".into())
+            litchi_odf_common::Error::from(CoreError::InvalidFormat(
+                "ODB settings projection was not materialized".into(),
+            ))
         })
     }
 
@@ -157,8 +447,8 @@ impl Database {
     ///
     /// Returns an error when the content XML is malformed or an extension
     /// range cannot be represented safely.
-    pub fn producer_extensions(&self) -> Result<Vec<crate::ProducerExtension>> {
-        crate::authoring::producer_extensions(self.content_xml())
+    pub fn producer_extensions(&self) -> FamilyResult<Vec<crate::ProducerExtension>> {
+        Ok(crate::authoring::producer_extensions(self.content_xml())?)
     }
 
     /// Inventories macros, scripts, event listeners, form controls, actions,
@@ -168,8 +458,8 @@ impl Database {
     ///
     /// Returns an error when a candidate XML member is malformed or the
     /// bounded scan limits are exceeded.
-    pub fn active_content(&self) -> Result<crate::ActiveContentInventory> {
-        self.package.active_content()
+    pub fn active_content(&self) -> FamilyResult<crate::ActiveContentInventory> {
+        Ok(self.package.active_content()?)
     }
 
     /// Inventories active-content dependencies inside one local form/report
@@ -183,19 +473,21 @@ impl Database {
         &self,
         kind: crate::ComponentKind,
         name: &str,
-    ) -> Result<crate::ActiveContentInventory> {
+    ) -> FamilyResult<crate::ActiveContentInventory> {
         let catalog = self.catalog()?;
         let mut matches = catalog
             .components()
             .iter()
             .filter(|component| component.kind() == kind && component.name() == Some(name));
         let component = matches.next().ok_or_else(|| {
-            Error::InvalidFormat("ODB active-content component does not exist".to_string())
+            litchi_odf_common::Error::from(CoreError::InvalidFormat(
+                "ODB active-content component does not exist".to_string(),
+            ))
         })?;
         if matches.next().is_some() {
-            return Err(Error::InvalidFormat(
+            return Err(litchi_odf_common::Error::from(CoreError::InvalidFormat(
                 "ODB active-content component selector is ambiguous".to_string(),
-            ));
+            )));
         }
         if component.link_kind() != crate::ComponentLinkKind::LocalPackage {
             return Ok(crate::ActiveContentInventory::new(Vec::new()));
@@ -227,19 +519,21 @@ impl Database {
         &self,
         kind: crate::ComponentKind,
         name: &str,
-    ) -> Result<crate::ComponentDependencyInventory> {
+    ) -> FamilyResult<crate::ComponentDependencyInventory> {
         let catalog = self.catalog()?;
         let mut matches = catalog
             .components()
             .iter()
             .filter(|component| component.kind() == kind && component.name() == Some(name));
         let component = matches.next().ok_or_else(|| {
-            Error::InvalidFormat("ODB component dependency selector does not exist".to_string())
+            litchi_odf_common::Error::from(CoreError::InvalidFormat(
+                "ODB component dependency selector does not exist".to_string(),
+            ))
         })?;
         if matches.next().is_some() {
-            return Err(Error::InvalidFormat(
+            return Err(litchi_odf_common::Error::from(CoreError::InvalidFormat(
                 "ODB component dependency selector is ambiguous".to_string(),
-            ));
+            )));
         }
         if component.link_kind() != crate::ComponentLinkKind::LocalPackage {
             return Ok(crate::ComponentDependencyInventory::new(
@@ -253,12 +547,12 @@ impl Database {
         let active_content_count = crate::package::Snapshot::payload_active_content_count(&files)?;
         let transfer_support = crate::package::Snapshot::payload_transfer_support(&files);
         let capacity = files.len().checked_add(directories.len()).ok_or_else(|| {
-            Error::InvalidFormat("ODB component dependency count overflow".to_string())
+            CoreError::InvalidFormat("ODB component dependency count overflow".to_string())
         })?;
         let mut entries = Vec::new();
         entries
             .try_reserve(capacity)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODB component dependency inventory",
                 source,
             })?;
@@ -292,8 +586,8 @@ impl Database {
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be inspected.
-    pub fn protection_status(&self) -> Result<crate::ProtectionStatus> {
-        self.package.protection_status()
+    pub fn protection_status(&self) -> FamilyResult<crate::ProtectionStatus> {
+        Ok(self.package.protection_status()?)
     }
 
     /// Returns the stable protected-publication capability contract.
@@ -330,17 +624,21 @@ impl Database {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for re-signing and re-encryption. No
-    /// package bytes are changed and no credential is requested.
+    /// Returns [`litchi_odf_common::Error::Refused`] for re-signing and
+    /// re-encryption. Package bytes and credentials remain untouched.
     pub fn require_protection_operation(
         &self,
         operation: crate::ProtectionOperation,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         match self.protection_decision(operation) {
             crate::ProtectionDecision::Supported => Ok(()),
-            crate::ProtectionDecision::Refused(reason) => Err(Error::Unsupported(format!(
-                "ODB protected-package operation is refused: {reason:?}"
-            ))),
+            crate::ProtectionDecision::Refused(_reason) => Err(litchi_odf_common::Error::from(
+                CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "odb.facade",
+                    "ODB protected-package operation is refused",
+                )),
+            )),
         }
     }
 
@@ -350,8 +648,8 @@ impl Database {
     /// # Errors
     ///
     /// Returns an error if signature XML cannot be decoded safely.
-    pub fn digital_signatures(&self) -> Result<crate::DigitalSignatures> {
-        self.package.digital_signatures()
+    pub fn digital_signatures(&self) -> FamilyResult<crate::DigitalSignatures> {
+        Ok(self.package.digital_signatures()?)
     }
 
     /// Verifies package/document signature math without making a certificate
@@ -361,29 +659,8 @@ impl Database {
     ///
     /// Returns an error if signature metadata or referenced bytes cannot be
     /// decoded or verified.
-    pub fn verify_document_signatures(&self) -> Result<Vec<crate::SignatureVerification>> {
-        self.package.verify_document_signatures()
-    }
-
-    /// Starts a source-bound unified database-front-end transaction.
-    ///
-    /// Connection targets, query commands, component links, and producer
-    /// extensions remain inert data and are never opened or executed.
-    #[must_use]
-    pub fn edit(&self) -> crate::Edit<'_> {
-        crate::Edit::new(self, crate::EditPolicy::default())
-    }
-
-    /// Starts a unified transaction with explicit protected-package policy.
-    #[must_use]
-    pub fn edit_with_policy(&self, policy: crate::EditPolicy) -> crate::Edit<'_> {
-        crate::Edit::new(self, policy)
-    }
-
-    /// Consumes the snapshot and returns the raw package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
+    pub fn verify_document_signatures(&self) -> FamilyResult<Vec<crate::SignatureVerification>> {
+        Ok(self.package.verify_document_signatures()?)
     }
 }
 
@@ -393,13 +670,13 @@ impl Database {
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 mod tests {
-    use super::{Builder, Database};
+    use super::Builder;
     use crate::model::{parse_count, parse_test_lock, reset_parse_count};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = Builder::new().build().unwrap();
-        let document = Database::from_bytes(bytes).unwrap();
+        let package = Builder::new().build().unwrap();
+        let document = package.database();
         assert!(document.content_xml().contains("<office:database"));
         assert!(!document.as_bytes().is_empty());
         assert!(document.catalog().unwrap().tables().is_empty());
@@ -409,7 +686,8 @@ mod tests {
     fn settings_reads_materialize_lazily_and_reuse_success() {
         let _lock = parse_test_lock().lock().unwrap();
         reset_parse_count();
-        let document = Database::from_bytes(Builder::new().build().unwrap()).unwrap();
+        let package = Builder::new().build().unwrap();
+        let document = package.database();
         assert_eq!(parse_count(), 0);
         let catalog = document.catalog().unwrap();
         assert!(catalog.tables().is_empty());
@@ -426,15 +704,13 @@ mod tests {
     fn custom_catalog_limits_do_not_reuse_default_settings_cache() {
         let _lock = parse_test_lock().lock().unwrap();
         reset_parse_count();
-        let document = Database::from_bytes(
-            Builder::new()
+        let package = Builder::new()
                 .content_xml(
                     r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:database><db:data-source><db:connection-data><db:connection-resource xlink:href="" xlink:type="simple"/><db:login db:user-name="alice"/></db:connection-data></db:data-source></office:database></office:body></office:document-content>"#,
                 )
                 .build()
-                .unwrap(),
-        )
-        .unwrap();
+                .unwrap();
+        let document = package.database();
         document.settings().unwrap();
         assert_eq!(parse_count(), 1);
 

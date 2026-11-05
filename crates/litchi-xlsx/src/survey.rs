@@ -20,7 +20,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod source;
@@ -39,6 +39,22 @@ const MAX_DEPTH: usize = 256;
 const MAX_SURVEYS: usize = 4_096;
 const MAX_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
 const MAX_TOTAL_TEXT_BYTES: usize = 16 * 1024 * 1024;
+
+/// A bounded dimension of the Survey family, configured by its [`Limits`]
+/// budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of one Survey part ([`Limits::max_part_bytes`]).
+    PartBytes,
+    /// Surveys of the workbook ([`Limits::max_surveys`]).
+    Surveys,
+    /// Questions of one Survey ([`Limits::max_questions`]).
+    Questions,
+    /// Bytes of the extension lists of one Survey
+    /// ([`Limits::max_extension_bytes`]).
+    ExtensionBytes,
+}
 
 /// Resource limits used while loading and authoring Survey parts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -597,7 +613,7 @@ impl Question {
     /// Create a question using an owning table-column name.
     ///
     /// The selector is resolved to the table's physical column UID by
-    /// [`Transaction::insert_for_table`] or [`Transaction::edit`]. It cannot be serialized directly
+    /// [`Edit::insert_for_table`] or [`Edit::edit`]. It cannot be serialized directly
     /// until that source-bound resolution has happened.
     pub fn for_column(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
@@ -610,10 +626,6 @@ impl Question {
         Ok(question)
     }
 
-    /// Alias for [`Self::for_column`] for constructor-style call sites.
-    pub fn new_for_column(name: impl Into<String>) -> Result<Self> {
-        Self::for_column(name)
-    }
     /// Change the bound table-column UID.
     pub fn set_binding(&mut self, value: Binding) {
         self.binding = value;
@@ -1569,14 +1581,13 @@ impl Parser {
 ///
 /// Returns an error when the XML is malformed, outside the Survey namespace,
 /// exceeds a parser limit, or violates the Survey schema constraints.
-pub fn parse(xml: &[u8]) -> Result<Survey> {
-    parse_with_limits(xml, &Limits::default())
-}
-
-/// Parse a standalone Survey part with an explicit resource policy.
-pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<Survey> {
     if xml.len() > limits.max_part_bytes() {
-        return Err(invalid("survey XML exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            xml.len(),
+            limits.max_part_bytes(),
+        ));
     }
     crate::source_attributes::validate_xml_characters(xml)?;
     let mut reader = NsReader::from_reader(xml);
@@ -1618,7 +1629,11 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
                         .as_ref()
                         .is_some_and(|survey| survey.questions.len() > limits.max_questions())
                     {
-                        return Err(invalid("survey has too many questions"));
+                        return Err(Error::limit(
+                            LimitKind::Questions,
+                            limits.max_questions().saturating_add(1),
+                            limits.max_questions(),
+                        ));
                     }
                 }
             },
@@ -1676,7 +1691,11 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
     validate_survey_with_limits(&survey, limits)?;
     let extension_bytes = survey_extension_bytes(&survey);
     if extension_bytes > limits.max_extension_bytes() {
-        return Err(invalid("survey extension list exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::ExtensionBytes,
+            extension_bytes,
+            limits.max_extension_bytes(),
+        ));
     }
     Ok(survey)
 }
@@ -1800,7 +1819,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
 }
 
 /// Load every table-owned Survey part with an explicit resource policy.
-pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
+pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
     let mut values = Vec::new();
     let mut ids = HashSet::new();
     let survey_parts = package
@@ -1808,7 +1827,11 @@ pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Par
         .filter(|part| part.content_type() == CONTENT_TYPE)
         .collect::<Vec<_>>();
     if survey_parts.len() > limits.max_surveys() {
-        return Err(invalid("survey count exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::Surveys,
+            survey_parts.len(),
+            limits.max_surveys(),
+        ));
     }
     for part in survey_parts {
         // The survey payload is read, so it is decoded here (ADR 0030).
@@ -1855,13 +1878,15 @@ pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Par
             .pop()
             .ok_or_else(|| invalid("survey owner relationship is absent"))?;
         let table_part = package.get_part(&table_part_name)?;
-        let survey = parse_with_limits(part.blob(), limits)?;
+        let survey = parse(part.blob(), limits)?;
         validate_table_bindings(table_part, &survey)?;
         if !ids.insert(survey.id()) {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
-        let table_relationships_source = package.source_relationships(&table_part_name)?;
-        let survey_relationships_source = package.source_relationships(part.partname())?;
+        let table_relationships_source =
+            package.source_relationships(&table_part_name, package.read_limits())?;
+        let survey_relationships_source =
+            package.source_relationships(part.partname(), package.read_limits())?;
         values.push(Part {
             survey: Arc::new(survey),
             table_part_name,
@@ -2302,19 +2327,14 @@ fn validate_row_source(value: &str) -> Result<()> {
     validate_text(Some(value), "rowSource")
 }
 
-/// Serialize one Survey part using the protocol namespace and retained
-/// extension XML.
-pub fn write(survey: &Survey) -> Result<Vec<u8>> {
-    write_with_limits(survey, &Limits::default())
-}
-
-/// Validate one Survey's typed semantic state without serializing it.
-pub fn validate(survey: &Survey) -> Result<()> {
-    validate_survey(survey)
-}
-
-/// Validate one Survey with an explicit resource policy.
-pub fn validate_with_limits(survey: &Survey, limits: &Limits) -> Result<()> {
+/// Validate one Survey's typed semantic state under `limits` without
+/// serializing it.
+///
+/// # Errors
+///
+/// Returns an error when the Survey violates its schema constraints or
+/// exceeds `limits`.
+pub fn validate(survey: &Survey, limits: &Limits) -> Result<()> {
     validate_survey_with_limits(survey, limits)
 }
 
@@ -2362,8 +2382,14 @@ fn has_namespace_declaration(attributes: &[RawAttribute], prefix: &str) -> bool 
         .any(|attribute| attribute.name.as_ref() == expected)
 }
 
-/// Serialize one Survey part with an explicit resource policy.
-pub fn write_with_limits(survey: &Survey, limits: &Limits) -> Result<Vec<u8>> {
+/// Serialize one Survey part under `limits`, using the protocol namespace
+/// and retained extension XML.
+///
+/// # Errors
+///
+/// Returns an error when the Survey is invalid or its output exceeds
+/// `limits`.
+pub fn write(survey: &Survey, limits: &Limits) -> Result<Vec<u8>> {
     validate_survey_with_limits(survey, limits)?;
     ensure_resolved_questions(survey)?;
     let output_bound = serialized_size_bound(survey)?;
@@ -2770,7 +2796,11 @@ fn validate_survey_with_limits(survey: &Survey, limits: &Limits) -> Result<()> {
         return Err(invalid("survey requires at least one question"));
     }
     if survey.questions.values.len() > limits.max_questions() {
-        return Err(invalid("survey has too many questions"));
+        return Err(Error::limit(
+            LimitKind::Questions,
+            survey.questions.values.len(),
+            limits.max_questions(),
+        ));
     }
     if !valid_guid(survey.guid.as_str()) {
         return Err(invalid("invalid survey GUID"));
@@ -2808,7 +2838,11 @@ fn validate_survey_with_limits(survey: &Survey, limits: &Limits) -> Result<()> {
     }
     validate_total_text_bytes(survey, limits)?;
     if survey_extension_bytes(survey) > limits.max_extension_bytes() {
-        return Err(invalid("survey extension list exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::ExtensionBytes,
+            survey_extension_bytes(survey),
+            limits.max_extension_bytes(),
+        ));
     }
     Ok(())
 }
@@ -2969,7 +3003,11 @@ fn validate_properties(properties: Option<&ElementProperties>) -> Result<()> {
 fn validate_extension(extension: Option<&[u8]>, limits: &Limits) -> Result<()> {
     if let Some(extension) = extension {
         if extension.len() > limits.max_extension_bytes() {
-            return Err(invalid("survey extension list exceeds the size limit"));
+            return Err(Error::limit(
+                LimitKind::ExtensionBytes,
+                extension.len(),
+                limits.max_extension_bytes(),
+            ));
         }
         std::str::from_utf8(extension)
             .map_err(|_| invalid("survey extension list is not UTF-8"))?;
@@ -3259,33 +3297,22 @@ impl Snapshot {
     }
 
     /// Load the Survey catalog with an explicit resource policy.
-    pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
+    pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
         let entries = Arc::from(load_with_limits(package, limits)?.into_boxed_slice());
         let incoming_relationships =
             Arc::from(incoming_relationships(package, &entries)?.into_boxed_slice());
         Ok(Self {
             entries,
-            source_content_types: package.source_content_types()?,
+            source_content_types: package.source_content_types(package.read_limits())?,
             incoming_relationships,
             limits: *limits,
         })
-    }
-
-    /// Alias emphasizing that this result is source-bound.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
     }
 
     /// Survey entries in deterministic UID order.
     #[must_use]
     pub fn entries(&self) -> &[Part] {
         &self.entries
-    }
-
-    /// Contextual alias for [`Self::entries`].
-    #[must_use]
-    pub fn surveys(&self) -> &[Part] {
-        self.entries()
     }
 
     /// Resource policy retained by this snapshot.
@@ -3336,41 +3363,127 @@ impl Snapshot {
     }
 }
 
-/// A clone-staged transaction over table-owned Survey parts.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
-    before: Snapshot,
-    draft: Vec<Part>,
+crate::record::record_family!("Survey");
+
+/// The configuration of a Survey edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound the edit by `limits` instead of the package's semantic Survey
+    /// limits ([`crate::SemanticLimits::survey`]).
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+}
+
+/// A staged, source-bound edit of the table-owned Survey parts of one
+/// [`crate::Package`].
+///
+/// Starting one retains the immutable source and finite policy only. The
+/// catalog and its clone-staged draft are read on the first operation that
+/// needs them. Dropping the edit discards it; [`Self::commit`] publishes a new
+/// package.
+pub struct Edit {
+    target: crate::record::Source,
+    before: Option<Snapshot>,
+    draft: Option<Vec<Part>>,
     limits: Limits,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction using the default Survey limits.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        Self::with_limits(target, &Limits::default())
+impl crate::Package {
+    /// Start a Survey edit under the package's semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the catalog's read errors.
+    pub fn edit_surveys(&self) -> Result<Edit> {
+        self.edit_surveys_with_options(EditOptions::default())
     }
 
-    /// Start a transaction using an explicit Survey resource policy.
-    pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
-        let before = Snapshot::load_with_limits(target, limits)?;
+    /// Start a Survey edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::edit_surveys`].
+    pub fn edit_surveys_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let limits = options
+            .limits
+            .unwrap_or_else(|| self.semantic_limits().survey_value());
+        Edit::start(crate::record::Source::new(self, "edit_surveys")?, &limits)
+    }
+
+    /// Apply an exact Survey patch to a new package; this one is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_surveys(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_surveys")
+    }
+}
+
+impl Edit {
+    fn start(target: crate::record::Source, limits: &Limits) -> Result<Self> {
         Ok(Self {
             target,
-            draft: before.entries.to_vec(),
-            before,
+            before: None,
+            draft: None,
             limits: *limits,
         })
     }
 
+    /// Materialize and clone the Survey catalog only when the edit first
+    /// needs a semantic value. Failed reads leave no partial draft and can be
+    /// retried without retaining the source graph.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load_with_limits(&self.target, &self.limits)?;
+        let draft = before.entries.to_vec();
+        self.draft = Some(draft);
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))
+    }
+
+    fn draft(&self) -> Result<&[Part]> {
+        self.draft
+            .as_deref()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))
+    }
+
+    fn draft_mut(&mut self) -> Result<&mut Vec<Part>> {
+        self.draft
+            .as_mut()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))
+    }
+
     /// Immutable source captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    #[must_use = "use the source snapshot or handle the error"]
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Currently staged Survey entries.
-    #[must_use]
-    pub fn entries(&self) -> &[Part] {
-        &self.draft
+    #[must_use = "use the staged survey entries or handle the error"]
+    pub fn entries(&mut self) -> Result<&[Part]> {
+        self.ensure_prepared()?;
+        self.draft()
     }
 
     /// Edit one existing Survey in a clone-staged callback.
@@ -3379,8 +3492,9 @@ impl<'a> Transaction<'a> {
         index: usize,
         edit: impl FnOnce(&mut Survey) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
-            .draft
+            .draft()?
             .get(index)
             .cloned()
             .ok_or_else(|| invalid(format!("survey index {index} is absent")))?;
@@ -3404,7 +3518,13 @@ impl<'a> Transaction<'a> {
             }
         }
         validate_survey_with_limits(&draft.survey, &self.limits)?;
-        if draft.survey == self.draft[index].survey {
+        if draft.survey
+            == self
+                .draft()?
+                .get(index)
+                .ok_or_else(|| invalid("survey index is absent"))?
+                .survey
+        {
             return Ok(false);
         }
         // Existing entries were validated at ingress or their last successful
@@ -3412,7 +3532,7 @@ impl<'a> Transaction<'a> {
         // remain immutable. Validate its bindings and catalog-wide uniqueness
         // before replacing one slot, so failures retain the exact staged state.
         if self
-            .draft
+            .draft()?
             .iter()
             .enumerate()
             .any(|(other, entry)| other != index && entry.survey.id() == draft.survey.id())
@@ -3420,7 +3540,7 @@ impl<'a> Transaction<'a> {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
         self.validate_entry_bindings(index, &draft)?;
-        self.draft[index] = draft;
+        self.draft_mut()?[index] = draft;
         Ok(true)
     }
 
@@ -3435,6 +3555,7 @@ impl<'a> Transaction<'a> {
 
     /// Attach a new Survey to an existing table part.
     pub fn insert(&mut self, table_part_name: PackURI, survey: Survey) -> Result<usize> {
+        self.ensure_prepared()?;
         validate_survey_with_limits(&survey, &self.limits)?;
         let table = self.target.get_part(&table_part_name)?;
         if table.content_type() != ct::SML_TABLE {
@@ -3445,16 +3566,16 @@ impl<'a> Transaction<'a> {
         }
         validate_table_bindings(table, &survey)?;
         if self
-            .draft
+            .draft()?
             .iter()
             .any(|entry| entry.survey.id() == survey.id())
         {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
-        let relationship_id = allocate_relationship_id(table, &self.draft, &table_part_name);
-        let part_name = allocate_part_name(self.target, &self.draft)?;
+        let relationship_id = allocate_relationship_id(table, self.draft()?, &table_part_name);
+        let part_name = allocate_part_name(&self.target, self.draft()?)?;
         let relationship_target = part_name.relative_ref(table_part_name.base_uri());
-        self.draft.push(Part {
+        self.draft_mut()?.push(Part {
             survey: Arc::new(survey),
             table_part_name,
             relationship_id,
@@ -3469,10 +3590,10 @@ impl<'a> Transaction<'a> {
             survey_relationships_source: None,
         });
         if let Err(error) = self.validate_draft() {
-            self.draft.pop();
+            self.draft_mut()?.pop();
             return Err(error);
         }
-        Ok(self.draft.len() - 1)
+        Ok(self.draft()?.len() - 1)
     }
 
     /// Attach a new Survey by semantic table name.
@@ -3482,7 +3603,8 @@ impl<'a> Transaction<'a> {
     /// authored. This keeps ordinary authoring independent of physical table
     /// part URIs and numeric column UIDs.
     pub fn insert_for_table(&mut self, table_name: &str, mut survey: Survey) -> Result<usize> {
-        let table_part_name = find_table_part(self.target, table_name)?;
+        self.ensure_prepared()?;
+        let table_part_name = find_table_part(&self.target, table_name)?;
         let table = crate::table::parse_table_xml(self.target.get_part(&table_part_name)?.blob())?
             .ok_or_else(|| invalid("Survey owner table is not a supported table part"))?;
         for question in survey.questions_mut().values_mut() {
@@ -3493,67 +3615,105 @@ impl<'a> Transaction<'a> {
 
     /// Remove one staged Survey and return its physical entry.
     pub fn remove(&mut self, index: usize) -> Result<Option<Part>> {
-        if index >= self.draft.len() {
+        self.ensure_prepared()?;
+        if index >= self.draft()?.len() {
             return Ok(None);
         }
-        let removed = self.draft.remove(index);
+        let removed = self.draft_mut()?.remove(index);
         if let Err(error) = self.validate_draft() {
-            self.draft.insert(index, removed);
+            self.draft_mut()?.insert(index, removed);
             return Err(error);
         }
         Ok(Some(removed))
     }
 
-    /// Whether staged Survey semantics or ownership identities differ.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.before.same_semantics(&self.draft)
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let draft = self.snapshot()?.entries.to_vec();
+        self.draft = Some(draft);
+        Ok(())
     }
 
-    /// Validate and atomically publish the staged Survey catalog.
+    /// Validate the staged Survey catalog and publish it as a new package.
+    /// An unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
+    /// the publication's validation errors.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published catalog.
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))?;
+        let draft = self
+            .draft
+            .take()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))?;
+        if before.same_semantics(&draft) {
+            let patch = Patch::new(before.clone(), before.clone());
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                before,
+            ));
         }
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load_with_limits(self.target, &self.limits)?;
-        if !current.same_source(&self.before) {
+        let current = Snapshot::load_with_limits(&self.target, &self.limits)?;
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "Survey catalog".into(),
             });
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         let content_types = transition_content_types(
-            &self.before.source_content_types,
-            self.before.entries(),
-            &self.draft,
+            &before.source_content_types,
+            before.entries(),
+            &draft,
+            self.target.read_limits().max_content_types_bytes(),
         )?;
         apply_entries(
             &mut candidate,
-            self.before.entries(),
-            &self.draft,
+            before.entries(),
+            &draft,
             &self.limits,
             &content_types,
         )?;
         let snapshot = Snapshot::load_with_limits(&candidate, &self.limits)?;
-        if !snapshot.same_semantics(&self.draft) {
+        if !snapshot.same_semantics(&draft) {
             return Err(invalid("Survey publication changed the staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
-        Ok(Commit::new(snapshot, patch, true))
+        let patch = Patch::new(before, snapshot.clone());
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 
     fn validate_draft(&self) -> Result<()> {
-        self.validate_draft_entries(&self.draft)
+        self.validate_draft_entries(
+            self.draft
+                .as_deref()
+                .ok_or_else(|| invalid("Survey edit is not prepared"))?,
+        )
     }
 
     fn validate_draft_entries(&self, entries: &[Part]) -> Result<()> {
         if entries.len() > self.limits.max_surveys() {
-            return Err(invalid("survey count exceeds the size limit"));
+            return Err(Error::limit(
+                LimitKind::Surveys,
+                entries.len(),
+                self.limits.max_surveys(),
+            ));
         }
         let mut ids = HashSet::new();
         for (index, entry) in entries.iter().enumerate() {
@@ -3576,6 +3736,19 @@ impl<'a> Transaction<'a> {
         }
         validate_table_bindings(table, &entry.survey)
             .map_err(|error| invalid(format!("survey {index} has invalid table binding: {error}")))
+    }
+}
+
+#[cfg(test)]
+mod lazy_entry_tests {
+    #[test]
+    fn edit_entry_defers_survey_catalog() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package.edit_surveys().expect("Survey edit");
+        assert!(edit.before.is_none());
+        assert!(edit.draft.is_none());
+        assert!(edit.entries().expect("first Survey read").is_empty());
+        assert!(edit.before.is_some());
     }
 }
 
@@ -3605,7 +3778,7 @@ impl Patch {
 
     /// Whether this patch preserves the exact source graph and bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -3619,14 +3792,14 @@ impl Patch {
     }
 
     /// Apply this patch atomically after validating its source closure.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load_with_limits(target, &self.before.limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Survey catalog".into(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() || target.requires_signature_edit_policy() {
@@ -3650,45 +3823,66 @@ impl Patch {
     }
 }
 
-/// Successful Survey transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
+    }
+
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
+    }
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
+/// A raw-graph route over [`Edit`] for the unit tests that author bare
+/// graphs.
+#[cfg(test)]
+pub(crate) struct Transaction<'a> {
+    target: crate::record::TestTarget<'a>,
+    edit: Edit,
+}
+
+#[cfg(test)]
+impl<'a> Transaction<'a> {
+    pub(crate) fn new(target: impl Into<crate::record::TestTarget<'a>>) -> Result<Self> {
+        Self::with_limits(target, &Limits::default())
+    }
+
+    pub(crate) fn with_limits(
+        target: impl Into<crate::record::TestTarget<'a>>,
+        limits: &Limits,
+    ) -> Result<Self> {
+        let target = target.into();
+        let package = target.package()?;
+        let edit = package.edit_surveys_with_options(EditOptions::default().limits(*limits))?;
+        Ok(Self { target, edit })
+    }
+
+    pub(crate) fn commit(self) -> Result<crate::record::RawCommit<Snapshot, Patch>> {
+        let (commit, snapshot) = self.edit.publish()?;
+        let changed = commit.diagnostics().changed();
+        let (package, patch) = commit.into_parts();
+        self.target.store(package);
+        Ok(crate::record::RawCommit {
             snapshot,
             patch,
             changed,
-        }
+        })
     }
+}
 
-    /// Whether Survey semantics or package ownership changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
+#[cfg(test)]
+impl std::ops::Deref for Transaction<'_> {
+    type Target = Edit;
+
+    fn deref(&self) -> &Edit {
+        &self.edit
     }
+}
 
-    /// Resulting source-bound catalog.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch produced by the transaction.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+#[cfg(test)]
+impl std::ops::DerefMut for Transaction<'_> {
+    fn deref_mut(&mut self) -> &mut Edit {
+        &mut self.edit
     }
 }
 
@@ -3813,8 +4007,12 @@ fn apply_entries(
         }
         add_entry(package, entry, limits)?;
     }
-    let current_content_types = package.source_content_types()?;
-    package.try_replace_content_types(current_content_types.bytes(), content_types)?;
+    let current_content_types = package.source_content_types(package.read_limits())?;
+    package.try_replace_content_types(
+        current_content_types.bytes(),
+        content_types,
+        package.read_limits(),
+    )?;
     Ok(())
 }
 
@@ -3822,6 +4020,7 @@ fn transition_content_types(
     before: &OwnedContentTypes,
     before_entries: &[Part],
     after_entries: &[Part],
+    maximum: usize,
 ) -> Result<OwnedContentTypes> {
     let mut removed = Vec::new();
     for entry in before_entries {
@@ -3841,7 +4040,6 @@ fn transition_content_types(
             additions.push((&entry.part_name, CONTENT_TYPE));
         }
     }
-    let maximum = litchi_opc::ReadLimits::default().max_content_types_bytes();
     let mut result = before.without_parts(&removed, maximum)?;
     if !additions.is_empty() {
         result = result.with_part_overrides(&additions, maximum)?;
@@ -3871,7 +4069,7 @@ fn replace_entry(
     if let Some(updated) = source::rewrite(proof, &previous.survey, &entry.survey, limits)? {
         package.try_replace_owned_xml_part(previous.source_xml.as_slice(), updated)?;
     } else {
-        let xml = write_with_limits(&entry.survey, limits)?;
+        let xml = write(&entry.survey, limits)?;
         package.get_part_mut(&entry.part_name)?.set_blob(xml);
     }
     Ok(())
@@ -3897,11 +4095,12 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     // Capture the complete owner member before adding the new edge. The
     // relationship token keeps comments, PIs, prefixes, attribute order and
     // explicit empty-member presence when the edge is spliced in.
-    let table_relationships = package.source_relationships(&entry.table_part_name)?;
+    let table_relationships =
+        package.source_relationships(&entry.table_part_name, package.read_limits())?;
     if let Some(proof) = &entry.source_proof {
         package.try_add_owned_xml_part(proof.as_ref().clone())?;
     } else {
-        let xml = write_with_limits(&entry.survey, limits)?;
+        let xml = write(&entry.survey, limits)?;
         package.try_add_part(Box::new(BlobPart::new(
             entry.part_name.clone(),
             CONTENT_TYPE.into(),
@@ -3915,10 +4114,14 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         TargetMode::Internal,
         usize::MAX,
     )?;
-    package.try_replace_relationships(&table_relationships, &table_replacement)?;
+    package.try_replace_relationships(
+        &table_relationships,
+        &table_replacement,
+        package.read_limits(),
+    )?;
     if let Some(source) = entry.survey_relationships_source.as_ref() {
-        let current = package.source_relationships(&entry.part_name)?;
-        package.try_replace_relationships(&current, source)?;
+        let current = package.source_relationships(&entry.part_name, package.read_limits())?;
+        package.try_replace_relationships(&current, source, package.read_limits())?;
     }
     Ok(())
 }
@@ -3936,10 +4139,15 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part) -> Result<()> {
     if relationship.target_ref() != entry.relationship_target {
         return Err(invalid("Survey owner relationship lexical target changed"));
     }
-    let table_relationships = package.source_relationships(&entry.table_part_name)?;
+    let table_relationships =
+        package.source_relationships(&entry.table_part_name, package.read_limits())?;
     let table_replacement =
         table_relationships.without_relationship(&entry.relationship_id, usize::MAX)?;
-    package.try_replace_relationships(&table_relationships, &table_replacement)?;
+    package.try_replace_relationships(
+        &table_relationships,
+        &table_replacement,
+        package.read_limits(),
+    )?;
     if part_is_referenced(package, &entry.part_name) {
         return Err(invalid("Survey part has an unexpected relationship owner"));
     }
@@ -3969,8 +4177,8 @@ fn part_is_referenced(package: &OpcPackage, part_name: &PackURI) -> bool {
 
 fn restore_relationship_provenance(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()> {
     let restore = |package: &mut OpcPackage, source: &OwnedRelationships| -> Result<()> {
-        let current = package.source_relationships(source.owner())?;
-        package.try_replace_relationships(&current, source)?;
+        let current = package.source_relationships(source.owner(), package.read_limits())?;
+        package.try_replace_relationships(&current, source, package.read_limits())?;
         Ok(())
     };
     for entry in snapshot.entries.iter() {
@@ -3996,7 +4204,9 @@ mod tests {
     const XML: &[u8] = br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}" title="Survey"><surveyPr cssClass="card" top="-2" width="320" position="relative"/><questions><questionsPr height="20"/><question binding="1" text="Pick one" type="choice" format="standard" required="true" decimalPlaces="15" rowSource="one;&quot;two;three&quot;;"><questionPr left="1"/></question></questions></survey>"#;
 
     fn as_source(package: &OpcPackage) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -4037,7 +4247,11 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     fn schema_xml(body: &str) -> Vec<u8> {
@@ -4053,8 +4267,8 @@ mod tests {
         setup.insert_for_table("T", second).unwrap();
         setup.commit().unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let before = transaction.before().clone();
-        for (source, draft) in before.entries().iter().zip(transaction.entries()) {
+        let before = transaction.before().unwrap().clone();
+        for (source, draft) in before.entries().iter().zip(transaction.entries().unwrap()) {
             assert!(Arc::ptr_eq(&source.survey, &draft.survey));
             assert!(Arc::ptr_eq(&source.survey, &source.clone().survey));
         }
@@ -4071,20 +4285,23 @@ mod tests {
         assert_eq!(before.entries()[0].survey().title(), Some("Survey"));
         assert!(!Arc::ptr_eq(
             &before.entries()[0].survey,
-            &transaction.entries()[0].survey
+            &transaction.entries().unwrap()[0].survey
         ));
         assert!(Arc::ptr_eq(
             &before.entries()[1].survey,
-            &transaction.entries()[1].survey
+            &transaction.entries().unwrap()[1].survey
         ));
         assert_eq!(
-            transaction.entries()[1].survey().questions().values()[0]
+            transaction.entries().unwrap()[1]
+                .survey()
+                .questions()
+                .values()[0]
                 .text()
                 .unwrap()
                 .as_ptr(),
             payload
         );
-        let accepted = transaction.entries()[0].survey.clone();
+        let accepted = transaction.entries().unwrap()[0].survey.clone();
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4093,7 +4310,10 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4102,7 +4322,10 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4111,12 +4334,18 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(!transaction.edit(0, |_| Ok(())).unwrap());
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(Arc::ptr_eq(
             &before.entries()[1].survey,
-            &transaction.entries()[1].survey
+            &transaction.entries().unwrap()[1].survey
         ));
         let patch = transaction.commit().unwrap().patch().clone();
         patch.inverse().apply(&mut package).unwrap();
@@ -4135,7 +4364,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("new".into()));
@@ -4166,7 +4395,8 @@ mod tests {
             &format!("{second}<!--b-->{new}{first_moved}{second_copy}"),
         );
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4190,14 +4420,14 @@ mod tests {
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&name).unwrap().blob(), xml.as_bytes());
     }
 
     #[test]
     fn question_collection_edits_move_allocations_and_cancel_exactly() {
-        let mut survey = parse(XML).unwrap();
+        let mut survey = parse(XML, &Limits::default()).unwrap();
         let original = survey.clone();
         let questions = survey.questions_mut();
         let text = questions.values()[0].text().unwrap().as_ptr();
@@ -4218,7 +4448,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(XML))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4228,7 +4458,6 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(!transaction.is_changed());
         transaction
             .edit(0, |survey| {
                 let question = survey.questions_mut().remove(0).unwrap();
@@ -4238,7 +4467,7 @@ mod tests {
             .unwrap();
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
+        assert!(commit.patch().is_noop());
         assert!(
             Snapshot::load(&package.into_plain_opc())
                 .unwrap()
@@ -4251,8 +4480,8 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(XML))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let foreign = parse(&schema_xml("<questions><question binding=\"1\"><extLst><opaque xmlns=\"urn:other\"/></extLst></question></questions>")).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let foreign = parse(&schema_xml("<questions><question binding=\"1\"><extLst><opaque xmlns=\"urn:other\"/></extLst></question></questions>"), &Limits::default()).unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -4282,7 +4511,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_properties(Some(ElementProperties::new()));
@@ -4316,7 +4545,8 @@ mod tests {
                 ),
             );
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4331,7 +4561,7 @@ mod tests {
         assert!(survey.questions.values[0].properties.is_some());
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&name).unwrap().blob(), xml.as_bytes());
     }
@@ -4346,7 +4576,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("new".into()));
@@ -4378,7 +4608,8 @@ mod tests {
                 &format!("<!--q--><questionPr xmlns=\"{namespace}\"/><s:extLst>"),
             );
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4387,9 +4618,11 @@ mod tests {
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
         assert!(
-            Snapshot::load(&OpcPackage::from_bytes(&bytes).unwrap())
-                .unwrap()
-                .same_source(&before)
+            Snapshot::load(
+                &OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap()
+            )
+            .unwrap()
+            .same_source(&before)
         );
     }
 
@@ -4401,7 +4634,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title_properties(survey.properties.clone());
@@ -4443,7 +4676,7 @@ mod tests {
             .set_blob(table.into_bytes());
         let mut package = crate::package::Package::from_opc(as_source(&opc)).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_id(Id::new(8));
@@ -4526,7 +4759,8 @@ mod tests {
             expected = expected.replace(from, to);
         }
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4534,7 +4768,7 @@ mod tests {
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&name).unwrap().blob(), xml.as_bytes());
     }
@@ -4548,29 +4782,30 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.remove(0).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
     #[test]
     fn xstring_output_budget_charges_encoded_growth_before_allocation() {
-        let mut survey = parse(XML).unwrap();
+        let mut survey = parse(XML, &Limits::default()).unwrap();
         survey.set_title(Some("\u{1}".repeat(1024)));
         let bound = serialized_size_bound(&survey).unwrap();
-        let output =
-            write_with_limits(&survey, &Limits::default().with_max_part_bytes(bound)).unwrap();
+        let output = write(&survey, &Limits::default().with_max_part_bytes(bound)).unwrap();
         assert!(output.len() <= bound);
-        assert!(
-            write_with_limits(&survey, &Limits::default().with_max_part_bytes(bound - 1)).is_err()
+        assert!(write(&survey, &Limits::default().with_max_part_bytes(bound - 1)).is_err());
+        assert_eq!(
+            parse(&output, &Limits::default()).unwrap().title(),
+            survey.title()
         );
-        assert_eq!(parse(&output).unwrap().title(), survey.title());
         assert!(xstring(&"a".repeat(MAX_TEXT_BYTES + 1), "title").is_err());
         assert!(xstring(&"a".repeat(MAX_TEXT_BYTES * 7 + 1), "title").is_err());
 
@@ -4605,13 +4840,13 @@ mod tests {
             "😀;\t\n\r",
             "_x0000_",
         ] {
-            let mut survey = parse(XML).unwrap();
+            let mut survey = parse(XML, &Limits::default()).unwrap();
             survey.questions.values[0]
                 .set_row_source(Some(value.into()))
                 .unwrap();
-            let output = write(&survey).unwrap();
+            let output = write(&survey, &Limits::default()).unwrap();
             assert_eq!(
-                parse(&output).unwrap().questions.values[0].row_source(),
+                parse(&output, &Limits::default()).unwrap().questions.values[0].row_source(),
                 Some(value)
             );
         }
@@ -4626,7 +4861,7 @@ mod tests {
             let xml = schema_xml(&format!(
                 r#"<questions><question binding="1" rowSource="{encoded}"/></questions>"#
             ));
-            assert!(parse(&xml).is_err());
+            assert!(parse(&xml, &Limits::default()).is_err());
         }
     }
 
@@ -4637,7 +4872,7 @@ mod tests {
         let xml = format!(
             r#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:q="urn:vendor" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}" title="{encoded}" description="{encoded}" q:title="_x0041_"><surveyPr cssClass="{encoded}"/><questions><question binding="1" text="{encoded}" helpText="{encoded}" defaultValue="{encoded}" rowSource="_x003B__x0022__x005F_x0000_"/></questions></survey>"#
         );
-        let survey = parse(xml.as_bytes()).unwrap();
+        let survey = parse(xml.as_bytes(), &Limits::default()).unwrap();
         for value in [
             survey.title(),
             survey.description(),
@@ -4650,14 +4885,14 @@ mod tests {
         }
         assert_eq!(survey.questions.values[0].row_source(), Some(";\"_x0000_"));
         assert_eq!(survey.unknown_attributes[0].value.as_ref(), "_x0041_");
-        let output = write(&survey).unwrap();
-        assert_eq!(parse(&output).unwrap(), survey);
+        let output = write(&survey, &Limits::default()).unwrap();
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
         assert!(String::from_utf8_lossy(&output).contains(r#"q:title="_x0041_""#));
     }
 
     #[test]
     fn xstring_authoring_preserves_controls_literal_escapes_and_attribute_whitespace() {
-        let mut survey = parse(XML).unwrap();
+        let mut survey = parse(XML, &Limits::default()).unwrap();
         let text = "_x0041_ _x005F_ _xD800_ & < > \" ' \t\n\r\0\u{1}\u{fffe}\u{ffff}😀";
         survey.set_title(Some(text.into()));
         survey.set_description(Some(text.into()));
@@ -4674,9 +4909,9 @@ mod tests {
             value: "_x0041_\t\n\r".into(),
         }]
         .into_boxed_slice();
-        let output = write(&survey).unwrap();
+        let output = write(&survey, &Limits::default()).unwrap();
         assert!(output.len() <= serialized_size_bound(&survey).unwrap());
-        assert_eq!(parse(&output).unwrap(), survey);
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
         assert!(
             !output
                 .iter()
@@ -4691,19 +4926,21 @@ mod tests {
             let xml = schema_xml(&format!(
                 r#"<questions><question binding="1" text="{encoded}"/></questions>"#
             ));
-            assert!(parse(&xml).is_err(), "{encoded}");
+            assert!(parse(&xml, &Limits::default()).is_err(), "{encoded}");
         }
         assert!(
-            parse(&schema_xml(
-                r#"<questions><question binding="_x0031_"/></questions>"#
-            ))
+            parse(
+                &schema_xml(r#"<questions><question binding="_x0031_"/></questions>"#),
+                &Limits::default()
+            )
             .is_err()
         );
-        assert!(parse(&schema_xml(r#"<questions><question binding="1" xmlns:q="urn:vendor" q:text="_xD800_"/></questions>"#)).is_ok());
+        assert!(parse(&schema_xml(r#"<questions><question binding="1" xmlns:q="urn:vendor" q:text="_xD800_"/></questions>"#), &Limits::default()).is_ok());
         assert!(
-            parse(&schema_xml(
-                "<questions><question binding='1' text='\u{fffe}'/></questions>"
-            ))
+            parse(
+                &schema_xml("<questions><question binding='1' text='\u{fffe}'/></questions>"),
+                &Limits::default()
+            )
             .is_err()
         );
     }
@@ -4711,7 +4948,7 @@ mod tests {
     #[test]
     fn xstring_changes_save_reopen_and_restore_the_original_source() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         let title = "literal _x0041_\t\n\r\0😀";
         transaction
             .edit(0, |survey| {
@@ -4723,15 +4960,20 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened =
-            crate::package::Package::from_opc(OpcPackage::from_bytes(&bytes).unwrap()).unwrap();
+        let mut reopened = crate::package::Package::from_opc(
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             reopened.surveys().unwrap().entries()[0].survey().title(),
             Some(title)
         );
-        reopened.apply_surveys_patch(&patch.inverse()).unwrap();
+        reopened = reopened
+            .apply_surveys(&patch.inverse())
+            .unwrap()
+            .into_package();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened.into_plain_opc()).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             restored
                 .get_part(&PackURI::new("/xl/surveys/survey1.xml").unwrap())
@@ -4746,8 +4988,15 @@ mod tests {
         let xml = schema_xml(
             r#"<surveyPr><extLst/></surveyPr><titlePr><extLst/></titlePr><descriptionPr><extLst/></descriptionPr><questions><questionsPr><extLst/></questionsPr><question binding="1"><questionPr><extLst/></questionPr><extLst/></question></questions><extLst/>"#,
         );
-        let survey = parse(&xml).unwrap();
-        assert_eq!(parse(&write(&survey).unwrap()).unwrap(), survey);
+        let survey = parse(&xml, &Limits::default()).unwrap();
+        assert_eq!(
+            parse(
+                &write(&survey, &Limits::default()).unwrap(),
+                &Limits::default()
+            )
+            .unwrap(),
+            survey
+        );
         for namespace in [
             "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
             "http://purl.oclc.org/ooxml/spreadsheetml/main",
@@ -4757,12 +5006,15 @@ mod tests {
             let body = format!(
                 r#"<questions><question binding="1"/></questions><extLst xmlns="{namespace}"/>"#
             );
-            assert!(parse(&schema_xml(&body)).is_err(), "{namespace}");
+            assert!(
+                parse(&schema_xml(&body), &Limits::default()).is_err(),
+                "{namespace}"
+            );
         }
         let aliased = schema_xml(
             r#"<questions><question binding="1"/></questions><s:extLst xmlns:s="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"/>"#,
         );
-        assert!(parse(&aliased).is_ok());
+        assert!(parse(&aliased, &Limits::default()).is_ok());
     }
 
     #[test]
@@ -4777,34 +5029,40 @@ mod tests {
             r#"<questions><question binding="1"/></questions><extLst/><titlePr/>"#,
             r#"<questions><question binding="1"/></questions><extLst/><extLst/>"#,
         ] {
-            assert!(parse(&schema_xml(body)).is_err(), "{body}");
+            assert!(
+                parse(&schema_xml(body), &Limits::default()).is_err(),
+                "{body}"
+            );
         }
     }
 
     #[test]
     fn qualified_attributes_cannot_supply_unqualified_protocol_fields() {
         assert!(
-            parse(&schema_xml(
-                r#"<questions><question xmlns:q="urn:vendor" q:binding="1"/></questions>"#
-            ))
+            parse(
+                &schema_xml(
+                    r#"<questions><question xmlns:q="urn:vendor" q:binding="1"/></questions>"#
+                ),
+                &Limits::default()
+            )
             .is_err()
         );
         let xml = schema_xml(
             r#"<surveyPr xmlns:q="urn:vendor" q:width="invalid"/><questions><question xmlns:q="urn:vendor" q:binding="999" binding="1" q:type="invalid"/></questions>"#,
         );
-        let survey = parse(&xml).unwrap();
+        let survey = parse(&xml, &Limits::default()).unwrap();
         assert_eq!(survey.questions.values[0].binding(), Binding::new(1));
         assert_eq!(survey.questions.values[0].kind, None);
         assert_eq!(survey.properties.as_ref().unwrap().width, None);
-        let output = write(&survey).unwrap();
+        let output = write(&survey, &Limits::default()).unwrap();
         assert!(String::from_utf8_lossy(&output).contains(r#"q:binding="999""#));
-        assert_eq!(parse(&output).unwrap(), survey);
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
         let wrong_id = String::from_utf8(schema_xml(
             r#"<questions><question binding="1"/></questions>"#,
         ))
         .unwrap()
         .replace(r#"id="7""#, r#"xmlns:q="urn:vendor" q:id="7""#);
-        assert!(parse(wrong_id.as_bytes()).is_err());
+        assert!(parse(wrong_id.as_bytes(), &Limits::default()).is_err());
     }
 
     #[test]
@@ -4817,7 +5075,10 @@ mod tests {
             r#"<questions><question binding="1"/></questions><extLst><q:unknown/></extLst>"#,
             r#"<questions><question binding="1"/></questions><extLst><unknown xmlns:a="urn:v" xmlns:b="urn:v" a:flag="1" b:flag="2"/></extLst>"#,
         ] {
-            assert!(parse(&schema_xml(body)).is_err(), "{body}");
+            assert!(
+                parse(&schema_xml(body), &Limits::default()).is_err(),
+                "{body}"
+            );
         }
     }
 
@@ -4828,7 +5089,7 @@ mod tests {
         );
         let mut package = crate::package::Package::from_opc(package_with_survey(&xml)).unwrap();
         let before = package.surveys().unwrap().entries()[0].survey().clone();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("edited".into()));
@@ -4837,14 +5098,19 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.clone().into_plain_opc()).unwrap();
-        let mut reopened =
-            crate::package::Package::from_opc(OpcPackage::from_bytes(&bytes).unwrap()).unwrap();
+        let mut reopened = crate::package::Package::from_opc(
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap();
         let after = reopened.surveys().unwrap().entries()[0].survey().clone();
         assert_eq!(after.questions, before.questions);
         assert_eq!(after.title(), Some("edited"));
-        reopened.apply_surveys_patch(&patch.inverse()).unwrap();
+        reopened = reopened
+            .apply_surveys(&patch.inverse())
+            .unwrap()
+            .into_package();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened.into_plain_opc()).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             restored
                 .get_part(&PackURI::new("/xl/surveys/survey1.xml").unwrap())
@@ -4864,7 +5130,7 @@ mod tests {
                 r#"<questions><question binding="1"/>{question}</questions>"#
             ));
             assert!(
-                matches!(parse_with_limits(&xml, &Limits::default().with_max_questions(1)),
+                matches!(parse(&xml, &Limits::default().with_max_questions(1)),
                 Err(Error::Invalid(message)) if message.contains("too many questions"))
             );
         }
@@ -4878,7 +5144,7 @@ mod tests {
         );
         let xml = schema_xml(&body);
         let limits = Limits::default().with_max_extension_bytes(extension.len() * 2);
-        let survey = parse_with_limits(&xml, &limits).unwrap();
+        let survey = parse(&xml, &limits).unwrap();
         assert_eq!(
             survey
                 .properties
@@ -4894,7 +5160,7 @@ mod tests {
             extension.as_bytes()
         );
         assert!(
-            parse_with_limits(
+            parse(
                 &xml,
                 &limits.with_max_extension_bytes(extension.len() * 2 - 1)
             )
@@ -4903,15 +5169,13 @@ mod tests {
         let empty = schema_xml(
             r#"<surveyPr><extLst/></surveyPr><questions><question binding="1"><extLst/></question></questions>"#,
         );
-        assert!(parse_with_limits(&empty, &Limits::default().with_max_extension_bytes(18)).is_ok());
-        assert!(
-            parse_with_limits(&empty, &Limits::default().with_max_extension_bytes(17)).is_err()
-        );
+        assert!(parse(&empty, &Limits::default().with_max_extension_bytes(18)).is_ok());
+        assert!(parse(&empty, &Limits::default().with_max_extension_bytes(17)).is_err());
     }
 
     #[test]
     fn parses_complete_ct_survey_family() {
-        let survey = parse(XML).expect("survey");
+        let survey = parse(XML, &Limits::default()).expect("survey");
         assert_eq!(survey.id(), Id::new(7));
         assert_eq!(survey.title(), Some("Survey"));
         assert_eq!(
@@ -4927,15 +5191,15 @@ mod tests {
 
     #[test]
     fn enforces_survey_constraints() {
-        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" decimalPlaces="16"/></questions></survey>"#).is_err());
-        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" rowSource="&quot;unterminated"/></questions></survey>"#).is_ok());
-        assert!(parse(br#"<survey xmlns:survey="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#).is_err());
-        assert!(parse(br#"<survey xmlns="urn:not-survey" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#).is_err());
+        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" decimalPlaces="16"/></questions></survey>"#, &Limits::default()).is_err());
+        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" rowSource="&quot;unterminated"/></questions></survey>"#, &Limits::default()).is_ok());
+        assert!(parse(br#"<survey xmlns:survey="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#, &Limits::default()).is_err());
+        assert!(parse(br#"<survey xmlns="urn:not-survey" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#, &Limits::default()).is_err());
     }
 
     #[test]
     fn accepts_the_survey_namespace_when_it_is_prefixed() {
-        let survey = parse(br#"<s:survey xmlns:s="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><s:questions><s:question binding="1"/></s:questions></s:survey>"#).expect("prefixed survey");
+        let survey = parse(br#"<s:survey xmlns:s="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><s:questions><s:question binding="1"/></s:questions></s:survey>"#, &Limits::default()).expect("prefixed survey");
         assert_eq!(survey.id(), Id::new(1));
     }
 
@@ -4944,16 +5208,18 @@ mod tests {
         let xml = format!(
             r#"<s:survey xmlns:s="{NAMESPACE_STR}" xmlns="urn:foreign" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><s:questions><s:question xmlns="urn:child-foreign" binding="1"><s:extLst><opaque><nested/></opaque></s:extLst></s:question></s:questions></s:survey>"#
         );
-        let survey = parse(xml.as_bytes()).expect("foreign default namespace");
-        let output = write(&survey).expect("write foreign default namespace");
+        let survey = parse(xml.as_bytes(), &Limits::default()).expect("foreign default namespace");
+        let output = write(&survey, &Limits::default()).expect("write foreign default namespace");
         let text = String::from_utf8(output.clone()).expect("UTF-8 Survey XML");
         assert!(text.starts_with("<s:survey xmlns=\"urn:foreign\""));
         assert!(text.contains("<s:question xmlns=\"urn:child-foreign\""));
         assert!(text.contains("<opaque><nested/></opaque>"));
-        let reopened = parse(&output).expect("reparse foreign default namespace");
+        let reopened =
+            parse(&output, &Limits::default()).expect("reparse foreign default namespace");
         assert_eq!(reopened, survey);
 
-        let mut detached = parse(xml.as_bytes()).expect("detached source survey");
+        let mut detached =
+            parse(xml.as_bytes(), &Limits::default()).expect("detached source survey");
         detached.set_id(Id::new(8));
         let mut package = package_with_survey(XML);
         let part_name = {
@@ -4961,7 +5227,7 @@ mod tests {
             let index = transaction
                 .insert(PackURI::new("/xl/tables/table1.xml").unwrap(), detached)
                 .expect("detached insert");
-            let part_name = transaction.entries()[index].part_name().clone();
+            let part_name = transaction.entries().unwrap()[index].part_name().clone();
             transaction.commit().expect("detached commit");
             part_name
         };
@@ -4974,7 +5240,7 @@ mod tests {
         assert!(inserted_text.contains("<s:question xmlns=\"urn:child-foreign\""));
         assert!(inserted_text.contains("<opaque><nested/></opaque>"));
         assert_eq!(
-            parse(inserted).unwrap(),
+            parse(inserted, &Limits::default()).unwrap(),
             survey_with_id(&survey, Id::new(8))
         );
     }
@@ -4984,8 +5250,8 @@ mod tests {
         let xml = format!(
             r#"<s:survey xmlns:s="{NAMESPACE_STR}" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><!--root-before--><s:surveyPr/><!--between-survey-and-title--><s:titlePr/><!--between-title-and-questions--><s:questions><!--before-questions-properties--><s:questionsPr><!--before-questions-properties-extension--><s:extLst><s:ext/></s:extLst><!--after-questions-properties-extension--></s:questionsPr><!--between-properties-and-first--><s:question binding="1"/><!--between-first-and-second--><s:question binding="1"/><!--after-second--></s:questions><!--between-questions-and-extension--><s:extLst><s:ext/></s:extLst><!--root-after-extension--></s:survey>"#
         );
-        let survey = parse(xml.as_bytes()).expect("commented Survey");
-        let output = write(&survey).expect("write commented Survey");
+        let survey = parse(xml.as_bytes(), &Limits::default()).expect("commented Survey");
+        let output = write(&survey, &Limits::default()).expect("write commented Survey");
         assert_comment_order(
             &output,
             &[
@@ -5005,7 +5271,8 @@ mod tests {
 
         let mut edited = survey.clone();
         edited.set_title(Some("edited".into()));
-        let edited_output = write(&edited).expect("write edited commented Survey");
+        let edited_output =
+            write(&edited, &Limits::default()).expect("write edited commented Survey");
         assert_comment_order(
             &edited_output,
             &[
@@ -5030,7 +5297,7 @@ mod tests {
             let index = transaction
                 .insert(PackURI::new("/xl/tables/table1.xml").unwrap(), edited)
                 .expect("detached commented insert");
-            let part_name = transaction.entries()[index].part_name().clone();
+            let part_name = transaction.entries().unwrap()[index].part_name().clone();
             transaction.commit().expect("detached commented commit");
             part_name
         };
@@ -5057,15 +5324,18 @@ mod tests {
         let xml = format!(
             r#"<s:survey xmlns:s="{NAMESPACE_STR}" xmlns="urn:foreign" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><q:surveyPr xmlns:q="{NAMESPACE_STR}"><q:extLst><opaque><nested/></opaque></q:extLst></q:surveyPr><q:questions xmlns:q="{NAMESPACE_STR}"><q:questionsPr/><q:question binding="1"><q:questionPr><q:extLst><opaque/></q:extLst></q:questionPr><q:extLst><opaque><nested/></opaque></q:extLst></q:question></q:questions></s:survey>"#
         );
-        let survey = parse(xml.as_bytes()).expect("nested modeled prefixes");
-        let output = write(&survey).expect("standalone write");
+        let survey = parse(xml.as_bytes(), &Limits::default()).expect("nested modeled prefixes");
+        let output = write(&survey, &Limits::default()).expect("standalone write");
         let output_text = String::from_utf8(output.clone()).expect("UTF-8 Survey XML");
         assert!(output_text.starts_with("<s:survey xmlns=\"urn:foreign\""));
         assert!(output_text.contains("<q:surveyPr xmlns:q=\""));
         assert!(output_text.contains("<q:questions xmlns:q=\""));
         assert!(output_text.contains("<q:question binding=\"1\""));
         assert!(output_text.contains("<opaque><nested/></opaque>"));
-        assert_eq!(parse(&output).expect("reparse standalone output"), survey);
+        assert_eq!(
+            parse(&output, &Limits::default()).expect("reparse standalone output"),
+            survey
+        );
 
         let mut detached = survey.clone();
         detached.set_id(Id::new(8));
@@ -5084,7 +5354,7 @@ mod tests {
             let index = transaction
                 .insert(PackURI::new("/xl/tables/table1.xml").unwrap(), detached)
                 .expect("detached insert");
-            let part_name = transaction.entries()[index].part_name().clone();
+            let part_name = transaction.entries().unwrap()[index].part_name().clone();
             transaction.commit().expect("detached commit");
             part_name
         };
@@ -5099,13 +5369,16 @@ mod tests {
         assert!(inserted_text.contains("<q:questions xmlns:q=\""));
         assert!(inserted_text.contains("<question xmlns=\""));
         assert!(inserted_text.contains("<q:question binding=\"1\""));
-        assert_eq!(parse(inserted).unwrap().id(), Id::new(8));
+        assert_eq!(
+            parse(inserted, &Limits::default()).unwrap().id(),
+            Id::new(8)
+        );
 
         let mut source_package =
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&source_package.clone().into_plain_opc()).unwrap();
-        let mut transaction = source_package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut source_package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -5118,7 +5391,7 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&source_package.into_plain_opc()).unwrap();
-        let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let changed = reopened.get_part(&name).unwrap().blob();
         let changed_text = String::from_utf8(changed.to_vec()).unwrap();
@@ -5142,8 +5415,8 @@ mod tests {
                 r#"<s:survey xmlns:s="{NAMESPACE_STR}" xmlns="urn:root-{suffix}" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><s:questions xmlns="urn:questions-{suffix}"><s:questionsPr xmlns="urn:questions-properties-{suffix}"><s:extLst><opaque/></s:extLst></s:questionsPr><s:question xmlns="urn:question-{suffix}" binding="1"><s:questionPr xmlns="urn:question-properties-{suffix}"><s:extLst><opaque/></s:extLst></s:questionPr><s:extLst><opaque/></s:extLst></s:question></s:questions></s:survey>"#
             )
         };
-        let first = parse(namespace_xml("a").as_bytes()).unwrap();
-        let second = parse(namespace_xml("b").as_bytes()).unwrap();
+        let first = parse(namespace_xml("a").as_bytes(), &Limits::default()).unwrap();
+        let second = parse(namespace_xml("b").as_bytes(), &Limits::default()).unwrap();
         assert_ne!(first.questions, second.questions);
         assert_ne!(first.questions.values[0], second.questions.values[0]);
         assert_ne!(first.questions.properties, second.questions.properties);
@@ -5153,7 +5426,7 @@ mod tests {
         );
 
         let commented = parse(
-            br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><!--root-before--><surveyPr><!--property--></surveyPr><!--root-after--><questions><!--questions--><questionsPr/><question binding="1"><!--question--><questionPr/></question></questions></survey>"#,
+            br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><!--root-before--><surveyPr><!--property--></surveyPr><!--root-after--><questions><!--questions--><questionsPr/><question binding="1"><!--question--><questionPr/></question></questions></survey>"#, &Limits::default(),
         )
         .unwrap();
         let mut root = commented.clone();
@@ -5170,10 +5443,9 @@ mod tests {
         assert_ne!(commented.properties, Some(properties));
 
         let mut package = as_source(&package_with_survey(namespace_xml("a").as_bytes()));
-        let replacement = parse(namespace_xml("b").as_bytes()).unwrap();
+        let replacement = parse(namespace_xml("b").as_bytes(), &Limits::default()).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(transaction.set(0, replacement.clone()).unwrap());
-        assert!(transaction.is_changed());
         assert!(matches!(
             transaction.commit(),
             Err(Error::Unsupported {
@@ -5187,22 +5459,22 @@ mod tests {
         let xml = schema_xml(
             r#"<questions><!--before--><question binding="1"/><!--after--></questions>"#,
         );
-        let mut survey = parse(&xml).unwrap();
+        let mut survey = parse(&xml, &Limits::default()).unwrap();
         survey
             .questions_mut()
             .set_properties(Some(ElementProperties::new()));
-        let output = write(&survey).unwrap();
+        let output = write(&survey, &Limits::default()).unwrap();
         let text = String::from_utf8(output.clone()).unwrap();
         assert_eq!(text.matches("<!--before-->").count(), 1);
         assert_eq!(text.matches("<!--after-->").count(), 1);
         assert!(text.find("<!--before-->").unwrap() < text.find("<questionsPr").unwrap());
         assert!(text.find("<questionsPr").unwrap() < text.find(" binding=\"1\"").unwrap());
-        assert_eq!(parse(&output).unwrap(), survey);
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
 
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -5213,7 +5485,8 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let changed = reopened.get_part(&name).unwrap().blob();
         let changed_text = String::from_utf8(changed.to_vec()).unwrap();
@@ -5235,9 +5508,9 @@ mod tests {
         let remove_xml = schema_xml(
             r#"<questions><!--before--><questionsPr/><!--between--><question binding="1"/><!--after--></questions>"#,
         );
-        let mut removed = parse(&remove_xml).unwrap();
+        let mut removed = parse(&remove_xml, &Limits::default()).unwrap();
         removed.questions_mut().set_properties(None);
-        let removed_output = write(&removed).unwrap();
+        let removed_output = write(&removed, &Limits::default()).unwrap();
         let removed_text = String::from_utf8(removed_output.clone()).unwrap();
         for marker in ["<!--before-->", "<!--between-->", "<!--after-->"] {
             assert_eq!(removed_text.matches(marker).count(), 1);
@@ -5250,13 +5523,13 @@ mod tests {
             removed_text.find("<!--between-->").unwrap()
                 < removed_text.find(" binding=\"1\"").unwrap()
         );
-        assert_eq!(parse(&removed_output).unwrap(), removed);
+        assert_eq!(parse(&removed_output, &Limits::default()).unwrap(), removed);
 
         let mut remove_package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&remove_xml)))
                 .unwrap();
         let remove_before = Snapshot::load(&remove_package.clone().into_plain_opc()).unwrap();
-        let mut remove_transaction = remove_package.edit_surveys().unwrap();
+        let mut remove_transaction = Transaction::new(&mut remove_package).unwrap();
         remove_transaction
             .edit(0, |survey| {
                 survey.questions_mut().set_properties(None);
@@ -5266,7 +5539,8 @@ mod tests {
         let remove_patch = remove_transaction.commit().unwrap().patch().clone();
         let remove_bytes =
             litchi_opc::PackageWriter::to_bytes(&remove_package.into_plain_opc()).unwrap();
-        let mut remove_reopened = OpcPackage::from_bytes(&remove_bytes).unwrap();
+        let mut remove_reopened =
+            OpcPackage::from_bytes(&remove_bytes, litchi_opc::SourceLimits::default()).unwrap();
         let remove_name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let remove_changed = remove_reopened.get_part(&remove_name).unwrap().blob();
         let remove_text = String::from_utf8(remove_changed.to_vec()).unwrap();
@@ -5293,30 +5567,33 @@ mod tests {
         let xml = schema_xml(
             r#"<questions><!--slot0--><question binding="1"/><!--slot1--><question binding="1"/><!--slot2--></questions>"#,
         );
-        let mut inserted = parse(&xml).unwrap();
+        let mut inserted = parse(&xml, &Limits::default()).unwrap();
         inserted
             .questions_mut()
             .insert(0, Question::new(Binding::new(1)))
             .unwrap();
-        let inserted_output = write(&inserted).unwrap();
+        let inserted_output = write(&inserted, &Limits::default()).unwrap();
         assert_comment_order(&inserted_output, &["slot0", "slot1", "slot2"]);
         let inserted_text = String::from_utf8(inserted_output.clone()).unwrap();
         assert!(
             inserted_text.find("<!--slot0-->").unwrap()
                 < inserted_text.find("<!--slot1-->").unwrap()
         );
-        assert_eq!(parse(&inserted_output).unwrap(), inserted);
+        assert_eq!(
+            parse(&inserted_output, &Limits::default()).unwrap(),
+            inserted
+        );
 
-        let mut removed = parse(&xml).unwrap();
+        let mut removed = parse(&xml, &Limits::default()).unwrap();
         removed.questions_mut().remove(0).unwrap();
-        let removed_output = write(&removed).unwrap();
+        let removed_output = write(&removed, &Limits::default()).unwrap();
         assert_comment_order(&removed_output, &["slot0", "slot1", "slot2"]);
-        assert_eq!(parse(&removed_output).unwrap(), removed);
+        assert_eq!(parse(&removed_output, &Limits::default()).unwrap(), removed);
 
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -5327,7 +5604,8 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let changed = reopened.get_part(&name).unwrap().blob();
         assert_comment_order(changed, &["slot0", "slot1", "slot2"]);
@@ -5340,7 +5618,7 @@ mod tests {
         let mut remove_package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let remove_before = Snapshot::load(&remove_package.clone().into_plain_opc()).unwrap();
-        let mut remove_transaction = remove_package.edit_surveys().unwrap();
+        let mut remove_transaction = Transaction::new(&mut remove_package).unwrap();
         remove_transaction
             .edit(0, |survey| {
                 survey.questions_mut().remove(0);
@@ -5350,7 +5628,8 @@ mod tests {
         let remove_patch = remove_transaction.commit().unwrap().patch().clone();
         let remove_bytes =
             litchi_opc::PackageWriter::to_bytes(&remove_package.into_plain_opc()).unwrap();
-        let mut remove_reopened = OpcPackage::from_bytes(&remove_bytes).unwrap();
+        let mut remove_reopened =
+            OpcPackage::from_bytes(&remove_bytes, litchi_opc::SourceLimits::default()).unwrap();
         let remove_changed = remove_reopened.get_part(&name).unwrap().blob();
         assert_comment_order(remove_changed, &["slot0", "slot1", "slot2"]);
         remove_patch.inverse().apply(&mut remove_reopened).unwrap();
@@ -5435,12 +5714,14 @@ mod tests {
             )
             .expect("survey relationship");
 
-        let workbook = crate::Workbook::from_package(package).expect("workbook");
-        assert_eq!(workbook.surveys().expect("surveys").len(), 1);
+        let workbook = crate::Package::from_opc(package).expect("workbook");
+        assert_eq!(workbook.workbook_ref().surveys().expect("surveys").len(), 1);
         let bytes = workbook.to_bytes().expect("save");
-        let reopened = crate::Workbook::from_bytes(bytes).expect("reopen");
+        let reopened = crate::Package::from_bytes(&bytes).expect("reopen");
         assert_eq!(
-            reopened.surveys().expect("surveys")[0].survey().id(),
+            reopened.workbook_ref().surveys().expect("surveys")[0]
+                .survey()
+                .id(),
             Id::new(7)
         );
     }
@@ -5448,7 +5729,7 @@ mod tests {
     #[test]
     fn package_transaction_supports_edit_insert_remove_and_inverse() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().expect("survey transaction");
+        let mut transaction = Transaction::new(&mut package).expect("survey transaction");
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -5469,16 +5750,17 @@ mod tests {
         assert_eq!(package.surveys().unwrap().len(), 2);
 
         let inverse = commit.patch().inverse();
-        package
-            .apply_surveys_patch(&inverse)
-            .expect("inverse patch");
+        package = package
+            .apply_surveys(&inverse)
+            .expect("inverse patch")
+            .into_package();
         assert_eq!(package.surveys().unwrap().len(), 1);
         assert_eq!(
             package.surveys().unwrap().entries()[0].survey().title(),
             Some("Survey")
         );
 
-        let mut transaction = package.edit_surveys().expect("second transaction");
+        let mut transaction = Transaction::new(&mut package).expect("second transaction");
         assert!(transaction.remove(0).expect("remove").is_some());
         let commit = transaction.commit().expect("remove commit");
         assert!(commit.changed());
@@ -5494,10 +5776,14 @@ mod tests {
             vec![Question::for_column("Answer").unwrap()],
         )
         .unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         let index = transaction.insert_for_table("T", survey).unwrap();
         assert_eq!(
-            transaction.entries()[index].survey().questions().values()[0].binding(),
+            transaction.entries().unwrap()[index]
+                .survey()
+                .questions()
+                .values()[0]
+                .binding(),
             Binding::new(1)
         );
         transaction.commit().unwrap();
@@ -5515,7 +5801,7 @@ mod tests {
             .unwrap()
             .blob()
             .to_vec();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(
             !transaction
                 .edit(0, |survey| {
@@ -5526,7 +5812,7 @@ mod tests {
         );
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
+        assert!(commit.patch().is_noop());
         let after = package
             .clone()
             .into_plain_opc()
@@ -5556,7 +5842,7 @@ mod tests {
             .unwrap()
             .rels()
             .to_xml();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_description(Some("edited".to_owned()));
@@ -5564,7 +5850,10 @@ mod tests {
             })
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
-        package.apply_surveys_patch(&patch.inverse()).unwrap();
+        package = package
+            .apply_surveys(&patch.inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(
             package
                 .clone()
@@ -5591,14 +5880,18 @@ mod tests {
         let mut package = noncanonical_graph_source(package_with_survey(XML));
         let table = PackURI::new("/xl/tables/table1.xml").unwrap();
         let survey = PackURI::new("/xl/surveys/survey1.xml").unwrap();
-        let content_types = package.source_content_types().unwrap().bytes().to_vec();
+        let content_types = package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
+            .to_vec();
         let table_relationships = package
-            .source_relationships(&table)
+            .source_relationships(&table, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
         let survey_relationships = package
-            .source_relationships(&survey)
+            .source_relationships(&survey, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
@@ -5607,22 +5900,33 @@ mod tests {
         transaction.remove(0).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let removed = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&removed).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&removed, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&reopened).unwrap().is_empty());
 
         patch.inverse().apply(&mut reopened).unwrap();
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&restored).unwrap();
+        let restored =
+            OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
-            restored.source_content_types().unwrap().bytes(),
+            restored
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             content_types.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&table).unwrap().bytes(),
+            restored
+                .source_relationships(&table, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             table_relationships.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&survey).unwrap().bytes(),
+            restored
+                .source_relationships(&survey, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             survey_relationships.as_slice()
         );
         assert_eq!(Snapshot::load(&restored).unwrap().len(), 1);
@@ -5633,14 +5937,18 @@ mod tests {
         let mut package = noncanonical_graph_source(package_with_survey(XML));
         let table = PackURI::new("/xl/tables/table1.xml").unwrap();
         let survey = PackURI::new("/xl/surveys/survey1.xml").unwrap();
-        let content_types = package.source_content_types().unwrap().bytes().to_vec();
+        let content_types = package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
+            .to_vec();
         let table_relationships = package
-            .source_relationships(&table)
+            .source_relationships(&table, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
         let survey_relationships = package
-            .source_relationships(&survey)
+            .source_relationships(&survey, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
@@ -5651,22 +5959,33 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let inserted = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&inserted).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&inserted, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(Snapshot::load(&reopened).unwrap().len(), 2);
 
         patch.inverse().apply(&mut reopened).unwrap();
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&restored).unwrap();
+        let restored =
+            OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
-            restored.source_content_types().unwrap().bytes(),
+            restored
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             content_types.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&table).unwrap().bytes(),
+            restored
+                .source_relationships(&table, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             table_relationships.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&survey).unwrap().bytes(),
+            restored
+                .source_relationships(&survey, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             survey_relationships.as_slice()
         );
         assert_eq!(Snapshot::load(&restored).unwrap().len(), 1);
@@ -5675,9 +5994,9 @@ mod tests {
     #[test]
     fn edits_retain_unknown_extension_xml_and_namespaces() {
         let xml = br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:x="urn:survey-future" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions><extLst><ext xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uri="urn:future"><x:future x:flag="1"/></ext></extLst></survey>"#;
-        let survey = parse(xml).expect("survey with extension");
+        let survey = parse(xml, &Limits::default()).expect("survey with extension");
         assert!(survey.extension_xml().unwrap().contains(&b'f'));
-        let serialized = write(&survey).expect("write extension");
+        let serialized = write(&survey, &Limits::default()).expect("write extension");
         assert!(
             serialized
                 .windows(b"x:future".len())
@@ -5685,7 +6004,7 @@ mod tests {
         );
 
         let mut package = crate::package::Package::from_opc(package_with_survey(xml)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_description(Some("description".to_owned()));
@@ -5717,7 +6036,7 @@ mod tests {
     fn edits_retain_nested_namespaces_comments_and_unknown_attributes() {
         let xml = br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><!-- between --><question xmlns:q="urn:question-future" q:unknown="question" binding="1"><questionPr xmlns:p="urn:properties-future" p:unknown="properties"><!-- property comment --></questionPr><!-- question comment --></question></questions></survey>"#;
         let mut package = crate::package::Package::from_opc(package_with_survey(xml)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_description(Some("edited".to_owned()));
@@ -5749,14 +6068,18 @@ mod tests {
     #[test]
     fn failed_edit_does_not_mutate_the_transaction_draft() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         let result = transaction.edit(0, |survey| {
             survey.questions_mut().values_mut()[0].set_binding(Binding::new(999));
             Ok(())
         });
         assert!(result.is_err());
         assert_eq!(
-            transaction.entries()[0].survey().questions().values()[0].binding(),
+            transaction.entries().unwrap()[0]
+                .survey()
+                .questions()
+                .values()[0]
+                .binding(),
             Binding::new(1)
         );
     }
@@ -5764,7 +6087,7 @@ mod tests {
     #[test]
     fn stale_patch_and_explicit_limits_are_rejected_atomically() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("Changed".to_owned()));
@@ -5789,7 +6112,7 @@ mod tests {
         assert_eq!(stale.get_part(&survey_part).unwrap().blob(), before);
 
         let limits = Limits::new().with_max_part_bytes(XML.len() - 1);
-        assert!(parse_with_limits(XML, &limits).is_err());
+        assert!(parse(XML, &limits).is_err());
     }
 
     #[test]
@@ -5977,7 +6300,9 @@ mod tests {
         let survey_relationships = br#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <!-- explicitly empty survey member -->
 </Relationships>"#;
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -6036,7 +6361,11 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     fn signature_protected_source() -> OpcPackage {

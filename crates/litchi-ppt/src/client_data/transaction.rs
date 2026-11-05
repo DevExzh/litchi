@@ -95,8 +95,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, ClientDataLimits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &ClientDataLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one complete record under explicit resource bounds.
@@ -104,7 +104,10 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: ClientDataLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(
+        bytes: impl AsRef<[u8]>,
+        limits: ClientDataLimits,
+    ) -> Result<Self> {
         let input = bytes.as_ref();
         let value = ClientData::parse_with_limits(input, limits)?;
         let encoded = value.to_bytes_with_limits(limits)?;
@@ -138,7 +141,7 @@ impl Snapshot {
         clippy::needless_pass_by_value,
         reason = "the capture API takes ownership of the semantic value by convention, matching `from_client_data`"
     )]
-    pub fn from_client_data_with_limits(
+    pub(crate) fn from_client_data_with_limits(
         value: ClientData,
         limits: ClientDataLimits,
     ) -> Result<Self> {
@@ -188,8 +191,8 @@ impl Snapshot {
 
     /// Start an isolated semantic edit over this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
+        RecordEdit {
             source: self.clone(),
             candidate: self.value.clone(),
             changes: Vec::new(),
@@ -199,7 +202,7 @@ impl Snapshot {
 
 /// Reversible, source-checked result of one successful transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct RecordPatch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -208,28 +211,28 @@ pub struct Patch {
     limits: ClientDataLimits,
 }
 
-impl Patch {
+impl RecordPatch {
     /// Source revision required by [`Self::apply`].
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by [`Self::apply`].
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     /// Ordered semantic edits represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Whether the transaction changed no child bytes.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
@@ -238,7 +241,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "client-data patch source does not match its base snapshot".into(),
@@ -252,7 +255,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
@@ -261,13 +264,13 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             base: self.target,
             target: self.base,
@@ -305,40 +308,28 @@ impl Change {
 
 /// Isolated, failure-atomic semantic editor over one source snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct RecordEdit {
     source: Snapshot,
     candidate: ClientData,
     changes: Vec<Change>,
 }
 
-impl Transaction {
-    /// Borrow the immutable source snapshot.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
+impl RecordEdit {
     /// Borrow the current transaction candidate.
     #[must_use]
-    pub const fn client_data(&self) -> &ClientData {
+    pub(crate) const fn client_data(&self) -> &ClientData {
         &self.candidate
     }
 
     /// Borrow the candidate's ordered child list.
     #[must_use]
-    pub fn children(&self) -> &[ClientDataChild] {
+    pub(crate) fn children(&self) -> &[ClientDataChild] {
         self.candidate.children()
-    }
-
-    /// Whether any staged operation changes the serialized candidate.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate != self.source.value
     }
 
     /// Borrow the staged semantic operations.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
@@ -347,7 +338,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn insert(&mut self, index: usize, child: ClientDataChild) -> Result<()> {
+    pub(crate) fn insert(&mut self, index: usize, child: ClientDataChild) -> Result<()> {
         if index > self.candidate.children.len() {
             return invalid("client-data insertion index is out of range");
         }
@@ -364,7 +355,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn append(&mut self, child: ClientDataChild) -> Result<()> {
+    pub(crate) fn append(&mut self, child: ClientDataChild) -> Result<()> {
         self.insert(self.candidate.children.len(), child)
     }
 
@@ -373,7 +364,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace(
+    pub(crate) fn replace(
         &mut self,
         index: usize,
         replacement: ClientDataChild,
@@ -401,7 +392,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove(&mut self, index: usize) -> Result<ClientDataChild> {
+    pub(crate) fn remove(&mut self, index: usize) -> Result<ClientDataChild> {
         if index >= self.candidate.children.len() {
             return Err(Error::InvalidFormat(
                 "client-data removal index is out of range".into(),
@@ -418,25 +409,12 @@ impl Transaction {
         Ok(child)
     }
 
-    /// Capture the current candidate without publishing the transaction.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
-        if bytes.as_slice() == self.source.bytes.as_ref() {
-            return Ok(self.source.clone());
-        }
-        Snapshot::parse_with_limits(bytes, self.source.limits)
-    }
-
     /// Validate and publish the candidate atomically with its reversible patch.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
         let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
         let snapshot = if bytes.as_slice() == self.source.bytes.as_ref() {
             self.source.clone()
@@ -448,7 +426,7 @@ impl Transaction {
         } else {
             self.changes
         };
-        let patch = Patch {
+        let patch = RecordPatch {
             base: self.source.revision,
             target: snapshot.revision,
             before: self.source.bytes.clone(),
@@ -456,54 +434,39 @@ impl Transaction {
             changes,
             limits: self.source.limits,
         };
-        Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard all staged edits and recover the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        Ok(RecordCommit { snapshot, patch })
     }
 }
 
 /// A successful immutable target and its source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: RecordPatch,
 }
 
-impl Commit {
+impl RecordCommit {
     /// Published target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the source to this target.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// Published target semantic value.
     #[must_use]
-    pub const fn client_data(&self) -> &ClientData {
+    pub(crate) const fn client_data(&self) -> &ClientData {
         self.snapshot.client_data()
     }
 
     /// Split the published target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.patch)
     }
 }

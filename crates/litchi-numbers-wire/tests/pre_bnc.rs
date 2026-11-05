@@ -7,6 +7,9 @@
 
 use litchi_iwa_common::formula::FiniteF64;
 use litchi_numbers_wire::pre_bnc::PreBncCellView;
+use litchi_numbers_wire::{Error, Limits};
+
+const TEST_LIMITS: Limits = Limits::DEFAULT;
 
 const FLAG_RICH_TEXT: u32 = 0x0000_0200;
 const FLAG_FORMULA: u32 = 0x0000_0008;
@@ -122,7 +125,7 @@ fn every_legacy_version_exposes_all_fields_from_the_fixed_order() {
             ALL_FLAGS
         };
         let source = cell_with_flags(version, 9, flags, &[]);
-        let view = PreBncCellView::parse(&source)
+        let view = PreBncCellView::parse(&source, &TEST_LIMITS)
             .unwrap_or_else(|_| panic!("version {version} did not parse"));
 
         assert_eq!(view.version(), version);
@@ -142,7 +145,7 @@ fn every_legacy_version_exposes_all_fields_from_the_fixed_order() {
 fn zero_identifiers_remain_present_in_all_legacy_versions() {
     for version in 0..=4 {
         let source = cell_with_zero_ids(version);
-        let view = PreBncCellView::parse(&source)
+        let view = PreBncCellView::parse(&source, &TEST_LIMITS)
             .unwrap_or_else(|_| panic!("version {version} did not parse"));
         assert_eq!(view.string_identifier(), Some(0));
         assert_eq!(view.rich_text_identifier(), Some(0));
@@ -164,7 +167,7 @@ fn every_truncated_prefix_before_the_known_fields_is_rejected() {
         let known_end = source.len();
         for length in 0..known_end {
             assert!(
-                PreBncCellView::parse(&source[..length]).is_err(),
+                PreBncCellView::parse(&source[..length], &TEST_LIMITS).is_err(),
                 "version {version} truncation at {length} was accepted"
             );
         }
@@ -189,7 +192,7 @@ fn non_finite_scalars_are_rejected_even_when_a_formula_identifier_wins() {
                     }
                 }
                 assert!(
-                    PreBncCellView::parse(&source).is_err(),
+                    PreBncCellView::parse(&source, &TEST_LIMITS).is_err(),
                     "version {version}, flag 0x{scalar_flag:08x}, value {raw:?} bypassed finite validation"
                 );
             }
@@ -207,7 +210,7 @@ fn unknown_flags_and_opaque_tail_are_preserved_without_copying_source() {
         let mut source = cell_with_flags(version, 3, known_flags | unknown_flag, &unknown_payload);
         source.extend_from_slice(&explicit_tail);
 
-        let view = PreBncCellView::parse(&source)
+        let view = PreBncCellView::parse(&source, &TEST_LIMITS)
             .unwrap_or_else(|_| panic!("version {version} did not parse"));
         assert_eq!(view.source(), source.as_slice());
         assert_eq!(view.cell_type(), 3);
@@ -222,6 +225,17 @@ fn unknown_flags_and_opaque_tail_are_preserved_without_copying_source() {
                 view.opaque_tail().as_ptr(),
                 source[view.source().len() - view.opaque_tail().len()..].as_ptr()
             );
+
+            let tail_limit = TEST_LIMITS
+                .with_tail_bytes(view.opaque_tail().len().saturating_sub(1).max(1))
+                .unwrap();
+            assert!(matches!(
+                PreBncCellView::parse(&source, &tail_limit),
+                Err(Error::LimitExceeded {
+                    kind: litchi_numbers_wire::LimitKind::TailBytes,
+                    ..
+                })
+            ));
         }
     }
 }
@@ -231,7 +245,7 @@ fn modern_and_future_versions_are_rejected_by_the_legacy_reader() {
     for version in [5, 6, 0xff] {
         let source = cell_with_flags(version, 3, FLAG_STRING, &[]);
         assert!(
-            PreBncCellView::parse(&source).is_err(),
+            PreBncCellView::parse(&source, &TEST_LIMITS).is_err(),
             "version {version} was accepted as pre-BNC"
         );
     }

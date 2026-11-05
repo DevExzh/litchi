@@ -7,12 +7,13 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::headers::{Count, Settings};
-use litchi_pages::{BodyTableHeaderSettingsError as Error, BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package, table::headers::transaction::Error};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -54,8 +55,12 @@ pub(crate) fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -66,7 +71,11 @@ pub(crate) fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -218,7 +227,8 @@ pub(crate) fn synthetic_package(names: [&str; 2], locked: Option<bool>) -> TestR
         objects.extend([attachment_object, drawable_object, model_object]);
     }
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -235,13 +245,14 @@ pub(crate) fn synthetic_package(names: [&str; 2], locked: Option<bool>) -> TestR
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -261,14 +272,18 @@ pub(crate) fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -293,6 +308,7 @@ fn append_selected_model_raw(package: &[u8], raw: &[u8]) -> TestResult<Vec<u8>> 
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -309,13 +325,19 @@ fn append_dependency_field(package: &[u8]) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or("missing model message")?;
         let mut data = model.messages[message_index].data.clone();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut data, 83, b"dependency")?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut data,
+            83,
+            b"dependency",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -339,6 +361,7 @@ fn append_table_info_raw(package: &[u8], raw: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -363,13 +386,14 @@ fn make_table_model_reference_external(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: info.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
 fn sentinel(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == "Data/sentinel.bin")
@@ -400,13 +424,20 @@ fn selectors_read_position_and_name_and_reject_ambiguity() -> TestResult {
     assert_eq!(by_position, fixture_settings());
     assert!(matches!(
         package.body_table_header_settings(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::headers::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ambiguous = Package::from_bytes(&synthetic_package(["Revenue", "Revenue"], None)?)?;
     assert!(matches!(
         ambiguous.body_table_header_settings(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::headers::transaction::Refusal::AmbiguousTableName)
+                | Error::Refused(
+                    litchi_pages::table::headers::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
     Ok(())
 }
@@ -484,7 +515,7 @@ fn changed_settings_preserve_unknowns_delete_previews_and_inverse_exactly() -> T
         b"untouched-sentinel"
     );
     let changed_model = model_payload(&commit.package().exact_bytes(), FIRST_MODEL_IDENTIFIER)?;
-    let unknown = WireView::parse(&changed_model)?
+    let unknown = WireView::parse(&changed_model, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
         .ok_or("unknown model field was dropped")?;
@@ -511,7 +542,7 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
         .edit_body_table_header_settings(0usize)?
         .set(changed_settings())
         .commit()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let tampered_source = catalog.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered")],
         Limits::default(),
@@ -534,13 +565,13 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
     ] {
         let malformed_source = append_selected_model_raw(&source, raw)?;
         let Ok(malformed) = Package::from_bytes(&malformed_source) else {
-            Catalog::from_bytes(&malformed_source)?;
+            Catalog::from_bytes(&malformed_source, Default::default())?;
             continue;
         };
         let before = malformed.exact_bytes();
         assert!(matches!(
             malformed.body_table_header_settings(0usize),
-            Err(Error::InvalidSource) | Err(Error::LimitExceeded { .. })
+            Err(Error::InvalidSource) | Err(Error::Limit { .. })
         ));
         assert_eq!(malformed.exact_bytes(), before.as_slice());
     }
@@ -556,7 +587,10 @@ fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze()
         .set(changed_settings())
         .commit()
         .expect_err("a locked table must reject a changed header edit");
-    assert!(matches!(locked_error, Error::TableLocked));
+    assert!(matches!(
+        locked_error,
+        Error::Refused(litchi_pages::table::headers::transaction::Refusal::TableLocked)
+    ));
     assert_eq!(locked.exact_bytes(), locked_source.as_slice());
 
     let dependency_source =
@@ -595,11 +629,13 @@ fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestRes
         &mut category_owner,
         2,
         &category_group,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     litchi_iwa_common::wire::append_length_delimited_field(
         &mut malformed_model_dependency,
         81,
         &category_owner,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     for malformed_source in [
         append_table_info_raw(&source, &[0x38, 0x01])?,
@@ -611,10 +647,10 @@ fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestRes
         let before = package.exact_bytes();
         let result = package
             .edit_body_table_header_settings(0usize)
-            .and_then(|edit| {
+            .and_then(|mut edit| {
                 let settings = Settings {
                     header_rows_frozen: Some(true),
-                    ..edit.settings()
+                    ..edit.settings()?
                 };
                 edit.set(settings).commit()
             });
@@ -631,14 +667,17 @@ fn finite_limits_fail_closed_before_publication() -> TestResult<()> {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let before = package.exact_bytes();
         let result = package
             .edit_body_table_header_settings(0usize)
             .and_then(|edit| edit.set(changed_settings()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(package.exact_bytes(), before.as_slice());
             transaction_rejected = true;
             break;
@@ -657,12 +696,12 @@ fn public_transaction_types_are_send_sync_debug_and_redacted() -> TestResult<()>
 
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<Settings>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Diagnostics>();
     assert_send_sync_debug::<Error>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::LimitKind>();
     let package = Package::from_bytes(&synthetic_package(["Revenue", "Costs"], None)?)?;
     let edit = package.edit_body_table_header_settings(0usize)?;
     assert!(format!("{edit:?}").contains("settings"));

@@ -109,7 +109,9 @@
     reason = "names and dense flag structures intentionally follow BIFF12 records and existing public API vocabulary"
 )]
 
+pub mod auto_filter;
 pub mod binary_index;
+pub mod builder;
 pub mod calc;
 pub mod calculation_chain;
 pub mod cell_values;
@@ -121,46 +123,57 @@ pub mod custom_data;
 pub mod data_model;
 pub mod data_validation;
 pub mod date_utils;
+pub mod drawing;
 pub mod external_link;
 pub mod formula;
 pub mod hyperlinks;
 pub mod leniency;
 pub mod merged_cells;
+pub mod metadata;
 pub mod named_ranges;
+pub mod opc;
+mod open_options;
 pub mod package;
+pub mod page_breaks;
+pub(crate) mod part_edit;
 mod pivot_chart;
 pub mod pivot_view;
 pub mod raw;
+pub mod ribbon;
+mod semantic_limits;
 pub mod shapes;
 pub mod shared_workbook;
 pub mod sheet;
+pub(crate) mod signature_policy;
 pub mod slicer;
 pub mod sparkline;
 pub mod styles;
+pub mod task_panes;
+#[cfg(all(test, feature = "vba-inspection"))]
+mod test_support;
 pub mod theme;
 pub mod timeline;
+#[cfg(feature = "vba-inspection")]
+pub mod vba;
 pub mod volatile_dependencies;
 pub mod workbook;
 pub(crate) mod worksheet_index;
 pub mod xml_maps;
 
 /// OPC resource limits and diagnostics used by XLSB package and workbook ingress.
-pub use litchi_opc::{ReadLimits, SourceCacheDiagnostics, SourceCacheLimits};
-pub mod writer;
+pub use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimitKind, SourceLimits};
+pub(crate) mod writer;
 
+/// Canonical builder for authoring a new XLSB package.
+pub use builder::Builder;
+
+pub use open_options::{OpenOptions, OpenPolicy};
 pub use raw::Error;
+pub use semantic_limits::SemanticLimits;
 
 pub use leniency::{
     CachedNumberDefect, Defect, LayoutDefect, Leniency, ReservedFieldDefect, ToleranceReport,
     ToleratedDefect, ValueEncodingDefect,
-};
-
-pub use custom_data::{
-    Commit as CustomDataCommit, CustomData, CustomDataView, ExtensionList,
-    Limits as CustomDataLimits, Part as CustomDataPart, Patch as CustomDataPatch, Properties,
-    RemovalDisposition, Snapshot as CustomDataSnapshot, Storage, StorageId, StorageSelector,
-    StorageSelectorInput, Transaction as CustomDataTransaction, parse_properties,
-    validate_workbook_root, write_properties,
 };
 
 pub use package::scenarios;

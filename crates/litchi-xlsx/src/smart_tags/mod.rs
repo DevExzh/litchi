@@ -2,21 +2,22 @@
 //!
 //! This owner is split by responsibility: semantic values in [`model`],
 //! bounded XML conversion in [`codec`], worksheet package ownership in
-//! [`package`], validation in [`validation`], and clone-staged edits in
-//! [`transaction`]. Smart-tag actions are never loaded or executed.
+//! [`package`], validation in [`validation`], and the staged [`Edit`]
+//! family (`Package::edit_smart_tags`, `Package::apply_smart_tags`).
+//! Smart-tag actions are never loaded or executed.
 
 pub mod codec;
+mod edit;
 pub mod model;
 pub mod package;
-pub mod transaction;
 pub mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use codec::{parse, replace_worksheet, write};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Cell, Collection, Conformance, Property, Tag};
-pub use transaction::Transaction;
 
 /// Validate a complete worksheet smart-tag collection without mutating it.
 pub fn validate(value: &Collection) -> crate::Result<()> {

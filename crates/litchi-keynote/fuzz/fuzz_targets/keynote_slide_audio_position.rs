@@ -14,7 +14,8 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi_keynote::{
-    Limits, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector, slide::media::Point,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::media::Point,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -41,27 +42,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_seed(data);
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_PACKAGE_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid audio-position archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid audio-position semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_PACKAGE_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid audio-position archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid audio-position semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -272,16 +275,11 @@ fn exercise_wrong_kind(package: &Package, source_bytes: &[u8]) {
 }
 
 fn exercise_limit_budget() {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )
-    .unwrap_or_else(|error| panic!("finite audio-position semantic limit must build: {error}"));
-    let options = ReadOptions::new(Limits::default(), semantic);
+    let semantic = SemanticLimits::builder()
+        .max_references(1)
+        .and_then(|limits| limits.build())
+        .unwrap_or_else(|error| panic!("finite audio-position semantic limit must build: {error}"));
+    let options = OpenOptions::new().semantic_limits(semantic);
     match Package::from_bytes_with_options(NATIVE_KEYNOTE, options) {
         Err(error) => observe_error(error),
         Ok(package) => {

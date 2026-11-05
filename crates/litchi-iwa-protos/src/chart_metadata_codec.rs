@@ -28,6 +28,9 @@ pub const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5023;
 
 const MODERN_EXTENSION_FIELD: u32 = 10_000;
 const MODERN_CHART_TYPE_FIELD: u32 = 1;
+const MODERN_SERIES_DIRECTION_FIELD: u32 = 5;
+/// `TSCH.SeriesDirection.series_direction_by_column`.
+const SERIES_BY_COLUMN: u64 = 2;
 const MODERN_DEFAULT_DATA_FIELD: u32 = 6;
 const MODERN_GRID_FIELD: u32 = 7;
 const MODERN_NON_STYLE_FIELD: u32 = 10;
@@ -328,6 +331,7 @@ pub struct ChartMetadataSnapshot<'source> {
     row_labels: LabelList<'source>,
     column_labels: LabelList<'source>,
     series_count: usize,
+    series_by_column: bool,
     non_style_ref: Option<NonZeroU64>,
     source: &'source [u8],
     grid_source: Option<&'source [u8]>,
@@ -343,6 +347,7 @@ impl fmt::Debug for ChartMetadataSnapshot<'_> {
             .field("row_label_count", &self.row_labels.len())
             .field("column_label_count", &self.column_labels.len())
             .field("series_count", &self.series_count)
+            .field("series_by_column", &self.series_by_column)
             .field("non_style_ref", &self.non_style_ref)
             .field("source_len", &self.source.len())
             .field("grid_source_len", &self.grid_source.map_or(0, <[u8]>::len))
@@ -385,6 +390,19 @@ impl<'source> ChartMetadataSnapshot<'source> {
     #[must_use]
     pub const fn series_count(self) -> usize {
         self.series_count
+    }
+
+    /// The data components that hold the chart's series, by its series
+    /// direction: the column labels of a by-column chart, otherwise
+    /// [`Self::series_count`]. Keynote's default pie is by column, with one
+    /// grid row and one wedge per column (record 0433).
+    #[must_use]
+    pub const fn series_components(self) -> usize {
+        if self.series_by_column {
+            self.column_labels.len()
+        } else {
+            self.series_count
+        }
     }
 
     /// Optional non-style object identifier, preserving absence.
@@ -748,6 +766,7 @@ pub fn decode_legacy_with_report<'source>(
 
 #[derive(Debug, Clone, Copy)]
 struct StrictModern<'source> {
+    series_by_column: bool,
     chart_type: i32,
     chart_type_present: bool,
     contains_default_data: Option<bool>,
@@ -804,6 +823,7 @@ fn preflight_modern_chart<'source>(
 ) -> Result<StrictModern<'source>, DecodeErrorKind> {
     let mut chart_type = None;
     let mut contains_default_data = None;
+    let mut series_by_column = false;
     let mut grid = None;
     let mut row_labels = LabelList::empty();
     let mut column_labels = LabelList::empty();
@@ -820,6 +840,12 @@ fn preflight_modern_chart<'source>(
                     ));
                 }
                 chart_type = Some(require_int32(field.varint()?)?);
+            },
+            MODERN_SERIES_DIRECTION_FIELD => {
+                // Any other wire shape reads as no direction, as before.
+                if let Ok(direction) = field.varint() {
+                    series_by_column = direction == SERIES_BY_COLUMN;
+                }
             },
             MODERN_DEFAULT_DATA_FIELD => {
                 if contains_default_data.is_some() {
@@ -854,6 +880,7 @@ fn preflight_modern_chart<'source>(
         }
     }
     Ok(StrictModern {
+        series_by_column,
         chart_type: chart_type.unwrap_or_default(),
         chart_type_present: chart_type.is_some(),
         contains_default_data,
@@ -1098,6 +1125,7 @@ fn project_modern<'source>(
         row_labels: strict.row_labels,
         column_labels: strict.column_labels,
         series_count: strict.series_count,
+        series_by_column: strict.series_by_column,
         non_style_ref: strict.non_style_ref,
         source: strict.root_source,
         grid_source: strict.grid_source,
@@ -1138,6 +1166,7 @@ fn project_legacy<'source>(
         row_labels: strict.row_labels,
         column_labels: strict.column_labels,
         series_count: strict.series_count,
+        series_by_column: false,
         non_style_ref: strict.non_style_ref,
         source,
         grid_source: strict.grid_source,

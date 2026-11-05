@@ -9,7 +9,7 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
 use litchi_pptx::presentation_properties::metadata::tracks::{
-    Block, CONTENT_TYPE, RELATIONSHIP_TYPE, Target, load,
+    Block, CONTENT_TYPE, Limits, RELATIONSHIP_TYPE, Target, load,
 };
 
 const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/caption-tracks/slide.xml");
@@ -19,7 +19,7 @@ const TRACK_DATA: &[u8] =
 #[test]
 fn presentation_caption_tracks_load_internal_webvtt() {
     let package = package_with_internal_track();
-    let tracks = load(&package).unwrap();
+    let tracks = load(&package, Limits::DEFAULT).unwrap();
 
     assert_eq!(tracks.len(), 1);
     assert_eq!(tracks[0].source_part_name, "/ppt/slides/slide1.xml");
@@ -59,7 +59,7 @@ fn presentation_caption_tracks_reject_invalid_sources() {
         );
 
     assert!(matches!(
-        load(&package),
+        load(&package, Limits::DEFAULT),
         Err(Error::Invalid(message)) if message.contains("invalid source")
     ));
 }

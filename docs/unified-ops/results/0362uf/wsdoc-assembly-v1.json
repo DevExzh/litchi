@@ -1,0 +1,118 @@
+{
+  "source": {
+    "commit": "eb718eece7e71c7e6756b537e7696ac0912a3ffe",
+    "status": "",
+    "branch": "uo2/coordinator-replay-integration",
+    "cargo_locks": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+    }
+  },
+  "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "policy": {
+    "runner_files": {
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+    },
+    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "memory_max": "20G",
+    "build_jobs": 1,
+    "test_threads": 1,
+    "target_guard_before": 19200000000,
+    "target_guard_after": 20000000000,
+    "free_guard": 12000000000
+  },
+  "selection": {
+    "only": [
+      "wsdoc"
+    ],
+    "start_at": null,
+    "indexes": [
+      34
+    ],
+    "full_step_count": 53,
+    "partial": true
+  },
+  "started": 1792770294.5805712,
+  "rows": [
+    {
+      "index": 34,
+      "total": 53,
+      "name": "wsdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "-q",
+        "--workspace",
+        "--no-deps",
+        "--all-features"
+      ],
+      "environment": {
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+        "CARGO_NET_OFFLINE": "true",
+        "LITCHI_MEM_MAX": "20G",
+        "CARGO_BUILD_JOBS": "1",
+        "RUST_TEST_THREADS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "RUSTDOCFLAGS": "-Dwarnings"
+      },
+      "exit": 101,
+      "seconds": 583.2082588672638,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-eb718/34-wsdoc.log",
+      "log_bytes": 389,
+      "log_sha256": "0f0667af960b657b9a1742111e4496cd79bc78aea849b493ee321028b7b3afc1",
+      "target_bytes_after": 3102195742,
+      "source_after": {
+        "commit": "eb718eece7e71c7e6756b537e7696ac0912a3ffe",
+        "status": "",
+        "branch": "uo2/coordinator-replay-integration",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+      },
+      "cargo_target_trace": [
+        {
+          "pid": "2381970",
+          "cargo_command": "doc",
+          "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target"
+        }
+      ],
+      "cargo_target_sizes": {
+        "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target": {
+          "bytes": 3102195742
+        }
+      },
+      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-eb718/34-cargo-targets.tsv",
+      "cargo_target_trace_bytes": 75,
+      "cargo_target_trace_sha256": "2822d39f88964b51c474fb39fe332c6e2e6fd6d887d768c065adb72d720aa8ff",
+      "preflight": {
+        "started": 1792770295.5487816,
+        "target_bytes": 0,
+        "free_bytes": 1952324644864,
+        "builders": []
+      },
+      "free_bytes_after": 1929909612544,
+      "effective_exit": 101,
+      "status": "failed"
+    }
+  ],
+  "updated": 1792770878.757233,
+  "note": "Isolated Litchi workspace rustdoc run reached stale ODB error-variant link; no memory kill. This run is failed and partial, not a full gate pass."
+}

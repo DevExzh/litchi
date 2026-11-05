@@ -55,7 +55,11 @@ pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Res
 }
 
 /// Stores a complete, inert `ActiveX` graph on a worksheet that has no controls.
-pub fn store_on_worksheet(
+///
+/// Storing changes the package, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
     value: &ControlSet,
@@ -67,7 +71,11 @@ pub fn store_on_worksheet(
 ///
 /// An empty set removes the graph. A typed package clone is used only for
 /// rollback; `ActiveX` payloads are still copied and never interpreted.
-pub fn replace_on_worksheet(
+///
+/// The signature policy is [`remove_from_worksheet`]'s and
+/// [`store_on_worksheet`]'s: a signed package is refused unless the call
+/// removes nothing from a worksheet without controls.
+pub(crate) fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
     value: &ControlSet,
@@ -93,7 +101,15 @@ pub fn replace_on_worksheet(
 ///
 /// Shared descriptor, binary, or preview parts are retained while any other
 /// internal relationship still targets them.
-pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) -> Result<bool> {
+///
+/// A worksheet without controls is left untouched and returns `false`, signed
+/// or not. Removing controls changes the package, so a signed package is
+/// refused with [`crate::Error::Signed`]: remove the signature explicitly
+/// first ([`OpcPackage::unsign`]).
+pub(crate) fn remove_from_worksheet(
+    package: &mut OpcPackage,
+    worksheet_uri: &PackURI,
+) -> Result<bool> {
     let loaded = load_from_worksheet(package, worksheet_uri)?;
     if loaded.controls.is_empty() {
         return Ok(false);
@@ -111,7 +127,7 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) 
         .filter_map(|item| item.preview.as_ref().map(|p| p.relationship_id.clone()))
         .collect();
     let remaining_ids = relationship_ids_in_xml(&updated)?;
-    package.unsign();
+    crate::signature_policy::ensure_unsigned(package)?;
     {
         let worksheet = package.get_part_mut(worksheet_uri)?;
         for id in &control_ids {
@@ -162,7 +178,7 @@ mod tests {
 
     const WS: &str = "/xl/worksheets/sheet1.xml";
     fn fixture(bytes: &[u8]) -> ControlSet {
-        let p = OpcPackage::from_bytes(bytes).unwrap();
+        let p = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         load_from_worksheet(&p, &PackURI::new(WS).unwrap()).unwrap()
     }
 
@@ -473,7 +489,7 @@ mod tests {
         assert!(xml.contains("</controls><tableParts count=\"0\"/><extLst/>"));
 
         let bytes = PackageWriter::to_bytes(&package).unwrap();
-        let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             load_from_worksheet(&reopened, &worksheet_uri).unwrap(),
             expected

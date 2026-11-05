@@ -74,7 +74,8 @@ fn post_eof_boolean_worksheet(shape: Shape) -> Vec<u8> {
 }
 
 fn source_for_shape(shape: Shape) -> (Vec<u8>, Vec<u8>) {
-    let mut package = OpcPackage::from_bytes(&two_sheets()).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&two_sheets(), litchi_opc::SourceLimits::default()).unwrap();
     let second_sheet = package
         .get_part(&PackURI::new(SECOND_SHEET).unwrap())
         .unwrap()
@@ -88,8 +89,11 @@ fn source_for_shape(shape: Shape) -> (Vec<u8>, Vec<u8>) {
 }
 
 fn selected_error(editor: &SourceBackedEditor) -> Error {
-    match editor.edit_sheets(["Sheet1".into()]) {
-        Ok(_) => panic!("post-EOF raw error was unexpectedly accepted"),
+    match editor
+        .edit_sheets(["Sheet1".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("post-EOF raw error was unexpectedly committed"),
         Err(error) => error,
     }
 }
@@ -142,11 +146,15 @@ fn assert_shape_contract(shape: Shape) {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!unaffected.changed(), "{} owner changed", shape.name());
-    assert!(unaffected.patch().is_empty());
-    assert_eq!(unaffected.snapshot().len(), 1);
+    assert!(
+        !unaffected.diagnostics().changed(),
+        "{} owner changed",
+        shape.name()
+    );
+    assert!(unaffected.patch().is_noop());
+    assert_eq!(unaffected.patch().after().len(), 1);
     assert_eq!(
-        unaffected.snapshot().value(0, address("A1")),
+        unaffected.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("20").unwrap()))
     );
 
@@ -160,7 +168,8 @@ fn assert_shape_contract(shape: Shape) {
         "{} failure polluted publication",
         shape.name()
     );
-    let published_archive = ArchiveReader::new(&published).unwrap();
+    let published_archive =
+        ArchiveReader::new(&published, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(
         published_archive
             .read(SECOND_SHEET.trim_start_matches('/'))

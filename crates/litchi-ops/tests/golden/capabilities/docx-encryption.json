@@ -1,0 +1,7463 @@
+{
+  "format": "docx",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": true
+    },
+    "remove": {
+      "supported": true
+    },
+    "move": {
+      "supported": true
+    },
+    "swap": {
+      "supported": true
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": true
+    },
+    "replace": {
+      "supported": true
+    },
+    "refresh": {
+      "supported": true
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    },
+    "dump": {
+      "supported": true
+    },
+    "raw": {
+      "supported": true
+    },
+    "validate": {
+      "supported": true
+    },
+    "add-part": {
+      "supported": true
+    },
+    "raw-set": {
+      "supported": true
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "docx",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        },
+        {
+          "element": "styles",
+          "pathSegment": "styles"
+        },
+        {
+          "element": "header",
+          "pathSegment": "header"
+        },
+        {
+          "element": "footer",
+          "pathSegment": "footer"
+        },
+        {
+          "element": "numbering",
+          "pathSegment": "numbering"
+        },
+        {
+          "element": "footnotes",
+          "pathSegment": "footnotes"
+        },
+        {
+          "element": "endnotes",
+          "pathSegment": "endnotes"
+        },
+        {
+          "element": "comments",
+          "pathSegment": "comments"
+        },
+        {
+          "element": "smartart",
+          "pathSegment": "smartart"
+        },
+        {
+          "element": "bookmark",
+          "pathSegment": "bookmark"
+        },
+        {
+          "element": "field",
+          "pathSegment": "field"
+        },
+        {
+          "element": "toc",
+          "pathSegment": "toc"
+        },
+        {
+          "element": "watermark",
+          "pathSegment": "watermark"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keywords": {
+          "type": "list",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.template": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.manager": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.company": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.application": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.applicationVersion": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.pages": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.words": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.characters": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.lines": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.paragraphs": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.totalTime": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "docx",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "sdt",
+          "pathSegment": "sdt"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "oMathPara"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "textbox",
+          "pathSegment": "textbox"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "paragraph",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]",
+          "/body/tbl[N]/tr[M]/tc[K]/p[J]",
+          "/body/sdt[N]/p[M]",
+          "/header[N]/p[M]",
+          "/footnote[N]/p[M]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "tab",
+          "pathSegment": "tab"
+        },
+        {
+          "element": "break",
+          "pathSegment": "break"
+        }
+      ],
+      "properties": {
+        "style": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "styleId": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "styleName": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineSpacing": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineRule": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "exact",
+            "atLeast"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeLines": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterLines": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeAuto": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterAuto": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leftChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepLines": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "widowControl": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contextualSpacing": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numId": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numLevel": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numFmt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "listStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outlineLvl": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "font.latin": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.ascii": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.hAnsi": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.ea": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.asciiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.hAnsiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.eaTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.csTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.hint": {
+          "type": "enum",
+          "values": [
+            "default",
+            "eastAsia",
+            "cs"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lang.latin": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lang.ea": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lang.cs": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.cs": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "size.cs": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "bold.cs": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "italic.cs": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "underline.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "strike": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "caps": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "smallcaps": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "dstrike": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "vanish": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "outline": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "emboss": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "imprint": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "noproof": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "superscript": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "subscript": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "position": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "charSpacing": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "rStyle": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/r[M]"
+        ]
+      },
+      "properties": {
+        "font.latin": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ascii": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsi": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ea": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.asciiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.eaTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.csTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hint": {
+          "type": "enum",
+          "values": [
+            "default",
+            "eastAsia",
+            "cs"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.latin": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.ea": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.cs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.cs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size.cs": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold.cs": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic.cs": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline.color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smallcaps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dstrike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "vanish": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outline": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "shadow": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "emboss": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "imprint": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "noproof": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "position": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "charSpacing": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "hyperlink",
+      "parent": "paragraph",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/hyperlink[M]"
+        ]
+      },
+      "properties": {
+        "url": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "docLocation": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tgtFrame": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font.cs": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "underline.color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rStyle": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "table",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]",
+          "/body/tbl[N]/tr[M]/tc[K]/tbl[J]"
+        ]
+      },
+      "children": [
+        {
+          "element": "row",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "cols": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rows": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rowBandSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "colBandSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "center",
+            "end",
+            "left",
+            "right",
+            "start"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "indent": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cellSpacing": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "layout": {
+          "type": "enum",
+          "values": [
+            "fixed",
+            "autofit"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tblLook": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.top": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.left": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.right": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedRows": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedCols": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "caption": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "colWidths": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "border.all": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.top": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.bottom": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.left": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.right": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.horizontal": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.vertical": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "row",
+      "parent": "table",
+      "elementAliases": [
+        "tr"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[M]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "height": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height.rule": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "exact",
+            "atLeast"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "header": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cantSplit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rowAlign": {
+          "type": "enum",
+          "values": [
+            "center",
+            "end",
+            "left",
+            "right",
+            "start"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "gridBefore": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "wBefore": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "gridAfter": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "wAfter": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cellSpacing": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "height.exact": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "height.atLeast": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "cell",
+      "parent": "row",
+      "elementAliases": [
+        "tc"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[M]/tc[K]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "sdt",
+          "pathSegment": "sdt"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "oMathPara"
+        }
+      ],
+      "properties": {
+        "width": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "valign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "both",
+            "bottom"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "vmerge": {
+          "type": "enum",
+          "values": [
+            "restart",
+            "continue"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hmerge": {
+          "type": "enum",
+          "values": [
+            "restart",
+            "continue"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "colspan": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.top": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.left": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.right": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "textDirection": {
+          "type": "enum",
+          "values": [
+            "tb",
+            "rl",
+            "lr",
+            "tbV",
+            "rlV",
+            "lrV",
+            "btLr",
+            "lrTb",
+            "lrTbV",
+            "tbLrV",
+            "tbRl",
+            "tbRlV"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nowrap": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hideMark": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tcFitText": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "sdt",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "contentcontrol"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/sdt[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "sdt",
+          "pathSegment": "sdt"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "oMathPara"
+        }
+      ],
+      "properties": {
+        "alias": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tag": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "equation",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "formula",
+        "math",
+        "omath",
+        "omathpara"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/oMathPara[N]"
+        ]
+      },
+      "properties": {
+        "mode": {
+          "type": "enum",
+          "values": [
+            "display",
+            "inline"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "section",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/section[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "header",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/header[@type=T]"
+        ],
+        "positional": [
+          "/header[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "default",
+            "first",
+            "even"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "field": {
+          "type": "enum",
+          "values": [
+            "page",
+            "numpages",
+            "date",
+            "author",
+            "title",
+            "time",
+            "filename"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "footer",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/footer[@type=T]"
+        ],
+        "positional": [
+          "/footer[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "default",
+            "first",
+            "even"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "field": {
+          "type": "enum",
+          "values": [
+            "page",
+            "numpages",
+            "date",
+            "author",
+            "title",
+            "time",
+            "filename"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "footnotes",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/footnotes"
+        ]
+      },
+      "children": [
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "footnote",
+      "parent": [
+        "document",
+        "footnotes"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/footnotes/footnote[N]",
+          "/footnote[N]"
+        ]
+      },
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "endnotes",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/endnotes"
+        ]
+      },
+      "children": [
+        {
+          "element": "endnote",
+          "pathSegment": "endnote"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "endnote",
+      "parent": [
+        "document",
+        "endnotes"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/endnotes/endnote[N]",
+          "/endnote[N]"
+        ]
+      },
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "comments",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/comments"
+        ]
+      },
+      "children": [
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "comment",
+      "parent": "comments",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/comments/comment[N]"
+        ]
+      },
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "done": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "parentId": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "runStart": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "range": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "styles",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/styles"
+        ]
+      },
+      "children": [
+        {
+          "element": "style",
+          "pathSegment": "<id or name>"
+        }
+      ],
+      "properties": {
+        "count": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "style",
+      "parent": "styles",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/styles/<id or name>"
+        ]
+      },
+      "properties": {
+        "id": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "paragraph",
+            "character",
+            "table",
+            "numbering"
+          ],
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "default": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "basedOn": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "basedOn.path": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "next": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "linked": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "autoRedefine": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "qFormat": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "uiPriority": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "semiHidden": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "unhideWhenUsed": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "locked": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "customStyle": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ascii": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsi": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ea": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.cs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.asciiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.eaTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.csTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size.cs": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold.cs": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic.cs": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline.color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dstrike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smallCaps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "vanish": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "charSpacing": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.latin": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.ea": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.cs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeAuto": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterAuto": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineSpacing": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineRule": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "exact",
+            "atLeast"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeLines": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterLines": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leftIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leftChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightChars": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outlineLvl": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepLines": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "widowControl": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contextualSpacing": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numId": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numLevel": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "numbering",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/numbering"
+        ]
+      },
+      "children": [
+        {
+          "element": "abstractNum",
+          "pathSegment": "abstractNum"
+        },
+        {
+          "element": "num",
+          "pathSegment": "num"
+        }
+      ],
+      "properties": {
+        "abstractNumCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "abstractNum",
+      "parent": "numbering",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/numbering/abstractNum[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "level",
+          "pathSegment": "level"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "hybridMultilevel",
+            "multilevel",
+            "singleLevel"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "styleLink": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numStyleLink": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "num",
+      "parent": "numbering",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/numbering/num[N]"
+        ]
+      },
+      "properties": {
+        "abstractNumId": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "startOverride.0": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.1": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.2": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.3": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.4": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.5": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.6": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.7": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "startOverride.8": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "continue": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "hybridMultilevel",
+            "multilevel",
+            "singleLevel"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "styleLink": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "numStyleLink": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level0.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level1.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level2.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level3.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level4.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level5.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level6.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level7.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.start": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.indent": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.hanging": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.color": {
+          "type": "color",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "level8.italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "level",
+      "parent": "abstractNum",
+      "elementAliases": [
+        "lvl"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/numbering/abstractNum[N]/level[L]"
+        ]
+      },
+      "properties": {
+        "start": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lvlText": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "justification": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "suff": {
+          "type": "enum",
+          "values": [
+            "tab",
+            "space",
+            "nothing"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lvlRestart": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "isLgl": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hanging": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "settings",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/settings"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "the settings part has no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "theme",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/theme"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "the theme part has no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "bookmark",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/bookmark[@name=X]"
+        ],
+        "positional": [
+          "/bookmark[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "id": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "field",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/field[N]"
+        ]
+      },
+      "properties": {
+        "fieldType": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "instruction": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fldLock": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "evaluated": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "bookmarkName": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "format": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "hyperlink": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "expression": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "trueText": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "falseText": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "formfield",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/formfield[NAME]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "legacy form fields have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "picture",
+      "parent": "paragraph",
+      "elementAliases": [
+        "image",
+        "img"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/picture[M]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "relId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "chart",
+      "parent": [
+        "paragraph",
+        "document"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/chart[M]",
+          "/chart[N]",
+          "/body/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "catTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "axisTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "colors": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dataLabels": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "labelPos": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "varyColors": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "gapWidth": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overlap": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "holeSize": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstSliceAngle": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "scatterStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "radarStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smooth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "explosion": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend.overlay": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "autoTitleDeleted": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisMin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisMax": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "majorUnit": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "gridlines": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minorGridlines": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "comboTypes": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "comboSplit": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "marker": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "markerSize": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showMarkers": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineWidth": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "view3d": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "increaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "decreaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "totalColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binCount": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binSize": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "intervalClosed": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "quartileMethod": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "parentLabelLayout": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "series1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series1.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "ole",
+      "parent": "paragraph",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/ole[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "embedded objects have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "toc",
+      "parent": "document",
+      "elementAliases": [
+        "tableofcontents"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/toc[N]"
+        ]
+      },
+      "properties": {
+        "levels": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hyperlinks": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "pageNumbers": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "revision",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/revision[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "tracked revisions have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "watermark",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/watermark"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "textbox",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/textbox[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "shape",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/shape[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "drawing shapes have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "break",
+      "parent": "paragraph",
+      "elementAliases": [
+        "br",
+        "pagebreak"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/break[M]"
+        ]
+      },
+      "properties": {
+        "breakType": {
+          "type": "enum",
+          "values": [
+            "page",
+            "column",
+            "textWrapping",
+            "line"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "page",
+            "column",
+            "textWrapping",
+            "line"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "tab",
+      "parent": "paragraph",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/tab[M]"
+        ]
+      },
+      "properties": {
+        "pos": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "val": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "decimal",
+            "bar",
+            "clear",
+            "num",
+            "start",
+            "end"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leader": {
+          "type": "enum",
+          "values": [
+            "none",
+            "dot",
+            "heavy",
+            "hyphen",
+            "middleDot",
+            "underscore"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "smartart",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/smartart[N]",
+          "/body/smartart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "node",
+          "pathSegment": "node"
+        }
+      ],
+      "properties": {
+        "layout": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "layoutId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nodeCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/chart[M]/series[K]",
+          "/chart[N]/series[K]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/chart[M]/axis[@role=ROLE]",
+          "/body/p[N]/chart[M]/axis[N]",
+          "/chart[N]/axis[@role=ROLE]"
+        ]
+      },
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "node",
+      "parent": [
+        "smartart",
+        "node"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/smartart[N]/node[K]",
+          "/smartart[N]/node[K]/node[J]"
+        ]
+      },
+      "children": [
+        {
+          "element": "node",
+          "pathSegment": "node"
+        }
+      ],
+      "properties": {
+        "level": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "column",
+      "parent": "table",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/col[M]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "settings",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-R6 (R4x)",
+      "reason": "the settings part has no node adapter yet"
+    },
+    {
+      "subject": "element",
+      "element": "theme",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-R6 (R4x)",
+      "reason": "the theme part has no node adapter yet"
+    },
+    {
+      "subject": "element",
+      "element": "formfield",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "legacy form fields have no located reader yet"
+    },
+    {
+      "subject": "element",
+      "element": "ole",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "embedded objects have no located reader yet"
+    },
+    {
+      "subject": "element",
+      "element": "revision",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "tracked revisions have no located reader yet"
+    },
+    {
+      "subject": "element",
+      "element": "shape",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "drawing shapes have no located reader yet"
+    },
+    {
+      "subject": "element",
+      "element": "bookmarkEnd",
+      "code": "unsupported_capability",
+      "followUp": "0339-F2 (deferred-P1)",
+      "reason": "a bookmark is one node over its start and end markers (record 0319); a standalone end marker is not addressed or added on its own"
+    },
+    {
+      "subject": "element",
+      "element": "permStart",
+      "code": "unsupported_capability",
+      "followUp": "0339-F2 (deferred-P1)",
+      "reason": "editing-permission ranges (w:permStart, w:permEnd) are kept but not projected as nodes"
+    },
+    {
+      "subject": "element",
+      "element": "ptab",
+      "code": "unsupported_capability",
+      "followUp": "0339-F2 (deferred-P1)",
+      "reason": "positional tabs (w:ptab) are kept in their runs but not projected as nodes"
+    },
+    {
+      "subject": "element",
+      "element": "fieldChar",
+      "code": "unsupported_capability",
+      "followUp": "none: out of scope (record 0332)",
+      "reason": "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements"
+    },
+    {
+      "subject": "element",
+      "element": "instrText",
+      "code": "unsupported_capability",
+      "followUp": "none: out of scope (record 0332)",
+      "reason": "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements"
+    },
+    {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
+    },
+    {
+      "subject": "property",
+      "element": "sdt",
+      "key": "type",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "the leaf reads a content control's id, tag and alias only"
+    },
+    {
+      "subject": "property",
+      "element": "sdt",
+      "key": "lock",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "the leaf reads a content control's id, tag and alias only"
+    },
+    {
+      "subject": "property",
+      "element": "section",
+      "key": "pageWidth",
+      "code": "unsupported_capability",
+      "followUp": "R4x",
+      "reason": "section properties are read through the section inventory, which the node view does not wire yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph",
+      "context": "wrapped-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position (record 0307)"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "run",
+      "context": "wrapped-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2",
+      "reason": "direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph/run",
+      "context": "mixed-paragraph-run-fanout",
+      "code": "unsupported_capability",
+      "followUp": "M2 (homogeneous mutation fanout)",
+      "reason": "one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011 / record 0307 (text-box stories)",
+      "reason": "fields and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits; markup-compatibility alternate content in a run is one opaque object, so a text set over one whose branches hold text (a text box) is refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "paragraph",
+      "context": "wrapped-or-unproven-parent",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "run",
+      "context": "wrapped-or-unproven-parent",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2",
+      "reason": "runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph/run",
+      "context": "wrapped-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / L-DOCX-W3",
+      "reason": "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph/run",
+      "context": "wrapped-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "paragraph/run",
+      "context": "nested-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "noncore-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (DOCX core properties)",
+      "reason": "initial metadata outside the DOCX core-properties part is not representable by the creator and is refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "text-paragraph-and-soft-breaks",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "full text-output parity remains incomplete; paragraph addition splits normalized LF into paragraphs with VT inline breaks; run setters update the first literal text node and mark the owning same-paragraph cached field dirty; run addition and paragraph setters normalize controls to inline breaks"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "read-and-extended-commands",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "get, query, view, raw, raw-set, add-part, validate and import are not integrated into batch item results"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "non-v2-dump-metadata",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "dumpVersion other than explicit v2 is refused for the whole batch; absent metadata uses current semantics"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "add-from",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "copying an add source requires typed transfer families not yet integrated into the command channel"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "move-properties",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "move-time property assignments are not integrated and are never silently dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "move-parent-and-relative-anchor",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "move to a parent combined with before or after is not represented by the current placement model"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "edit",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "unlocked-encrypted-owner",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
+    },
+    {
+      "subject": "operation",
+      "verb": "save",
+      "element": "document",
+      "context": "encrypted-without-reencrypt",
+      "code": "document_protected",
+      "followUp": "SaveOptions::reencrypt",
+      "reason": "an encrypted DOCX cannot be published as plain bytes because that would silently downgrade its protection profile"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

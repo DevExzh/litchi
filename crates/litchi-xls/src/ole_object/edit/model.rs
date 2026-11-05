@@ -67,9 +67,12 @@ impl Snapshot {
     }
 
     /// Starts an independent failure-atomic edit.
+    /// A codec-level edit of this bare snapshot (tests only); package
+    /// callers use [`crate::Package::edit_ole_objects`].
+    #[cfg(test)]
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> super::Edit {
+        super::Edit::new(None, self.clone())
     }
 
     /// Publishes this immutable snapshot without rebuilding the CFB.
@@ -155,9 +158,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.source.as_ref() != self.before.as_ref() {
-            return Err(Error::UnsafeEdit(
-                "OLE-object patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit OLE objects",
+                reason: "OLE-object patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -175,46 +179,150 @@ impl Patch {
     }
 }
 
-/// A validated immutable publication containing the resulting snapshot and
-/// its reversible patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
+/// A published OLE-object edit: the new package, its exact artifact patch
+/// and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
+
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
+
+/// A configured OLE-object capture or publication resource dimension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Selected embedded object count.
+    Objects,
+    /// Bytes retained for one standalone embedded compound file.
+    ObjectBytes,
+    /// Directory entries visited during bounded capture.
+    DirectoryEntries,
+    /// Captured descendant storage count.
+    Storages,
+    /// Nested storage depth.
+    StorageDepth,
+    /// Captured stream count, bounded by both object and package policies.
+    Streams,
+    /// Bytes in one stream, before reading its payload.
+    StreamBytes,
+    /// Aggregate captured stream bytes.
+    AggregateBytes,
 }
 
-impl Commit {
-    pub(super) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
+impl LimitKind {
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::Objects => "OLE object count",
+            Self::ObjectBytes => "OLE object bytes",
+            Self::DirectoryEntries => "OLE directory entries",
+            Self::Storages => "OLE storage count",
+            Self::StorageDepth => "OLE storage depth",
+            Self::Streams => "OLE stream count",
+            Self::StreamBytes => "OLE stream bytes",
+            Self::AggregateBytes => "OLE aggregate stream bytes",
+        }
     }
 
-    /// Returns the post-edit typed snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub(crate) const fn exceeded(self, observed: u64, maximum: u64) -> Error {
+        Error::Limit {
+            kind: crate::LimitKind::OleObject(self),
+            observed,
+            maximum,
+        }
     }
 
-    /// Returns the source-checked reversible patch.
+    pub(crate) const fn invalid_zero(self) -> Error {
+        Error::InvalidLimit {
+            kind: crate::LimitKind::OleObject(self),
+            value: 0,
+            maximum: match self {
+                Self::ObjectBytes | Self::StreamBytes | Self::AggregateBytes => u64::MAX,
+                _ => usize::MAX as u64,
+            },
+        }
+    }
+}
+
+/// Per-edit configuration of an OLE-object edit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Limits,
+}
+
+impl EditOptions {
+    /// Default options: the default object capture bounds.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Whether publication changed any artifact byte.
+    /// Select the object capture bounds.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
-    /// Consumes the publication into its post-edit snapshot.
+    /// The selected object capture bounds.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+}
+
+impl crate::Package {
+    /// The OLE-object and form-control read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a supported BIFF8 workbook.
+    pub fn ole_objects(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::open(bytes, Limits::default())
     }
 
-    /// Consumes the publication into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
+    /// Start an OLE-object edit of this package with the default bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted, protected or unsupported workbook.
+    pub fn edit_ole_objects(&self) -> Result<super::Edit> {
+        self.edit_ole_objects_with_options(EditOptions::default())
+    }
+
+    /// Start an OLE-object edit of this package under explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::edit_ole_objects`], or a limit
+    /// error when the package exceeds `options`.
+    pub fn edit_ole_objects_with_options(&self, options: EditOptions) -> Result<super::Edit> {
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::Protected,
+                "edit OLE objects",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(super::Edit::lazy(
+            Some(self.clone()),
+            self.clone(),
+            options.limits_value(),
+        ))
+    }
+
+    /// Replay an OLE-object patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_ole_objects(&self, patch: &Patch) -> Result<Commit> {
+        crate::scoped::replay_source(self, patch.before(), "edit OLE objects")?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), patch.after())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

@@ -5,8 +5,9 @@ The concrete iWork crates intentionally have a physical ``Package`` API.  A
 whole-crate dependency scan would therefore reject the package boundary (for
 example its caller-selected archive limits) and would also classify semantic
 names such as ``identifier`` as native IDs.  This gate starts at each crate's
-public ``document`` module (or crate-root re-exports when that implementation
-module is private), follows the semantic types reachable from that module,
+public semantic projection module -- ``document`` for Numbers and Pages,
+``presentation`` for Keynote (ADR 0034 deck noun, record 0298) -- or at the
+crate-root re-exports when that implementation module is private, follows the semantic types reachable from that module,
 and checks the resulting rustdoc surface instead.
 
 Rustdoc JSON is used rather than source text so resolved aliases, re-exports,
@@ -41,6 +42,21 @@ LEAF_PACKAGES = (
 LEAF_CRATE_NAMES = {package: package.replace("-", "_") for package in LEAF_PACKAGES}
 
 
+# The family-named semantic projection module of each leaf crate (ADR 0034
+# §2): `workbook` for Numbers (record 0297), `document` for Pages and
+# `presentation` for Keynote (record 0298).
+SEMANTIC_MODULES = {
+    "litchi_numbers": "workbook",
+    "litchi_pages": "document",
+    "litchi_keynote": "presentation",
+}
+
+
+def semantic_module(crate_name: str) -> str:
+    """Return the public semantic projection module name of one leaf crate."""
+    return SEMANTIC_MODULES[crate_name.replace("-", "_")]
+
+
 DEFAULT_JSON = {
     crate_name: ROOT / "target" / "doc" / f"{crate_name}.json"
     for crate_name in LEAF_CRATE_NAMES.values()
@@ -68,7 +84,6 @@ ALLOWED_EXTERNAL_CRATES = frozenset(
 FORBIDDEN_CRATES = frozenset(
     {
         "buffa",
-        "litchi_iwa",
         "litchi_iwa_archive",
         "litchi_iwa_common",
         "litchi_iwa_core",
@@ -83,6 +98,35 @@ FORBIDDEN_CRATES = frozenset(
         "prost_types",
     }
 )
+
+
+# Archive-free semantic value modules inside an otherwise forbidden crate.
+# `litchi-iwa-common` mixes wire helpers with the neutral table vocabulary
+# that Pages, Keynote and Numbers share, so the crate stays forbidden and only
+# these module prefixes are allowed. Each module imports nothing but `std` and
+# its siblings in this list (`tools/test_check_iwork_leaf_public_api.py`
+# verifies that from the sources); record 0300 triaged the 45 Numbers
+# findings to these three modules.
+ALLOWED_SEMANTIC_MODULES: Mapping[tuple[str, ...], str] = {
+    ("litchi_iwa_common", "table", "model"): (
+        "shared sparse table model (Table, Builder, Cell, Grid, View, "
+        "Dimensions and their errors) behind the Numbers table facade"
+    ),
+    ("litchi_iwa_common", "table", "coordinate"): (
+        "checked cell coordinates and A1 ranges (At, Area)"
+    ),
+    ("litchi_iwa_common", "table", "cell", "value"): (
+        "presence-preserving semantic cell values"
+    ),
+}
+
+
+def _allowed_semantic_module(path: tuple[str, ...]) -> bool:
+    """Return whether a resolved path lies in an allowlisted value module."""
+    return any(
+        path[: len(prefix)] == prefix and len(path) > len(prefix)
+        for prefix in ALLOWED_SEMANTIC_MODULES
+    )
 
 
 RAW_ARGUMENT_NAMES = frozenset(
@@ -264,13 +308,14 @@ def _is_keynote_selector_error_bridge(
 ) -> bool:
     """Ignore Keynote's generated selector-to-package error bridge.
 
-    ``EditError::Selector(#[from])`` generates an ``automatically_derived``
-    ``From<SlideSelectorError> for EditError`` implementation.  Rustdoc emits
+    ``edit::Error::Selector(#[from])`` (``EditError`` before record 0298)
+    generates an ``automatically_derived``
+    ``From<SlideSelectorError> for edit::Error`` implementation.  Rustdoc emits
     that implementation without a path entry, so a semantic graph walk that
     follows all local implementation IDs can reach the physical package error
     even though no document method has that error in its signature.  Keep this
     exception exact: only this generated implementation in the Keynote crate
-    is outside the semantic-reader graph.  A direct ``EditError`` reference
+    is outside the semantic-reader graph.  A direct ``edit::Error`` reference
     still goes through normal path validation.
     """
     if crate_name != "litchi_keynote" or not isinstance(item, dict):
@@ -320,7 +365,7 @@ def _is_keynote_selector_error_bridge(
         crate_name,
         "package",
         "edit",
-        "EditError",
+        "Error",
     )
 
 
@@ -366,6 +411,11 @@ def _semantic_path_violation(
     if not path:
         return None
     referenced_crate = _crate_path(path)
+    if _allowed_semantic_module(path):
+        reason = _name_violation(path[-1])
+        if reason is not None:
+            return f"{reason} `{'::'.join(path)}`"
+        return None
     if referenced_crate in FORBIDDEN_CRATES:
         return f"forbidden type `{'::'.join(path)}`"
     if referenced_crate == crate_name:
@@ -386,12 +436,18 @@ def _semantic_path_violation(
 def _document_ids(
     index: Mapping[str, Any], paths: Mapping[str, Any], crate_name: str
 ) -> tuple[set[str], str | None]:
-    """Return the public document module and its root re-export targets."""
-    module_path = (crate_name, "document")
+    """Return the public semantic-projection module and its root re-export
+    targets.
+
+    The projection module is named for its family (ADR 0034 §2): `document`
+    for word processing, `workbook` for spreadsheets (record 0297) and
+    `presentation` for decks; each crate is checked at its own family module.
+    """
+    module_paths = ((crate_name, semantic_module(crate_name)),)
     roots = {
         item_id
         for item_id, entry in paths.items()
-        if _path_entry_path(entry) == module_path
+        if _path_entry_path(entry) in module_paths
     }
 
     # A root `pub use document::{...}` has a root path but points at the
@@ -428,11 +484,11 @@ def _document_ids(
         is_root_alias = item_id in crate_root_items or (
             crate_root_id is None and item_path[:1] == (crate_name,)
         )
-        if target_path[:2] == module_path and is_root_alias:
+        if target_path[:2] in module_paths and is_root_alias:
             roots.add(item_id)
 
     if not roots:
-        return set(), f"missing public module `{crate_name}::document`"
+        return set(), f"missing public module `{crate_name}::{semantic_module(crate_name)}`"
     return roots, None
 
 

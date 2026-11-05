@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{LegacyNumberingAlignment, LegacyNumberingFormat, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{LegacyNumberingAlignment, LegacyNumberingFormat, write::Writer};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\pnseclvl1\pnucrm\pnqc\pnstart3\pnindent720\pnsp144\pnhang\pnprev\pnf2
@@ -17,7 +18,7 @@ Body}";
 
 #[test]
 fn parses_decodes_and_round_trips_legacy_section_numbering() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let numbering = doc.legacy_section_numbering();
     assert_eq!(numbering.levels().len(), 2);
     let first = numbering.get(1).unwrap();
@@ -34,13 +35,12 @@ fn parses_decodes_and_round_trips_legacy_section_numbering() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    RtfWriter::new(&mut first_bytes)
-        .write_document(&doc)
-        .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first_bytes).unwrap();
+    Writer::new(&mut first_bytes).write_document(&doc).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(numbering, reparsed.legacy_section_numbering());
     let mut second_bytes = Vec::new();
-    RtfWriter::new(&mut second_bytes)
+    Writer::new(&mut second_bytes)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first_bytes, second_bytes);
@@ -60,7 +60,7 @@ fn rejects_malformed_legacy_section_numbering() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -68,9 +68,12 @@ fn rejects_malformed_legacy_section_numbering() {
 
 #[test]
 fn parses_real_libreoffice_pnseclvl_fixture() {
-    let doc = RtfDocument::parse_bytes(include_bytes!(
-        "../../../test-data/libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf"
-    ))
+    let doc = Tree::parse_bytes(
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let numbering = doc.legacy_section_numbering();
     assert_eq!(numbering.levels().len(), 9);

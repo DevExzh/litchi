@@ -6,6 +6,7 @@
 //! authors, clocks, or collaboration behavior from them.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
@@ -13,10 +14,11 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Id, Shape, Snapshot, State};
-pub use transaction::{Commit, Diagnostics, Edit, Patch};
+pub(crate) use transaction::Draft;
 
-pub(crate) use package::{apply_commit, apply_patch, load};
+pub(crate) use package::{apply_commit_with_limits, load_with_limits};
 
 /// Office 2010 `PowerPoint` `p14` namespace used by both identifier elements.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";

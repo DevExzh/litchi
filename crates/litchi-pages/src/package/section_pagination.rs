@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, encode_varint_into, varint::encoded_len, wire::WireView,
 };
@@ -13,7 +13,7 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::pages_section_codec::{
     DecodeOptions as ProjectionOptions, PaginationSnapshot, decode_pagination,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{
     MAX_SECTIONS, NativeSectionReference, Package, PackageError, SECTION_MESSAGE_TYPE,
@@ -30,7 +30,7 @@ const STARTING_PAGE_NUMBER_FIELD: u32 = 22;
 /// published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SectionPaginationLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package bytes.
@@ -53,7 +53,7 @@ pub enum SectionPaginationLimitKind {
     WireWork,
 }
 
-impl fmt::Display for SectionPaginationLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -74,34 +74,16 @@ impl fmt::Display for SectionPaginationLimitKind {
 ///
 /// Errors intentionally omit native identifiers, member names, document
 /// content, raw bytes, and lower-layer diagnostic strings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SectionPaginationError {
-    /// More than one section matched an exact-name selector.
-    #[error(
-        "the Pages section-pagination selector is ambiguous at positions {first:?} and {duplicate:?}"
-    )]
-    AmbiguousSelector {
-        /// First matching source position.
-        first: Position,
-        /// Next matching source position.
-        duplicate: Position,
-    },
-    /// No section matched an exact-name selector.
-    #[error("the Pages section-pagination selector did not match a section")]
-    NameNotFound,
-    /// No section exists at the requested source position.
-    #[error("the Pages section position {position:?} does not exist")]
-    PositionNotFound {
-        /// Requested semantic source position.
-        position: Position,
-    },
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The requested pagination violates a public semantic invariant.
     #[error("invalid Pages section pagination: {0}")]
     InvalidPagination(#[source] section::pagination::Error),
-    /// The snapshot has no exact physical source suitable for a changed edit.
-    #[error("this Pages source does not support physical section-pagination edits")]
-    UnsupportedSource,
     /// The selected native section cannot be decoded or rewritten safely.
     #[error("the Pages source cannot be edited safely")]
     InvalidSource,
@@ -109,9 +91,9 @@ pub enum SectionPaginationError {
     #[error(
         "Pages section-pagination {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
-        kind: SectionPaginationLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -131,29 +113,77 @@ pub enum SectionPaginationError {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// More than one section matched an exact-name selector.
+    #[error(
+        "the Pages section-pagination selector is ambiguous at positions {first:?} and {duplicate:?}"
+    )]
+    AmbiguousSelector {
+        /// First matching source position.
+        first: Position,
+        /// Next matching source position.
+        duplicate: Position,
+    },
+    /// No section matched an exact-name selector.
+    #[error("the Pages section-pagination selector did not match a section")]
+    NameNotFound,
+    /// No section exists at the requested source position.
+    #[error("the Pages section position {position:?} does not exist")]
+    PositionNotFound {
+        /// Requested semantic source position.
+        position: Position,
+    },
+    /// The snapshot has no exact physical source suitable for a changed edit.
+    #[error("this Pages source does not support physical section-pagination edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousSelector { .. } => RefusalKind::InvalidValue,
+            Self::NameNotFound { .. } | Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 /// A mutable pagination value staged against one immutable Pages package.
-pub struct SectionPaginationEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     position: Position,
     before: section::Pagination,
     pagination: section::Pagination,
 }
 
-impl fmt::Debug for SectionPaginationEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SectionPaginationEdit")
+            .debug_struct("Edit")
             .field("position", &self.position)
             .field("pagination", &self.pagination)
             .finish_non_exhaustive()
     }
 }
 
-impl<'a> SectionPaginationEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'selector>(
         source: &'a Package,
         selector: impl Into<SectionSelector<'selector>>,
-    ) -> Result<Self, SectionPaginationError> {
+    ) -> Result<Self, Error> {
         let position = resolve_position(source, selector)?;
         let before = pagination_at(source, position)?;
         Ok(Self {
@@ -180,15 +210,10 @@ impl<'a> SectionPaginationEdit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`SectionPaginationError::InvalidPagination`] without changing
+    /// Returns [`Error::InvalidPagination`] without changing
     /// the staged value when a known enum value uses a noncanonical alias.
-    pub fn set_pagination(
-        &mut self,
-        pagination: section::Pagination,
-    ) -> Result<&mut Self, SectionPaginationError> {
-        pagination
-            .validate()
-            .map_err(SectionPaginationError::InvalidPagination)?;
+    pub fn set_pagination(&mut self, pagination: section::Pagination) -> Result<&mut Self, Error> {
+        pagination.validate().map_err(Error::InvalidPagination)?;
         self.pagination = pagination;
         Ok(self)
     }
@@ -197,16 +222,11 @@ impl<'a> SectionPaginationEdit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`SectionPaginationError::InvalidPagination`] when a known
+    /// Returns [`Error::InvalidPagination`] when a known
     /// value is represented by an `Unknown` alias.
-    pub fn set_start(
-        &mut self,
-        start: Option<section::Start>,
-    ) -> Result<&mut Self, SectionPaginationError> {
+    pub fn set_start(&mut self, start: Option<section::Start>) -> Result<&mut Self, Error> {
         let mut staged = self.pagination;
-        staged
-            .set_start(start)
-            .map_err(SectionPaginationError::InvalidPagination)?;
+        staged.set_start(start).map_err(Error::InvalidPagination)?;
         self.pagination = staged;
         Ok(self)
     }
@@ -215,16 +235,16 @@ impl<'a> SectionPaginationEdit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`SectionPaginationError::InvalidPagination`] when a known
+    /// Returns [`Error::InvalidPagination`] when a known
     /// value is represented by an `Unknown` alias.
     pub fn set_page_numbering(
         &mut self,
         numbering: Option<section::PageNumbering>,
-    ) -> Result<&mut Self, SectionPaginationError> {
+    ) -> Result<&mut Self, Error> {
         let mut staged = self.pagination;
         staged
             .set_page_numbering(numbering)
-            .map_err(SectionPaginationError::InvalidPagination)?;
+            .map_err(Error::InvalidPagination)?;
         self.pagination = staged;
         Ok(self)
     }
@@ -251,21 +271,21 @@ impl<'a> SectionPaginationEdit<'a> {
     ///
     /// Returns an error without modifying `source` when selection, source
     /// topology, resource bounds, physical preservation, or readback fails.
-    pub fn commit(self) -> Result<SectionPaginationCommit, SectionPaginationError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         self.pagination
             .validate()
-            .map_err(SectionPaginationError::InvalidPagination)?;
+            .map_err(Error::InvalidPagination)?;
         self.source.validate().map_err(map_package_error)?;
         if pagination_at(self.source, self.position)? != self.before {
-            return Err(SectionPaginationError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
 
         let source_bytes = self.source.state.source.shared_source();
         let source_fingerprint = fingerprint(&source_bytes);
         if self.before == self.pagination {
-            return Ok(SectionPaginationCommit {
-                package: self.source.snapshot(),
-                patch: SectionPaginationPatch {
+            return Ok(Commit {
+                package: self.source.clone(),
+                patch: Patch {
                     source_bytes: Arc::clone(&source_bytes),
                     target_bytes: source_bytes,
                     source_fingerprint,
@@ -274,20 +294,20 @@ impl<'a> SectionPaginationEdit<'a> {
                     before: self.before,
                     after: self.pagination,
                 },
-                diagnostics: SectionPaginationDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
         if !self.source.state.source.source_is_exact() {
-            return Err(SectionPaginationError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let package =
             rewrite_package_pagination(self.source, self.position, self.before, self.pagination)?;
         let target_bytes = package.state.source.shared_source();
         let target_fingerprint = fingerprint(&target_bytes);
-        Ok(SectionPaginationCommit {
+        Ok(Commit {
             package,
-            patch: SectionPaginationPatch {
+            patch: Patch {
                 source_bytes,
                 target_bytes,
                 source_fingerprint,
@@ -296,7 +316,7 @@ impl<'a> SectionPaginationEdit<'a> {
                 before: self.before,
                 after: self.pagination,
             },
-            diagnostics: SectionPaginationDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -307,7 +327,7 @@ impl<'a> SectionPaginationEdit<'a> {
 /// private. Fingerprints are diagnostics only; exact byte comparison
 /// authorizes application.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SectionPaginationPatch {
+pub struct Patch {
     source_bytes: Arc<[u8]>,
     target_bytes: Arc<[u8]>,
     source_fingerprint: u64,
@@ -317,10 +337,10 @@ pub struct SectionPaginationPatch {
     after: section::Pagination,
 }
 
-impl fmt::Debug for SectionPaginationPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SectionPaginationPatch")
+            .debug_struct("Patch")
             .field("position", &self.position)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -328,7 +348,7 @@ impl fmt::Debug for SectionPaginationPatch {
     }
 }
 
-impl SectionPaginationPatch {
+impl Patch {
     /// Return the semantic source position selected by this patch.
     #[must_use]
     pub const fn position(&self) -> Position {
@@ -384,13 +404,13 @@ impl SectionPaginationPatch {
 
 /// Compact evidence describing one section-pagination commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SectionPaginationDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl SectionPaginationDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -429,13 +449,13 @@ impl SectionPaginationDiagnostics {
 /// The fully verified result of one immutable section-pagination transaction.
 #[must_use = "a Pages section-pagination commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SectionPaginationCommit {
+pub struct Commit {
     package: Package,
-    patch: SectionPaginationPatch,
-    diagnostics: SectionPaginationDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SectionPaginationCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -448,15 +468,21 @@ impl SectionPaginationCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SectionPaginationPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SectionPaginationDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -471,7 +497,7 @@ impl Package {
     pub fn section_pagination<'selector>(
         &self,
         selector: impl Into<SectionSelector<'selector>>,
-    ) -> Result<section::Pagination, SectionPaginationError> {
+    ) -> Result<section::Pagination, Error> {
         let position = resolve_position(self, selector)?;
         pagination_at(self, position)
     }
@@ -488,8 +514,8 @@ impl Package {
     pub fn edit_section_pagination<'selector>(
         &self,
         selector: impl Into<SectionSelector<'selector>>,
-    ) -> Result<SectionPaginationEdit<'_>, SectionPaginationError> {
-        SectionPaginationEdit::new(self, selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, selector)
     }
 
     /// Apply an exact-source-checked section-pagination patch.
@@ -499,51 +525,46 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`SectionPaginationError::PatchConflict`] unless this package
+    /// Returns [`Error::PatchConflict`] unless this package
     /// is the exact immutable source captured by `patch`, or another typed
     /// error when the retained target cannot be safely published.
-    pub fn apply_section_pagination(
-        &self,
-        patch: &SectionPaginationPatch,
-    ) -> Result<SectionPaginationCommit, SectionPaginationError> {
+    pub fn apply_section_pagination(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = &self.state.source;
         let source_bytes = source.shared_source();
         if fingerprint(source.source_bytes()) != patch.source_fingerprint
             || source.source_bytes() != patch.source_bytes.as_ref()
             || source_bytes.as_ref() != patch.source_bytes.as_ref()
         {
-            return Err(SectionPaginationError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         self.validate().map_err(map_package_error)?;
         if pagination_at(self, patch.position)? != patch.before {
-            return Err(SectionPaginationError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
 
         if patch.is_noop() {
-            return Ok(SectionPaginationCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: SectionPaginationDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source.source_is_exact() || fingerprint(&patch.target_bytes) != patch.target_fingerprint
         {
-            return Err(SectionPaginationError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
 
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source = source
+            .reopen(Arc::clone(&patch.target_bytes))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         candidate.validate().map_err(map_package_error)?;
         verify_candidate(self, &candidate, patch.position, patch.after)?;
-        Ok(SectionPaginationCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: SectionPaginationDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -551,16 +572,16 @@ impl Package {
 fn resolve_position<'selector>(
     package: &Package,
     selector: impl Into<SectionSelector<'selector>>,
-) -> Result<Position, SectionPaginationError> {
+) -> Result<Position, Error> {
     let selected_selector = selector.into();
     let selected = package
-        .semantic_document()
+        .document_ref()
         .select_section(selected_selector)
         .map_err(map_selector_error)?
         .ok_or(match selected_selector {
-            SectionSelector::Name(_) => SectionPaginationError::NameNotFound,
+            SectionSelector::Name(_) => Error::Refused(Refusal::NameNotFound),
             SectionSelector::Position(position) => {
-                SectionPaginationError::PositionNotFound { position }
+                Error::Refused(Refusal::PositionNotFound { position })
             },
         })?;
     Ok(Position::new(selected.index()))
@@ -571,68 +592,64 @@ fn rewrite_package_pagination(
     position: Position,
     before: section::Pagination,
     after: section::Pagination,
-) -> Result<Package, SectionPaginationError> {
+) -> Result<Package, Error> {
     let source_catalog = &source.state.source;
     let identifier = section_identifier_at(source, position)?;
     let mut matching_components = source_catalog
         .components()
         .iter()
         .filter(|component| component.archive().object(identifier.get()).is_some());
-    let component = matching_components
-        .next()
-        .ok_or(SectionPaginationError::InvalidSource)?;
+    let component = matching_components.next().ok_or(Error::InvalidSource)?;
     if matching_components.next().is_some() {
-        return Err(SectionPaginationError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let component_name = component.name();
     let entry = source_catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(SectionPaginationError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SectionPaginationError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .object(identifier.get())
-        .ok_or(SectionPaginationError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut messages = object
         .messages
         .iter()
         .enumerate()
         .filter(|(_index, message)| message.type_ == SECTION_MESSAGE_TYPE);
-    let (message_index, message) = messages
-        .next()
-        .ok_or(SectionPaginationError::InvalidSource)?;
+    let (message_index, message) = messages.next().ok_or(Error::InvalidSource)?;
     if messages.next().is_some() {
-        return Err(SectionPaginationError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let wire_limits = wire_limits(source)?;
     if strict_payload_pagination(&message.data, wire_limits)? != before {
-        return Err(SectionPaginationError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let rewritten = rewrite_pagination_payload(&message.data, before, after, wire_limits)?;
     if strict_payload_pagination(&rewritten, wire_limits)? != after {
-        return Err(SectionPaginationError::Verification);
+        return Err(Error::Verification);
     }
 
     archive
         .object_mut(identifier.get())
-        .ok_or(SectionPaginationError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SECTION_MESSAGE_TYPE,
@@ -641,10 +658,9 @@ fn rewrite_package_pagination(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&rewritten_archive).map_err(map_core_error)?;
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(
@@ -652,25 +668,23 @@ fn rewrite_package_pagination(
             physical_limits,
         )
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = source_catalog
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     candidate.validate().map_err(map_package_error)?;
     verify_candidate(source, &candidate, position, after)?;
     Ok(candidate)
 }
 
-fn section_identifier_at(
-    package: &Package,
-    position: Position,
-) -> Result<NonZeroU64, SectionPaginationError> {
+fn section_identifier_at(package: &Package, position: Position) -> Result<NonZeroU64, Error> {
     let components = package.state.source.components();
     let limits = package.state.source.limits();
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let body_identifier = root.body.ok_or(SectionPaginationError::UnsupportedSource)?;
-    let body = find_object(components, body_identifier.get())
-        .ok_or(SectionPaginationError::InvalidSource)?;
+    let body_identifier = root
+        .body
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+    let body = find_object(components, body_identifier.get()).ok_or(Error::InvalidSource)?;
     let max_text_bytes = effective_text_limit(limits);
     let (_storage, table_references) = decode_body_storage(
         &body.messages,
@@ -687,15 +701,12 @@ fn section_identifier_at(
         .get(position.get())
         .copied()
         .map(|NativeSectionReference { identifier, .. }| identifier)
-        .ok_or(SectionPaginationError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn pagination_at(
-    package: &Package,
-    position: Position,
-) -> Result<section::Pagination, SectionPaginationError> {
+fn pagination_at(package: &Package, position: Position) -> Result<section::Pagination, Error> {
     if package.sections().get(position.get()).is_none() {
-        return Err(SectionPaginationError::PositionNotFound { position });
+        return Err(Error::Refused(Refusal::PositionNotFound { position }));
     }
     let identifier = section_identifier_at(package, position)?;
     let mut payload = None;
@@ -704,31 +715,26 @@ fn pagination_at(
             continue;
         };
         if payload.is_some() {
-            return Err(SectionPaginationError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut messages = object
             .messages
             .iter()
             .filter(|message| message.type_ == SECTION_MESSAGE_TYPE);
-        let message = messages
-            .next()
-            .ok_or(SectionPaginationError::InvalidSource)?;
+        let message = messages.next().ok_or(Error::InvalidSource)?;
         if messages.next().is_some() {
-            return Err(SectionPaginationError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         payload = Some(message.data.as_slice());
     }
-    strict_payload_pagination(
-        payload.ok_or(SectionPaginationError::InvalidSource)?,
-        wire_limits(package)?,
-    )
+    strict_payload_pagination(payload.ok_or(Error::InvalidSource)?, wire_limits(package)?)
 }
 
 fn strict_payload_pagination(
     payload: &[u8],
     limits: WireLimits,
-) -> Result<section::Pagination, SectionPaginationError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+) -> Result<section::Pagination, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut start = None;
     let mut numbering = None;
     let mut page = None;
@@ -740,40 +746,39 @@ fn strict_payload_pagination(
             _ => continue,
         };
         if destination.is_some() || field.wire_type() != 0 {
-            return Err(SectionPaginationError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_wire_error)?;
-        let (value, consumed) = decode_varint_from_bytes(field.payload())
-            .map_err(|_error| SectionPaginationError::InvalidSource)?;
+        let (value, consumed) =
+            decode_varint_from_bytes(field.payload()).map_err(|_error| Error::InvalidSource)?;
         if consumed != field.payload().len() || encoded_len(value) != consumed {
-            return Err(SectionPaginationError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        *destination =
-            Some(u32::try_from(value).map_err(|_error| SectionPaginationError::InvalidSource)?);
+        *destination = Some(u32::try_from(value).map_err(|_error| Error::InvalidSource)?);
     }
 
     let projected = decode_pagination(payload, ProjectionOptions::new(payload.len(), 1))
-        .map_err(|_error| SectionPaginationError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     let preflight = PaginationSnapshot {
         section_start_kind: start,
         section_page_number_kind: numbering,
         section_page_number_start: page,
     };
     if projected != preflight {
-        return Err(SectionPaginationError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let mut pagination = section::Pagination::new();
     pagination
         .set_start(start.map(section::Start::from_raw))
-        .map_err(SectionPaginationError::InvalidPagination)?;
+        .map_err(Error::InvalidPagination)?;
     pagination
         .set_page_numbering(numbering.map(section::PageNumbering::from_raw))
-        .map_err(SectionPaginationError::InvalidPagination)?;
+        .map_err(Error::InvalidPagination)?;
     let page_number = page
         .map(section::PageNumber::new)
         .transpose()
-        .map_err(|_error| SectionPaginationError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     pagination.set_starting_page_number(page_number);
     Ok(pagination)
 }
@@ -783,11 +788,11 @@ fn rewrite_pagination_payload(
     before: section::Pagination,
     after: section::Pagination,
     limits: WireLimits,
-) -> Result<Vec<u8>, SectionPaginationError> {
+) -> Result<Vec<u8>, Error> {
     if strict_payload_pagination(source, limits)? != before {
-        return Err(SectionPaginationError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let fields = [
         SECTION_START_FIELD,
         PAGE_NUMBERING_FIELD,
@@ -804,26 +809,22 @@ fn rewrite_pagination_payload(
         if let Some(field) = view.fields().find(|field| field.number() == field_number) {
             output_length = output_length
                 .checked_sub(field.raw().len())
-                .ok_or(SectionPaginationError::InvalidSource)?;
-            output_fields = output_fields
-                .checked_sub(1)
-                .ok_or(SectionPaginationError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
+            output_fields = output_fields.checked_sub(1).ok_or(Error::InvalidSource)?;
         }
         if let Some(value) = replacement {
             output_length = output_length
                 .checked_add(encoded_varint_field_length(field_number, value))
                 .ok_or_else(|| output_limit_error(usize::MAX, limits))?;
-            output_fields = output_fields
-                .checked_add(1)
-                .ok_or(SectionPaginationError::InvalidSource)?;
+            output_fields = output_fields.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     if output_length > limits.max_output_bytes() {
         return Err(output_limit_error(output_length, limits));
     }
     if output_fields > limits.max_fields() {
-        return Err(SectionPaginationError::LimitExceeded {
-            kind: SectionPaginationLimitKind::WireFields,
+        return Err(Error::Limit {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
         });
@@ -863,7 +864,7 @@ fn rewrite_pagination_payload(
         }
     }
     if output.len() != output_length {
-        return Err(SectionPaginationError::Verification);
+        return Err(Error::Verification);
     }
     Ok(output)
 }
@@ -890,7 +891,7 @@ fn encoded_varint_field_length(field_number: u32, value: u32) -> usize {
     encoded_len(u64::from(field_number) << 3).saturating_add(encoded_len(u64::from(value)))
 }
 
-fn wire_limits(package: &Package) -> Result<WireLimits, SectionPaginationError> {
+fn wire_limits(package: &Package) -> Result<WireLimits, Error> {
     let maximum = package
         .state
         .source
@@ -909,11 +910,11 @@ fn verify_candidate(
     candidate: &Package,
     position: Position,
     expected: section::Pagination,
-) -> Result<(), SectionPaginationError> {
+) -> Result<(), Error> {
     if source.stats().total_objects() != candidate.stats().total_objects()
         || source.sections().len() != candidate.sections().len()
     {
-        return Err(SectionPaginationError::Verification);
+        return Err(Error::Verification);
     }
     for (before, after) in source.sections().iter().zip(candidate.sections()) {
         if before.name() != after.name()
@@ -923,20 +924,20 @@ fn verify_candidate(
             || before.text_storages() != after.text_storages()
             || before.page_count() != after.page_count()
         {
-            return Err(SectionPaginationError::Verification);
+            return Err(Error::Verification);
         }
     }
     if pagination_at(candidate, position)? != expected {
-        return Err(SectionPaginationError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
 
-fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, SectionPaginationError> {
+fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(capacity)
-        .map_err(|_allocation| SectionPaginationError::Allocation { amount: capacity })?;
+        .map_err(|_allocation| Error::Allocation { amount: capacity })?;
     Ok(output)
 }
 
@@ -944,15 +945,15 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, SectionPaginationError> {
     clippy::needless_pass_by_value,
     reason = "used directly as a Result::map_err conversion"
 )]
-fn map_selector_error(selection_error: crate::SelectorError) -> SectionPaginationError {
+fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     match selection_error {
-        crate::SelectorError::EmptySectionName => SectionPaginationError::NameNotFound,
+        crate::SelectorError::EmptySectionName => Error::Refused(Refusal::NameNotFound),
         crate::SelectorError::AmbiguousSectionName {
             first, duplicate, ..
-        } => SectionPaginationError::AmbiguousSelector {
+        } => Error::Refused(Refusal::AmbiguousSelector {
             first: Position::new(first),
             duplicate: Position::new(duplicate),
-        },
+        }),
     }
 }
 
@@ -960,32 +961,37 @@ fn map_selector_error(selection_error: crate::SelectorError) -> SectionPaginatio
     clippy::needless_pass_by_value,
     reason = "used directly as a Result::map_err conversion"
 )]
-fn map_package_error(package_error: PackageError) -> SectionPaginationError {
+fn map_package_error(package_error: PackageError) -> Error {
     match package_error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
-        PackageError::SectionNamesTooLarge { observed, limit } => {
-            SectionPaginationError::LimitExceeded {
-                kind: SectionPaginationLimitKind::SemanticBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(limit),
-            }
-        },
-        PackageError::NotPages => SectionPaginationError::UnsupportedSource,
-        PackageError::PayloadLimit { observed, limit } => SectionPaginationError::LimitExceeded {
-            kind: SectionPaginationLimitKind::WireBytes,
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
+            kind: LimitKind::SemanticBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => SectionPaginationError::LimitExceeded {
-            kind: SectionPaginationLimitKind::Entries,
+        PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::Allocation { amount } => SectionPaginationError::Allocation { amount },
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::Entries,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => Error::Allocation { amount },
         PackageError::Io(_)
         | PackageError::Detection(_)
         | PackageError::InvalidFormat(_)
-        | PackageError::Semantic(_) => SectionPaginationError::InvalidSource,
+        | PackageError::Semantic(_) => Error::InvalidSource,
     }
 }
 
@@ -993,46 +999,31 @@ fn map_package_error(package_error: PackageError) -> SectionPaginationError {
     clippy::needless_pass_by_value,
     reason = "used directly as a Result::map_err conversion"
 )]
-fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> SectionPaginationError {
+fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     match archive_error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SectionPaginationError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => SectionPaginationLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SectionPaginationLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => SectionPaginationLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
                 | litchi_iwa_archive::LimitKind::MetadataBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
                 | litchi_iwa_archive::LimitKind::EntryBytes
-                | litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    SectionPaginationLimitKind::EntryBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::EntryBytes,
                 litchi_iwa_archive::LimitKind::TotalBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    SectionPaginationLimitKind::TotalBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SectionPaginationError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => SectionPaginationError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1040,23 +1031,21 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> SectionPaginat
     clippy::needless_pass_by_value,
     reason = "used directly as a Result::map_err conversion"
 )]
-fn map_core_error(core_error: litchi_iwa_core::Error) -> SectionPaginationError {
+fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
     match core_error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SectionPaginationError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => SectionPaginationLimitKind::Entries,
-                litchi_iwa_core::LimitKind::MessageBytes => SectionPaginationLimitKind::WireBytes,
-                litchi_iwa_core::LimitKind::HeaderFields => SectionPaginationLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SectionPaginationLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -1065,21 +1054,15 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> SectionPaginationError 
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SectionPaginationLimitKind::EntryBytes
-                },
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SectionPaginationError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => SectionPaginationError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1087,50 +1070,43 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> SectionPaginationError 
     clippy::needless_pass_by_value,
     reason = "used directly as a Result::map_err conversion"
 )]
-fn map_wire_error(wire_error: litchi_iwa_common::Error) -> SectionPaginationError {
+fn map_wire_error(wire_error: litchi_iwa_common::Error) -> Error {
     match wire_error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SectionPaginationError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes
-                | litchi_iwa_common::LimitKind::OutputBytes => {
-                    SectionPaginationLimitKind::WireBytes
-                },
+                | litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SectionPaginationLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => SectionPaginationLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => SectionPaginationLimitKind::WireWork,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SectionPaginationError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => SectionPaginationError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn output_limit_error(observed: usize, limits: WireLimits) -> SectionPaginationError {
-    SectionPaginationError::LimitExceeded {
-        kind: SectionPaginationLimitKind::WireBytes,
+fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
+    Error::Limit {
+        kind: LimitKind::WireBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_output_bytes()),
     }
 }
 
-fn work_limit_error(observed: usize, limits: WireLimits) -> SectionPaginationError {
-    SectionPaginationError::LimitExceeded {
-        kind: SectionPaginationLimitKind::WireWork,
+fn work_limit_error(observed: usize, limits: WireLimits) -> Error {
+    Error::Limit {
+        kind: LimitKind::WireWork,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_rewrite_work()),
     }

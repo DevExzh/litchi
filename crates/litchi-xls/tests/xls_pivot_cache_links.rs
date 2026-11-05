@@ -1,8 +1,8 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::{
-    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotTableConfig, Writer,
+    Builder, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotTableConfig,
 };
 
 const SXVIEW: u16 = 0x00B0;
@@ -59,7 +59,7 @@ fn pivot_config(
 }
 
 fn generated_bytes(pivots_per_sheet: &[usize]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (sheet_index, &pivot_count) in pivots_per_sheet.iter().enumerate() {
         let sheet_name = format!("Source{}", sheet_index + 1);
         let sheet = writer.add_worksheet(&sheet_name).unwrap();
@@ -79,12 +79,14 @@ fn generated_bytes(pivots_per_sheet: &[usize]) -> Vec<u8> {
         }
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn workbook_records(bytes: &[u8]) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let mut offset = 0usize;
@@ -109,7 +111,9 @@ fn record_u16_values(records: &[(u16, Vec<u8>)], record_type: u16, offset: usize
 }
 
 fn cache_streams(bytes: &[u8], count: u16) -> Vec<Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     (1..=count)
         .map(|stream_id| {
             let name = format!("{stream_id:04X}");
@@ -146,7 +150,7 @@ fn pivot_cache_links_progress_across_two_worksheets() {
     assert!(contains_f64(&caches[1], 22.0));
     assert!(!contains_f64(&caches[1], 11.0));
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.sheets().len(), 2);
     assert!(workbook.xls_worksheet(0).is_ok());
     assert!(workbook.xls_worksheet(1).is_ok());
@@ -164,7 +168,7 @@ fn pivot_cache_links_progress_from_same_sheet_to_later_sheet() {
         assert!(contains_f64(&caches[cache_index], expected_value));
     }
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.sheets().len(), 2);
     assert!(workbook.xls_worksheet(0).is_ok());
     assert!(workbook.xls_worksheet(1).is_ok());

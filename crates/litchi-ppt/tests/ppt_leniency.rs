@@ -15,13 +15,16 @@
 //! control must report nothing.
 
 use litchi_core::OwnedSource;
+use litchi_ole_common::object::{
+    Edit as ObjectEdit, Limits as ObjectLimits, OpenOptions, Package, Targets,
+};
 use litchi_ppt::shapes::ShapeEnum;
 use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
-use litchi_ppt::writer::Writer;
+use litchi_ppt::writer::Builder;
 use litchi_ppt::writer::text_format::Paragraph;
 use litchi_ppt::{
-    Defect, DefectLocation, Package, PersistDefect, Presentation, Shape as _, ShapeDefect,
-    SlideListDefect, SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect,
+    Defect, DefectLocation, PersistDefect, Presentation, Shape as _, ShapeDefect, SlideListDefect,
+    SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect, raw::Reader,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -30,6 +33,20 @@ use std::sync::Arc;
 const STYLE_TEXT_PROP_HEADER: [u8; 4] = [0x00, 0x00, 0xA1, 0x0F];
 /// The text every fixture carries; the atom covers its length plus one.
 const TEXT: &str = "abcd";
+
+fn open_object(bytes: Vec<u8>, targets: Targets, limits: ObjectLimits) -> ObjectEdit {
+    Package::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+        .unwrap()
+        .edit()
+        .unwrap()
+}
+
+fn object_bytes(editor: &ObjectEdit) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 /// A written presentation together with the location of its single
 /// `StyleTextPropAtom` payload.
@@ -41,13 +58,13 @@ struct Fixture {
 
 impl Fixture {
     fn new(paragraph: Paragraph, expected_payload_prefix: &[u8]) -> Self {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_rich_textbox(slide, 10, 10, 200, 40, vec![paragraph])
             .unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
         let bytes = output.into_inner();
 
         let headers: Vec<usize> = bytes
@@ -120,7 +137,7 @@ impl Fixture {
 
     /// Open through the default (`Leniency::Strict`) owned-reader path.
     fn open(&self) -> Presentation {
-        Package::from_reader(Cursor::new(self.bytes.clone()))
+        Reader::from_reader(Cursor::new(self.bytes.clone()))
             .unwrap()
             .presentation()
             .unwrap()
@@ -502,7 +519,7 @@ const OUTLINE_TEXT_REF_ATOM: u16 = 0x0F9E;
 
 /// A slide with two plain text boxes, `first` and `second`.
 fn two_textboxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     for text in ["first", "second"] {
         writer
@@ -510,7 +527,7 @@ fn two_textboxes() -> Vec<u8> {
             .unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -525,7 +542,7 @@ fn style_atom_headers(bytes: &[u8]) -> Vec<usize> {
 
 fn open_both(bytes: &[u8]) -> [Presentation; 2] {
     [
-        Package::from_reader(Cursor::new(bytes.to_vec()))
+        Reader::from_reader(Cursor::new(bytes.to_vec()))
             .unwrap()
             .presentation()
             .unwrap(),
@@ -647,8 +664,7 @@ fn corpus_presentations_report_nothing() {
     assert!(files.len() >= 20, "test-data corpus not found");
     let mut opened = 0;
     for path in &files {
-        let presentation = match Package::open(path).and_then(|mut package| package.presentation())
-        {
+        let presentation = match Reader::open(path).and_then(|mut package| package.presentation()) {
             Ok(presentation) => presentation,
             // Encrypted presentations are out of scope (no password).
             Err(error) => {
@@ -712,7 +728,7 @@ struct Deck {
 
 impl Deck {
     fn new(count: usize) -> Self {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         for index in 0..count {
             let slide = writer.add_slide().unwrap();
             writer
@@ -727,7 +743,7 @@ impl Deck {
                 .unwrap();
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
         let bytes = output.into_inner();
         let mut slides = Vec::new();
         for presentation in open_both(&bytes) {
@@ -1034,7 +1050,7 @@ fn user_edit_chain_corruption_stays_fatal() {
     let mut deck = deck.patch_u32(at, 0);
     deck.bytes[headers[0] + 2] = 0xF4;
     for result in [
-        Package::from_reader(Cursor::new(deck.bytes.clone()))
+        Reader::from_reader(Cursor::new(deck.bytes.clone()))
             .and_then(|mut package| package.presentation())
             .err(),
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(deck.bytes.clone())))
@@ -1071,15 +1087,16 @@ struct EditedDeck {
 
 impl EditedDeck {
     fn new() -> Self {
-        use litchi_ppt::text_edit::{Position, Snapshot, Target};
+        use litchi_ppt::package::edit::{Position, Target};
 
         let deck = Deck::new(2);
-        let mut edit = Snapshot::from_bytes(deck.bytes.clone())
+        let mut edit = litchi_ppt::Package::from_bytes(&deck.bytes)
             .unwrap()
-            .edit_text(Target::new(Position::new(1), Position::new(0)))
+            .edit()
             .unwrap();
-        edit.set_text("edited").unwrap();
-        let bytes = edit.commit().unwrap().snapshot().bytes().to_vec();
+        edit.set_shape_text(Target::new(Position::new(1), Position::new(0)), "edited")
+            .unwrap();
+        let bytes = edit.commit().unwrap().package().to_bytes().unwrap();
         let directories = record_headers(&bytes, 0x1772);
         let user_edits = record_headers(&bytes, 0x0FF5);
         assert_eq!((directories.len(), user_edits.len()), (2, 2));
@@ -1193,7 +1210,7 @@ fn truncated_persist_directory_stays_fatal() {
     // A run claiming 0xFFF offsets overruns the directory.
     let edited = edited.with_directory([0xFFF0_0001, 0, 0, 0, 0]);
     for result in [
-        Package::from_reader(Cursor::new(edited.deck.bytes.clone()))
+        Reader::from_reader(Cursor::new(edited.deck.bytes.clone()))
             .and_then(|mut package| package.presentation())
             .err(),
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(edited.deck.bytes.clone())))
@@ -1238,7 +1255,7 @@ fn nonconforming_user_edit_length_is_read_and_recorded() {
         &[open_time(PersistDefect::UserEditAtomLength, 30, None)],
     );
     // The older edit is the one read: the second slide's pre-edit text.
-    let presentation = Package::from_reader(Cursor::new(deck.bytes.clone()))
+    let presentation = Reader::from_reader(Cursor::new(deck.bytes.clone()))
         .unwrap()
         .presentation()
         .unwrap();
@@ -1267,7 +1284,7 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
     bytes[older + 8..older + 12].copy_from_slice(&live.to_le_bytes());
 
     for error in [
-        Package::from_reader(Cursor::new(bytes.clone()))
+        Reader::from_reader(Cursor::new(bytes.clone()))
             .and_then(|mut package| package.presentation())
             .err(),
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
@@ -1278,9 +1295,9 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
         assert!(error.to_string().contains("cyclic"), "{error}");
     }
 
-    let options = OpenOptions::default().with_leniency(Leniency::TolerateUserEditChainDefects);
+    let options = OpenOptions::new().leniency(Leniency::TolerateUserEditChainDefects);
     for presentation in [
-        Package::from_reader(Cursor::new(bytes.clone()))
+        Reader::from_reader(Cursor::new(bytes.clone()))
             .unwrap()
             .presentation_with_options(options)
             .unwrap(),
@@ -1303,8 +1320,24 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
         assert_eq!(textbox.text(), "edited");
     }
 
+    let native =
+        litchi_ppt::slide_order::Snapshot::from_bytes_with_options(bytes.clone(), options).unwrap();
+    assert_eq!(native.leniency(), Leniency::TolerateUserEditChainDefects);
+    let canonical = litchi_ppt::Package::from_bytes_with_options(&bytes, options).unwrap();
+    assert!(matches!(
+        canonical
+            .edit()
+            .and_then(litchi_ppt::package::edit::Edit::commit),
+        Err(litchi_ppt::package::edit::Error::Native(
+            litchi_ppt::slide_order::Error::Refused(
+                litchi_ppt::slide_order::Refusal::RepairedUserEditChain
+            )
+        ))
+    ));
+    assert_eq!(canonical.to_bytes().unwrap(), bytes);
+
     // The opted-in control (no cycle) repairs nothing.
-    let control = Package::from_reader(Cursor::new(edited.deck.bytes.clone()))
+    let control = Reader::from_reader(Cursor::new(edited.deck.bytes.clone()))
         .unwrap()
         .presentation_with_options(options)
         .unwrap();
@@ -1317,16 +1350,11 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
 
 /// `bytes` with a 5000-byte `LeniencyProbe` stream added at the root.
 fn with_probe(bytes: Vec<u8>) -> Vec<u8> {
-    let mut package = litchi_ole_common::object::Editor::open(
-        bytes,
-        litchi_ole_common::object::Targets::default(),
-        litchi_ole_common::object::Limits::default(),
-    )
-    .unwrap();
+    let mut package = open_object(bytes, Targets::default(), ObjectLimits::default());
     package
         .add_stream(vec!["LeniencyProbe".to_string()], vec![0xAB; 5000])
         .unwrap();
-    package.finish().unwrap()
+    object_bytes(&package)
 }
 
 /// Shrink the probe's declared size from 5000 to 4096 bytes, so its
@@ -1360,10 +1388,13 @@ fn container_repairs_join_the_open_time_report() {
     }
 
     let bytes = shrink_probe(conformant);
-    let container = litchi_cfb::OleFile::open(Cursor::new(bytes.clone()))
-        .unwrap()
-        .tolerance_report()
-        .clone();
+    let container = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap()
+    .tolerance_report()
+    .clone();
     assert!(container.contains(litchi_cfb::AllocationDefect::ChainLongerThanSize));
     let expected: Vec<_> = container
         .defects()
@@ -1436,12 +1467,11 @@ fn summary_information_with_unpaired_surrogate() -> Vec<u8> {
 /// by the title's property identifier.
 #[test]
 fn property_set_repairs_join_the_open_time_report() {
-    let mut package = litchi_ole_common::object::Editor::open(
+    let mut package = open_object(
         Deck::new(2).bytes,
-        litchi_ole_common::object::Targets::default(),
-        litchi_ole_common::object::Limits::default(),
-    )
-    .unwrap();
+        Targets::default(),
+        ObjectLimits::default(),
+    );
     let path = vec!["\u{5}SummaryInformation".to_string()];
     let stream = summary_information_with_unpaired_surrogate();
     if package.stream(&path).is_some() {
@@ -1449,7 +1479,7 @@ fn property_set_repairs_join_the_open_time_report() {
     } else {
         package.add_stream(path, stream).unwrap();
     }
-    let bytes = package.finish().unwrap();
+    let bytes = object_bytes(&package);
 
     let expected = [open_time(
         Defect::PropertySet(litchi_ole_common::leniency::Defect::String(
@@ -1573,7 +1603,7 @@ fn current_user_header_and_size_deviations_are_read_and_recorded() {
     let mut bytes = deck.bytes;
     bytes[at + 2..at + 4].copy_from_slice(&0x0FF5u16.to_le_bytes());
     assert!(
-        Package::from_reader(Cursor::new(bytes))
+        Reader::from_reader(Cursor::new(bytes))
             .unwrap()
             .presentation()
             .is_err()

@@ -1035,7 +1035,8 @@ mod tests {
 
     #[test]
     fn reads_libreoffice_text_box_fixture() {
-        let package = OpcPackage::from_bytes(TEXT_BOX_FIXTURE).unwrap();
+        let package =
+            OpcPackage::from_bytes(TEXT_BOX_FIXTURE, litchi_opc::SourceLimits::default()).unwrap();
         let document = package
             .get_part(&PackURI::new("/word/document.xml").unwrap())
             .unwrap();

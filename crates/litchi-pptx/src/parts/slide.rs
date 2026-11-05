@@ -1,18 +1,19 @@
 //! Borrowed slide, layout, and master part views.
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::{OpcPackage, Part, SourceLimits};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
 
 use super::{
-    MceCapture, invalid, processed_xml, processed_xml_with_capture, processed_xml_with_source,
-    related_part_by_type, validate_content_type,
+    MceCapture, invalid, processed_xml, processed_xml_with_source, raw_xml, related_part_by_type,
+    validate_content_type, validate_source_part_xml,
 };
 use crate::leniency::{MarkupDefect, ToleranceReport};
 use crate::notes::SlideRootProof;
@@ -32,6 +33,40 @@ const MAX_SEMANTIC_TEXT_OBJECTS: usize = 100_000;
 const MAX_SEMANTIC_TEXT_EVENT_BYTES: usize = 1024 * 1024;
 const MAX_SEMANTIC_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
 const MAX_SEMANTIC_TEXT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_LAYOUT_REFERENCES: usize = 4_096;
+const MIN_NATIVE_ID: u32 = 2_147_483_648;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PresentationNamespace {
+    Transitional,
+    Strict,
+}
+
+fn presentation_namespace(namespace: &ResolveResult<'_>) -> Option<PresentationNamespace> {
+    match namespace {
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::namespace::PRESENTATIONML_NAMESPACE =>
+        {
+            Some(PresentationNamespace::Transitional)
+        },
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE =>
+        {
+            Some(PresentationNamespace::Strict)
+        },
+        _ => None,
+    }
+}
+
+fn same_presentation_namespace(
+    root: Option<PresentationNamespace>,
+    namespace: &ResolveResult<'_>,
+) -> bool {
+    let Some(root) = root else {
+        return false;
+    };
+    Some(root) == presentation_namespace(namespace)
+}
 
 fn root_name_from_xml(xml: &[u8]) -> Result<String> {
     let mut reader = NsReader::from_reader(xml);
@@ -70,6 +105,35 @@ fn c_sld_name(part: &dyn Part) -> Result<Option<String>> {
     c_sld_name_from_xml(xml.as_ref())
 }
 
+fn c_sld_authored_name_from_xml(xml: &[u8]) -> Result<Option<String>> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader.read_resolved_event()?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"cSld",
+                ) =>
+            {
+                return Ok(litchi_ooxml_common::xml::unqualified_attribute_value(
+                    &element,
+                    b"name",
+                    reader.decoder(),
+                )?);
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+fn c_sld_authored_name(part: &dyn Part) -> Result<Option<String>> {
+    let xml = processed_xml(part)?;
+    c_sld_authored_name_from_xml(xml.as_ref())
+}
+
 /// Read the ordered `p:sldLayoutIdLst` relationship references owned by a
 /// slide master. The OPC relationship collection may contain stale or
 /// producer-private edges; the XML list is the semantic owner of the layout
@@ -78,84 +142,416 @@ fn layout_relationship_ids(part: &dyn Part) -> Result<Vec<String>> {
     let xml = processed_xml(part)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut depth = 0usize;
-    let mut in_list = false;
-    let mut seen_list = false;
+    let mut roots = 0usize;
+    let mut root_namespace = None;
+    let mut lists = 0usize;
+    let mut list_depth: Option<usize> = None;
+    let mut reference_depth: Option<usize> = None;
+    let mut opaque_depth: Option<usize> = None;
+    let mut extension_seen = false;
+    let mut root_extension_seen = false;
     let mut relationship_ids = Vec::new();
+    let mut seen_relationship_ids = HashSet::new();
+    let mut native_ids = HashSet::new();
 
     loop {
-        let (_namespace, event) = reader.read_resolved_event()?;
+        let (namespace, event) = reader.read_resolved_event()?;
         match event {
-            Event::Start(element) => {
+            Event::Start(_) if opaque_depth.is_some() => {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?;
-                if depth == 2 && element.local_name().as_ref() == b"sldLayoutIdLst" {
-                    if seen_list {
-                        return Err(invalid("duplicate slide-layout ID list"));
-                    }
-                    seen_list = true;
-                    in_list = true;
-                } else if depth == 3 && in_list && element.local_name().as_ref() == b"sldLayoutId" {
-                    relationship_ids.push(
-                        crate::namespace::relationship_attribute_value(
-                            &element,
-                            b"id",
-                            reader.decoder(),
-                            reader.resolver(),
-                        )?
-                        .ok_or_else(|| {
-                            invalid("slide-layout entry is missing its relationship ID")
-                        })?,
-                    );
-                }
             },
-            Event::Empty(element) => {
-                let child_depth = depth
+            Event::Empty(_) if opaque_depth.is_some() => {},
+            Event::End(_) if opaque_depth.is_some() => {
+                if opaque_depth == Some(depth) {
+                    opaque_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("slide-master XML nesting underflow"))?;
+            },
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) if opaque_depth.is_some() => {},
+            Event::Start(element) => {
+                let is_root = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldMaster",
+                );
+                let is_list = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutIdLst",
+                );
+                let is_reference = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutId",
+                );
+                let is_extension = is_layout_extension(&namespace, element.name());
+                let is_root_extension =
+                    crate::namespace::is_presentationml_name(&namespace, element.name(), b"extLst");
+                if is_extension
+                    && ((reference_depth == Some(depth))
+                        || (reference_depth.is_none() && depth == 1))
+                    && !same_presentation_namespace(root_namespace, &namespace)
+                {
+                    return Err(invalid("slide-master extension list has mixed conformance"));
+                }
+                if reference_depth == Some(depth) && is_extension {
+                    if extension_seen {
+                        return Err(invalid(
+                            "slide-layout reference has duplicate extension lists",
+                        ));
+                    }
+                    extension_seen = true;
+                    opaque_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                    );
+                } else if reference_depth.is_none() && depth == 1 && is_root_extension {
+                    if root_extension_seen {
+                        return Err(invalid("slide-master has duplicate root extension lists"));
+                    }
+                    root_extension_seen = true;
+                    opaque_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                    );
+                } else {
+                    if reference_depth.is_some() {
+                        return Err(invalid(
+                            "slide-layout reference contains an unexpected child",
+                        ));
+                    }
+                    if depth == 0 {
+                        roots = roots
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML root count overflow"))?;
+                        if !is_root {
+                            return Err(invalid("slide-master XML has an invalid root"));
+                        }
+                        root_namespace =
+                            Some(presentation_namespace(&namespace).ok_or_else(|| {
+                                invalid("slide-master XML has an invalid root namespace")
+                            })?);
+                    }
+                    if is_list {
+                        if depth != 1 || lists != 0 {
+                            return Err(invalid(
+                                "slide-layout ID list must be one direct root child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout ID list has mixed conformance"));
+                        }
+                        lists = lists
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-layout ID list count overflow"))?;
+                        reject_layout_id_list_attributes(&element)?;
+                        list_depth = Some(
+                            depth
+                                .checked_add(1)
+                                .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                        );
+                    } else if is_reference {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "slide-layout reference is not a direct list child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout reference has mixed conformance"));
+                        }
+                        append_layout_relationship_id(
+                            &mut relationship_ids,
+                            &mut seen_relationship_ids,
+                            &mut native_ids,
+                            &element,
+                            &reader,
+                        )?;
+                        reference_depth = Some(
+                            depth
+                                .checked_add(1)
+                                .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                        );
+                        extension_seen = false;
+                    } else if element.local_name().as_ref() == b"sldLayoutIdLst" {
+                        return Err(invalid("slide-layout ID list has an invalid namespace"));
+                    } else if depth == 1 && element.local_name().as_ref() == b"extLst" {
+                        return Err(invalid(
+                            "slide-master extension list has an invalid namespace",
+                        ));
+                    } else if list_depth == Some(depth) {
+                        return Err(invalid("slide-layout ID list contains an unexpected child"));
+                    }
+                }
+                depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?;
-                if child_depth == 2 && element.local_name().as_ref() == b"sldLayoutIdLst" {
-                    if seen_list {
-                        return Err(invalid("duplicate slide-layout ID list"));
-                    }
-                    seen_list = true;
-                } else if child_depth == 3
-                    && in_list
-                    && element.local_name().as_ref() == b"sldLayoutId"
+            },
+            Event::Empty(element) => {
+                let is_root = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldMaster",
+                );
+                let is_list = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutIdLst",
+                );
+                let is_reference = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutId",
+                );
+                let is_extension = is_layout_extension(&namespace, element.name());
+                let is_root_extension =
+                    crate::namespace::is_presentationml_name(&namespace, element.name(), b"extLst");
+                if is_extension
+                    && ((reference_depth == Some(depth))
+                        || (reference_depth.is_none() && depth == 1))
+                    && !same_presentation_namespace(root_namespace, &namespace)
                 {
-                    relationship_ids.push(
-                        crate::namespace::relationship_attribute_value(
+                    return Err(invalid("slide-master extension list has mixed conformance"));
+                }
+                if reference_depth == Some(depth) && is_extension {
+                    if extension_seen {
+                        return Err(invalid(
+                            "slide-layout reference has duplicate extension lists",
+                        ));
+                    }
+                    extension_seen = true;
+                } else if reference_depth.is_none() && depth == 1 && is_root_extension {
+                    if root_extension_seen {
+                        return Err(invalid("slide-master has duplicate root extension lists"));
+                    }
+                    root_extension_seen = true;
+                } else {
+                    if reference_depth.is_some() {
+                        return Err(invalid(
+                            "slide-layout reference contains an unexpected child",
+                        ));
+                    }
+                    if depth == 0 {
+                        roots = roots
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML root count overflow"))?;
+                        if !is_root {
+                            return Err(invalid("slide-master XML has an invalid root"));
+                        }
+                        root_namespace =
+                            Some(presentation_namespace(&namespace).ok_or_else(|| {
+                                invalid("slide-master XML has an invalid root namespace")
+                            })?);
+                    }
+                    if is_list {
+                        if depth != 1 || lists != 0 {
+                            return Err(invalid(
+                                "slide-layout ID list must be one direct root child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout ID list has mixed conformance"));
+                        }
+                        lists = lists
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-layout ID list count overflow"))?;
+                        reject_layout_id_list_attributes(&element)?;
+                    } else if is_reference {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "slide-layout reference is not a direct list child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout reference has mixed conformance"));
+                        }
+                        append_layout_relationship_id(
+                            &mut relationship_ids,
+                            &mut seen_relationship_ids,
+                            &mut native_ids,
                             &element,
-                            b"id",
-                            reader.decoder(),
-                            reader.resolver(),
-                        )?
-                        .ok_or_else(|| {
-                            invalid("slide-layout entry is missing its relationship ID")
-                        })?,
-                    );
+                            &reader,
+                        )?;
+                    } else if element.local_name().as_ref() == b"sldLayoutIdLst" {
+                        return Err(invalid("slide-layout ID list has an invalid namespace"));
+                    } else if depth == 1 && element.local_name().as_ref() == b"extLst" {
+                        return Err(invalid(
+                            "slide-master extension list has an invalid namespace",
+                        ));
+                    } else if list_depth == Some(depth) {
+                        return Err(invalid("slide-layout ID list contains an unexpected child"));
+                    }
                 }
             },
             Event::End(element) => {
                 if depth == 0 {
                     return Err(invalid("unexpected closing element in slide-master XML"));
                 }
-                if depth == 2 && element.local_name().as_ref() == b"sldLayoutIdLst" {
-                    in_list = false;
+                if reference_depth == Some(depth) {
+                    if !same_presentation_namespace(root_namespace, &namespace)
+                        || !crate::namespace::is_presentationml_name(
+                            &namespace,
+                            element.name(),
+                            b"sldLayoutId",
+                        )
+                    {
+                        return Err(invalid(
+                            "slide-layout reference has an invalid closing element",
+                        ));
+                    }
+                    reference_depth = None;
+                    extension_seen = false;
+                }
+                if list_depth == Some(depth)
+                    && same_presentation_namespace(root_namespace, &namespace)
+                    && crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldLayoutIdLst",
+                    )
+                {
+                    list_depth = None;
                 }
                 depth -= 1;
             },
-            Event::DocType(_) => {
-                return Err(invalid("DTDs are rejected"));
+            Event::Text(value) if reference_depth == Some(depth) => {
+                if !value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid("slide-layout references contain text content"));
+                }
             },
+            Event::Text(value) if list_depth == Some(depth) => {
+                if !value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid("slide-layout ID list contains text content"));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if reference_depth == Some(depth) => {
+                return Err(invalid(
+                    "slide-layout references contain unsupported content",
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) if list_depth == Some(depth) => {
+                return Err(invalid("slide-layout ID list contains unsupported content"));
+            },
+            Event::DocType(_) => return Err(invalid("DTDs are rejected")),
             Event::Eof => break,
             _ => {},
         }
     }
 
-    if depth != 0 {
-        return Err(invalid("unterminated slide-master XML"));
+    if roots != 1
+        || depth != 0
+        || list_depth.is_some()
+        || reference_depth.is_some()
+        || opaque_depth.is_some()
+    {
+        return Err(invalid("slide-master XML is not a balanced tree"));
     }
     Ok(relationship_ids)
+}
+
+fn is_layout_extension(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    crate::namespace::is_presentationml_name(namespace, name, b"extLst")
+}
+
+fn reject_layout_id_list_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let key = attribute.key.as_ref();
+        if key != b"xmlns" && !key.starts_with(b"xmlns:") {
+            return Err(invalid(
+                "slide-layout ID list permits only namespace declarations",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn append_layout_relationship_id(
+    relationship_ids: &mut Vec<String>,
+    seen_relationship_ids: &mut HashSet<String>,
+    native_ids: &mut HashSet<u32>,
+    element: &quick_xml::events::BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+) -> Result<()> {
+    if relationship_ids.len() >= MAX_LAYOUT_REFERENCES {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: MAX_LAYOUT_REFERENCES,
+        });
+    }
+    let native_id = parse_layout_native_id(element, reader.decoder())?;
+    if native_id.is_some_and(|id| native_ids.contains(&id)) {
+        return Err(invalid("slide-layout native IDs must be unique"));
+    }
+    let relationship_id = crate::namespace::relationship_attribute_value(
+        element,
+        b"id",
+        reader.decoder(),
+        reader.resolver(),
+    )?
+    .ok_or_else(|| invalid("slide-layout reference lacks r:id"))?;
+    if seen_relationship_ids.contains(&relationship_id) {
+        return Err(invalid("slide-layout relationship IDs must be unique"));
+    }
+    seen_relationship_ids
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "slide-master layout relationship IDs",
+            source,
+        })?;
+    if native_id.is_some() {
+        native_ids
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "slide-master layout native IDs",
+                source,
+            })?;
+    }
+    relationship_ids
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "slide-master layout references",
+            source,
+        })?;
+    if let Some(native_id) = native_id {
+        native_ids.insert(native_id);
+    }
+    seen_relationship_ids.insert(relationship_id.clone());
+    relationship_ids.push(relationship_id);
+    Ok(())
+}
+
+fn parse_layout_native_id(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Option<u32>> {
+    let Some(value) =
+        litchi_ooxml_common::xml::unqualified_attribute_value(element, b"id", decoder)?
+    else {
+        return Ok(None);
+    };
+    let value = value
+        .parse::<u32>()
+        .ok()
+        .filter(|value| *value >= MIN_NATIVE_ID)
+        .ok_or_else(|| invalid("slide-layout native ID is invalid"))?;
+    Ok(Some(value))
 }
 
 fn root_bool(part: &dyn Part, attribute: &[u8], field: &str, default: bool) -> Result<bool> {
@@ -169,9 +565,14 @@ fn root_bool(part: &dyn Part, attribute: &[u8], field: &str, default: bool) -> R
                     attribute,
                     reader.decoder(),
                 )?;
-                return value.map_or(Ok(default), |value| super::parse_bool(&value, field));
+                return value.map_or(Ok(default), |value| match value.as_str() {
+                    "1" | "true" => Ok(true),
+                    "0" | "false" => Ok(false),
+                    _ => Err(invalid(format!("{field} must be 0, 1, true, or false"))),
+                });
             },
             Event::Decl(_) | Event::Comment(_) => {},
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
             _ => return Err(invalid("PresentationML part lacks an element root")),
         }
     }
@@ -195,14 +596,16 @@ impl SemanticTextXmlBudget {
         })?;
         if self.events > MAX_SEMANTIC_TEXT_EVENTS {
             return Err(Error::Limit {
-                resource: "semantic slide XML events",
-                limit: MAX_SEMANTIC_TEXT_EVENTS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlEvents),
+                observed: self.events,
+                maximum: MAX_SEMANTIC_TEXT_EVENTS,
             });
         }
         if event_bytes > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide XML event bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: event_bytes,
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         Ok(())
@@ -214,8 +617,9 @@ impl SemanticTextXmlBudget {
         })?;
         if self.depth > MAX_SEMANTIC_TEXT_DEPTH {
             return Err(Error::Limit {
-                resource: "semantic slide XML depth",
-                limit: MAX_SEMANTIC_TEXT_DEPTH,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: self.depth,
+                maximum: MAX_SEMANTIC_TEXT_DEPTH,
             });
         }
         Ok(())
@@ -263,8 +667,11 @@ fn validate_semantic_attributes(element: &quick_xml::events::BytesStart<'_>) -> 
             .ok_or_else(|| Error::Invalid("semantic slide XML attribute length overflow".into()))?;
         if total > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide XML attribute bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: total,
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         let value = attribute
@@ -433,8 +840,11 @@ impl RawTextScan {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
                 if self.budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
@@ -452,8 +862,11 @@ impl RawTextScan {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
             },
@@ -469,8 +882,11 @@ impl RawTextScan {
                 }
                 if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide XML reference bytes",
-                        limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::ReferenceBytes,
+                        ),
+                        observed: reference.as_ref().len(),
+                        maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
                     });
                 }
             },
@@ -491,8 +907,9 @@ impl RawTextScan {
 fn check_semantic_text_raw_len(xml: &[u8]) -> Result<()> {
     if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
         return Err(Error::Limit {
-            resource: "semantic slide raw XML bytes",
-            limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
         });
     }
     Ok(())
@@ -627,12 +1044,22 @@ impl<'a> SemanticTextParser<'a> {
 }
 
 impl<'a> SemanticTextParser<'a> {
-    fn increment(value: &mut usize, limit: usize, resource: &'static str) -> Result<()> {
-        *value = value
-            .checked_add(1)
-            .ok_or_else(|| Error::Invalid(format!("{resource} counter overflow")))?;
+    fn increment(
+        value: &mut usize,
+        limit: usize,
+        kind: crate::error::CodecLimitKind,
+    ) -> Result<()> {
+        *value = value.checked_add(1).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(kind),
+            observed: usize::MAX,
+            maximum: limit,
+        })?;
         if *value > limit {
-            return Err(Error::Limit { resource, limit });
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(kind),
+                observed: *value,
+                maximum: limit,
+            });
         }
         Ok(())
     }
@@ -643,8 +1070,9 @@ impl<'a> SemanticTextParser<'a> {
         })?;
         if observed > MAX_SEMANTIC_TEXT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded text bytes",
-                limit: MAX_SEMANTIC_TEXT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed,
+                maximum: MAX_SEMANTIC_TEXT_BYTES,
             });
         }
         self.output
@@ -700,7 +1128,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.objects,
                 MAX_SEMANTIC_TEXT_OBJECTS,
-                "semantic slide text objects",
+                crate::error::CodecLimitKind::TextObjects,
             )?;
             self.active_text_depth = Some(self.budget.depth);
             self.text_has_payload = false;
@@ -708,7 +1136,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.runs,
                 MAX_SEMANTIC_TEXT_RUNS,
-                "semantic slide text runs",
+                crate::error::CodecLimitKind::TextRuns,
             )?;
         }
         Ok(())
@@ -734,7 +1162,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.objects,
                 MAX_SEMANTIC_TEXT_OBJECTS,
-                "semantic slide text objects",
+                crate::error::CodecLimitKind::TextObjects,
             )?;
             if !self.output.is_empty() {
                 self.append_output(self.paragraph_separator)?;
@@ -743,7 +1171,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.runs,
                 MAX_SEMANTIC_TEXT_RUNS,
-                "semantic slide text runs",
+                crate::error::CodecLimitKind::TextRuns,
             )?;
         }
         Ok(())
@@ -795,8 +1223,9 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded text event bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         self.append_text_fragment(&decoded)
@@ -809,8 +1238,9 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded text event bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         self.append_text_fragment(&decoded)
@@ -819,8 +1249,11 @@ impl<'a> SemanticTextParser<'a> {
     fn reference_event(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<()> {
         if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide XML reference bytes",
-                limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ReferenceBytes,
+                ),
+                observed: reference.as_ref().len(),
+                maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
             });
         }
         let decoded = litchi_ooxml_common::xml::decode_xml_reference(reference)
@@ -828,8 +1261,11 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded reference bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ReferenceBytes,
+                ),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         self.append_text_fragment(&decoded)
@@ -914,8 +1350,11 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
                 if !decoded.as_bytes().iter().all(u8::is_ascii_whitespace) {
@@ -929,8 +1368,11 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
             },
@@ -951,16 +1393,22 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
             },
             Event::GeneralRef(reference) => {
                 if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide XML reference bytes",
-                        limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::ReferenceBytes,
+                        ),
+                        observed: reference.as_ref().len(),
+                        maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
                     });
                 }
                 let decoded = litchi_ooxml_common::xml::decode_xml_reference(&reference)
@@ -1047,8 +1495,9 @@ fn semantic_text_and_repairs(
     let processed = processed?;
     if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
         return Err(Error::Limit {
-            resource: "semantic slide processed XML bytes",
-            limit: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: processed.xml.len(),
+            maximum: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
         });
     }
     parse_semantic_text(processed.xml.as_ref(), paragraph_separator)
@@ -1193,24 +1642,36 @@ impl<'a> SlidePart<'a> {
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
         let xml = processed_xml_with_source(part)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml, None)
+        Self::finish_from_processed(part, collect_notes_proof, xml, None, false)
     }
 
     /// Capture variant that may reuse a default-profile transformed slide
     /// projection already retained by the opened snapshot, and a notes-root
     /// classification an earlier capture proved for the same payload
-    /// allocation. Every source, root, name, and MCE limit check still runs
-    /// for this call; only the complete notes-root scan of a payload whose
-    /// classification is already proved is not repeated.
+    /// allocation. Source, name, and MCE checks still run for this call; an
+    /// exact notes-root proof may answer the root classification without
+    /// repeating its complete bounded scan.
     pub(crate) fn from_part_with_name_with_capture<'parent>(
         part: &'a dyn Part,
         collect_notes_proof: bool,
         capture: &mut MceCapture<'a, 'parent>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_limits: SourceLimits,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
-        let xml = processed_xml_with_capture(part, capture)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots)
+        let source = raw_xml(part)?;
+        // A memo hit was admitted from this package's source profile during
+        // the preceding capture. Reusing it avoids a second physical XML
+        // scan; misses and the first capture must still honor the selected
+        // source event, depth, attribute, and part-byte limits before MCE.
+        let memo_hit = proved_roots.and_then(|memo| memo.lookup(source)).is_some();
+        if !memo_hit {
+            validate_source_part_xml(source, source_limits)?;
+        }
+        let source_checked = true;
+        let processed = capture.process(source)?;
+        let xml = super::ProcessedXml { source, processed };
+        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots, source_checked)
     }
 
     fn finish_from_processed(
@@ -1218,39 +1679,52 @@ impl<'a> SlidePart<'a> {
         collect_notes_proof: bool,
         xml: super::ProcessedXml<'a>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_checked: bool,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         if root_name_from_xml(xml.processed.as_ref())? != "sld" {
             return Err(invalid("slide part does not have a p:sld root"));
         }
         let name = c_sld_name_from_xml(xml.processed.as_ref());
-        let notes_proof = (collect_notes_proof && name.is_ok()).then(|| {
-            let scan = || {
-                #[cfg(test)]
-                ROOT_SCANS.with(|scans| scans.set(scans.get() + 1));
-                crate::notes::root_conformance_from_processed(
-                    xml.processed.as_ref(),
-                    xml.source.len(),
-                    crate::notes::MAX_SLIDE_XML,
-                    "sld",
-                )
-            };
-            // The memo is keyed on the exact raw observation MCE just read, so
-            // a hit names these very bytes; a miss is the ordinary scan.
-            let conformance = match proved_roots.and_then(|memo| memo.lookup(xml.source)) {
-                Some(proved) => {
-                    debug_assert_eq!(
-                        scan(),
-                        Some(proved),
-                        "a proved slide-root classification answered for different bytes"
-                    );
+        let notes_proof = (collect_notes_proof && name.is_ok())
+            .then(|| -> Result<_> {
+                let scan = || {
                     #[cfg(test)]
-                    PROVED_ROOT_HITS.with(|hits| hits.set(hits.get() + 1));
-                    Some(proved)
-                },
-                None => scan(),
-            };
-            SlideRootProof::new(xml.source, conformance)
-        });
+                    ROOT_SCANS.with(|scans| scans.set(scans.get() + 1));
+                    crate::notes::root_conformance_from_processed(
+                        xml.processed.as_ref(),
+                        xml.source.len(),
+                        crate::notes::MAX_SLIDE_XML,
+                        "sld",
+                    )
+                };
+                // The memo is keyed on the exact raw observation MCE just read,
+                // so a hit names these very bytes; a miss is the ordinary scan.
+                let conformance = match proved_roots.and_then(|memo| memo.lookup(xml.source)) {
+                    Some(proved) => {
+                        #[cfg(debug_assertions)]
+                        {
+                            let checked = scan().expect(
+                                "a proved slide-root classification must remain resource-valid",
+                            );
+                            debug_assert_eq!(
+                                checked,
+                                Some(proved),
+                                "a proved slide-root classification answered for different bytes"
+                            );
+                        }
+                        #[cfg(test)]
+                        PROVED_ROOT_HITS.with(|hits| hits.set(hits.get() + 1));
+                        Some(proved)
+                    },
+                    None => scan()?,
+                };
+                Ok(SlideRootProof::with_source_checked(
+                    xml.source,
+                    conformance,
+                    source_checked,
+                ))
+            })
+            .transpose()?;
         drop(xml);
         let name = name.map(|name| name.unwrap_or_else(|| part.partname().to_string()));
         Ok((Self { part }, name, notes_proof))
@@ -1270,6 +1744,16 @@ impl<'a> SlidePart<'a> {
     /// Returns an error if the operation fails.
     pub fn name(&self) -> Result<String> {
         Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
+    }
+
+    /// Return the authored `p:cSld@name`, without a physical part-name
+    /// fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        c_sld_authored_name(self.part)
     }
 
     /// Whether the slide is marked hidden by its root `show` attribute.
@@ -1323,7 +1807,12 @@ impl<'a> SlidePart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Resolve ordinary `DrawingML` chart parts related to this slide.
@@ -1426,6 +1915,14 @@ impl<'a> SlideLayoutPart<'a> {
         Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
     }
 
+    /// The authored display name, without a physical package-name fallback.
+    ///
+    /// # Errors
+    /// Returns an error when the part XML is malformed.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        c_sld_name(self.part)
+    }
+
     /// Layout kind token from `p:sldLayout@type`, if present.
     ///
     /// # Errors
@@ -1444,6 +1941,7 @@ impl<'a> SlideLayoutPart<'a> {
                     )?);
                 },
                 Event::Decl(_) | Event::Comment(_) => {},
+                Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
                 _ => return Err(invalid("slide-layout part lacks an element root")),
             }
         }
@@ -1455,7 +1953,12 @@ impl<'a> SlideLayoutPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the optional theme override attached to this layout.
@@ -1526,6 +2029,14 @@ impl<'a> SlideMasterPart<'a> {
         Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
     }
 
+    /// The authored display name, without a physical package-name fallback.
+    ///
+    /// # Errors
+    /// Returns an error when the part XML is malformed.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        c_sld_name(self.part)
+    }
+
     /// Whether the master is marked preserved.
     ///
     /// # Errors
@@ -1541,7 +2052,12 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the theme reached from this slide master.
@@ -1564,7 +2080,7 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn layouts(&self, package: &'a OpcPackage) -> Result<Vec<SlideLayoutPart<'a>>> {
-        let relationship_ids = layout_relationship_ids(self.part)?;
+        let relationship_ids = self.layout_references()?;
         let mut layouts = Vec::with_capacity(relationship_ids.len());
         for relationship_id in relationship_ids {
             let relationship = self.part.rels().get(&relationship_id).ok_or_else(|| {
@@ -1590,6 +2106,10 @@ impl<'a> SlideMasterPart<'a> {
         }
         Ok(layouts)
     }
+
+    pub(crate) fn layout_references(&self) -> Result<Vec<String>> {
+        layout_relationship_ids(self.part)
+    }
 }
 
 #[cfg(test)]
@@ -1600,11 +2120,12 @@ mod tests {
         reason = "focused low-level part tests use literal XML fixtures"
     )]
 
-    use super::{SlidePart, semantic_text_from_part};
+    use super::{SlideLayoutPart, SlideMasterPart, SlidePart, semantic_text_from_part};
     use crate::Error;
     use litchi_opc::PackURI;
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::part::BlobPart;
+    use std::fmt::Write as _;
 
     // The two semantic-text passes as they stood before change 0743,
     // verbatim: a complete raw scan, then markup-compatibility processing,
@@ -1622,8 +2143,9 @@ mod tests {
     fn oracle_scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
         if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide raw XML bytes",
-                limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: xml.len(),
+                maximum: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
             });
         }
 
@@ -1696,8 +2218,11 @@ mod tests {
                     validate_xml_characters(&decoded)?;
                     if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                         return Err(Error::Limit {
-                            resource: "semantic slide decoded text event bytes",
-                            limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::TextBytes,
+                            ),
+                            observed: decoded.len(),
+                            maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                         });
                     }
                     if budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
@@ -1715,8 +2240,11 @@ mod tests {
                     validate_xml_characters(&decoded)?;
                     if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                         return Err(Error::Limit {
-                            resource: "semantic slide decoded text event bytes",
-                            limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::TextBytes,
+                            ),
+                            observed: decoded.len(),
+                            maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                         });
                     }
                 },
@@ -1732,8 +2260,11 @@ mod tests {
                     }
                     if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
                         return Err(Error::Limit {
-                            resource: "semantic slide XML reference bytes",
-                            limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::ReferenceBytes,
+                            ),
+                            observed: reference.as_ref().len(),
+                            maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
                         });
                     }
                 },
@@ -1763,8 +2294,9 @@ mod tests {
         )?;
         if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide processed XML bytes",
-                limit: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: processed.xml.len(),
+                maximum: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
             });
         }
 
@@ -1805,6 +2337,21 @@ mod tests {
         )
     }
 
+    fn slide_master_part(
+        body: &str,
+        presentation_namespace: &str,
+        relationship_namespace: &str,
+    ) -> BlobPart {
+        let xml = format!(
+            r#"<p:sldMaster xmlns:p="{presentation_namespace}" xmlns:r="{relationship_namespace}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:s="http://purl.oclc.org/ooxml/presentationml/main" xmlns:t="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:x="urn:foreign"><p:cSld><p:spTree/></p:cSld>{body}</p:sldMaster>"#
+        );
+        BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            xml.into_bytes(),
+        )
+    }
+
     #[test]
     fn combined_text_and_name_matches_separate_reads_through_mce_and_unusual_text() {
         let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:producer-future" mc:Ignorable="x">
@@ -1818,6 +2365,10 @@ mod tests {
         let slide = SlidePart::from_part(&part).unwrap();
         let separate = (slide.text().unwrap(), slide.name().unwrap());
         assert_eq!(slide.text_and_name().unwrap(), separate);
+        assert_eq!(
+            slide.authored_name().unwrap().as_deref(),
+            Some("  Producer & Name  ")
+        );
         assert_eq!(separate.0, " leading & \ntail\ntwo");
         assert_eq!(separate.1, "  Producer & Name  ");
     }
@@ -1842,22 +2393,29 @@ mod tests {
             (
                 br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>"#.as_slice(),
                 "",
+                None,
             ),
             (
                 br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:spTree/></p:cSld></p:sld>"#.as_slice(),
                 "",
+                Some(""),
             ),
             (
                 br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:spTree/></p:sld>"#.as_slice(),
                 "/ppt/slides/slide1.xml",
+                None,
             ),
         ];
-        for (xml, expected_name) in fixtures {
+        for (xml, expected_name, expected_authored_name) in fixtures {
             let part = slide_part(xml);
             let slide = SlidePart::from_part(&part).unwrap();
             let separate = (slide.text().unwrap(), slide.name().unwrap());
             assert_eq!(slide.text_and_name().unwrap(), separate);
             assert_eq!(separate, (String::new(), expected_name.to_owned()));
+            assert_eq!(
+                slide.authored_name().unwrap().as_deref(),
+                expected_authored_name
+            );
         }
     }
 
@@ -1893,7 +2451,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::Limit {
-                resource: "semantic slide decoded text bytes",
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
                 ..
             }
         ));
@@ -2070,7 +2628,9 @@ mod tests {
             let Ok(bytes) = std::fs::read(&fixture) else {
                 continue;
             };
-            let Ok(package) = litchi_opc::OpcPackage::from_vec(bytes) else {
+            let Ok(package) =
+                litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            else {
                 continue;
             };
             // Package parts iterate in hash order; visit them by name so the
@@ -2136,6 +2696,319 @@ mod tests {
             assert!(
                 error.contains(expected),
                 "{body}: expected {expected:?}, got {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_accept_transitional_and_strict_direct_children() {
+        for (presentation_namespace, relationship_namespace) in [
+            (
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            ),
+            (
+                "http://purl.oclc.org/ooxml/presentationml/main",
+                "http://purl.oclc.org/ooxml/officeDocument/relationships",
+            ),
+        ] {
+            let part = slide_master_part(
+                r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst>"#,
+                presentation_namespace,
+                relationship_namespace,
+            );
+            let master = SlideMasterPart::from_part(&part).unwrap();
+            assert_eq!(master.layout_references().unwrap(), vec!["rIdLayout"]);
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_reject_mixed_root_and_core_namespaces() {
+        for (presentation_namespace, body) in [
+            (
+                "http://purl.oclc.org/ooxml/presentationml/main",
+                r#"<t:sldLayoutIdLst><t:sldLayoutId r:id="rIdLayout"/></t:sldLayoutIdLst>"#,
+            ),
+            (
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                r#"<s:sldLayoutIdLst><s:sldLayoutId r:id="rIdLayout"/></s:sldLayoutIdLst>"#,
+            ),
+        ] {
+            let part = slide_master_part(
+                body,
+                presentation_namespace,
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            );
+            assert!(
+                SlideMasterPart::from_part(&part)
+                    .unwrap()
+                    .layout_references()
+                    .is_err(),
+                "core layout references must use the root conformance"
+            );
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_reject_undeclared_p_prefix() {
+        let part = BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            br#"<p:sldMaster><p:cSld><p:spTree/></p:cSld><p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst></p:sldMaster>"#.to_vec(),
+        );
+        assert!(
+            SlideMasterPart::from_part(&part)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn slide_master_layout_references_reject_namespace_spoof_nested_and_duplicate_entries() {
+        let cases = [
+            r#"<p:sldLayoutIdLst><x:sldLayoutId r:id="rIdForeign"/></p:sldLayoutIdLst>"#,
+            r#"<p:sldLayoutIdLst><p:wrapper><p:sldLayoutId r:id="rIdNested"/></p:wrapper></p:sldLayoutIdLst>"#,
+            r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="secret-id"/><p:sldLayoutId r:id="secret-id"/></p:sldLayoutIdLst>"#,
+        ];
+        for body in cases {
+            let part = slide_master_part(
+                body,
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            );
+            let master = SlideMasterPart::from_part(&part).unwrap();
+            let error = master
+                .layout_references()
+                .expect_err("invalid layout list must be refused")
+                .to_string();
+            assert!(!error.contains("secret-id"));
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_bound_collection_before_the_4097th_entry() {
+        let mut body = String::new();
+        for index in 0..=4_096 {
+            write!(&mut body, r#"<p:sldLayoutId r:id="rId{index}"/>"#).unwrap();
+        }
+        let body = format!(r#"<p:sldLayoutIdLst>{body}</p:sldLayoutIdLst>"#);
+        let part = slide_master_part(
+            &body,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        let master = SlideMasterPart::from_part(&part).unwrap();
+        assert!(matches!(
+            master.layout_references(),
+            Err(Error::Limit { .. })
+        ));
+    }
+
+    #[test]
+    fn slide_master_layout_references_allow_one_opaque_extension_list_per_entry() {
+        let part = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rIdLayout"><p:extLst><p:future><p:sldLayoutId r:id="ignored"/><p:sldLayoutIdLst/></p:future></p:extLst></p:sldLayoutId></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        let master = SlideMasterPart::from_part(&part).unwrap();
+        assert_eq!(master.layout_references().unwrap(), vec!["rIdLayout"]);
+
+        let drawingml_extension = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"><a:extLst><a:future><p:sldLayoutId r:id="ignored"/></a:future></a:extLst></p:sldLayoutId></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert!(
+            SlideMasterPart::from_part(&drawingml_extension)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+
+        let duplicate = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"><p:extLst/><p:extLst/></p:sldLayoutId></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert!(
+            SlideMasterPart::from_part(&duplicate)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn slide_master_layout_references_ignore_opaque_root_extension_payloads() {
+        let part = slide_master_part(
+            r#"<p:extLst><p:future><p:sldLayoutId r:id="ignored"/><p:sldLayoutIdLst><p:sldLayoutId r:id="also-ignored"/></p:sldLayoutIdLst></p:future></p:extLst><p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert_eq!(
+            SlideMasterPart::from_part(&part)
+                .unwrap()
+                .layout_references()
+                .unwrap(),
+            vec!["rIdLayout"]
+        );
+
+        let duplicate = slide_master_part(
+            r#"<p:extLst/><p:extLst/><p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert!(
+            SlideMasterPart::from_part(&duplicate)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn slide_master_layout_references_validate_optional_native_ids() {
+        let valid = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rIdOne"/><p:sldLayoutId id="2147483650" r:id="rIdTwo"/></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert_eq!(
+            SlideMasterPart::from_part(&valid)
+                .unwrap()
+                .layout_references()
+                .unwrap(),
+            vec!["rIdOne", "rIdTwo"]
+        );
+
+        for body in [
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rIdOne"/><p:sldLayoutId id="2147483649" r:id="rIdTwo"/></p:sldLayoutIdLst>"#,
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483647" r:id="rIdOne"/></p:sldLayoutIdLst>"#,
+        ] {
+            let part = slide_master_part(
+                body,
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            );
+            assert!(
+                SlideMasterPart::from_part(&part)
+                    .unwrap()
+                    .layout_references()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn root_booleans_accept_strict_lexical_values_and_redact_invalid_tokens() {
+        const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+        for (value, expected) in [("1", true), ("true", true), ("0", false), ("false", false)] {
+            let xml = format!(
+                r#"<p:sldMaster xmlns:p="{PML}" preserve="{value}"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+            );
+            let part = BlobPart::new(
+                PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+                ct::PML_SLIDE_MASTER.to_owned(),
+                xml.into_bytes(),
+            );
+            assert_eq!(
+                SlideMasterPart::from_part(&part)
+                    .unwrap()
+                    .is_preserved()
+                    .unwrap(),
+                expected
+            );
+        }
+
+        let master_xml = format!(
+            r#"<?xml version="1.0"?>
+
+            <p:sldMaster xmlns:p="{PML}" preserve="true"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+        );
+        let master_part = BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            master_xml.into_bytes(),
+        );
+        assert!(
+            SlideMasterPart::from_part(&master_part)
+                .unwrap()
+                .is_preserved()
+                .unwrap()
+        );
+
+        let slide_xml = format!(
+            r#"<?xml version="1.0"?>
+
+            <p:sld xmlns:p="{PML}" show="true"><p:cSld><p:spTree/></p:cSld></p:sld>"#
+        );
+        let slide = slide_part(slide_xml.as_bytes());
+        assert!(!SlidePart::from_part(&slide).unwrap().is_hidden().unwrap());
+
+        let layout_xml = format!(
+            r#"<?xml version="1.0"?>
+
+            <p:sldLayout xmlns:p="{PML}" type="title"><p:cSld><p:spTree/></p:cSld></p:sldLayout>"#
+        );
+        let layout = BlobPart::new(
+            PackURI::new("/ppt/slideLayouts/slideLayout1.xml").unwrap(),
+            ct::PML_SLIDE_LAYOUT.to_owned(),
+            layout_xml.into_bytes(),
+        );
+        assert_eq!(
+            SlideLayoutPart::from_part(&layout)
+                .unwrap()
+                .kind()
+                .unwrap()
+                .as_deref(),
+            Some("title")
+        );
+
+        let private_invalid = "private-invalid-boolean-token-7f2d9c";
+        let invalid_master = format!(
+            r#"<p:sldMaster xmlns:p="{PML}" preserve="{private_invalid}"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+        );
+        let master_part = BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            invalid_master.into_bytes(),
+        );
+        let error = SlideMasterPart::from_part(&master_part)
+            .unwrap()
+            .is_preserved()
+            .expect_err("non-schema boolean must be refused")
+            .to_string();
+        assert!(!error.contains(private_invalid));
+
+        for value in ["on", "off"] {
+            let invalid_master = format!(
+                r#"<p:sldMaster xmlns:p="{PML}" preserve="{value}"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+            );
+            let master_part = BlobPart::new(
+                PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+                ct::PML_SLIDE_MASTER.to_owned(),
+                invalid_master.into_bytes(),
+            );
+            assert!(
+                SlideMasterPart::from_part(&master_part)
+                    .unwrap()
+                    .is_preserved()
+                    .is_err(),
+                "{value} must be refused for slide-master preserve"
+            );
+
+            let invalid_slide_xml = format!(
+                r#"<p:sld xmlns:p="{PML}" show="{value}"><p:cSld><p:spTree/></p:cSld></p:sld>"#
+            );
+            let invalid_slide = slide_part(invalid_slide_xml.as_bytes());
+            assert!(
+                SlidePart::from_part(&invalid_slide)
+                    .unwrap()
+                    .is_hidden()
+                    .is_err(),
+                "{value} must be refused for slide show"
             );
         }
     }

@@ -1,6 +1,7 @@
 use super::codec::encode_record;
 use super::package::validate_unrelated_streams;
-use super::{Facet, Font, FontCollections, FontEmbeddingFlags, Patch, Scope, Snapshot};
+use super::patch::Patch;
+use super::{Facet, Font, FontCollections, FontEmbeddingFlags, Scope, Snapshot};
 use crate::package::{Error, Result};
 use crate::records::Record;
 use std::sync::Arc;
@@ -43,7 +44,7 @@ impl Change {
 }
 
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     document: Arc<Record>,
     fonts: FontCollections,
@@ -61,20 +62,12 @@ impl Transaction {
     }
 
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-    #[must_use]
-    pub const fn fonts(&self) -> &FontCollections {
+    pub(crate) const fn fonts(&self) -> &FontCollections {
         &self.fonts
     }
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.changes.is_empty()
     }
 
     /// Stage a replacement of the font at `index` in the collection for
@@ -84,7 +77,7 @@ impl Transaction {
     ///
     /// Returns an error if the collection is absent, `index` is unknown, or
     /// the result violates the source limits.
-    pub fn replace_font(&mut self, scope: Scope, index: u16, font: Font) -> Result<()> {
+    pub(crate) fn replace_font(&mut self, scope: Scope, index: u16, font: Font) -> Result<()> {
         if self
             .fonts
             .collection(scope)
@@ -116,7 +109,7 @@ impl Transaction {
     ///
     /// Returns an error if the collection is absent, the format font limit
     /// would be exceeded, or the result violates the source limits.
-    pub fn append_font(&mut self, scope: Scope, font: Font) -> Result<u16> {
+    pub(crate) fn append_font(&mut self, scope: Scope, font: Font) -> Result<u16> {
         let mut candidate = self.fonts.clone();
         let index = candidate
             .collection_mut(scope)
@@ -140,7 +133,7 @@ impl Transaction {
     ///
     /// Returns an error if the collection is absent, `index` is unknown,
     /// `data` fails EOT validation, or the result violates the source limits.
-    pub fn set_facet(
+    pub(crate) fn set_facet(
         &mut self,
         scope: Scope,
         index: u16,
@@ -185,7 +178,7 @@ impl Transaction {
     /// prepared font cannot be encoded or rolled back, or the result violates
     /// the source limits.
     #[cfg(feature = "fonts")]
-    pub fn set_prepared_facet(
+    pub(crate) fn set_prepared_facet(
         &mut self,
         scope: Scope,
         index: u16,
@@ -287,7 +280,7 @@ impl Transaction {
     ///
     /// Returns an error if the collection is absent, `index` is unknown, or
     /// the result violates the source limits.
-    pub fn remove_facet(&mut self, scope: Scope, index: u16, facet: Facet) -> Result<bool> {
+    pub(crate) fn remove_facet(&mut self, scope: Scope, index: u16, facet: Facet) -> Result<bool> {
         let mut candidate = self.fonts.clone();
         let removed = candidate
             .collection_mut(scope)
@@ -322,7 +315,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the result violates the source limits.
-    pub fn set_embedding_flags(&mut self, flags: Option<FontEmbeddingFlags>) -> Result<()> {
+    pub(crate) fn set_embedding_flags(&mut self, flags: Option<FontEmbeddingFlags>) -> Result<()> {
         if self.fonts.embedding_flags == flags {
             return Ok(());
         }
@@ -339,28 +332,6 @@ impl Transaction {
         Ok(())
     }
 
-    /// Removal is refused until every base and PP10 reference can be proven and remapped.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn remove_font(&mut self, _scope: Scope, _index: u16) -> Result<Font> {
-        Err(Error::InvalidFormat(
-            "font removal requires a complete base and PP10 reference remap".into(),
-        ))
-    }
-
-    /// Reordering is refused until every base and PP10 reference can be proven and remapped.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn reorder_fonts(&mut self, _scope: Scope, _order: &[u16]) -> Result<()> {
-        Err(Error::InvalidFormat(
-            "font reordering requires a complete base and PP10 reference remap".into(),
-        ))
-    }
-
     /// Publish the staged changes as an incremental patch and return the
     /// resulting commit.
     ///
@@ -369,7 +340,7 @@ impl Transaction {
     /// Returns an error if the publication budget is exceeded, the live owner
     /// changed during staging, serialization fails, or the published candidate
     /// fails its semantic reopen.
-    pub fn commit(mut self) -> Result<Commit> {
+    pub(crate) fn commit(mut self) -> Result<Commit> {
         if self.changes.is_empty() {
             let revision = self.source.revision();
             let patch = Patch {
@@ -397,6 +368,7 @@ impl Transaction {
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
             self.source.bytes.clone(),
             self.source.limits.max_source_bytes,
+            self.source.limits.fonts.records,
         )?;
         let live = editor.persisted_record(self.source.document_persist_id)?;
         if live.as_slice() != self.source.document.as_ref() {
@@ -449,38 +421,29 @@ impl Transaction {
         };
         Ok(Commit { snapshot, patch })
     }
-
-    /// Consume the transaction, publishing its staged changes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error under the same conditions as [`Self::commit`].
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
 
+#[allow(
+    dead_code,
+    reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+)]
 impl Commit {
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
     #[must_use]
-    pub const fn fonts(&self) -> &FontCollections {
+    pub(crate) const fn fonts(&self) -> &FontCollections {
         self.snapshot.fonts()
     }
     /// Revert the committed patch against an exact current snapshot.
@@ -489,7 +452,7 @@ impl Commit {
     ///
     /// Returns an error if `current` is neither this commit's snapshot nor
     /// its exact base source.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
     /// Re-apply the committed patch against an exact current snapshot.
@@ -498,11 +461,11 @@ impl Commit {
     ///
     /// Returns an error if `current` is neither the base source nor the exact
     /// already-applied target of the patch.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }

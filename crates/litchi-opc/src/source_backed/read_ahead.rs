@@ -1,11 +1,13 @@
 //! A bounded, archive-owned forward-start read-ahead window.
 //!
 //! The window is deliberately kept below the `SourceReader` adapter.  It is
-//! therefore shared by ZIP metadata and lazy member reads, while source
-//! artifacts and the exact publication helpers continue to use the snapshot
-//! directly.  A small admission gate serializes forward operations and lets
-//! exact-publication transitions drain them without holding a cache lock over
-//! a provider call.
+//! therefore shared by ZIP metadata and lazy member reads while their package
+//! owner is live.  Source artifacts retain the immutable archive index and
+//! catalog; their reader upgrades the package's window when it is available
+//! and falls back to checked exact snapshot reads after the owner drops.  A
+//! small admission gate serializes forward operations and lets exact-
+//! publication transitions drain them without holding a cache lock over a
+//! provider call.
 
 use crate::error::{OpcError, Result};
 use litchi_core::{Reservation, Resource};
@@ -272,6 +274,16 @@ impl Drop for FillLease<'_> {
 }
 
 impl ArchiveReadAhead {
+    /// Return the source-read policy captured at admission.  Publication may
+    /// drain the retained window and switch the adapter to exact reads, but
+    /// the deferred owner must still be able to reopen its output under the
+    /// original configured policy.
+    pub(super) const fn source_read_policy(&self) -> SourceReadPolicy {
+        SourceReadPolicy {
+            window_bytes: self.configured_window_bytes,
+        }
+    }
+
     /// Construct a window after the source snapshot has captured its length
     /// and version.  Memory is admitted before the vector allocation and the
     /// reservation remains live until the window is disabled or dropped.

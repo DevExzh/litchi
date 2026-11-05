@@ -1,0 +1,71 @@
+{
+  "status": "returned for final qualification; historical Part A timing retained",
+  "source_commit": "8f84379e3191f8228d5dc14e64d75a16cb1c8426",
+  "method": "Read immutable git blobs; no new benchmark executed.",
+  "artifacts": [
+    {
+      "path": "crates/litchi-ops/examples/file_w8_probe.rs",
+      "bytes": 12363,
+      "sha256": "b96ce20fcc35f19f3e85aacdfaea8d95dc3e9f8f5237928e1ef06541565c8605"
+    },
+    {
+      "path": "docs/unified-ops/0362-w8-file-contract.md",
+      "bytes": 36006,
+      "sha256": "87cc274c7ae57962676f9b7e60026444aa64c5a147104639ffd4b2f70772f1f0"
+    },
+    {
+      "path": "docs/unified-ops/results/0362/abba.sh",
+      "bytes": 708,
+      "sha256": "55e81c97938fbfeff4bb446417783acfcf35caf9fdc43be24aed44b6324e5105"
+    },
+    {
+      "path": "docs/unified-ops/results/0362/analyze.py",
+      "bytes": 960,
+      "sha256": "120a0dc9c0e49140ef0489c6321465bb6bc7be481a80156b53c314d7b9a67e05"
+    },
+    {
+      "path": "docs/unified-ops/results/0362/summary.json",
+      "bytes": 10092,
+      "sha256": "d31a62c7f29b54ff6a7c13163a691a5fb2b1abe75c6ad37bb2c23f102a97c9de"
+    },
+    {
+      "path": "docs/unified-ops/results/0362/binaries.sha256",
+      "bytes": 145,
+      "sha256": "98d3ea15922988bffcb3f01611188fcb0eded7537d356678bfb5d070adf4b249"
+    }
+  ],
+  "findings": [
+    {
+      "id": "paired_leaf_coverage",
+      "file": "crates/litchi-ops/examples/file_w8_probe.rs",
+      "detail": "Only unified File routes are timed. No same-build equivalent leaf legs or save/repeated-save route."
+    },
+    {
+      "id": "published_result_validation",
+      "file": "crates/litchi-ops/examples/file_w8_probe.rs",
+      "detail": "black_box observes successful operation results, but set/batch/import/merge results are dropped without reading the changed state or output. open_get observes only path string length."
+    },
+    {
+      "id": "timing_provenance",
+      "file": "crates/litchi-ops/examples/file_w8_probe.rs",
+      "detail": "Per-scenario JSON retains sample count, median_us and min_us, not raw samples, call count or elapsed totals. The runner records load averages, without process-overlap guard."
+    },
+    {
+      "id": "failure_propagation",
+      "file": "docs/unified-ops/results/0362/abba.sh",
+      "detail": "A failed probe is followed by echo FAIL; later success can leave the script exit status zero."
+    },
+    {
+      "id": "unsupported_attribution",
+      "file": "docs/unified-ops/0362-w8-file-contract.md",
+      "detail": "PPTX code-placement attribution is based on unchanged leaf path, without matched instruction/allocation or placement attribution here. A broad 1.05 before/after threshold does not establish the goal's paired leaf budgets."
+    }
+  ],
+  "required_next_steps": [
+    "Freeze historical probe and receipts; use new route names for corrected harness.",
+    "Measure final integrated source with matched dependencies/features and paired leaf routes.",
+    "Validate semantics and output, exact no-op/inverse where applicable; measure repeated output separately from edit/commit.",
+    "Retain calibrated totals, all paired blocks, host-overlap checks, exact failure exit codes, source/fixture/binary/lock hashes and allocation evidence.",
+    "Apply coordinator regression rule; do not accept an increase merely because it is below 1.05 or attributed to placement without evidence."
+  ]
+}

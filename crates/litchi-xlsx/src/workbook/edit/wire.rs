@@ -11,6 +11,7 @@ use serde_json::Value;
 use super::model::Patch;
 use crate::error::{Error, Result, allocation, invalid};
 use crate::workbook::Workbook;
+use litchi_opc::OpcPackage;
 
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_WIRE_JSON_BYTES: usize = 192 * 1024 * 1024;
@@ -87,10 +88,10 @@ impl DurablePatch {
     /// # Errors
     ///
     /// Returns an error for stale source bytes or an invalid target workbook.
-    pub fn apply(&self, source: &Workbook) -> Result<Workbook> {
+    pub fn apply(&self, source: &crate::Package) -> Result<crate::Package> {
         let inverse = self.inner.inverse();
         let expected = direction(&inverse)?.target_bytes;
-        if workbook_bytes(source)? != expected {
+        if workbook_bytes(source.workbook_ref())? != expected {
             return Err(stale());
         }
         workbook_from_target(&self.inner)
@@ -145,9 +146,9 @@ impl SealedPatch {
     /// # Errors
     ///
     /// Returns an error for a stale source digest or invalid target workbook.
-    pub fn apply(&self, source: &Workbook) -> Result<Workbook> {
+    pub fn apply(&self, source: &crate::Package) -> Result<crate::Package> {
         let direction = direction(&self.inner)?;
-        let source_bytes = workbook_bytes(source)?;
+        let source_bytes = workbook_bytes(source.workbook_ref())?;
         if BlobId::of(&source_bytes).as_hex() != direction.source_id {
             return Err(stale());
         }
@@ -232,18 +233,24 @@ fn validate_sealed(patch: &CorePatch<ForwardOnly>) -> Result<()> {
     validate_workbook_bytes(direction(patch)?.target_bytes)
 }
 
-fn workbook_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<Workbook> {
+fn workbook_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<crate::Package> {
     let target = direction(patch)?.target_bytes;
-    Workbook::from_bytes(copy_bytes(target)?)
+    crate::Package::from_opc(OpcPackage::from_vec(
+        copy_bytes(target)?,
+        litchi_opc::SourceLimits::default(),
+    )?)
 }
 
 fn validate_workbook_bytes(bytes: &[u8]) -> Result<()> {
-    let _ = Workbook::from_bytes(copy_bytes(bytes)?)?;
+    let _ = crate::Package::from_opc(OpcPackage::from_vec(
+        copy_bytes(bytes)?,
+        litchi_opc::SourceLimits::default(),
+    )?)?;
     Ok(())
 }
 
 fn workbook_bytes(workbook: &Workbook) -> Result<Vec<u8>> {
-    let bytes = workbook.to_plain_bytes()?;
+    let bytes = crate::writer::to_bytes(workbook.opc_package())?;
     ensure_size(bytes.len())?;
     Ok(bytes)
 }

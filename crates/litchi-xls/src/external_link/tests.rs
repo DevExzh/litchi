@@ -181,10 +181,10 @@ fn external_link_snapshot_noop_preserves_exact_stream() {
     assert_eq!(snapshot.links().supporting_books().len(), 1);
     assert_eq!(snapshot.links().external_names().len(), 1);
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().source_fingerprint(), snapshot.fingerprint());
-    assert_eq!(commit.snapshot().finish(), bytes);
+    assert_eq!(commit.package().finish(), bytes);
 }
 
 #[test]
@@ -203,8 +203,8 @@ fn metadata_edits_are_contextual_and_preserve_unknown_records() {
         .unwrap();
     let commit = transaction.commit().unwrap();
 
-    assert!(commit.changed());
-    let links = commit.snapshot().links();
+    assert!(commit.diagnostics().changed());
+    let links = commit.package().links();
     let super::model::SupportingBook::ExternalWorkbook(book) = &links.supporting_books()[0] else {
         panic!("expected external workbook")
     };
@@ -217,21 +217,21 @@ fn metadata_edits_are_contextual_and_preserve_unknown_records() {
     ));
     assert!(
         commit
-            .snapshot()
+            .package()
             .bytes()
             .windows(3)
             .any(|window| window == [0xA1, 0xB2, 0xC3])
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .bytes()
             .windows(2)
             .any(|window| window == [0xD4, 0xE5])
     );
 
     let applied = commit.patch().apply(&snapshot).unwrap();
-    assert_eq!(applied, *commit.snapshot());
+    assert_eq!(applied, *commit.package());
     let reverted = commit.patch().inverse().apply(&applied).unwrap();
     assert_eq!(reverted.bytes(), snapshot.bytes());
 }
@@ -245,7 +245,7 @@ fn external_name_edit_preserves_owned_continue_payload() {
     let commit = transaction.commit().unwrap();
 
     assert!(matches!(
-        commit.snapshot().links().external_names()[0].body(),
+        commit.package().links().external_names()[0].body(),
         NameBody::DdeOrOle {
             name,
             matrix: Some(matrix),
@@ -255,7 +255,7 @@ fn external_name_edit_preserves_owned_continue_payload() {
     let continuation = record(CONTINUE_RECORD_TYPE, &[0x00, 0, 0, 0, 0, 0, 0, 0, 0]);
     assert!(
         commit
-            .snapshot()
+            .package()
             .bytes()
             .windows(continuation.len())
             .any(|window| window == continuation)
@@ -267,7 +267,12 @@ fn invalid_edits_are_failure_atomic_and_stale_patches_are_rejected() {
     let bytes = source_stream();
     let snapshot = Snapshot::parse(bytes).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
 
     assert!(
         transaction
@@ -279,7 +284,15 @@ fn invalid_edits_are_failure_atomic_and_stale_patches_are_rejected() {
     assert!(transaction.set_external_name(0, &"x".repeat(256)).is_err());
     assert!(transaction.set_cache_valid(0, 5, true).is_err());
     assert!(transaction.set_cache_valid(0, 0, true).is_ok());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 
     let mut edit = snapshot.edit();
     edit.set_external_name(0, "Changed").unwrap();

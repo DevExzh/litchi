@@ -12,7 +12,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_protos::{tsch, tsd, tsp};
 use litchi_keynote::{
-    ChartSelector, Package, Position, ReadOptions, SemanticLimits, SlideSelector,
+    ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
 };
 use prost::Message as _;
 
@@ -26,7 +26,10 @@ mod value_axis {
     use litchi_iwa_common::chart::axis::{
         Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
     };
-    use litchi_keynote::{ChartValueAxisError, ChartValueAxisLimitKind};
+    use litchi_keynote::{
+        chart::value_axis::Error as ChartValueAxisError,
+        chart::value_axis::LimitKind as ChartValueAxisLimitKind,
+    };
 
     const VALUE_MAJOR_FIELD: u32 = 5;
     const VALUE_MINOR_FIELD: u32 = 6;
@@ -53,8 +56,13 @@ mod value_axis {
         if unknown {
             // Deliberately place an opaque field after the scalar.  A source
             // preserving rewrite must retain it and its original order.
-            append_length_delimited_field(&mut nested, 4_777, b"nested bound extension")
-                .expect("small test field fits");
+            append_length_delimited_field(
+                &mut nested,
+                4_777,
+                b"nested bound extension",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .expect("small test field fits");
         }
         nested
     }
@@ -80,6 +88,7 @@ mod value_axis {
                 &mut generated,
                 VALUE_MAXIMUM_FIELD,
                 &encoded_bound(maximum.value(), unknown_nested),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )
             .expect("small bound fits");
         }
@@ -88,6 +97,7 @@ mod value_axis {
                 &mut generated,
                 VALUE_MINIMUM_FIELD,
                 &encoded_bound(minimum.value(), unknown_nested),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )
             .expect("small bound fits");
         }
@@ -100,7 +110,7 @@ mod value_axis {
         unknown_nested: bool,
     ) -> TestResult<Vec<u8>> {
         let original = message_payload(source, VALUE_NON_STYLES[0], AXIS_NON_STYLE_MESSAGE_TYPE)?;
-        let extension = WireView::parse(&original)?
+        let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
             .ok_or_else(|| io::Error::other("missing generated axis extension"))?;
@@ -121,23 +131,25 @@ mod value_axis {
         nested: u32,
         unknown: u32,
     ) -> TestResult<Vec<Vec<u8>>> {
-        let outer = WireView::parse(payload)?
+        let outer = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == outer)
             .ok_or_else(|| io::Error::other("missing synthetic outer field"))?;
-        let nested = WireView::parse(outer.payload())?
+        let nested = WireView::parse(outer.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == nested)
             .ok_or_else(|| io::Error::other("missing synthetic nested field"))?;
-        Ok(WireView::parse(nested.payload())?
-            .fields()
-            .filter(|field| field.number() == unknown)
-            .map(|field| field.raw().to_vec())
-            .collect())
+        Ok(
+            WireView::parse(nested.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+                .fields()
+                .filter(|field| field.number() == unknown)
+                .map(|field| field.raw().to_vec())
+                .collect(),
+        )
     }
 
     fn without_previews(source: &[u8]) -> TestResult<Vec<u8>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entries = catalog
             .iter()
             .filter(|entry| !PREVIEWS.contains(&entry.name()))
@@ -151,7 +163,7 @@ mod value_axis {
 
     fn with_shared_primary_value_axis(source: &[u8]) -> TestResult<Vec<u8>> {
         let original = message_payload(source, CHARTS[1], CHART_MESSAGE_TYPE)?;
-        let chart_extension = WireView::parse(&original)?
+        let chart_extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
             .ok_or_else(|| io::Error::other("missing synthetic chart extension"))?;
@@ -197,7 +209,7 @@ mod value_axis {
     fn commit_settings(
         package: &Package,
         target: ValueAxisSettings,
-    ) -> TestResult<litchi_keynote::ChartValueAxisCommit> {
+    ) -> TestResult<litchi_keynote::chart::value_axis::Commit> {
         Ok(package
             .edit_slide_chart_value_axis_settings(
                 SlideSelector::name("Charts"),
@@ -492,7 +504,12 @@ mod value_axis {
             .edit_slide_chart_value_axis_settings(SlideSelector::index(0), ChartSelector::index(0))?
             .set(invalid)
             .expect_err("logarithmic axes must have positive manual bounds");
-        assert!(matches!(error, ChartValueAxisError::InvalidSettings));
+        assert!(matches!(
+            error,
+            ChartValueAxisError::Refused(
+                litchi_keynote::chart::value_axis::Refusal::InvalidSettings
+            )
+        ));
         error_is_redacted(&error);
         assert_eq!(exact_bytes(&package)?, before);
         Ok(())
@@ -635,7 +652,7 @@ mod value_axis {
         let source = synthetic_metadata_package(true)?;
 
         let chart = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-        let drawable = WireView::parse(&chart)?
+        let drawable = WireView::parse(&chart, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
             .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -839,7 +856,7 @@ mod value_axis {
         let baseline = ValueAxisSettings::automatic();
         let base = with_value_axis_settings(&source, baseline, false)?;
         let original = message_payload(&base, VALUE_NON_STYLES[0], AXIS_NON_STYLE_MESSAGE_TYPE)?;
-        let extension = WireView::parse(&original)?
+        let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
             .ok_or_else(|| io::Error::other("missing generated axis extension"))?;
@@ -853,24 +870,44 @@ mod value_axis {
             }),
             ("wrong-major-wire", {
                 let mut generated = extension.payload().to_vec();
-                append_length_delimited_field(&mut generated, VALUE_MAJOR_FIELD, b"wrong")?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MAJOR_FIELD,
+                    b"wrong",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("truncated-bound", {
                 let mut generated = extension.payload().to_vec();
-                append_length_delimited_field(&mut generated, VALUE_MINIMUM_FIELD, &[0x09, 1, 2])?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MINIMUM_FIELD,
+                    &[0x09, 1, 2],
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("missing-bound-scalar", {
                 let mut generated = extension.payload().to_vec();
-                append_length_delimited_field(&mut generated, VALUE_MAXIMUM_FIELD, &[])?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MAXIMUM_FIELD,
+                    &[],
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("duplicate-bound-scalar", {
                 let mut generated = extension.payload().to_vec();
                 let mut nested = fixed64_field(1, 1.0_f64.to_bits());
                 nested.extend_from_slice(&fixed64_field(1, 2.0_f64.to_bits()));
-                append_length_delimited_field(&mut generated, VALUE_MAXIMUM_FIELD, &nested)?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MAXIMUM_FIELD,
+                    &nested,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("nonfinite-bound", {
@@ -879,6 +916,7 @@ mod value_axis {
                     &mut generated,
                     VALUE_MAXIMUM_FIELD,
                     &fixed64_field(1, f64::NAN.to_bits()),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
                 generated
             }),
@@ -888,11 +926,13 @@ mod value_axis {
                     &mut generated,
                     VALUE_MAXIMUM_FIELD,
                     &encoded_bound(1.0, false),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
                 append_length_delimited_field(
                     &mut generated,
                     VALUE_MINIMUM_FIELD,
                     &encoded_bound(2.0, false),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
                 generated
             }),
@@ -948,10 +988,17 @@ mod value_axis {
         // The package's semantic profile is checked at ingress.  A one-object
         // ceiling is intentionally below this graph and must fail before an
         // edit can clone or reassemble anything.
-        let limited_semantics = SemanticLimits::new(1, 1, 1, 1, 1, 1)?;
+        let limited_semantics = SemanticLimits::builder()
+            .max_objects(1)?
+            .max_slides(1)?
+            .max_references(1)?
+            .max_text_storages(1)?
+            .max_text_fragments(1)?
+            .max_text_bytes(1)?
+            .build()?;
         let limited = Package::from_bytes_with_options(
             &source,
-            ReadOptions::new(Limits::default(), limited_semantics),
+            OpenOptions::new().semantic_limits(limited_semantics),
         );
         let error = limited.expect_err("semantic limit must reject hostile graph");
         error_is_redacted(&error);
@@ -968,17 +1015,15 @@ mod value_axis {
         assert!(candidate.len() > source.len());
 
         let defaults = Limits::default();
-        let limits = Limits::new(
-            u64::try_from(candidate.len() - 1)?,
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_total_bytes(),
-            defaults.max_iwa_stream_bytes(),
-        )?;
-        let package = Package::from_bytes_with_options(
-            &source,
-            ReadOptions::new(limits, SemanticLimits::default()),
-        )?;
+        let limits = SourceLimits::builder()
+            .max_input_bytes(u64::try_from(candidate.len() - 1)?)?
+            .max_entries(defaults.max_entries())?
+            .max_entry_bytes(defaults.max_entry_bytes())?
+            .max_aggregate_bytes(defaults.max_total_bytes())?
+            .max_component_bytes(defaults.max_iwa_stream_bytes())?
+            .build()?;
+        let package =
+            Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
         let before = exact_bytes(&package)?;
         let error = package
             .edit_slide_chart_value_axis_settings(SlideSelector::index(0), ChartSelector::index(0))
@@ -987,7 +1032,7 @@ mod value_axis {
         error_is_redacted(&error);
         assert!(matches!(
             error,
-            ChartValueAxisError::LimitExceeded {
+            ChartValueAxisError::Limit {
                 kind: ChartValueAxisLimitKind::OutputBytes,
                 ..
             }

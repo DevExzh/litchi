@@ -4,17 +4,18 @@ use core::mem::size_of;
 
 use litchi_iwa_protos::numbers_formula_codec::{
     self as codec, BinaryOperator as WireBinary, DecodeLimit, DecodeOptions,
-    FormulaWriteAxisReference, FormulaWriteCellReference, FormulaWriteContext,
-    FormulaWriteDependencyLimits, FormulaWriteDependencyVisitor, FormulaWriteNode,
-    FormulaWriteOwnerUid, FormulaWritePrecedent, FormulaWriteRange, ResolvedFormulaWriteOwner,
+    FormulaWriteAxisReference, FormulaWriteCategoryReference, FormulaWriteCellReference,
+    FormulaWriteContext, FormulaWriteDependencyLimits, FormulaWriteDependencyVisitor,
+    FormulaWriteNode, FormulaWriteOwnerUid, FormulaWritePrecedent, FormulaWriteRange,
+    ResolvedFormulaWriteOwner,
 };
 
 use crate::{
     Package,
-    formula::{BinaryOperator, Node},
+    formula::{BinaryOperator, Node, PivotReference},
     package::function_map::function_identifier,
     table::{
-        CellPosition,
+        At,
         cells::{Change, Error, Input, LimitKind, Path},
     },
 };
@@ -24,7 +25,7 @@ use super::{budget, cache_commit, lists, resolve, tile};
 #[derive(Debug)]
 pub(super) struct AuthoredFormula {
     pub(super) change_index: usize,
-    pub(super) position: CellPosition,
+    pub(super) position: At,
     pub(super) bytes: Vec<u8>,
     pub(super) precedents: Vec<FormulaWritePrecedent>,
     pub(super) ranges: Vec<FormulaWriteRange>,
@@ -429,7 +430,8 @@ fn count_table_paths(node: &Node, mut total: usize, path: Path) -> Result<usize,
         | Node::Cell(_)
         | Node::Range(..)
         | Node::Rows(..)
-        | Node::Columns(..) => {},
+        | Node::Columns(..)
+        | Node::PivotCategory(_) => {},
     }
     Ok(total)
 }
@@ -459,7 +461,8 @@ fn collect_table_paths(node: &Node, output: &mut Vec<ReferencedTablePath>) {
         | Node::Cell(_)
         | Node::Range(..)
         | Node::Rows(..)
-        | Node::Columns(..) => {},
+        | Node::Columns(..)
+        | Node::PivotCategory(_) => {},
     }
 }
 
@@ -470,6 +473,7 @@ struct Preflight {
     precedent_upper: usize,
     range_upper: usize,
     external_occurrences: usize,
+    pivot_references: usize,
     output_upper: usize,
     fields_upper: usize,
     work_upper: usize,
@@ -497,6 +501,7 @@ fn preflight(changes: &[Change], rows: u32, columns: u32, path: Path) -> Result<
         total.range_upper = checked_add(total.range_upper, stats.range_upper, path)?;
         total.external_occurrences =
             checked_add(total.external_occurrences, stats.external_occurrences, path)?;
+        total.pivot_references = checked_add(total.pivot_references, stats.pivot_references, path)?;
         total.output_upper = checked_add(total.output_upper, stats.output_upper, path)?;
         total.fields_upper = checked_add(total.fields_upper, stats.fields_upper, path)?;
         total.work_upper = checked_add(total.work_upper, stats.work_upper, path)?;
@@ -706,6 +711,13 @@ fn preflight_node(
         Node::Text(_) | Node::Boolean(_) => {
             stats.lowered_nodes = checked_add(stats.lowered_nodes, 1, path)?;
         },
+        // One category node and its two precedents: the grouping-columns
+        // and aggregate cells of the group-by's formula owner.
+        Node::PivotCategory(_) => {
+            stats.lowered_nodes = checked_add(stats.lowered_nodes, 1, path)?;
+            stats.precedent_upper = checked_add(stats.precedent_upper, 2, path)?;
+            stats.pivot_references = checked_add(stats.pivot_references, 1, path)?;
+        },
         Node::Function { arguments, .. } => {
             for argument in arguments {
                 preflight_node(argument.root(), local_rows, local_columns, stats, path)?;
@@ -764,6 +776,7 @@ pub(super) fn prepare(
     if preflight.formulas == 0 {
         return Ok(PreparedFormulaBatch::default());
     }
+    let pivots = pivot_categories(source, preflight.pivot_references, budget, path)?;
     let envelope = budget::Usage {
         retained_elements: as_u64(
             preflight
@@ -833,6 +846,7 @@ pub(super) fn prepare(
         changes,
         staged_nodes,
         owner,
+        &pivots,
         rows,
         columns,
         envelope,
@@ -856,6 +870,7 @@ fn prepare_authorized(
     changes: &[Change],
     staged_nodes: usize,
     owner: LocalOwner<'_>,
+    pivots: &Pivots,
     rows: u32,
     columns: u32,
     limits: budget::Usage,
@@ -933,7 +948,7 @@ fn prepare_authorized(
                 amount: stats.range_upper,
             })?;
         exact_capacity(&ranges, stats.range_upper, path)?;
-        lower(expression.root(), owner, &mut nodes, path)?;
+        lower(expression.root(), owner, pivots, &mut nodes, path)?;
         if nodes.len() != stats.lowered_nodes {
             return Err(Error::Verification { path });
         }
@@ -944,7 +959,8 @@ fn prepare_authorized(
             32,
             as_usize(limits.formula_nodes, path)?,
             expression.owned_bytes().max(1),
-        );
+        )
+        .with_max_owner_entries(wire_owners.len());
         let context = FormulaWriteContext::new(
             owner.internal_owner,
             change.position().row(),
@@ -1063,10 +1079,16 @@ fn prepare_authorized(
 fn lower<'text>(
     node: &'text Node,
     owner: LocalOwner<'_>,
+    pivots: &Pivots,
     output: &mut Vec<FormulaWriteNode<'text>>,
     path: Path,
 ) -> Result<(), Error> {
     match node {
+        Node::PivotCategory(reference) => {
+            output.push(FormulaWriteNode::CategoryReference(resolve_pivot(
+                pivots, *reference, path,
+            )?));
+        },
         Node::Number(value) => {
             let value = value.get();
             if value != 0.0 && value.is_sign_negative() {
@@ -1090,12 +1112,14 @@ fn lower<'text>(
         },
         Node::Function { name, arguments } => {
             for argument in arguments {
-                lower(argument.root(), owner, output, path)?;
+                lower(argument.root(), owner, pivots, output, path)?;
             }
-            let identifier = function_identifier(name).ok_or(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            })?;
+            let identifier = function_identifier(name).ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            ))?;
             output.push(FormulaWriteNode::Function {
                 identifier,
                 argument_count: u32::try_from(arguments.len())
@@ -1104,16 +1128,16 @@ fn lower<'text>(
         },
         Node::Binary { operator, operands } => {
             for operand in operands {
-                lower(operand.root(), owner, output, path)?;
+                lower(operand.root(), owner, pivots, output, path)?;
             }
             output.push(FormulaWriteNode::Binary(lower_binary(*operator)));
         },
         Node::Negate(operands) => {
-            lower(operands[0].root(), owner, output, path)?;
+            lower(operands[0].root(), owner, pivots, output, path)?;
             output.push(FormulaWriteNode::Negation);
         },
         Node::Percent(operands) => {
-            lower(operands[0].root(), owner, output, path)?;
+            lower(operands[0].root(), owner, pivots, output, path)?;
             output.push(FormulaWriteNode::Percent);
         },
         Node::Range(start, end) => output.push(FormulaWriteNode::ResolvedRange {
@@ -1152,6 +1176,76 @@ fn lower<'text>(
         },
     }
     Ok(())
+}
+
+/// The workbook's pivot categories by native identity, read only when the
+/// batch references one.
+type Pivots = std::collections::HashMap<
+    crate::table::pivot::CategoryKey,
+    crate::package::pivot_categories::Found,
+>;
+
+/// Read the categories a batch with `references` pivot references resolves
+/// against: the host's group-by walk, bounded by the source limits and its
+/// node ceiling. The lookups are charged as formula work.
+fn pivot_categories(
+    source: &Package,
+    references: usize,
+    budget: &mut budget::TransactionBudget,
+    path: Path,
+) -> Result<Pivots, Error> {
+    if references == 0 {
+        return Ok(Pivots::new());
+    }
+    let lookups = budget::Usage {
+        formula_work: as_u64(references),
+        transaction_work: as_u64(references),
+        lookups: as_u64(references),
+        ..budget::Usage::default()
+    };
+    budget.authorize(lookups)?;
+    match crate::package::pivot_categories::categories(source) {
+        Ok(categories) => {
+            budget.record_authorized(lookups)?;
+            Ok(categories)
+        },
+        Err(_) => {
+            budget.cancel_authorization();
+            Err(Error::InvalidSource { path })
+        },
+    }
+}
+
+/// Resolve one reference as the host's `append_pivot_category_reference`
+/// does: the category must be present, with the same summary function and
+/// group level.
+fn resolve_pivot(
+    pivots: &Pivots,
+    reference: PivotReference,
+    path: Path,
+) -> Result<FormulaWriteCategoryReference, Error> {
+    let found = pivots.get(&reference.key).ok_or(Error::Refused(
+        crate::package::table_cells::Refusal::PivotCategoryNotFound,
+    ))?;
+    if !found.aggregate_types.contains(&reference.aggregate_type)
+        || found.level != reference.group_level
+    {
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::PivotCategoryChanged,
+        ));
+    }
+    let uid = |(lower, upper): (u64, u64)| FormulaWriteOwnerUid::from_halves(lower, upper);
+    let (group_by, column, group) = reference.key;
+    Ok(FormulaWriteCategoryReference::new(
+        uid(group_by),
+        uid(column),
+        uid(group),
+        reference.aggregate_type,
+        reference.group_level,
+        u32::try_from(found.owner).map_err(|_| Error::InvalidSource { path })?,
+        found.grouping,
+        found.aggregate,
+    ))
 }
 
 fn wire_cell(
@@ -1349,6 +1443,12 @@ fn map_codec(error: codec::DecodeError, path: Path) -> Error {
         Some(DecodeLimit::Nodes { observed, maximum }) => {
             (LimitKind::FormulaWork, observed, maximum)
         },
+        Some(DecodeLimit::Owners { observed, maximum }) => {
+            // The transaction's existing References budget counts the
+            // source-resolved owner entries retained by formula authoring;
+            // this is not an AST-node observation.
+            (LimitKind::References, observed, maximum)
+        },
         Some(DecodeLimit::Text { observed, maximum }) => {
             (LimitKind::OwnedValueBytes, observed, maximum)
         },
@@ -1359,13 +1459,15 @@ fn map_codec(error: codec::DecodeError, path: Path) -> Error {
             };
         },
         None => {
-            return Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            };
+            return Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            );
         },
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: as_u64(observed),
         maximum: as_u64(maximum),

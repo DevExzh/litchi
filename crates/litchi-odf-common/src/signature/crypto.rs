@@ -199,7 +199,7 @@ impl DocumentSigner {
 }
 
 pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<Vec<u8>> {
-    let archive = ArchiveReader::new(unsigned)
+    let archive = ArchiveReader::new(unsigned, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| format_error(format!("invalid ODF ZIP archive while signing: {error}")))?;
     let mut names: Vec<String> = archive
         .file_names()
@@ -301,7 +301,7 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &DocumentSigner) -> Result<V
 }
 
 pub(crate) fn verify_package(data: &[u8]) -> Result<Vec<SignatureVerification>> {
-    let archive = ArchiveReader::new(data)
+    let archive = ArchiveReader::new(data, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| format_error(format!("invalid ODF ZIP archive: {error}")))?;
     if !archive.contains(DOCUMENT_SIGNATURE_PATH) {
         return Ok(Vec::new());
@@ -577,7 +577,8 @@ fn validate_key_matches_certificate(
 }
 
 fn rebuild_with_signature(archive: &ArchiveReader<'_>, signature_xml: &str) -> Result<Vec<u8>> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         if name == DOCUMENT_SIGNATURE_PATH {
             continue;

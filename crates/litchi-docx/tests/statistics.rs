@@ -3,15 +3,16 @@ use std::io::Cursor;
 
 #[test]
 fn reopened_document_statistics_use_the_concrete_metrics_owner() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document.add_paragraph_with_text("alpha beta");
         document.add_paragraph();
     }
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
 
     let reopened = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let statistics = reopened.document().unwrap().statistics().unwrap();

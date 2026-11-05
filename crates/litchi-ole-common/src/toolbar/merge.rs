@@ -188,6 +188,14 @@ impl<'a> ExtraInfo<'a> {
         }
     }
 
+    pub(crate) fn encoded_len(&self) -> usize {
+        self.help_file.encoded_len()
+            + self.tag.encoded_len()
+            + self.on_action.encoded_len()
+            + self.param.encoded_len()
+            + 20
+    }
+
     #[must_use]
     pub const fn help_file(&self) -> &WString<'a> {
         &self.help_file

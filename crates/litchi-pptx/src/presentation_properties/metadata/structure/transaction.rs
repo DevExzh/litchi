@@ -1,7 +1,7 @@
 //! Detached, source-checked edits for the validated presentation structure.
 //!
 //! The presentation slide relationship graph is captured as immutable source
-//! context. Transactions edit only the semantic custom-show and section
+//! context. Detached edits only the semantic custom-show and section
 //! layers, while publication replaces one presentation XML blob atomically.
 //! Every candidate is parsed and validated again before it becomes a commit.
 
@@ -11,11 +11,10 @@ use litchi_opc::{OpcPackage, Part, TargetMode};
 
 use super::codec;
 use super::model::{Graph, Reference};
+use crate::presentation_properties::metadata::Limits;
 use crate::presentation_properties::metadata::custom_show::List as ShowList;
 use crate::presentation_properties::metadata::sections::List as SectionList;
 use crate::{Error, Result};
-
-const MAX_SOURCE_BYTES: usize = 8 * 1024 * 1024;
 
 /// Stable fingerprint of the exact presentation XML source bytes.
 pub type Revision = u64;
@@ -51,6 +50,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) relationships: Vec<SourceRelationship>,
     pub(crate) graph: Graph,
+    pub(crate) limits: Limits,
     pub(crate) revision: Revision,
 }
 
@@ -60,17 +60,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        super::package::load_snapshot(package)
-    }
-
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
+    pub fn load(package: &OpcPackage, limits: Limits) -> Result<Self> {
+        super::package::load_snapshot(package, limits)
     }
 
     pub(crate) fn from_wire(
@@ -79,11 +70,16 @@ impl Snapshot {
         source_xml: Arc<Vec<u8>>,
         relationships: Vec<SourceRelationship>,
         graph: Graph,
+        limits: Limits,
     ) -> Result<Self> {
-        if source_xml.len() > MAX_SOURCE_BYTES {
-            return Err(limit("presentation structure source bytes"));
+        if source_xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: source_xml.len(),
+                maximum: limits.max_input_bytes(),
+            });
         }
-        codec::validate_detached_graph(&graph, &graph)?;
+        codec::validate_detached_graph(&graph, &graph, limits)?;
         Ok(Self {
             presentation_part_name,
             presentation_content_type,
@@ -91,6 +87,7 @@ impl Snapshot {
             source_xml,
             relationships,
             graph,
+            limits,
         })
     }
 
@@ -99,13 +96,6 @@ impl Snapshot {
     #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.graph
-    }
-
-    /// Contextual alias for [`Self::graph`].
-    #[inline]
-    #[must_use]
-    pub fn structure(&self) -> &Graph {
-        self.graph()
     }
 
     /// Borrow the resolved, ordered presentation slide references.
@@ -160,8 +150,8 @@ impl Snapshot {
     /// Start an atomic detached edit over custom shows and sections.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.graph.clone(),
         }
@@ -192,12 +182,12 @@ impl Snapshot {
 
 /// A detached atomic edit over custom shows and sections.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Draft {
     original: Snapshot,
     working: Graph,
 }
 
-impl Transaction {
+impl Draft {
     /// Immutable source snapshot used for conflict checks and inverse patches.
     #[inline]
     #[must_use]
@@ -210,13 +200,6 @@ impl Transaction {
     #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.working
-    }
-
-    /// Contextual alias for [`Self::graph`].
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Graph {
-        self.graph()
     }
 
     /// Borrow the staged custom-show catalog.
@@ -233,11 +216,14 @@ impl Transaction {
         &self.working.sections
     }
 
-    /// Whether the staged semantic graph differs from the captured source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         !codec::equivalent_graph(&self.original.graph, &self.working)
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Replace the complete typed graph, retaining the source slide topology.
@@ -324,10 +310,10 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+    pub(crate) fn commit(self) -> Result<Prepared> {
+        if !self.has_changes() {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -338,8 +324,9 @@ impl Transaction {
             self.original.source_xml.as_slice(),
             &self.original.graph,
             &self.working,
+            self.original.limits,
         )?;
-        let graph = codec::parse_detached(&updated, &self.working.slides)?;
+        let graph = codec::parse_detached(&updated, &self.working.slides, self.original.limits)?;
         if !codec::equivalent_graph(&graph, &self.working) {
             return Err(invalid(
                 "published presentation structure changed the staged graph",
@@ -351,9 +338,10 @@ impl Transaction {
             Arc::new(updated),
             self.original.relationships.clone(),
             graph,
+            self.original.limits,
         )?;
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -361,68 +349,70 @@ impl Transaction {
     }
 
     fn validate(&self, value: &Graph) -> Result<()> {
-        codec::validate_detached_graph(&self.original.graph, value)
+        codec::validate_detached_graph(&self.original.graph, value, self.original.limits)
     }
 }
 
 /// A successful presentation-structure edit and its reversible patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
-    /// Whether publication changes the exact presentation XML bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+impl Prepared {
+    #[cfg(test)]
+    fn has_changes(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 
     /// Consume the commit into its patch.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible source-checked replacement of one presentation XML blob.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
@@ -430,61 +420,49 @@ impl Patch {
     /// Source context required before publication.
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact source no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        self.is_empty()
-    }
-
-    /// Whether this patch changes the presentation source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch without reinterpreting XML.
     #[inline]
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
-    /// Return the source fingerprint required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
     /// Apply this patch atomically after checking the source and relationship topology.
+    ///
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 }
@@ -500,8 +478,4 @@ fn fingerprint(bytes: &[u8]) -> Revision {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
-}
-
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("{what} exceeds the supported safety limit"))
 }

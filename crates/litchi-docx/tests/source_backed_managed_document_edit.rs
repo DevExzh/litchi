@@ -8,6 +8,8 @@
 //! ordinary document snapshot/edit path must retain its source owner and every
 //! candidate owner through the commit and publication boundary.
 
+use litchi_docx::document::Commit;
+
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -18,14 +20,60 @@ use litchi_core::{
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::document::{
-    Commit, RevisionAction, RevisionKind, RevisionSelector, TransactionError,
+    Error as TransactionError, RevisionAction, RevisionKind, RevisionSelector,
 };
 use litchi_docx::paragraph::{Collapsed, Inline, Symbols};
-use litchi_docx::{Error, ReadLimits, source_backed};
+use litchi_docx::{Error, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::rel::Relationships;
 use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
+
+type ManagedCommit = Commit<source_backed::Package>;
+
+/// Record 0355a: a detached main-document commit replays onto a
+/// source-backed package (`Package::apply`), and its inverse patch restores
+/// the main document; there is no separate publication product any more.
+struct Published {
+    patch: litchi_docx::document::Patch,
+}
+
+trait PublishDocument {
+    fn publish_with_inverse(
+        &self,
+        writer: impl Write,
+        commit: &ManagedCommit,
+    ) -> Result<Published, TransactionError>;
+    fn publish_inverse(
+        &self,
+        writer: impl Write,
+        publication: &Published,
+    ) -> Result<litchi_docx::document::Snapshot, TransactionError>;
+}
+
+impl PublishDocument for source_backed::Package {
+    fn publish_with_inverse(
+        &self,
+        writer: impl Write,
+        commit: &ManagedCommit,
+    ) -> Result<Published, TransactionError> {
+        let applied = self.apply(commit.patch())?;
+        applied.package().write_to(writer)?;
+        Ok(Published {
+            patch: applied.patch().clone(),
+        })
+    }
+
+    fn publish_inverse(
+        &self,
+        writer: impl Write,
+        publication: &Published,
+    ) -> Result<litchi_docx::document::Snapshot, TransactionError> {
+        let restored = self.apply(&publication.patch.inverse())?;
+        restored.package().write_to(writer)?;
+        restored.package().document_snapshot()
+    }
+}
 
 const MAIN: &str = "word/document.xml";
 const MEDIA: &str = "word/media/image1.png";
@@ -222,7 +270,8 @@ fn archive_fixture(
     }
     relationships.push_str("</Relationships>");
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -255,7 +304,7 @@ fn archive_fixture(
 }
 
 fn part_bytes(bytes: &[u8], name: &str) -> Vec<u8> {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .get_part(&PackURI::new(format!("/{name}")).unwrap())
         .unwrap()
@@ -299,10 +348,11 @@ fn managed_context_with_output(
 
 fn managed(bytes: Vec<u8>, memory: u64) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) = managed_context(memory);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     (budget, cancellation_source, package)
@@ -311,18 +361,15 @@ fn managed(bytes: Vec<u8>, memory: u64) -> (Budget, CancellationSource, source_b
 fn publish_managed_edit_with_inverse(
     source: Vec<u8>,
     replacement: &str,
-) -> (Vec<u8>, source_backed::DocumentPublication, Budget, Commit) {
+) -> (Vec<u8>, Published, Budget, ManagedCommit) {
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), replacement)
         .unwrap();
     let commit = edit.commit().unwrap();
-    drop(snapshot);
     let mut output = Vec::new();
-    let publication = package
-        .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
-        .unwrap();
+    let publication = package.publish_with_inverse(&mut output, &commit).unwrap();
+    drop(package);
     (output, publication, budget, commit)
 }
 
@@ -366,24 +413,10 @@ fn is_output_budget_refusal(error: &TransactionError) -> bool {
     )
 }
 
-fn is_artifact_mismatch(error: &TransactionError) -> bool {
-    matches!(
-        error,
-        TransactionError::Document(Error::Opc(OpcError::SourceArtifactMismatch {
-            artifact: "current",
-            ..
-        }))
-    )
-}
-
 fn is_protection_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "changed document publication",
-            reason: "document or write protection, or tracked revisions, is enabled",
-            ..
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "changed document publication" && refusal.reason() == "document or write protection, or tracked revisions, is enabled"
     )
 }
 
@@ -397,23 +430,17 @@ fn is_mixed_dialect_refusal(error: &TransactionError) -> bool {
 
 fn is_mce_policy_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "changed document publication",
-            reason: "markup-compatibility projection or unknown source policy is not admitted",
-            ..
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "changed document publication" && refusal.reason() == "markup-compatibility projection or unknown source policy is not admitted"
     )
 }
 
 fn is_settings_policy_refusal(error: &TransactionError) -> bool {
     matches!(
         error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "changed document publication",
-            ..
-        }) | TransactionError::Document(Error::InvalidFormat(_))
-    )
+        TransactionError::Document(Error::Refused(refusal))
+            if refusal.operation() == "changed document publication"
+    ) || matches!(error, TransactionError::Document(Error::InvalidFormat(_)))
 }
 
 fn is_literal_namespace_refusal(error: &TransactionError) -> bool {
@@ -436,12 +463,8 @@ fn is_dtd_policy_refusal(error: &TransactionError) -> bool {
 
 fn is_mce_document_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "source-backed document read",
-            reason: "markup-compatibility preprocessing would require an unbudgeted owned payload",
-            ..
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "source-backed document read" && refusal.reason() == "markup-compatibility preprocessing would require an unbudgeted owned payload"
     )
 }
 
@@ -578,7 +601,7 @@ fn managed_document_snapshot_and_edit_retain_source_and_candidate_reservations()
     let cloned_snapshot = snapshot.clone();
     assert_eq!(budget.used(Resource::Memory), source_reserved);
 
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "candidate")
         .unwrap();
     let candidate_reserved = budget.used(Resource::Memory);
@@ -624,13 +647,14 @@ fn managed_document_bom_offsets_are_preserved_through_snapshot_and_edit() {
     );
     assert!(snapshot.xml_bytes().starts_with(b"\xEF\xBB\xBF"));
 
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "after")
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -639,14 +663,21 @@ fn managed_document_bom_offsets_are_preserved_through_snapshot_and_edit() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(1))
             .unwrap()
             .text()
             .unwrap(),
         "kept"
     );
-    assert!(commit.snapshot().xml_bytes().starts_with(b"\xEF\xBB\xBF"));
+    assert!(
+        commit
+            .patch()
+            .target()
+            .xml_bytes()
+            .starts_with(b"\xEF\xBB\xBF")
+    );
     drop(commit);
     drop(snapshot);
     drop(package);
@@ -708,11 +739,8 @@ fn managed_paragraph_and_nested_run_mutations_refuse_without_state_change() {
     for value in [None, Some(Collapsed::Disabled)] {
         let result = paragraph.set_collapsed(value);
         assert!(matches!(
-            result,
-            Err(Error::UnsafeEdit {
-                operation: "paragraph.set_collapsed",
-                ..
-            })
+                    result,
+                    Err(Error::Refused(refusal)) if refusal.operation() == "paragraph.set_collapsed"
         ));
         assert_eq!(paragraph.collapsed().unwrap(), before_collapsed);
     }
@@ -729,11 +757,8 @@ fn managed_paragraph_and_nested_run_mutations_refuse_without_state_change() {
     assert!(before_symbols.is_empty());
     let result = nested_run.set_symbols(Symbols::default());
     assert!(matches!(
-        result,
-        Err(Error::UnsafeEdit {
-            operation: "run.set_symbols",
-            ..
-        })
+            result,
+            Err(Error::Refused(refusal)) if refusal.operation() == "run.set_symbols"
     ));
     assert_eq!(nested_run.symbols().unwrap(), before_symbols);
 
@@ -811,11 +836,8 @@ fn managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mu
     let before_symbols = nested_run.symbols().unwrap();
     let result = nested_run.set_symbols(Symbols::default());
     assert!(matches!(
-        result,
-        Err(Error::UnsafeEdit {
-            operation: "run.set_symbols",
-            ..
-        })
+            result,
+            Err(Error::Refused(refusal)) if refusal.operation() == "run.set_symbols"
     ));
     assert_eq!(nested_run.symbols().unwrap(), before_symbols);
 
@@ -889,10 +911,10 @@ fn managed_retained_runs_resolve_inherited_symex_and_ignore_foreign_bindings() {
 fn managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection() {
     let (budget, _cancellation_source, package) = managed(fixture("managed", "second"), 1 << 20);
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "candidate")
         .unwrap();
-    let expected_xml = edit.projected().xml_bytes().to_vec();
+    let expected_xml = edit.projected().unwrap().xml_bytes().to_vec();
     let source_reserved = budget.used(Resource::Memory);
     let remaining = budget
         .limit(Resource::Memory)
@@ -902,13 +924,19 @@ fn managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection() 
 
     let result = edit.try_clone();
     assert!(result.as_ref().is_err_and(is_budget_refusal));
-    assert_eq!(edit.projected().xml_bytes(), expected_xml.as_slice());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        expected_xml.as_slice()
+    );
 
     drop(hold);
     let cloned = edit.try_clone().unwrap();
-    assert_eq!(cloned.projected().xml_bytes(), expected_xml.as_slice());
+    assert_eq!(
+        cloned.projected().unwrap().xml_bytes(),
+        expected_xml.as_slice()
+    );
     let commit = cloned.commit().unwrap();
-    assert_eq!(commit.snapshot().xml_bytes(), expected_xml.as_slice());
+    assert_eq!(commit.patch().target().xml_bytes(), expected_xml.as_slice());
 
     drop(commit);
     drop(edit);
@@ -922,54 +950,82 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     let source = fixture_signed("before", "second");
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     assert!(!noop.diagnostics().changed());
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &noop)
+        .apply(noop.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    let topology = package
+        .source_backed_package()
+        .unwrap()
+        .clone()
+        .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+        .unwrap();
+    let retained = package.with_prepared_topology(topology).unwrap();
+    let retained_noop = retained.edit().unwrap().commit().unwrap();
+    let applied = retained
+        .apply(retained_noop.patch())
+        .unwrap()
+        .into_package();
+    let mut retained_output = Vec::new();
+    applied.write_to(&mut retained_output).unwrap();
+    assert_eq!(retained_output, source);
+    drop(applied);
+    drop(retained_noop);
+    drop(retained);
+    drop(package);
     assert_eq!(output, source);
     drop(noop);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "before tail")
         .unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     let result = edit.replace_paragraph_text(Position::new(0), "changed");
     assert!(matches!(
         result,
-        Err(TransactionError::Document(Error::UnsafeEdit { .. }))
+        Err(TransactionError::Document(Error::Refused(_)))
     ));
     drop(edit);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
-    let mut output = Vec::new();
     assert!(matches!(
-        package.publish_document_commit_to_stream(&mut output, &commit),
+        edit.commit(),
         Err(TransactionError::Document(Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         )))
     ));
-    assert!(output.is_empty());
+    drop(package);
 }
 
 /// One paragraph holding a direct tracked insertion and a direct tracked
@@ -1010,8 +1066,8 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
     for signed in [false, true] {
         let source = tracked_revision_fixture(signed);
         let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-        let mut edit = package.edit_document().unwrap();
-        let projected = edit.projected().xml_bytes().to_vec();
+        let mut edit = package.edit().unwrap();
+        let projected = edit.projected().unwrap().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);
 
         let reference = edit
@@ -1023,14 +1079,11 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
             )
             .map(|_| ())
             .unwrap_err();
-        let TransactionError::Document(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "replace_revision_text",
-            reason: expected_reason,
-        }) = reference
-        else {
+        let TransactionError::Document(Error::Refused(refusal)) = reference else {
             panic!("managed revision text replacement must be refused: {reference:?}");
         };
+        assert_eq!(refusal.operation(), "replace_revision_text");
+        let expected_reason = refusal.reason();
 
         let attempts = [
             (
@@ -1066,13 +1119,9 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         ];
         for (expected_operation, result) in attempts {
             match result {
-                Err(TransactionError::Document(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation,
-                    reason,
-                })) => {
-                    assert_eq!(operation, expected_operation, "signed = {signed}");
-                    assert_eq!(reason, expected_reason, "signed = {signed}");
+                Err(TransactionError::Document(Error::Refused(refusal))) => {
+                    assert_eq!(refusal.operation(), expected_operation, "signed = {signed}");
+                    assert_eq!(refusal.reason(), expected_reason, "signed = {signed}");
                 },
                 other => panic!(
                     "managed {expected_operation} must be refused like revision text replacement \
@@ -1082,15 +1131,21 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         }
 
         // Every refusal happened before any state change or admission.
-        assert_eq!(edit.projected().xml_bytes(), projected.as_slice());
+        assert_eq!(edit.projected().unwrap().xml_bytes(), projected.as_slice());
         assert_eq!(budget.used(Resource::Memory), reserved);
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().operations(), 0);
         let mut output = Vec::new();
         package
-            .publish_document_commit_to_stream(&mut output, &commit)
+            .apply(commit.patch())
+            .and_then(|committed| {
+                let committed = committed.into_package();
+                committed.write_to(&mut output)?;
+                committed.document_snapshot()
+            })
             .unwrap();
+        drop(package);
         assert_eq!(output, source);
         drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0);
@@ -1102,7 +1157,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         tracked_revision_fixture(false),
     )))
     .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap();
     edit.apply_revision(deletion, RevisionAction::Reject)
@@ -1116,7 +1171,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
 fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "second changed")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
@@ -1125,7 +1180,8 @@ fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     assert!(commit.diagnostics().changed());
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -1134,21 +1190,25 @@ fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(1))
             .unwrap()
             .text()
             .unwrap(),
         "second changed"
     );
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.patch().target())
+        .unwrap();
     assert_eq!(restored.xml_bytes(), commit.patch().source().xml_bytes());
     drop(restored);
 
     let mut output = Vec::new();
-    let publication = package
-        .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
-        .unwrap();
+    let publication = package.publish_with_inverse(&mut output, &commit).unwrap();
+    drop(package);
     assert_eq!(part_bytes(&output, MEDIA), part_bytes(&source, MEDIA));
     assert_eq!(part_bytes(&output, OPAQUE), part_bytes(&source, OPAQUE));
     let (inverse_budget, _cancellation_source, reopened) = managed(output, 1 << 20);
@@ -1171,8 +1231,9 @@ fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     );
     let mut restored = Vec::new();
     reopened
-        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .publish_inverse(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     drop(snapshot);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
@@ -1192,7 +1253,7 @@ fn unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_out
 
     let first_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(first))).unwrap();
-    let mut edit = first_package.edit_document().unwrap();
+    let mut edit = first_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first package change")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1201,8 +1262,13 @@ fn unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_out
     let second_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(second))).unwrap();
     let mut output = Vec::new();
-    let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
-    assert!(matches!(result, Err(TransactionError::StaleSource)));
+    let result = second_package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    });
+    drop(second_package);
+    assert!(matches!(result, Err(TransactionError::PatchConflict)));
     assert!(output.is_empty());
 }
 
@@ -1214,7 +1280,7 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
         13,
     );
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     for (position, replacement) in [
         (3_usize, "three changed"),
         (1_usize, "one changed"),
@@ -1235,7 +1301,8 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
     ] {
         assert_eq!(
             commit
-                .snapshot()
+                .patch()
+                .target()
                 .paragraph(Position::new(position))
                 .unwrap()
                 .text()
@@ -1245,14 +1312,14 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
     }
 
     let mut changed = Vec::new();
-    let publication = package
-        .publish_document_commit_with_inverse_to_stream(&mut changed, &commit)
-        .unwrap();
+    let publication = package.publish_with_inverse(&mut changed, &commit).unwrap();
+    drop(package);
     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
     let mut restored = Vec::new();
     reopened
-        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .publish_inverse(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
     drop(publication);
@@ -1263,7 +1330,7 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
 #[test]
 fn managed_repeated_position_keeps_final_value_and_collapses_equal_setter() {
     let (budget, _cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "first final")
@@ -1275,7 +1342,8 @@ fn managed_repeated_position_keeps_final_value_and_collapses_equal_setter() {
     assert_eq!(commit.patch().operations().len(), 1);
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -1284,7 +1352,8 @@ fn managed_repeated_position_keeps_final_value_and_collapses_equal_setter() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(1))
             .unwrap()
             .text()
@@ -1300,7 +1369,7 @@ fn managed_repeated_position_keeps_final_value_and_collapses_equal_setter() {
 fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
     edit.replace_paragraph_text(Position::new(1), "second changed")
@@ -1312,7 +1381,8 @@ fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
     assert_eq!(commit.patch().operations().len(), 1);
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -1321,14 +1391,19 @@ fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(1))
             .unwrap()
             .text()
             .unwrap(),
         "second changed"
     );
-    let restored_xml = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored_xml = commit
+        .patch()
+        .inverse()
+        .apply(commit.patch().target())
+        .unwrap();
     assert_eq!(
         restored_xml.xml_bytes(),
         commit.patch().source().xml_bytes()
@@ -1336,15 +1411,15 @@ fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
     drop(restored_xml);
 
     let mut changed = Vec::new();
-    let publication = package
-        .publish_document_commit_with_inverse_to_stream(&mut changed, &commit)
-        .unwrap();
+    let publication = package.publish_with_inverse(&mut changed, &commit).unwrap();
+    drop(package);
     assert_ne!(changed, source);
     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
     let mut restored = Vec::new();
     reopened
-        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .publish_inverse(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
     drop(publication);
@@ -1356,7 +1431,7 @@ fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
 fn managed_revert_to_original_publishes_exact_noop_bytes() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "temporary")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "before tail")
@@ -1366,8 +1441,14 @@ fn managed_revert_to_original_publishes_exact_noop_bytes() {
     assert!(commit.patch().operations().is_empty());
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -1376,10 +1457,10 @@ fn managed_revert_to_original_publishes_exact_noop_bytes() {
 #[test]
 fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
     let (budget, _cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
-    let first_projected = edit.projected().xml_bytes().to_vec();
+    let first_projected = edit.projected().unwrap().xml_bytes().to_vec();
     let remaining = budget
         .limit(Resource::Memory)
         .saturating_sub(budget.used(Resource::Memory));
@@ -1387,13 +1468,17 @@ fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
     let hold = budget.reserve(Resource::Memory, remaining).unwrap();
     let result = edit.replace_paragraph_text(Position::new(1), "second changed");
     assert!(result.as_ref().is_err_and(is_budget_refusal));
-    assert_eq!(edit.projected().xml_bytes(), first_projected.as_slice());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        first_projected.as_slice()
+    );
     drop(hold);
 
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -1402,7 +1487,8 @@ fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(1))
             .unwrap()
             .text()
@@ -1417,14 +1503,17 @@ fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
 #[test]
 fn managed_failed_second_edit_cancellation_leaves_first_projection_intact() {
     let (budget, cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
-    let first_projected = edit.projected().xml_bytes().to_vec();
+    let first_projected = edit.projected().unwrap().xml_bytes().to_vec();
     cancellation_source.cancel();
     let result = edit.replace_paragraph_text(Position::new(1), "second changed");
     assert!(result.as_ref().is_err_and(is_cancelled));
-    assert_eq!(edit.projected().xml_bytes(), first_projected.as_slice());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        first_projected.as_slice()
+    );
     drop(edit);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -1434,33 +1523,45 @@ fn managed_failed_second_edit_cancellation_leaves_first_projection_intact() {
 fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     assert!(!noop.diagnostics().changed());
     let mut noop_output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut noop_output, &noop)
+        .apply(noop.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut noop_output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    drop(package);
     assert_eq!(noop_output, source);
     drop(noop);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
-    let source_xml = edit.source().xml_bytes().to_vec();
+    let mut edit = package.edit().unwrap();
+    let source_xml = edit.source().unwrap().xml_bytes().to_vec();
     edit.replace_paragraph_text(Position::new(0), "after")
         .unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let inverse = commit.patch().inverse();
-    let restored = inverse.apply(commit.snapshot()).unwrap();
+    let restored = inverse.apply(commit.patch().target()).unwrap();
     assert_eq!(restored.xml_bytes(), source_xml.as_slice());
     drop(restored);
     drop(inverse);
 
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    drop(package);
     assert_ne!(output, source);
     assert_eq!(part_bytes(&output, MEDIA), part_bytes(&source, MEDIA));
     assert_eq!(part_bytes(&output, OPAQUE), part_bytes(&source, OPAQUE));
@@ -1489,13 +1590,19 @@ fn managed_protected_settings_noop_preserves_relationship_and_payload_exactly() 
     );
     let source = fixture_with_settings(document_xml("before", "second"), settings.clone(), false);
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let commit = package.edit_document().unwrap().commit().unwrap();
+    let commit = package.edit().unwrap().commit().unwrap();
     assert!(!commit.diagnostics().changed());
 
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     assert_eq!(part_bytes(&output, SETTINGS), settings);
     drop(commit);
@@ -1543,24 +1650,27 @@ fn managed_changed_publication_enforces_settings_protection_flags() {
             false,
         );
         let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
-        let commit = edit.commit().unwrap();
         let mut output = Vec::new();
-        let result = package.publish_document_commit_to_stream(&mut output, &commit);
-        if refused {
-            assert!(
-                result.as_ref().is_err_and(is_protection_refusal),
-                "{label} must refuse changed publication: {:?}",
-                result.as_ref().err()
-            );
-            assert!(output.is_empty(), "{label} must refuse before output");
-        } else {
-            result.expect("explicitly disabled policy must admit changed publication");
-            assert!(!output.is_empty(), "{label} must publish changed output");
+        let result = edit.commit();
+        drop(package);
+        match result {
+            Ok(commit) => {
+                assert!(!refused, "{label} unexpectedly refused changed publication");
+                commit.package().write_to(&mut output).unwrap();
+                assert!(!output.is_empty(), "{label} must publish changed output");
+            },
+            Err(error) => {
+                assert!(refused, "{label} unexpectedly refused changed publication");
+                assert!(
+                    is_protection_refusal(&error),
+                    "{label} returned the wrong refusal: {error:?}"
+                );
+                assert!(output.is_empty(), "{label} must refuse before output");
+            },
         }
-        drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0, "{label} leaked budget");
     }
 }
@@ -1571,28 +1681,26 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
     let source = fixture_with_settings(document_xml("before", "second"), settings.clone(), false);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "managed changed")
         .unwrap();
     let commit = edit.commit().unwrap();
     let mut managed_output = Vec::new();
-    package
-        .publish_document_commit_to_stream(&mut managed_output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut managed_output).unwrap();
+    drop(package);
     assert_eq!(part_bytes(&managed_output, SETTINGS), settings);
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let unmanaged_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut edit = unmanaged_package.edit_document().unwrap();
+    let mut edit = unmanaged_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "unmanaged changed")
         .unwrap();
     let commit = edit.commit().unwrap();
     let mut unmanaged_output = Vec::new();
-    unmanaged_package
-        .publish_document_commit_to_stream(&mut unmanaged_output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut unmanaged_output).unwrap();
+    drop(unmanaged_package);
     assert_eq!(part_bytes(&unmanaged_output, SETTINGS), settings);
 }
 
@@ -1605,28 +1713,22 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
     let source = fixture_with_settings(document_xml("before", "second"), settings, false);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "managed changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
-    let mut managed_output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut managed_output, &commit);
+    let result = edit.commit();
+    drop(package);
     assert!(result.as_ref().is_err_and(is_protection_refusal));
-    assert!(managed_output.is_empty());
-    drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let unmanaged_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut edit = unmanaged_package.edit_document().unwrap();
+    let mut edit = unmanaged_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "unmanaged changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
-    let mut unmanaged_output = Vec::new();
-    let result =
-        unmanaged_package.publish_document_commit_to_stream(&mut unmanaged_output, &commit);
+    let result = edit.commit();
+    drop(unmanaged_package);
     assert!(result.as_ref().is_err_and(is_protection_refusal));
-    assert!(unmanaged_output.is_empty());
 }
 
 #[test]
@@ -1676,19 +1778,16 @@ fn changed_publication_rejects_unresolved_ignorable_and_active_mce_controls() {
     for (label, settings, refusal) in cases {
         let source = fixture_with_settings(document_xml("before", "second"), settings, false);
         let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
-        let commit = edit.commit().unwrap();
-        let mut output = Vec::new();
-        let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        let result = edit.commit();
+        drop(package);
         assert!(
             result.as_ref().is_err_and(refusal),
             "{label} must refuse changed publication: {:?}",
             result.as_ref().err()
         );
-        assert!(output.is_empty(), "{label} must refuse before output");
-        drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0, "{label} leaked budget");
     }
 }
@@ -1698,15 +1797,12 @@ fn managed_changed_publication_rejects_mixed_settings_dialect_before_output() {
     let strict_settings = settings_xml(STRICT_W, r#"<w:docVars/>"#);
     let source = fixture_with_settings(document_xml("before", "second"), strict_settings, true);
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
-    let mut output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    let result = edit.commit();
+    drop(package);
     assert!(result.as_ref().is_err_and(is_mixed_dialect_refusal));
-    assert!(output.is_empty());
-    drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -1733,19 +1829,16 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
     for (label, settings, refusal) in cases {
         let source = fixture_with_settings(document_xml("before", "second"), settings, false);
         let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
-        let commit = edit.commit().unwrap();
-        let mut output = Vec::new();
-        let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        let result = edit.commit();
+        drop(package);
         assert!(
             result.as_ref().is_err_and(refusal),
             "{label} must refuse changed publication: {:?}",
             result.as_ref().err()
         );
-        assert!(output.is_empty(), "{label} must refuse before output");
-        drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0, "{label} leaked budget");
     }
 
@@ -1769,19 +1862,72 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
         let source = fixture_with_settings(document_xml("before", "second"), settings, false);
         let package =
             source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
-        let commit = edit.commit().unwrap();
-        let mut output = Vec::new();
-        let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        let result = edit.commit();
+        drop(package);
         assert!(
             result.as_ref().is_err_and(is_literal_namespace_refusal),
             "{label} must refuse changed publication: {:?}",
             result.as_ref().err()
         );
-        assert!(output.is_empty(), "{label} must refuse before output");
     }
+}
+
+/// Record 0011: Word's markup compatibility that cannot change content (a
+/// declared namespace, a root `mc:Ignorable` of an understood namespace) is
+/// admitted under an execution context. The managed transaction edits and
+/// publishes the source bytes exactly as the unmanaged one does, and every
+/// reservation is released.
+#[test]
+fn managed_source_document_admits_word_markup_compatibility() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{MCE}" xmlns:w14="{W14}" mc:Ignorable="w14"><w:body><w:p w14:paraId="1A2B3C4D"><w:r><w:t>before</w:t></w:r></w:p><w:p><w:r><w:t>second</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let source = fixture_with_document(document.clone(), 37, 13);
+
+    let unmanaged =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    let mut edit = unmanaged.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut expected = Vec::new();
+    unmanaged
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut expected)?;
+            committed.document_snapshot()
+        })
+        .unwrap();
+    drop(unmanaged);
+
+    let (budget, _cancellation_source, package) = managed(source, 1 << 20);
+    let snapshot = package.document_snapshot().unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    drop(snapshot);
+    let mut output = Vec::new();
+    package
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
+        .unwrap();
+    drop(package);
+    assert_eq!(part_bytes(&output, MAIN), part_bytes(&expected, MAIN));
+    let published = String::from_utf8(part_bytes(&output, MAIN)).unwrap();
+    assert!(published.contains(r#"mc:Ignorable="w14""#));
+    assert!(published.contains(r#"w14:paraId="1A2B3C4D""#));
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
 
 #[test]
@@ -1825,7 +1971,8 @@ fn managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member()
         publish_managed_edit_with_inverse(source.clone(), "after");
     assert_eq!(
         publication
-            .snapshot()
+            .patch
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -1837,19 +1984,23 @@ fn managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member()
     let foreign = fixture_with_document(changed_document, 37, 29);
     assert_eq!(part_bytes(&foreign, MAIN), part_bytes(&changed, MAIN));
     assert_ne!(foreign, changed);
+    // Record 0355a: a package with the changed main document but foreign
+    // members is not the commit's artifact, and the main-document patch is
+    // bound to its source lineage, so the inverse is refused before output.
     let (foreign_budget, _cancellation_source, foreign_package) = managed(foreign, 1 << 20);
     let mut foreign_output = Vec::new();
-    let result =
-        foreign_package.publish_document_inverse_to_stream(&mut foreign_output, &publication);
-    assert!(result.as_ref().is_err_and(is_artifact_mismatch));
+    let result = foreign_package.publish_inverse(&mut foreign_output, &publication);
+    drop(foreign_package);
+    assert!(matches!(result, Err(TransactionError::PatchConflict)));
     assert!(foreign_output.is_empty());
     assert_eq!(foreign_budget.used(Resource::Memory), 0);
 
     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
     let mut restored = Vec::new();
     reopened
-        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .publish_inverse(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
 
@@ -1864,16 +2015,18 @@ fn managed_reopened_inverse_rejects_source_mutation_before_output() {
     let (changed, publication, budget, commit) = publish_managed_edit_with_inverse(source, "after");
     let mutable = Arc::new(MutableSource::new(changed));
     let (inverse_budget, _cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         mutable.clone(),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     mutable.bump_revision();
 
     let mut output = Vec::new();
-    let result = package.publish_document_inverse_to_stream(&mut output, &publication);
+    let result = package.publish_inverse(&mut output, &publication);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_source_changed));
     assert!(output.is_empty());
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
@@ -1889,21 +2042,23 @@ fn managed_reopened_inverse_cancellation_and_output_budget_are_before_output() {
     let (inverse_budget, cancellation_source, package) = managed(changed.clone(), 1 << 20);
     cancellation_source.cancel();
     let mut cancelled_output = Vec::new();
-    let result = package.publish_document_inverse_to_stream(&mut cancelled_output, &publication);
+    let result = package.publish_inverse(&mut cancelled_output, &publication);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_cancelled));
     assert!(cancelled_output.is_empty());
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
 
     let (limited_budget, _cancellation_source, context) = managed_context_with_output(1 << 20, 1);
-    let limited_package = source_backed::Package::from_read_at_with_execution_context(
+    let limited_package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(changed)),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut limited_output = Vec::new();
-    let result =
-        limited_package.publish_document_inverse_to_stream(&mut limited_output, &publication);
+    let result = limited_package.publish_inverse(&mut limited_output, &publication);
+    drop(limited_package);
     assert!(result.as_ref().is_err_and(is_output_budget_refusal));
     assert!(limited_output.is_empty());
     assert_eq!(limited_budget.used(Resource::Memory), 0);
@@ -1922,7 +2077,8 @@ fn managed_reopened_inverse_reports_partial_sink_failure() {
         bytes: Vec::new(),
         limit: 1,
     };
-    let result = package.publish_document_inverse_to_stream(&mut sink, &publication);
+    let result = package.publish_inverse(&mut sink, &publication);
+    drop(package);
     assert!(matches!(
         result,
         Err(TransactionError::Document(Error::Opc(
@@ -1947,10 +2103,11 @@ fn managed_file_source_pins_the_open_source_across_path_replacement() {
     std::fs::write(&replacement_path, &replacement).unwrap();
 
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_path_with_execution_context(
+    let package = source_backed::Package::open_with_options(
         &path,
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let version = package.source_version().unwrap();
@@ -1978,20 +2135,26 @@ fn managed_source_change_refuses_publication_before_sink_output() {
     let source_bytes = fixture("before", "second");
     let source = Arc::new(MutableSource::new(source_bytes));
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
     source.bump_revision();
 
     let mut output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    });
+    drop(package);
     assert!(result.as_ref().is_err_and(is_source_changed));
     assert!(output.is_empty());
     drop(commit);
@@ -2003,18 +2166,28 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
     let source = fixture("before", "second");
     let (budget, cancellation_source, package) = managed(source.clone(), 1 << 20);
     cancellation_source.cancel();
-    assert!(is_cancelled(&package.edit_document().unwrap_err()));
+    assert!(is_cancelled(
+        &package
+            .document_snapshot()
+            .map(|_| package.edit())
+            .unwrap_err()
+    ));
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
     cancellation_source.cancel();
     let mut output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    });
+    drop(package);
     assert!(result.as_ref().is_err_and(is_cancelled));
     assert!(output.is_empty());
     drop(commit);
@@ -2024,7 +2197,8 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
 #[test]
 fn managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory() {
     let (budget, cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let edit = package.edit_document().unwrap();
+    let edit = package.edit().unwrap();
+    let _ = edit.projected().unwrap();
     assert!(budget.used(Resource::Memory) > 0);
     cancellation_source.cancel();
 
@@ -2038,7 +2212,8 @@ fn managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory()
 fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
     let source = fixture_with_document(empty_text_slot_document(4096), 37, 13);
     let (probe_budget, _cancellation_source, probe_package) = managed(source.clone(), 1 << 24);
-    let probe_edit = probe_package.edit_document().unwrap();
+    let probe_edit = probe_package.edit().unwrap();
+    let _ = probe_edit.projected().unwrap();
     let baseline_memory = probe_budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     drop(probe_edit);
@@ -2047,11 +2222,11 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
 
     let low_memory_limit = baseline_memory.saturating_add(2 * 1024 * 1024);
     let (budget, _cancellation_source, package) = managed(source, low_memory_limit);
-    let mut edit = package.edit_document().unwrap();
-    let before = edit.projected().xml_bytes().to_vec();
+    let mut edit = package.edit().unwrap();
+    let before = edit.projected().unwrap().xml_bytes().to_vec();
     let result = edit.replace_paragraph_text(Position::new(0), "x");
     assert!(result.as_ref().is_err_and(is_budget_refusal));
-    assert_eq!(edit.projected().xml_bytes(), before.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), before.as_slice());
     drop(edit);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -2061,7 +2236,8 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
 fn managed_candidate_budget_failure_happens_before_publication_output() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
+    let _ = edit.projected().unwrap();
     let baseline_memory = budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     let remaining = budget
@@ -2083,7 +2259,7 @@ fn managed_candidate_budget_failure_happens_before_publication_output() {
 fn managed_publication_reports_a_partial_sink_failure() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2091,7 +2267,12 @@ fn managed_publication_reports_a_partial_sink_failure() {
         bytes: Vec::new(),
         limit: 1,
     };
-    let result = package.publish_document_commit_to_stream(&mut sink, &commit);
+    let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut sink)?;
+        committed.document_snapshot()
+    });
+    drop(package);
     assert!(matches!(
         result,
         Err(TransactionError::Document(Error::Opc(
@@ -2110,7 +2291,7 @@ fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget()
     let original_media = part_bytes(&source, MEDIA);
     let original_opaque = part_bytes(&source, OPAQUE);
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2121,7 +2302,8 @@ fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget()
     );
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
@@ -2132,8 +2314,14 @@ fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget()
 
     let mut output = Vec::new();
     let published = package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
+    drop(package);
     assert_eq!(
         published
             .paragraph(Position::new(0))
@@ -2162,7 +2350,7 @@ fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
     assert_ne!(part_bytes(&first, OPAQUE), part_bytes(&second, OPAQUE));
 
     let (first_budget, _first_cancellation, first_package) = managed(first, 1 << 20);
-    let mut edit = first_package.edit_document().unwrap();
+    let mut edit = first_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first package change")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2171,8 +2359,13 @@ fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
 
     let (second_budget, _second_cancellation, second_package) = managed(second, 1 << 20);
     let mut output = Vec::new();
-    let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
-    assert!(matches!(result, Err(TransactionError::StaleSource)));
+    let result = second_package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    });
+    drop(second_package);
+    assert!(matches!(result, Err(TransactionError::PatchConflict)));
     assert!(output.is_empty());
 
     drop(commit);
@@ -2186,22 +2379,27 @@ fn managed_source_change_during_current_part_read_refuses_before_output() {
     let source = Arc::new(MutableSource::new(source_bytes));
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
     let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source.clone(),
-            ReadLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let package = source_backed::Package::from_read_at_with_options(
+        source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(context),
+    )
+    .unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
     source.arm_revision_on_read();
 
     let mut output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    });
+    drop(package);
     assert!(result.as_ref().is_err_and(is_source_changed));
     assert!(output.is_empty());
 
@@ -2215,25 +2413,67 @@ fn managed_cancellation_during_current_part_read_refuses_before_output() {
     let source = Arc::new(MutableSource::new(source_bytes));
     let (budget, cancellation_source, context) = managed_context(1 << 20);
     let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source.clone(),
-            ReadLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let package = source_backed::Package::from_read_at_with_options(
+        source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(context),
+    )
+    .unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
     source.arm_cancellation_on_read(cancellation_source);
 
     let mut output = Vec::new();
-    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
+        committed.write_to(&mut output)?;
+        committed.document_snapshot()
+    });
+    drop(package);
     assert!(result.as_ref().is_err_and(is_cancelled));
     assert!(output.is_empty());
 
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn shared_package_reservations_live_until_the_last_source_owner_drops() {
+    let (budget, _cancellation, package) = managed(fixture("before", "second"), 1 << 20);
+    // Open is cold; admit the main payload before measuring shared cache retention.
+    drop(package.document_snapshot().unwrap());
+    let opened_memory = budget.used(Resource::Memory);
+    let opened_objects = budget.used(Resource::Objects);
+    assert!(opened_memory > 0);
+    let shared = package.clone();
+    let last_owner = shared.clone();
+    assert_eq!(budget.used(Resource::Memory), opened_memory);
+    assert_eq!(budget.used(Resource::Objects), opened_objects);
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    drop(package);
+    let mut output = Vec::new();
+    let published = shared
+        .apply(commit.patch())
+        .and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
+        .unwrap();
+    assert!(!output.is_empty());
+    assert!(last_owner.document_snapshot().is_ok());
+    drop(published);
+    drop(commit);
+    drop(shared);
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(last_owner);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
 }

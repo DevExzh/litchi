@@ -14,7 +14,7 @@ use std::sync::Arc;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{ParsedFormula, Parser, Token};
 use crate::package::frt::{parse_formula_header, serialize_formula_header};
-use crate::raw::{Records, Writer, kind};
+use crate::raw::{Encoder, Records, kind};
 
 const MAX_BINDINGS: usize = 65_536;
 const MAX_APP_REF_CODE_UNITS: usize = 32_767;
@@ -50,10 +50,11 @@ impl Binding {
         application_reference: impl Into<String>,
         formula: ParsedFormula,
         valid_external_sheet: impl FnOnce(u16) -> bool,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
         let application_reference = application_reference.into();
         validate_app_ref(&application_reference)?;
-        let range = range_from_formula(&formula)?;
+        let range = range_from_formula(&formula, limits)?;
         if !valid_external_sheet(range.external_sheet_index) {
             return Err(invalid(
                 "BrtWebExtension",
@@ -67,11 +68,13 @@ impl Binding {
         })
     }
 
-    /// Parse one `BrtWebExtension` payload.
+    /// Parse one `BrtWebExtension` payload under an explicit raw profile.
     pub fn parse_payload(
         data: &[u8],
         valid_external_sheet: impl FnOnce(u16) -> bool,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
+        let limits = admit(data.len(), limits)?;
         let (mut formulas, consumed) = parse_formula_header(data, "BrtWebExtension", 1)?;
         if formulas.len() != 1 {
             return Err(invalid(
@@ -89,21 +92,23 @@ impl Binding {
             expected: consumed,
             found: data.len(),
         })?;
-        let application_reference = parse_wide_string_exact(string_data)?;
-        Self::new(application_reference, formula, valid_external_sheet)
+        let application_reference = parse_wide_string_exact(string_data, limits)?;
+        Self::new(application_reference, formula, valid_external_sheet, limits)
     }
 
-    /// Serialize one `BrtWebExtension` payload.
-    pub fn to_payload(&self) -> Result<Vec<u8>> {
+    /// Serialize one `BrtWebExtension` payload under an explicit raw profile.
+    pub fn to_payload(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         validate_app_ref(&self.application_reference)?;
-        if range_from_formula(&self.formula)? != self.range {
+        if range_from_formula(&self.formula, limits)? != self.range {
             return Err(invalid(
                 "BrtWebExtension",
                 "cached range disagrees with its binary formula",
             ));
         }
         let mut output = serialize_formula_header(std::slice::from_ref(&self.formula), 1)?;
-        write_wide_string(&mut output, &self.application_reference)?;
+        write_wide_string(&mut output, &self.application_reference, limits)?;
+        admit(output.len(), limits)?;
         Ok(output)
     }
 }
@@ -112,11 +117,12 @@ impl Binding {
 pub fn parse_xlsb_web_extension_bindings(
     records: &[u8],
     mut valid_external_sheet: impl FnMut(u16) -> bool,
+    limits: crate::raw::Limits,
 ) -> Result<Vec<Binding>> {
-    let mut iterator = Records::new(records);
+    let mut iterator = Records::new(records, limits);
     let begin = iterator
         .next()
-        .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+        .ok_or(Error::UnexpectedEndOfStream("WEBEXTENSIONS"))??;
     if begin.kind() != kind::BEGIN_WEB_EXTENSIONS || !begin.payload().is_empty() {
         return Err(invalid(
             "WEBEXTENSIONS",
@@ -128,14 +134,14 @@ pub fn parse_xlsb_web_extension_bindings(
     loop {
         let record = iterator
             .next()
-            .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+            .ok_or(Error::UnexpectedEndOfStream("WEBEXTENSIONS"))??;
         match record.kind() {
             kind::WEB_EXTENSION => {
                 if bindings.len() == MAX_BINDINGS {
                     return Err(invalid("WEBEXTENSIONS", "binding count exceeds 65,536"));
                 }
                 let binding =
-                    Binding::parse_payload(record.payload(), |index| valid_external_sheet(index))?;
+                    Binding::parse_payload(record.payload(), &mut valid_external_sheet, limits)?;
                 if !app_refs.insert(binding.application_reference.clone()) {
                     return Err(invalid("WEBEXTENSIONS", "duplicate binding appRef"));
                 }
@@ -159,24 +165,24 @@ pub fn parse_xlsb_web_extension_bindings(
                 }
                 return Ok(bindings);
             },
-            other => {
-                return Err(invalid(
-                    "WEBEXTENSIONS",
-                    format!("unexpected record 0x{other:04X}"),
-                ));
+            _other => {
+                return Err(invalid("WEBEXTENSIONS", "unexpected record 0x"));
             },
         }
     }
 }
 
 /// Serialize a complete `WEBEXTENSIONS` record collection.
-pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> Result<Vec<u8>> {
-    validate_bindings(bindings, None)?;
+pub fn write_xlsb_web_extension_bindings(
+    bindings: &[Binding],
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
+    validate_bindings(bindings, None, limits)?;
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, limits);
     writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
     for binding in bindings {
-        writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;
+        writer.write_record(kind::WEB_EXTENSION, &binding.to_payload(limits)?)?;
     }
     writer.write_record(kind::END_WEB_EXTENSIONS, &[])?;
     Ok(output)
@@ -192,6 +198,7 @@ pub struct Snapshot {
     source: Arc<[u8]>,
     bindings: Vec<Binding>,
     valid_external_sheets: ValidExternalSheets,
+    limits: crate::raw::Limits,
 }
 
 impl Snapshot {
@@ -201,24 +208,34 @@ impl Snapshot {
     /// source collection.  When an edit needs to introduce a previously
     /// unseen XTI, use [`Self::read_with_external_sheet_indices`] to provide
     /// the complete worksheet relationship set.
+    ///
+    /// `limits` bounds the record stream, every payload and string, and is
+    /// retained for drafts and patches of this snapshot.
     pub fn read(
         records: impl AsRef<[u8]>,
         mut valid_external_sheet: impl FnMut(u16) -> bool,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
         let records = records.as_ref();
+        let limits = limits.validate()?;
         let mut valid_external_sheets = ValidExternalSheets::default();
-        let bindings = parse_xlsb_web_extension_bindings(records, |index| {
-            let valid = valid_external_sheet(index);
-            if valid {
-                valid_external_sheets.insert(index);
-            }
-            valid
-        })?;
-        validate_bindings(&bindings, Some(&valid_external_sheets))?;
+        let bindings = parse_xlsb_web_extension_bindings(
+            records,
+            |index| {
+                let valid = valid_external_sheet(index);
+                if valid {
+                    valid_external_sheets.insert(index);
+                }
+                valid
+            },
+            limits,
+        )?;
+        validate_bindings(&bindings, Some(&valid_external_sheets), limits)?;
         Ok(Self {
             source: Arc::from(records.to_vec().into_boxed_slice()),
             bindings,
             valid_external_sheets,
+            limits,
         })
     }
 
@@ -229,20 +246,16 @@ impl Snapshot {
     pub fn read_with_external_sheet_indices(
         records: impl AsRef<[u8]>,
         valid_external_sheets: impl IntoIterator<Item = u16>,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
+        let records = records.as_ref();
+        let limits = limits.validate()?;
         let valid_external_sheets = ValidExternalSheets::from_indices(valid_external_sheets);
         Self::from_source(
-            Arc::from(records.as_ref().to_vec().into_boxed_slice()),
+            Arc::from(records.to_vec().into_boxed_slice()),
             valid_external_sheets,
+            limits,
         )
-    }
-
-    /// Alias for [`Self::read`].
-    pub fn parse(
-        records: impl AsRef<[u8]>,
-        valid_external_sheet: impl FnMut(u16) -> bool,
-    ) -> Result<Self> {
-        Self::read(records, valid_external_sheet)
     }
 
     /// Parse and validate a collection against both worksheet XTI and package
@@ -251,8 +264,9 @@ impl Snapshot {
         records: impl AsRef<[u8]>,
         valid_external_sheet: impl FnMut(u16) -> bool,
         package_bindings: impl IntoIterator<Item = &'a web::Binding>,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
-        let snapshot = Self::read(records, valid_external_sheet)?;
+        let snapshot = Self::read(records, valid_external_sheet, limits)?;
         snapshot.validate_apprefs(package_bindings)?;
         Ok(snapshot)
     }
@@ -275,12 +289,6 @@ impl Snapshot {
         &self.source
     }
 
-    /// Alias for [`Self::source_bytes`].
-    #[must_use]
-    pub fn bytes(&self) -> &[u8] {
-        self.source_bytes()
-    }
-
     /// Whether this snapshot is bound to an exact source stream.
     #[must_use]
     pub const fn is_source_bound(&self) -> bool {
@@ -295,25 +303,33 @@ impl Snapshot {
         validate_xlsb_web_extension_apprefs(&self.bindings, package_bindings)
     }
 
-    /// Start a detached, failure-atomic transaction.
+    /// Start a detached, failure-atomic byte-level draft of this collection;
+    /// [`Draft::finish`] returns its exact, reversible [`Patch`].
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn draft(&self) -> Draft {
+        Draft {
             source: self.clone(),
             bindings: self.bindings.clone(),
             valid_external_sheets: self.valid_external_sheets.clone(),
         }
     }
 
-    fn from_source(source: Arc<[u8]>, valid_external_sheets: ValidExternalSheets) -> Result<Self> {
-        let bindings = parse_xlsb_web_extension_bindings(&source, |index| {
-            valid_external_sheets.contains(index)
-        })?;
-        validate_bindings(&bindings, Some(&valid_external_sheets))?;
+    fn from_source(
+        source: Arc<[u8]>,
+        valid_external_sheets: ValidExternalSheets,
+        limits: crate::raw::Limits,
+    ) -> Result<Self> {
+        let bindings = parse_xlsb_web_extension_bindings(
+            &source,
+            |index| valid_external_sheets.contains(index),
+            limits,
+        )?;
+        validate_bindings(&bindings, Some(&valid_external_sheets), limits)?;
         Ok(Self {
             source,
             bindings,
             valid_external_sheets,
+            limits,
         })
     }
 }
@@ -326,31 +342,25 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached, typed edit over one worksheet `WEBEXTENSIONS` snapshot.
+/// A detached, typed draft over one worksheet `WEBEXTENSIONS` snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Draft {
     source: Snapshot,
     bindings: Vec<Binding>,
     valid_external_sheets: ValidExternalSheets,
 }
 
-impl Transaction {
-    /// Construct an edit from a validated source snapshot.
+impl Draft {
+    /// Construct a draft from a validated source snapshot.
     #[must_use]
     pub fn new(source: Snapshot) -> Self {
-        source.edit()
+        source.draft()
     }
 
     /// Borrow the immutable source snapshot used for conflict checks.
     #[must_use]
     pub const fn before(&self) -> &Snapshot {
         &self.source
-    }
-
-    /// Alias for [`Self::before`].
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        self.before()
     }
 
     /// Borrow the currently staged typed bindings.
@@ -367,7 +377,7 @@ impl Transaction {
 
     /// Whether staged serialization differs from the source semantics.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub fn changed(&self) -> bool {
         self.bindings != self.source.bindings
     }
 
@@ -381,7 +391,11 @@ impl Transaction {
 
     /// Replace the complete typed collection while preserving source order.
     pub fn replace(&mut self, bindings: Vec<Binding>) -> Result<bool> {
-        validate_bindings(&bindings, Some(&self.valid_external_sheets))?;
+        validate_bindings(
+            &bindings,
+            Some(&self.valid_external_sheets),
+            self.source.limits,
+        )?;
         if self.bindings == bindings {
             return Ok(false);
         }
@@ -408,7 +422,11 @@ impl Transaction {
         }
         let mut candidate = self.bindings.clone();
         candidate.insert(index, binding);
-        validate_bindings(&candidate, Some(&self.valid_external_sheets))?;
+        validate_bindings(
+            &candidate,
+            Some(&self.valid_external_sheets),
+            self.source.limits,
+        )?;
         self.bindings = candidate;
         Ok(true)
     }
@@ -431,14 +449,13 @@ impl Transaction {
             return Ok(false);
         }
         candidate[index] = binding;
-        validate_bindings(&candidate, Some(&self.valid_external_sheets))?;
+        validate_bindings(
+            &candidate,
+            Some(&self.valid_external_sheets),
+            self.source.limits,
+        )?;
         self.bindings = candidate;
         Ok(true)
-    }
-
-    /// Alias for [`Self::set`].
-    pub fn replace_at(&mut self, index: usize, binding: Binding) -> Result<bool> {
-        self.set(index, binding)
     }
 
     /// Remove one binding by source-relative index.
@@ -454,7 +471,11 @@ impl Transaction {
         }
         let mut candidate = self.bindings.clone();
         let removed = candidate.remove(index);
-        validate_bindings(&candidate, Some(&self.valid_external_sheets))?;
+        validate_bindings(
+            &candidate,
+            Some(&self.valid_external_sheets),
+            self.source.limits,
+        )?;
         self.bindings = candidate;
         Ok(Some(removed))
     }
@@ -473,7 +494,11 @@ impl Transaction {
             )
         })?;
         edit(binding)?;
-        validate_bindings(&candidate, Some(&self.valid_external_sheets))?;
+        validate_bindings(
+            &candidate,
+            Some(&self.valid_external_sheets),
+            self.source.limits,
+        )?;
         if candidate == self.bindings {
             return Ok(false);
         }
@@ -495,72 +520,30 @@ impl Transaction {
     }
 
     /// Materialize the currently staged collection as a validated snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = write_xlsb_web_extension_bindings(&self.bindings)?;
+    pub fn preview(&self) -> Result<Snapshot> {
+        let bytes = write_xlsb_web_extension_bindings(&self.bindings, self.source.limits)?;
         if bytes.as_slice() == self.source.source_bytes() {
             return Ok(self.source.clone());
         }
         Snapshot::from_source(
             Arc::from(bytes.into_boxed_slice()),
             self.valid_external_sheets.clone(),
+            self.source.limits,
         )
     }
 
-    /// Discard staged edits and return the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
-    /// Validate and publish the staged collection as a reversible patch.
-    pub fn commit(self) -> Result<Commit> {
-        let snapshot = self.snapshot()?;
+    /// Validate the staged collection and return its snapshot and its exact,
+    /// reversible patch.
+    pub fn finish(self) -> Result<(Snapshot, Patch)> {
+        let snapshot = self.preview()?;
         let patch = Patch {
             before: Arc::clone(&self.source.source),
             after: Arc::clone(&snapshot.source),
             before_external_sheets: self.source.valid_external_sheets,
             after_external_sheets: snapshot.valid_external_sheets.clone(),
+            limits: self.source.limits,
         };
-        let changed = !patch.is_empty();
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed,
-        })
-    }
-}
-
-/// A successful source-checked worksheet collection publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether publication changed any record byte.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+        Ok((snapshot, patch))
     }
 }
 
@@ -571,19 +554,14 @@ pub struct Patch {
     after: Arc<[u8]>,
     before_external_sheets: ValidExternalSheets,
     after_external_sheets: ValidExternalSheets,
+    limits: crate::raw::Limits,
 }
 
 impl Patch {
     /// Whether this patch preserves the exact source record stream.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.before == self.after
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.is_empty()
+        self.before == self.after
     }
 
     /// Borrow the exact source record stream required by this patch.
@@ -603,34 +581,35 @@ impl Patch {
         if source.source.as_ref() != self.before.as_ref()
             || source.valid_external_sheets != self.before_external_sheets
         {
-            return Err(invalid(
-                "WEBEXTENSIONS patch",
-                "source snapshot does not match the patch base",
-            ));
+            return Err(Error::PatchConflict {
+                part: "web extension bindings",
+            });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_source(Arc::clone(&self.after), self.after_external_sheets.clone())
+        Snapshot::from_source(
+            Arc::clone(&self.after),
+            self.after_external_sheets.clone(),
+            self.limits,
+        )
     }
 
     /// Apply to exact source bytes and return the resulting record stream.
     pub fn apply_bytes(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
-            return Err(invalid(
-                "WEBEXTENSIONS patch",
-                "source bytes do not match the patch base",
-            ));
+            return Err(Error::PatchConflict {
+                part: "web extension bindings",
+            });
         }
-        if !self.is_empty() {
-            Snapshot::from_source(Arc::clone(&self.after), self.after_external_sheets.clone())?;
+        if !self.is_noop() {
+            Snapshot::from_source(
+                Arc::clone(&self.after),
+                self.after_external_sheets.clone(),
+                self.limits,
+            )?;
         }
         Ok(self.after.to_vec())
-    }
-
-    /// Alias for [`Self::apply`].
-    pub fn commit(&self, source: &Snapshot) -> Result<Snapshot> {
-        self.apply(source)
     }
 
     /// Apply the exact inverse to the committed target snapshot.
@@ -646,21 +625,9 @@ impl Patch {
             after: Arc::clone(&self.before),
             before_external_sheets: self.after_external_sheets.clone(),
             after_external_sheets: self.before_external_sheets.clone(),
+            limits: self.limits,
         }
     }
-}
-
-/// Read one source-bound worksheet `WEBEXTENSIONS` collection.
-pub fn read(
-    records: impl AsRef<[u8]>,
-    valid_external_sheet: impl FnMut(u16) -> bool,
-) -> Result<Snapshot> {
-    Snapshot::read(records, valid_external_sheet)
-}
-
-/// Apply a source-checked patch to exact worksheet collection bytes.
-pub fn apply(source: &[u8], patch: &Patch) -> Result<Vec<u8>> {
-    patch.apply_bytes(source)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -697,6 +664,7 @@ impl ValidExternalSheets {
 fn validate_bindings(
     bindings: &[Binding],
     valid_external_sheets: Option<&ValidExternalSheets>,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     if bindings.is_empty() || bindings.len() > MAX_BINDINGS {
         return Err(invalid(
@@ -712,7 +680,7 @@ fn validate_bindings(
         )
     })?;
     for binding in bindings {
-        validate_binding(binding, valid_external_sheets)?;
+        validate_binding(binding, valid_external_sheets, limits)?;
         if !app_refs.insert(&binding.application_reference) {
             return Err(invalid("WEBEXTENSIONS", "duplicate binding appRef"));
         }
@@ -723,9 +691,10 @@ fn validate_bindings(
 fn validate_binding(
     binding: &Binding,
     valid_external_sheets: Option<&ValidExternalSheets>,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     validate_app_ref(&binding.application_reference)?;
-    let range = range_from_formula(&binding.formula)?;
+    let range = range_from_formula(&binding.formula, limits)?;
     if range != binding.range {
         return Err(invalid(
             "BrtWebExtension",
@@ -798,10 +767,7 @@ impl<'a> PackageAppRefs<'a> {
             if !self.values.contains(binding.application_reference.as_str()) {
                 return Err(invalid(
                     "BrtWebExtension.appRef",
-                    format!(
-                        "'{}' has no matching MS-OWEXML binding",
-                        binding.application_reference
-                    ),
+                    "has no matching MS-OWEXML binding",
                 ));
             }
         }
@@ -809,7 +775,7 @@ impl<'a> PackageAppRefs<'a> {
     }
 }
 
-fn range_from_formula(formula: &ParsedFormula) -> Result<Range> {
+fn range_from_formula(formula: &ParsedFormula, limits: crate::raw::Limits) -> Result<Range> {
     if formula
         .rgce
         .first()
@@ -820,7 +786,7 @@ fn range_from_formula(formula: &ParsedFormula) -> Result<Range> {
             "binding formula root must use the REFERENCE operand class",
         ));
     }
-    let tokens = Parser::with_extra(&formula.rgce, &formula.rgcb).parse()?;
+    let tokens = Parser::with_extra(&formula.rgce, &formula.rgcb, limits).parse()?;
     if tokens.len() != 1 {
         return Err(invalid(
             "BrtWebExtension",
@@ -908,7 +874,7 @@ fn validate_app_ref(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn parse_wide_string_exact(data: &[u8]) -> Result<String> {
+fn parse_wide_string_exact(data: &[u8], limits: crate::raw::Limits) -> Result<String> {
     let length_bytes = data.get(..4).ok_or(Error::InvalidLength {
         expected: 4,
         found: data.len(),
@@ -918,6 +884,7 @@ fn parse_wide_string_exact(data: &[u8]) -> Result<String> {
         found: data.len(),
     })?;
     let count = u32::from_le_bytes(length_bytes) as usize;
+    admit_units(count, limits)?;
     if count == 0 || count > MAX_APP_REF_CODE_UNITS {
         return Err(invalid("BrtWebExtension.appRef", "invalid string length"));
     }
@@ -948,8 +915,9 @@ fn parse_wide_string_exact(data: &[u8]) -> Result<String> {
         .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 string"))
 }
 
-fn write_wide_string(output: &mut Vec<u8>, value: &str) -> Result<()> {
+fn write_wide_string(output: &mut Vec<u8>, value: &str, limits: crate::raw::Limits) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
+    admit_units(units.len(), limits)?;
     if units.is_empty() || units.len() > MAX_APP_REF_CODE_UNITS {
         return Err(invalid("BrtWebExtension.appRef", "invalid string length"));
     }
@@ -961,15 +929,53 @@ fn write_wide_string(output: &mut Vec<u8>, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: val.into(),
-    }
+fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ, val }
+}
+
+/// Validate `limits` and admit an input or output of `length` bytes.
+fn admit(length: usize, limits: crate::raw::Limits) -> Result<crate::raw::Limits> {
+    Ok(limits.admit(length)?)
+}
+
+/// Refuse an appRef longer than the profile's UTF-16-unit ceiling.
+fn admit_units(units: usize, limits: crate::raw::Limits) -> Result<()> {
+    Ok(limits.admit_units(units, 0)?)
 }
 
 #[cfg(test)]
 mod tests {
+    /// The snapshot and patch of a finished draft, under one name.
+    struct Commit {
+        snapshot: Snapshot,
+        patch: Patch,
+    }
+
+    impl Commit {
+        fn changed(&self) -> bool {
+            !self.patch.is_noop()
+        }
+
+        fn snapshot(&self) -> &Snapshot {
+            &self.snapshot
+        }
+
+        fn patch(&self) -> &Patch {
+            &self.patch
+        }
+    }
+
+    trait FinishCommit {
+        fn commit(self) -> Result<Commit>;
+    }
+
+    impl FinishCommit for Draft {
+        fn commit(self) -> Result<Commit> {
+            let (snapshot, patch) = self.finish()?;
+            Ok(Commit { snapshot, patch })
+        }
+    }
+
     use super::*;
     use crate::package::formula::text::Compiler as TextCompiler;
 
@@ -996,20 +1002,36 @@ mod tests {
             rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
             rgcb: Vec::new(),
         };
-        Binding::new("sales-table", binary, |index| index == 0).unwrap()
+        Binding::new(
+            "sales-table",
+            binary,
+            |index| index == 0,
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap()
     }
 
     #[test]
     fn payload_and_collection_roundtrip() {
         let binding = binding();
-        let payload = binding.to_payload().unwrap();
+        let payload = binding.to_payload(crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(
-            Binding::parse_payload(&payload, |index| index == 0).unwrap(),
+            Binding::parse_payload(&payload, |index| index == 0, crate::raw::Limits::DEFAULT)
+                .unwrap(),
             binding
         );
-        let collection = write_xlsb_web_extension_bindings(std::slice::from_ref(&binding)).unwrap();
+        let collection = write_xlsb_web_extension_bindings(
+            std::slice::from_ref(&binding),
+            crate::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(
-            parse_xlsb_web_extension_bindings(&collection, |index| index == 0).unwrap(),
+            parse_xlsb_web_extension_bindings(
+                &collection,
+                |index| index == 0,
+                crate::raw::Limits::DEFAULT
+            )
+            .unwrap(),
             [binding]
         );
     }
@@ -1017,13 +1039,13 @@ mod tests {
     #[test]
     fn rejects_invalid_xti_local_refs_and_trailing_payload() {
         let binding = binding();
-        let payload = binding.to_payload().unwrap();
-        assert!(Binding::parse_payload(&payload, |_| false).is_err());
+        let payload = binding.to_payload(crate::raw::Limits::DEFAULT).unwrap();
+        assert!(Binding::parse_payload(&payload, |_| false, crate::raw::Limits::DEFAULT).is_err());
         let local = TextCompiler::compile("$A$1:$B$4").unwrap();
-        assert!(Binding::new("local", local, |_| true).is_err());
+        assert!(Binding::new("local", local, |_| true, crate::raw::Limits::DEFAULT).is_err());
         let mut trailing = payload;
         trailing.push(0);
-        assert!(Binding::parse_payload(&trailing, |_| true).is_err());
+        assert!(Binding::parse_payload(&trailing, |_| true, crate::raw::Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -1043,17 +1065,19 @@ mod tests {
 
     #[test]
     fn source_checked_transaction_preserves_noop_and_reverses_edits() {
-        let source = write_xlsb_web_extension_bindings(&[binding()]).unwrap();
-        let snapshot = Snapshot::read(&source, |index| index == 0).unwrap();
+        let source =
+            write_xlsb_web_extension_bindings(&[binding()], crate::raw::Limits::DEFAULT).unwrap();
+        let snapshot =
+            Snapshot::read(&source, |index| index == 0, crate::raw::Limits::DEFAULT).unwrap();
 
-        let noop = snapshot.edit().commit().unwrap();
+        let noop = snapshot.draft().commit().unwrap();
         assert!(!noop.changed());
-        assert!(noop.patch().is_empty());
+        assert!(noop.patch().is_noop());
         assert_eq!(noop.patch().before(), source.as_slice());
         assert_eq!(noop.patch().after(), source.as_slice());
         assert_eq!(noop.patch().apply(&snapshot).unwrap(), snapshot);
 
-        let mut transaction = snapshot.edit();
+        let mut transaction = snapshot.draft();
         assert!(
             transaction
                 .set_application_reference(0, "expenses-table")
@@ -1100,12 +1124,26 @@ mod tests {
             .is_err()
         );
 
-        let source = write_xlsb_web_extension_bindings(&[binding()]).unwrap();
-        assert!(Snapshot::read(&source, |_| false).is_err());
-        assert!(Snapshot::read(&source[..source.len() - 1], |_| true).is_err());
-        assert!(Snapshot::read_with_external_sheet_indices(&source, []).is_err());
+        let source =
+            write_xlsb_web_extension_bindings(&[binding()], crate::raw::Limits::DEFAULT).unwrap();
+        assert!(Snapshot::read(&source, |_| false, crate::raw::Limits::DEFAULT).is_err());
+        assert!(
+            Snapshot::read(
+                &source[..source.len() - 1],
+                |_| true,
+                crate::raw::Limits::DEFAULT
+            )
+            .is_err()
+        );
+        assert!(
+            Snapshot::read_with_external_sheet_indices(&source, [], crate::raw::Limits::DEFAULT)
+                .is_err()
+        );
 
-        let mut transaction = Snapshot::read(&source, |index| index == 0).unwrap().edit();
+        let mut transaction =
+            Snapshot::read(&source, |index| index == 0, crate::raw::Limits::DEFAULT)
+                .unwrap()
+                .draft();
         let mut invalid = binding();
         invalid.application_reference.clear();
         assert!(transaction.set(0, invalid).is_err());
@@ -1114,5 +1152,57 @@ mod tests {
             "sales-table"
         );
         assert!(transaction.remove(0).is_err());
+    }
+
+    #[test]
+    fn raw_limits_bound_binding_payload_and_app_ref() {
+        use crate::raw::{Error as WireError, Limits};
+        let binding = binding();
+        let payload = binding.to_payload(Limits::DEFAULT).unwrap();
+        let units = "sales-table".encode_utf16().count();
+        let exact = Limits::new(payload.len(), units);
+        assert_eq!(
+            Binding::parse_payload(&payload, |index| index == 0, exact).unwrap(),
+            binding
+        );
+        assert!(matches!(
+            Binding::parse_payload(
+                &payload,
+                |index| index == 0,
+                Limits::new(payload.len() - 1, units)
+            ),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
+        assert!(matches!(
+            Binding::parse_payload(
+                &payload,
+                |index| index == 0,
+                Limits::new(payload.len(), units - 1)
+            ),
+            Err(Error::Wire(WireError::StringLimit { .. }))
+        ));
+        assert!(matches!(
+            binding.to_payload(Limits::new(payload.len() - 1, units)),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
+        assert_eq!(binding.to_payload(exact).unwrap(), payload);
+    }
+
+    #[test]
+    fn raw_limits_bound_sheet_view_payloads() {
+        use crate::package::sheet_view::{parse_view, write_view_payload};
+        use crate::raw::{Error as WireError, Limits};
+        let payload = write_view_payload(None, Limits::DEFAULT).unwrap();
+        let exact = Limits::new(payload.len(), 0);
+        assert!(parse_view(&payload, exact).is_ok());
+        assert!(matches!(
+            parse_view(&payload, Limits::new(payload.len() - 1, 0)),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
+        assert_eq!(write_view_payload(None, exact).unwrap(), payload);
+        assert!(matches!(
+            write_view_payload(None, Limits::new(payload.len() - 1, 0)),
+            Err(Error::Wire(WireError::PayloadLimit { .. }))
+        ));
     }
 }

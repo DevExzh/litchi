@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_opc::{PackURI, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const CT: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -20,7 +21,8 @@ fn uri(value: &str) -> PackURI {
 }
 
 fn empty_package(types: &str, relationships: Option<&str>) -> Vec<u8> {
-    let mut zip = StreamingArchiveWriter::new();
+    let mut zip =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     zip.write_stored("[Content_Types].xml", types.as_bytes())
         .unwrap();
     if let Some(relationships) = relationships {
@@ -31,7 +33,14 @@ fn empty_package(types: &str, relationships: Option<&str>) -> Vec<u8> {
 }
 
 fn publish_first_part(source: Vec<u8>, add_relationship: bool) -> Vec<u8> {
-    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let mut plan = SourceTopologyPlan::new();
     plan.try_add_part(
         uri("/first.xml"),
@@ -65,8 +74,14 @@ fn publish_first_part(source: Vec<u8>, add_relationship: bool) -> Vec<u8> {
         .unwrap();
     let mut output = Vec::new();
     prepared.publish_to_stream(&mut output).unwrap();
-    let reopened =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(output.clone()))).unwrap();
+    let reopened = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(output.clone())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .part(&uri("/first.xml"))
@@ -86,10 +101,13 @@ fn first_mapping_expands_empty_default_and_prefixed_content_types_roots() {
             "<?xml version='1.0'?>\r\n<!--before--><{root} {namespace}='{CT}'  /><!--after-->"
         );
         let output = publish_first_part(empty_package(&types, None), false);
-        let xml = ArchiveReader::new(output.as_slice())
-            .unwrap()
-            .read("[Content_Types].xml")
-            .unwrap();
+        let xml = ArchiveReader::new(
+            output.as_slice(),
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap()
+        .read("[Content_Types].xml")
+        .unwrap();
         let xml = std::str::from_utf8(&xml).unwrap();
         assert!(xml.starts_with(&format!(
             "<?xml version='1.0'?>\r\n<!--before--><{root} {namespace}='{CT}'  >"
@@ -102,10 +120,13 @@ fn first_mapping_expands_empty_default_and_prefixed_content_types_roots() {
 fn first_mapping_preserves_prefixed_paired_root_and_comments() {
     let types = format!("<c:Types xmlns:c='{CT}'>\r\n<!--inside--></c:Types><!--tail-->");
     let output = publish_first_part(empty_package(&types, None), false);
-    let xml = ArchiveReader::new(output.as_slice())
-        .unwrap()
-        .read("[Content_Types].xml")
-        .unwrap();
+    let xml = ArchiveReader::new(
+        output.as_slice(),
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap()
+    .read("[Content_Types].xml")
+    .unwrap();
     let xml = std::str::from_utf8(&xml).unwrap();
     assert!(xml.starts_with(&format!("<c:Types xmlns:c='{CT}'>\r\n<!--inside-->")));
     assert!(xml.contains("<c:Override "));
@@ -122,10 +143,13 @@ fn first_relationship_expands_empty_default_and_prefixed_roots() {
             "<?xml version='1.0'?>\n<!--before--><{root} {namespace}='{REL}' /><!--after-->"
         );
         let output = publish_first_part(empty_package(&types, Some(&relationships)), true);
-        let xml = ArchiveReader::new(output.as_slice())
-            .unwrap()
-            .read("_rels/.rels")
-            .unwrap();
+        let xml = ArchiveReader::new(
+            output.as_slice(),
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap()
+        .read("_rels/.rels")
+        .unwrap();
         let xml = std::str::from_utf8(&xml).unwrap();
         assert!(xml.starts_with(&format!(
             "<?xml version='1.0'?>\n<!--before--><{root} {namespace}='{REL}' >"

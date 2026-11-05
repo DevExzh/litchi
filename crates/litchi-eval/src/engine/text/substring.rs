@@ -8,15 +8,11 @@ use super::helpers::{
     to_non_negative_int, to_positive_int,
 };
 
-pub(crate) async fn eval_char(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_char(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("CHAR expects 1 argument".to_string()));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     let code = match to_positive_int(&value) {
         Some(n) if n <= 255 => n as u8,
         _ => {
@@ -28,15 +24,11 @@ pub(crate) async fn eval_char(
     Ok(CellValue::String((code as char).to_string()))
 }
 
-pub(crate) async fn eval_code(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_code(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("CODE expects 1 argument".to_string()));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&value);
     if let Some(ch) = text.chars().next() {
         Ok(CellValue::Int(ch as u32 as i64))
@@ -45,7 +37,7 @@ pub(crate) async fn eval_code(
     }
 }
 
-pub(crate) async fn eval_clean(
+pub(crate) fn eval_clean(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -53,7 +45,7 @@ pub(crate) async fn eval_clean(
     if args.len() != 1 {
         return Ok(CellValue::Error("CLEAN expects 1 argument".to_string()));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&value);
     let cleaned: String = text
         .chars()
@@ -65,20 +57,16 @@ pub(crate) async fn eval_clean(
     Ok(CellValue::String(cleaned))
 }
 
-pub(crate) async fn eval_left(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_left(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.is_empty() || args.len() > 2 {
         return Ok(CellValue::Error(
             "LEFT expects 1 or 2 arguments (text, [num_chars])".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
     let num_chars = if args.len() == 2 {
-        let num_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let num_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_non_negative_int(&num_val) {
             Some(n) => n,
             None => {
@@ -94,7 +82,7 @@ pub(crate) async fn eval_left(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_leftb(
+pub(crate) fn eval_leftb(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -104,10 +92,10 @@ pub(crate) async fn eval_leftb(
             "LEFTB expects 1 or 2 arguments (text, [num_bytes])".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
     let num_bytes = if args.len() == 2 {
-        let num_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let num_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_non_negative_int(&num_val) {
             Some(n) => n,
             None => {
@@ -123,7 +111,7 @@ pub(crate) async fn eval_leftb(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_right(
+pub(crate) fn eval_right(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -133,10 +121,10 @@ pub(crate) async fn eval_right(
             "RIGHT expects 1 or 2 arguments (text, [num_chars])".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
     let num_chars = if args.len() == 2 {
-        let num_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let num_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_non_negative_int(&num_val) {
             Some(n) => n,
             None => {
@@ -152,7 +140,7 @@ pub(crate) async fn eval_right(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_rightb(
+pub(crate) fn eval_rightb(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -162,10 +150,10 @@ pub(crate) async fn eval_rightb(
             "RIGHTB expects 1 or 2 arguments (text, [num_bytes])".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
     let num_bytes = if args.len() == 2 {
-        let num_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let num_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_non_negative_int(&num_val) {
             Some(n) => n,
             None => {
@@ -181,19 +169,15 @@ pub(crate) async fn eval_rightb(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_mid(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_mid(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 3 {
         return Ok(CellValue::Error(
             "MID expects 3 arguments (text, start_num, num_chars)".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
-    let start_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let start_num = match to_positive_int(&start_val) {
         Some(n) => n,
         None => {
@@ -202,7 +186,7 @@ pub(crate) async fn eval_mid(
             ));
         },
     };
-    let count_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let count_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let num_chars = match to_non_negative_int(&count_val) {
         Some(n) => n,
         None => {
@@ -215,19 +199,15 @@ pub(crate) async fn eval_mid(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_midb(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_midb(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 3 {
         return Ok(CellValue::Error(
             "MIDB expects 3 arguments (text, start_num, num_bytes)".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
-    let start_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let start_num = match to_positive_int(&start_val) {
         Some(n) => n,
         None => {
@@ -236,7 +216,7 @@ pub(crate) async fn eval_midb(
             ));
         },
     };
-    let count_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let count_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let num_bytes = match to_non_negative_int(&count_val) {
         Some(n) => n,
         None => {
@@ -249,7 +229,7 @@ pub(crate) async fn eval_midb(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_replace(
+pub(crate) fn eval_replace(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -259,9 +239,9 @@ pub(crate) async fn eval_replace(
             "REPLACE expects 4 arguments (old_text, start_num, num_chars, new_text)".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let original = to_text(&text);
-    let start_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let start_num = match to_positive_int(&start_val) {
         Some(n) => n,
         None => {
@@ -270,7 +250,7 @@ pub(crate) async fn eval_replace(
             ));
         },
     };
-    let count_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let count_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let num_chars = match to_non_negative_int(&count_val) {
         Some(n) => n,
         None => {
@@ -279,7 +259,7 @@ pub(crate) async fn eval_replace(
             ));
         },
     };
-    let new_text = evaluate_expression(ctx, current_sheet, &args[3]).await?;
+    let new_text = evaluate_expression(ctx, current_sheet, &args[3])?;
     let replacement = to_text(&new_text);
 
     if start_num > original.chars().count() {
@@ -291,7 +271,7 @@ pub(crate) async fn eval_replace(
     Ok(CellValue::String(replaced))
 }
 
-pub(crate) async fn eval_replaceb(
+pub(crate) fn eval_replaceb(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -301,9 +281,9 @@ pub(crate) async fn eval_replaceb(
             "REPLACEB expects 4 arguments (old_text, start_num, num_bytes, new_text)".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let original = to_text(&text);
-    let start_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let start_byte = match to_positive_int(&start_val) {
         Some(n) => n,
         None => {
@@ -312,7 +292,7 @@ pub(crate) async fn eval_replaceb(
             ));
         },
     };
-    let count_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let count_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let num_bytes = match to_non_negative_int(&count_val) {
         Some(n) => n,
         None => {
@@ -321,7 +301,7 @@ pub(crate) async fn eval_replaceb(
             ));
         },
     };
-    let new_text = evaluate_expression(ctx, current_sheet, &args[3]).await?;
+    let new_text = evaluate_expression(ctx, current_sheet, &args[3])?;
     let replacement = to_text(&new_text);
 
     let total_bytes = super::helpers::dbcs_byte_len(&original);
@@ -334,15 +314,11 @@ pub(crate) async fn eval_replaceb(
     Ok(CellValue::String(replaced))
 }
 
-pub(crate) async fn eval_find(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_find_like(ctx, current_sheet, args, true, "FIND").await
+pub(crate) fn eval_find(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_find_like(ctx, current_sheet, args, true, "FIND")
 }
 
-pub(crate) async fn eval_findb(
+pub(crate) fn eval_findb(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -352,12 +328,12 @@ pub(crate) async fn eval_findb(
             "FINDB expects 2 or 3 arguments (find_text, within_text, [start_num])".to_string(),
         ));
     }
-    let find_text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let find_text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let needle = to_text(&find_text);
-    let within_text = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let within_text = evaluate_expression(ctx, current_sheet, &args[1])?;
     let haystack = to_text(&within_text);
     let start_byte = if args.len() == 3 {
-        let start_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let start_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_positive_int(&start_val) {
             Some(n) => n,
             None => {
@@ -415,15 +391,15 @@ pub(crate) async fn eval_findb(
     ))
 }
 
-pub(crate) async fn eval_search(
+pub(crate) fn eval_search(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_find_like(ctx, current_sheet, args, false, "SEARCH").await
+    eval_find_like(ctx, current_sheet, args, false, "SEARCH")
 }
 
-pub(crate) async fn eval_searchb(
+pub(crate) fn eval_searchb(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -433,12 +409,12 @@ pub(crate) async fn eval_searchb(
             "SEARCHB expects 2 or 3 arguments (find_text, within_text, [start_num])".to_string(),
         ));
     }
-    let find_text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let find_text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let needle = to_text(&find_text);
-    let within_text = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let within_text = evaluate_expression(ctx, current_sheet, &args[1])?;
     let haystack = to_text(&within_text);
     let start_byte = if args.len() == 3 {
-        let start_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let start_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_positive_int(&start_val) {
             Some(n) => n,
             None => {
@@ -497,7 +473,7 @@ pub(crate) async fn eval_searchb(
     ))
 }
 
-async fn eval_find_like(
+fn eval_find_like(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -509,17 +485,17 @@ async fn eval_find_like(
             "{name} expects 2 or 3 arguments (find_text, within_text, [start_num])"
         )));
     }
-    let find_text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let find_text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let needle = to_text(&find_text);
     if needle.is_empty() {
         return Ok(CellValue::Error(format!(
             "{name} requires non-empty find_text"
         )));
     }
-    let within_text = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let within_text = evaluate_expression(ctx, current_sheet, &args[1])?;
     let haystack = to_text(&within_text);
     let start_num = if args.len() == 3 {
-        let start_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let start_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_positive_int(&start_val) {
             Some(n) => n,
             None => {
@@ -583,128 +559,128 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_char() {
+    #[test]
+    fn test_eval_char() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(65.0)];
-        let result = eval_char(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_char(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "A"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_char_invalid() {
+    #[test]
+    fn test_eval_char_invalid() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(300.0)];
-        let result = eval_char(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_char(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("between 1 and 255")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_code() {
+    #[test]
+    fn test_eval_code() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("A")];
-        let result = eval_code(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_code(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 65),
             _ => panic!("Expected Int(65)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_code_empty() {
+    #[test]
+    fn test_eval_code_empty() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("")];
-        let result = eval_code(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_code(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("must not be empty")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_clean() {
+    #[test]
+    fn test_eval_clean() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello\x00world")];
-        let result = eval_clean(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_clean(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "helloworld"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_left() {
+    #[test]
+    fn test_eval_left() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), num_expr(3.0)];
-        let result = eval_left(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_left(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hel"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_left_default() {
+    #[test]
+    fn test_eval_left_default() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello")];
-        let result = eval_left(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_left(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "h"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_right() {
+    #[test]
+    fn test_eval_right() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), num_expr(3.0)];
-        let result = eval_right(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_right(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "llo"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mid() {
+    #[test]
+    fn test_eval_mid() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello world"), num_expr(7.0), num_expr(5.0)];
-        let result = eval_mid(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mid(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "world"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mid_start_at_1() {
+    #[test]
+    fn test_eval_mid_start_at_1() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), num_expr(1.0), num_expr(3.0)];
-        let result = eval_mid(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mid(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hel"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_replace() {
+    #[test]
+    fn test_eval_replace() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -713,55 +689,55 @@ mod tests {
             num_expr(5.0),
             str_expr("universe"),
         ];
-        let result = eval_replace(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_replace(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hello universe"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_find() {
+    #[test]
+    fn test_eval_find() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("world"), str_expr("hello world")];
-        let result = eval_find(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_find(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 7),
             _ => panic!("Expected Int(7)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_find_case_sensitive() {
+    #[test]
+    fn test_eval_find_case_sensitive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("WORLD"), str_expr("hello world")];
-        let result = eval_find(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_find(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("could not find")),
             _ => panic!("Expected Error - FIND is case sensitive"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_search() {
+    #[test]
+    fn test_eval_search() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("world"), str_expr("hello world")];
-        let result = eval_search(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_search(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 7),
             _ => panic!("Expected Int(7)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_search_case_insensitive() {
+    #[test]
+    fn test_eval_search_case_insensitive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("WORLD"), str_expr("hello world")];
-        let result = eval_search(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_search(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 7),
             _ => panic!("Expected Int(7) - SEARCH is case insensitive"),

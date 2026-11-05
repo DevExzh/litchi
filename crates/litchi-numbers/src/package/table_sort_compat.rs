@@ -1,9 +1,9 @@
 //! Physical-only persisted-sort admission for legacy migration snapshots.
 //!
-//! Some historical `litchi-iwa` builder snapshots contain valid native table
-//! models whose cell-storage projection is not accepted by the strict
-//! semantic package reader.  The migration host may still need to configure
-//! field 44 for those snapshots.  Keep that exception here, in the focused
+//! Some historical snapshots built by the retired migration host (deleted by
+//! record 0429; last present at commit `4d8a3e161f`) contain valid native
+//! table models whose cell-storage projection is not accepted by the strict
+//! semantic package reader, and may still need field 44 configured.  Keep that exception here, in the focused
 //! Numbers owner: only the rooted sheet/table graph and the sort payload are
 //! admitted, and the same source-preserving codec is used for the rewrite.
 
@@ -15,10 +15,7 @@ use litchi_iwa_protos::{
     table_model_discovery_codec as model_codec, table_sort_order_codec as codec,
 };
 
-use super::{
-    Components, Document, DocumentLimits, Index, Package, ReadOptions, SemanticLimits, State,
-    table_headers,
-};
+use super::{Components, Index, Package, Profile, SemanticLimits, State, table_headers};
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::lock::State as LockState;
 use crate::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
@@ -78,9 +75,11 @@ impl Package {
             return copy_bytes(source.state.source.as_ref());
         }
         if target.native.locked == LockState::Locked {
-            return Err(Error::TableLocked {
-                path: target.path(),
-            });
+            return Err(Error::Refused(
+                crate::package::table_sort::Refusal::TableLocked {
+                    path: target.path(),
+                },
+            ));
         }
         let output = rewrite_bytes(&source, &target, Some(&after))?;
         verify_candidate(&source, &output, &target, Some(&after))?;
@@ -100,9 +99,11 @@ impl Package {
             return copy_bytes(source.state.source.as_ref());
         }
         if target.native.locked == LockState::Locked {
-            return Err(Error::TableLocked {
-                path: target.path(),
-            });
+            return Err(Error::Refused(
+                crate::package::table_sort::Refusal::TableLocked {
+                    path: target.path(),
+                },
+            ));
         }
         let output = rewrite_bytes(&source, &target, None)?;
         verify_candidate(&source, &output, &target, None)?;
@@ -111,7 +112,7 @@ impl Package {
 }
 
 fn physical_package(bytes: &[u8]) -> Result<Package> {
-    let options = ReadOptions::default();
+    let options = Profile::default();
     let components = Components::from_bytes(bytes, options.archive()).map_err(map_package_error)?;
     super::validate_numbers_application(&components, options.archive())
         .map_err(map_package_error)?;
@@ -119,9 +120,11 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
         .map_err(map_package_error)?;
     let source = components
         .physical()
-        .ok_or(Error::UnsupportedSource)?
+        .ok_or(Error::Refused(
+            crate::package::table_sort::Refusal::UnsupportedSource,
+        ))?
         .__source_owner();
-    let document = Document::from_sheets_with_limits(Vec::new(), DocumentLimits::default())
+    let document = crate::Workbook::from_sheets_with_limits(Vec::new(), SemanticLimits::DEFAULT)
         .map_err(|_| invalid_source())?;
     Ok(Package {
         state: Arc::new(State {
@@ -130,6 +133,7 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
             index,
             document,
             options,
+            proofs: Default::default(),
         }),
     })
 }
@@ -170,11 +174,15 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
     let root = Package::root_sheet_order(&source.state.components, SemanticLimits::default())
         .map_err(|_| invalid_source())?;
     match selector {
-        SheetSelector::Index(index) => root
-            .sheet_references()
-            .get(index)
-            .map(|_| index)
-            .ok_or(Error::SheetNotFound),
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            root.sheet_references()
+                .get(index)
+                .map(|_| index)
+                .ok_or(Error::Refused(
+                    crate::package::table_sort::Refusal::SheetNotFound,
+                ))
+        },
         SheetSelector::Name(name) => {
             let mut found = None;
             for index in 0..root.sheet_references().len() {
@@ -183,7 +191,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
                     return Err(invalid_source());
                 }
             }
-            found.ok_or(Error::SheetNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_sort::Refusal::SheetNotFound,
+            ))
         },
     }
 }
@@ -194,7 +204,8 @@ fn resolve_table_position(
     selector: TableSelector<'_>,
 ) -> Result<usize> {
     match selector {
-        TableSelector::Index(index) => {
+        TableSelector::Position(index) => {
+            let index = index.get();
             table_headers::resolve::resolve_target_physical(source, sheet_position, index)
                 .map_err(map_header_error)?;
             Ok(index)
@@ -213,7 +224,9 @@ fn resolve_table_position(
                     return Err(invalid_source());
                 }
             }
-            found.ok_or(Error::TableNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_sort::Refusal::TableNotFound,
+            ))
         },
     }
 }
@@ -279,9 +292,9 @@ fn resolve_sheet_target(source: &Package, sheet_position: usize) -> Result<Sheet
         table_headers::resolve::repeated_length_payloads(&document_message.data, 1)
             .map_err(map_header_error)?;
     let sheet_identifier = table_headers::resolve::local_reference_identifier(
-        sheet_payloads
-            .get(sheet_position)
-            .ok_or(Error::SheetNotFound)?,
+        sheet_payloads.get(sheet_position).ok_or(Error::Refused(
+            crate::package::table_sort::Refusal::SheetNotFound,
+        ))?,
     )
     .map_err(map_header_error)?;
     let resolved = source
@@ -380,7 +393,9 @@ fn snapshot_from_order(order: &Order) -> Result<codec::SortOrderSnapshot> {
 fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Result<Vec<u8>> {
     let catalog = table_headers::rewrite::physical_source(source).map_err(map_header_error)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_sort::Refusal::UnsupportedSource,
+        ));
     }
     let component = source
         .state
@@ -398,12 +413,10 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
     let object = archive
@@ -432,7 +445,7 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
             .into_bytes()
     };
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.message_index,
             RawMessage {
                 type_: target.native.message_type,
@@ -442,22 +455,10 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
         )
         .map_err(map_core_error)?;
     archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(rewritten.len()).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
-            kind: LimitKind::EntryBytes,
-            observed: u64::try_from(compressed_bound).unwrap_or(u64::MAX),
-            maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
-            path: Path::Package,
-        });
-    }
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(component.name(), compressed.as_slice())];
     let prepared = catalog
         .package()
@@ -478,8 +479,8 @@ fn verify_candidate(
     let candidate = physical_package(output)?;
     let selected = resolve_target(
         &candidate,
-        SheetSelector::Index(target.native.sheet_position),
-        TableSelector::Index(target.native.table_position),
+        SheetSelector::index(target.native.sheet_position),
+        TableSelector::index(target.native.table_position),
     )?;
     if selected.before.as_ref() != expected
         || selected.native.model_identifier != target.native.model_identifier
@@ -690,11 +691,11 @@ fn map_package_error(error: super::Error) -> Error {
                 amount,
                 path: Path::Package,
             },
-            super::ResourceError::LimitExceeded {
+            super::ResourceError::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Error::LimitExceeded {
+            } => Error::Limit {
                 kind: match kind {
                     super::PayloadLimitKind::InputBytes => LimitKind::WireBytes,
                     super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -714,7 +715,7 @@ fn map_package_error(error: super::Error) -> Error {
     }
     match error {
         super::Error::Archive(error) => map_archive_error(error),
-        super::Error::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        super::Error::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -722,7 +723,7 @@ fn map_package_error(error: super::Error) -> Error {
         },
         super::Error::SemanticLimit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -762,7 +763,7 @@ fn map_model_codec_error(error: model_codec::DecodeError) -> Error {
             (LimitKind::WireScratchBytes, observed, maximum)
         },
         model_codec::DecodeLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -771,7 +772,7 @@ fn map_model_codec_error(error: model_codec::DecodeError) -> Error {
         },
         _ => return invalid_source(),
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

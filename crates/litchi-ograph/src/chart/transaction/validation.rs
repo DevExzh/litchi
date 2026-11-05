@@ -1,17 +1,18 @@
-//! Transaction-local semantic guards.
+//! Edit-local semantic guards.
 
-use super::super::{Cache, Chart, Value, XlValue};
+use super::super::{Cache, Model, Value, XlValue};
 use super::model::{CacheValue, Identity};
 use crate::{Error, Result};
 
-pub(super) fn ensure_editable(chart: &Chart) -> Result<()> {
+pub(super) fn ensure_editable(chart: &Model) -> Result<()> {
     if chart.is_pristine() {
         Ok(())
     } else {
-        Err(Error::UnsupportedMutation {
-            operation: "cache-value-patch",
-            reason: "only a pristine parsed chart has a replayable source stream",
-        })
+        Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "cache-value-patch",
+            "only a pristine parsed chart has a replayable source stream",
+        )))
     }
 }
 
@@ -47,7 +48,7 @@ pub(super) fn ensure_identity(cache: &Cache, identity: Identity) -> Result<()> {
     if Identity::from_cache(cache) == identity {
         Ok(())
     } else {
-        Err(Error::UnsupportedMutation {
+        Err(Error::PatchConflict {
             operation: "cache-value-patch",
             reason: "patch cache identity does not match the target snapshot",
         })
@@ -55,10 +56,11 @@ pub(super) fn ensure_identity(cache: &Cache, identity: Identity) -> Result<()> {
 }
 
 fn same_wire_class<T>() -> Result<T> {
-    Err(Error::UnsupportedMutation {
-        operation: "cache-value-patch",
-        reason: "replacement would change the physical cache record class",
-    })
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "cache-value-patch",
+        "replacement would change the physical cache record class",
+    )))
 }
 
 fn ensure_xnum(value: f64) -> Result<()> {

@@ -122,7 +122,7 @@ struct Node {
 enum HostKind {
     Document,
     Body,
-    Spreadsheet,
+    Workbook,
     Owner,
     Record,
     Paragraph,
@@ -283,7 +283,7 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                         && (parent == Some(HostKind::Owner) || active_record.is_some());
                 let tracked_scope = kind == HostKind::Owner
                     || kind == HostKind::Record
-                    || parent == Some(HostKind::Spreadsheet) && local == "tracked-changes"
+                    || parent == Some(HostKind::Workbook) && local == "tracked-changes"
                     || active_record.is_some()
                     || stack.iter().any(|open| open.kind == HostKind::Owner);
                 if tracked_scope {
@@ -303,7 +303,7 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                 {
                     open.unsupported = true;
                 }
-                if parent == Some(HostKind::Spreadsheet) {
+                if parent == Some(HostKind::Workbook) {
                     if kind == HostKind::Owner {
                         if spreadsheet_child_seen {
                             return invalid(
@@ -579,8 +579,8 @@ fn classify_host(parent: Option<HostKind>, namespace: Namespace, local: &str) ->
         && namespace == Namespace::Office
         && local == "spreadsheet"
     {
-        HostKind::Spreadsheet
-    } else if parent == Some(HostKind::Spreadsheet)
+        HostKind::Workbook
+    } else if parent == Some(HostKind::Workbook)
         && namespace == Namespace::Table
         && local == "tracked-changes"
     {
@@ -608,7 +608,7 @@ fn reject_illegal_host_position(
 ) -> Result<()> {
     if namespace == Namespace::Office && local == "document-content" && kind != HostKind::Document
         || namespace == Namespace::Office && local == "body" && kind != HostKind::Body
-        || namespace == Namespace::Office && local == "spreadsheet" && kind != HostKind::Spreadsheet
+        || namespace == Namespace::Office && local == "spreadsheet" && kind != HostKind::Workbook
         || namespace == Namespace::Table && local == "tracked-changes" && kind != HostKind::Owner
     {
         return invalid(format!("illegal ODS host placement for {local}"));
@@ -643,7 +643,7 @@ fn complete_source_element(
     };
     match open.kind {
         HostKind::Body => set_unique(body, element, "office:body")?,
-        HostKind::Spreadsheet => set_unique(spreadsheet, element, "office:spreadsheet")?,
+        HostKind::Workbook => set_unique(spreadsheet, element, "office:spreadsheet")?,
         HostKind::Owner => {
             if owner.is_some() {
                 return invalid("duplicate table:tracked-changes");
@@ -924,8 +924,8 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_tracked_changes(xml: &str) -> Result<Option<Changes>> {
-    Ok(inspect_tracked_changes_source(xml, &Limits::default())?.changes)
+pub fn parse_tracked_changes(xml: &str, limits: &Limits) -> Result<Option<Changes>> {
+    Ok(inspect_tracked_changes_source(xml, limits)?.changes)
 }
 
 fn parse_tracked_changes_semantic(xml: &str, limits: &Limits) -> Result<Option<Changes>> {
@@ -1911,18 +1911,21 @@ impl Changes {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn to_xml_fragment(&self) -> Result<String> {
-        write_tracked_changes_owner(self, Some(self.enabled), &Limits::default())
+    pub fn to_xml_fragment(&self, limits: &Limits) -> Result<String> {
+        write_tracked_changes_owner(self, Some(self.enabled), limits)
     }
 }
 
 /// # Errors
 ///
 /// Returns an error when the value cannot be serialized.
-pub fn write_tracked_changes(output: &mut String, changes: Option<&Changes>) -> Result<()> {
+pub fn write_tracked_changes(
+    output: &mut String,
+    changes: Option<&Changes>,
+    limits: &Limits,
+) -> Result<()> {
     if let Some(changes) = changes {
-        let fragment =
-            write_tracked_changes_owner(changes, Some(changes.enabled), &Limits::default())?;
+        let fragment = write_tracked_changes_owner(changes, Some(changes.enabled), limits)?;
         output
             .try_reserve(fragment.len())
             .map_err(allocation_error)?;

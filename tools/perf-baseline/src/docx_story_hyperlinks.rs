@@ -9,6 +9,7 @@
 use super::{Case, CaseResult, Corpus as BaseCorpus, CorpusManifest, SourceSummary};
 use litchi_core::{OwnedSource, ReadAt};
 use litchi_docx::source_backed;
+use litchi_docx::story_hyperlinks::Mode;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use serde::Serialize;
@@ -283,8 +284,11 @@ fn build_archive() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 /// Build the deterministic high-cardinality DOCX package used by the case.
 pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     let archive = build_archive()?;
-    let opc = OpcPackage::from_bytes(&archive)?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -366,7 +370,7 @@ fn verify_plan_effect(plan: &litchi_docx::story_hyperlinks::Plan, corpus: &Corpu
 }
 
 fn verify_output_parts(output: &[u8]) -> Result<bool, Box<dyn std::error::Error>> {
-    let package = OpcPackage::from_bytes(output)?;
+    let package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     for story_index in 0..STORY_COUNT {
         let file_name = story_file_name(story_index)?;
         let part_name = generated_string(48, "DOCX output story URI", |value| {
@@ -427,14 +431,16 @@ fn prepare(corpus: &Corpus) -> Result<Prepared, Box<dyn std::error::Error>> {
         return Err("DOCX story hyperlink selector guards are not verified".into());
     }
 
-    let commit = plan.apply()?;
+    let commit = package
+        .edit_story_hyperlink_redaction(&[target], Mode::Strict)?
+        .commit()?;
     let mut output = Vec::new();
     reserve_exact(
         &mut output,
         corpus.base.archive.len(),
         "DOCX story hyperlink output",
     )?;
-    package.publish_story_hyperlink_redaction_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let output_sha256 = super::sha256_hex(&output);
     let output_parts_verified = verify_output_parts(&output)?;
     let output_package = source_package(owned_source(&output)?)?;
@@ -456,11 +462,10 @@ fn prepare(corpus: &Corpus) -> Result<Prepared, Box<dyn std::error::Error>> {
         "DOCX repeated story hyperlink output",
     )?;
     let second_package = source_package(owned_source(&corpus.base.archive)?)?;
-    let second_snapshot = second_package.story_hyperlinks_only_snapshot()?;
-    let second_plan = second_snapshot.plan_target_urls(&[target])?;
-    let second_commit = second_plan.apply()?;
-    second_package
-        .publish_story_hyperlink_redaction_to_stream(&mut second_output, &second_commit)?;
+    let second_commit = second_package
+        .edit_story_hyperlink_redaction(&[target], Mode::Strict)?
+        .commit()?;
+    second_commit.package().write_to(&mut second_output)?;
     let deterministic_output_verified = second_output == output;
     let publication_verified = output_inventory_verified
         && output_relationships_verified

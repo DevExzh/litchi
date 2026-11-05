@@ -20,7 +20,7 @@ use std::sync::Arc;
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
 use litchi_odp::model::animation::Kind;
-use litchi_odp::{Presentation, SourceBackedPresentation, SourceBackedPresentationCatalog};
+use litchi_odp::{Package, SourceBackedPresentation, SourceBackedPresentationCatalog};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 
@@ -77,7 +77,7 @@ fn expected() -> Vec<Recorded> {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
-    let owned = Presentation::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().presentation().unwrap();
     assert_eq!(owned.slides().unwrap().len(), 5, "{label}");
     assert_eq!(
         recorded(owned.tolerance_report()),
@@ -86,16 +86,22 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
     );
 
     // The report is the same whether it or the slides are requested first.
-    let report_first = Presentation::from_bytes(bytes.to_vec()).unwrap();
+    let report_first = Package::from_bytes(bytes).unwrap().presentation().unwrap();
     assert_eq!(
         recorded(report_first.tolerance_report()),
         defects,
         "{label}: report first"
     );
 
-    let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
-        .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Presentation::from_prepared_package(prepared).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(
+        bytes.to_vec(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap_or_else(|| panic!("{label}: package must prepare"));
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -135,7 +141,12 @@ fn unknown_animation_elements_are_skipped_and_recorded_per_slide() {
     let bytes = with_unknown_animations();
     assert_every_open_path(&bytes, &expected(), "unknown animations");
 
-    let slides = Presentation::from_bytes(bytes).unwrap().slides().unwrap();
+    let slides = Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
+        .unwrap()
+        .slides()
+        .unwrap();
     // Slide 2 keeps its timing tree minus the two unmappable elements.
     let root = &slides[2].animations()[0];
     assert_eq!(root.kind(), Kind::Parallel);
@@ -181,7 +192,9 @@ fn disallowed_known_children_and_broken_xml_stay_hard_errors() {
         )
     });
     assert!(
-        Presentation::from_bytes(misplaced)
+        Package::from_bytes(&misplaced)
+            .unwrap()
+            .presentation()
             .unwrap()
             .slides()
             .is_err()
@@ -191,7 +204,8 @@ fn disallowed_known_children_and_broken_xml_stay_hard_errors() {
         insert_before_page_end(xml, 1, r#"<anim:future-tree><anim:par/>"#)
     });
     assert!(
-        Presentation::from_bytes(unterminated)
+        Package::from_bytes(&unterminated)
+            .and_then(|package| package.presentation())
             .and_then(|presentation| presentation.slides())
             .is_err()
     );

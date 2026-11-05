@@ -14,7 +14,6 @@ use crate::{Error, Limits};
 
 use super::codec::{COMP_OBJ, OLE, WORKBOOK};
 use super::semantic::{Package, PackageRef, Workbook, WorkbookRef};
-use super::snapshot::Snapshot;
 use super::validation::{
     BOF, BOF_BYTES, CHART_SHEET, EOF, GLOBALS, OGRAPH_VERSION, REQUIRED_PLATFORM_FLAGS,
 };
@@ -35,7 +34,7 @@ fn workbook() -> Vec<u8> {
 }
 
 fn workbook_with_bofs(globals: [u8; BOF_BYTES], chart: [u8; BOF_BYTES]) -> Vec<u8> {
-    let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut out = Encoder::new(Limits::default().biff).expect("BIFF limits");
     out.push(BOF, &globals).expect("globals BOF");
     out.push(Kind::from_wire(0x7777), &[1, 2, 3])
         .expect("unknown record");
@@ -48,7 +47,7 @@ fn workbook_with_bofs(globals: [u8; BOF_BYTES], chart: [u8; BOF_BYTES]) -> Vec<u
 }
 
 fn editable_chart(with_cache: bool) -> Vec<u8> {
-    let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut out = Encoder::new(Limits::default().biff).expect("BIFF limits");
     out.push(BOF, &bof(CHART_SHEET)).expect("chart BOF");
 
     let mut rect = [0u8; 16];
@@ -101,12 +100,12 @@ fn editable_chart(with_cache: bool) -> Vec<u8> {
 
 fn editable_workbook(with_cache: bool) -> Vec<u8> {
     let chart = editable_chart(with_cache);
-    let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut out = Encoder::new(Limits::default().biff).expect("BIFF limits");
     out.push(BOF, &bof(GLOBALS)).expect("globals BOF");
     out.push(Kind::from_wire(0x7776), &[0x10, 0x20])
         .expect("opaque globals record");
     out.push(EOF, &[]).expect("globals EOF");
-    for item in Records::new(&chart) {
+    for item in Records::new(&chart, litchi_biff::Limits::default()).expect("valid BIFF limits") {
         out.push_ref(item.expect("chart record"))
             .expect("chart replay");
     }
@@ -128,8 +127,8 @@ fn package(workbook: Option<&[u8]>, extras: &[(&str, &[u8])]) -> Vec<u8> {
     output.into_inner()
 }
 
-fn authored_graph_chart() -> chart::Chart {
-    let mut chart = chart::Chart::new_graph_authoring(chart::GraphFamily::Pie, Limits::default())
+fn authored_graph_chart() -> chart::Model {
+    let mut chart = chart::Model::new_graph_authoring(chart::GraphFamily::Pie, Limits::default())
         .expect("Graph scaffold");
     let count = chart::Count::new(2).expect("count");
     let row = chart::RowCol::new(1).expect("row");
@@ -201,13 +200,14 @@ fn authored_graph_chart() -> chart::Chart {
 
 #[test]
 fn authored_graph_package_reopens_as_owned_graph_chart() {
-    let package = Package::from_chart(authored_graph_chart()).expect("Graph package");
+    let package = Package::from_chart(authored_graph_chart(), crate::OpenOptions::default())
+        .expect("Graph package");
     assert_eq!(package.topology().stream_count(), 1);
     let bytes = package.finish().into_bytes();
     let reopened = Package::open(bytes).expect("reopen Graph package");
     let workbook = reopened.workbook().expect("Workbook");
     let parsed =
-        chart::Chart::parse(workbook.chart(), chart::Context::graph()).expect("typed Graph chart");
+        chart::Model::parse(workbook.chart(), chart::Context::graph()).expect("typed Graph chart");
     assert_eq!(parsed.groups().len(), 1);
     assert!(parsed.axes().is_empty());
     assert_eq!(parsed.series().len(), 1);
@@ -224,7 +224,10 @@ fn accepts_exact_standalone_topology_and_reads_workbook() {
     let opened = parsed.workbook().expect("read Workbook");
     assert_eq!(opened.as_bytes(), workbook);
     assert_eq!(opened.chart().kind(), chart::Kind::Graph);
-    assert_eq!(opened.chart().records().count(), 3);
+    assert_eq!(
+        opened.chart().records().expect("validated records").count(),
+        3
+    );
 }
 
 #[test]
@@ -267,7 +270,7 @@ fn rejects_missing_unknown_and_nested_root_entries() {
 
 #[test]
 fn rejects_wrong_substream_shape_and_trailing_records() {
-    let mut wrong = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut wrong = Encoder::new(Limits::default().biff).expect("BIFF limits");
     wrong.push(BOF, &bof(GLOBALS)).expect("BOF");
     wrong.push(EOF, &[]).expect("EOF");
     wrong.push(BOF, &bof(GLOBALS)).expect("wrong BOF");
@@ -295,9 +298,9 @@ fn checks_package_and_workbook_limits_before_exposing_data() {
         ..Limits::default()
     };
     assert!(matches!(
-        PackageRef::with_limits(&bytes, package_limits),
-        Err(Error::LimitExceeded {
-            resource: "package bytes",
+        PackageRef::open_with_options(&bytes, crate::OpenOptions::new().limits(package_limits)),
+        Err(Error::Limit {
+            kind: crate::LimitKind::PackageBytes,
             ..
         })
     ));
@@ -307,9 +310,9 @@ fn checks_package_and_workbook_limits_before_exposing_data() {
         ..Limits::default()
     };
     assert!(matches!(
-        PackageRef::with_limits(&bytes, workbook_limits),
-        Err(Error::LimitExceeded {
-            resource: "Workbook bytes",
+        PackageRef::open_with_options(&bytes, crate::OpenOptions::new().limits(workbook_limits)),
+        Err(Error::Limit {
+            kind: crate::LimitKind::WorkbookBytes,
             ..
         })
     ));
@@ -370,13 +373,17 @@ fn strict_bof_checks_must_fields_but_preserves_undefined_bits() {
 }
 
 #[test]
-fn package_snapshot_edit_replays_typed_graph_metadata_and_opaque_streams() {
+fn package_edit_replays_typed_graph_metadata_and_opaque_streams() {
     let source = package(
         Some(&editable_workbook(true)),
         &[(COMP_OBJ, &[0xCA, 0xFE]), (OLE, &[0xBA, 0xBE, 0x01])],
     );
-    let snapshot = Snapshot::from_bytes(source.clone()).expect("snapshot");
-    let before = snapshot.chart().expect("typed chart");
+    let snapshot = Package::open(source.clone()).expect("snapshot");
+    let before = chart::Model::parse(
+        snapshot.workbook().unwrap().chart(),
+        chart::Context::graph(),
+    )
+    .expect("typed chart");
     assert_eq!(before.rect(), chart::Rect::default());
     assert_eq!(before.caches()[0].value(), chart::ValueRef::Number(1.25));
     assert_eq!(before.unknown().len(), 1);
@@ -387,7 +394,7 @@ fn package_snapshot_edit_replays_typed_graph_metadata_and_opaque_streams() {
         width: 4_500 << 16,
         height: 2_500 << 16,
     };
-    let mut transaction = snapshot.edit().expect("transaction");
+    let mut transaction = snapshot.edit();
     transaction.set_rect(target).expect("chart area");
     transaction
         .set_props(chart::Props {
@@ -399,36 +406,37 @@ fn package_snapshot_edit_replays_typed_graph_metadata_and_opaque_streams() {
         .set_cache_value(0, chart::Value::Number(2.5))
         .expect("cache value");
     let commit = transaction.commit().expect("package commit");
-    assert!(commit.changed());
-    assert_eq!(commit.patch().chart().len(), 3);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().chart().change_count(), 3);
 
-    let output = commit.snapshot();
-    let after = output.chart().expect("reparsed chart");
+    let output = commit.package();
+    let after = chart::Model::parse(output.workbook().unwrap().chart(), chart::Context::graph())
+        .expect("reparsed chart");
     assert_eq!(after.rect(), target);
     assert_eq!(after.props().flags, 2 | (1 << 16));
     assert_eq!(after.caches()[0].value(), chart::ValueRef::Number(2.5));
     assert_eq!(after.unknown().len(), 1);
 
-    let mut cfb = litchi_cfb::OleFile::open(Cursor::new(output.bytes())).expect("CFB");
+    let mut cfb = litchi_cfb::OleFile::open(
+        Cursor::new(output.as_bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB");
     assert_eq!(cfb.open_stream(&[COMP_OBJ]).expect("CompObj"), [0xCA, 0xFE]);
     assert_eq!(cfb.open_stream(&[OLE]).expect("Ole"), [0xBA, 0xBE, 0x01]);
-    assert_ne!(output.bytes(), source.as_slice());
+    assert_ne!(output.as_bytes(), source.as_slice());
 }
 
 #[test]
 fn package_no_op_is_exact_and_inverse_patch_restores_source() {
     let source = package(Some(&editable_workbook(false)), &[(COMP_OBJ, &[1, 2, 3])]);
-    let snapshot = Snapshot::from_bytes(source.clone()).expect("snapshot");
-    let no_op = snapshot
-        .edit()
-        .expect("transaction")
-        .commit()
-        .expect("commit");
-    assert!(!no_op.changed());
-    assert!(no_op.patch().is_empty());
-    assert_eq!(no_op.snapshot().bytes(), source.as_slice());
+    let snapshot = Package::open(source.clone()).expect("snapshot");
+    let no_op = snapshot.edit().commit().expect("commit");
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().as_bytes(), source.as_slice());
 
-    let mut edit = snapshot.edit().expect("transaction");
+    let mut edit = snapshot.edit();
     edit.set_rect(chart::Rect {
         x: 0,
         y: 0,
@@ -438,19 +446,18 @@ fn package_no_op_is_exact_and_inverse_patch_restores_source() {
     .expect("stage");
     let commit = edit.commit().expect("commit");
     let restored = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
+        .package()
+        .apply(&commit.patch().inverse())
         .expect("inverse");
-    assert_eq!(restored.bytes(), source.as_slice());
+    assert_eq!(restored.package().as_bytes(), source.as_slice());
 }
 
 #[test]
 fn package_patch_rejects_stale_sources_and_invalid_edits_atomically() {
     let source = package(Some(&editable_workbook(false)), &[]);
-    let snapshot = Snapshot::from_bytes(source.clone()).expect("snapshot");
+    let snapshot = Package::open(source.clone()).expect("snapshot");
 
-    let mut invalid = snapshot.edit().expect("transaction");
+    let mut invalid = snapshot.edit();
     assert!(matches!(
         invalid.set_rect(chart::Rect {
             x: 1,
@@ -464,10 +471,10 @@ fn package_patch_rejects_stale_sources_and_invalid_edits_atomically() {
         })
     ));
     let invalid_commit = invalid.commit().expect("atomic no-op");
-    assert!(!invalid_commit.changed());
-    assert_eq!(invalid_commit.snapshot().bytes(), source.as_slice());
+    assert!(!invalid_commit.diagnostics().changed());
+    assert_eq!(invalid_commit.package().as_bytes(), source.as_slice());
 
-    let mut edit = snapshot.edit().expect("transaction");
+    let mut edit = snapshot.edit();
     edit.set_props(chart::Props {
         flags: 2 | (1 << 16),
         plot_area: true,
@@ -476,12 +483,105 @@ fn package_patch_rejects_stale_sources_and_invalid_edits_atomically() {
     let commit = edit.commit().expect("commit");
     let patch = commit.patch().clone();
     let stale_bytes = package(Some(&editable_workbook(false)), &[(COMP_OBJ, &[9])]);
-    let stale = Snapshot::from_bytes(stale_bytes).expect("stale package");
+    let stale = Package::open(stale_bytes).expect("stale package");
     assert!(matches!(
-        patch.apply(&stale),
-        Err(Error::UnsupportedMutation {
+        stale.apply(&patch),
+        Err(Error::PatchConflict {
             operation: "package-patch",
             ..
         })
     ));
+}
+
+#[test]
+fn shared_owner_edits_are_lazy_and_drop_preserves_the_exact_artifact() {
+    // Valid frame lengths but an invalid typed Chart payload: edit creation
+    // must not parse it; either staging or committing must still reject it.
+    let original = workbook();
+    let mut malformed = Encoder::new(Limits::default().biff).unwrap();
+    for record in Records::new(&original, Limits::default().biff).unwrap() {
+        let record = record.unwrap();
+        let kind = if record.kind() == Kind::from_wire(0x7778) {
+            Kind::from_wire(0x1002)
+        } else {
+            record.kind()
+        };
+        malformed.push(kind, record.payload()).unwrap();
+    }
+    let bytes = package(Some(&malformed.finish()), &[(COMP_OBJ, &[7; 4096])]);
+    let pointer = bytes.as_ptr();
+    let source = Package::open(bytes).unwrap();
+    let mut edit = source.edit();
+    assert!(edit.is_empty());
+    assert_eq!(edit.len(), 0);
+    assert_eq!(edit.source().as_bytes().as_ptr(), pointer);
+    assert!(edit.set_rect(chart::Rect::default()).is_err());
+    drop(edit);
+    assert!(source.edit().commit().is_err());
+    let recovered = source.finish().into_bytes();
+    assert_eq!(recovered.as_ptr(), pointer);
+}
+
+#[test]
+fn package_replay_is_content_based_and_returns_an_editable_owner() {
+    let bytes = package(Some(&editable_workbook(true)), &[(COMP_OBJ, &[9, 8, 7])]);
+    let source = Package::open(bytes.clone()).unwrap();
+    let mut edit = source.edit();
+    edit.set_cache_value(0, chart::Value::Number(4.5)).unwrap();
+    let commit = edit.commit().unwrap();
+    let recipient = Package::open_with_options(
+        bytes.clone(),
+        crate::OpenOptions::new().limits(Limits {
+            max_cached_values: 1,
+            ..Limits::default()
+        }),
+    )
+    .unwrap();
+    assert_ne!(source.as_bytes().as_ptr(), recipient.as_bytes().as_ptr());
+    let replayed: crate::Commit = recipient.apply(commit.patch()).unwrap();
+    assert!(replayed.diagnostics().changed());
+    assert_eq!(replayed.package().as_bytes(), commit.package().as_bytes());
+    assert_eq!(
+        replayed.package().as_ref().limits(),
+        recipient.as_ref().limits()
+    );
+    let mut next = replayed.package().edit();
+    next.set_cache_value(0, chart::Value::Number(6.5)).unwrap();
+    assert!(next.commit().unwrap().diagnostics().changed());
+    let reopened = Package::open(replayed.package().as_bytes().to_vec()).unwrap();
+    let inverse = reopened.apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(inverse.package().as_bytes(), bytes);
+    let noop = source.edit().commit().unwrap();
+    let noop_replayed = recipient.apply(noop.patch()).unwrap();
+    assert!(!noop_replayed.diagnostics().changed());
+    assert!(noop_replayed.patch().is_noop());
+    assert_eq!(noop_replayed.package().as_bytes(), bytes);
+    assert_eq!(source.as_bytes(), bytes);
+}
+
+#[test]
+fn concurrent_package_borrows_promote_one_immutable_allocation() {
+    let bytes = package(Some(&editable_workbook(true)), &[]);
+    let pointer = bytes.as_ptr() as usize;
+    let source = Package::open(bytes).unwrap();
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                scope.spawn(|| {
+                    let copy = source.clone();
+                    assert_eq!(copy.as_bytes(), source.as_bytes());
+                    assert_eq!(copy.as_bytes().as_ptr() as usize, pointer);
+                    assert_eq!(
+                        copy.workbook().unwrap().as_bytes(),
+                        source.workbook().unwrap().as_bytes()
+                    );
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    });
+    let recovered = source.finish().into_bytes();
+    assert_eq!(recovered.as_ptr() as usize, pointer);
 }

@@ -1,9 +1,7 @@
 //! Same-parent sequence publication without transplanting inherited context.
 
-use super::{
-    MAX_EDITS, MAX_OWNED_XML_BYTES, OwnedXmlPart, invalid_source, owned_offset, validate_source_xml,
-};
-use crate::{OpcError, ReadLimits, Result};
+use super::{MAX_EDITS, OwnedXmlPart, invalid_source, owned_offset, validate_source_xml};
+use crate::{OpcError, Result};
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::{fmt, ops::Range, sync::Arc};
@@ -44,7 +42,7 @@ impl OwnedXmlPart {
         children: &[OwnedChildElement<'_>],
         max_output_bytes: usize,
     ) -> Result<Self> {
-        let maximum = max_output_bytes.min(MAX_OWNED_XML_BYTES);
+        let maximum = self.max_output_bytes(max_output_bytes);
         if selected_tags.len() > MAX_EDITS || children.len() > MAX_EDITS {
             return Err(invalid_source("too many owned XML child elements"));
         }
@@ -170,7 +168,7 @@ impl OwnedXmlPart {
                         part: self.name.to_string(),
                         source,
                     })?;
-                    validate_source_xml(&self.name, bytes, ReadLimits::default(), None)?;
+                    validate_source_xml(&self.name, bytes, self.limits, None)?;
                     bytes.len()
                 },
             };
@@ -186,6 +184,7 @@ impl OwnedXmlPart {
         if size > maximum {
             return Err(invalid_source("owned XML child output exceeds limit"));
         }
+        Self::check_capture_bytes(size, self.limits)?;
         if children.len() == bounds.len()
             && children.iter().enumerate().all(
                 |(index, child)| matches!(child, OwnedChildElement::Retained(old) if *old == index),
@@ -231,11 +230,12 @@ impl OwnedXmlPart {
             bytes.push(b'>');
         }
         bytes.extend_from_slice(&self.bytes[cursor..]);
-        validate_source_xml(&self.name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, self.limits, None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
             bytes: Arc::new(bytes),
+            limits: self.limits,
         })
     }
 }

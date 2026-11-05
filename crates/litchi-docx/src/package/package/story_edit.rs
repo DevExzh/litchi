@@ -5,7 +5,8 @@ use super::super::story::{
     StoryHyperlinkTextReplacement, StoryInventory, StoryKind, StoryLimits, capture,
 };
 use crate::document::{
-    HyperlinkTextReplacement, Refusal, Snapshot, TransactionError, TransactionResult,
+    Error as TransactionError, HyperlinkTextReplacement, Refusal, Result as TransactionResult,
+    Snapshot,
 };
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::PackURI;
@@ -43,14 +44,14 @@ impl Package {
     /// Returns a typed document transaction error when a selector is
     /// ambiguous, a story is not an editable main/header/footer story, a leaf
     /// cannot be represented safely, or candidate package validation fails.
-    pub fn replace_story_hyperlink_texts(
+    pub(crate) fn replace_story_hyperlink_texts(
         &mut self,
         replacements: &[StoryHyperlinkTextReplacement],
     ) -> TransactionResult<StoryInventory> {
         validate_replacements(replacements)?;
         let limits = StoryLimits::default();
         let inventory = self
-            .story_inventory_with_limits(limits)
+            .story_inventory_bounded(limits)
             .map_err(TransactionError::from)?;
         let mut grouped = BTreeMap::<&str, Vec<HyperlinkTextReplacement>>::new();
         for replacement in replacements {
@@ -143,9 +144,9 @@ fn validate_replacements(replacements: &[StoryHyperlinkTextReplacement]) -> Tran
     if replacements.is_empty() || replacements.len() > MAX_STORY_HYPERLINK_REPLACEMENTS {
         return if replacements.len() > MAX_STORY_HYPERLINK_REPLACEMENTS {
             Err(TransactionError::Limit {
-                resource: "story hyperlink replacements",
-                max: MAX_STORY_HYPERLINK_REPLACEMENTS,
-                actual: replacements.len(),
+                kind: crate::document::LimitKind::StoryHyperlinkReplacements,
+                maximum: MAX_STORY_HYPERLINK_REPLACEMENTS,
+                observed: replacements.len(),
             })
         } else {
             Err(TransactionError::Refused {
@@ -415,7 +416,7 @@ mod tests {
                 "rBodyLink".to_owned(),
                 true,
             );
-        package.mutable_doc = None;
+
         package
     }
 

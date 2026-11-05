@@ -206,7 +206,7 @@ impl SlideShowSettings {
     /// cannot be re-parsed exactly.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical SlideShowDocInfoAtom did not consume its bytes");
         }
@@ -431,11 +431,15 @@ mod tests {
         for (offset, replacement) in [(0, 0u8), (8 + 3, 0x08), (8 + 77, 0x02)] {
             let mut hostile = bytes.clone();
             hostile[offset] = replacement;
-            let record = Record::parse(&hostile, 0).unwrap().0;
+            let record = Record::parse(&hostile, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0;
             assert!(SlideShowSettings::parse(&root(vec![record])).is_err());
         }
         bytes[8 + 8..8 + 10].copy_from_slice(&(-1i16).to_le_bytes());
-        let record = Record::parse(&bytes, 0).unwrap().0;
+        let record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(SlideShowSettings::parse(&root(vec![record])).is_err());
 
         let mut value = settings();

@@ -193,7 +193,7 @@ impl Inspection {
             .max(self.maximum_object_identifier);
         let source_seed = fingerprint(source_bytes, 0xcbf2_9ce4_8422_2325);
         for ordinal in 0..count {
-            identifier = identifier.checked_add(1).ok_or(Error::LimitExceeded {
+            identifier = identifier.checked_add(1).ok_or(Error::Limit {
                 kind: LimitKind::Objects,
                 observed: u64::MAX,
                 maximum: u64::MAX - 1,
@@ -473,7 +473,7 @@ fn map_error(error: RewriteError, path: Path) -> Error {
             amount,
         }
     } else if error.resource_limit().is_some() {
-        Error::LimitExceeded {
+        Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: u64::MAX - 1,

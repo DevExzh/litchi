@@ -5,6 +5,7 @@
 //! the composed artifact is reopened through the normal CFB parser before a
 //! sink can observe a byte.
 
+use crate::SharedOleFileLimits;
 use crate::consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM};
 use crate::file::{OleError, OleFile, ParsedOleIndex};
 use crate::shared::SharedOleFile;
@@ -361,7 +362,7 @@ impl OverlayOperationShape {
 impl PublishReport {
     /// Complete published artifact length.
     #[must_use]
-    pub const fn bytes(self) -> u64 {
+    pub const fn output_bytes(self) -> u64 {
         self.bytes
     }
 
@@ -515,6 +516,7 @@ pub(crate) struct SourceSnapshot {
     pub(crate) version: SourceVersion,
     pub(crate) length: u64,
     pub(crate) source_is_owned_immutable: bool,
+    pub(crate) limits: SharedOleFileLimits,
 }
 
 impl SourceSnapshot {
@@ -759,6 +761,7 @@ impl SharedOleFile {
             version: self.expected_version,
             length: self.index.file_size,
             source_is_owned_immutable: self.source_is_owned_immutable,
+            limits: self.limits,
         }
     }
 
@@ -932,6 +935,137 @@ impl ValidatedOverlayPlan {
     #[must_use]
     pub const fn target_fingerprint(&self) -> ArtifactFingerprint {
         self.target_fingerprint
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn source_limits_for_test(&self) -> SharedOleFileLimits {
+        self.source.limits
+    }
+
+    /// Rebind this checked overlay to an independently opened source with the
+    /// same complete artifact content. The physical spans and their target
+    /// fingerprint remain valid because the recipient bytes are authenticated
+    /// before the plan is returned.
+    pub fn rebase_to(&self, recipient: &SharedOleFile) -> Result<Self, OverlayError> {
+        recipient.check_source_version()?;
+        let source = recipient.plan_source_snapshot();
+        source.ensure_length()?;
+        if source.length != self.source.length {
+            return Err(unavailable(
+                "overlay recipient length differs from the recorded source",
+            ));
+        }
+        let (source_fingerprint, target_fingerprint) = fingerprints(&source, &self.spans)?;
+        if source_fingerprint != self.source_fingerprint {
+            return Err(OverlayError::SourceFingerprintChanged {
+                expected: self.source_fingerprint,
+                observed: source_fingerprint,
+            });
+        }
+        if target_fingerprint != self.target_fingerprint {
+            return Err(OverlayError::TargetFingerprintChanged {
+                expected: self.target_fingerprint,
+                observed: target_fingerprint,
+            });
+        }
+        if !source.source_is_owned_immutable {
+            let (observed_source, observed_target) = fingerprints(&source, &self.spans)?;
+            if observed_source != source_fingerprint {
+                return Err(OverlayError::SourceFingerprintChanged {
+                    expected: source_fingerprint,
+                    observed: observed_source,
+                });
+            }
+            if observed_target != target_fingerprint {
+                return Err(OverlayError::TargetFingerprintChanged {
+                    expected: target_fingerprint,
+                    observed: observed_target,
+                });
+            }
+        }
+        Ok(Self {
+            source,
+            spans: self.spans.clone(),
+            source_fingerprint,
+            target_fingerprint,
+        })
+    }
+
+    /// Build the exact inverse overlay on an independently opened target.
+    /// Original bytes are retained only for the changed physical spans, so
+    /// inverse replay does not materialize either complete workbook.
+    pub fn inverse_rebased_to(&self, recipient: &SharedOleFile) -> Result<Self, OverlayError> {
+        self.preflight_fingerprints()?;
+        let mut inverse_spans = Vec::new();
+        inverse_spans
+            .try_reserve_exact(self.spans.len())
+            .map_err(|source| OverlayError::Allocation {
+                resource: "CFB inverse overlay spans",
+                source,
+            })?;
+        for span in &self.spans {
+            let length = span.len();
+            let mut original = Vec::new();
+            original
+                .try_reserve_exact(length)
+                .map_err(|source| OverlayError::Allocation {
+                    resource: "CFB inverse overlay bytes",
+                    source,
+                })?;
+            original.resize(length, 0);
+            self.source.read_exact(span.offset, &mut original)?;
+            inverse_spans.push(PhysicalSpan {
+                offset: span.offset,
+                replacement: Arc::from(original.into_boxed_slice()),
+                replacement_range: 0..length,
+            });
+        }
+        if !self.source.source_is_owned_immutable {
+            self.preflight_fingerprints()?;
+        }
+
+        recipient.check_source_version()?;
+        let source = recipient.plan_source_snapshot();
+        source.ensure_length()?;
+        if source.length != self.source.length {
+            return Err(unavailable(
+                "overlay inverse recipient length differs from the recorded target",
+            ));
+        }
+        let (source_fingerprint, target_fingerprint) = fingerprints(&source, &inverse_spans)?;
+        if source_fingerprint != self.target_fingerprint {
+            return Err(OverlayError::SourceFingerprintChanged {
+                expected: self.target_fingerprint,
+                observed: source_fingerprint,
+            });
+        }
+        if target_fingerprint != self.source_fingerprint {
+            return Err(OverlayError::TargetFingerprintChanged {
+                expected: self.source_fingerprint,
+                observed: target_fingerprint,
+            });
+        }
+        if !source.source_is_owned_immutable {
+            let (observed_source, observed_target) = fingerprints(&source, &inverse_spans)?;
+            if observed_source != source_fingerprint {
+                return Err(OverlayError::SourceFingerprintChanged {
+                    expected: source_fingerprint,
+                    observed: observed_source,
+                });
+            }
+            if observed_target != target_fingerprint {
+                return Err(OverlayError::TargetFingerprintChanged {
+                    expected: target_fingerprint,
+                    observed: observed_target,
+                });
+            }
+        }
+        Ok(Self {
+            source,
+            spans: inverse_spans,
+            source_fingerprint,
+            target_fingerprint,
+        })
     }
 
     /// Returns a checked, read-only positional view of the composed target.
@@ -1191,7 +1325,7 @@ fn empty_splice_identity(source: &SourceSnapshot) -> Result<ArtifactFingerprint,
     // ADR 0003's proof that the composed candidate parses. It is retained for
     // the empty splice list too, because it is the only observation that
     // re-reads the CFB index against the bytes the scan above covered.
-    SharedOleFile::open(candidate).map_err(OverlayError::from)?;
+    SharedOleFile::open(candidate, source.limits).map_err(OverlayError::from)?;
     Ok(source_fingerprint)
 }
 
@@ -1228,7 +1362,7 @@ where
         target_fingerprint,
     ));
     let candidate_source: Arc<dyn ReadAt> = view.clone();
-    let candidate = SharedOleFile::open(candidate_source)
+    let candidate = SharedOleFile::open(candidate_source, source.limits)
         .map_err(OverlayError::from)
         .map_err(E::from)?;
     // Bracket caller-specific preconditions with complete fingerprints. This
@@ -1504,7 +1638,7 @@ fn validate_composed_artifact(
 ) -> Result<(), OverlayError> {
     source.ensure_length()?;
     let cursor = OverlayCursor::new(source, spans);
-    let mut candidate = OleFile::open(cursor)?;
+    let mut candidate = OleFile::open(cursor, source.limits.to_ole_file_limits()?)?;
     source.ensure_length()?;
     for selection in selections {
         let refs = path_refs(&selection.path)?;

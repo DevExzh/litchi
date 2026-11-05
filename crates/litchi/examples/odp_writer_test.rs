@@ -295,7 +295,7 @@ fn main() -> Result<()> {
 
     // Save the presentation
     println!("💾 Saving presentation to: {}", output_file);
-    builder.save(output_file)?;
+    builder.build()?.save(output_file)?;
 
     println!("✅ Presentation saved successfully!");
     println!("\n📊 Presentation Contents:");

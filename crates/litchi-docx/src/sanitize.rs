@@ -205,11 +205,191 @@ impl RelationshipState {
     pub(crate) const fn is_external(&self) -> bool {
         self.external
     }
+
+    fn from_raw(value: raw::Relationship) -> Self {
+        Self::new(
+            value.id,
+            value.relationship_type,
+            value.target,
+            value.external,
+        )
+    }
+
+    fn raw(&self) -> raw::Relationship {
+        raw::Relationship::new(
+            self.id.clone(),
+            self.relationship_type.clone(),
+            self.target.clone(),
+            self.external,
+        )
+    }
+}
+
+/// Standalone bounded XML codec types.
+pub mod raw {
+    use super::{Limits, Patch, Result, Snapshot};
+
+    /// One relationship record in a standalone raw XML closure.
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct Relationship {
+        pub(super) id: String,
+        pub(super) relationship_type: String,
+        pub(super) target: String,
+        pub(super) external: bool,
+    }
+
+    impl Relationship {
+        /// Construct a relationship record for a raw XML closure.
+        #[must_use]
+        pub fn new(
+            id: impl Into<String>,
+            relationship_type: impl Into<String>,
+            target: impl Into<String>,
+            external: bool,
+        ) -> Self {
+            Self {
+                id: id.into(),
+                relationship_type: relationship_type.into(),
+                target: target.into(),
+                external,
+            }
+        }
+
+        /// Relationship identifier.
+        #[must_use]
+        pub fn id(&self) -> &str {
+            &self.id
+        }
+
+        /// Relationship type URI.
+        #[must_use]
+        pub fn relationship_type(&self) -> &str {
+            &self.relationship_type
+        }
+
+        /// Relationship target.
+        #[must_use]
+        pub fn target(&self) -> &str {
+            &self.target
+        }
+
+        /// Whether the relationship target is external.
+        #[must_use]
+        pub const fn is_external(&self) -> bool {
+            self.external
+        }
+    }
+
+    impl std::fmt::Debug for Relationship {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Relationship")
+                .field("id_bytes", &self.id.len())
+                .field("relationship_type_bytes", &self.relationship_type.len())
+                .field("target_bytes", &self.target.len())
+                .field("external", &self.external)
+                .finish_non_exhaustive()
+        }
+    }
+
+    /// Mutable bounded codec for standalone main-document wrapper detachment.
+    ///
+    /// The codec owns the current XML closure and relationship records. It is
+    /// intentionally separate from the source-backed package owner: callers
+    /// that have a package should use `source_backed::Package::edit_external_
+    /// hyperlink_detachment` so the package topology and source identity are
+    /// retained by the canonical family.
+    #[derive(Clone)]
+    pub struct Codec {
+        snapshot: Snapshot,
+    }
+
+    impl std::fmt::Debug for Codec {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Codec")
+                .field("xml_bytes", &self.snapshot.xml.len())
+                .field(
+                    "external_hyperlinks",
+                    &self.snapshot.external_hyperlink_count(),
+                )
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl Codec {
+        /// Parse an owned XML closure under the required finite policy.
+        pub fn from_xml(
+            xml: Vec<u8>,
+            relationships: Vec<Relationship>,
+            limits: Limits,
+        ) -> Result<Self> {
+            Ok(Self {
+                snapshot: Snapshot::from_xml(xml, relationships, limits)?,
+            })
+        }
+
+        /// Adopt a parsed snapshot under an explicitly repeated policy.
+        pub fn from_snapshot(snapshot: Snapshot, limits: Limits) -> Result<Self> {
+            if snapshot.limits != limits {
+                return Err(super::invalid(
+                    "raw sanitizer limits do not match the snapshot",
+                ));
+            }
+            Ok(Self { snapshot })
+        }
+
+        /// Borrow the current read-only XML projection.
+        #[must_use]
+        pub const fn snapshot(&self) -> &Snapshot {
+            &self.snapshot
+        }
+
+        /// Borrow the current XML bytes.
+        #[must_use]
+        pub fn xml_bytes(&self) -> &[u8] {
+            self.snapshot.xml_bytes()
+        }
+
+        /// Return the current relationship records.
+        #[must_use]
+        pub fn relationships(&self) -> Vec<Relationship> {
+            self.snapshot
+                .relationships
+                .iter()
+                .map(super::RelationshipState::raw)
+                .collect()
+        }
+
+        /// Apply the detach-all operation to the owned raw state.
+        pub fn detach(&mut self) -> Result<Patch> {
+            let patch = self.snapshot.plan().apply()?;
+            self.snapshot = patch.apply(&self.snapshot)?;
+            Ok(patch)
+        }
+
+        /// Apply a reversible raw patch to the current owned state.
+        pub fn apply(&mut self, patch: &Patch) -> Result<()> {
+            self.snapshot = patch.apply(&self.snapshot)?;
+            Ok(())
+        }
+    }
+}
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("xml_bytes", &self.xml.len())
+            .field("external_hyperlinks", &self.external_hyperlink_count())
+            .field("relationships", &self.relationships.len())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Immutable exact-source snapshot for external relationship-backed wrapper
 /// detachment in the main document.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Snapshot {
     xml: Arc<Vec<u8>>,
     relationships: Arc<Vec<RelationshipState>>,
@@ -226,6 +406,24 @@ impl Snapshot {
     ) -> Result<Self> {
         relationships.sort_unstable_by(|left, right| left.id.cmp(&right.id));
         Self::parse(xml, Arc::new(relationships), limits)
+    }
+
+    /// Parse a standalone main-document XML closure with its relationship
+    /// records under an explicit bounded policy.
+    ///
+    /// This is the raw codec ingress. Source-backed callers should use the
+    /// package snapshot methods so source identity and package topology remain
+    /// attached to the operation.
+    pub fn from_xml(
+        xml: Vec<u8>,
+        relationships: Vec<raw::Relationship>,
+        limits: Limits,
+    ) -> Result<Self> {
+        let relationships = relationships
+            .into_iter()
+            .map(RelationshipState::from_raw)
+            .collect();
+        Self::from_source(Arc::new(xml), relationships, limits)
     }
 
     fn parse(
@@ -290,7 +488,7 @@ impl Snapshot {
 
 /// A non-mutating plan for explicitly detaching external relationship-backed
 /// hyperlink wrappers from the main document.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SanitizePlan {
     source: Snapshot,
 }
@@ -309,17 +507,13 @@ impl SanitizePlan {
     ///
     /// Returns an error if the surgical result does not parse, retain visible
     /// text, or remove exactly the selected wrappers.
-    pub fn apply(self) -> Result<Commit> {
+    pub fn apply(self) -> Result<Patch> {
         if self.source.wrappers.is_empty() {
-            return Ok(Commit {
-                snapshot: self.source.clone(),
-                patch: Patch {
-                    before_xml: Arc::clone(&self.source.xml),
-                    after_xml: Arc::clone(&self.source.xml),
-                    relationships: Arc::clone(&self.source.relationships),
-                    limits: self.source.limits,
-                    report: self.source.report,
-                },
+            return Ok(Patch {
+                before_xml: Arc::clone(&self.source.xml),
+                after_xml: Arc::clone(&self.source.xml),
+                relationships: Arc::clone(&self.source.relationships),
+                limits: self.source.limits,
                 report: self.source.report,
             });
         }
@@ -343,57 +537,28 @@ impl SanitizePlan {
             ));
         }
         let report = self.source.report;
-        Ok(Commit {
-            patch: Patch {
-                before_xml: Arc::clone(&self.source.xml),
-                after_xml: Arc::clone(&snapshot.xml),
-                relationships: Arc::clone(&self.source.relationships),
-                limits: self.source.limits,
-                report,
-            },
-            snapshot,
+        Ok(Patch {
+            before_xml: Arc::clone(&self.source.xml),
+            after_xml: Arc::clone(&snapshot.xml),
+            relationships: Arc::clone(&self.source.relationships),
+            limits: self.source.limits,
             report,
         })
     }
 }
 
-/// A successful external main-document hyperlink-wrapper detachment result.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    report: EffectReport,
-}
-
-impl Commit {
-    /// Borrow the main-document snapshot after wrapper detachment.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Return the deterministic effects applied by this commit.
-    #[must_use]
-    pub const fn effect_report(&self) -> EffectReport {
-        self.report
-    }
-
-    /// Move the snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+impl std::fmt::Debug for SanitizePlan {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SanitizePlan")
+            .field("effect_report", &self.effect_report())
+            .finish_non_exhaustive()
     }
 }
 
 /// An exact-source-checked reversible patch for external main-document
 /// hyperlink-wrapper detachment.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Patch {
     before_xml: Arc<Vec<u8>>,
     after_xml: Arc<Vec<u8>>,
@@ -443,7 +608,10 @@ impl Patch {
         if source.xml.as_ref() != self.before_xml.as_ref()
             || source.relationships.as_ref() != self.relationships.as_ref()
         {
-            return Err(Error::ExternalHyperlinkDetachmentConflict);
+            return Err(Error::conflict(
+                "external_hyperlink_detachment",
+                "the patch base does not match the supplied source",
+            ));
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -454,9 +622,15 @@ impl Patch {
             self.limits,
         )
     }
+}
 
-    pub(crate) const fn limits(&self) -> Limits {
-        self.limits
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("noop", &self.is_noop())
+            .field("effect_report", &self.effect_report())
+            .finish_non_exhaustive()
     }
 }
 
@@ -504,7 +678,7 @@ fn scan_with_root(
 ) -> Result<(Vec<Wrapper>, EffectReport)> {
     if xml.len() > limits.max_document_bytes {
         return Err(limit(
-            "main-document XML bytes",
+            LimitKind::MainDocumentXmlBytes,
             limits.max_document_bytes,
             xml.len(),
         ));
@@ -539,7 +713,11 @@ fn scan_with_root(
                     .checked_add(1)
                     .ok_or_else(|| invalid("main-document XML depth overflows usize"))?;
                 if depth > limits.max_depth {
-                    return Err(limit("main-document XML depth", limits.max_depth, depth));
+                    return Err(limit(
+                        LimitKind::MainDocumentXmlDepth,
+                        limits.max_depth,
+                        depth,
+                    ));
                 }
                 validate_root(&namespace, &element, depth, &mut roots, expected_root)?;
                 if is_hyperlink(&namespace, element.local_name().as_ref()) {
@@ -565,7 +743,7 @@ fn scan_with_root(
                     .ok_or_else(|| invalid("main-document XML depth overflows usize"))?;
                 if child_depth > limits.max_depth {
                     return Err(limit(
-                        "main-document XML depth",
+                        LimitKind::MainDocumentXmlDepth,
                         limits.max_depth,
                         child_depth,
                     ));
@@ -746,19 +924,15 @@ fn external_relationship_id(
         .binary_search_by(|candidate| candidate.id.as_str().cmp(&id))
         .ok()
         .map(|index| &relationships[index])
-        .ok_or_else(|| {
-            invalid(format!(
-                "WordprocessingML hyperlink references missing relationship '{id}'"
-            ))
-        })?;
+        .ok_or_else(|| invalid("WordprocessingML hyperlink references a missing relationship"))?;
     if !matches!(
         relationship.relationship_type.as_str(),
         litchi_opc::constants::relationship_type::HYPERLINK
             | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
     ) {
-        return Err(invalid(format!(
-            "WordprocessingML hyperlink relationship '{id}' has the wrong type"
-        )));
+        return Err(invalid(
+            "WordprocessingML hyperlink relationship has an unsupported type",
+        ));
     }
     if !relationship.external {
         return Ok(None);
@@ -820,11 +994,11 @@ fn validate_removable_wrapper_attributes(
 }
 
 fn unsafe_wrapper_attribute(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "external_hyperlink_wrapper_detachment",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "external_hyperlink_wrapper_detachment",
         reason,
-    }
+    )
 }
 
 fn is_relationships_namespace(namespace: &ResolveResult<'_>) -> bool {
@@ -841,7 +1015,7 @@ fn add_element(current: usize, limits: Limits) -> Result<usize> {
         .ok_or_else(|| invalid("main-document element counter overflows usize"))?;
     if next > limits.max_elements {
         return Err(limit(
-            "main-document XML elements",
+            LimitKind::MainDocumentXmlElements,
             limits.max_elements,
             next,
         ));
@@ -852,7 +1026,7 @@ fn add_element(current: usize, limits: Limits) -> Result<usize> {
 fn push_wrapper(wrappers: &mut Vec<Wrapper>, wrapper: Wrapper, limits: Limits) -> Result<()> {
     if wrappers.len() >= limits.max_external_hyperlinks {
         return Err(limit(
-            "external hyperlinks",
+            LimitKind::ExternalHyperlinks,
             limits.max_external_hyperlinks,
             wrappers.len().saturating_add(1),
         ));
@@ -941,10 +1115,46 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn limit(resource: &'static str, maximum: usize, actual: usize) -> Error {
+fn limit(resource: LimitKind, maximum: usize, actual: usize) -> Error {
     Error::ExternalHyperlinkDetachmentLimit {
-        resource,
+        kind: resource,
         maximum,
         actual,
+    }
+}
+
+/// The bounded resources of external-hyperlink detachment, carried by [`crate::Error::ExternalHyperlinkDetachmentLimit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// External hyperlinks.
+    ExternalHyperlinks,
+    /// Main-document XML bytes.
+    MainDocumentXmlBytes,
+    /// Main-document XML depth.
+    MainDocumentXmlDepth,
+    /// Main-document XML elements.
+    MainDocumentXmlElements,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ExternalHyperlinks => "external hyperlinks",
+            Self::MainDocumentXmlBytes => "main-document XML bytes",
+            Self::MainDocumentXmlDepth => "main-document XML depth",
+            Self::MainDocumentXmlElements => "main-document XML elements",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }

@@ -42,11 +42,11 @@ use super::super::{codec, package};
 
 /// Transaction-scoped worksheet-grid-default editor.
 #[derive(Debug)]
-pub struct DefaultsEdit<'a> {
+pub struct Defaults<'a> {
     pub(super) action: &'a mut Option<DefaultsAction>,
 }
 
-impl DefaultsEdit<'_> {
+impl Defaults<'_> {
     fn action(&mut self) -> &mut DefaultsAction {
         self.action.get_or_insert_default()
     }
@@ -143,13 +143,13 @@ impl DefaultsEdit<'_> {
 
 /// Transaction-scoped editor for one checked worksheet row.
 #[derive(Debug)]
-pub struct RowEdit<'a> {
+pub struct Row<'a> {
     pub(super) actions: &'a mut BTreeMap<RowIndex, RowAction>,
     pub(super) style_lineage: &'a Arc<StyleLineage>,
     pub(super) row: RowIndex,
 }
 
-impl RowEdit<'_> {
+impl Row<'_> {
     fn action(&mut self) -> &mut RowAction {
         self.actions.entry(self.row).or_default()
     }
@@ -271,13 +271,13 @@ impl RowEdit<'_> {
 
 /// Transaction-scoped editor for one checked worksheet column.
 #[derive(Debug)]
-pub struct ColumnEdit<'a> {
+pub struct Column<'a> {
     pub(super) actions: &'a mut BTreeMap<ColumnIndex, ColumnAction>,
     pub(super) style_lineage: &'a Arc<StyleLineage>,
     pub(super) column: ColumnIndex,
 }
 
-impl ColumnEdit<'_> {
+impl Column<'_> {
     fn action(&mut self) -> &mut ColumnAction {
         self.actions.entry(self.column).or_default()
     }

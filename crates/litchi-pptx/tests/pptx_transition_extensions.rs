@@ -14,7 +14,12 @@ const PRESENTATIONML_NAMESPACE: &str = "http://schemas.openxmlformats.org/presen
 #[test]
 fn transition_reader_uses_the_local_powerpoint_2010_choice() {
     let fragment = std::str::from_utf8(LOCAL_P14_RIPPLE).unwrap();
-    let transition = read(slide_xml(fragment).as_bytes()).unwrap().unwrap();
+    let transition = read(
+        slide_xml(fragment).as_bytes(),
+        litchi_pptx::transition::Limits::DEFAULT,
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(transition.speed(), Speed::Slow);
     assert_eq!(transition.duration().map(Ms::get), Some(1500));
     assert!(!transition.click());
@@ -32,7 +37,12 @@ fn transition_reader_keeps_invalid_powerpoint_2010_ripple_direction_raw() {
 
     // The out-of-domain token degrades the effect to a raw effect and is
     // recorded (leniency audit finding 6.6); the transition's timing reads.
-    let transition = read(slide_xml(&invalid).as_bytes()).unwrap().unwrap();
+    let transition = read(
+        slide_xml(&invalid).as_bytes(),
+        litchi_pptx::transition::Limits::DEFAULT,
+    )
+    .unwrap()
+    .unwrap();
     assert!(matches!(transition.kind(), Kind::Raw(raw) if raw.xml().contains("not-a-direction")));
     assert_eq!(transition.after().map(Ms::get), Some(4250));
     assert_eq!(
@@ -47,7 +57,10 @@ fn transition_reader_keeps_invalid_powerpoint_2010_ripple_direction_raw() {
         )]
     );
     assert!(!matches!(
-        read(slide_xml(&invalid).as_bytes()),
+        read(
+            slide_xml(&invalid).as_bytes(),
+            litchi_pptx::transition::Limits::DEFAULT
+        ),
         Err(Error::Invalid(_))
     ));
 }
@@ -59,15 +72,18 @@ fn transition_writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
         .with_duration(Ms::new(1500).unwrap())
         .with_click(false)
         .with_after(Ms::new(4250).unwrap());
-    let xml = write(&expected).unwrap();
+    let xml = write(&expected, litchi_pptx::transition::Limits::DEFAULT).unwrap();
     assert!(xml.contains("<mc:AlternateContent"));
     assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
     assert!(xml.contains("<p:fade/>"));
     assert!(
-        read(slide_xml(&xml).as_bytes())
-            .unwrap()
-            .unwrap()
-            .same_semantics(&expected)
+        read(
+            slide_xml(&xml).as_bytes(),
+            litchi_pptx::transition::Limits::DEFAULT
+        )
+        .unwrap()
+        .unwrap()
+        .same_semantics(&expected)
     );
 }
 
@@ -78,14 +94,17 @@ fn transition_writer_round_trips_custom_duration_through_compatibility_markup() 
         .with_duration(Ms::new(750).unwrap())
         .with_click(false)
         .with_after(Ms::new(1250).unwrap());
-    let xml = write(&expected).unwrap();
+    let xml = write(&expected, litchi_pptx::transition::Limits::DEFAULT).unwrap();
     assert!(xml.contains(r#"p14:dur="750""#));
     assert!(xml.contains("<mc:Fallback>"));
     assert!(
-        read(slide_xml(&xml).as_bytes())
-            .unwrap()
-            .unwrap()
-            .same_semantics(&expected)
+        read(
+            slide_xml(&xml).as_bytes(),
+            litchi_pptx::transition::Limits::DEFAULT
+        )
+        .unwrap()
+        .unwrap()
+        .same_semantics(&expected)
     );
 }
 

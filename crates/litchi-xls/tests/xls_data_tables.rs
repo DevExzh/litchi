@@ -1,8 +1,8 @@
 //! Round-trip tests for the BIFF8 Table record (what-if data tables).
 
 use litchi_core::sheet::Cell;
-use litchi_xls::writer::Writer;
-use litchi_xls::{DataTable, DataTableInputCell, DataTableKind, DataTableRange, Workbook};
+use litchi_xls::writer::Builder;
+use litchi_xls::{DataTable, DataTableInputCell, DataTableKind, DataTableRange, raw::Reader};
 use std::io::Cursor;
 
 #[test]
@@ -19,15 +19,15 @@ fn data_tables_round_trip_through_writer_and_reader() {
     );
     two_variable.set_always_calc(true);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Tables").unwrap();
     writer.write_number(sheet, 3, 3, 1.5).unwrap();
     writer.add_data_table(sheet, 1, 2, one_variable).unwrap();
     writer.add_data_table(sheet, 1, 6, two_variable).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let tables = worksheet.data_tables();
     assert_eq!(tables, &[one_variable, two_variable]);
@@ -49,7 +49,7 @@ fn data_table_anchor_validation() {
     let table =
         DataTable::one_variable(range, false, DataTableInputCell::Present { row: 0, col: 0 });
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Tables").unwrap();
     // Anchor inside the range.
     assert!(writer.add_data_table(sheet, 4, 4, table).is_err());

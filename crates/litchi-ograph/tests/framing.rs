@@ -19,7 +19,7 @@ fn bof() -> [u8; 16] {
 }
 
 fn chart_bytes() -> Vec<u8> {
-    let mut output = Encoder::new();
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     output.push(BOF, &bof()).expect("BOF");
     output.push(UNKNOWN, &[0xAA, 0xBB]).expect("unknown");
     output.push(EOF, &[]).expect("EOF");
@@ -29,10 +29,11 @@ fn chart_bytes() -> Vec<u8> {
 #[test]
 fn canonical_frames_preserve_exact_bytes_and_offsets_through_ograph() {
     let bytes = chart_bytes();
-    let chart = chart::Ref::open(&bytes).expect("chart");
+    let chart = chart::Ref::open(&bytes, Limits::default()).expect("chart");
     assert_eq!(chart.kind(), ChartKind::Excel);
     let records = chart
         .records()
+        .expect("validated records")
         .map(|record| record.expect("valid BIFF record"))
         .collect::<Vec<_>>();
 
@@ -56,7 +57,7 @@ fn canonical_frames_preserve_exact_bytes_and_offsets_through_ograph() {
 #[test]
 fn malformed_frames_remain_typed_biff_errors_at_their_wire_offset() {
     let malformed = [0x09, 0x08, 0x04, 0x00, 0x01, 0x02];
-    let mut records = chart::Refs::with_limits(&malformed, Limits::default()).expect("scanner");
+    let mut records = chart::Refs::open_workbook(&malformed, Limits::default()).expect("scanner");
 
     assert!(matches!(
         records.next(),
@@ -80,28 +81,29 @@ fn biff_record_bounds_are_enforced_without_a_second_ograph_frame_policy() {
         },
         ..Limits::default()
     };
-    let mut records = chart::Refs::with_limits(&bytes, limits).expect("scanner");
+    let mut records = chart::Refs::open_workbook(&bytes, limits).expect("scanner");
 
     assert!(matches!(
         records.next(),
-        Some(Err(Error::Biff(BiffError::LimitExceeded {
-            resource: Resource::RecordCount,
+        Some(Err(Error::Limit {
+            kind: litchi_ograph::LimitKind::Biff(Resource::RecordCount),
             observed: 3,
             maximum: 2,
-        })))
+        }))
     ));
     assert!(records.next().is_none());
 }
 
 #[test]
 fn chart_context_still_rejects_non_chart_bofs_after_frame_validation() {
-    let mut output = Encoder::new();
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut payload = bof();
     payload[2..4].copy_from_slice(&0x0005_u16.to_le_bytes());
     output.push(BOF, &payload).expect("BOF");
     output.push(EOF, &[]).expect("EOF");
 
-    let error = chart::Book::open(output.finish()).expect_err("not a chart workbook");
+    let error =
+        chart::Book::open(output.finish(), Limits::default()).expect_err("not a chart workbook");
     assert!(matches!(
         error,
         Error::InvalidChart {

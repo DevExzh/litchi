@@ -33,14 +33,30 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_doc::embedded_object::{Info, Limits};
-use litchi_doc::writer::{Picture, Writer};
-use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, Package};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Target, Targets};
+use litchi_doc::builder::Builder;
+use litchi_doc::embedded_object::Info;
+use litchi_doc::writer::Picture;
+use litchi_doc::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions, Package, raw::Reader};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits as ObjectLimits, OpenOptions as ObjectOpenOptions,
+    Package as ObjectPackage, Target, Targets,
+};
 use std::io::Cursor;
 
 const MINIMAL_MTEF_HEX: &str =
     include_str!("../../../test-data/ole/doc/mtef/equation3-minimal.hex");
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: ObjectLimits,
+) -> Result<ObjectEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
 
 fn decode_hex_fixture() -> Vec<u8> {
     MINIMAL_MTEF_HEX
@@ -66,10 +82,10 @@ fn preview_png() -> Vec<u8> {
 }
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("native equation follows").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -79,7 +95,8 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     let equation = MtefEquation::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
     let preview = Picture::new(preview_png()).unwrap();
-    let mut editor = Editor::open(base_doc(), Limits::default()).unwrap();
+    let source = Package::from_bytes(&base_doc()).unwrap();
+    let mut editor = source.edit_embedded_objects().unwrap();
     let reference = editor
         .add_mtef_equation(MtefEquationWriteOptions::new(314_159, equation, preview))
         .unwrap();
@@ -93,9 +110,13 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .collect::<Vec<_>>(),
         vec![reference.storage_id]
     );
-    let bytes = editor.finish().unwrap();
+    let bytes = editor.commit().unwrap().patch().after_bytes().to_vec();
 
-    let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let storage = ole
         .list_directory_entries(&["ObjectPool"])
         .unwrap()
@@ -110,7 +131,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
 
     let target = Target::new("_314159", ["ObjectPool", "_314159"]).unwrap();
     let objects =
-        ObjectEditor::open(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
+        open_object(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
     let object = objects.objects().get("_314159").unwrap();
     assert_eq!(object.path(), ["ObjectPool", "_314159"]);
     assert_eq!(object.storage().clsid(), Some(storage.clsid.as_str()));
@@ -122,7 +143,11 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     assert!(descriptor.recompose_on_resize);
     assert!(descriptor.view_object);
     assert_eq!(descriptor.clipboard_format, 3);
-    let mut nested = OleFile::open(Cursor::new(object.compound())).unwrap();
+    let mut nested = OleFile::open(
+        Cursor::new(object.compound()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         nested.root_entry().unwrap().clsid,
         "0002CE02-0000-0000-C000-000000000046"
@@ -134,7 +159,10 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .equation_native()
     );
 
-    let reopened = Editor::open(bytes.clone(), Limits::default()).unwrap();
+    let reopened = Package::from_bytes(&bytes)
+        .unwrap()
+        .embedded_objects()
+        .unwrap();
     assert_eq!(
         reopened
             .objects()
@@ -144,7 +172,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .collect::<Vec<_>>(),
         vec![reference.storage_id]
     );
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().contains("native equation follows"));
     #[cfg(feature = "formula")]

@@ -9,7 +9,7 @@
 use litchi_core::Error;
 use litchi_odf_common::core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitResource as Resource, GeneratedXmlLimits,
-    GeneratedXmlReport, PackageWriter, PackageWriterError,
+    GeneratedXmlReport, PackageWriter, PackageWriterError, StreamingArchiveLimits,
 };
 use soapberry_zip::office::ArchiveReader;
 use std::cell::{Cell, RefCell};
@@ -42,7 +42,10 @@ fn publish(
     fragments: Vec<&[u8]>,
 ) -> Result<(Vec<u8>, GeneratedXmlReport), (PackageWriterError, u64, usize)> {
     let accepted = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(SharedSink(Rc::clone(&accepted)));
+    let mut writer = PackageWriter::with_writer(
+        SharedSink(Rc::clone(&accepted)),
+        StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype_streaming(MIME)
         .expect("fixed MIME preflight");
@@ -145,7 +148,11 @@ fn assert_shell_exact_and_under(
     assert!(exact > 0, "all shell dimensions in this test are nonzero");
     let successful = publish(prefix, suffix, narrowed(resource, exact), 1, Vec::new())
         .expect("inclusive shell limit");
-    let archive = ArchiveReader::new(&successful.0).unwrap();
+    let archive = ArchiveReader::new(
+        &successful.0,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         archive.read("content.xml").unwrap(),
         shell_bytes(prefix, suffix)
@@ -232,7 +239,11 @@ fn composed_fragment_aggregate_limits_are_inclusive_and_one_under() {
         )
         .expect("inclusive composed aggregate limit");
         assert_eq!(successful.1, report);
-        let archive = ArchiveReader::new(&successful.0).unwrap();
+        let archive = ArchiveReader::new(
+            &successful.0,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let expected = [PREFIX, FRAGMENT_A, FRAGMENT_B, SUFFIX].concat();
         assert_eq!(archive.read("content.xml").unwrap(), expected);
 
@@ -263,7 +274,11 @@ fn token_limit_is_checked_per_fragment_even_when_aggregate_limits_allow_it() {
         vec![fragment],
     )
     .expect("inclusive fragment token limit");
-    let archive = ArchiveReader::new(&successful.0).unwrap();
+    let archive = ArchiveReader::new(
+        &successful.0,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let expected = [PREFIX, fragment, SUFFIX].concat();
     assert_eq!(archive.read("content.xml").unwrap(), expected);
 

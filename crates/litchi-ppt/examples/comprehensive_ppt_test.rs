@@ -10,23 +10,26 @@
 //!
 //! Run with: cargo run --example `comprehensive_ppt_test`
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive PPT Writer Test ===\n");
 
     // Create a widescreen presentation (16:9)
-    let mut writer = Writer::new_widescreen();
+    let mut writer = Builder::new_widescreen();
 
     // ============================================================
     // PRESENTATION PROPERTIES
     // ============================================================
     println!("Setting presentation properties...");
-    writer.set_property("Title", "Comprehensive PPT Format Test");
-    writer.set_property("Author", "Litchi Library");
-    writer.set_property("Subject", "Testing all PPT writing features");
-    writer.set_property("Company", "Litchi Project");
-    writer.set_property("Comments", "Generated to test PowerPoint 97-2003 format");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Comprehensive PPT Format Test".to_owned()),
+        author: Some("Litchi Library".to_owned()),
+        subject: Some("Testing all PPT writing features".to_owned()),
+        company: Some("Litchi Project".to_owned()),
+        description: Some("Generated to test PowerPoint 97-2003 format".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // ============================================================
     // SLIDE 1: TITLE SLIDE
@@ -533,7 +536,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nTotal slides created: {slide_count}");
 
     println!("\nSaving to comprehensive_test.ppt...");
-    writer.save("comprehensive_test.ppt")?;
+    writer.build()?.save("comprehensive_test.ppt")?;
 
     println!("\n✅ SUCCESS! PPT file created with:");
     println!("   ✓ {slide_count} slides");

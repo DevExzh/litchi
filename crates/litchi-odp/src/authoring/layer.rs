@@ -488,6 +488,10 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Unsupported(message.into()))
+fn unsupported<T>(reason: &'static str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.authoring.layer",
+        reason,
+    )))
 }

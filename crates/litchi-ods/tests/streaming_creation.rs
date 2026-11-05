@@ -23,7 +23,7 @@ use litchi_ods::streaming::{
     PublicationFailureKind, ScalarStreamReport, StreamingCell, StreamingError, StreamingLimits,
     XmlAuditLimits, stream_scalar_rows_to,
 };
-use litchi_ods::{CellValue, Spreadsheet};
+use litchi_ods::{CellValue, Package};
 use zip::ZipArchive;
 
 const ODS_MIME: &[u8] = b"application/vnd.oasis.opendocument.spreadsheet";
@@ -203,7 +203,10 @@ fn assert_three_member_archive(bytes: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
 }
 
 fn assert_reopens_with_expected_scalars(bytes: &[u8]) {
-    let spreadsheet = Spreadsheet::from_bytes(bytes.to_vec()).expect("streamed ODS reopens");
+    let spreadsheet = Package::from_bytes(bytes)
+        .expect("streamed ODS reopens")
+        .workbook()
+        .expect("streamed ODS reopens");
     assert_eq!(spreadsheet.sheet_count(), 1);
     let sheet = &spreadsheet.sheets()[0];
     assert_eq!(sheet.name, "Sheet1");
@@ -332,7 +335,10 @@ fn streams_empty_and_variable_rows_and_reopens_fixed_three_member_package() {
     assert_eq!(empty_report.rows(), 0);
     assert_eq!(empty_report.cells(), 0);
     assert_three_member_archive(&empty_output);
-    let empty_spreadsheet = Spreadsheet::from_bytes(empty_output).expect("empty ODS reopens");
+    let empty_spreadsheet = Package::from_bytes(&empty_output)
+        .expect("empty ODS reopens")
+        .workbook()
+        .expect("empty ODS reopens");
     assert_eq!(empty_spreadsheet.sheet_count(), 1);
     assert!(empty_spreadsheet.sheets()[0].rows.is_empty());
 
@@ -371,7 +377,10 @@ fn text_escaping_preserves_whitespace_unicode_and_single_decode_entities() {
     // a second-level `<`.
     let single_decode = vec![vec![StreamingCell::Text(Cow::Borrowed("&lt;"))]];
     let (output, _report) = control(&single_decode);
-    let spreadsheet = Spreadsheet::from_bytes(output).expect("single decode reopens");
+    let spreadsheet = Package::from_bytes(&output)
+        .expect("single decode reopens")
+        .workbook()
+        .expect("single decode reopens");
     assert_eq!(
         spreadsheet.sheets()[0].rows[0].cells[0].value,
         CellValue::Text("&lt;".to_owned())

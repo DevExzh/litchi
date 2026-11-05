@@ -1,0 +1,108 @@
+[package]
+name = "litchi-perf-baseline"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+# Consumer-only adapters for the paired RTF probe; neither feature changes the
+# historical litchi-rtf implementation.
+rtf-current-api = []
+rtf-legacy-api = []
+allocator-metrics = []
+ordinary-save-process-metrics = []
+xls-source-attribution = ["litchi/xls"]
+xlsb-crud = ["litchi/xlsb"]
+
+[[bin]]
+name = "litchi-perf-baseline-alloc"
+path = "src/bin/litchi-perf-baseline-alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsx_managed_compression_alloc"
+path = "src/bin/xlsx_managed_compression_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "docx_plain_paragraph_tail_append"
+path = "src/bin/docx_plain_paragraph_tail_append.rs"
+
+[[bin]]
+name = "docx_bounded_tail_append_compare"
+path = "src/bin/docx_bounded_tail_append_compare.rs"
+
+[[bin]]
+name = "docx_replayable_tail_append"
+path = "src/bin/docx_replayable_tail_append.rs"
+
+[[bin]]
+name = "xml_attribute_bounds"
+path = "src/bin/xml_attribute_bounds.rs"
+
+[[bin]]
+name = "attribute_checks"
+path = "src/bin/attribute_checks.rs"
+
+# Needs the changed library (record 0770): not built for the base.
+[[bin]]
+name = "attribute_checks_equivalence"
+path = "src/bin/attribute_checks_equivalence.rs"
+
+[[bin]]
+name = "ordinary_save_artifacts"
+path = "src/bin/ordinary_save_artifacts.rs"
+
+[[bin]]
+name = "xlsb_crud"
+path = "src/bin/xlsb_crud.rs"
+required-features = ["xlsb-crud"]
+
+[[bin]]
+name = "xlsb_synthetic_fixture"
+path = "src/bin/xlsb_synthetic_fixture.rs"
+required-features = ["xlsb-crud"]
+
+[[bin]]
+name = "xls_source_attribution"
+path = "src/bin/xls_source_attribution.rs"
+required-features = ["xls-source-attribution"]
+
+[dependencies]
+litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
+litchi-core = { path = "../../crates/litchi-core" }
+litchi-crypto = { path = "../../crates/litchi-crypto", features = ["ooxml"] }
+litchi-doc = { path = "../../crates/litchi-doc", features = ["performance-diagnostics"] }
+litchi-docx = { path = "../../crates/litchi-docx" }
+litchi-odf-common = { path = "../../crates/litchi-odf-common" }
+litchi-odraw = { path = "../../crates/litchi-odraw" }
+litchi-odp = { path = "../../crates/litchi-odp" }
+litchi-ods = { path = "../../crates/litchi-ods" }
+litchi-odt = { path = "../../crates/litchi-odt" }
+litchi-ole-common = { path = "../../crates/litchi-ole-common" }
+litchi-ooxml-common = { path = "../../crates/litchi-ooxml-common" }
+litchi-opc = { path = "../../crates/litchi-opc", features = ["sign", "performance-diagnostics"] }
+litchi-ops = { path = "../../crates/litchi-ops" }
+litchi = { path = "../../crates/litchi", features = ["doc", "docx", "ods", "odt", "odp", "ppt", "pptx", "rtf", "xlsx"] }
+litchi-ppt = { path = "../../crates/litchi-ppt" }
+litchi-pptx = { path = "../../crates/litchi-pptx" }
+litchi-rtf = { path = "../../crates/litchi-rtf" }
+litchi-sign = { path = "../../crates/litchi-sign" }
+litchi-xls = { path = "../../crates/litchi-xls" }
+litchi-xlsb = { path = "../../crates/litchi-xlsb" }
+litchi-xlsx = { path = "../../crates/litchi-xlsx" }
+xml-minifier = { path = "../../crates/xml-minifier" }
+quick-xml = "0.41"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../crates/soapberry-zip" }
+rustix = { version = "1.1.4", features = ["fs", "param"] }
+
+[lints.clippy]
+# The workspace `clippy.toml` disallows quick-xml's checked attribute iteration
+# for the library crates that opt in (record 0770); the harness measures and
+# cross-checks those crates and keeps quick-xml's own API.
+disallowed_methods = "allow"
+
+[workspace]

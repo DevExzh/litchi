@@ -1,0 +1,73 @@
+{
+  "source": "42b1c5a3c22deae4f8ca3b1d5a850ed5a13c1176",
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_check_api_glossary",
+        "tools.test_officecli_corpus",
+        "tools.test_officecli_capability_delta",
+        "tools.test_no_3rdparty_references",
+        "tools.test_check_crate_boundaries",
+        "tools.test_non_iwork_gate",
+        "tools.test_unified_bench_matrix",
+        "tools.test_check_iwork_leaf_public_api"
+      ],
+      "exit": 1,
+      "seconds": 33.9141493749994,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-0.log",
+      "bytes": 637664,
+      "sha256": "424e28aaaedd5944ca0392b491f3e214ff090a953435acfd541000f84fccc651"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit": 1,
+      "seconds": 279.41456936099894,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-1.log",
+      "bytes": 362,
+      "sha256": "6bb37b1e729b56bc4674f0278b61999efe6381c1a4ada79d2881e02cc864e5da"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/unified_bench_matrix.py",
+        "--check"
+      ],
+      "exit": 1,
+      "seconds": 0.2529503149999073,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-2.log",
+      "bytes": 3404,
+      "sha256": "b274428a863d4b15af28c3d9a76c092cbe14f2d7e583933050d837b85d5bb3a9"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/officecli_capability_delta.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.542485697000302,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-3.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/officecli_corpus.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 1.0569447120014956,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-4.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "note": "1334 tooling tests ran; one benchmark-matrix coverage failure. Crate-boundary checker found missing archive header field coverage and unclassified ops-to-zip edge. Matrix check failed; capability delta and corpus checks passed. These commands do not establish full corpus replay or native qualification."
+}

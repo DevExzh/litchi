@@ -12,7 +12,8 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
+use crate::cell_values::SheetChange;
+use crate::cell_values::test_editors::SourceBackedEditor;
 use crate::{Address, Error, Number, Value};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -204,7 +205,8 @@ fn package_with_sheet(sheet: &[u8]) -> Vec<u8> {
     let workbook_relationships = format!(
         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdSheet\" Type=\"{REL}/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>"
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content-types member");
@@ -251,11 +253,12 @@ fn assert_valid_noop(sheet: &[u8]) {
         .expect("cap fallback should accept valid worksheet")
         .commit()
         .expect("valid no-op commit");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .value(0, Address::from_a1("A1").expect("A1 address")),
         Some(&Value::Number(Number::new("1").expect("source number")))
     );
@@ -265,7 +268,10 @@ fn assert_valid_noop(sheet: &[u8]) {
 fn assert_rejected_with_retry(sheet: &[u8], expected: &str) {
     let (bytes, source, editor) = source_and_editor(sheet);
     for attempt in 0..2 {
-        assert_invalid(editor.edit_sheets(["Sheet1".into()]), expected);
+        let edit = editor
+            .edit_sheets(["Sheet1".into()])
+            .expect("source-backed entry remains lazy");
+        assert_invalid(edit.commit(), expected);
         assert_eq!(
             source.as_slice(),
             bytes.as_slice(),
@@ -510,17 +516,18 @@ fn eligible_small_source_uses_successful_value_edit_control() {
     let mut edit = editor
         .edit_sheets(["Sheet1".into()])
         .expect("eligible worksheet");
-    edit.apply_batch([SheetCellValueEdit::set(
+    edit.apply_batch([SheetChange::set(
         "Sheet1",
         Address::from_a1("A1").expect("A1 address"),
         2u32,
     )])
     .expect("stage value edit");
     let commit = edit.commit().expect("commit value edit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .value(0, Address::from_a1("A1").expect("A1 address")),
         Some(&Value::Number(Number::new("2").expect("edited number")))
     );
@@ -898,7 +905,7 @@ fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
     let mut rewritten_shared = 0usize;
     let mut borrowed = 0usize;
     for path in &paths {
-        let Ok(package) = OpcPackage::open(path) else {
+        let Ok(package) = OpcPackage::open(path, litchi_opc::SourceLimits::default()) else {
             continue;
         };
         for part in package

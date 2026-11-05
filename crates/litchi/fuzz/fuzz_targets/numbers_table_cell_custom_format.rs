@@ -17,8 +17,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, PackageError, PackageLimits, PackageReadOptions, PackageSemanticLimits,
-    SheetSelector, TableSelector,
+    At, Error as PackageError, Package, SheetSelector, TableSelector,
     cell::data_format::custom::{
         Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern,
         MAX_NAME_BYTES, MAX_PATTERN_BYTES, MAX_RULES, Name, Number as CustomNumber, NumberPattern,
@@ -46,9 +45,9 @@ const PRIVATE_TABLE: &str = "__litchi_private_custom_format_table_9e31__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_custom_format_input_9e31__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
 
-const FIXTURE_POSITION: CellPosition = CellPosition::new(0, 0);
-const FIXTURE_SIBLING_POSITION: CellPosition = CellPosition::new(0, 1);
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
+const FIXTURE_POSITION: At = At::new(0, 0);
+const FIXTURE_SIBLING_POSITION: At = At::new(0, 1);
+const NATIVE_POSITION: At = At::new(2, 1);
 
 fuzz_target!(|data: &[u8]| {
     // Arbitrary ingress remains useful for package-level parser coverage, but
@@ -81,23 +80,32 @@ fuzz_target!(|data: &[u8]| {
     exercise_output_limit();
 });
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid Custom archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| unreachable!("valid Custom semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| unreachable!("valid Custom projection limits: {error}"));
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Custom archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Custom semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Custom projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -292,7 +300,7 @@ fn exercise_custom_package(package: &Package, family: fixture::CustomFamily, dat
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPosition) {
+fn exercise_selector_reads(package: &Package, data: &[u8], position: At) {
     let random = random_position(data);
     observe_result(package.table_cell_custom_format(
         SheetSelector::index(usize::from(control(data, 0))),
@@ -300,7 +308,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
         random,
     ));
     observe_result(package.table_cell_custom_format(0usize, 0usize, position));
-    if let Some(sheet) = package.document().sheets().first()
+    if let Some(sheet) = package.workbook_ref().sheets().first()
         && let Some(table) = sheet.tables().next()
     {
         let by_name = package.table_cell_custom_format(
@@ -313,9 +321,9 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
-    let sheet_count = package.document().sheets().len();
+    let sheet_count = package.workbook_ref().sheets().len();
     observe_result(package.table_cell_custom_format(
         SheetSelector::index(sheet_count),
         TableSelector::index(0),
@@ -338,7 +346,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     observe_result(package.table_cell_custom_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ));
     assert_eq!(package_bytes(package), source_bytes);
 }
@@ -381,7 +389,7 @@ fn wrong_family_packages() -> &'static [(fixture::FormatFamily, Package)] {
         .as_slice()
 }
 
-fn assert_custom_refusal(package: &Package, data: &[u8], position: CellPosition) {
+fn assert_custom_refusal(package: &Package, data: &[u8], position: At) {
     let source_bytes = package_bytes(package);
     let read = package.table_cell_custom_format(0usize, 0usize, position);
     assert!(
@@ -804,9 +812,16 @@ fn exercise_input_limit() {
 fn exercise_semantic_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let semantic = PackageSemanticLimits::new(1, 1, 1, 1)
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("one-entry Custom limits: {error}"));
-        let constrained = PackageReadOptions::new(options().archive(), semantic);
+        let constrained = litchi::numbers::OpenOptions::new()
+            .source_limits(options().source_limits_value())
+            .semantic_limits(semantic);
         let source = fixture::custom_package(fixture::CustomFamily::Number)
             .unwrap_or_else(|error| panic!("Custom semantic-limit source: {error}"));
         let result = Package::from_bytes_with_options(&source, constrained);
@@ -820,17 +835,25 @@ fn exercise_output_limit() {
     ONCE.get_or_init(|| {
         let source = fixture::custom_package(fixture::CustomFamily::Number)
             .unwrap_or_else(|error| panic!("Custom output-limit source: {error}"));
-        let limits = PackageLimits::new(
-            u64::try_from(source.len()).unwrap_or(u64::MAX),
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            PackageLimits::MAX_TOTAL_BYTES,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("Custom output limits: {error}"));
+        let limits = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX))
+            .and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members()))
+            .and_then(|b| {
+                b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())
+            })
+            .and_then(|b| {
+                b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+            })
+            .and_then(|b| {
+                b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())
+            })
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("Custom output limits: {error}"));
         let package = Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(limits, options().semantic()),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(limits)
+                .semantic_limits(options().semantic_limits_value()),
         )
         .unwrap_or_else(|error| panic!("Custom exact-limit source must open: {error}"));
         let before = package_bytes(&package);
@@ -848,8 +871,8 @@ fn exercise_output_limit() {
     });
 }
 
-fn random_position(data: &[u8]) -> CellPosition {
-    CellPosition::new(
+fn random_position(data: &[u8]) -> At {
+    At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     )

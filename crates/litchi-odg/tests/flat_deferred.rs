@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
-use litchi_core::Error;
-use litchi_odg::FlatDrawing;
+use litchi_core::Error as CoreError;
+use litchi_odg::flat::{Drawing, Error};
 
 const SHAPE_FODG: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?>"#,
@@ -26,7 +26,7 @@ const HARDENING_SEED: &str = concat!(
 
 #[test]
 fn flat_pages_and_noop_bytes_stay_exact() {
-    let drawing = FlatDrawing::from_bytes(SHAPE_FODG.as_bytes().to_vec()).unwrap();
+    let drawing = Drawing::from_bytes(SHAPE_FODG.as_bytes()).unwrap();
     assert_eq!(drawing.pages().len(), 1);
     assert_eq!(drawing.as_bytes(), SHAPE_FODG.as_bytes());
     assert_eq!(drawing.clone().into_bytes(), SHAPE_FODG.as_bytes());
@@ -34,39 +34,41 @@ fn flat_pages_and_noop_bytes_stay_exact() {
 
 #[test]
 fn flat_shape_text_edit_is_lossless_and_transactional() {
-    let source = FlatDrawing::from_bytes(SHAPE_FODG.as_bytes().to_vec()).unwrap();
+    let source = Drawing::from_bytes(SHAPE_FODG.as_bytes()).unwrap();
     assert_eq!(source.pages()[0].shapes()[0].text(), "Old label");
     let mut edit = source.edit();
     edit.set_shape_text(0, 0, "New <label>").unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(source.pages()[0].shapes()[0].text(), "Old label");
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].text(),
+        commit.package().pages()[0].shapes()[0].text(),
         "New <label>"
     );
-    let output = std::str::from_utf8(commit.snapshot().as_bytes()).unwrap();
+    let output = std::str::from_utf8(commit.package().as_bytes()).unwrap();
     assert!(output.contains("<text:p>New &lt;label&gt;</text:p>"));
     assert_eq!(commit.patch().changes()[0].before(), "Old label");
     assert!(commit.patch().is_applicable_to(&source));
-    let reapplied = commit.patch().apply(&source).unwrap();
-    assert_eq!(reapplied.as_bytes(), commit.snapshot().as_bytes());
+    assert!(commit.diagnostics().changed());
+    let reapplied = source.apply(commit.patch()).unwrap();
+    assert!(reapplied.diagnostics().changed());
+    assert_eq!(reapplied.package().as_bytes(), commit.package().as_bytes());
 
-    let different = FlatDrawing::from_bytes(
-        SHAPE_FODG
+    let different = Drawing::from_bytes(
+        &SHAPE_FODG
             .replace("Old label", "Different label")
             .into_bytes(),
     )
     .unwrap();
     assert!(!commit.patch().is_applicable_to(&different));
     assert!(matches!(
-        commit.patch().apply(&different),
-        Err(Error::InvalidFormat(_))
+        different.apply(commit.patch()),
+        Err(Error::PatchConflict { .. })
     ));
 
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.changes()[0].after(), "Old label");
-    let restored = inverse.apply(commit.snapshot()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    let restored = commit.package().apply(&inverse).unwrap();
+    assert_eq!(restored.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -90,8 +92,8 @@ fn flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors() {
     ];
     for case in cases {
         assert!(matches!(
-            FlatDrawing::from_bytes(case.into_bytes()),
-            Err(Error::InvalidFormat(_))
+            Drawing::from_bytes(case.as_bytes()),
+            Err(Error::Core(CoreError::InvalidFormat(_)))
         ));
     }
 }
@@ -100,18 +102,81 @@ fn flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors() {
 fn flat_truncation_and_mutation_sweeps_never_panic() {
     let bytes = HARDENING_SEED.as_bytes();
     for end in 0..bytes.len() {
-        drop(FlatDrawing::from_bytes(bytes[..end].to_vec()));
+        drop(Drawing::from_bytes(&bytes[..end]));
     }
     for position in 0..bytes.len() {
         let mut mutated = bytes.to_vec();
         mutated[position] ^= 1;
-        drop(FlatDrawing::from_bytes(mutated));
+        drop(Drawing::from_bytes(&mutated));
     }
-    assert!(FlatDrawing::from_bytes(bytes.to_vec()).is_ok());
+    assert!(Drawing::from_bytes(bytes).is_ok());
     let mut invalid_utf8 = bytes.to_vec();
     invalid_utf8.insert(bytes.len() / 2, 0xfe);
     assert!(matches!(
-        FlatDrawing::from_bytes(invalid_utf8),
-        Err(Error::InvalidFormat(_))
+        Drawing::from_bytes(&invalid_utf8),
+        Err(Error::Core(CoreError::InvalidFormat(_)))
+    ));
+}
+
+#[test]
+fn flat_drawing_takes_caller_limits_through_open_options() {
+    use litchi_odg::{LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits};
+
+    let shallow = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_depth(3)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    assert!(matches!(
+        Drawing::from_bytes_with_options(SHAPE_FODG.as_bytes(), shallow),
+        Err(Error::Limit {
+            kind: LimitKind::Semantic(SemanticLimitKind::Depth),
+            ..
+        })
+    ));
+    let one_shape = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_shapes(1)
+            .unwrap()
+            .max_text_bytes(1024)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let drawing = Drawing::from_bytes_with_options(SHAPE_FODG.as_bytes(), one_shape).unwrap();
+    assert_eq!(drawing.options(), one_shape);
+    let mut edit = drawing.edit();
+    assert!(matches!(
+        edit.set_shape_text(0, 0, "x".repeat(1025)),
+        Err(Error::Limit {
+            kind: LimitKind::Semantic(SemanticLimitKind::TextBytes),
+            ..
+        })
+    ));
+    assert!(matches!(
+        edit.set_shape_text(0, 9, "x"),
+        Err(Error::Refused(_))
+    ));
+    edit.set_shape_text(0, 0, "short").unwrap();
+    edit.reset();
+    let noop = edit.commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().as_bytes(), drawing.as_bytes());
+
+    let reader = Drawing::from_reader(std::io::Cursor::new(SHAPE_FODG.as_bytes())).unwrap();
+    assert_eq!(reader.as_bytes(), SHAPE_FODG.as_bytes());
+    let tiny = OpenOptions::new().source_limits(
+        litchi_odg::SourceLimits::builder()
+            .max_input_bytes(8)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    assert!(matches!(
+        Drawing::from_reader_with_options(std::io::Cursor::new(SHAPE_FODG.as_bytes()), tiny),
+        Err(Error::Limit { .. })
     ));
 }

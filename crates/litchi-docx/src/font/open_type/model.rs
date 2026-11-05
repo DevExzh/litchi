@@ -290,7 +290,8 @@ impl OpenType {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
+    pub fn parse(xml: &[u8], limits: &super::Limits) -> Result<Self> {
+        super::limit::admit_xml(xml, limits)?;
         super::codec::parse(xml)
     }
 

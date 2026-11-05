@@ -1,4 +1,9 @@
-use super::{Snapshot, Transaction};
+use super::{Snapshot, transaction::Transaction};
+use litchi_odf_common::XmlStreamLimits;
+
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::default()
+}
 
 const META: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-meta
@@ -15,7 +20,7 @@ const META: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 #[test]
 fn no_op_metadata_transaction_preserves_source_exactly() {
-    let snapshot = Snapshot::from_source(Some(META.to_string()))
+    let snapshot = Snapshot::from_source(Some(META.to_string()), limits())
         .expect("test fixture or operation should succeed");
     let commit = snapshot
         .transaction()
@@ -23,12 +28,11 @@ fn no_op_metadata_transaction_preserves_source_exactly() {
         .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.xml(), Some(META));
-    assert_eq!(commit.metadata().title.as_deref(), Some("Before"));
 }
 
 #[test]
 fn metadata_patch_preserves_bounded_unknown_markup() {
-    let snapshot = Snapshot::from_source(Some(META.to_string()))
+    let snapshot = Snapshot::from_source(Some(META.to_string()), limits())
         .expect("test fixture or operation should succeed");
     let mut transaction = snapshot.transaction();
     transaction
@@ -45,7 +49,7 @@ fn metadata_patch_preserves_bounded_unknown_markup() {
     assert!(xml.contains("vendor:flag=\"keep\""));
     assert!(xml.contains("<dc:title>After</dc:title>"));
     assert_eq!(
-        Snapshot::from_source(Some(xml.to_string()))
+        Snapshot::from_source(Some(xml.to_string()), limits())
             .expect("test fixture or operation should succeed")
             .value()
             .title
@@ -56,7 +60,7 @@ fn metadata_patch_preserves_bounded_unknown_markup() {
 
 #[test]
 fn unsupported_metadata_fields_fail_before_publication() {
-    let snapshot = Snapshot::from_source(Some(META.to_string()))
+    let snapshot = Snapshot::from_source(Some(META.to_string()), limits())
         .expect("test fixture or operation should succeed");
     let mut transaction = snapshot.transaction();
     let mut value = transaction.metadata().clone();
@@ -67,7 +71,8 @@ fn unsupported_metadata_fields_fail_before_publication() {
 
 #[test]
 fn metadata_can_be_created_and_explicitly_removed() {
-    let snapshot = Snapshot::from_source(None).expect("test fixture or operation should succeed");
+    let snapshot =
+        Snapshot::from_source(None, limits()).expect("test fixture or operation should succeed");
     let mut transaction = snapshot.transaction();
     transaction
         .editor()
@@ -80,8 +85,8 @@ fn metadata_can_be_created_and_explicitly_removed() {
         .expect("test fixture or operation should succeed");
     assert!(created.contains("<dc:title>New</dc:title>"));
 
-    let snapshot =
-        Snapshot::from_source(Some(created)).expect("test fixture or operation should succeed");
+    let snapshot = Snapshot::from_source(Some(created), limits())
+        .expect("test fixture or operation should succeed");
     let mut transaction: Transaction<'_> = snapshot.transaction();
     transaction.remove();
     let removed = transaction

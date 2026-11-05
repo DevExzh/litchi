@@ -173,6 +173,7 @@ fn modern_labels_kind_default_and_nested_source_are_borrowed() {
         ["North"]
     );
     assert_eq!(snapshot.series_count(), 2);
+    assert_eq!(snapshot.series_components(), 2);
     assert_eq!(snapshot.non_style_ref().map(|id| id.get()), Some(77));
     assert!(ptr::eq(snapshot.source(), source.as_slice()));
 
@@ -515,4 +516,35 @@ fn exact_and_one_below_limits_report_the_attempted_resource() {
         },
         "nesting",
     );
+}
+
+/// A by-column chart holds its series in the columns: the grid's row count is
+/// not its series count (record 0433).
+#[test]
+fn by_column_series_are_the_column_labels() {
+    let mut grid = Vec::new();
+    append(
+        &mut grid,
+        [
+            length_field(1, b"Region"),
+            length_field(2, b"April"),
+            length_field(2, b"May"),
+            length_field(2, b"June"),
+            length_field(3, &varint_field(1, 1)),
+        ],
+    );
+    let mut chart = Vec::new();
+    append(
+        &mut chart,
+        [
+            signed_field(1, 5),
+            varint_field(5, 2),
+            length_field(7, &grid),
+        ],
+    );
+    let source = length_field(10_000, &chart);
+    let options = permissive_options(&source);
+    let (snapshot, _) = decode_modern_with_report(&source, &options).expect("modern chart");
+    assert_eq!(snapshot.series_count(), 1);
+    assert_eq!(snapshot.series_components(), 3);
 }

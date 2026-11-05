@@ -11,10 +11,7 @@
 use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
-use litchi::numbers::{
-    Package, PackageError, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi::numbers::{Error as PackageError, Package, SheetSelector, TableSelector};
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::to_bytes};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
@@ -108,25 +105,32 @@ fn hex_nibble(byte: u8) -> Option<u8> {
     }
 }
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid relocation archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| unreachable!("valid relocation semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| {
-                    unreachable!("valid relocation projection limits: {error}")
-                });
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid relocation archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid relocation semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid relocation projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -145,7 +149,7 @@ fn native_fixture() -> &'static [u8] {
             );
             document.archive_info.message_infos[0].object_references =
                 vec![SOURCE_SHEET_ID, DESTINATION_SHEET_ID];
-            let mut sheet_path = FieldInfo::new(vec![1]);
+            let mut sheet_path = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
             sheet_path.object_references = vec![SOURCE_SHEET_ID, DESTINATION_SHEET_ID];
             document.archive_info.message_infos[0].field_infos = vec![sheet_path];
 
@@ -157,9 +161,9 @@ fn native_fixture() -> &'static [u8] {
                         fixture_sheet(DESTINATION_SHEET_ID, DESTINATION_SHEET, &[]),
                     ],
                 }
-                .to_bytes()
+                .to_bytes(Default::default())
                 .unwrap_or_else(|error| panic!("Numbers relocation document fixture: {error}")),
-            )
+             Default::default(),)
             .unwrap_or_else(|error| panic!("Numbers relocation document compression: {error}"));
 
             let tables_component = SnappyStream::compress(
@@ -174,9 +178,9 @@ fn native_fixture() -> &'static [u8] {
                         fixture_sidecars(),
                     ],
                 }
-                .to_bytes()
+                .to_bytes(Default::default())
                 .unwrap_or_else(|error| panic!("Numbers relocation table fixture: {error}")),
-            )
+             Default::default(),)
             .unwrap_or_else(|error| panic!("Numbers relocation table compression: {error}"));
 
             to_bytes(
@@ -210,7 +214,7 @@ fn fixture_object(identifier: u64, message_type: u32, data: Vec<u8>) -> ArchiveO
             type_: message_type,
             data,
         }],
-    )
+     Default::default(),)
     .unwrap_or_else(|error| panic!("Numbers relocation fixture object: {error}"))
 }
 
@@ -230,7 +234,7 @@ fn fixture_sheet(identifier: u64, name: &str, drawable_identifiers: &[u64]) -> A
         .encode_to_vec(),
     );
     sheet.archive_info.message_infos[0].object_references = drawable_identifiers.to_vec();
-    let mut drawable_path = FieldInfo::new(vec![2]);
+    let mut drawable_path = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     drawable_path.object_references = drawable_identifiers.to_vec();
     sheet.archive_info.message_infos[0].field_infos = vec![drawable_path];
     sheet
@@ -249,7 +253,7 @@ fn fixture_table_info() -> ArchiveObject {
     let mut table_info = fixture_object(TABLE_INFO_ID, TABLE_INFO_MESSAGE_TYPE, payload);
     table_info.archive_info.message_infos[0].object_references =
         vec![SOURCE_SHEET_ID, TABLE_MODEL_ID];
-    let mut parent_path = FieldInfo::new(vec![1, 2]);
+    let mut parent_path = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     parent_path.object_references = vec![SOURCE_SHEET_ID];
     table_info.archive_info.message_infos[0].field_infos = vec![parent_path];
     table_info
@@ -286,7 +290,7 @@ fn fixture_sidecars() -> ArchiveObject {
         .encode_to_vec(),
     })
     .collect();
-    ArchiveObject::new(SIDECAR_ID, messages)
+    ArchiveObject::new(SIDECAR_ID, messages, Default::default())
         .unwrap_or_else(|error| panic!("Numbers relocation fixture sidecars: {error}"))
 }
 

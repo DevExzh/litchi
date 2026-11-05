@@ -28,6 +28,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -41,7 +42,11 @@ fn referenced_object(
     let mut object = object(identifier, type_, data)?;
     let info = &mut object.archive_info.message_infos[0];
     info.object_references.extend_from_slice(references);
-    let mut field = FieldInfo::new(path.to_vec());
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     info.field_infos.push(field);
@@ -49,7 +54,10 @@ fn referenced_object(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn node(slide_identifier: u64) -> Vec<u8> {
@@ -234,7 +242,12 @@ fn cross_component_inbound_reference_refuses_before_publication() -> TestResult 
     let bytes = topology_package(128, 8, true)?;
     let package = Package::from_bytes(&bytes)?;
     let (attempt, report) = production_test_attempt(&package, Position::new(0), None);
-    assert!(matches!(attempt, Err(Error::AmbiguousOwnership)));
+    assert!(matches!(
+        attempt,
+        Err(Error::Refused(
+            crate::slide::delete::Refusal::AmbiguousOwnership
+        ))
+    ));
     assert_ne!(report.objects_scanned(), 0);
     assert_ne!(report.references_scanned(), 0);
     assert_eq!(report.component_deletions(), 0);
@@ -340,7 +353,7 @@ fn max_minus_one_refuses_before_deletion_output_or_reopen() -> TestResult {
     let (attempt, rejected) = production_test_attempt(&package, Position::new(0), Some(maximum));
     assert!(matches!(
         attempt,
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::Work,
             observed: attempted,
             maximum: reported_maximum,

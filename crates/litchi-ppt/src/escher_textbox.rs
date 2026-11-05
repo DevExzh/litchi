@@ -4,7 +4,7 @@ use super::package::{Error, Result};
 ///
 /// Based on Apache POI's `EscherTextboxWrapper`, this wraps an Escher textbox record
 /// and provides access to its child PPT records (`TextCharsAtom`, `TextBytesAtom`, `StyleTextPropAtom`).
-use super::records::Record;
+use super::records::{Record, RecordParseSession};
 use super::text_interaction::{TextInteraction, TextInteractionLimits, text_units_from_records};
 use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
 use crate::consts::RecordType;
@@ -98,6 +98,25 @@ impl EscherTextboxWrapper {
         Self::new_with_interaction_limits_and_report(data, TextInteractionLimits::default(), report)
     }
 
+    /// Create a source-bound wrapper, recording repaired text-style defects.
+    ///
+    /// Shape projections retain the package's [`crate::SourceLimits`] while
+    /// the detached `ClientTextbox` payload is decoded.  Keep those limits
+    /// on this second parse too; otherwise a low event, depth, or record-size
+    /// profile would be silently replaced by the neutral wrapper defaults.
+    pub(crate) fn new_source_bound_with_report(
+        data: Vec<u8>,
+        source_limits: crate::SourceLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        Self::new_with_source_limits_and_interaction_limits_and_report(
+            data,
+            source_limits,
+            crate::text_interaction::limits_for_source(source_limits),
+            report,
+        )
+    }
+
     /// Create a wrapper with explicit text-interaction resource limits,
     /// recording every repaired non-structural text-style defect in `report`.
     ///
@@ -110,7 +129,22 @@ impl EscherTextboxWrapper {
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Self> {
         // Parse child records from the escher data
-        let child_records = Self::find_child_records(&data)?;
+        let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        Self::new_with_source_limits_and_interaction_limits_and_report(
+            data,
+            source_limits,
+            limits,
+            report,
+        )
+    }
+
+    fn new_with_source_limits_and_interaction_limits_and_report(
+        data: Vec<u8>,
+        source_limits: crate::SourceLimits,
+        limits: TextInteractionLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        let child_records = Self::find_child_records(&data, &source_limits)?;
 
         let mut extractor = TextRunExtractor::new();
         extractor.extract_from_records_with_report(&child_records, report)?;
@@ -153,7 +187,8 @@ impl EscherTextboxWrapper {
     /// Find child PPT records in the Escher textbox data.
     ///
     /// Based on POI's `Record.findChildRecords()`.
-    fn find_child_records(data: &[u8]) -> Result<Vec<Record>> {
+    fn find_child_records(data: &[u8], limits: &crate::SourceLimits) -> Result<Vec<Record>> {
+        let mut session = RecordParseSession::new(*limits, data.len())?;
         let mut records = Vec::new();
         let mut offset = 0;
 
@@ -185,7 +220,7 @@ impl EscherTextboxWrapper {
                 ));
             }
 
-            let (record, consumed) = Record::parse(&data[offset..record_end], 0)?;
+            let (record, consumed) = session.parse_strict_record_at_depth(data, offset, 0)?;
             if consumed != record_end - offset {
                 return Err(Error::Corrupted(
                     "ClientTextbox child record was only partially parsed".to_string(),
@@ -203,11 +238,12 @@ impl EscherTextboxWrapper {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_text_interactions_with_limits(
+    pub(crate) fn parse_text_interactions_with_limits(
         data: &[u8],
         limits: TextInteractionLimits,
     ) -> Result<Vec<TextInteraction>> {
-        let records = Self::find_child_records(data)?;
+        let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        let records = Self::find_child_records(data, &source_limits)?;
         Self::text_interactions_from_records(&records, limits)
     }
 

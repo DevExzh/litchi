@@ -9,7 +9,8 @@ use soapberry_zip::office::StreamingArchiveWriter;
 
 fn nested_index_with_compressible_payload() -> Result<Vec<u8>> {
     let payload = vec![0u8; 64 * 1024];
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("Index/Document.iwa", &payload)?;
     Ok(writer.finish_to_bytes()?)
 }
@@ -58,7 +59,8 @@ fn assert_nested_input_limit<T>(label: &str, result: Result<T>, observed: u64, m
 fn declared_nested_index_size_wins_over_corrupt_deflate_for_every_ingress_api()
 -> std::result::Result<(), Box<dyn StdError>> {
     let index = nested_index_with_compressible_payload()?;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_deflated("legacy.pages/Index.zip", &index)?;
     let mut bytes = writer.finish_to_bytes()?;
     assert!(bytes.len() < index.len());
@@ -70,13 +72,13 @@ fn declared_nested_index_size_wins_over_corrupt_deflate_for_every_ingress_api()
 
     assert_nested_input_limit(
         "physical catalog",
-        Catalog::from_bytes_with_limits(&bytes, limits),
+        Catalog::from_bytes(&bytes, limits),
         nested,
         input,
     );
     assert_nested_input_limit(
         "component catalog",
-        ComponentCatalog::from_bytes_with_limits(&bytes, limits),
+        ComponentCatalog::from_bytes(&bytes, limits),
         nested,
         input,
     );

@@ -1,0 +1,42 @@
+[
+  {
+    "leaf_us": 414.80095,
+    "scenario": "odt_plain",
+    "unified_us": 416.2894
+  },
+  {
+    "leaf_us": 1021.3095,
+    "scenario": "odt_frames",
+    "unified_us": 1022.887
+  },
+  {
+    "leaf_us": null,
+    "scenario": "pptx_shape",
+    "unified_us": 103.72260000000001
+  },
+  {
+    "leaf_us": null,
+    "scenario": "pptx_paragraph",
+    "unified_us": 112.03815000000002
+  },
+  {
+    "leaf_us": null,
+    "scenario": "pptx_cell",
+    "unified_us": 149.77285
+  },
+  {
+    "leaf_us": null,
+    "scenario": "ppt_shape",
+    "unified_us": 131.59575
+  },
+  {
+    "leaf_us": null,
+    "scenario": "docx_cell",
+    "unified_us": 49.799299999999995
+  },
+  {
+    "leaf_us": null,
+    "scenario": "odp_shape",
+    "unified_us": 1264.09445
+  }
+]

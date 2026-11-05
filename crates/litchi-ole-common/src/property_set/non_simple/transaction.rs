@@ -2,6 +2,7 @@
 
 use super::codec::{self, PayloadEdit};
 use super::model::{ElementKind, EntryRecord, Limits, Snapshot, State, same_path};
+use crate::Error;
 use crate::object::directory::{EntryKind, Metadata};
 use crate::property_set::model::{
     IndirectPropertyName, Stream, Value, VersionedStream, invalid, try_clone_property_set,
@@ -34,14 +35,14 @@ impl Revision {
 }
 
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub struct Edit {
     source: Snapshot,
     candidate: Option<Stream>,
     records: Option<Vec<EntryRecord>>,
     edits: Vec<PayloadEdit>,
 }
 
-impl Editor {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             source,
@@ -56,21 +57,16 @@ impl Editor {
         &self.source
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.is_some() || self.records.is_some() || !self.edits.is_empty()
-    }
-
-    pub fn contents(&self) -> Result<Stream, OleError> {
+    pub fn contents(&self) -> Result<Stream, Error> {
         match &self.candidate {
-            Some(candidate) => clone_stream(candidate),
+            Some(candidate) => Ok(clone_stream(candidate)?),
             None => self.source.contents(),
         }
     }
 
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut Stream) -> Result<(), OleError>,
+        F: FnOnce(&mut Stream) -> Result<(), Error>,
     {
         let mut candidate = self.ensure_contents()?;
         edit(&mut candidate)?;
@@ -78,7 +74,7 @@ impl Editor {
         Ok(self)
     }
 
-    pub fn replace_contents(&mut self, candidate: Stream) -> Result<&mut Self, OleError> {
+    pub fn replace_contents(&mut self, candidate: Stream) -> Result<&mut Self, Error> {
         self.set_candidate(candidate)?;
         Ok(self)
     }
@@ -88,15 +84,18 @@ impl Editor {
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
         value: Value,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         self.update(|stream| {
             let section = stream
                 .section_mut(format_identifier)
-                .ok_or_else(|| invalid("Property Set section is not present"))?;
+                .ok_or_else(Error::invalid_property_set_selector)?;
             if section.property(property_identifier).is_some() {
-                section.update(property_identifier, value).map(|_| ())
+                section
+                    .update(property_identifier, value)
+                    .map(|_| ())
+                    .map_err(Error::from)
             } else {
-                section.add(property_identifier, value)
+                section.add(property_identifier, value).map_err(Error::from)
             }
         })
     }
@@ -105,11 +104,11 @@ impl Editor {
         &mut self,
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
-    ) -> Result<Option<Value>, OleError> {
+    ) -> Result<Option<Value>, Error> {
         let mut candidate = self.ensure_contents()?;
         let removed = candidate
             .section_mut(format_identifier)
-            .ok_or_else(|| invalid("Property Set section is not present"))?
+            .ok_or_else(Error::invalid_property_set_selector)?
             .remove(property_identifier);
         self.set_candidate(candidate)?;
         Ok(removed)
@@ -119,7 +118,7 @@ impl Editor {
         &mut self,
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         self.set_property(
             format_identifier,
             property_identifier,
@@ -131,7 +130,7 @@ impl Editor {
         &mut self,
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         self.set_property(
             format_identifier,
             property_identifier,
@@ -143,7 +142,7 @@ impl Editor {
         &mut self,
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         self.set_property(
             format_identifier,
             property_identifier,
@@ -155,7 +154,7 @@ impl Editor {
         &mut self,
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         self.set_property(
             format_identifier,
             property_identifier,
@@ -168,7 +167,7 @@ impl Editor {
         format_identifier: crate::property_set::Guid,
         property_identifier: u32,
         version_guid: crate::property_set::Guid,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         self.set_property(
             format_identifier,
             property_identifier,
@@ -180,7 +179,7 @@ impl Editor {
         &mut self,
         path: &[&str],
         class_id: Option<crate::property_set::Guid>,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         let records = self.records();
         validate_new_path(&self.source.state, records, path)?;
         let mut candidate_records =
@@ -205,16 +204,17 @@ impl Editor {
         Ok(self)
     }
 
-    pub fn set_stream(&mut self, path: &[&str], bytes: Vec<u8>) -> Result<&mut Self, OleError> {
+    pub fn set_stream(&mut self, path: &[&str], bytes: Vec<u8>) -> Result<&mut Self, Error> {
         if path.len() == 1 && directory_names_equal(path[0], "CONTENTS") {
-            return Err(invalid("use replace_contents to edit the CONTENTS stream"));
+            return Err(Error::invalid_property_set_selector());
         }
         if bytes.len() as u64 > self.source.state.limits.max_stream_bytes {
             return Err(OleError::LimitExceeded {
                 resource: "non-simple Property Set stream bytes",
                 observed: bytes.len() as u64,
                 maximum: self.source.state.limits.max_stream_bytes,
-            });
+            }
+            .into());
         }
         let records = self.records();
         let existing = records
@@ -223,7 +223,7 @@ impl Editor {
         if let Some(record) = existing
             && record.kind != Some(ElementKind::Stream)
         {
-            return Err(invalid("non-simple path identifies a storage"));
+            return Err(Error::invalid_property_set_selector());
         }
         let owned_path = if existing.is_none() {
             validate_new_path(&self.source.state, records, path)?;
@@ -277,18 +277,16 @@ impl Editor {
         Ok(self)
     }
 
-    pub fn remove_element(&mut self, path: &[&str]) -> Result<&mut Self, OleError> {
+    pub fn remove_element(&mut self, path: &[&str]) -> Result<&mut Self, Error> {
         if path.is_empty() || (path.len() == 1 && directory_names_equal(path[0], "CONTENTS")) {
-            return Err(invalid(
-                "the non-simple root and CONTENTS stream are required",
-            ));
+            return Err(Error::invalid_property_set_selector());
         }
         let records = self.records();
         let Some(target) = records
             .iter()
             .find(|record| path_matches(path, &record.path))
         else {
-            return Err(OleError::StreamNotFound);
+            return Err(Error::property_set_element_not_found());
         };
         let target_path = clone_path(&target.path, "non-simple removal path")?;
         let mut candidate_records =
@@ -303,29 +301,21 @@ impl Editor {
         Ok(self)
     }
 
-    pub fn snapshot(&self) -> Result<Snapshot, OleError> {
-        self.materialize()
-    }
-
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(&self.source, &snapshot);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn ensure_contents(&self) -> Result<Stream, OleError> {
+    fn ensure_contents(&self) -> Result<Stream, Error> {
         match &self.candidate {
-            Some(candidate) => clone_stream(candidate),
+            Some(candidate) => Ok(clone_stream(candidate)?),
             None => self.source.contents(),
         }
     }
 
-    fn set_candidate(&mut self, candidate: Stream) -> Result<(), OleError> {
+    fn set_candidate(&mut self, candidate: Stream) -> Result<(), Error> {
         let records = self
             .records
             .as_deref()
@@ -342,7 +332,7 @@ impl Editor {
             .unwrap_or(&self.source.state.records)
     }
 
-    fn materialize(&self) -> Result<Snapshot, OleError> {
+    fn materialize(&self) -> Result<Snapshot, Error> {
         if self.candidate.is_none() && self.records.is_none() && self.edits.is_empty() {
             return Ok(self.source.clone());
         }
@@ -367,7 +357,7 @@ impl Editor {
         &self,
         candidate: &Stream,
         records: &[EntryRecord],
-    ) -> Result<Snapshot, OleError> {
+    ) -> Result<Snapshot, Error> {
         codec::validate_closure(&self.source.state, candidate, records)?;
         let contents_bytes =
             match candidate.to_bytes_with_limit(self.source.state.limits.max_contents_bytes) {
@@ -378,7 +368,8 @@ impl Editor {
                         resource: "non-simple Property Set CONTENTS bytes",
                         observed,
                         maximum,
-                    });
+                    }
+                    .into());
                 },
                 result => result?,
             };
@@ -403,7 +394,7 @@ impl Editor {
         &self,
         records: &[EntryRecord],
         contents_bytes: &[u8],
-    ) -> Result<bool, OleError> {
+    ) -> Result<bool, Error> {
         if records.len() != self.source.state.records.len()
             || records
                 .iter()
@@ -438,43 +429,12 @@ impl Editor {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Patch {
@@ -546,13 +506,11 @@ impl Patch {
         self.is_noop()
     }
 
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if Revision::of(&source.state.source) != self.base
             || source.state.source.as_ref() != self.before.as_ref()
         {
-            return Err(invalid(
-                "non-simple Property Set patch source does not match its base",
-            ));
+            return Err(Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -560,7 +518,7 @@ impl Patch {
         Snapshot::open_shared(Arc::clone(&self.after), self.limits)
     }
 
-    pub fn revert(&self, target: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn revert(&self, target: &Snapshot) -> Result<Snapshot, Error> {
         self.inverse().apply(target)
     }
 
@@ -576,9 +534,9 @@ impl Patch {
     }
 }
 
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Editor) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut editor = snapshot.edit();
     edit(&mut editor)?;
@@ -761,16 +719,12 @@ fn owned_path_matches(left: &[String], right: &[String]) -> bool {
             .all(|(left, right)| directory_names_equal(left, right))
 }
 
-fn validate_new_path(
-    state: &State,
-    records: &[EntryRecord],
-    path: &[&str],
-) -> Result<(), OleError> {
+fn validate_new_path(state: &State, records: &[EntryRecord], path: &[&str]) -> Result<(), Error> {
     if path.is_empty() {
-        return Err(invalid("non-simple CFB path cannot be empty"));
+        return Err(Error::invalid_property_set_selector());
     }
     for component in path {
-        validate_directory_name(component)?;
+        validate_directory_name(component).map_err(|_| Error::invalid_property_set_selector())?;
     }
     if path
         .iter()
@@ -784,20 +738,22 @@ fn validate_new_path(
                 .max()
                 .unwrap_or(0) as u64,
             maximum: state.limits.max_name_bytes as u64,
-        });
+        }
+        .into());
     }
     if path.len() > state.limits.max_storage_depth.saturating_add(1) {
         return Err(OleError::LimitExceeded {
             resource: "non-simple Property Set storage depth",
             observed: path.len() as u64,
             maximum: state.limits.max_storage_depth.saturating_add(1) as u64,
-        });
+        }
+        .into());
     }
     if records
         .iter()
         .any(|record| path_matches(path, &record.path))
     {
-        return Err(invalid("non-simple CFB path already exists"));
+        return Err(Error::invalid_property_set_selector());
     }
     if path.len() > 1 {
         let parent = &path[..path.len() - 1];
@@ -805,7 +761,7 @@ fn validate_new_path(
             .iter()
             .find(|record| path_matches(parent, &record.path));
         if parent_record.is_none_or(|record| record.kind != Some(ElementKind::Storage)) {
-            return Err(invalid("non-simple CFB path parent is not a storage"));
+            return Err(Error::invalid_property_set_selector());
         }
     }
     Ok(())

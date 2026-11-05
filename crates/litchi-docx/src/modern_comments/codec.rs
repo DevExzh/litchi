@@ -28,7 +28,7 @@ use super::model::{
     ReactionUser, WORD_2012_NAMESPACE, WORD_2018_NAMESPACE,
 };
 use crate::{Error, Result};
-use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, Writer, XmlVersion};
@@ -110,8 +110,8 @@ impl ExtensionList {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<Extended>> {
-    let document = parse_document(xml)?;
+pub fn parse_comments_extended(xml: &[u8], limits: &MceLimits) -> Result<Vec<Extended>> {
+    let document = parse_document(xml, limits)?;
     let root = document.root()?;
     require_name(root, WORD_2012_NAMESPACE, "commentsEx")?;
     reject_attributes(root, &[])?;
@@ -149,8 +149,8 @@ pub fn parse_comments_extended(xml: &[u8]) -> Result<Vec<Extended>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<IdMapping>> {
-    let document = parse_document(xml)?;
+pub fn parse_comments_ids(xml: &[u8], limits: &MceLimits) -> Result<Vec<IdMapping>> {
+    let document = parse_document(xml, limits)?;
     let root = document.root()?;
     require_name(root, COMMENTS_IDS_NAMESPACE, "commentsIds")?;
     reject_attributes(root, &[])?;
@@ -190,12 +190,21 @@ pub fn parse_comments_ids(xml: &[u8]) -> Result<Vec<IdMapping>> {
 /// # Panics
 ///
 /// Panics if an internal writer invariant is violated.
-pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<Comment>> {
-    let document = parse_document(xml)?;
+pub fn parse_comments_extensible(xml: &[u8], limits: &MceLimits) -> Result<Vec<Comment>> {
+    let document = parse_document(xml, limits)?;
     let root = document.root()?;
     require_name(root, COMMENTS_EXTENSIBLE_NAMESPACE, "commentsExtensible")?;
     reject_attributes(root, &[])?;
-    let mut comments = Vec::new();
+    let comment_count = root
+        .children
+        .iter()
+        .filter(|child| {
+            child.namespace == COMMENTS_EXTENSIBLE_NAMESPACE
+                && child.local_name == "commentExtensible"
+        })
+        .count();
+    enforce_count("commentExtensible", comment_count)?;
+    let mut comments = Vec::with_capacity(comment_count);
     let mut seen = HashSet::new();
     let mut saw_root_extensions = false;
     for child in &root.children {
@@ -242,7 +251,7 @@ pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<Comment>> {
             reactions,
         });
     }
-    enforce_count("commentExtensible", comments.len())?;
+    validate_extensible(&comments)?;
     Ok(comments)
 }
 
@@ -250,8 +259,8 @@ pub fn parse_comments_extensible(xml: &[u8]) -> Result<Vec<Comment>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse_people(xml: &[u8]) -> Result<Vec<Person>> {
-    let document = parse_document(xml)?;
+pub fn parse_people(xml: &[u8], limits: &MceLimits) -> Result<Vec<Person>> {
+    let document = parse_document(xml, limits)?;
     let root = document.root()?;
     require_name(root, WORD_2012_NAMESPACE, "people")?;
     reject_attributes(root, &[])?;
@@ -293,9 +302,21 @@ pub fn parse_people(xml: &[u8]) -> Result<Vec<Person>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write_comments_extended(items: &[Extended], conformance: Conformance) -> Result<Vec<u8>> {
+pub fn write_comments_extended(
+    items: &[Extended],
+    conformance: Conformance,
+    limits: &MceLimits,
+) -> Result<Vec<u8>> {
     validate_extended(items)?;
-    let mut out = xml_header("w15", WORD_2012_NAMESPACE, "commentsEx", conformance);
+    let output_len = extended_output_len(items, conformance)?;
+    check_output_len(output_len, limits)?;
+    let mut out = String::with_capacity(output_len);
+    out.push_str(&xml_header(
+        "w15",
+        WORD_2012_NAMESPACE,
+        "commentsEx",
+        conformance,
+    ));
     for item in items {
         out.push_str("<w15:commentEx w15:paraId=\"");
         out.push_str(&format_hex(item.paragraph_id));
@@ -308,16 +329,29 @@ pub fn write_comments_extended(items: &[Extended], conformance: Conformance) -> 
         out.push_str("\"/>");
     }
     out.push_str("</w15:commentsEx>");
-    Ok(out.into_bytes())
+    debug_assert_eq!(out.len(), output_len);
+    finish_output(out, limits)
 }
 
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write_comments_ids(items: &[IdMapping], conformance: Conformance) -> Result<Vec<u8>> {
+pub fn write_comments_ids(
+    items: &[IdMapping],
+    conformance: Conformance,
+    limits: &MceLimits,
+) -> Result<Vec<u8>> {
     validate_ids(items)?;
-    let mut out = xml_header("w16cid", COMMENTS_IDS_NAMESPACE, "commentsIds", conformance);
+    let output_len = ids_output_len(items, conformance)?;
+    check_output_len(output_len, limits)?;
+    let mut out = String::with_capacity(output_len);
+    out.push_str(&xml_header(
+        "w16cid",
+        COMMENTS_IDS_NAMESPACE,
+        "commentsIds",
+        conformance,
+    ));
     for item in items {
         out.push_str("<w16cid:commentId w16cid:paraId=\"");
         out.push_str(&format_hex(item.paragraph_id));
@@ -326,7 +360,8 @@ pub fn write_comments_ids(items: &[IdMapping], conformance: Conformance) -> Resu
         out.push_str("\"/>");
     }
     out.push_str("</w16cid:commentsIds>");
-    Ok(out.into_bytes())
+    debug_assert_eq!(out.len(), output_len);
+    finish_output(out, limits)
 }
 
 ///
@@ -336,9 +371,13 @@ pub fn write_comments_ids(items: &[IdMapping], conformance: Conformance) -> Resu
 pub fn write_comments_extensible(
     comments: &[Comment],
     conformance: Conformance,
+    limits: &MceLimits,
 ) -> Result<Vec<u8>> {
     validate_extensible(comments)?;
-    let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
+    let output_len = extensible_output_len(comments, conformance)?;
+    check_output_len(output_len, limits)?;
+    let mut out = String::with_capacity(output_len);
+    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     out.push_str("<w16cex:commentsExtensible xmlns:w16cex=\"");
     out.push_str(COMMENTS_EXTENSIBLE_NAMESPACE);
     out.push_str("\" xmlns:w16=\"");
@@ -412,16 +451,29 @@ pub fn write_comments_extensible(
         out.push_str("</cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible>");
     }
     out.push_str("</w16cex:commentsExtensible>");
-    Ok(out.into_bytes())
+    debug_assert_eq!(out.len(), output_len);
+    finish_output(out, limits)
 }
 
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write_people(people: &[Person], conformance: Conformance) -> Result<Vec<u8>> {
+pub fn write_people(
+    people: &[Person],
+    conformance: Conformance,
+    limits: &MceLimits,
+) -> Result<Vec<u8>> {
     validate_people(people)?;
-    let mut out = xml_header("w15", WORD_2012_NAMESPACE, "people", conformance);
+    let output_len = people_output_len(people, conformance)?;
+    check_output_len(output_len, limits)?;
+    let mut out = String::with_capacity(output_len);
+    out.push_str(&xml_header(
+        "w15",
+        WORD_2012_NAMESPACE,
+        "people",
+        conformance,
+    ));
     for person in people {
         out.push_str("<w15:person w15:author=\"");
         escape_attr(&mut out, &person.author);
@@ -436,7 +488,8 @@ pub fn write_people(people: &[Person], conformance: Conformance) -> Result<Vec<u
         }
     }
     out.push_str("</w15:people>");
-    Ok(out.into_bytes())
+    debug_assert_eq!(out.len(), output_len);
+    finish_output(out, limits)
 }
 
 pub(super) fn validate_metadata(metadata: &Metadata) -> Result<()> {
@@ -506,6 +559,7 @@ fn validate_ids(items: &[IdMapping]) -> Result<()> {
 
 fn validate_extensible(items: &[Comment]) -> Result<()> {
     enforce_count("commentExtensible", items.len())?;
+    let mut strings = StringBudget::default();
     let mut ids = HashSet::new();
     for item in items {
         validate_durable_id(item.durable_id)?;
@@ -514,6 +568,7 @@ fn validate_extensible(items: &[Comment]) -> Result<()> {
         }
         if let Some(date) = &item.date_utc {
             validate_utc(date)?;
+            strings.add(date)?;
         }
         enforce_count("reaction", item.reactions.len())?;
         let mut kinds = HashSet::new();
@@ -525,27 +580,31 @@ fn validate_extensible(items: &[Comment]) -> Result<()> {
                 return invalid("duplicate reactionType on one comment".into());
             }
             if let Some(extensions) = &reaction.extensions {
-                validate_extension_list(extensions)?;
+                validate_extension_list_with_budget(extensions, &mut strings)?;
             }
             enforce_count("reactionInfo", reaction.reactions.len())?;
             let mut users = HashSet::new();
             for info in &reaction.reactions {
                 if let Some(date) = &info.date_utc {
                     validate_utc(date)?;
+                    strings.add(date)?;
                 }
                 if let Some(user) = &info.user {
                     require_nonempty("reaction userId", &user.user_id)?;
                     require_nonempty("reaction userName", &user.user_name)?;
                     require_nonempty("reaction userProvider", &user.user_provider)?;
+                    strings.add(&user.user_id)?;
+                    strings.add(&user.user_name)?;
+                    strings.add(&user.user_provider)?;
                     if !users.insert(user.user_id.clone()) {
                         return invalid("duplicate reaction userId for reactionType".into());
                     }
                     if let Some(extensions) = &user.extensions {
-                        validate_extension_list(extensions)?;
+                        validate_extension_list_with_budget(extensions, &mut strings)?;
                     }
                 }
                 if let Some(extensions) = &info.extensions {
-                    validate_extension_list(extensions)?;
+                    validate_extension_list_with_budget(extensions, &mut strings)?;
                 }
             }
         }
@@ -555,15 +614,19 @@ fn validate_extensible(items: &[Comment]) -> Result<()> {
 
 fn validate_people(people: &[Person]) -> Result<()> {
     enforce_count("person", people.len())?;
+    let mut strings = StringBudget::default();
     let mut authors = HashSet::new();
     for person in people {
         require_nonempty("person author", &person.author)?;
+        strings.add(&person.author)?;
         if !authors.insert(person.author.clone()) {
             return invalid("duplicate people author".into());
         }
         if let Some(presence) = &person.presence {
             require_nonempty("presence providerId", &presence.provider_id)?;
             require_nonempty("presence userId", &presence.user_id)?;
+            strings.add(&presence.provider_id)?;
+            strings.add(&presence.user_id)?;
         }
     }
     Ok(())
@@ -597,7 +660,16 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<Reaction>> {
             let reaction_type = required_attr(reaction, "", "reactionType")?
                 .parse::<u32>()
                 .map_err(|_source_error| Error::Invalid("invalid reactionType".into()))?;
-            let mut infos = Vec::new();
+            let info_count = reaction
+                .children
+                .iter()
+                .filter(|info| {
+                    !(info.namespace == OFFICE_EXTENSION_LIST_NAMESPACE
+                        && info.local_name == "extLst")
+                })
+                .count();
+            enforce_count("reactionInfo", info_count)?;
+            let mut infos = Vec::with_capacity(info_count);
             let mut extensions = None;
             for (index, info) in reaction.children.iter().enumerate() {
                 if info.namespace == OFFICE_EXTENSION_LIST_NAMESPACE && info.local_name == "extLst"
@@ -650,12 +722,6 @@ fn parse_comment_extensions(comment: &Node) -> Result<Vec<Reaction>> {
             });
         }
     }
-    validate_extensible(&[Comment {
-        durable_id: 1,
-        date_utc: None,
-        intelligent_placeholder: None,
-        reactions: reactions.clone(),
-    }])?;
     Ok(reactions)
 }
 
@@ -714,6 +780,14 @@ fn write_extension_list(out: &mut String, list: &ExtensionList) {
 }
 
 fn validate_extension_list(list: &ExtensionList) -> Result<()> {
+    let mut strings = StringBudget::default();
+    validate_extension_list_with_budget(list, &mut strings)
+}
+
+fn validate_extension_list_with_budget(
+    list: &ExtensionList,
+    strings: &mut StringBudget,
+) -> Result<()> {
     enforce_count("modern comment extension", list.extensions.len())?;
     for extension in &list.extensions {
         if let Some(uri) = &extension.uri
@@ -724,6 +798,10 @@ fn validate_extension_list(list: &ExtensionList) -> Result<()> {
         if extension.child_xml.len() > MAX_MODERN_COMMENT_PART_BYTES {
             return invalid("extension child XML exceeds the part-size bound".into());
         }
+        if let Some(uri) = &extension.uri {
+            strings.add(uri)?;
+        }
+        strings.add(&extension.child_xml)?;
         canonical_extension_child(&extension.child_xml)?;
     }
     Ok(())
@@ -744,8 +822,190 @@ fn canonical_extension_child(value: &str) -> Result<String> {
     if value.trim_start().starts_with("<?xml") {
         return invalid("extension child XML cannot contain an XML declaration".into());
     }
-    let document = build_dom(value.as_bytes())?;
+    let document = build_dom(value.as_bytes(), &MceLimits::default())?;
     Ok(document.root()?.raw_xml.clone())
+}
+
+fn check_output_len(actual: usize, limits: &MceLimits) -> Result<()> {
+    let maximum = limits.max_output_bytes.min(MAX_MODERN_COMMENT_PART_BYTES);
+    if actual > maximum {
+        return Err(Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::OutputBytes,
+            actual,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
+fn add_len(length: &mut usize, value: usize) -> Result<()> {
+    *length = length
+        .checked_add(value)
+        .ok_or_else(|| Error::Invalid("modern comment output length overflow".into()))?;
+    Ok(())
+}
+
+fn escaped_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let extra = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length
+            .checked_add(extra)
+            .ok_or_else(|| Error::Invalid("modern comment output length overflow".into()))
+    })
+}
+
+fn extended_output_len(items: &[Extended], conformance: Conformance) -> Result<usize> {
+    let mut length = xml_header("w15", WORD_2012_NAMESPACE, "commentsEx", conformance).len();
+    for item in items {
+        add_len(&mut length, b"<w15:commentEx w15:paraId=\"".len())?;
+        add_len(&mut length, 8)?;
+        if item.parent_paragraph_id.is_some() {
+            add_len(&mut length, b"\" w15:paraIdParent=\"".len())?;
+            add_len(&mut length, 8)?;
+        }
+        add_len(&mut length, b"\" w15:done=\"0\"/>".len())?;
+    }
+    add_len(&mut length, b"</w15:commentsEx>".len())?;
+    Ok(length)
+}
+
+fn ids_output_len(items: &[IdMapping], conformance: Conformance) -> Result<usize> {
+    let mut length = xml_header("w16cid", COMMENTS_IDS_NAMESPACE, "commentsIds", conformance).len();
+    for _ in items {
+        add_len(&mut length, b"<w16cid:commentId w16cid:paraId=\"".len())?;
+        add_len(&mut length, 8)?;
+        add_len(&mut length, b"\" w16cid:durableId=\"".len())?;
+        add_len(&mut length, 8)?;
+        add_len(&mut length, b"\"/>".len())?;
+    }
+    add_len(&mut length, b"</w16cid:commentsIds>".len())?;
+    Ok(length)
+}
+
+fn people_output_len(people: &[Person], conformance: Conformance) -> Result<usize> {
+    let mut length = xml_header("w15", WORD_2012_NAMESPACE, "people", conformance).len();
+    for person in people {
+        add_len(&mut length, b"<w15:person w15:author=\"".len())?;
+        add_len(&mut length, escaped_len(&person.author)?)?;
+        if let Some(presence) = &person.presence {
+            add_len(&mut length, b"\"><w15:presenceInfo w15:providerId=\"".len())?;
+            add_len(&mut length, escaped_len(&presence.provider_id)?)?;
+            add_len(&mut length, b"\" w15:userId=\"".len())?;
+            add_len(&mut length, escaped_len(&presence.user_id)?)?;
+            add_len(&mut length, b"\"/></w15:person>".len())?;
+        } else {
+            add_len(&mut length, b"\"/>".len())?;
+        }
+    }
+    add_len(&mut length, b"</w15:people>".len())?;
+    Ok(length)
+}
+
+fn extension_list_output_len(list: &ExtensionList) -> Result<usize> {
+    let mut length = b"<oel:extLst>".len();
+    for extension in list.extensions() {
+        add_len(&mut length, b"<oel:ext".len())?;
+        if let Some(uri) = extension.uri() {
+            add_len(&mut length, b" uri=\"".len())?;
+            add_len(&mut length, escaped_len(uri)?)?;
+            add_len(&mut length, 1)?;
+        }
+        add_len(&mut length, 1)?;
+        add_len(&mut length, extension.child_xml().len())?;
+        add_len(&mut length, b"</oel:ext>".len())?;
+    }
+    add_len(&mut length, b"</oel:extLst>".len())?;
+    Ok(length)
+}
+
+fn extensible_output_len(comments: &[Comment], conformance: Conformance) -> Result<usize> {
+    let mut length = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>".len();
+    add_len(
+        &mut length,
+        format!(
+            "<w16cex:commentsExtensible xmlns:w16cex=\"{}\" xmlns:w16=\"{}\" xmlns:cr=\"{}\" xmlns:oel=\"{}\" xmlns:w=\"{}\">",
+            COMMENTS_EXTENSIBLE_NAMESPACE,
+            WORD_2018_NAMESPACE,
+            REACTIONS_NAMESPACE,
+            OFFICE_EXTENSION_LIST_NAMESPACE,
+            conformance.word_namespace(),
+        )
+        .len(),
+    )?;
+    for comment in comments {
+        add_len(
+            &mut length,
+            b"<w16cex:commentExtensible w16cex:durableId=\"".len(),
+        )?;
+        add_len(&mut length, 8)?;
+        if let Some(date) = &comment.date_utc {
+            add_len(&mut length, b"\" w16cex:dateUtc=\"".len())?;
+            add_len(&mut length, escaped_len(date)?)?;
+        }
+        if let Some(value) = comment.intelligent_placeholder {
+            add_len(&mut length, b"\" w16cex:intelligentPlaceholder=\"".len())?;
+            add_len(&mut length, if value { 1 } else { 1 })?;
+        }
+        if comment.reactions.is_empty() {
+            add_len(&mut length, b"\"/>".len())?;
+            continue;
+        }
+        add_len(&mut length, b"\"><w16cex:extLst><w16:ext w16:uri=\"".len())?;
+        add_len(&mut length, REACTIONS_EXTENSION_URI.len())?;
+        add_len(&mut length, b"\"><cr:reactions>".len())?;
+        for reaction in &comment.reactions {
+            add_len(&mut length, b"<cr:reaction reactionType=\"".len())?;
+            add_len(&mut length, reaction.reaction_type.to_string().len())?;
+            add_len(&mut length, b"\">".len())?;
+            for info in &reaction.reactions {
+                add_len(&mut length, b"<cr:reactionInfo".len())?;
+                if let Some(date) = &info.date_utc {
+                    add_len(&mut length, b" dateUtc=\"".len())?;
+                    add_len(&mut length, escaped_len(date)?)?;
+                    add_len(&mut length, 1)?;
+                }
+                if info.user.is_none() && info.extensions.is_none() {
+                    add_len(&mut length, b"/>".len())?;
+                    continue;
+                }
+                add_len(&mut length, 1)?;
+                if let Some(user) = &info.user {
+                    add_len(&mut length, b"<cr:user userId=\"".len())?;
+                    add_len(&mut length, escaped_len(&user.user_id)?)?;
+                    add_len(&mut length, b"\" userName=\"".len())?;
+                    add_len(&mut length, escaped_len(&user.user_name)?)?;
+                    add_len(&mut length, b"\" userProvider=\"".len())?;
+                    add_len(&mut length, escaped_len(&user.user_provider)?)?;
+                    if let Some(extensions) = &user.extensions {
+                        add_len(&mut length, 2)?;
+                        add_len(&mut length, extension_list_output_len(extensions)?)?;
+                        add_len(&mut length, b"</cr:user>".len())?;
+                    } else {
+                        add_len(&mut length, b"\"/>".len())?;
+                    }
+                }
+                if let Some(extensions) = &info.extensions {
+                    add_len(&mut length, extension_list_output_len(extensions)?)?;
+                }
+                add_len(&mut length, b"</cr:reactionInfo>".len())?;
+            }
+            if let Some(extensions) = &reaction.extensions {
+                add_len(&mut length, extension_list_output_len(extensions)?)?;
+            }
+            add_len(&mut length, b"</cr:reaction>".len())?;
+        }
+        add_len(
+            &mut length,
+            b"</cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible>".len(),
+        )?;
+    }
+    add_len(&mut length, b"</w16cex:commentsExtensible>".len())?;
+    Ok(length)
 }
 
 fn xml_header(prefix: &str, namespace: &str, root: &str, conformance: Conformance) -> String {
@@ -753,6 +1013,18 @@ fn xml_header(prefix: &str, namespace: &str, root: &str, conformance: Conformanc
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><{prefix}:{root} xmlns:{prefix}=\"{namespace}\" xmlns:w=\"{}\">",
         conformance.word_namespace()
     )
+}
+
+fn finish_output(output: String, limits: &MceLimits) -> Result<Vec<u8>> {
+    let maximum = limits.max_output_bytes.min(MAX_MODERN_COMMENT_PART_BYTES);
+    if output.len() > maximum {
+        return Err(Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::OutputBytes,
+            actual: output.len(),
+            maximum,
+        });
+    }
+    Ok(output.into_bytes())
 }
 
 fn validate_durable_id(value: u32) -> Result<()> {
@@ -806,10 +1078,40 @@ fn optional_on_off(node: &Node, namespace: &str, name: &str) -> Result<Option<bo
         .transpose()
 }
 
-fn enforce_count(label: &str, count: usize) -> Result<()> {
+fn enforce_count(_label: &str, count: usize) -> Result<()> {
     if count > MAX_MODERN_COMMENT_ITEMS {
-        invalid(format!("{label} count exceeds {MAX_MODERN_COMMENT_ITEMS}"))
+        Err(Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::Items,
+            actual: count,
+            maximum: MAX_MODERN_COMMENT_ITEMS,
+        })
     } else {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct StringBudget {
+    total: usize,
+}
+
+impl StringBudget {
+    fn add(&mut self, value: &str) -> Result<()> {
+        self.total =
+            self.total
+                .checked_add(value.len())
+                .ok_or_else(|| Error::ModernCommentLimit {
+                    kind: crate::modern_comments::LimitKind::StringBytes,
+                    actual: usize::MAX,
+                    maximum: MAX_MODERN_COMMENT_STRING_BYTES,
+                })?;
+        if self.total > MAX_MODERN_COMMENT_STRING_BYTES {
+            return Err(Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::StringBytes,
+                actual: self.total,
+                maximum: MAX_MODERN_COMMENT_STRING_BYTES,
+            });
+        }
         Ok(())
     }
 }
@@ -864,11 +1166,14 @@ impl XmlDocument {
     }
 }
 
-fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
-    if xml.len() > MAX_MODERN_COMMENT_PART_BYTES {
-        return invalid(format!(
-            "modern comment part exceeds {MAX_MODERN_COMMENT_PART_BYTES} bytes"
-        ));
+fn parse_document(xml: &[u8], limits: &MceLimits) -> Result<XmlDocument> {
+    let maximum = limits.max_input_bytes.min(MAX_MODERN_COMMENT_PART_BYTES);
+    if xml.len() > maximum {
+        return Err(Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum,
+        });
     }
     let mut capabilities = Capabilities::ooxml_baseline();
     for namespace in [
@@ -881,7 +1186,7 @@ fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
     ] {
         capabilities.understand_namespace(namespace);
     }
-    let limits = Limits {
+    let mce_limits = MceLimits {
         max_input_bytes: MAX_MODERN_COMMENT_PART_BYTES,
         max_output_bytes: MAX_MODERN_COMMENT_PART_BYTES * 2,
         max_depth: MAX_MODERN_COMMENT_DEPTH,
@@ -890,8 +1195,12 @@ fn parse_document(xml: &[u8]) -> Result<XmlDocument> {
         max_choices_per_alternate: 1024,
         max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
-    let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
-    let document = build_dom(processed.xml.as_ref())?;
+    let mut mce_limits = mce_limits;
+    mce_limits.max_input_bytes = mce_limits.max_input_bytes.min(limits.max_input_bytes);
+    mce_limits.max_output_bytes = mce_limits.max_output_bytes.min(limits.max_output_bytes);
+    mce_limits.max_depth = mce_limits.max_depth.min(limits.max_depth);
+    let processed = process_markup_compatibility(xml, &capabilities, &mce_limits)?;
+    let document = build_dom(processed.xml.as_ref(), limits)?;
     validate_metadata_text(document.root()?, false)?;
     Ok(document)
 }
@@ -902,7 +1211,7 @@ struct StackEntry {
     raw: Vec<u8>,
 }
 
-fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
+fn build_dom(xml: &[u8], limits: &MceLimits) -> Result<XmlDocument> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut document = XmlDocument { root: None };
@@ -922,6 +1231,7 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
                 &mut string_bytes,
                 &mut node_count,
                 false,
+                limits,
             )?,
             Event::Empty(element) => push_node(
                 &reader,
@@ -932,6 +1242,7 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
                 &mut string_bytes,
                 &mut node_count,
                 true,
+                limits,
             )?,
             Event::End(_) if stack.is_empty() => return invalid("unexpected XML end tag".into()),
             Event::End(end) => {
@@ -1015,17 +1326,22 @@ fn push_node(
     string_bytes: &mut usize,
     node_count: &mut usize,
     empty: bool,
+    limits: &MceLimits,
 ) -> Result<()> {
-    if stack.len() >= MAX_MODERN_COMMENT_DEPTH {
-        return invalid(format!(
-            "modern comment XML depth exceeds {MAX_MODERN_COMMENT_DEPTH}"
-        ));
+    if stack.len() >= limits.max_depth.min(MAX_MODERN_COMMENT_DEPTH) {
+        return Err(Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::Depth,
+            actual: stack.len().saturating_add(1),
+            maximum: limits.max_depth.min(MAX_MODERN_COMMENT_DEPTH),
+        });
     }
     *node_count = node_count.saturating_add(1);
     if *node_count > MAX_MODERN_COMMENT_ITEMS {
-        return invalid(format!(
-            "modern comment XML node count exceeds {MAX_MODERN_COMMENT_ITEMS}"
-        ));
+        return Err(Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::Items,
+            actual: *node_count,
+            maximum: MAX_MODERN_COMMENT_ITEMS,
+        });
     }
     let mut namespaces = stack
         .last()
@@ -1044,7 +1360,11 @@ fn push_node(
             .into_owned();
         *string_bytes = string_bytes.saturating_add(name.len() + value.len());
         if *string_bytes > MAX_MODERN_COMMENT_STRING_BYTES {
-            return invalid("modern comment strings exceed allocation cap".into());
+            return Err(Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::StringBytes,
+                actual: *string_bytes,
+                maximum: MAX_MODERN_COMMENT_STRING_BYTES,
+            });
         }
         if name == "xmlns" {
             namespaces.insert(String::new(), value);

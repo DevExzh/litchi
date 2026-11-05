@@ -25,8 +25,8 @@ use litchi_core::{
 };
 use litchi_opc::phys_pkg::PhysPkgReader;
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, SourceArtifactFingerprint, SourceArtifactRestoreProof,
-    SourceBackedPackage, SourceCacheLimits, SourcePartSpliceLimits, SourcePartSpliceProof,
+    OpcError, PackURI, SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
+    SourceCacheLimits, SourceLimits, SourcePartSpliceLimits, SourcePartSpliceProof,
     SourceReadPolicy, SourceTopologyPlan,
 };
 use sha2::{Digest as _, Sha256};
@@ -116,7 +116,8 @@ fn archive_bytes_with_typed_unknown(typed_unknown: bool) -> Vec<u8> {
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -167,11 +168,12 @@ fn managed_context(memory: u64, input_bytes: u64) -> (Budget, ExecutionContext) 
 }
 
 fn read_ahead_package(source: Arc<dyn ReadAt>, policy: SourceReadPolicy) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    SourceBackedPackage::from_read_at(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits(),
         policy,
+        None,
     )
     .expect("source-backed read-ahead fixture must open")
 }
@@ -181,18 +183,18 @@ fn managed_read_ahead_package(
     policy: SourceReadPolicy,
     context: ExecutionContext,
 ) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+    SourceBackedPackage::from_read_at(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits(),
         policy,
-        context,
+        Some(context),
     )
     .expect("managed source-backed read-ahead fixture must open")
 }
 
 fn unknown_member(bytes: &[u8]) -> Vec<u8> {
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .expect("published archive must be readable")
         .read_member(UNKNOWN_MEMBER)
         .expect("published archive must retain the unknown member")
@@ -209,8 +211,12 @@ fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
         .expect("published archive must be valid ZIP")
         .into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut scratch)
-        .expect("published archive must have preservable physical records");
+    let index = PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("published archive must have preservable physical records");
 
     index
         .entries()
@@ -437,8 +443,14 @@ fn source_read_policy_is_bounded_and_exact_is_the_default_control() {
     assert!(SourceReadPolicy::forward_start(65_536).is_ok());
 
     let source = archive_bytes();
-    let exact = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source.clone())))
-        .expect("exact control package must open");
+    let exact = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source.clone())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("exact control package must open");
     assert!(
         exact
             .source_read_diagnostics()
@@ -460,14 +472,14 @@ fn source_read_policy_is_bounded_and_exact_is_the_default_control() {
     );
 
     let (_budget, managed_context) = managed_context(8 * 1024 * 1024, u64::MAX);
-    let managed_exact =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(OwnedSource::new(archive_bytes())),
-            ReadLimits::default(),
-            cache_limits(),
-            managed_context,
-        )
-        .expect("managed exact control package must open");
+    let managed_exact = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(archive_bytes())),
+        SourceLimits::default(),
+        cache_limits(),
+        SourceReadPolicy::exact(),
+        Some(managed_context),
+    )
+    .expect("managed exact control package must open");
     assert!(
         managed_exact
             .source_read_diagnostics()
@@ -661,7 +673,7 @@ fn exact_source_save_preserves_unknown_member_after_known_payload_read() {
     let mut saved = Vec::new();
     package
         .source_artifact()
-        .write_to_stream(&mut saved)
+        .write_to(&mut saved)
         .expect("exact source save must succeed");
     assert_eq!(saved, source, "exact source save must retain all ZIP bytes");
     assert_eq!(unknown_member(&saved), UNKNOWN_PAYLOAD);
@@ -726,10 +738,16 @@ fn publication_disables_read_ahead_before_output_and_keeps_future_reads_exact() 
 
     let mut saved = Vec::new();
     materialized
-        .to_stream(&mut saved)
+        .write_to(&mut saved)
         .expect("materialized package save must succeed");
     assert_eq!(unknown_member(&saved), UNKNOWN_PAYLOAD);
-    let reopened = SourceBackedPackage::from_vec(saved).expect("saved package must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        saved,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("saved package must reopen");
     assert_eq!(
         reopened
             .part(&uri(DOCUMENT_URI))
@@ -743,7 +761,7 @@ fn publication_disables_read_ahead_before_output_and_keeps_future_reads_exact() 
 
 fn assert_document_replacement_and_unknown_preservation(source: &[u8], output: &[u8]) {
     assert_eq!(
-        PhysPkgReader::new(output)
+        PhysPkgReader::new(output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(DOCUMENT_MEMBER)
             .expect("published document must be readable"),
@@ -760,8 +778,13 @@ fn assert_document_replacement_and_unknown_preservation(source: &[u8], output: &
 }
 
 fn assert_external_relationship_was_removed(output: &[u8]) {
-    let reopened = SourceBackedPackage::from_vec(output.to_vec())
-        .expect("published relationship-removal archive must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        output.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published relationship-removal archive must reopen");
     assert_eq!(
         reopened
             .part(&uri(DOCUMENT_URI))
@@ -772,7 +795,7 @@ fn assert_external_relationship_was_removed(output: &[u8]) {
         "the selected external relationship must be absent after publication"
     );
     assert!(
-        PhysPkgReader::new(output)
+        PhysPkgReader::new(output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(DOCUMENT_RELS_MEMBER)
             .expect("published document relationships must be readable")
@@ -843,7 +866,8 @@ fn batch_replacement_and_deletion_preserve_unknown_physical_records() {
         .expect("batch replacement and deletion must publish");
 
     assert_document_replacement_and_unknown_preservation(&source, &output);
-    let physical = PhysPkgReader::new(&output).expect("published archive must be readable");
+    let physical = PhysPkgReader::new(&output, SourceLimits::default())
+        .expect("published archive must be readable");
     assert!(
         !physical
             .member_names()
@@ -883,13 +907,19 @@ fn non_empty_topology_publication_disables_opt_in_reads_and_adds_a_typed_part() 
         .expect("non-empty topology publication must succeed");
     assert_eq!(unknown_member(&output), UNKNOWN_PAYLOAD);
     assert_eq!(
-        PhysPkgReader::new(&output)
+        PhysPkgReader::new(&output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(added.membername())
             .expect("added topology member must be readable"),
         b"topology payload"
     );
-    let reopened = SourceBackedPackage::from_vec(output).expect("topology output must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("topology output must reopen");
     assert_eq!(
         reopened
             .part(&added)
@@ -935,13 +965,19 @@ fn precompressed_topology_addition_disables_opt_in_reads_before_physical_transfe
         .expect("precompressed topology publication must succeed");
     assert_eq!(unknown_member(&output), UNKNOWN_PAYLOAD);
     assert_eq!(
-        PhysPkgReader::new(&output)
+        PhysPkgReader::new(&output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(added.membername())
             .expect("precompressed topology member must be readable"),
         SECOND_PAYLOAD
     );
-    let reopened = SourceBackedPackage::from_vec(output).expect("topology output must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("topology output must reopen");
     assert_eq!(
         reopened
             .part(&added)
@@ -968,7 +1004,7 @@ fn exact_splice_artifact() -> (Vec<u8>, Vec<ReadCall>) {
         .expect("exact splice control must prepare");
     let before_publication = source.calls().len();
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("exact splice control must publish");
     let calls = source
         .calls()
@@ -1008,7 +1044,7 @@ fn expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice()
     let expected_len = u64::try_from(expected.len()).expect("fixture output length fits u64");
     let expected_hash = SourceArtifactFingerprint::from_sha256(digest(&expected));
     let mut output = Vec::new();
-    plan.write_to_stream_with_expected_artifact(&mut output, expected_len, expected_hash)
+    plan.write_to_with_expected_artifact(&mut output, expected_len, expected_hash)
         .expect("expected-artifact splice publication must succeed");
     assert_eq!(output, expected);
 
@@ -1027,13 +1063,18 @@ fn expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice()
         "expected-artifact preview and emission must use two exact physical traversals"
     );
     assert_eq!(
-        SourceBackedPackage::from_vec(output.clone())
-            .expect("published splice archive must reopen")
-            .part(&uri(DOCUMENT_URI))
-            .expect("published splice document must exist")
-            .data()
-            .expect("published splice document must decode")
-            .as_bytes(),
+        SourceBackedPackage::from_vec(
+            output.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None
+        )
+        .expect("published splice archive must reopen")
+        .part(&uri(DOCUMENT_URI))
+        .expect("published splice document must exist")
+        .data()
+        .expect("published splice document must decode")
+        .as_bytes(),
         splice_candidate(SPLICE_FRAGMENT)
     );
     assert_eq!(unknown_member(&output), UNKNOWN_PAYLOAD);
@@ -1132,7 +1173,7 @@ fn managed_changed_overlay_releases_window_before_first_write_and_preserves_unkn
         central_without_local_offset(&source_unknown.central)
     );
     assert_eq!(
-        PhysPkgReader::new(&output)
+        PhysPkgReader::new(&output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(DOCUMENT_MEMBER)
             .expect("published document must be readable"),
@@ -1175,9 +1216,145 @@ fn retained_source_artifact_does_not_pin_the_read_ahead_window() {
     );
     let mut saved = Vec::new();
     artifact
-        .write_to_stream(&mut saved)
+        .write_to(&mut saved)
         .expect("retained source artifact must remain usable");
     assert_eq!(saved, archive_bytes());
+}
+
+#[test]
+fn retained_source_artifact_streams_after_its_last_package_owner_drops() {
+    let source_bytes = archive_bytes();
+    let (current_artifact, original_artifact, proof) = {
+        let package = read_ahead_package(
+            Arc::new(OwnedSource::new(source_bytes.clone())),
+            SourceReadPolicy::forward_start(4096).expect("window policy must be valid"),
+        );
+        package
+            .part(&uri(DOCUMENT_URI))
+            .expect("document part must be present")
+            .data()
+            .expect("document payload must decode");
+        let diagnostics = package
+            .source_read_diagnostics()
+            .expect("diagnostics must be readable")
+            .expect("read-ahead diagnostics must be enabled");
+        assert!(diagnostics.retained_window_bytes > 0);
+
+        let current_artifact = package.source_artifact();
+        let original_artifact = package.source_artifact();
+        let proof = SourceArtifactRestoreProof {
+            current_len: current_artifact.len(),
+            current_sha256: current_artifact
+                .fingerprint()
+                .expect("current artifact must fingerprint"),
+            original_len: original_artifact.len(),
+            original_sha256: original_artifact
+                .fingerprint()
+                .expect("original artifact must fingerprint"),
+        };
+        (current_artifact, original_artifact, proof)
+    };
+
+    let recipient = read_ahead_package(
+        Arc::new(OwnedSource::new(source_bytes.clone())),
+        SourceReadPolicy::exact(),
+    );
+    let mut output = Vec::new();
+    recipient
+        .restore_streamed_artifact_to_stream(
+            &current_artifact,
+            &original_artifact,
+            proof,
+            original_artifact.len() + 1,
+            &mut output,
+            None,
+        )
+        .expect("dropped-package artifacts must stream through the checked admission path");
+    assert_eq!(output, source_bytes);
+}
+
+#[test]
+fn a_live_package_clone_keeps_the_read_ahead_window_until_the_last_clone_drops() {
+    let (budget, context) = managed_context(8 * 1024 * 1024, u64::MAX);
+    let package = managed_read_ahead_package(
+        Arc::new(OwnedSource::new(archive_bytes())),
+        SourceReadPolicy::forward_start(4096).expect("window policy must be valid"),
+        context,
+    );
+    let clone = package.clone();
+    package
+        .part(&uri(DOCUMENT_URI))
+        .expect("document part must be present")
+        .data()
+        .expect("document payload must decode");
+    let diagnostics = clone
+        .source_read_diagnostics()
+        .expect("clone diagnostics must be readable")
+        .expect("clone must retain read-ahead diagnostics");
+    assert!(diagnostics.retained_window_bytes > 0);
+    assert!(budget.used(Resource::Memory) > 0);
+
+    drop(package);
+    assert!(
+        budget.used(Resource::Memory) > 0,
+        "a live clone must retain the bounded read-ahead allocation"
+    );
+    drop(clone);
+    assert_eq!(
+        budget.used(Resource::Memory),
+        0,
+        "the read-ahead allocation must release with the last package clone"
+    );
+}
+
+#[test]
+fn dropped_artifact_freshness_precedes_restore_and_fingerprint() {
+    let source = VersionedSource::new(archive_bytes());
+    let package = read_ahead_package(
+        source.clone(),
+        SourceReadPolicy::forward_start(4096).expect("window policy must be valid"),
+    );
+    package
+        .part(&uri(DOCUMENT_URI))
+        .expect("document part must be present")
+        .data()
+        .expect("document payload must decode");
+    let original_artifact = package.source_artifact();
+    let original_fingerprint = original_artifact
+        .fingerprint()
+        .expect("original artifact must fingerprint before mutation");
+    drop(package);
+    source.bump_revision();
+
+    assert!(matches!(
+        original_artifact.fingerprint(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+
+    let recipient = read_ahead_package(
+        Arc::new(OwnedSource::new(archive_bytes())),
+        SourceReadPolicy::exact(),
+    );
+    let current_artifact = recipient.source_artifact();
+    let proof = SourceArtifactRestoreProof {
+        current_len: current_artifact.len(),
+        current_sha256: current_artifact
+            .fingerprint()
+            .expect("recipient artifact must fingerprint"),
+        original_len: original_artifact.len(),
+        original_sha256: original_fingerprint,
+    };
+    let mut output = Vec::new();
+    let error = recipient
+        .restore_source_artifact_to_stream(
+            &original_artifact,
+            proof,
+            original_artifact.len() + 1,
+            &mut output,
+        )
+        .expect_err("a changed dropped artifact must refuse restore before output");
+    assert!(matches!(error, OpcError::SourceChanged { .. }));
+    assert!(output.is_empty());
 }
 
 #[derive(Debug)]

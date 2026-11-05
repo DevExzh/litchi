@@ -20,8 +20,8 @@ pub(super) fn validate_pivot_identifier(
     Ok(())
 }
 
-pub(super) fn invalid(typ: &'static str, value: impl Into<String>) -> Error {
-    Error::InvalidFormula(format!("{typ}: {}", value.into()))
+pub(super) fn invalid(_typ: &'static str, _value: impl Into<String>) -> Error {
+    Error::InvalidFormula("invalid value")
 }
 
 pub(super) fn validate_table_name(name: &str) -> Result<()> {
@@ -30,19 +30,19 @@ pub(super) fn validate_table_name(name: &str) -> Result<()> {
         .get(..3)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("_xl"))
     {
-        return Err(Error::InvalidFormula(format!(
-            "table display name {name:?} uses reserved _xl prefix"
-        )));
+        return Err(Error::InvalidFormula(
+            "table display name uses reserved _xl prefix",
+        ));
     }
     Ok(())
 }
 
-pub(super) fn validate_table_column_name(name: &str, index: usize) -> Result<()> {
+pub(super) fn validate_table_column_name(name: &str, _index: usize) -> Result<()> {
     let units = name.encode_utf16().count();
     if units == 0 || units > 255 || name.contains('\0') {
-        return Err(Error::InvalidFormula(format!(
-            "table column {index} has invalid name length or NUL content"
-        )));
+        return Err(Error::InvalidFormula(
+            "table column has invalid name length or NUL content",
+        ));
     }
     Ok(())
 }

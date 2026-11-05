@@ -10,6 +10,7 @@ use super::{
     GeneratedParagraphProducer, MeasureSource, ReplayCounters, SourceCounters, TextMode,
     build_fixture,
 };
+use crate::docx_family_publication::StreamPlanPublish as _;
 use litchi_core::ReadAt;
 use litchi_docx::source_backed;
 use litchi_docx::source_backed::tail_append_stream::{AuthoredReplayError, Error as StreamError};
@@ -202,7 +203,7 @@ fn file_replay_mutation_after_publication_prefix_is_incomplete_and_typed() {
 
     let mut sink = MutatingPrefixSink::new(temporary.path());
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("mutation during DOCX publication must fail");
     assert!(sink.mutated, "sink must mutate after accepting its prefix");
     assert!(!sink.bytes.is_empty(), "publication must accept a prefix");

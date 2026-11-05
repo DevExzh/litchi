@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use std::io::{self, Cursor, Write};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -7,7 +11,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion, TextOutputOptions,
 };
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 
@@ -92,7 +96,7 @@ fn docx_bytes_with_alternate(primary: Vec<u8>, alternate: Vec<u8>) -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
-fn eager_texts(document: &litchi_docx::Document<'_>) -> Vec<String> {
+fn eager_texts(document: &litchi_docx::Document) -> Vec<String> {
     document
         .paragraphs()
         .unwrap()
@@ -110,7 +114,7 @@ fn source_texts(document: &source_backed::Document) -> Vec<String> {
         .collect()
 }
 
-fn assert_eager_view(document: &litchi_docx::Document<'_>, expected: &[&str]) {
+fn assert_eager_view(document: &litchi_docx::Document, expected: &[&str]) {
     assert_eq!(document.paragraph_count().unwrap(), expected.len());
     assert_eq!(document.text().unwrap(), expected.concat());
     assert_eq!(eager_texts(document), expected);
@@ -229,14 +233,13 @@ fn bom_and_mce_visibility_are_preserved_across_repeated_index_queries() {
 
 #[test]
 fn eager_mutable_save_replaces_cached_ranges_and_survives_reopen() {
-    let mut package =
-        Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let package = Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
     assert_eager_view(&package.document().unwrap(), &["before"]);
 
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("after");
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(1), "after")
+        .unwrap();
+    let package = edit.commit().unwrap().into_package();
     let output = tempfile::NamedTempFile::with_suffix(".docx").unwrap();
     package.save(output.path()).unwrap();
 
@@ -253,14 +256,19 @@ fn eager_raw_edit_replaces_cached_ranges_and_keeps_old_snapshot_stable() {
     let old_snapshot = package.document_snapshot().unwrap();
 
     let main = PackURI::new(MAIN).unwrap();
-    package
-        .edit_opc(|candidate| {
-            candidate
-                .get_part_mut(&main)?
-                .set_blob(document_xml(&["after", "new tail"]));
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&main)?
+                    .set_blob(document_xml(&["after", "new tail"]));
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     assert_eq!(old_snapshot.paragraph_count(), 1);
     assert_eq!(
@@ -283,20 +291,25 @@ fn eager_root_relationship_retarget_replaces_cached_ranges_and_survives_save() {
     let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
     assert_eager_view(&package.document().unwrap(), &["primary"]);
 
-    package
-        .edit_opc(|candidate| {
-            let office_document_id = candidate
-                .rels()
-                .iter()
-                .find(|relationship| relationship.reltype() == rt::OFFICE_DOCUMENT)
-                .map(|relationship| relationship.r_id().to_owned())
-                .expect("fixture must have one officeDocument relationship");
-            candidate
-                .relationships_mut()
-                .retarget(&office_document_id, "word/alternate.xml".to_owned())?;
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                let office_document_id = candidate
+                    .rels()
+                    .iter()
+                    .find(|relationship| relationship.reltype() == rt::OFFICE_DOCUMENT)
+                    .map(|relationship| relationship.r_id().to_owned())
+                    .expect("fixture must have one officeDocument relationship");
+                candidate
+                    .relationships_mut()
+                    .retarget(&office_document_id, "word/alternate.xml".to_owned())?;
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     assert_eager_view(
         &package.document().unwrap(),
@@ -313,20 +326,21 @@ fn eager_root_relationship_retarget_replaces_cached_ranges_and_survives_save() {
 
 #[test]
 fn eager_failed_save_keeps_warmed_generation_retryable() {
-    let mut package =
-        Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let package = Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
     assert_eager_view(&package.document().unwrap(), &["before"]);
 
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("after");
-    assert!(package.to_stream(FailingWriter).is_err());
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(1), "after")
+        .unwrap();
+    let changed = edit.commit().unwrap().into_package();
+    assert!(changed.write_to(FailingWriter).is_err());
 
-    // The failed sink must leave the published OPC generation unchanged. The
-    // staged mutable document remains retryable, while the warmed index still
-    // describes the old XML rather than an unpublished candidate.
+    // The failed sink must leave both published OPC generations unchanged:
+    // the source keeps its warmed index of the old XML, and the committed
+    // package stays retryable.
     assert_eager_view(&package.document().unwrap(), &["before"]);
+    assert_eager_view(&changed.document().unwrap(), &["before", "after"]);
+    let package = changed;
 
     let output = tempfile::NamedTempFile::with_suffix(".docx").unwrap();
     package.save(output.path()).unwrap();
@@ -402,10 +416,11 @@ fn source_change_after_a_warm_index_refuses_new_view_but_old_view_stays_pinned()
 fn cancellation_after_a_warm_index_is_checked_before_cache_reuse() {
     let bytes = docx_bytes(document_xml(&["managed", "read"]));
     let (budget, cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let document = package.document().unwrap();
@@ -438,10 +453,11 @@ fn managed_clean_index_pressure_does_not_refuse_a_following_text_sink() {
         .saturating_add(index_admission)
         .saturating_add(parser_workspace);
     let (budget, _cancellation_source, context) = managed_context(memory_limit);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
 
@@ -484,10 +500,11 @@ fn managed_clean_index_pressure_does_not_block_core_metadata_read() {
         .saturating_add(index_admission)
         .saturating_add(parser_workspace);
     let (budget, _cancellation_source, context) = managed_context(memory_limit);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
 
@@ -512,4 +529,96 @@ fn managed_clean_index_pressure_does_not_block_core_metadata_read() {
     drop(hold);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn owned_eager_projection_retains_the_graph_after_publication_and_drop() {
+    fn assert_owned_send_sync<T: Send + Sync + 'static>() {}
+    assert_owned_send_sync::<litchi_docx::Document>();
+
+    let original_core = core_properties_xml("before");
+    let bytes = docx_bytes_with_core(document_xml(&["before"]), original_core.clone());
+    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let document = package.document().unwrap();
+    let second = package.document().unwrap();
+    // Acquiring a projection shares the complete graph; it does not clone
+    // the package's parts or read unrelated payloads.
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    assert!(std::ptr::eq(document.opc_package(), second.opc_package()));
+    assert_eager_view(&document, &["before"]);
+    let core = PackURI::new("/docProps/core.xml").unwrap();
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&PackURI::new(MAIN).unwrap())?
+                    .set_blob(document_xml(&["after", "tail"]));
+                candidate
+                    .get_part_mut(&core)?
+                    .set_blob(core_properties_xml("after"));
+                Ok(())
+            }
+        })(edit.package_mut())
+        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    assert!(!std::ptr::eq(document.opc_package(), package.opc_package()));
+    assert_eager_view(&package.document().unwrap(), &["after", "tail"]);
+    assert_eq!(
+        document.opc_package().get_part(&core).unwrap().blob(),
+        original_core
+    );
+    drop(package);
+    drop(second);
+    assert_eager_view(&document, &["before"]);
+    assert_eq!(
+        document.opc_package().get_part(&core).unwrap().blob(),
+        original_core
+    );
+}
+
+#[test]
+fn owned_eager_projection_survives_failed_edit_and_failed_save() {
+    let package = Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let document = package.document().unwrap();
+    let error = {
+        let mut edit = package.edit_opc();
+        let value = (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&PackURI::new(MAIN).unwrap())?
+                    .set_blob(document_xml(&["unpublished"]));
+                Err::<(), _>(Error::InvalidFormat("injected edit failure".into()))
+            }
+        })(edit.package_mut());
+        // The failed staging is never committed; dropping the edit discards it.
+        drop(edit);
+        value
+    };
+    assert!(error.is_err());
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(1), "after")
+        .unwrap();
+    let package = edit.commit().unwrap().into_package();
+    assert!(package.write_to(FailingWriter).is_err());
+    assert_eager_view(&document, &["before"]);
+    let mut output = Cursor::new(Vec::new());
+    package.write_to(&mut output).unwrap();
+    assert_eager_view(&package.document().unwrap(), &["before", "after"]);
+    drop(package);
+    assert_eager_view(&document, &["before"]);
+}
+
+#[test]
+fn unchanged_eager_save_keeps_projection_graph_shared_and_bytes_exact() {
+    let bytes = docx_bytes(document_xml(&["unchanged"]));
+    let package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let document = package.document().unwrap();
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    assert_eq!(output, bytes);
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    assert_eager_view(&document, &["unchanged"]);
 }

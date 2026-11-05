@@ -21,8 +21,8 @@ use litchi_sheet::view::{
 };
 use litchi_sheet::{Cell, Rect};
 use litchi_xlsb::Workbook;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::raw::{Kind, Records, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -34,19 +34,27 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn workbook_bytes(configure: impl FnOnce(&mut MutableWorksheet)) -> Vec<u8> {
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+fn workbook_bytes(configure: impl FnOnce(&mut builder::Worksheet)) -> Vec<u8> {
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "views");
     configure(&mut sheet);
     workbook.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
 fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
-    let package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .get_part(&PackURI::new(path).unwrap())
         .unwrap()
@@ -56,7 +64,7 @@ fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
 
 fn records(data: &[u8]) -> Vec<(Kind, Vec<u8>)> {
     let mut result = Vec::new();
-    for record in Records::new(data) {
+    for record in Records::new(data, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         result.push((record.kind(), record.payload().to_vec()));
     }
@@ -279,7 +287,7 @@ fn explicit_sheet_view_round_trip() {
 
 #[test]
 fn freeze_panes_updates_canonical_view_without_losing_non_pane_state() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     let mut view = View::default();
     view.window = Window::new(9);
     view.color = Color::new(64).unwrap();
@@ -376,7 +384,7 @@ fn untouched_worksheet_stream_round_trips_byte_identical() {
         assert_eq!(worksheet.views().len(), 1);
     }
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.to_package().write_to(&mut output).unwrap();
     let saved = output.into_inner();
 
     for name in [

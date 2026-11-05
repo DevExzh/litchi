@@ -6,13 +6,15 @@ use crate::animation::diagram_build::BuildType;
 use crate::package::{Error, Result};
 
 use super::super::model::{Build, Id, ShapeRef};
-use super::super::transaction::{Change, Patch as DiagramPatch, Transaction as DiagramTransaction};
+use super::super::transaction::{
+    Change, RecordEdit as DiagramTransaction, RecordPatch as DiagramPatch,
+};
 use super::codec;
 use super::model::{SlideLimits, SlideRevision, SlideSnapshot};
 
 /// An isolated editor over the supported diagram metadata inside one slide.
 #[derive(Debug, Clone)]
-pub struct SlideEditor {
+pub(crate) struct SlideEditor {
     source: SlideSnapshot,
     diagram: DiagramTransaction,
 }
@@ -25,27 +27,15 @@ impl SlideEditor {
         }
     }
 
-    /// Borrow the exact source slide snapshot.
-    #[must_use]
-    pub const fn source(&self) -> &SlideSnapshot {
-        &self.source
-    }
-
     /// Iterate the currently staged typed diagram builds.
     #[must_use]
-    pub fn builds(&self) -> impl ExactSizeIterator<Item = Build> + '_ {
+    pub(crate) fn builds(&self) -> impl ExactSizeIterator<Item = Build> + '_ {
         self.diagram.builds()
-    }
-
-    /// Whether supported metadata differs from the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.diagram.is_changed()
     }
 
     /// Borrow semantic diagram changes staged in this editor.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         self.diagram.changes()
     }
 
@@ -54,7 +44,7 @@ impl SlideEditor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_mode(&mut self, id: Id, mode: BuildType) -> Result<()> {
+    pub(crate) fn set_mode(&mut self, id: Id, mode: BuildType) -> Result<()> {
         self.diagram.set_mode(id, mode)
     }
 
@@ -63,7 +53,7 @@ impl SlideEditor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_shape_id(&mut self, id: Id, shape_id: u32) -> Result<Id> {
+    pub(crate) fn set_shape_id(&mut self, id: Id, shape_id: u32) -> Result<Id> {
         self.diagram.set_shape_id(id, shape_id)
     }
 
@@ -73,23 +63,8 @@ impl SlideEditor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_shape(&mut self, id: Id, shape: ShapeRef) -> Result<Id> {
+    pub(crate) fn set_shape(&mut self, id: Id, shape: ShapeRef) -> Result<Id> {
         self.diagram.set_shape(id, shape)
-    }
-
-    /// Capture the candidate slide without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<SlideSnapshot> {
-        let diagram = self.diagram.snapshot()?;
-        let bytes = codec::replace_build_list(
-            self.source.bytes(),
-            self.source.build_range.clone(),
-            diagram.bytes(),
-        )?;
-        SlideSnapshot::from_bytes_with_limits(bytes, self.source.limits())
     }
 
     /// Validate and publish a source-checked, reversible slide patch.
@@ -97,7 +72,7 @@ impl SlideEditor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<SlideCommit> {
+    pub(crate) fn commit(self) -> Result<SlideCommit> {
         let diagram_commit = self.diagram.commit()?;
         let source = self.source;
         let target_diagram = diagram_commit.snapshot();
@@ -138,26 +113,11 @@ impl SlideEditor {
         };
         Ok(SlideCommit { snapshot, patch })
     }
-
-    /// Alias matching move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<SlideCommit> {
-        self.commit()
-    }
-
-    /// Discard staged changes and recover the exact source slide.
-    #[must_use]
-    pub fn rollback(self) -> SlideSnapshot {
-        self.source
-    }
 }
 
 /// A committed owning-slide snapshot and reversible whole-slide patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideCommit {
+pub(crate) struct SlideCommit {
     snapshot: SlideSnapshot,
     patch: SlidePatch,
 }
@@ -165,19 +125,19 @@ pub struct SlideCommit {
 impl SlideCommit {
     /// Borrow the validated target slide snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &SlideSnapshot {
+    pub(crate) const fn snapshot(&self) -> &SlideSnapshot {
         &self.snapshot
     }
 
     /// Borrow the source-checked patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlidePatch {
+    pub(crate) const fn patch(&self) -> &SlidePatch {
         &self.patch
     }
 
     /// Consume the commit into its target snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (SlideSnapshot, SlidePatch) {
+    pub(crate) fn into_parts(self) -> (SlideSnapshot, SlidePatch) {
         (self.snapshot, self.patch)
     }
 
@@ -186,7 +146,7 @@ impl SlideCommit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
+    pub(crate) fn undo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
         self.patch.undo(current)
     }
 
@@ -195,14 +155,14 @@ impl SlideCommit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
+    pub(crate) fn redo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
         self.patch.redo(current)
     }
 }
 
 /// A source-checked reversible patch for one complete `SlideContainer`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlidePatch {
+pub(crate) struct SlidePatch {
     base: SlideRevision,
     target: SlideRevision,
     before: Arc<[u8]>,
@@ -214,43 +174,37 @@ pub struct SlidePatch {
 impl SlidePatch {
     /// Source revision required for forward application.
     #[must_use]
-    pub const fn base(&self) -> SlideRevision {
+    pub(crate) const fn base(&self) -> SlideRevision {
         self.base
     }
 
     /// Target revision produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> SlideRevision {
+    pub(crate) const fn target(&self) -> SlideRevision {
         self.target
     }
 
     /// Exact source slide bytes bound to this patch.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Exact replacement slide bytes produced by this patch.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// The nested typed diagram patch represented by this publication.
     #[must_use]
-    pub const fn diagram(&self) -> &DiagramPatch {
-        &self.diagram
-    }
-
-    /// Alias for callers that name the nested owner explicitly.
-    #[must_use]
-    pub const fn build(&self) -> &DiagramPatch {
+    pub(crate) const fn diagram(&self) -> &DiagramPatch {
         &self.diagram
     }
 
     /// Whether this patch is an exact no-op.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.diagram.is_empty()
     }
 
@@ -259,7 +213,7 @@ impl SlidePatch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
+    pub(crate) fn apply(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
         if current.revision() != self.base || current.bytes() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "diagram publication patch source does not match its base slide".into(),
@@ -282,7 +236,7 @@ impl SlidePatch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
+    pub(crate) fn undo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
         self.inverse().apply(current)
     }
 
@@ -291,13 +245,13 @@ impl SlidePatch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
+    pub(crate) fn redo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             base: self.target,
             target: self.base,

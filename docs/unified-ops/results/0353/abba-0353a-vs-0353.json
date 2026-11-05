@@ -1,0 +1,141 @@
+{
+ "order": "ABBA per round",
+ "rounds": 12,
+ "rows": 2000,
+ "samples_per_process": 15,
+ "cpu": 20,
+ "baseline": "bench-a3",
+ "candidate": "bench-final",
+ "processes_per_leg": 24,
+ "scenarios": {
+  "cell/xls": {
+   "baseline_median_us": 105.31,
+   "candidate_median_us": 92.26,
+   "ratio": 0.8761,
+   "baseline_min_us": 100.31,
+   "candidate_min_us": 89.01
+  },
+  "cell/xlsb": {
+   "baseline_median_us": 891.63,
+   "candidate_median_us": 776.33,
+   "ratio": 0.8707,
+   "baseline_min_us": 872.13,
+   "candidate_min_us": 766.76
+  },
+  "cell/xlsx": {
+   "baseline_median_us": 824.95,
+   "candidate_median_us": 808.61,
+   "ratio": 0.9802,
+   "baseline_min_us": 811.69,
+   "candidate_min_us": 792.69
+  },
+  "cell_value/xls": {
+   "baseline_median_us": 114.34,
+   "candidate_median_us": 105.5,
+   "ratio": 0.9227,
+   "baseline_min_us": 107.52,
+   "candidate_min_us": 103.66
+  },
+  "cell_value/xlsb": {
+   "baseline_median_us": 859.0,
+   "candidate_median_us": 799.56,
+   "ratio": 0.9308,
+   "baseline_min_us": 846.56,
+   "candidate_min_us": 793.87
+  },
+  "cell_value/xlsx": {
+   "baseline_median_us": 817.86,
+   "candidate_median_us": 821.19,
+   "ratio": 1.0041,
+   "baseline_min_us": 811.28,
+   "candidate_min_us": 809.39
+  },
+  "cells/xls": {
+   "baseline_median_us": 8.43,
+   "candidate_median_us": 8.21,
+   "ratio": 0.9739,
+   "baseline_min_us": 8.33,
+   "candidate_min_us": 7.83
+  },
+  "cells/xlsb": {
+   "baseline_median_us": 309.21,
+   "candidate_median_us": 296.98,
+   "ratio": 0.9605,
+   "baseline_min_us": 303.05,
+   "candidate_min_us": 290.63
+  },
+  "cells/xlsx": {
+   "baseline_median_us": 290.64,
+   "candidate_median_us": 294.88,
+   "ratio": 1.0146,
+   "baseline_min_us": 287.77,
+   "candidate_min_us": 291.29
+  },
+  "evaluate/xls": {
+   "baseline_median_us": 555.53,
+   "candidate_median_us": 556.95,
+   "ratio": 1.0026,
+   "baseline_min_us": 550.25,
+   "candidate_min_us": 551.55
+  },
+  "evaluate/xlsb": {
+   "baseline_median_us": 1752.53,
+   "candidate_median_us": 1756.41,
+   "ratio": 1.0022,
+   "baseline_min_us": 1736.02,
+   "candidate_min_us": 1736.94
+  },
+  "evaluate/xlsx": {
+   "baseline_median_us": 5994.06,
+   "candidate_median_us": 5622.86,
+   "ratio": 0.9381,
+   "baseline_min_us": 5929.64,
+   "candidate_min_us": 5587.63
+  },
+  "recalculate/xls": {
+   "baseline_median_us": 3048.64,
+   "candidate_median_us": 2793.41,
+   "ratio": 0.9163,
+   "baseline_min_us": 3021.36,
+   "candidate_min_us": 2775.94
+  },
+  "recalculate/xlsb": {
+   "baseline_median_us": 5861.58,
+   "candidate_median_us": 5368.47,
+   "ratio": 0.9159,
+   "baseline_min_us": 5822.15,
+   "candidate_min_us": 5313.0
+  },
+  "recalculate/xlsx": {
+   "baseline_median_us": 5800.31,
+   "candidate_median_us": 5330.96,
+   "ratio": 0.9191,
+   "baseline_min_us": 5748.81,
+   "candidate_min_us": 5293.21
+  },
+  "recalculate_heavy/xls": {
+   "baseline_median_us": 2035.4,
+   "candidate_median_us": 1785.44,
+   "ratio": 0.8772,
+   "baseline_min_us": 2007.37,
+   "candidate_min_us": 1759.67
+  },
+  "recalculate_heavy/xlsb": {
+   "baseline_median_us": 6974.08,
+   "candidate_median_us": 6030.55,
+   "ratio": 0.8647,
+   "baseline_min_us": 6906.33,
+   "candidate_min_us": 5945.06
+  },
+  "recalculate_heavy/xlsx": {
+   "baseline_median_us": 7007.57,
+   "candidate_median_us": 5996.09,
+   "ratio": 0.8557,
+   "baseline_min_us": 6885.04,
+   "candidate_min_us": 5936.67
+  }
+ },
+ "record": "0353a",
+ "baseline_commit": "d8c442a413 (record 0353 tip)",
+ "note": "before/after of one change, not a leaf-vs-unified pair; candidate = uo2/sheet-dispatch 0353a"
+}

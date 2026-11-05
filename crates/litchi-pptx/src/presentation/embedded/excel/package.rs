@@ -1,5 +1,6 @@
 use super::model::{Chart, Kind};
 use crate::Result;
+use litchi_drawingml::chart::authoring::Spec;
 use litchi_opc::PackURI;
 use litchi_opc::phys_pkg::PhysPkgWriter;
 use std::fmt::Write;
@@ -32,6 +33,24 @@ pub fn generate(chart: &Chart) -> Result<Vec<u8>> {
         "/xl/worksheets/sheet1.xml",
         worksheet.as_bytes(),
     )?;
+    Ok(writer.finish()?)
+}
+
+/// Generate a minimal workbook holding the worksheet layout an authored
+/// chart spec refers to ([`Spec::sheet_layout`]), on `Sheet1`: the members
+/// of [`Spec::workbook_members`], zipped.
+///
+/// # Errors
+///
+/// Returns an error if the spec is invalid or the package cannot be written.
+pub(crate) fn generate_spec(spec: &Spec) -> Result<Vec<u8>> {
+    let members = spec
+        .workbook_members()
+        .map_err(|error| crate::Error::Invalid(error.to_string()))?;
+    let mut writer = PhysPkgWriter::new();
+    for (name, bytes) in members {
+        write_part(&mut writer, name, &bytes)?;
+    }
     Ok(writer.finish()?)
 }
 
@@ -227,7 +246,7 @@ mod tests {
                 .with_values(vec![10.0, 20.0]),
         );
         let bytes = generate(&chart).unwrap();
-        let package = OpcPackage::from_bytes(&bytes).unwrap();
+        let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(
             package
                 .get_part(&PackURI::new("/xl/workbook.xml").unwrap())

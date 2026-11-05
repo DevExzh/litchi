@@ -1,0 +1,476 @@
+{
+  "build_provenance": {
+    "build_command": "CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/tmp/litchi-unified-0161-target CARGO_NET_OFFLINE=true cargo build --offline --release --manifest-path tools/perf-baseline/unified-pptx-shape-removal/Cargo.toml",
+    "crate": "unified-pptx-shape-removal-baseline",
+    "crate_version": "0.1.0",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "source_commit": "c63a0ad4fbd975394ebc7b8f7f4b0a11d2573245",
+    "target": "x86_64-unknown-linux-gnu",
+    "source_manifest_files": 8234,
+    "source_manifest_sha256": "d03b6b60f1cf40a6d88315c42d54583c73cbcfcf4515b74bc0bafba80fd990a2",
+    "source_manifest_algorithm": "Sort relative .rs, Cargo.toml and Cargo.lock paths under crates and tools/perf-baseline/unified-pptx-shape-removal; concatenate SHA-256(file), two spaces, path, LF; SHA-256 that UTF-8 manifest.",
+    "working_tree": "dirty: includes records 0159\u20130161 changes",
+    "binary": {
+      "name": "unified-pptx-shape-removal-baseline",
+      "bytes": 9900272,
+      "sha256": "be4ab4c9a7634e61ccfc00a443f3de82a9cd60fc22d57c1e983f4c581cbb3e8b"
+    }
+  },
+  "counts": [
+    1,
+    10,
+    100,
+    1000,
+    10000
+  ],
+  "equivalence_scope": "warm-up outputs are compared by exact bytes, falling back to decoded ZIP members before timing",
+  "failure_matrix": [],
+  "format": "pptx",
+  "order": "ABBA",
+  "owners": [
+    "eager",
+    "source"
+  ],
+  "performance_claim": "scoped timing evidence only; full acceptance remains pending",
+  "publication_contract": "native_calls and native_commits are one per sample; unified_remove_calls is one per sample; one top-level shape is removed per sample",
+  "results": [
+    {
+      "artifact": {
+        "bytes": 29508,
+        "corpus_sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75",
+        "count": 1,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75"
+      },
+      "count": 1,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 316612,
+      "native_ns": [
+        379242,
+        321191,
+        312342,
+        309762,
+        316571,
+        316612
+      ],
+      "native_route": "pptx_eager_native_primary_shape_removal_v1",
+      "native_shape_position": 0,
+      "operation": "shape_remove",
+      "owner": "eager",
+      "unified_diagnostics": null,
+      "unified_median_ns": 328582,
+      "unified_ns": [
+        353862,
+        340712,
+        328582,
+        315281,
+        317312,
+        320592
+      ],
+      "unified_over_native": 1.0378065266003815,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_eager_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[1]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 29508,
+        "corpus_sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75",
+        "count": 1,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75"
+      },
+      "count": 1,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 52361,
+      "native_ns": [
+        57650,
+        53460,
+        52361,
+        51980,
+        51741,
+        52021
+      ],
+      "native_route": "pptx_source_native_primary_shape_removal_v1",
+      "native_shape_position": 0,
+      "operation": "shape_remove",
+      "owner": "source",
+      "unified_diagnostics": null,
+      "unified_median_ns": 53490,
+      "unified_ns": [
+        57191,
+        53670,
+        52790,
+        53160,
+        53490,
+        52780
+      ],
+      "unified_over_native": 1.0215618494681156,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_source_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[1]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 29601,
+        "corpus_sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8",
+        "count": 10,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8"
+      },
+      "count": 10,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 507753,
+      "native_ns": [
+        570183,
+        509162,
+        506163,
+        504683,
+        491843,
+        507753
+      ],
+      "native_route": "pptx_eager_native_primary_shape_removal_v1",
+      "native_shape_position": 9,
+      "operation": "shape_remove",
+      "owner": "eager",
+      "unified_diagnostics": null,
+      "unified_median_ns": 550892,
+      "unified_ns": [
+        566683,
+        553752,
+        537582,
+        527162,
+        550892,
+        532403
+      ],
+      "unified_over_native": 1.0849606009221018,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_eager_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[10]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 29601,
+        "corpus_sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8",
+        "count": 10,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8"
+      },
+      "count": 10,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 289291,
+      "native_ns": [
+        290861,
+        284352,
+        289861,
+        282632,
+        289291,
+        281831
+      ],
+      "native_route": "pptx_source_native_primary_shape_removal_v1",
+      "native_shape_position": 9,
+      "operation": "shape_remove",
+      "owner": "source",
+      "unified_diagnostics": null,
+      "unified_median_ns": 285541,
+      "unified_ns": [
+        302082,
+        285541,
+        291722,
+        284281,
+        283592,
+        282261
+      ],
+      "unified_over_native": 0.9870372738868475,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_source_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[10]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 30237,
+        "corpus_sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9",
+        "count": 100,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9"
+      },
+      "count": 100,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 2302202,
+      "native_ns": [
+        2341542,
+        2302202,
+        2283822,
+        2282512,
+        2309662,
+        2298202
+      ],
+      "native_route": "pptx_eager_native_primary_shape_removal_v1",
+      "native_shape_position": 99,
+      "operation": "shape_remove",
+      "owner": "eager",
+      "unified_diagnostics": null,
+      "unified_median_ns": 2541603,
+      "unified_ns": [
+        2571033,
+        2540343,
+        2541603,
+        2546133,
+        2534423,
+        2537543
+      ],
+      "unified_over_native": 1.1039878342560732,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_eager_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[100]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 30237,
+        "corpus_sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9",
+        "count": 100,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9"
+      },
+      "count": 100,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 2575953,
+      "native_ns": [
+        2577243,
+        2575953,
+        2574634,
+        2578173,
+        2571594,
+        2574953
+      ],
+      "native_route": "pptx_source_native_primary_shape_removal_v1",
+      "native_shape_position": 99,
+      "operation": "shape_remove",
+      "owner": "source",
+      "unified_diagnostics": null,
+      "unified_median_ns": 2568853,
+      "unified_ns": [
+        2581824,
+        2562163,
+        2556743,
+        2579763,
+        2567563,
+        2568853
+      ],
+      "unified_over_native": 0.9972437385309437,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_source_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[100]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 36017,
+        "corpus_sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771",
+        "count": 1000,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771"
+      },
+      "count": 1000,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 19721512,
+      "native_ns": [
+        19904093,
+        19707522,
+        19721512,
+        19744392,
+        19676962,
+        19676662
+      ],
+      "native_route": "pptx_eager_native_primary_shape_removal_v1",
+      "native_shape_position": 999,
+      "operation": "shape_remove",
+      "owner": "eager",
+      "unified_diagnostics": null,
+      "unified_median_ns": 22149294,
+      "unified_ns": [
+        22190134,
+        22196185,
+        22128534,
+        22116084,
+        22143744,
+        22149294
+      ],
+      "unified_over_native": 1.1231032387374762,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_eager_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[1000]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 36017,
+        "corpus_sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771",
+        "count": 1000,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771"
+      },
+      "count": 1000,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 25510952,
+      "native_ns": [
+        25510952,
+        25519571,
+        25560112,
+        25434571,
+        25503362,
+        25504081
+      ],
+      "native_route": "pptx_source_native_primary_shape_removal_v1",
+      "native_shape_position": 999,
+      "operation": "shape_remove",
+      "owner": "source",
+      "unified_diagnostics": null,
+      "unified_median_ns": 25428041,
+      "unified_ns": [
+        25428041,
+        25447142,
+        25404512,
+        25421501,
+        25412381,
+        25463542
+      ],
+      "unified_over_native": 0.9967499840852666,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_source_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[1000]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 91398,
+        "corpus_sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd",
+        "count": 10000,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd"
+      },
+      "count": 10000,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 193809031,
+      "native_ns": [
+        195038157,
+        194049572,
+        193454369,
+        193437169,
+        193809031,
+        193633760
+      ],
+      "native_route": "pptx_eager_native_primary_shape_removal_v1",
+      "native_shape_position": 9999,
+      "operation": "shape_remove",
+      "owner": "eager",
+      "unified_diagnostics": null,
+      "unified_median_ns": 218211667,
+      "unified_ns": [
+        218211667,
+        218244997,
+        217759514,
+        217875085,
+        217933005,
+        218221187
+      ],
+      "unified_over_native": 1.12591072703934,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_eager_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[10000]",
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 91398,
+        "corpus_sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd",
+        "count": 10000,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd"
+      },
+      "count": 10000,
+      "native_calls": 1,
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 255017097,
+      "native_ns": [
+        254889526,
+        254372703,
+        254847476,
+        255017097,
+        255086847,
+        256066242
+      ],
+      "native_route": "pptx_source_native_primary_shape_removal_v1",
+      "native_shape_position": 9999,
+      "operation": "shape_remove",
+      "owner": "source",
+      "unified_diagnostics": null,
+      "unified_median_ns": 254368824,
+      "unified_ns": [
+        253919121,
+        254368824,
+        254354254,
+        254225012,
+        255318398,
+        255678710
+      ],
+      "unified_over_native": 0.9974579233799371,
+      "unified_remove_calls": 1,
+      "unified_route": "pptx_source_unified_file_remove_shape_removal_v1",
+      "unified_target": "/slide[1]/shape[10000]",
+      "warm_equivalence": "exact_bytes"
+    }
+  ],
+  "rounds": 3,
+  "routes": [
+    "pptx_eager_native_primary_shape_removal_v1",
+    "pptx_eager_unified_file_remove_shape_removal_v1",
+    "pptx_source_native_primary_shape_removal_v1",
+    "pptx_source_unified_file_remove_shape_removal_v1"
+  ],
+  "samples_per_leg": 6,
+  "schema": 1,
+  "selector_template": "/slide[1]/shape[N]",
+  "timing_scope": "one native primary Edit.remove_shape(Position(0), count-1) call plus one commit, or one prepared unified File::remove('/slide[1]/shape[N]') call; excludes corpus generation, opening, target preparation, warm-up, output serialization/save, equivalence checks and drop",
+  "workload": "one-slide-shape-removal",
+  "measurement_environment": {
+    "platform": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.43",
+    "cpu_affinity": [
+      0
+    ],
+    "cpu_model": "AMD EPYC 9R45",
+    "command": "taskset -c 0 /tmp/litchi-unified-0161-target/release/unified-pptx-shape-removal-baseline --rounds 3",
+    "concurrent_cargo_jobs": false
+  },
+  "raw_artifact": {
+    "name": "litchi-unified-0161-removal-raw.json",
+    "bytes": 14042,
+    "sha256": "8557a5a4913e74a77b53969fefb93feb7ccf620cd2a60a7d4a92f63089006b6b",
+    "regenerate": "Build with build_provenance.build_command, then run measurement_environment.command with the recorded LITCHI_* provenance environment.",
+    "cleanup": "Raw JSON and compiled binary removed after retaining every timing sample and provenance in this result."
+  }
+}

@@ -234,7 +234,12 @@ fn parse_archive(bytes: &[u8]) -> ZipArchive<Cursor<&[u8]>> {
 fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
     let parsed = parse_archive(bytes);
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&parsed, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &parsed,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     index
         .entries()
         .iter()

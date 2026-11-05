@@ -7,11 +7,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let poi_path =
         "test-data/poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt";
     let poi_file = std::fs::File::open(poi_path)?;
-    let mut poi_ole = OleFile::open(poi_file)?;
+    let mut poi_ole = OleFile::open(poi_file, litchi_cfb::OleFileLimits::default())?;
     let poi = poi_ole.open_stream(&["PowerPoint Document"])?;
 
     let min_file = std::fs::File::open("minimal.ppt")?;
-    let mut min_ole = OleFile::open(min_file)?;
+    let mut min_ole = OleFile::open(min_file, litchi_cfb::OleFileLimits::default())?;
     let min = min_ole.open_stream(&["PowerPoint Document"])?;
 
     let mut diff = 0;
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Check with_slide.ppt size
     let ws_file = std::fs::File::open("with_slide.ppt")?;
-    let mut ws_ole = OleFile::open(ws_file)?;
+    let mut ws_ole = OleFile::open(ws_file, litchi_cfb::OleFileLimits::default())?;
     let ws = ws_ole.open_stream(&["PowerPoint Document"])?;
     println!("with_slide.ppt: {} bytes", ws.len());
 

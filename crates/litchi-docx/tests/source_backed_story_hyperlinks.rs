@@ -10,7 +10,7 @@ use litchi_core::{
 use litchi_docx::package::StoryLimits;
 use litchi_docx::source_backed;
 use litchi_docx::story_hyperlinks::{Limits as StoryHyperlinkLimits, Mode, UnsupportedClass};
-use litchi_docx::{Error, ReadLimits};
+use litchi_docx::{Error, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -128,7 +128,7 @@ fn open(bytes: Vec<u8>) -> source_backed::Package {
 }
 
 fn empty_inventory_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     for (part_name, relationship_id) in [
         ("/word/document.xml", "rMain"),
         ("/word/header1.xml", "rLink"),
@@ -183,7 +183,7 @@ impl ReadAt for VersionedSource {
 }
 
 fn nested_owner_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/word/header1.xml").unwrap())
         .unwrap()
@@ -199,7 +199,7 @@ fn nested_owner_fixture() -> Vec<u8> {
 }
 
 fn mixed_dialect_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let header = package
         .get_part_mut(&PackURI::new("/word/header1.xml").unwrap())
         .unwrap();
@@ -214,7 +214,7 @@ fn mixed_dialect_fixture() -> Vec<u8> {
 }
 
 fn prolog_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let document = package
         .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -247,7 +247,7 @@ fn package_signature_fixture() -> Vec<u8> {
 }
 
 fn protected_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let main = package
         .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -273,7 +273,7 @@ fn protected_fixture() -> Vec<u8> {
 }
 
 fn delete_instruction_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let main = package
         .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -286,7 +286,7 @@ fn delete_instruction_fixture() -> Vec<u8> {
 }
 
 fn mixed_transitional_hyperlink_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let header = package
         .get_part_mut(&PackURI::new("/word/header1.xml").unwrap())
         .unwrap();
@@ -304,7 +304,7 @@ fn mixed_transitional_hyperlink_fixture() -> Vec<u8> {
 }
 
 fn strict_package_with_transitional_hyperlink_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let part_names: Vec<PackURI> = package
         .iter_parts()
         .map(|part| part.partname().clone())
@@ -386,7 +386,7 @@ fn strict_package_with_transitional_hyperlink_fixture() -> Vec<u8> {
 }
 
 fn custom_inbound_owner_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     let mut custom = BlobPart::new(
         PackURI::new("/custom/custom.xml").unwrap(),
         "application/xml".to_owned(),
@@ -415,7 +415,8 @@ fn suspicious_non_part_fixture() -> Vec<u8> {
 }
 
 fn suspicious_non_part_fixture_with_members(names: &[&str]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",
@@ -452,7 +453,7 @@ fn suspicious_non_part_fixture_with_members(names: &[&str]) -> Vec<u8> {
 }
 
 fn child_relationship_limit_fixture(extra_relationships: usize) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture(false), SourceLimits::default()).unwrap();
     for part_name in [
         "/word/header1.xml",
         "/word/footer1.xml",
@@ -517,18 +518,15 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
             .all(|relationship| relationship.wrapper_count() == 1)
     );
 
-    let commit = package
-        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
         .unwrap();
-    assert_eq!(commit.effect_report().removed_relationships(), 7);
-    assert_eq!(commit.effect_report().unwrapped_hyperlinks(), 7);
+    assert_eq!(edit.effect_report().removed_relationships(), 7);
+    assert_eq!(edit.effect_report().unwrapped_hyperlinks(), 7);
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-        .unwrap();
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     for name in [
         "document.xml",
         "header1.xml",
@@ -550,7 +548,7 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
 fn duplicate_target_selectors_are_deduplicated_and_missing_targets_are_typed() {
     let package = open(fixture(false));
     let plan = package
-        .plan_story_hyperlink_redaction(
+        .edit_story_hyperlink_redaction(
             &["https://shared.invalid/", "https://shared.invalid/"],
             Mode::Strict,
         )
@@ -559,7 +557,7 @@ fn duplicate_target_selectors_are_deduplicated_and_missing_targets_are_typed() {
     assert_eq!(plan.effect_report().removed_relationships(), 7);
 
     assert!(matches!(
-        package.plan_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
+        package.edit_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
         Err(Error::InvalidFormat(message)) if message.contains("target is not present")
     ));
 }
@@ -574,40 +572,46 @@ fn empty_relationship_inventory_fails_closed_and_publishes_an_exact_noop() {
     assert!(snapshot.inventory().is_complete());
 
     assert!(matches!(
-        package.plan_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
+        package.edit_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
         Err(Error::InvalidFormat(message)) if message.contains("target is not present")
     ));
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
+    assert!(edit.effect_report().is_noop());
+    let commit = edit.commit().unwrap();
+    assert!(commit.patch().is_noop());
     let mut output = Vec::new();
-    package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 }
 
 #[test]
-fn stale_and_foreign_commits_fail_before_output() {
+fn stale_commits_fail_and_matching_sources_replay_before_output() {
     let source = Arc::new(VersionedSource {
         bytes: fixture(false),
         revision: AtomicU64::new(0),
     });
     let package = source_backed::Package::from_read_at(source.clone()).unwrap();
     let commit = package
-        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
+    let inverse = commit.patch().inverse();
+    assert!(matches!(
+        package.apply_story_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_story_hyperlink_redaction_to_stream(&mut output, &commit),
+        package
+            .apply_story_hyperlink_redaction(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
-            | Err(Error::ExternalHyperlinkRedactionConflict)
+            | Err(Error::PatchConflict { .. })
     ));
     assert!(output.is_empty());
 
@@ -615,16 +619,46 @@ fn stale_and_foreign_commits_fail_before_output() {
     let first = open(bytes.clone());
     let second = open(bytes);
     let commit = first
-        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
+    second
+        .apply_story_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
+        .unwrap();
+    assert!(!output.is_empty());
+}
+
+#[test]
+fn inverse_restores_its_owner_but_refuses_an_equal_foreign_redacted_artifact() {
+    let original = fixture(false);
+    let package = open(original.clone());
+    let commit = package
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .unwrap()
+        .commit()
+        .unwrap();
+    let inverse = commit.patch().inverse();
+
+    let restored = commit
+        .package()
+        .apply_story_hyperlink_redaction(&inverse)
+        .expect("the inverse must restore its retained owner");
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(restored_bytes, original);
+
+    let mut redacted = Vec::new();
+    commit.package().write_to(&mut redacted).unwrap();
+    let foreign = open(redacted);
     assert!(matches!(
-        second.publish_story_hyperlink_redaction_to_stream(&mut output, &commit),
-        Err(Error::ExternalHyperlinkRedactionConflict)
+        foreign.apply_story_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+                && refusal.operation() == "story_hyperlink_redaction"
     ));
-    assert!(output.is_empty());
 }
 
 #[test]
@@ -634,13 +668,13 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
         .with_max_selected_relationships(6)
         .unwrap();
     assert!(matches!(
-        package.plan_story_hyperlink_redaction_with_limits(
-            &["https://shared.invalid/"],
-            Mode::Strict,
-            selected_limit,
-        ),
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(selected_limit)
+            )
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "selected story hyperlink relationships",
+            kind: litchi_docx::redact::LimitKind::SelectedStoryHyperlinkRelationships,
             maximum: 6,
             actual: 7,
         })
@@ -650,13 +684,13 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
         .with_max_changed_stories(6)
         .unwrap();
     assert!(matches!(
-        package.plan_story_hyperlink_redaction_with_limits(
-            &["https://shared.invalid/"],
-            Mode::Strict,
-            changed_story_limit,
-        ),
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(changed_story_limit)
+            )
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
-            resource: "changed story parts",
+            kind: litchi_docx::redact::LimitKind::ChangedStoryParts,
             maximum: 6,
             actual: 7,
         })
@@ -667,16 +701,14 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
 fn exact_noop_copies_source_and_strict_fields_refuse_before_output() {
     let bytes = fixture(false);
     let package = open(bytes.clone());
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
+    assert!(edit.effect_report().is_noop());
+    let commit = edit.commit().unwrap();
+    assert!(commit.patch().is_noop());
     let mut output = Vec::new();
-    package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
     let field = open(fixture(true));
@@ -689,7 +721,7 @@ fn exact_noop_copies_source_and_strict_fields_refuse_before_output() {
     );
     assert!(
         field
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -706,7 +738,7 @@ fn nested_story_owner_is_inventory_diagnostic_and_strict_refusal() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -720,7 +752,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
     let story = StoryLimits {
@@ -729,7 +764,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
 
@@ -740,7 +778,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
     let story = StoryLimits {
@@ -749,7 +790,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
 }
@@ -766,7 +810,10 @@ fn closure_capture_enforces_exact_and_one_under_topology_limit() {
             ..StoryLimits::default()
         };
         if package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story)),
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
         {
             high = middle;
@@ -780,7 +827,10 @@ fn closure_capture_enforces_exact_and_one_under_topology_limit() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
     let one_under = StoryLimits {
@@ -789,7 +839,11 @@ fn closure_capture_enforces_exact_and_one_under_topology_limit() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(one_under))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .story_hyperlinks(with_story_limits(one_under))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
 }
@@ -809,7 +863,7 @@ fn mixed_strict_child_qname_is_rejected_and_root_signature_is_diagnosed() {
     );
     assert!(
         signed
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -840,60 +894,53 @@ fn late_custom_inbound_story_owner_is_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
 
 #[test]
-fn foreign_identical_source_lineage_cannot_publish_a_noop_commit() {
+fn matching_source_lineage_can_publish_a_noop_commit() {
     let bytes = fixture(false);
     let first = open(bytes.clone());
     let second = open(bytes);
     let commit = first
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
-    assert!(
-        second
-            .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-            .is_err()
-    );
-    assert!(output.is_empty());
+    second
+        .apply_story_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
+        .unwrap();
+    assert_eq!(output, fixture(false));
 }
 
 #[test]
 fn empty_selector_copies_signed_source_exactly_despite_security_diagnostics() {
     let bytes = package_signature_fixture();
     let package = open(bytes.clone());
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
-    assert!(!commit.report().is_complete());
+    assert!(edit.effect_report().is_noop());
+    assert!(!edit.report().is_complete());
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
     let bytes = protected_fixture();
     let package = open(bytes.clone());
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
-    assert!(!commit.report().is_complete());
+    assert!(edit.effect_report().is_noop());
+    assert!(!edit.report().is_complete());
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 }
 
@@ -902,21 +949,19 @@ fn signed_exact_noop_is_byte_exact_and_changed_plan_has_empty_output() {
     let bytes = package_signature_fixture();
     let package = open(bytes.clone());
     let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
-    package
-        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
     let package = open(package_signature_fixture());
     let output = Vec::<u8>::new();
     assert!(matches!(
-        package.plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
-        Err(Error::UnsafeEdit { .. })
+        package.edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
+        Err(Error::Refused(_))
     ));
     assert!(output.is_empty());
 }
@@ -945,7 +990,7 @@ fn untyped_non_part_security_surfaces_are_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -967,7 +1012,7 @@ fn root_level_embeddings_non_part_is_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -989,7 +1034,7 @@ fn root_level_activex_non_part_is_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -1016,7 +1061,10 @@ fn relationship_limits_are_checked_before_main_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(limits))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(limits))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
     let after = package.cache_diagnostics();
@@ -1030,13 +1078,37 @@ fn relationship_limits_are_checked_before_main_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
 }
 
 #[test]
-fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
+fn main_story_byte_limit_is_preflighted_before_payload_reads() {
+    let package = open(fixture(false));
+    let before = package.cache_diagnostics();
+    let limits = StoryLimits {
+        max_story_bytes: 1,
+        ..StoryLimits::default()
+    };
+    assert!(
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(limits))
+            )
+            .story_hyperlinks_only_snapshot()
+            .is_err()
+    );
+    let after = package.cache_diagnostics();
+    assert_eq!(before.cold_loads, after.cold_loads);
+    assert_eq!(before.successful_loads, after.successful_loads);
+}
+
+#[test]
+fn child_relationship_owner_limit_is_preflighted_before_any_payload_reads() {
     let package = open(child_relationship_limit_fixture(7));
     let before = package.cache_diagnostics();
     let one_under = StoryLimits {
@@ -1045,12 +1117,16 @@ fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(one_under))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .story_hyperlinks(with_story_limits(one_under))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
     let after = package.cache_diagnostics();
-    assert_eq!(after.cold_loads, before.cold_loads + 1);
-    assert_eq!(after.successful_loads, before.successful_loads + 1);
+    assert_eq!(after.cold_loads, before.cold_loads);
+    assert_eq!(after.successful_loads, before.successful_loads);
 
     let exact = StoryLimits {
         max_relationships_per_owner: 8,
@@ -1058,13 +1134,16 @@ fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
 }
 
 #[test]
-fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
+fn child_relationship_total_is_preflighted_before_any_offending_payload_read() {
     let package = open(fixture(false));
     let before = package.cache_diagnostics();
     let one_under = StoryLimits {
@@ -1074,12 +1153,16 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(one_under))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .story_hyperlinks(with_story_limits(one_under))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
     let after = package.cache_diagnostics();
-    assert_eq!(after.cold_loads, before.cold_loads + 6);
-    assert_eq!(after.successful_loads, before.successful_loads + 6);
+    assert_eq!(after.cold_loads, before.cold_loads);
+    assert_eq!(after.successful_loads, before.successful_loads);
 
     let exact = StoryLimits {
         max_relationships_per_owner: 7,
@@ -1088,7 +1171,10 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
 }
@@ -1096,10 +1182,11 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
 #[test]
 fn managed_story_snapshot_retains_budgeted_part_data() {
     let (budget, context) = managed_context();
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture(false))),
-        ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let snapshot = package.story_hyperlinks_only_snapshot().unwrap();

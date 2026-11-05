@@ -6,10 +6,6 @@
     clippy::expect_used,
     reason = "the invariant is established immediately before extraction"
 )]
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 //! VML shape authoring for DOCX documents.
 //!
 //! Legacy VML shapes are serialized inside `w:pict` as `v:rect`,
@@ -82,29 +78,30 @@ pub enum VmlShapePosition {
 
 /// A mutable VML shape being authored in a document.
 ///
-/// Built with [`MutableVmlShape::new`], then attached to a document via
-/// [`crate::writer::MutableDocument::add_vml_shape`], which assigns the
+/// Built with [`VmlShape::new`], then attached to a document via
+/// [`crate::builder::Document::add_vml_shape`], which assigns the
 /// shape identity and validates uniqueness.
 ///
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::{MutableVmlShape, Package, VmlShapeKind};
+/// use litchi_docx::{Builder, VmlShapeKind};
+/// use litchi_docx::builder::VmlShape;
 ///
-/// let mut package = Package::new()?;
-/// let mut shape = MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914_400)?;
+/// let mut builder = Builder::new()?;
+/// let mut shape = VmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914_400)?;
 /// shape.set_fill_color("#E5F1F8")?;
 /// shape.add_run("legacy box").bold = Some(true);
-/// package.document_mut()?.add_vml_shape(shape)?;
-/// package.save("out.docx")?;
+/// builder.document()?.add_vml_shape(shape)?;
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
-pub struct MutableVmlShape {
+#[derive(Debug, Clone)]
+pub struct VmlShape {
     /// The VML preset shape element.
     pub(crate) kind: VmlShapeKind,
     /// VML shape ID (`v:shape@id`); assigned by
-    /// `MutableDocument::add_vml_shape` when left empty.
+    /// `Document::add_vml_shape` when left empty.
     pub(crate) id: String,
     /// Shape width in EMUs (English Metric Units, 1 inch = `914_400` EMUs).
     pub(crate) width_emu: i64,
@@ -122,7 +119,7 @@ pub struct MutableVmlShape {
     pub(crate) anchor_id: Option<AnchorId>,
 }
 
-impl MutableVmlShape {
+impl VmlShape {
     /// Create a shape of the given kind with the given EMU extents.
     ///
     /// # Errors
@@ -196,7 +193,7 @@ impl MutableVmlShape {
     /// Set an explicit VML shape ID instead of accepting the allocated one.
     ///
     /// The ID must be unique within the document;
-    /// [`crate::writer::MutableDocument::add_vml_shape`] rejects
+    /// [`crate::builder::Document::add_vml_shape`] rejects
     /// collisions with existing shapes.
     ///
     /// # Errors
@@ -283,7 +280,7 @@ impl MutableVmlShape {
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
         if self.id.is_empty() {
             return Err(Error::InvalidFormat(
-                "VML shape has no ID; add it via MutableDocument::add_vml_shape".to_string(),
+                "VML shape has no ID; add it via Document::add_vml_shape".to_string(),
             ));
         }
         let width_pt = self.width_emu as f64 / EMUS_PER_PT as f64;
@@ -360,7 +357,7 @@ mod tests {
     use crate::drawing::AnchorId;
     use crate::textbox::{TextBoxAnchor, TextBoxBodyProperties, load_text_boxes};
 
-    fn shape_document_xml(shape: &MutableVmlShape) -> String {
+    fn shape_document_xml(shape: &VmlShape) -> String {
         let mut xml = String::new();
         shape.to_xml(&mut xml).unwrap();
         format!(
@@ -371,13 +368,13 @@ mod tests {
         )
     }
 
-    fn identified(shape: &mut MutableVmlShape) {
+    fn identified(shape: &mut VmlShape) {
         shape.id = "_x0000_s1025".to_string();
     }
 
     #[test]
     fn serializes_rect_with_colors_and_text() {
-        let mut shape = MutableVmlShape::new(VmlShapeKind::Rectangle, 1828800, 914_400).unwrap();
+        let mut shape = VmlShape::new(VmlShapeKind::Rectangle, 1828800, 914_400).unwrap();
         identified(&mut shape);
         shape.set_fill_color("e5f1f8").unwrap();
         shape.set_stroke_color("#007ab9").unwrap();
@@ -403,7 +400,7 @@ mod tests {
 
     #[test]
     fn authors_checked_legacy_picture_anchor_id() {
-        let mut shape = MutableVmlShape::rectangle();
+        let mut shape = VmlShape::rectangle();
         identified(&mut shape);
         let anchor_id = AnchorId::new(0x7fff_ffff).unwrap();
         shape.set_anchor_id(anchor_id);
@@ -433,7 +430,7 @@ mod tests {
             (VmlShapeKind::RoundRectangle, "<v:roundrect "),
             (VmlShapeKind::Ellipse, "<v:oval "),
         ] {
-            let mut shape = MutableVmlShape::new(kind, 914_400, 914_400).unwrap();
+            let mut shape = VmlShape::new(kind, 914_400, 914_400).unwrap();
             identified(&mut shape);
             let mut xml = String::new();
             shape.to_xml(&mut xml).unwrap();
@@ -441,7 +438,7 @@ mod tests {
             assert!(!xml.contains("<v:textbox>"));
         }
 
-        let mut line = MutableVmlShape::new(VmlShapeKind::Line, 914_400, 457200).unwrap();
+        let mut line = VmlShape::new(VmlShapeKind::Line, 914_400, 457200).unwrap();
         identified(&mut line);
         line.set_stroke_color("FF0000").unwrap();
         let mut xml = String::new();
@@ -452,7 +449,7 @@ mod tests {
 
     #[test]
     fn serializes_floating_position() {
-        let mut shape = MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, 914_400).unwrap();
+        let mut shape = VmlShape::new(VmlShapeKind::Rectangle, 914_400, 914_400).unwrap();
         identified(&mut shape);
         shape.set_floating(914_400, 457200);
         let mut xml = String::new();
@@ -466,20 +463,20 @@ mod tests {
 
     #[test]
     fn validates_colors_extents_and_identity() {
-        let mut shape = MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, 914_400).unwrap();
+        let mut shape = VmlShape::new(VmlShapeKind::Rectangle, 914_400, 914_400).unwrap();
         assert!(shape.set_fill_color("red").is_err());
         assert!(shape.set_fill_color("#12345").is_err());
         assert!(shape.set_fill_color("#GGGGGG").is_err());
         assert!(shape.set_fill_color("A0B1C2").is_ok());
-        assert!(MutableVmlShape::new(VmlShapeKind::Rectangle, 0, 914_400).is_err());
-        assert!(MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, -1).is_err());
+        assert!(VmlShape::new(VmlShapeKind::Rectangle, 0, 914_400).is_err());
+        assert!(VmlShape::new(VmlShapeKind::Rectangle, 914_400, -1).is_err());
         // Serialization requires an assigned ID.
         assert!(shape.to_xml(&mut String::new()).is_err());
     }
 
     #[test]
     fn textless_shapes_are_not_text_box_inventory_entries() {
-        let mut shape = MutableVmlShape::new(VmlShapeKind::Ellipse, 914_400, 914_400).unwrap();
+        let mut shape = VmlShape::new(VmlShapeKind::Ellipse, 914_400, 914_400).unwrap();
         identified(&mut shape);
         shape.set_fill_color("#00FF00").unwrap();
         let inventory = load_text_boxes(shape_document_xml(&shape).as_bytes()).unwrap();
@@ -492,12 +489,11 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
             document.add_paragraph_with_text("before the shape");
-            let mut shape =
-                MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914_400).unwrap();
+            let mut shape = VmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914_400).unwrap();
             shape.set_fill_color("#E5F1F8").unwrap();
             shape.set_stroke_color("#007AB9").unwrap();
             shape.set_floating(914_400, 457200);
@@ -507,6 +503,7 @@ mod tests {
             let shape = document.add_vml_shape(shape).unwrap();
             assert_eq!(shape.id(), "_x0000_s1025");
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -531,25 +528,25 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
-            let mut first = MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, 457200).unwrap();
+            let document = builder.document().unwrap();
+            let mut first = VmlShape::new(VmlShapeKind::Rectangle, 914_400, 457200).unwrap();
             first.add_run("first");
             let first = document.add_vml_shape(first).unwrap();
             assert_eq!(first.id(), "_x0000_s1025");
 
-            let mut second = MutableVmlShape::new(VmlShapeKind::Ellipse, 457200, 457200).unwrap();
+            let mut second = VmlShape::new(VmlShapeKind::Ellipse, 457200, 457200).unwrap();
             second.add_run("second");
             let second = document.add_vml_shape(second).unwrap();
             assert_eq!(second.id(), "_x0000_s1026");
 
             // An explicit shape ID colliding with an assigned one is rejected.
-            let mut duplicate =
-                MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, 914_400).unwrap();
+            let mut duplicate = VmlShape::new(VmlShapeKind::Rectangle, 914_400, 914_400).unwrap();
             duplicate.set_shape_id("_x0000_s1025").unwrap();
             assert!(document.add_vml_shape(duplicate).is_err());
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -571,17 +568,17 @@ mod tests {
 
     #[test]
     fn coexists_with_drawingml_text_boxes_and_images() {
-        use crate::{MutableTextBox, Package};
+        use crate::{Package, builder::TextBox};
         use tempfile::NamedTempFile;
 
         const PNG_HEADER: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
 
-            let mut text_box = MutableTextBox::new("DrawingML Box", 914_400, 457200).unwrap();
+            let mut text_box = TextBox::new("DrawingML Box", 914_400, 457200).unwrap();
             text_box.add_run("drawingml story").unwrap();
             document.add_text_box(text_box);
 
@@ -590,10 +587,11 @@ mod tests {
                 .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914_400), Some(914_400))
                 .unwrap();
 
-            let mut shape = MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, 457200).unwrap();
+            let mut shape = VmlShape::new(VmlShapeKind::Rectangle, 914_400, 457200).unwrap();
             shape.add_run("vml story");
             document.add_vml_shape(shape).unwrap();
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();

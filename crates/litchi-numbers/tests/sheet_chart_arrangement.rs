@@ -8,11 +8,9 @@
 
 use std::{fmt::Debug, io};
 
-use litchi_iwa_archive::{Limits, package::Catalog};
-use litchi_numbers::{
-    ChartArrangement, ChartSelector, MAX_OBJECTS, Package, PackageReadOptions,
-    PackageSemanticLimits, SheetChartArrangementError, SheetSelector,
-};
+use litchi_iwa_archive::package::Catalog;
+use litchi_numbers::sheet::chart::arrangement::Error as SheetChartArrangementError;
+use litchi_numbers::{ChartArrangement, ChartSelector, MAX_OBJECTS, Package, SheetSelector};
 
 #[path = "support/chart_arrangement_fixture.rs"]
 mod fixture;
@@ -40,7 +38,7 @@ fn commit_arrangement(
     sheet: usize,
     chart: usize,
     value: ChartArrangement,
-) -> TestResult<litchi_numbers::SheetChartArrangementCommit> {
+) -> TestResult<litchi_numbers::sheet::chart::arrangement::Commit> {
     Ok(package
         .edit_sheet_chart_arrangement(SheetSelector::index(sheet), ChartSelector::index(chart))?
         .set(value)
@@ -48,8 +46,8 @@ fn commit_arrangement(
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -96,10 +94,10 @@ fn chart_arrangement_public_handles_are_typed_and_redacted() -> TestResult {
     assert_send_sync_debug::<ChartSelector>();
     assert_send_sync_debug::<SheetSelector<'static>>();
     assert_send_sync_debug::<ChartArrangement>();
-    assert_send_sync_debug::<litchi_numbers::SheetChartArrangementCommit>();
-    assert_send_sync_debug::<litchi_numbers::SheetChartArrangementEdit<'static>>();
-    assert_send_sync_debug::<litchi_numbers::SheetChartArrangementPatch>();
-    assert_send_sync_debug::<litchi_numbers::SheetChartArrangementDiagnostics>();
+    assert_send_sync_debug::<litchi_numbers::sheet::chart::arrangement::Commit>();
+    assert_send_sync_debug::<litchi_numbers::sheet::chart::arrangement::Edit<'static>>();
+    assert_send_sync_debug::<litchi_numbers::sheet::chart::arrangement::Patch>();
+    assert_send_sync_debug::<litchi_numbers::sheet::chart::arrangement::Diagnostics>();
     assert_send_sync_debug::<SheetChartArrangementError>();
 
     let package = Package::from_bytes(&fixture::fixture()?)?;
@@ -198,7 +196,7 @@ fn chart_arrangement_inverse_and_exact_apply_are_source_bound() -> TestResult {
         .apply_sheet_chart_arrangement(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, source);
     assert_eq!(
-        arrangement(&restored.package(), 0, 0)?,
+        arrangement(restored.package(), 0, 0)?,
         ChartArrangement::default()
     );
 
@@ -265,15 +263,15 @@ fn chart_arrangement_rejects_malformed_ownership_parent_and_message_graphs_atomi
 #[test]
 fn chart_arrangement_refuses_finite_reference_budget_without_mutation() -> TestResult {
     let source = fixture::with_single_rooted_sheet(&fixture::fixture()?)?;
-    let semantic = PackageSemanticLimits::new(
-        MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        3,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(3))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let before = exact_bytes(&package)?;
     let error = package
@@ -294,18 +292,16 @@ fn chart_arrangement_fixture_has_cross_component_profile_and_untouched_assets() 
     assert_eq!(package.sheets().len(), 2);
     assert_eq!(package.sheets()[0].name(), "Sheet 1");
     assert_eq!(package.sheets()[1].name(), "Sheet 2");
-    assert_eq!(
-        fixture::object_message(
+    assert!(
+        !fixture::object_message(
             &source,
             DOCUMENT_MEMBER,
             fixture::DOCUMENT_ID,
             fixture::DOCUMENT_MESSAGE_TYPE
         )?
-        .len()
-            > 0,
-        true
+        .is_empty()
     );
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     for member in [
         DOCUMENT_MEMBER,
         CALCULATION_MEMBER,

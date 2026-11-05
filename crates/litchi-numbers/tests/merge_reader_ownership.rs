@@ -1,4 +1,6 @@
 //! Source lifetime and concurrency contracts of metadata-only Numbers reads.
+use litchi_numbers::table::merge::transaction::Error as TableMergesError;
+use litchi_numbers::table::merge::transaction::LimitKind as TableMergesLimitKind;
 
 use std::sync::Arc;
 
@@ -55,26 +57,27 @@ fn cloned_readers_can_query_the_same_immutable_source_concurrently() {
 
 #[test]
 fn bounded_path_ingress_retains_an_independent_immutable_source() {
-    use litchi_numbers::{
-        PackageLimits, PackageReadOptions, PackageSemanticLimits, TableMergesError,
-        TableMergesLimitKind,
-    };
-
     let file = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(file.path(), NATIVE).unwrap();
     let maximum = u64::try_from(NATIVE.len() - 1).unwrap();
-    let physical = PackageLimits::new(
-        maximum,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )
-    .unwrap();
-    let options = PackageReadOptions::new(physical, PackageSemanticLimits::default());
+    let physical = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(maximum)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())
+        .unwrap();
+    let options = litchi_numbers::OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT);
     assert!(matches!(
         MergeReader::open_with_options(file.path(), options),
-        Err(TableMergesError::LimitExceeded {
+        Err(TableMergesError::Limit {
             kind: TableMergesLimitKind::InputBytes,
             observed,
             maximum: actual_maximum,
@@ -93,11 +96,8 @@ fn bounded_path_ingress_retains_an_independent_immutable_source() {
 #[test]
 fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() {
     use litchi_iwa_archive::{ComponentCatalog, Limits};
-    use litchi_numbers::{
-        PackageReadOptions, PackageSemanticLimits, TableMergesError, TableMergesLimitKind,
-    };
 
-    let records = ComponentCatalog::from_bytes(NATIVE)
+    let records = ComponentCatalog::from_bytes(NATIVE, Default::default())
         .unwrap()
         .into_iter()
         .map(|component| {
@@ -122,28 +122,30 @@ fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() 
         .iter()
         .map(|(_, archive)| archive.objects.len())
         .sum();
-    let defaults = PackageSemanticLimits::default();
-    let limited = PackageSemanticLimits::new(
-        object_count - 1,
-        defaults.max_sheets(),
-        defaults.max_tables(),
-        defaults.max_references(),
-    )
-    .unwrap();
+    let defaults = litchi_numbers::SemanticLimits::DEFAULT;
+    let limited = litchi_numbers::SemanticLimits::builder()
+        .max_objects(object_count - 1)
+        .and_then(|b| b.max_sheets(defaults.max_sheets()))
+        .and_then(|b| b.max_tables(defaults.max_tables()))
+        .and_then(|b| b.max_references(defaults.max_references()))
+        .and_then(|b| b.build())
+        .unwrap();
     assert!(matches!(
         MergeReader::__from_shared_catalog(
             Arc::clone(&catalog),
-            PackageReadOptions::new(Limits::default(), limited),
+            litchi_numbers::OpenOptions::new().semantic_limits(limited),
         ),
-        Err(TableMergesError::LimitExceeded {
+        Err(TableMergesError::Limit {
             kind: TableMergesLimitKind::PayloadObjects,
             observed,
             maximum,
         }) if observed == object_count as u64 && maximum == (object_count - 1) as u64
     ));
-    let reader =
-        MergeReader::__from_shared_catalog(Arc::clone(&catalog), PackageReadOptions::default())
-            .unwrap();
+    let reader = MergeReader::__from_shared_catalog(
+        Arc::clone(&catalog),
+        litchi_numbers::OpenOptions::new(),
+    )
+    .unwrap();
     let clone = reader.clone();
     for (name, archive) in &records {
         assert!(std::ptr::eq(

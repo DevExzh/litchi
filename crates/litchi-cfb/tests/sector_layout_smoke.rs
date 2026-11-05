@@ -1,6 +1,6 @@
 //! Smoke checks for the reuse sector-layout policy.
 
-use litchi_cfb::{OleFile, OleWriter, SectorLayoutPolicy};
+use litchi_cfb::{OleFile, OleFileLimits, OleWriter, SectorLayoutPolicy};
 use std::io::Cursor;
 
 fn build(streams: &[(&[&str], Vec<u8>)]) -> Vec<u8> {
@@ -14,7 +14,7 @@ fn build(streams: &[(&[&str], Vec<u8>)]) -> Vec<u8> {
 }
 
 fn read_all(bytes: &[u8]) -> Vec<(Vec<String>, Vec<u8>)> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     let mut paths = ole.list_streams();
     paths.sort();
     paths
@@ -42,7 +42,11 @@ fn reuse_keeps_sectors_for_a_same_length_edit() {
     ]);
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer
         .create_stream(&["WordDocument"], &vec![9u8; 9000])
         .unwrap();
@@ -72,7 +76,11 @@ fn reuse_appends_when_a_stream_outgrows_its_allocation() {
     ]);
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer
         .create_stream(&["WordDocument"], &vec![9u8; 40000])
         .unwrap();
@@ -96,7 +104,11 @@ fn reuse_handles_mini_to_regular_cutoff_migration() {
     let source = build(&[(&["Payload"], vec![0x11u8; 4095])]);
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer
         .create_stream(&["Payload"], &vec![0x22u8; 5000])
         .unwrap();
@@ -117,7 +129,11 @@ fn reuse_handles_regular_to_mini_cutoff_migration() {
     let source = build(&[(&["Payload"], vec![0x11u8; 5000])]);
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer
         .create_stream(&["Payload"], &vec![0x22u8; 4095])
         .unwrap();
@@ -150,7 +166,11 @@ fn rewrite_policy_declines_and_matches_today() {
 
     let mut opted = OleWriter::new();
     opted.set_sector_layout_policy(SectorLayoutPolicy::Rewrite);
-    assert!(opted.adopt_source_layout(&source).unwrap());
+    assert!(
+        opted
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     opted
         .create_stream(&["WordDocument"], &vec![9u8; 9000])
         .unwrap();
@@ -170,7 +190,11 @@ fn shrinking_a_stream_reclaims_its_sectors() {
     ]);
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer
         .create_stream(&["WordDocument"], &vec![9u8; 6000])
         .unwrap();
@@ -193,7 +217,11 @@ fn shrinking_a_stream_reclaims_its_sectors() {
 fn a_changed_stream_set_declines() {
     let source = build(&[(&["A"], vec![1u8; 9000])]);
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer.create_stream(&["A"], &vec![1u8; 9000]).unwrap();
     writer.create_stream(&["B"], &vec![2u8; 9000]).unwrap();
     let mut out = Cursor::new(Vec::new());
@@ -223,7 +251,11 @@ fn shape_fallback_preserves_adopted_clsids_until_explicitly_changed() {
     let source = source_output.into_inner();
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer.create_storage(&["Object"]).unwrap();
     writer.create_storage(&["Added"]).unwrap();
     writer
@@ -240,7 +272,7 @@ fn shape_fallback_preserves_adopted_clsids_until_explicitly_changed() {
         Some(litchi_cfb::SectorLayoutFallback::DirectoryShapeChanged)
     );
 
-    let ole = OleFile::open(Cursor::new(output)).unwrap();
+    let ole = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert!(ole.root_entry().unwrap().clsid.contains("11111111"));
     let object = ole
         .list_directory_entries(&[])
@@ -267,7 +299,11 @@ fn explicit_zero_clsids_clear_source_directory_fields() {
     let source = source_output.into_inner();
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&source, OleFileLimits::default())
+            .unwrap()
+    );
     writer.set_root_clsid([0; 16]);
     writer.create_storage(&["Object"]).unwrap();
     writer.set_storage_clsid(&["Object"], [0; 16]).unwrap();
@@ -279,7 +315,7 @@ fn explicit_zero_clsids_clear_source_directory_fields() {
     let output = output.into_inner();
     assert!(writer.last_sector_layout().unwrap().reused_source_layout());
 
-    let ole = OleFile::open(Cursor::new(output.clone())).unwrap();
+    let ole = OleFile::open(Cursor::new(output.clone()), OleFileLimits::default()).unwrap();
     assert!(ole.root_entry().unwrap().clsid.is_empty());
     let entries = ole.list_directory_entries(&[]).unwrap();
     let object = entries.iter().find(|entry| entry.name == "Object").unwrap();
@@ -296,7 +332,7 @@ fn explicit_zero_clsids_clear_source_directory_fields() {
 #[test]
 fn reused_v3_zero_length_stream_masks_high_size_word() {
     let source = build(&[(&["Empty"], Vec::new())]);
-    let ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+    let ole = OleFile::open(Cursor::new(source.clone()), OleFileLimits::default()).unwrap();
     let sid = ole
         .list_directory_entries(&[])
         .unwrap()
@@ -310,7 +346,11 @@ fn reused_v3_zero_length_stream_masks_high_size_word() {
     mutated[size_offset..size_offset + 8].copy_from_slice(&0xDEAD_BEEF_0000_0000u64.to_le_bytes());
 
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(&mutated).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(&mutated, OleFileLimits::default())
+            .unwrap()
+    );
     writer.create_stream(&["Empty"], &[]).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -319,7 +359,7 @@ fn reused_v3_zero_length_stream_masks_high_size_word() {
     let directory = directory_image_offset(&output);
     let size_offset = directory + sid as usize * 128 + 120;
     assert_eq!(&output[size_offset..size_offset + 8], &[0; 8]);
-    OleFile::open(Cursor::new(output)).unwrap();
+    OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
 }
 
 #[test]
@@ -330,7 +370,11 @@ fn shrinking_a_mini_stream_clears_former_payload_from_root_padding() {
     expanded.extend_from_slice(&[9u8; 70]);
     let render = |source: &[u8], payload: &[u8]| {
         let mut writer = OleWriter::new();
-        assert!(writer.adopt_source_layout(source).unwrap());
+        assert!(
+            writer
+                .adopt_source_layout(source, OleFileLimits::default())
+                .unwrap()
+        );
         writer.create_stream(&["Small"], payload).unwrap();
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();

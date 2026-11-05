@@ -6,13 +6,14 @@
 
 mod access;
 mod alternatives;
+mod catalogs;
 mod data_stores;
 mod document;
 mod merge;
+mod metadata;
 mod parts;
 mod settings;
 mod story_edit;
-mod styles_with_effects;
 mod task_panes;
 mod transfer;
 mod validation;

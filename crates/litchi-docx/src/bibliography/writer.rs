@@ -168,8 +168,8 @@ impl BibliographyPerson {
 ///
 /// Built with [`BibliographySourceBuilder::new`], optional fields chained,
 /// then passed to
-/// [`crate::Package::add_bibliography_source`] or
-/// [`crate::Package::replace_bibliography_source`]. Fields not covered
+/// [`crate::bibliography::Edit::add_source`] or
+/// [`crate::bibliography::Edit::replace_source`]. Fields not covered
 /// by the typed API can be carried with [`Self::custom_field`] so nothing is
 /// silently dropped.
 ///
@@ -181,12 +181,15 @@ impl BibliographyPerson {
 /// };
 /// use litchi_docx::Package;
 ///
-/// let mut package = Package::new()?;
+/// let package = Package::new()?;
 /// let source = BibliographySourceBuilder::new(BibliographySourceKind::Book, "Doe2024")?
 ///     .title("Example & Practice")?
 ///     .year("2024")?
 ///     .person(BibliographyPerson::new("Doe")?.with_first("Jane")?)?;
-/// package.add_bibliography_source(source)?;
+/// let mut edit = package.edit_bibliography();
+/// edit.add_source(source)?;
+/// let package = edit.commit()?.into_package();
+/// # let _ = package;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, Default)]
@@ -472,7 +475,11 @@ pub(crate) fn add_source_xml(
     match root.local_name.as_str() {
         "Sources" => {
             if count_sources(&root) >= MAX_STORE_SOURCES {
-                return Err(invalid("bibliography source count limit exceeded"));
+                return Err(Error::BibliographyLimit {
+                    kind: crate::bibliography::LimitKind::SourceCount,
+                    actual: (count_sources(&root)).saturating_add(1),
+                    maximum: MAX_STORE_SOURCES,
+                });
             }
             root.children.push(source.to_node());
         },
@@ -646,9 +653,11 @@ fn write_element(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Error as DocxError;
     use crate::bibliography::discover_bibliography_source_stores;
+    use litchi_core::edit::RefusalKind;
     use litchi_ooxml_common::custom_xml::{
-        Conformance, Item, NewItem, NewProps, Props, add, discover,
+        Conformance, Edit, Item, NewItem, NewProps, Props, discover,
     };
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::part::BlobPart;
@@ -662,26 +671,25 @@ mod tests {
             ct::WML_DOCUMENT_MAIN.to_string(),
             Vec::new(),
         )));
-        add(
-            &mut package,
-            NewItem {
-                source,
-                rel_id: "rIdBib".to_string(),
-                part: PackURI::new("/customXml/item1.xml").unwrap(),
-                content_type: "application/xml".to_string(),
-                xml: xml.to_vec(),
-                props: Some(NewProps {
-                    part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
-                    rel_id: "rIdProps".to_string(),
-                    value: Props {
-                        id: "{11111111-1111-1111-1111-111111111111}".to_string(),
-                        schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
-                    },
-                }),
-                conformance: Conformance::Transitional,
-            },
-        )
+        let mut edit = Edit::new(&package).unwrap();
+        edit.insert(NewItem {
+            source,
+            rel_id: "rIdBib".to_string(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".to_string(),
+            xml: xml.to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".to_string(),
+                value: Props {
+                    id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+                    schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
+                },
+            }),
+            conformance: Conformance::Transitional,
+        })
         .unwrap();
+        package = edit.commit().unwrap().into_package();
         let item = discover(&package).unwrap().remove(0);
         assert_eq!(item.root().namespace, namespace);
         assert_eq!(item.root().local_name, local_name);
@@ -931,6 +939,17 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut empty = Package::new().unwrap();
+        let missing_store = empty
+            .replace_bibliography_source(
+                "Missing",
+                BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing").unwrap(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            missing_store,
+            DocxError::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+        ));
         let mut package = Package::new().unwrap();
         package.add_bibliography_source(built()).unwrap();
         // Duplicate tags are rejected before any mutation.
@@ -945,15 +964,16 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-        assert!(
-            package
-                .replace_bibliography_source(
-                    "Missing",
-                    BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing")
-                        .unwrap(),
-                )
-                .is_err()
-        );
+        let missing_source = package
+            .replace_bibliography_source(
+                "Missing",
+                BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing").unwrap(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            missing_source,
+            DocxError::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+        ));
 
         assert!(package.remove_bibliography_source("Doe2024").unwrap());
         assert!(!package.remove_bibliography_source("Doe2024").unwrap());

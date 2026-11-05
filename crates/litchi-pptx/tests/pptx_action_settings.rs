@@ -7,7 +7,6 @@
 use litchi_opc::constants::relationship_type::{HYPERLINK, SLIDE};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
-use litchi_pptx::Package;
 use litchi_pptx::actions::{Jump, Kind, Limits, Target, Trigger, load_slide_action_settings};
 
 const LOCAL_ACTIONS: &[u8] =
@@ -91,11 +90,12 @@ fn package_with_local_actions() -> OpcPackage {
 }
 
 fn package_with_actions(fragment: &str, add_relationships: bool) -> OpcPackage {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     install_actions(&mut package, fragment, add_relationships);
     package
 }

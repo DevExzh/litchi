@@ -59,7 +59,8 @@ fn try_own_formula(
         make_execution("owned-values-preparation");
     let resolver = Resolver::new(&sheets, SheetExtent::new(8, 8), &preparation)
         .expect("fixture resolver is valid");
-    let expression = Expression::parse(source).expect("fixture expression is valid");
+    let expression =
+        Expression::parse(source, &Default::default()).expect("fixture expression is valid");
     let context = Context::new(&preparation, Position::new("Main", 0, 0)).with_mode(mode);
     let evaluated = evaluate(&expression, &resolver, &context, &ValueLimits::default())?;
     evaluated.to_owned(copy_execution, copy_limits)
@@ -136,7 +137,8 @@ fn owned_references_preserve_local_3d_metadata_and_list_order() {
         &ValueLimits::default(),
     );
     let reference = owned_3d.as_reference().expect("3D reference result");
-    let expected = Reference::parse("[Main.A1:Archive.B2]").expect("valid expected reference");
+    let expected = Reference::parse("[Main.A1:Archive.B2]", &Default::default())
+        .expect("valid expected reference");
     assert_eq!(reference.reference(), Some(&expected));
     assert_eq!(reference.len(), 1);
     assert_eq!(reference.areas()[0].starts(), [0, 0, 0]);
@@ -153,7 +155,8 @@ fn owned_references_preserve_local_3d_metadata_and_list_order() {
         .as_reference_list()
         .expect("reference-list result");
     assert_reference_list(list, &[0, 0, 1]);
-    let expected_first = Reference::parse("[.A1]").expect("valid expected reference");
+    let expected_first =
+        Reference::parse("[.A1]", &Default::default()).expect("valid expected reference");
     assert_eq!(
         list.get(0).expect("first list item").reference(),
         Some(&expected_first)
@@ -174,7 +177,8 @@ fn owned_reference_lexical_markers_and_axis_kinds_survive_copy() {
             &execution,
             &ValueLimits::default(),
         );
-        let expected = Reference::parse(source).expect("valid reference lexeme");
+        let expected =
+            Reference::parse(source, &Default::default()).expect("valid reference lexeme");
         assert_eq!(
             owned.as_reference().expect("owned reference").reference(),
             Some(&expected),

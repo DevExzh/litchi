@@ -3,24 +3,15 @@
 use std::iter::FusedIterator;
 use std::num::{NonZeroU32, NonZeroUsize};
 
-use litchi_ograph::chart::{Book, Context, Refs};
-use litchi_ograph::{Package as GraphPackage, PackageRef};
+use litchi_ograph::chart::{Book, Context, Model, Refs};
+use litchi_ograph::{Package as OgraphPackage, PackageRef};
 
 use super::codec::encode_storage;
 use super::package::classify;
-use super::transaction::PackageEditor;
-use crate::embedded::object::{ContainerKind, Editor as ObjectEditor, ExternalObject};
+use crate::builder::graph::Draft;
+use crate::embedded::object::{self, Collection, ContainerKind, ExternalObject};
 use crate::embedded::storage::Compression;
 use crate::package::{Error, Result as PackageResult};
-
-/// Owned host-neutral semantic view of one validated chart substream.
-///
-/// This is the MS-OGRAPH model from `litchi-ograph`, exposed from the PPT
-/// chart host with the producer context selected from [`Kind`]. Parsed values
-/// retain an exact bounded source stream and can replay it unchanged; parsed
-/// mutation and fresh emission remain subject to the neutral model's explicit
-/// safety errors.
-pub type SemanticChart = litchi_ograph::chart::Chart;
 
 /// Fallible semantic views over every chart substream in one PPT chart object.
 ///
@@ -28,27 +19,27 @@ pub type SemanticChart = litchi_ograph::chart::Chart;
 /// bounded semantic copy because the neutral semantic model must retain the
 /// source stream for lossless pristine replay.
 #[derive(Debug)]
-pub struct SemanticCharts<'a> {
+pub struct Models<'a> {
     charts: Refs<'a>,
     context: Context,
     limits: litchi_ograph::Limits,
 }
 
-impl Iterator for SemanticCharts<'_> {
-    type Item = PackageResult<SemanticChart>;
+impl Iterator for Models<'_> {
+    type Item = PackageResult<Model>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next_chart = self.charts.next()?;
         Some(match next_chart {
             Ok(chart_ref) => {
-                SemanticChart::parse_with(chart_ref, self.context, self.limits).map_err(Into::into)
+                Model::parse_with(chart_ref, self.context, self.limits).map_err(Into::into)
             },
             Err(error) => Err(error.into()),
         })
     }
 }
 
-impl FusedIterator for SemanticCharts<'_> {}
+impl FusedIterator for Models<'_> {}
 
 /// The producer grammar and host topology behind a chart object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -145,7 +136,7 @@ impl Info {
 #[derive(Debug)]
 pub struct Graph {
     info: Info,
-    package: Box<GraphPackage>,
+    package: Box<OgraphPackage>,
     book: Book,
     compression: Compression,
 }
@@ -171,8 +162,7 @@ impl Graph {
 
     /// Iterate the single chart-sheet substream through the bounded semantic
     /// model, retaining source bytes for exact pristine replay.
-    #[must_use]
-    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+    pub fn semantic_charts(&self) -> PackageResult<Models<'_>> {
         semantic_charts(&self.book, Kind::Graph)
     }
 
@@ -185,8 +175,8 @@ impl Graph {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self) -> PackageResult<SemanticChart> {
-        let mut charts = self.semantic_charts();
+    pub fn semantic_chart(&self) -> PackageResult<Model> {
+        let mut charts = self.semantic_charts()?;
         let chart = charts
             .next()
             .ok_or_else(|| Error::Corrupted("Graph Workbook has no chart stream".to_string()))??;
@@ -199,66 +189,69 @@ impl Graph {
         Ok(chart)
     }
 
-    /// Open a copy-on-write transaction over this chart's standalone OLE2
-    /// package.
+    /// A copy-on-write draft of this chart's standalone OLE2 package.
     ///
-    /// The read model remains unchanged. The returned editor can replace the
-    /// validated Graph chart stream and commit a new package, while preserving
-    /// the original package when no edit is staged.
+    /// The read model remains unchanged. The draft can replace the validated
+    /// Graph chart stream; it keeps the original package bytes when no
+    /// replacement is staged.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_package(&self) -> PackageResult<PackageEditor> {
+    pub fn draft_package(&self) -> PackageResult<Draft> {
         let package = self.package.as_ref().as_ref();
-        PackageEditor::with_limits(package.as_bytes().to_vec(), package.limits())
+        Draft::open_with_options(
+            package.as_bytes().to_vec(),
+            litchi_ograph::OpenOptions::new().limits(package.limits()),
+        )
     }
 
-    /// Move this Graph object into a package transaction without cloning its
+    /// Move this Graph object into a package draft without cloning its
     /// validated OLE2 allocation.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn into_package_editor(self) -> PackageResult<PackageEditor> {
+    pub fn into_draft_package(self) -> PackageResult<Draft> {
         let Self { package, .. } = self;
         let graph_package = *package;
         let limits = graph_package.as_ref().limits();
-        PackageEditor::with_limits(graph_package.finish().into_bytes(), limits)
+        Draft::open_with_options(
+            graph_package.finish().into_bytes(),
+            litchi_ograph::OpenOptions::new().limits(limits),
+        )
     }
 
-    /// Stage a committed Graph package back into its owning PPT object.
+    /// Stage a Graph package draft back into its owning PPT object on a
+    /// package-level embedded-object edit.
     ///
-    /// The host editor is checked against this chart's `[MS-PPT]`
-    /// `ExOleObjAtom`: the external-object ID, persist ID, embedded-object
-    /// container, and Graph subtype/ProgID must all still agree. The supplied
-    /// [`PackageEditor`] is then committed and stored as one inert
+    /// The staged objects of `edit` are checked against this chart's
+    /// `[MS-PPT]` `ExOleObjAtom`: the external-object ID, persist ID,
+    /// embedded-object container, and Graph subtype/ProgID must all still
+    /// agree. The draft's package bytes are then stored as one inert
     /// `ExOleObjStg` payload. No slide record, `OfficeArt` frame, or
     /// `ExObjRefAtom` is rewritten, so the existing `[MS-ODRAW]` anchor remains
-    /// attached to the same external object.
-    ///
-    /// This is the host-side half of the typed replacement path. The package
-    /// transaction still owns `[MS-OGRAPH]` chart-stream validation and
-    /// replacement; this method only bridges its resulting OLE2 bytes into the
-    /// PPT editor's failure-atomic storage transaction.
+    /// attached to the same external object. [`object::Edit::commit`]
+    /// publishes the new presentation.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
-    pub fn replace_package(
-        &self,
-        editor: &mut ObjectEditor,
-        package: PackageEditor,
-    ) -> PackageResult<()> {
-        validate_replacement_target(editor, &self.info)?;
-        let bytes = package.finish()?;
+    /// Returns [`object::Error::Refused`] with
+    /// [`litchi_core::edit::RefusalKind::NotFound`] when `edit` holds no
+    /// object with this chart's id, with
+    /// [`litchi_core::edit::RefusalKind::UnsupportedTarget`] when that object
+    /// is no longer this embedded Graph object, and [`object::Error::Package`]
+    /// when the draft cannot be encoded as a storage.
+    pub fn replace_package(&self, edit: &mut object::Edit, package: Draft) -> object::Result<()> {
+        validate_replacement_target(edit.objects()?, &self.info)?;
+        let bytes = package.into_bytes()?;
         let storage = encode_storage(bytes, self.compression)?;
-        editor.replace_storage(self.info.persist_id(), storage)
+        edit.replace_storage(self.info.persist_id(), storage)
     }
 
     pub(super) fn new(
         info: Info,
-        package: Box<GraphPackage>,
+        package: Box<OgraphPackage>,
         book: Book,
         compression: Compression,
     ) -> Self {
@@ -293,8 +286,7 @@ impl Excel {
 
     /// Iterate the Workbook's chart substreams through the bounded semantic
     /// model, retaining source bytes for exact pristine replay.
-    #[must_use]
-    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+    pub fn semantic_charts(&self) -> PackageResult<Models<'_>> {
         semantic_charts(&self.book, Kind::Excel)
     }
 
@@ -303,8 +295,8 @@ impl Excel {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<SemanticChart>> {
-        self.semantic_charts().nth(index).transpose()
+    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<Model>> {
+        self.semantic_charts()?.nth(index).transpose()
     }
 
     pub(super) fn new(info: Info, book: Book) -> Self {
@@ -341,12 +333,11 @@ impl Chart {
     }
 
     /// Traverse every neutral chart substream without allocation.
-    #[must_use]
-    pub fn charts(&self) -> Refs<'_> {
-        match self {
+    pub fn charts(&self) -> PackageResult<Refs<'_>> {
+        Ok(match self {
             Self::Graph(chart) => chart.book.charts(),
             Self::Excel(chart) => chart.book.charts(),
-        }
+        }?)
     }
 
     /// Iterate every chart substream through the bounded semantic model.
@@ -354,8 +345,7 @@ impl Chart {
     /// This is opt-in; [`Self::charts`] continues to expose the allocation-free
     /// raw view and therefore preserves the existing permissive inventory
     /// contract for callers that only need framed records.
-    #[must_use]
-    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+    pub fn semantic_charts(&self) -> PackageResult<Models<'_>> {
         match self {
             Self::Graph(chart) => semantic_charts(&chart.book, Kind::Graph),
             Self::Excel(chart) => semantic_charts(&chart.book, Kind::Excel),
@@ -368,8 +358,8 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<SemanticChart>> {
-        self.semantic_charts().nth(index).transpose()
+    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<Model>> {
+        self.semantic_charts()?.nth(index).transpose()
     }
 
     /// Typed standalone Graph view, when applicable.
@@ -390,7 +380,7 @@ impl Chart {
         }
     }
 
-    /// Open a package transaction for a standalone Graph chart.
+    /// A package draft of a standalone Graph chart.
     ///
     /// Excel-hosted charts expose their validated Workbook inventory through
     /// [`Excel::book`], but their surrounding workbook package belongs to the
@@ -399,11 +389,11 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_package(&self) -> PackageResult<PackageEditor> {
+    pub fn draft_package(&self) -> PackageResult<Draft> {
         match self {
-            Self::Graph(chart) => chart.edit_package(),
+            Self::Graph(chart) => chart.draft_package(),
             Self::Excel(_) => Err(Error::InvalidFormat(
-                "only standalone Graph chart packages support this transaction".to_string(),
+                "only standalone Graph chart packages support a package draft".to_string(),
             )),
         }
     }
@@ -534,47 +524,38 @@ fn semantic_context(kind: Kind) -> Context {
     }
 }
 
-fn semantic_charts(book: &Book, kind: Kind) -> SemanticCharts<'_> {
-    SemanticCharts {
-        charts: book.charts(),
+fn semantic_charts(book: &Book, kind: Kind) -> PackageResult<Models<'_>> {
+    Ok(Models {
+        charts: book.charts()?,
         context: semantic_context(kind),
         limits: book.limits(),
-    }
+    })
 }
 
-fn validate_replacement_target(editor: &ObjectEditor, info: &Info) -> PackageResult<()> {
-    let object = editor
-        .objects()
-        .objects
-        .iter()
-        .find(|object| object.id() == info.object_id())
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "chart external-object ID {} is not present in the host editor",
-                info.object_id()
-            ))
-        })?;
-    let ExternalObject::Object(definition) = object else {
-        return Err(Error::InvalidFormat(
-            "chart replacement target is not an OLE object definition".to_string(),
-        ));
+fn validate_replacement_target(objects: &Collection, info: &Info) -> object::Result<()> {
+    const OPERATION: &str = "chart.replace_package";
+    let target = || -> object::Error {
+        crate::scoped::unsupported_target(
+            OPERATION,
+            "the chart's external object is no longer an embedded Graph object",
+        )
+        .into()
     };
-    if !matches!(definition.kind, ContainerKind::Embedded(_)) {
-        return Err(Error::InvalidFormat(
-            "chart replacement target is not an embedded OLE object".to_string(),
-        ));
-    }
-    if definition.object.persist_id != info.persist_id() {
-        return Err(Error::InvalidFormat(format!(
-            "chart persist ID {} does not match host object persist ID {}",
-            info.persist_id(),
-            definition.object.persist_id
-        )));
-    }
-    if classify(definition.object.subtype, definition.program_id.as_deref()) != Some(Kind::Graph) {
-        return Err(Error::InvalidFormat(
-            "chart replacement target is not a Graph OLE object".to_string(),
-        ));
+    let found = objects
+        .get(info.object_id())
+        .ok_or_else(|| -> object::Error {
+            crate::scoped::not_found(OPERATION, "the edit holds no object with the chart's id")
+                .into()
+        })?;
+    let ExternalObject::Object(definition) = found else {
+        return Err(target());
+    };
+    if !matches!(definition.kind, ContainerKind::Embedded(_))
+        || definition.object.persist_id != info.persist_id()
+        || classify(definition.object.subtype, definition.program_id.as_deref())
+            != Some(Kind::Graph)
+    {
+        return Err(target());
     }
     Ok(())
 }

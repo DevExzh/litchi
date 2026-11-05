@@ -28,7 +28,7 @@
 
 use crate::package::error::Result;
 use crate::package::pivot::model::*;
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind as rt;
 
 use super::{validation, wire};
@@ -43,7 +43,7 @@ use super::{validation, wire};
 /// is rejected; see the module documentation for the exact refusal rules.
 pub(super) fn write_pivot_cache_definition(definition: &PivotCacheDefinition) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(512);
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_record(
         rt::BEGIN_PIVOT_CACHE_DEF,
         &wire::definition_payload(definition),
@@ -114,7 +114,7 @@ pub(super) fn write_pivot_cache_definition(definition: &PivotCacheDefinition) ->
 
 /// `BrtBeginPCDSource` collection (MS-XLSB 2.4.166).
 fn write_source<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     source: &PivotCacheSource,
 ) -> Result<()> {
     let mut payload = Vec::with_capacity(8);
@@ -137,7 +137,7 @@ fn write_source<W: std::io::Write>(
 
 /// `BrtBeginPCDSConsol` collection (MS-XLSB 2.4.150).
 fn write_consolidation<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     consolidation: &PivotCacheConsolidationSource,
 ) -> Result<()> {
     validation::validate_consolidation(consolidation)?;
@@ -187,7 +187,7 @@ fn write_consolidation<W: std::io::Write>(
 }
 
 /// `BrtBeginPCDField` collection (MS-XLSB 2.4.136).
-fn write_field<W: std::io::Write>(writer: &mut Writer<W>, field: &PivotCacheField) -> Result<()> {
+fn write_field<W: std::io::Write>(writer: &mut Encoder<W>, field: &PivotCacheField) -> Result<()> {
     writer.write_record(rt::BEGIN_PCD_FIELD, &wire::field_payload(field)?)?;
     if !field.shared_items.items.is_empty() || field.shared_items.stats.is_some() {
         write_shared_items(writer, &field.shared_items)?;
@@ -205,7 +205,7 @@ fn write_field<W: std::io::Write>(writer: &mut Writer<W>, field: &PivotCacheFiel
 
 /// `BrtBeginPCDFAtbl` collection (MS-XLSB 2.4.131).
 fn write_shared_items<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     shared_items: &PivotCacheSharedItems,
 ) -> Result<()> {
     validation::validate_shared_items(shared_items)?;
@@ -236,7 +236,7 @@ fn write_shared_items<W: std::io::Write>(
 /// the reader skips `BrtPCDIIndex`, so writing it would silently drop the
 /// item on re-read.
 fn write_cache_item<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     value: &PivotCacheItemValue,
     additional: Option<&PivotCacheItemInfo>,
     context: &'static str,
@@ -297,7 +297,7 @@ fn write_cache_item<W: std::io::Write>(
 
 /// `BrtBeginPCDFGroup` collection (MS-XLSB 2.4.135).
 fn write_grouping<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     grouping: &PivotCacheFieldGrouping,
 ) -> Result<()> {
     let mut payload = Vec::with_capacity(8);
@@ -362,7 +362,7 @@ fn write_grouping<W: std::io::Write>(
 
 /// `BrtBeginPCDHierarchy` collection (MS-XLSB 2.4.146).
 fn write_hierarchy<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     hierarchy: &PivotCacheHierarchy,
 ) -> Result<()> {
     writer.write_record(
@@ -446,7 +446,7 @@ fn write_hierarchy<W: std::io::Write>(
 
 /// `BrtBeginPCDHGLGroup` collection (MS-XLSB 2.4.143).
 fn write_grouping_group<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     group: &PivotCacheGroupingGroup,
 ) -> Result<()> {
     let mut payload = Vec::with_capacity(24);
@@ -482,7 +482,7 @@ fn write_grouping_group<W: std::io::Write>(
 
 /// `BrtBeginPCDSDTupleCache` collection (MS-XLSB 2.4.164).
 fn write_tuple_cache<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     cache: &PivotCacheTupleCache,
 ) -> Result<()> {
     writer.write_record(rt::BEGIN_PCDSD_TUPLE_CACHE, &[])?;
@@ -537,7 +537,7 @@ fn write_tuple_cache<W: std::io::Write>(
 
 /// `BrtBeginPCDCalcItem` collection (MS-XLSB 2.4.124).
 fn write_calculated_item<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     item: &CalculatedItem,
 ) -> Result<()> {
     let mut payload = Vec::with_capacity(16);
@@ -570,7 +570,7 @@ fn write_calculated_item<W: std::io::Write>(
 }
 
 /// `BrtBeginPName` collection (MS-XLSB 2.4.176).
-fn write_name<W: std::io::Write>(writer: &mut Writer<W>, name: &PivotName) -> Result<()> {
+fn write_name<W: std::io::Write>(writer: &mut Encoder<W>, name: &PivotName) -> Result<()> {
     let mut payload = Vec::with_capacity(8);
     payload.extend_from_slice(&name.field_index.to_le_bytes());
     payload.push(name.function as u8);
@@ -609,7 +609,7 @@ fn write_name<W: std::io::Write>(writer: &mut Writer<W>, name: &PivotName) -> Re
 
 /// `BrtBeginPRFilter` collection (MS-XLSB 2.4.180; `PRFilter` structure).
 fn write_rule_filter<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     filter: &PivotRuleFilter,
 ) -> Result<()> {
     validation::validate_rule_filter(filter)?;
@@ -635,7 +635,7 @@ fn write_rule_filter<W: std::io::Write>(
 /// `BrtBeginPCDCalcMem` collection (MS-XLSB 2.4.126; `PCDCalcMemCommon`,
 /// MS-XLSB 2.5.99).
 fn write_calculated_member<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     member: &CalculatedMember,
 ) -> Result<()> {
     let mut payload = Vec::with_capacity(24);

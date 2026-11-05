@@ -12,13 +12,13 @@ pub const RECORD_TYPE: u16 = 0xF010;
 pub(super) const HEADER_LEN: usize = 8;
 
 impl Data {
-    /// Parse an exact anchor payload using the default bound.
+    /// Parse an exact anchor payload under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse an exact anchor payload with an explicit resource bound.
@@ -26,7 +26,7 @@ impl Data {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let payload = bytes.as_ref();
         validation::payload_len(payload.len(), limits)?;
         match payload.len() {
@@ -89,13 +89,13 @@ impl Data {
 }
 
 impl Anchor {
-    /// Parse one exact complete record using the default bound.
+    /// Parse one exact complete record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one exact complete record with an explicit resource bound.
@@ -103,7 +103,7 @@ impl Anchor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let record = bytes.as_ref();
         if record.len() < HEADER_LEN {
             return Err(Error::Corrupted(

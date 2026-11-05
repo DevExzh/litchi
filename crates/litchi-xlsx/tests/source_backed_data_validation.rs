@@ -15,12 +15,13 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, SourceCacheLimits,
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, SourceLimits,
     TargetMode,
 };
+use litchi_xlsx::SourceBackedWorkbook;
 use litchi_xlsx::data_validation::{
-    Collection, Formula, ListSource, Source, SourceBackedEditor, SourceEdit, Sqref, Validation,
-    ValidationOperator, ValidationType, replace_data_validation_collections,
+    Collection, Formula, ListSource, Source, Sqref, Validation, ValidationOperator, ValidationType,
+    replace_data_validation_collections,
 };
 use litchi_xlsx::{Error, Package};
 
@@ -176,7 +177,7 @@ fn ordinary_fixture(signed: bool) -> Vec<u8> {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -216,12 +217,15 @@ fn target_collections() -> Vec<Collection> {
     vec![Collection::new(Source::Core, vec![rule]).unwrap()]
 }
 
-fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::data_validation::Commit {
-    let mut edit = editor.edit("Sheet1").unwrap();
+fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::data_validation::source::Edit {
+    let mut edit = editor.edit_data_validations("Sheet1").unwrap();
     assert!(edit.set_collections(target_collections()).unwrap());
-    let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.diagnostics().touched_worksheets(), 1);
+    edit
+}
+
+fn changed_commit(editor: &SourceBackedWorkbook) -> litchi_xlsx::data_validation::source::Commit {
+    let commit = changed_edit(editor).commit().unwrap();
+    assert!(commit.diagnostics().changed());
     commit
 }
 
@@ -246,26 +250,27 @@ fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<Str
 fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
     let source_bytes = ordinary_fixture(false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
+    let opened = editor.cache_diagnostics().successful_loads;
     let commit = changed_commit(&editor);
-    assert_eq!(editor.cache_diagnostics().successful_loads, 2);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::data_validation::Snapshot::load(&replay, "Sheet1")
             .unwrap()
             .collections(),
         target_collections()
     );
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -274,14 +279,12 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
 
     let mut output = Vec::new();
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
     let commit = changed_commit(&editor);
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let output_package = OpcPackage::from_bytes(&output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let output_package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     for part in source
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -300,7 +303,6 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
     assert_eq!(
         package
             .workbook()
-            .unwrap()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -315,31 +317,29 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     let source_bytes = ordinary_fixture(false);
     let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let editor =
-        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(VersionedSource::new(source_bytes.clone())),
-            ReadLimits::default(),
-            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
-            context,
-        )
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(source_bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
+    let snapshot = editor
+        .edit_data_validations("Sheet1")
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
-    let snapshot = editor.snapshot("Sheet1").unwrap();
     assert!(snapshot.collections().is_empty());
     assert_eq!(budget.used(Resource::Memory), exact);
     drop(snapshot);
 
     let commit = changed_commit(&editor);
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
-    assert!(matches!(
-        commit.patch().inverse().apply(&mut replay),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let published = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(
         litchi_xlsx::data_validation::Snapshot::load(&published, "Sheet1")
             .unwrap()
@@ -351,13 +351,15 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob()
     );
     drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -366,19 +368,23 @@ fn managed_one_under_budget_refuses_before_selected_payload_retention() {
     let source_bytes = ordinary_fixture(false);
     let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
-    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(VersionedSource::new(source_bytes)),
-        ReadLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
+    let opened = editor.cache_diagnostics().successful_loads;
     assert!(matches!(
-        editor.snapshot("Sheet1"),
+        editor
+            .edit_data_validations("Sheet1")
+            .and_then(|edit| edit.before().cloned()),
         Err(Error::Package(OpcError::Execution(
             ExecutionError::ResourceLimit(_)
         )))
     ));
-    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
@@ -387,51 +393,49 @@ fn managed_one_under_budget_refuses_before_selected_payload_retention() {
 fn no_op_signed_source_is_exact_but_changed_signed_source_is_refused() {
     let source_bytes = ordinary_fixture(true);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
-    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
-    assert!(!commit.changed());
-    let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
+    let commit = editor
+        .edit_data_validations("Sheet1")
+        .unwrap()
+        .commit()
         .unwrap();
+    assert!(!commit.diagnostics().changed());
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, source_bytes);
 
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes))).unwrap();
-    let commit = changed_commit(&editor);
-    assert!(
-        editor
-            .publish_commit_to_stream(Vec::new(), &commit)
-            .is_err()
-    );
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes))).unwrap();
+    // A changed edit of a signed source is refused at commit.
+    assert!(changed_edit(&editor).commit().is_err());
 }
 
 #[test]
 fn add_replace_clear_noop_and_atomic_update_are_exact() {
     let source_bytes = ordinary_fixture(false);
-    let mut seeded = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut seeded = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     let sheet = seeded.get_part_mut(&PackURI::new(SHEET).unwrap()).unwrap();
     sheet.set_blob(
         replace_data_validation_collections(sheet.blob(), &target_collections()).unwrap(),
     );
     let seeded = PackageWriter::to_bytes(&seeded).unwrap();
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(seeded))).unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(seeded))).unwrap();
+    let mut edit = editor.edit_data_validations("Sheet1").unwrap();
     assert!(!edit.set_collections(target_collections()).unwrap());
-    assert!(edit.clear());
-    assert!(!edit.clear());
+    assert!(edit.clear().unwrap());
+    assert!(!edit.clear().unwrap());
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let mut output = Vec::new();
-    let published = editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let published = commit.patch().after().clone();
     assert!(published.collections().is_empty());
 
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes))).unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes))).unwrap();
+    let mut edit = editor.edit_data_validations("Sheet1").unwrap();
     assert!(matches!(
         edit.update(|collections| {
             *collections = target_collections();
@@ -439,7 +443,7 @@ fn add_replace_clear_noop_and_atomic_update_are_exact() {
         }),
         Err(Error::UnsupportedSelector)
     ));
-    assert!(edit.collections().is_empty());
+    assert!(edit.collections().unwrap().is_empty());
     assert!(
         edit.update(|collections| {
             *collections = target_collections();
@@ -448,18 +452,18 @@ fn add_replace_clear_noop_and_atomic_update_are_exact() {
         .unwrap()
     );
     assert!(!edit.set_collections(target_collections()).unwrap());
-    assert!(edit.clear());
-    assert!(!edit.commit().unwrap().changed());
+    assert!(edit.clear().unwrap());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
 fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_change() {
     let source_bytes = ordinary_fixture(false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
     let commit = changed_commit(&editor);
-    let mut package = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -472,22 +476,18 @@ fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_c
         )
         .unwrap();
     assert!(matches!(
-        commit.patch().apply(&mut package),
+        replay_patch(&mut package, commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
 
     let source = Arc::new(VersionedSource::new(source_bytes));
-    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let commit = changed_commit(&editor);
     source.changed();
-    assert!(
-        editor
-            .publish_commit_to_stream(Vec::new(), &commit)
-            .is_err()
-    );
+    assert!(commit.package().write_to(Vec::new()).is_err());
 
     let foreign = ordinary_fixture(false);
-    let mut foreign_package = OpcPackage::from_bytes(&foreign).unwrap();
+    let mut foreign_package = OpcPackage::from_bytes(&foreign, SourceLimits::default()).unwrap();
     foreign_package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -496,13 +496,16 @@ fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_c
         );
     let foreign = PackageWriter::to_bytes(&foreign_package).unwrap();
     let foreign_editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(foreign))).unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(foreign))).unwrap();
     assert!(matches!(
-        foreign_editor.publish_commit_to_stream(Vec::new(), &commit),
+        foreign_editor
+            .apply_data_validations(commit.patch())
+            .map(|_| ()),
         Err(Error::PatchConflict { .. })
     ));
 
-    let mut retargeted = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut retargeted =
+        OpcPackage::from_bytes(&ordinary_fixture(false), SourceLimits::default()).unwrap();
     let workbook = retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap();
@@ -516,10 +519,8 @@ fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_c
             TargetMode::Internal,
         )
         .unwrap();
-    assert!(matches!(
-        commit.patch().apply(&mut retargeted),
-        Err(Error::PatchConflict { .. })
-    ));
+    // An owner refuses the retargeted graph at open.
+    assert!(replay_patch(&mut retargeted, commit.patch()).is_err());
 }
 
 #[test]
@@ -528,38 +529,36 @@ fn mce_selected_collections_and_partial_sinks_are_refused() {
         r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" mc:Ignorable="x14"><mc:AlternateContent><mc:Choice Requires="x14"><dataValidations count="1"><dataValidation type="whole" sqref="A1"><formula1>1</formula1><formula2>2</formula2></dataValidation></dataValidations></mc:Choice><mc:Fallback/></mc:AlternateContent><sheetData/></worksheet>"#
     );
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(mce, false))))
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(mce, false))))
             .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+    let mut edit = editor.edit_data_validations("Sheet1").unwrap();
     edit.set_collections(target_collections()).unwrap();
     let error = edit.commit().unwrap_err();
     assert!(error.to_string().contains("selected through MCE"));
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedEditor::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(VersionedSource::new(ordinary_fixture(false))),
-            limits,
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let source_bytes = ordinary_fixture(false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes))).unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes))).unwrap();
     let commit = changed_commit(&editor);
-    let error = editor
-        .publish_commit_to_stream(
-            FailingSink {
-                accepted: 0,
-                limit: 32,
-            },
-            &commit,
-        )
+    let error = commit
+        .package()
+        .write_to(FailingSink {
+            accepted: 0,
+            limit: 32,
+        })
         .unwrap_err();
     assert!(error.to_string().contains("sink") || error.to_string().contains("injected"));
 }
@@ -567,15 +566,16 @@ fn mce_selected_collections_and_partial_sinks_are_refused() {
 #[test]
 fn chartsheet_selection_is_refused_and_editor_is_send() {
     fn assert_send<T: Send>() {}
-    assert_send::<SourceBackedEditor>();
-    assert_send::<SourceEdit>();
+    assert_send::<SourceBackedWorkbook>();
+    assert_send::<litchi_xlsx::data_validation::source::Edit>();
 
     const CHARTSHEET_REL: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
     const CHARTSHEET_CT: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
-    let mut package = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&ordinary_fixture(false), SourceLimits::default()).unwrap();
     let sheet_uri = PackURI::new(SHEET).unwrap();
     let sheet = package.get_part_mut(&sheet_uri).unwrap();
     sheet.set_content_type(CHARTSHEET_CT.to_owned()).unwrap();
@@ -592,9 +592,27 @@ fn chartsheet_selection_is_refused_and_editor_is_send() {
         )
         .unwrap();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(matches!(
-        editor.edit("Sheet1"),
+        editor.edit_data_validations("Sheet1").unwrap().commit(),
         Err(Error::NotWorksheet { .. })
     ));
+}
+
+/// Replay a source-backed patch onto `package` through a source-backed
+/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// source-backed workbooks).
+fn replay_patch(
+    package: &mut OpcPackage,
+    patch: &litchi_xlsx::data_validation::source::Patch,
+) -> litchi_xlsx::Result<()> {
+    let bytes = PackageWriter::to_bytes(package)?;
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let next = workbook
+        .apply_data_validations(patch)?
+        .into_package()
+        .to_bytes()?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
+    Ok(())
 }

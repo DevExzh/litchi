@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use super::codec;
 use super::model::{Border, BorderSide, Conformance, Frameset, Id, Key, Layout, Screen, Settings};
-use super::{Error, Result, invalid};
+use super::{Error, Limits, Result, invalid};
 
 /// One bounded semantic operation supported by the source-preserving codec.
 #[derive(Debug, Clone)]
@@ -37,9 +37,9 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
+    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
         let xml = xml.into();
-        let (settings, conformance) = codec::parse(&xml)?;
+        let (settings, conformance) = super::raw::parse(&xml, limits)?;
         Ok(Self {
             xml: Arc::from(xml.into_boxed_slice()),
             settings,
@@ -53,14 +53,27 @@ impl Snapshot {
     pub(super) fn from_xml_with_conformance(
         xml: impl Into<Vec<u8>>,
         conformance: Conformance,
+        limits: &Limits,
     ) -> Result<Self> {
-        let snapshot = Self::from_xml(xml)?;
+        let snapshot = Self::from_xml(xml, limits)?;
         if snapshot.conformance != conformance {
             return Err(invalid(
                 "web-settings XML conformance does not match its relationship",
             ));
         }
         Ok(snapshot)
+    }
+
+    pub(super) fn from_parsed_xml(
+        xml: impl Into<Vec<u8>>,
+        settings: Settings,
+        conformance: Conformance,
+    ) -> Self {
+        Self {
+            xml: Arc::from(xml.into().into_boxed_slice()),
+            settings,
+            conformance,
+        }
     }
 
     /// Borrow the exact authored XML retained by this snapshot.
@@ -86,7 +99,7 @@ impl Snapshot {
 
     /// Start an isolated source-checked edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             base: self.clone(),
             next: self.settings.clone(),
@@ -97,7 +110,7 @@ impl Snapshot {
 
 /// A web-settings edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     base: Snapshot,
     next: Settings,
     edits: Vec<Edit>,
@@ -276,7 +289,6 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         // The canonical writer is used only as a complete semantic validation
         // pass. The authored bytes below are produced by the surgical codec.
-        let _ = self.next.xml(self.base.conformance)?;
         if self.edits.is_empty() {
             return Ok(Commit {
                 patch: Patch {
@@ -291,7 +303,8 @@ impl Transaction {
         }
 
         let xml = codec::rewrite(self.base.xml_bytes(), &self.edits)?;
-        let snapshot = Snapshot::from_xml_with_conformance(xml, self.base.conformance)?;
+        let snapshot =
+            Snapshot::from_xml_with_conformance(xml, self.base.conformance, &Limits::DEFAULT)?;
         if snapshot.settings != self.next {
             return Err(invalid(
                 "source-preserving web-settings rewrite did not match its semantic projection",
@@ -404,7 +417,7 @@ impl Transaction {
 /// A successful web-settings publication containing its new snapshot and
 /// reversible source patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -439,7 +452,7 @@ impl Commit {
 
 /// A source-checked, reversible web-settings patch.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Settings,
     after: Settings,
     before_xml: Arc<[u8]>,
@@ -499,7 +512,11 @@ impl Patch {
         if self.before == self.after {
             return Ok(source.clone());
         }
-        Snapshot::from_xml_with_conformance(self.after_xml.to_vec(), self.conformance)
+        Snapshot::from_xml_with_conformance(
+            self.after_xml.to_vec(),
+            self.conformance,
+            &Limits::DEFAULT,
+        )
     }
 }
 

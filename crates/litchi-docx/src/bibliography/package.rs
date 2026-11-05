@@ -139,7 +139,7 @@ mod tests {
         LEGACY_WORD_BIBLIOGRAPHY_NAMESPACE, OOXML_BIBLIOGRAPHY_NAMESPACE,
         STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE,
     };
-    use litchi_ooxml_common::custom_xml::{Conformance, NewItem, NewProps, Props, add, discover};
+    use litchi_ooxml_common::custom_xml::{Conformance, Edit, NewItem, NewProps, Props, discover};
     use litchi_opc::OpcPackage;
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::part::BlobPart;
@@ -152,26 +152,25 @@ mod tests {
             ct::WML_DOCUMENT_MAIN.to_string(),
             Vec::new(),
         )));
-        add(
-            &mut package,
-            NewItem {
-                source,
-                rel_id: "rIdBib".to_string(),
-                part: PackURI::new("/customXml/item1.xml").unwrap(),
-                content_type: "application/xml".to_string(),
-                xml: xml.to_vec(),
-                props: Some(NewProps {
-                    part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
-                    rel_id: "rIdProps".to_string(),
-                    value: Props {
-                        id: "{11111111-1111-1111-1111-111111111111}".to_string(),
-                        schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
-                    },
-                }),
-                conformance: Conformance::Transitional,
-            },
-        )
+        let mut edit = Edit::new(&package).unwrap();
+        edit.insert(NewItem {
+            source,
+            rel_id: "rIdBib".to_string(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".to_string(),
+            xml: xml.to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".to_string(),
+                value: Props {
+                    id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+                    schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
+                },
+            }),
+            conformance: Conformance::Transitional,
+        })
         .unwrap();
+        package = edit.commit().unwrap().into_package();
         let item = discover(&package).unwrap().remove(0);
         assert_eq!(item.root().namespace, namespace);
         assert_eq!(item.root().local_name, local_name);

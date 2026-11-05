@@ -5,7 +5,7 @@
 )]
 
 use litchi_odp::core::{OwnedPackage, PackageWriter};
-use litchi_odp::{Builder, Presentation, edit};
+use litchi_odp::{Builder, Package, edit};
 
 fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(
@@ -36,9 +36,9 @@ fn semantic_slide(mut slide: litchi_odp::Slide) -> litchi_odp::Slide {
 #[test]
 fn unsupported_real_producer_pages_are_refused_before_staging() {
     let source_bytes = fixture("tdf169979.odp");
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
-    let before = transaction.slides().to_vec();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
+    let before = transaction.slides().unwrap().to_vec();
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
@@ -47,16 +47,18 @@ fn unsupported_real_producer_pages_are_refused_before_staging() {
             .to_string()
             .contains("declarations or settings cannot yet be reordered losslessly")
     );
-    assert_eq!(transaction.slides(), before);
+    assert_eq!(transaction.slides().unwrap(), before);
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
 fn noncompact_source_without_settings_or_declarations_is_refused() {
     const CONTENT: &[u8] = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="page-a" /><draw:page draw:name="page-b" /></office:presentation></office:body></office:document-content>"#;
-    let mut archive = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut archive = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     archive
         .write_stored(
             "mimetype",
@@ -70,43 +72,43 @@ fn noncompact_source_without_settings_or_declarations_is_refused() {
             br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
         )
         .unwrap();
-    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&archive.finish_to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
 
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
     assert!(error.to_string().contains("current writer"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn retained_declarations_and_settings_are_conservatively_refused() {
     const CONTENT: &[u8] = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><office:body><office:presentation><presentation:header-decl presentation:name="header">Header</presentation:header-decl><draw:page draw:name="page-a" presentation:use-header-name="header"/><draw:page draw:name="page-b"/><presentation:settings presentation:start-page="page-a"/></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
-    let before = transaction.slides().to_vec();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
+    let before = transaction.slides().unwrap().to_vec();
 
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
     assert!(error.to_string().contains("declarations or settings"));
-    assert_eq!(transaction.slides(), before);
+    assert_eq!(transaction.slides().unwrap(), before);
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 fn compact_producer_deck() -> Vec<u8> {
     const CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:vendor="urn:example:producer"><office:body><office:presentation><vendor:deck-token vendor:value="keep"/><draw:page draw:name="page-a" draw:id="id-a"><draw:frame draw:name="shape-a" draw:protect="content"><draw:image xlink:href="Pictures/pixel.png"/><draw:text-box><text:p>A</text:p></draw:text-box></draw:frame><office:annotation office:name="comment-a"><text:p>annotation-a</text:p></office:annotation><vendor:page-token vendor:value="alpha"/></draw:page><draw:page draw:name="page-b" draw:id="id-b"><draw:frame draw:name="shape-b"><draw:text-box><text:p>B</text:p></draw:text-box></draw:frame><presentation:notes><text:p>notes-b</text:p></presentation:notes><vendor:page-token vendor:value="beta"/></draw:page><draw:page draw:name="page-c" draw:id="id-c"><draw:frame draw:name="shape-c"><draw:text-box><text:p>C</text:p></draw:text-box></draw:frame><vendor:transition vendor:type="fade"/><vendor:page-token vendor:value="gamma"/></draw:page></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -133,17 +135,17 @@ fn compact_source_pages_move_as_exact_fragments_with_durable_inverse() {
     let source_pages = page_fragments(&source_content);
     assert_eq!(source_pages.len(), 3);
 
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let original_slides = source.slides().to_vec();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let original_slides = source.slides().unwrap().to_vec();
+    let mut transaction = source.edit().unwrap();
     transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap()
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
-    let moved = commit.snapshot().to_presentation().unwrap();
+    let moved = commit.package().presentation().unwrap();
     let moved_slides = moved.slides().unwrap();
     for (actual, expected) in moved_slides.iter().cloned().map(semantic_slide).zip(
         [1usize, 2, 0]
@@ -169,7 +171,7 @@ fn compact_source_pages_move_as_exact_fragments_with_durable_inverse() {
         &litchi_odp::annotation::Position::Page { index: 2 }
     );
 
-    let moved_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let moved_package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let moved_content = String::from_utf8(moved_package.get_file("content.xml").unwrap()).unwrap();
     let moved_fragments = page_fragments(&moved_content);
     assert_eq!(
@@ -191,16 +193,20 @@ fn compact_source_pages_move_as_exact_fragments_with_durable_inverse() {
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let replayed = durable.apply(&source).unwrap();
-    assert_eq!(replayed.bytes(), commit.snapshot().bytes());
+    let replayed = source.apply(&durable).unwrap().into_package();
+    assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        durable.inverse().apply(&replayed).unwrap().bytes(),
+        replayed
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source_bytes
     );
     let mut other = Builder::new();
     other.add_slide_with_title("unrelated", "source").unwrap();
-    let other = edit::Snapshot::from_bytes(other.build().unwrap()).unwrap();
-    assert!(durable.apply(&other).is_err());
+    let other = Package::from_bytes(&other.build().unwrap().to_bytes().unwrap()).unwrap();
+    assert!(other.apply(&durable).is_err());
 }
 
 #[test]
@@ -211,9 +217,9 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
             .add_slide_with_title(title, &format!("body-{title}"))
             .unwrap();
     }
-    let source = edit::Snapshot::from_bytes(builder.build().unwrap()).unwrap();
+    let source = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap()).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .move_slide("B", edit::SlidePosition::Last)
         .unwrap()
@@ -221,6 +227,7 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
@@ -233,25 +240,26 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
         ["D", "A", "C", "B"]
     );
-    let before_failure = transaction.slides().to_vec();
+    let before_failure = transaction.slides().unwrap().to_vec();
     assert!(
         transaction
             .move_slide(1, edit::SlidePosition::Index(4))
             .is_err()
     );
-    assert_eq!(transaction.slides(), before_failure);
+    assert_eq!(transaction.slides().unwrap(), before_failure);
     assert!(
         transaction
             .move_slide("missing", edit::SlidePosition::First)
             .unwrap()
             .is_none()
     );
-    assert_eq!(transaction.slides(), before_failure);
+    assert_eq!(transaction.slides().unwrap(), before_failure);
     transaction
         .move_slide(0, edit::SlidePosition::Index(2))
         .unwrap()
@@ -259,44 +267,48 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
         ["A", "C", "D", "B"]
     );
-    let before_mixed_edit = transaction.slides().to_vec();
+    let before_mixed_edit = transaction.slides().unwrap().to_vec();
     assert!(transaction.remove(0).is_err());
-    assert_eq!(transaction.slides(), before_mixed_edit);
+    assert_eq!(transaction.slides().unwrap(), before_mixed_edit);
     let commit = transaction.commit().unwrap();
-    Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
 
-    let mut noop = source.transaction().unwrap();
+    let mut noop = source.edit().unwrap();
     noop.move_slide(0, edit::SlidePosition::First)
         .unwrap()
         .unwrap();
     let noop = noop.commit().unwrap();
-    assert!(!noop.changed());
-    assert_eq!(noop.snapshot().bytes(), source.bytes());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn page_indexed_operation_conflict_is_refused_without_moving_slides() {
-    let source = edit::Snapshot::from_bytes(compact_producer_deck()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&compact_producer_deck()).unwrap();
+    let mut transaction = source.edit().unwrap();
     let annotation = litchi_odp::annotation::Annotation::new("staged comment");
     transaction
         .add_annotation(&litchi_odp::annotation::Anchor::page(1), &annotation)
         .unwrap();
-    let before = transaction.slides().to_vec();
+    let before = transaction.slides().unwrap().to_vec();
 
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
     assert!(error.to_string().contains("page-indexed operations"));
-    assert_eq!(transaction.slides(), before);
+    assert_eq!(transaction.slides().unwrap(), before);
 
     let commit = transaction.commit().unwrap();
-    let reopened = commit.snapshot().to_presentation().unwrap();
+    let reopened = commit.package().presentation().unwrap();
     assert_eq!(
         reopened
             .pages()

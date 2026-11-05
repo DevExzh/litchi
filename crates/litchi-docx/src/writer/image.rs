@@ -1,7 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 //! Image support for DOCX documents.
 use crate::error::{Error, Result};
 use litchi_core::unit::{EMUS_PER_INCH, pt_to_emu_f64, px_to_emu_96};
@@ -14,8 +10,8 @@ pub use super::super::format::ImageFormat;
 /// A mutable inline image in a document.
 ///
 /// Inline images are embedded within paragraphs as part of runs.
-#[derive(Debug)]
-pub struct MutableInlineImage {
+#[derive(Debug, Clone)]
+pub struct InlineImage {
     /// Image binary data
     pub(crate) data: Vec<u8>,
     /// Image format
@@ -28,7 +24,7 @@ pub struct MutableInlineImage {
     pub(crate) description: String,
 }
 
-impl MutableInlineImage {
+impl InlineImage {
     /// Create a new inline image from bytes.
     ///
     /// # Arguments
@@ -112,7 +108,7 @@ mod tests {
     #[test]
     fn test_inline_image_from_bytes_png() {
         let data = PNG_HEADER.to_vec();
-        let image = MutableInlineImage::from_bytes(data.clone(), None, None);
+        let image = InlineImage::from_bytes(data.clone(), None, None);
         assert!(image.is_ok());
         let img = image.unwrap();
         assert_eq!(img.format, ImageFormat::Png);
@@ -125,7 +121,7 @@ mod tests {
     fn test_inline_image_from_bytes_jpeg() {
         // JPEG magic bytes
         let jpeg_data = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46];
-        let image = MutableInlineImage::from_bytes(jpeg_data, None, None);
+        let image = InlineImage::from_bytes(jpeg_data, None, None);
         assert!(image.is_ok());
         let img = image.unwrap();
         assert_eq!(img.format, ImageFormat::Jpeg);
@@ -135,7 +131,7 @@ mod tests {
     fn test_inline_image_from_bytes_gif() {
         // GIF magic bytes - GIF89a header
         let gif_data = b"GIF89a\x01\x00\x01\x00".to_vec();
-        let image = MutableInlineImage::from_bytes(gif_data, None, None);
+        let image = InlineImage::from_bytes(gif_data, None, None);
         assert!(image.is_ok());
         let img = image.unwrap();
         assert_eq!(img.format, ImageFormat::Gif);
@@ -144,7 +140,7 @@ mod tests {
     #[test]
     fn test_inline_image_from_bytes_unknown_format() {
         let invalid_data = vec![0x00, 0x01, 0x02, 0x03];
-        let image = MutableInlineImage::from_bytes(invalid_data, None, None);
+        let image = InlineImage::from_bytes(invalid_data, None, None);
         assert!(image.is_err());
     }
 
@@ -153,7 +149,7 @@ mod tests {
         let data = PNG_HEADER.to_vec();
         let width = 9144000i64; // 10 inches in EMUs
         let height = 6858000i64; // 7.5 inches in EMUs
-        let image = MutableInlineImage::from_bytes(data, Some(width), Some(height)).unwrap();
+        let image = InlineImage::from_bytes(data, Some(width), Some(height)).unwrap();
         assert_eq!(image.width_emu, Some(width));
         assert_eq!(image.height_emu, Some(height));
     }
@@ -161,7 +157,7 @@ mod tests {
     #[test]
     fn test_inline_image_set_description() {
         let data = PNG_HEADER.to_vec();
-        let mut image = MutableInlineImage::from_bytes(data, None, None).unwrap();
+        let mut image = InlineImage::from_bytes(data, None, None).unwrap();
         image.set_description("Test image description");
         assert_eq!(image.description, "Test image description");
     }
@@ -169,33 +165,33 @@ mod tests {
     #[test]
     fn test_inline_image_data_accessor() {
         let data = PNG_HEADER.to_vec();
-        let image = MutableInlineImage::from_bytes(data.clone(), None, None).unwrap();
+        let image = InlineImage::from_bytes(data.clone(), None, None).unwrap();
         assert_eq!(image.data(), &data);
     }
 
     #[test]
     fn test_inline_image_format_accessor() {
         let data = PNG_HEADER.to_vec();
-        let image = MutableInlineImage::from_bytes(data, None, None).unwrap();
+        let image = InlineImage::from_bytes(data, None, None).unwrap();
         assert_eq!(image.format(), ImageFormat::Png);
     }
 
     #[test]
     fn test_px_to_emu() {
-        let emu = MutableInlineImage::px_to_emu(96);
+        let emu = InlineImage::px_to_emu(96);
         assert_eq!(emu, 914_400); // 1 inch at 96 DPI
     }
 
     #[test]
     fn test_pt_to_emu() {
-        let emu = MutableInlineImage::pt_to_emu(72.0);
+        let emu = InlineImage::pt_to_emu(72.0);
         assert_eq!(emu, 914_400); // 1 inch = 72 points
     }
 
     #[test]
     fn test_inline_image_to_xml() {
         let data = PNG_HEADER.to_vec();
-        let image = MutableInlineImage::from_bytes(data, Some(9144000), Some(6858000)).unwrap();
+        let image = InlineImage::from_bytes(data, Some(9144000), Some(6858000)).unwrap();
         let mut xml = String::new();
         let result = image.to_xml(&mut xml, "rId5");
         assert!(result.is_ok());
@@ -210,7 +206,7 @@ mod tests {
     #[test]
     fn test_inline_image_to_xml_with_description() {
         let data = PNG_HEADER.to_vec();
-        let mut image = MutableInlineImage::from_bytes(data, None, None).unwrap();
+        let mut image = InlineImage::from_bytes(data, None, None).unwrap();
         image.set_description("My test image");
         let mut xml = String::new();
         let result = image.to_xml(&mut xml, "rId1");
@@ -221,7 +217,7 @@ mod tests {
     #[test]
     fn test_inline_image_default_dimensions() {
         let data = PNG_HEADER.to_vec();
-        let image = MutableInlineImage::from_bytes(data, None, None).unwrap();
+        let image = InlineImage::from_bytes(data, None, None).unwrap();
         let mut xml = String::new();
         let _ = image.to_xml(&mut xml, "rId1");
         // Default is EMUS_PER_INCH = 914_400

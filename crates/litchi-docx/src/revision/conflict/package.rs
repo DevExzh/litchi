@@ -8,8 +8,9 @@
 )]
 //! Story discovery and failure-atomic package publication.
 
+use super::LimitKind;
 use super::model::{Binding, Source};
-use super::transaction::{Commit, Patch};
+use super::transaction::{DraftCommit, DraftPatch};
 use super::{Limits, Snapshot};
 use crate::package::story::{
     StoryInventory as Capture, StoryLimits, StoryPart as Located, capture_with_policy,
@@ -44,12 +45,6 @@ impl Story {
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
-
-    /// Consume the wrapper and retain the story-bound snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
 }
 
 impl Package {
@@ -59,7 +54,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn conflicts(&self) -> Result<Snapshot> {
-        self.conflicts_with_limits(Limits::default())
+        self.conflicts_bounded(self.semantic_limits().conflicts_value())
     }
 
     /// Read the main-story conflicts with explicit semantic resource limits.
@@ -67,9 +62,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn conflicts_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn conflicts_bounded(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
-        self.ensure_conflict_opc_current("conflicts_with_limits")?;
+        self.ensure_conflict_opc_current("conflicts_bounded")?;
         let captured = capture(self.opc_package(), limits, false)?;
         let story = captured
             .stories
@@ -89,7 +84,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn conflict_stories(&self) -> Result<Vec<Story>> {
-        self.conflict_stories_with_limits(Limits::default())
+        self.conflict_stories_bounded(self.semantic_limits().conflicts_value())
     }
 
     /// Read every reachable story with explicit semantic resource limits.
@@ -97,9 +92,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn conflict_stories_with_limits(&self, limits: Limits) -> Result<Vec<Story>> {
+    pub(crate) fn conflict_stories_bounded(&self, limits: Limits) -> Result<Vec<Story>> {
         let limits = limits.validate()?;
-        self.ensure_conflict_opc_current("conflict_stories_with_limits")?;
+        self.ensure_conflict_opc_current("conflict_stories_bounded")?;
         let captured = capture(self.opc_package(), limits, true)?;
         let mut stories = Vec::new();
         stories
@@ -133,8 +128,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply_conflicts(&mut self, commit: &Commit) -> Result<Snapshot> {
-        self.apply_conflict_patch(commit.patch())
+    pub(crate) fn publish_conflict_draft(&mut self, commit: &DraftCommit) -> Result<Snapshot> {
+        self.publish_conflict_draft_patch(commit.patch())
     }
 
     /// Publish a reversible story-bound conflict patch.
@@ -148,9 +143,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply_conflict_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
+    pub(crate) fn publish_conflict_draft_patch(&mut self, patch: &DraftPatch) -> Result<Snapshot> {
         let claim = patch.claim_publication()?;
-        self.ensure_conflict_opc_current("apply_conflict_patch")?;
+        self.ensure_conflict_opc_current("publish_conflict_draft_patch")?;
         let binding = patch
             .story_binding()
             .ok_or_else(|| invalid("conflict patch is not bound to a package story"))?
@@ -193,26 +188,27 @@ impl Package {
         let replacement = source_blob(after)?;
         let expected_topology = Arc::clone(&captured.topology);
         let expected_published = expected.clone();
-        let published = self.edit_semantic_opc("apply_conflict_patch", move |candidate| {
-            let staged = capture(candidate, source_limits, true)?;
-            if staged.topology.as_ref() != expected_topology.as_ref() {
-                return Err(invalid("conflict story topology is stale"));
-            }
-            let source = bound_story(&staged, &binding)?;
-            if source.part != target || source.source.as_slice() != before.as_ref() {
-                return Err(invalid("conflict patch source story is stale"));
-            }
-            preflight_replacement_total(
-                &staged,
-                source.source.len(),
-                replacement.len(),
-                target_limits,
-            )?;
-            candidate
-                .get_part_mut(&target)?
-                .set_blob_shared(Arc::clone(&replacement));
-            Ok(expected_published)
-        })?;
+        let published =
+            self.edit_semantic_opc("publish_conflict_draft_patch", move |candidate| {
+                let staged = capture(candidate, source_limits, true)?;
+                if staged.topology.as_ref() != expected_topology.as_ref() {
+                    return Err(invalid("conflict story topology is stale"));
+                }
+                let source = bound_story(&staged, &binding)?;
+                if source.part != target || source.source.as_slice() != before.as_ref() {
+                    return Err(invalid("conflict patch source story is stale"));
+                }
+                preflight_replacement_total(
+                    &staged,
+                    source.source.len(),
+                    replacement.len(),
+                    target_limits,
+                )?;
+                candidate
+                    .get_part_mut(&target)?
+                    .set_blob_shared(Arc::clone(&replacement));
+                Ok(expected_published)
+            })?;
         claim.finalize();
         Ok(published)
     }
@@ -353,31 +349,31 @@ impl Aggregate {
             self.story_bytes,
             value.story_bytes,
             limits.max_total_story_bytes,
-            "story byte",
+            LimitKind::TotalStoryBytes,
         )?;
         self.conflicts = checked_total(
             self.conflicts,
             value.conflicts,
             limits.max_total_conflicts,
-            "conflict element",
+            LimitKind::TotalConflicts,
         )?;
         self.ranges = checked_total(
             self.ranges,
             value.ranges,
             limits.max_total_ranges,
-            "conflict range",
+            LimitKind::TotalRanges,
         )?;
         self.metadata_bytes = checked_total(
             self.metadata_bytes,
             value.metadata_bytes,
             limits.max_total_metadata_bytes,
-            "metadata byte",
+            LimitKind::TotalMetadataBytes,
         )?;
         self.text_segments = checked_total(
             self.text_segments,
             value.text_segments,
             limits.max_total_text_segments,
-            "text segment",
+            LimitKind::TotalTextSegments,
         )?;
         Ok(())
     }
@@ -479,19 +475,14 @@ fn source_blob(source: Source) -> Result<Arc<Vec<u8>>> {
     }
 }
 
-fn checked_total(
-    total: usize,
-    added: usize,
-    limit: usize,
-    resource: &'static str,
-) -> Result<usize> {
-    let total = total
-        .checked_add(added)
-        .ok_or_else(|| invalid(format!("DOCX conflict aggregate {resource} count overflow")))?;
+fn checked_total(total: usize, added: usize, limit: usize, kind: LimitKind) -> Result<usize> {
+    let total = total.checked_add(added).unwrap_or(usize::MAX);
     if total > limit {
-        return Err(invalid(format!(
-            "DOCX conflict aggregate {resource} count exceeds {limit}"
-        )));
+        return Err(Error::ConflictLimit {
+            kind,
+            actual: total,
+            maximum: limit,
+        });
     }
     Ok(total)
 }

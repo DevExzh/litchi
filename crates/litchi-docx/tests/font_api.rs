@@ -1,6 +1,6 @@
 use litchi_docx::font::{
-    Charset, Conformance, Embed, Family, Font, FontKey, Key, Pitch, Resource, Signature, Style,
-    Table, put, read, remove, write,
+    Charset, Conformance, Embed, Family, Font, FontKey, Key, Limits, Pitch, Resource, Signature,
+    Style, Table, raw,
 };
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
 
@@ -10,7 +10,11 @@ const KEY: FontKey = FontKey::new([
 
 #[test]
 fn downstream_surface_is_short_safe_and_move_first() -> litchi_docx::Result<()> {
-    let face = Embed::new(Style::Regular, KEY, Resource::new(vec![0; 32])?);
+    let face = Embed::new(
+        Style::Regular,
+        KEY,
+        Resource::new(vec![0; 32], &Limits::DEFAULT)?,
+    );
     let font = Font::new("Example")?
         .with_charset(Charset::Ansi)
         .with_family(Family::Swiss)
@@ -29,7 +33,7 @@ fn downstream_surface_is_short_safe_and_move_first() -> litchi_docx::Result<()> 
         old.map(|font| font.name().to_owned()),
         Some("Example".into())
     );
-    assert!(write(&table, Conformance::Strict)?.starts_with(b"<?xml"));
+    assert!(raw::write(&table, Conformance::Strict, &Limits::DEFAULT)?.starts_with(b"<?xml"));
 
     let mut package = OpcPackage::new();
     let document = PackURI::new("/word/document.xml").expect("test URI");
@@ -44,9 +48,14 @@ fn downstream_surface_is_short_safe_and_move_first() -> litchi_docx::Result<()> 
         "rId1".into(),
         false,
     );
-    put(&mut package, table, Conformance::Transitional)?;
-    assert!(read(&package)?.is_some());
-    assert!(remove(&mut package)?);
-    assert!(!remove(&mut package)?);
+    raw::put(
+        &mut package,
+        table,
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )?;
+    assert!(raw::read(&package, &Limits::DEFAULT)?.is_some());
+    assert!(raw::remove(&mut package, &Limits::DEFAULT)?);
+    assert!(!raw::remove(&mut package, &Limits::DEFAULT)?);
     Ok(())
 }

@@ -4,31 +4,22 @@ use phf::phf_map;
 use super::super::parser::Expr;
 use super::{EngineCtx, ReferenceResolver};
 
-use std::future::Future;
-use std::pin::Pin;
-
-pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-
 pub(crate) trait DispatchCtx: EngineCtx + ReferenceResolver + Send + Sync {}
 
 impl<T> DispatchCtx for T where T: EngineCtx + ReferenceResolver + Send + Sync + ?Sized {}
 
 pub(crate) type DispatchFn =
-    for<'a> fn(&'a dyn DispatchCtx, &'a str, &'a [Expr]) -> BoxFuture<'a, Result<CellValue>>;
+    for<'a> fn(&'a dyn DispatchCtx, &'a str, &'a [Expr]) -> Result<CellValue>;
 
-fn eval_pi<'a>(
-    _: &'a dyn DispatchCtx,
-    _: &'a str,
-    _: &'a [Expr],
-) -> BoxFuture<'a, Result<CellValue>> {
-    Box::pin(async move { Ok(CellValue::Float(std::f64::consts::PI)) })
+fn eval_pi<'a>(_: &'a dyn DispatchCtx, _: &'a str, _: &'a [Expr]) -> Result<CellValue> {
+    Ok(CellValue::Float(std::f64::consts::PI))
 }
 
 macro_rules! register_functions {
     ($( $wrapper:ident => $path:path => [$($name:expr),+ $(,)?] ),+ $(,)? ) => {
         $(
-            fn $wrapper<'a>(ctx: &'a dyn DispatchCtx, current_sheet: &'a str, args: &'a [Expr]) -> BoxFuture<'a, Result<CellValue>> {
-                Box::pin($path(ctx, current_sheet, args))
+            fn $wrapper<'a>(ctx: &'a dyn DispatchCtx, current_sheet: &'a str, args: &'a [Expr]) -> Result<CellValue> {
+                $path(ctx, current_sheet, args)
             }
         )+
 

@@ -413,7 +413,8 @@ impl ParagraphStreamPatch {
                 maximum: ABSOLUTE_MAX_PATCH_BYTES as u64,
             })?;
         let mut writer = JsonWriter::new(maximum);
-        serde_json::to_writer(&mut writer, &self.to_value(reference))
+        // Sorted members whatever `serde_json` features are unified (0349).
+        litchi_core::canonical_json::to_writer(&mut writer, &self.to_value(reference))
             .map_err(|error| PatchError::Encoding(error.to_string()))?;
         Ok(writer.finish())
     }
@@ -784,7 +785,7 @@ impl ExactInverseAuthorization {
             maximum: ABSOLUTE_MAX_PATCH_BYTES as u64,
         })?;
         let mut writer = JsonWriter::new(maximum);
-        serde_json::to_writer(
+        litchi_core::canonical_json::to_writer(
             &mut writer,
             &object([
                 ("current", artifact_value(self.current)),
@@ -865,7 +866,7 @@ pub fn apply_exact_inverse<W: Write, P: OriginalArtifactProvider>(
     provider: &P,
     writer: W,
 ) -> Result<()> {
-    let current_package: &SourceBackedPackage = &current.package;
+    let current_package: &SourceBackedPackage = current.physical_opc_package()?;
     authenticate_current_artifact(current_package, inverse.current)?;
     let original = match provider.open(&inverse.reference) {
         Ok(original) => original,
@@ -1415,7 +1416,7 @@ fn parse_limits(value: &Value) -> Result<PatchLimits> {
 
 fn canonical_bytes(value: &Value) -> Result<Vec<u8>> {
     let mut writer = JsonWriter::new(ABSOLUTE_MAX_PATCH_BYTES);
-    serde_json::to_writer(&mut writer, value)
+    litchi_core::canonical_json::to_writer(&mut writer, value)
         .map_err(|error| PatchError::Encoding(error.to_string()))?;
     Ok(writer.finish())
 }
@@ -1561,6 +1562,17 @@ pub enum PatchError {
     /// OPC rejected or interrupted an exact restore.
     #[error(transparent)]
     Opc(#[from] litchi_opc::error::OpcError),
+    /// The owning DOCX source boundary failed before exact restoration.
+    /// Preserve the typed owner error instead of collapsing it into a generic
+    /// OPC refusal.
+    #[error("DOCX source error while applying stream patch")]
+    Document(#[source] Box<crate::Error>),
+}
+
+impl From<crate::Error> for PatchError {
+    fn from(error: crate::Error) -> Self {
+        Self::Document(Box::new(error))
+    }
 }
 
 #[cfg(test)]

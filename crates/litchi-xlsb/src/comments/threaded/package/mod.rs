@@ -14,7 +14,7 @@ use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, TargetMode};
 use crate::package::error::{Error, Result};
 
 use super::codec::{parse_comments, parse_persons, write_comments, write_persons};
-use super::semantic::{Comments, CommentsPart, Graph, People, PeoplePart};
+use super::semantic::{CommentsPart, Graph, PeoplePart};
 use super::validation::{validate_graph as validate_model_graph, validate_people};
 
 /// Content type of an XLSB threaded-comments XML part.
@@ -56,9 +56,9 @@ pub fn load_graph(package: &OpcPackage) -> Result<Graph> {
 }
 
 /// Replace the complete typed threaded-comments graph atomically.
-pub fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
+pub(crate) fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
     validate_package_graph(package)?;
-    validate_model_graph(graph).map_err(map_model_error)?;
+    validate_model_graph(graph).map_err(map_authoring_error)?;
     let mut candidate = package.clone();
     remove_graph_inner(&mut candidate)?;
     let workbook = workbook_uri(&candidate)?;
@@ -66,8 +66,7 @@ pub fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
         store_people_part(&mut candidate, &workbook, persons)?;
     }
     for worksheet in &graph.worksheets {
-        let worksheet_uri = PackURI::new(&worksheet.worksheet_part_name)
-            .map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let worksheet_uri = PackURI::new(&worksheet.worksheet_part_name)?;
         store_comments_part(&mut candidate, &worksheet_uri, worksheet)?;
     }
     validate_package_graph(&candidate)?;
@@ -76,7 +75,8 @@ pub fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
 }
 
 /// Remove every threaded-comments/person relationship and unreferenced part.
-pub fn remove_graph(package: &mut OpcPackage) -> Result<bool> {
+#[cfg(test)]
+pub(crate) fn remove_graph(package: &mut OpcPackage) -> Result<bool> {
     validate_package_graph(package)?;
     let mut candidate = package.clone();
     let changed = remove_graph_inner(&mut candidate)?;
@@ -103,56 +103,16 @@ pub fn load_people(package: &OpcPackage, workbook_part: &PackURI) -> Result<Opti
     };
     let part = package.get_part(&part_name)?;
     validate_xml_part(part, PERSONS_CONTENT_TYPE, "persons")?;
-    let persons = parse_persons(part.blob()).map_err(map_model_error)?;
+    let persons = parse_persons(
+        part.blob(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_model_error)?;
     Ok(Some(PeoplePart {
         relationship_id,
         part_name: part_name.to_string(),
         persons,
     }))
-}
-
-/// Store or replace the workbook persons part using a bounded canonical name.
-pub fn store_people(
-    package: &mut OpcPackage,
-    workbook_part: &PackURI,
-    people: &People,
-) -> Result<PeoplePart> {
-    validate_package_graph(package)?;
-    let mut candidate = package.clone();
-    let result = store_people_part(
-        &mut candidate,
-        workbook_part,
-        &PeoplePart {
-            relationship_id: String::new(),
-            part_name: String::new(),
-            persons: people.clone(),
-        },
-    )?;
-    validate_package_graph(&candidate)?;
-    *package = candidate;
-    Ok(result)
-}
-
-/// Remove the workbook persons relationship and unreferenced part.
-pub fn remove_people(package: &mut OpcPackage, workbook_part: &PackURI) -> Result<bool> {
-    validate_package_graph(package)?;
-    let Some((relationship_id, part_name)) = find_relationship(
-        package.get_part(workbook_part)?,
-        PERSONS_RELATIONSHIP_TYPE,
-        "persons",
-    )?
-    else {
-        return Ok(false);
-    };
-    let mut candidate = package.clone();
-    candidate
-        .get_part_mut(workbook_part)?
-        .rels_mut()
-        .remove(&relationship_id);
-    remove_if_unreferenced(&mut candidate, &part_name);
-    validate_package_graph(&candidate)?;
-    *package = candidate;
-    Ok(true)
 }
 
 /// Load the optional threaded-comments part owned by one XLSB worksheet.
@@ -171,7 +131,11 @@ pub fn load_from_worksheet(
     };
     let part = package.get_part(&part_name)?;
     validate_xml_part(part, COMMENTS_CONTENT_TYPE, "threaded comments")?;
-    let comments = parse_comments(part.blob()).map_err(map_model_error)?;
+    let comments = parse_comments(
+        part.blob(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_model_error)?;
     Ok(Some(CommentsPart {
         worksheet_part_name: worksheet_part.to_string(),
         relationship_id,
@@ -180,58 +144,18 @@ pub fn load_from_worksheet(
     }))
 }
 
-/// Store or replace one worksheet's threaded-comments part.
-pub fn store_on_worksheet(
-    package: &mut OpcPackage,
-    worksheet_part: &PackURI,
-    comments: &Comments,
-) -> Result<CommentsPart> {
-    validate_package_graph(package)?;
-    let mut candidate = package.clone();
-    let result = store_comments_part(
-        &mut candidate,
-        worksheet_part,
-        &CommentsPart {
-            worksheet_part_name: worksheet_part.to_string(),
-            relationship_id: String::new(),
-            part_name: String::new(),
-            comments: comments.clone(),
-        },
-    )?;
-    validate_package_graph(&candidate)?;
-    *package = candidate;
-    Ok(result)
-}
-
-/// Remove one worksheet's threaded-comments relationship and unreferenced part.
-pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI) -> Result<bool> {
-    validate_package_graph(package)?;
-    require_worksheet(package.get_part(worksheet_part)?)?;
-    let Some((relationship_id, part_name)) = find_relationship(
-        package.get_part(worksheet_part)?,
-        COMMENTS_RELATIONSHIP_TYPE,
-        "threaded comments",
-    )?
-    else {
-        return Ok(false);
-    };
-    package
-        .get_part_mut(worksheet_part)?
-        .rels_mut()
-        .remove(&relationship_id);
-    remove_if_unreferenced(package, &part_name);
-    package.unsign();
-    Ok(true)
-}
-
 fn store_people_part(
     package: &mut OpcPackage,
     workbook_part: &PackURI,
     value: &PeoplePart,
 ) -> Result<PeoplePart> {
     require_workbook(package.get_part(workbook_part)?)?;
-    validate_people(&value.persons).map_err(map_model_error)?;
-    let payload = write_persons(&value.persons).map_err(map_model_error)?;
+    validate_people(&value.persons).map_err(map_authoring_error)?;
+    let payload = write_persons(
+        &value.persons,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_authoring_error)?;
     let existing = find_relationship(
         package.get_part(workbook_part)?,
         PERSONS_RELATIONSHIP_TYPE,
@@ -281,7 +205,11 @@ fn store_comments_part(
     value: &CommentsPart,
 ) -> Result<CommentsPart> {
     require_worksheet(package.get_part(worksheet_part)?)?;
-    let payload = write_comments(&value.comments).map_err(map_model_error)?;
+    let payload = write_comments(
+        &value.comments,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_authoring_error)?;
     let existing = find_relationship(
         package.get_part(worksheet_part)?,
         COMMENTS_RELATIONSHIP_TYPE,
@@ -359,10 +287,7 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
                 continue;
             }
             if relationship.is_external() {
-                return Err(invalid(format!(
-                    "{} relationship cannot be external",
-                    relationship.reltype()
-                )));
+                return Err(invalid("relationship cannot be external"));
             }
             let target = relationship.target_partname()?;
             sources.push((
@@ -378,10 +303,9 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
     for (source_name, source_type, relationship_type, relationship_id, target) in sources {
         let target_part = package.get_part(&target)?;
         if !target_part.rels().is_empty() {
-            return Err(invalid(format!(
-                "threaded-comments part '{}' must not have outgoing relationships",
-                target
-            )));
+            return Err(invalid(
+                "threaded-comments part must not have outgoing relationships",
+            ));
         }
         if relationship_type == PERSONS_RELATIONSHIP_TYPE {
             if source_type != ct::XLSB_BIN || workbook_name != source_name {
@@ -397,7 +321,11 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
             if people_target.replace(target.clone()).is_some() {
                 return Err(invalid("workbook has multiple persons relationships"));
             }
-            let persons = parse_persons(target_part.blob()).map_err(map_model_error)?;
+            let persons = parse_persons(
+                target_part.blob(),
+                litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+            )
+            .map_err(map_model_error)?;
             graph.persons = Some(PeoplePart {
                 relationship_id,
                 part_name: target.to_string(),
@@ -420,12 +348,13 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
                 ));
             }
             if !comment_targets.insert(target.clone()) {
-                return Err(invalid(format!(
-                    "threaded-comments part '{}' is targeted more than once",
-                    target
-                )));
+                return Err(invalid("threaded-comments part is targeted more than once"));
             }
-            let comments = parse_comments(target_part.blob()).map_err(map_model_error)?;
+            let comments = parse_comments(
+                target_part.blob(),
+                litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+            )
+            .map_err(map_model_error)?;
             graph.worksheets.push(CommentsPart {
                 worksheet_part_name: source_name.to_string(),
                 relationship_id,
@@ -439,24 +368,24 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
         if part.content_type() == PERSONS_CONTENT_TYPE
             && people_target.as_ref() != Some(part.partname())
         {
-            return Err(invalid(format!(
-                "persons part '{}' has no workbook relationship",
-                part.partname()
-            )));
+            return Err(invalid("persons part has no workbook relationship"));
         }
         if part.content_type() == COMMENTS_CONTENT_TYPE
             && !comment_targets.contains(part.partname())
         {
-            return Err(invalid(format!(
-                "threaded-comments part '{}' has no worksheet relationship",
-                part.partname()
-            )));
+            return Err(invalid(
+                "threaded-comments part has no worksheet relationship",
+            ));
         }
     }
     validate_model_graph(&graph).map_err(map_model_error)
 }
 
 fn remove_graph_inner(package: &mut OpcPackage) -> Result<bool> {
+    // Callers hand in a clone and drop it on error, so refusing after the
+    // removals leaves their package untouched; the decision is taken on the
+    // signature state before any removal.
+    let signed = crate::signature_policy::ensure_unsigned(package);
     let mut changed = false;
     let mut removals = Vec::new();
     // Keep removal bound to the same resolved workbook URI used by graph
@@ -493,11 +422,11 @@ fn remove_graph_inner(package: &mut OpcPackage) -> Result<bool> {
             changed = true;
         }
     }
+    if changed {
+        signed?;
+    }
     for target in removals {
         remove_if_unreferenced(package, &target);
-    }
-    if changed {
-        package.unsign();
     }
     Ok(changed)
 }
@@ -512,6 +441,7 @@ fn replace_part_and_relationship(
     relationship_type: &str,
     payload: Vec<u8>,
 ) -> Result<()> {
+    crate::signature_policy::ensure_unsigned(package)?;
     if let Some(old_part) = old_part
         && old_part != part_name
     {
@@ -551,9 +481,7 @@ fn replace_part_and_relationship(
             });
     if let Some((existing_type, external, existing_target)) = existing_relationship {
         if external || existing_type != relationship_type || existing_target? != *part_name {
-            return Err(invalid(format!(
-                "relationship ID '{relationship_id}' is already used by another target",
-            )));
+            return Err(invalid("relationship ID is already used by another target"));
         }
     } else {
         package
@@ -566,14 +494,13 @@ fn replace_part_and_relationship(
                 TargetMode::Internal,
             )?;
     }
-    package.unsign();
     Ok(())
 }
 
 fn find_relationship(
     source: &dyn Part,
     relationship_type: &str,
-    description: &str,
+    _description: &str,
 ) -> Result<Option<(String, PackURI)>> {
     let mut found = None;
     for relationship in source
@@ -582,16 +509,10 @@ fn find_relationship(
         .filter(|relationship| relationship.reltype() == relationship_type)
     {
         if found.is_some() {
-            return Err(invalid(format!(
-                "{} has multiple {} relationships",
-                source.partname(),
-                description
-            )));
+            return Err(invalid("has multiple relationships"));
         }
         if relationship.is_external() {
-            return Err(invalid(format!(
-                "{description} relationship cannot be external"
-            )));
+            return Err(invalid("relationship cannot be external"));
         }
         found = Some((
             relationship.r_id().to_owned(),
@@ -601,20 +522,12 @@ fn find_relationship(
     Ok(found)
 }
 
-fn validate_xml_part(part: &dyn Part, expected: &str, description: &str) -> Result<()> {
+fn validate_xml_part(part: &dyn Part, expected: &str, _description: &str) -> Result<()> {
     if part.content_type() != expected {
-        return Err(invalid(format!(
-            "{description} part '{}' has content type '{}', expected '{}'",
-            part.partname(),
-            part.content_type(),
-            expected
-        )));
+        return Err(invalid("part has content type"));
     }
     if !part.rels().is_empty() {
-        return Err(invalid(format!(
-            "{description} part '{}' must not have relationships",
-            part.partname()
-        )));
+        return Err(invalid("part must not have relationships"));
     }
     Ok(())
 }
@@ -623,10 +536,9 @@ fn require_workbook(part: &dyn Part) -> Result<()> {
     if part.content_type() == ct::XLSB_BIN {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "threaded-comment persons operations require an XLSB workbook, got '{}'",
-            part.content_type()
-        )))
+        Err(invalid(
+            "threaded-comment persons operations require an XLSB workbook",
+        ))
     }
 }
 
@@ -634,10 +546,9 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
     if part.content_type() == WORKSHEET_CONTENT_TYPE {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "threaded-comment operations require an XLSB worksheet, got '{}'",
-            part.content_type()
-        )))
+        Err(invalid(
+            "threaded-comment operations require an XLSB worksheet",
+        ))
     }
 }
 
@@ -666,8 +577,7 @@ fn choose_part_name(
     template: &str,
 ) -> Result<PackURI> {
     if let Some(requested) = requested {
-        let part_name =
-            PackURI::new(requested).map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let part_name = PackURI::new(requested)?;
         match package.get_part(&part_name) {
             Ok(_) => return Ok(part_name),
             Err(OpcError::PartNotFound(_)) => {},
@@ -699,9 +609,7 @@ fn choose_relationship_id(
         if relationships.get(requested).is_none() {
             return Ok(requested.to_owned());
         }
-        return Err(invalid(format!(
-            "relationship ID '{requested}' is already used"
-        )));
+        return Err(invalid("relationship ID is already used"));
     }
     for suffix in 1..=MAX_NAME_ATTEMPTS {
         let candidate = format!("{prefix}{suffix}");
@@ -731,16 +639,24 @@ fn remove_if_unreferenced(package: &mut OpcPackage, target: &PackURI) {
     }
 }
 
-fn map_model_error(error: impl std::fmt::Display) -> Error {
+fn map_model_error(_error: impl std::fmt::Display) -> Error {
     Error::Unrecognized {
-        typ: "XLSB threaded-comments".to_owned(),
-        val: error.to_string(),
+        typ: "XLSB threaded-comments",
+        val: "unexpected value",
     }
 }
 
-fn invalid(value: impl Into<String>) -> Error {
+fn map_authoring_error(_error: impl std::fmt::Display) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_threaded_comments",
+        "the threaded-comments content cannot be authored losslessly",
+    )
+}
+
+fn invalid(value: &'static str) -> Error {
     Error::Unrecognized {
-        typ: "XLSB threaded-comments package graph".to_owned(),
-        val: value.into(),
+        typ: "XLSB threaded-comments package graph",
+        val: value,
     }
 }

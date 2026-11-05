@@ -1,0 +1,71 @@
+{
+  "path": "/body/tbl[1]",
+  "type": "table",
+  "childCount": 2,
+  "format": {
+    "cols": "2",
+    "rows": "2",
+    "style": "TableGrid",
+    "width": "100%",
+    "align": "center",
+    "layout": "fixed",
+    "tblLook": "0420",
+    "firstRow": true,
+    "bandedRows": true,
+    "colWidths": "2880dxa,2880dxa"
+  },
+  "children": [
+    {
+      "path": "/body/tbl[1]/tr[1]",
+      "type": "row",
+      "childCount": 2,
+      "format": {
+        "height": "400dxa",
+        "height.rule": "exact",
+        "header": true
+      },
+      "children": [
+        {
+          "path": "/body/tbl[1]/tr[1]/tc[1]",
+          "type": "cell",
+          "text": "Region",
+          "childCount": 1,
+          "format": {
+            "width": "2880dxa",
+            "valign": "center"
+          },
+          "children": []
+        },
+        {
+          "path": "/body/tbl[1]/tr[1]/tc[2]",
+          "type": "cell",
+          "text": "Sales",
+          "childCount": 1,
+          "format": {
+            "width": "2880dxa"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "/body/tbl[1]/tr[2]",
+      "type": "row",
+      "childCount": 1,
+      "format": {},
+      "children": [
+        {
+          "path": "/body/tbl[1]/tr[2]/tc[1]",
+          "type": "cell",
+          "text": "Westnested",
+          "childCount": 3,
+          "format": {
+            "vmerge": "restart",
+            "colspan": 2
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

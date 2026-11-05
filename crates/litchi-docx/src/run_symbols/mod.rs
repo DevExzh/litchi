@@ -16,7 +16,7 @@ mod validation;
 mod tests;
 
 pub use model::{MAX_FONT_CHARS, MAX_SYMBOLS, Symbol, Symbols};
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::Snapshot;
 
 /// Target namespace of the Word 2015 `symEx` extension.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2015/wordml/symex";

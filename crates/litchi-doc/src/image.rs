@@ -304,8 +304,8 @@ impl Image {
         }
 
         // Parse the first Escher record (usually SpContainer or BStoreContainer)
-        let (_, record_size) =
-            Record::parse(data_stream, offset).map_err(ImageError::DecodeOfficeArtRecord)?;
+        let (_, record_size) = Record::parse(data_stream, offset, litchi_odraw::Limits::default())
+            .map_err(ImageError::DecodeOfficeArtRecord)?;
         offset = offset
             .checked_add(record_size)
             .filter(|offset| *offset <= block_end)
@@ -313,10 +313,11 @@ impl Image {
 
         // Continue parsing remaining records looking for BSE or BLIP
         while offset < block_end {
-            let (next_record, next_record_size) = match Record::parse(data_stream, offset) {
-                Ok(r) => r,
-                Err(_) => break,
-            };
+            let (next_record, next_record_size) =
+                match Record::parse(data_stream, offset, litchi_odraw::Limits::default()) {
+                    Ok(r) => r,
+                    Err(_) => break,
+                };
 
             // Check if this is a BSE (0xF007) or BLIP record (0xF018-0xF117)
             if next_record.raw_kind() != 0xF007
@@ -331,9 +332,11 @@ impl Image {
 
             // Try to extract image from this record
             // Pass data_stream for delay-loaded BLIPs
-            if let Ok(img) =
-                litchi_odraw::image::record_with_delay(&next_record, Some(word_document))
-            {
+            if let Ok(img) = litchi_odraw::image::record_with_delay(
+                &next_record,
+                Some(word_document),
+                litchi_odraw::image::Limits::default(),
+            ) {
                 return Ok(img);
             }
             // TODO: log this error?

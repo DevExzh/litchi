@@ -50,9 +50,7 @@ impl<'a> Compiler<'a> {
         context: Option<&'a CompilationContext<'a>>,
     ) -> Result<ParsedFormula> {
         if base_row >= 1_048_576 || base_col >= 16_384 {
-            return Err(Error::InvalidCellReference(format!(
-                "shared formula base ({base_row}, {base_col})"
-            )));
+            return Err(Error::InvalidCellReference("shared formula base (, )"));
         }
         Self::compile_with_encoding(
             formula,
@@ -68,9 +66,7 @@ impl<'a> Compiler<'a> {
     ) -> Result<ParsedFormula> {
         let input = formula.strip_prefix('=').unwrap_or(formula).trim();
         if input.is_empty() {
-            return Err(Error::InvalidFormula(
-                "formula expression is empty".to_string(),
-            ));
+            return Err(Error::InvalidFormula("formula expression is empty"));
         }
         let mut compiler = Self {
             input,
@@ -87,10 +83,7 @@ impl<'a> Compiler<'a> {
         let mut rgcb = Vec::new();
         Self::emit(&expression, &mut rgce, &mut rgcb, encoding)?;
         if rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "compiled formula is {} bytes; maximum is {MAX_CELL_FORMULA_BYTES}",
-                rgce.len()
-            )));
+            return Err(Error::InvalidFormula("compiled formula is bytes; maximum"));
         }
         Ok(ParsedFormula { rgce, rgcb })
     }

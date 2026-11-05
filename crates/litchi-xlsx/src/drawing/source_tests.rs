@@ -92,7 +92,7 @@ fn scans_direct_pictures_in_all_anchor_forms_and_preserves_ranges() {
         absolute(3)
     );
     let source_bytes = transitional_drawing(&body);
-    let source = SourceDrawing::scan_with_ordinal(&source_bytes, 7).unwrap();
+    let source = SourceDrawing::scan(&source_bytes, 7, ScanLimits::default()).unwrap();
 
     assert_eq!(source.drawing_ordinal(), 7);
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
@@ -160,7 +160,7 @@ fn contextual_svg_values_share_scope_without_retaining_completed_fragments() {
         .map(|index| two_cell(index + 1, &owner, ""))
         .collect::<String>();
     let source_bytes = long_scope_drawing(&body);
-    let source = SourceDrawing::scan(&source_bytes).unwrap();
+    let source = SourceDrawing::scan(&source_bytes, 0, ScanLimits::default()).unwrap();
 
     assert_eq!(source.pictures().len(), 32);
     let owners = source
@@ -198,7 +198,7 @@ fn contextual_projection_uses_raw_fragment_limit_boundary() {
     let owner = format!(r#"<a:ext uri="{SVG_URI}">{raw}</a:ext>"#);
     let source_bytes = transitional_drawing(&two_cell(1, &owner, ""));
 
-    let exact = SourceDrawing::scan_with_limits(
+    let exact = SourceDrawing::scan(
         &source_bytes,
         0,
         ScanLimits {
@@ -220,7 +220,7 @@ fn contextual_projection_uses_raw_fragment_limit_boundary() {
     );
 
     assert!(
-        SourceDrawing::scan_with_limits(
+        SourceDrawing::scan(
             &source_bytes,
             0,
             ScanLimits {
@@ -236,7 +236,7 @@ fn contextual_projection_uses_raw_fragment_limit_boundary() {
 fn strict_host_keeps_transitional_svg_attribute_dialect() {
     let owner = format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip trans:embed="rIdSvg"/></a:ext>"#);
     let source_bytes = strict_drawing(&two_cell(1, &owner, ""));
-    let source = SourceDrawing::scan(&source_bytes).unwrap();
+    let source = SourceDrawing::scan(&source_bytes, 0, ScanLimits::default()).unwrap();
 
     assert_eq!(source.dialect(), DrawingDialect::Strict);
     assert_eq!(source.relationship_dialect(), RelationshipDialect::Strict);
@@ -259,7 +259,7 @@ fn strict_mixed_namespace_profile_keeps_shared_svg_relationships_typed() {
     );
     let body = format!("{}{}", two_cell(1, &owner, ""), two_cell(2, &owner, ""));
     let source_bytes = strict_drawing(&body);
-    let source = SourceDrawing::scan(&source_bytes).unwrap();
+    let source = SourceDrawing::scan(&source_bytes, 0, ScanLimits::default()).unwrap();
 
     assert_eq!(source.pictures().len(), 2);
     assert_eq!(source.relationship_references().len(), 4);
@@ -291,7 +291,7 @@ fn duplicate_and_mce_owner_branches_are_refused_without_guessing() {
         r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdOne"/></a:ext><a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdTwo"/></a:ext>"#
     );
     let duplicate_bytes = transitional_drawing(&two_cell(1, &duplicate, ""));
-    let duplicate_source = SourceDrawing::scan(&duplicate_bytes).unwrap();
+    let duplicate_source = SourceDrawing::scan(&duplicate_bytes, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         duplicate_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Ambiguous
@@ -301,7 +301,7 @@ fn duplicate_and_mce_owner_branches_are_refused_without_guessing() {
         r#"<mc:AlternateContent><mc:Choice Requires="asvg"><a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext></mc:Choice><mc:Fallback/></mc:AlternateContent>"#
     );
     let mce_bytes = transitional_drawing(&two_cell(1, &mce, ""));
-    let mce_source = SourceDrawing::scan(&mce_bytes).unwrap();
+    let mce_source = SourceDrawing::scan(&mce_bytes, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         mce_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -309,7 +309,7 @@ fn duplicate_and_mce_owner_branches_are_refused_without_guessing() {
 
     let unknown = r#"<a:ext uri="urn:future"><future:payload xmlns:future="urn:future" r:link="rIdOpaque"/></a:ext>"#;
     let unknown_bytes = transitional_drawing(&two_cell(1, unknown, ""));
-    let unknown_source = SourceDrawing::scan(&unknown_bytes).unwrap();
+    let unknown_source = SourceDrawing::scan(&unknown_bytes, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         unknown_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Opaque
@@ -319,7 +319,7 @@ fn duplicate_and_mce_owner_branches_are_refused_without_guessing() {
         r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdSvg"/><future:payload/></a:ext>"#
     );
     let malformed_bytes = transitional_drawing(&two_cell(1, &malformed, ""));
-    let malformed_source = SourceDrawing::scan(&malformed_bytes).unwrap();
+    let malformed_source = SourceDrawing::scan(&malformed_bytes, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         malformed_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -333,9 +333,9 @@ fn source_limits_and_provenance_reject_unbounded_or_unrelated_inputs() {
         max_nodes: 2,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&source_bytes, 0, limited).is_err());
+    assert!(SourceDrawing::scan(&source_bytes, 0, limited).is_err());
     assert!(
-        SourceDrawing::scan_with_limits(
+        SourceDrawing::scan(
             &source_bytes,
             0,
             ScanLimits {
@@ -346,7 +346,7 @@ fn source_limits_and_provenance_reject_unbounded_or_unrelated_inputs() {
         .is_err()
     );
     assert!(
-        SourceDrawing::scan_with_limits(
+        SourceDrawing::scan(
             &source_bytes,
             0,
             ScanLimits {
@@ -357,7 +357,7 @@ fn source_limits_and_provenance_reject_unbounded_or_unrelated_inputs() {
         .is_err()
     );
     assert!(
-        SourceDrawing::scan_with_limits(
+        SourceDrawing::scan(
             &source_bytes,
             0,
             ScanLimits {
@@ -368,7 +368,7 @@ fn source_limits_and_provenance_reject_unbounded_or_unrelated_inputs() {
         .is_err()
     );
 
-    let source = SourceDrawing::scan(&source_bytes).unwrap();
+    let source = SourceDrawing::scan(&source_bytes, 0, ScanLimits::default()).unwrap();
     let picture = source.picture(0).unwrap();
     let unrelated = source_bytes.clone();
     assert!(
@@ -386,13 +386,13 @@ fn source_limits_and_provenance_reject_unbounded_or_unrelated_inputs() {
     let foreign_root = format!(
         r#"<future:root xmlns:future="urn:future"><xdr:wsDr xmlns:xdr="{XDR}"/></future:root>"#
     );
-    assert!(SourceDrawing::scan(foreign_root.as_bytes()).is_err());
+    assert!(SourceDrawing::scan(foreign_root.as_bytes(), 0, ScanLimits::default()).is_err());
 }
 
 #[test]
 fn cloned_source_records_keep_the_member_borrowed() {
     let source_bytes = transitional_drawing(&two_cell(1, "", ""));
-    let drawing = SourceDrawing::scan(&source_bytes).unwrap();
+    let drawing = SourceDrawing::scan(&source_bytes, 0, ScanLimits::default()).unwrap();
     let picture = drawing.picture(0).unwrap().clone();
     let owner = picture.svg_owner().clone();
     drop(drawing);

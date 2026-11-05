@@ -50,13 +50,13 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
                     let document = package.document()?;
                     let text = document.text()?;
                     println!("Text from {file}: {} characters", text.len());
-                    print_props("  ", package.props());
+                    print_props("  ", package.metadata());
                 },
                 Err(error) => println!("Could not read {file}: {error}"),
             },
             Some("xlsx") => match XlsxPackage::open(file) {
                 Ok(package) => {
-                    let workbook = package.workbook()?;
+                    let workbook = package.workbook();
                     let names: Vec<_> = workbook
                         .sheets()
                         .map(|sheet| sheet.name().to_owned())
@@ -81,13 +81,13 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_props(prefix: &str, props: Option<&litchi::ooxml_common::Props>) {
+fn print_props(prefix: &str, props: Option<&litchi_core::Metadata>) {
     if let Some(props) = props {
         if let Some(title) = &props.title {
             println!("{prefix}Title: {title}");
         }
-        if let Some(creator) = &props.creator {
-            println!("{prefix}Creator: {creator}");
+        if let Some(author) = &props.author {
+            println!("{prefix}Author: {author}");
         }
     } else {
         println!("{prefix}No core properties");
@@ -151,7 +151,7 @@ fn demo_docx_reading() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             println!("  Metadata:");
-            print_props("    ", package.props());
+            print_props("    ", package.metadata());
         },
         Err(error) => {
             println!("  File not found or error: {error}");
@@ -171,7 +171,7 @@ fn demo_xlsx_reading() -> Result<(), Box<dyn std::error::Error>> {
 
     match XlsxPackage::open(filename) {
         Ok(package) => {
-            let workbook = package.workbook()?;
+            let workbook = package.workbook();
             println!("  Worksheets: {}", workbook.len());
 
             println!("  Sheet names:");

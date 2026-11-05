@@ -1,9 +1,9 @@
 use super::super::comment;
-use super::super::{CommentWriteOptions, ShapeGroupWrite, ShapeWrite, WritableWorksheet, Writer};
+use super::super::{Builder, CommentWriteOptions, ShapeGroupWrite, ShapeWrite, WritableWorksheet};
 use crate::error::{Error, Result};
 use std::collections::HashSet;
 
-impl Writer {
+impl Builder {
     /// Add a canonical, macro-inert BIFF8 comment to a cell.
     /// # Errors
     ///

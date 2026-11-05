@@ -21,10 +21,16 @@ fn typed_payload_round_trips_in_transitional_and_strict_omml() {
         .with_binary_subtraction_break(BinarySubtractionBreak::MinusPlus);
 
     for strict in [false, true] {
-        let mut xml = String::new();
-        super::codec::write(&mut xml, &value, strict).unwrap();
-        assert_eq!(super::codec::parse(xml.as_bytes()).unwrap(), value);
-        assert!(xml.contains(if strict { STRICT_OMML_NS } else { OMML_NS }));
+        let limits = crate::presentation_properties::Limits::default();
+        let mut xml = super::super::codec::XmlSink::output(0, limits.max_output_bytes()).unwrap();
+        super::codec::write(&mut xml, &value, strict, limits).unwrap();
+        let xml = xml.finish().unwrap();
+        assert_eq!(super::codec::parse(&xml, limits).unwrap(), value);
+        assert!(String::from_utf8_lossy(&xml).contains(if strict {
+            STRICT_OMML_NS
+        } else {
+            OMML_NS
+        }));
     }
 }
 
@@ -32,9 +38,62 @@ fn typed_payload_round_trips_in_transitional_and_strict_omml() {
 fn empty_math_properties_use_schema_defaults() {
     let xml = format!(r#"<a14:m xmlns:a14="{A14_NS}" xmlns:m="{OMML_NS}"><m:mathPr/></a14:m>"#);
     assert_eq!(
-        super::codec::parse(xml.as_bytes()).unwrap(),
+        super::codec::parse(
+            xml.as_bytes(),
+            crate::presentation_properties::Limits::default(),
+        )
+        .unwrap(),
         Properties::new()
     );
+}
+
+#[test]
+fn replay_validator_uses_recipient_presentation_profile() {
+    let xml = format!(
+        r#"<p:presentationPr xmlns:p="{P_NS}"><p:extLst><p:ext uri="urn:future"/></p:extLst></p:presentationPr>"#
+    );
+    let name = litchi_opc::PackURI::new("/ppt/presProps.xml").unwrap();
+    let part = litchi_opc::part::BlobPart::new(
+        name,
+        crate::presentation_properties::CONTENT_TYPE.to_owned(),
+        xml.into_bytes(),
+    );
+    assert!(
+        crate::presentation_properties::validate_replay_part(
+            &part,
+            crate::presentation_properties::Limits::default(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .is_ok()
+    );
+    let tight =
+        crate::presentation_properties::Limits::new(1024, 1024, 128, 1, 1024, 1, 1).unwrap();
+    assert!(
+        crate::presentation_properties::validate_replay_part(
+            &part,
+            tight,
+            litchi_opc::SourceLimits::default(),
+        )
+        .is_err(),
+        "the recipient's tighter node profile must be enforced during replay"
+    );
+
+    let event_limited = litchi_opc::SourceLimits::builder()
+        .max_events(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        crate::presentation_properties::validate_replay_part(
+            &part,
+            crate::presentation_properties::Limits::default(),
+            event_limited,
+        ),
+        Err(crate::Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::Events,
+            ..
+        }))
+    ));
 }
 
 #[test]
@@ -43,7 +102,11 @@ fn strict_math_payload_accepts_strict_omml_closing_names() {
         r#"<a14:m xmlns:a14="{A14_NS}" xmlns:m="{STRICT_OMML_NS}"><m:mathPr><m:brkBin m:val="after"/></m:mathPr></a14:m>"#
     );
     assert_eq!(
-        super::codec::parse(xml.as_bytes()).unwrap(),
+        super::codec::parse(
+            xml.as_bytes(),
+            crate::presentation_properties::Limits::default(),
+        )
+        .unwrap(),
         Properties::new().with_binary_break(BinaryBreak::After)
     );
 }
@@ -76,7 +139,11 @@ fn math_payload_rejects_ambiguous_or_unsafe_grammar() {
 
     for xml in cases {
         assert!(
-            super::codec::parse(xml.as_bytes()).is_err(),
+            super::codec::parse(
+                xml.as_bytes(),
+                crate::presentation_properties::Limits::default(),
+            )
+            .is_err(),
             "accepted {xml}"
         );
     }
@@ -87,7 +154,8 @@ fn parent_facade_preserves_opaque_extensions_around_typed_math() {
     let xml = format!(
         r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:a14="{A14_NS}" xmlns:m="{OMML_NS}" xmlns:r="{R_NS}" xmlns:v="urn:vendor"><p:extLst><p:ext uri="{MATH_URI}"><a14:m><m:mathPr><m:brkBin m:val="repeat"/></m:mathPr></a14:m></p:ext><p:ext uri="urn:vendor:opaque"><v:payload r:id="rIdNeverFetched" href="https://example.invalid/not-opened"/></p:ext></p:extLst></p:presentationPr>"#
     );
-    let value = crate::presentation_properties::Properties::parse(xml.as_bytes()).unwrap();
+    let limits = crate::presentation_properties::Limits::default();
+    let value = crate::presentation_properties::Properties::parse(xml.as_bytes(), limits).unwrap();
     assert_eq!(
         value.math(),
         Some(&Properties::new().with_binary_break(BinaryBreak::Repeat))
@@ -99,8 +167,8 @@ fn parent_facade_preserves_opaque_extensions_around_typed_math() {
                 && String::from_utf8_lossy(xml).contains("r:id=\"rIdNeverFetched\"")
     ));
 
-    let written = value.to_xml(false).unwrap();
-    let again = crate::presentation_properties::Properties::parse(&written).unwrap();
+    let written = value.to_xml(false, limits).unwrap();
+    let again = crate::presentation_properties::Properties::parse(&written, limits).unwrap();
     assert_eq!(again.math(), value.math());
     assert!(String::from_utf8_lossy(&written).contains("https://example.invalid/not-opened"));
 }

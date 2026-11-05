@@ -2,36 +2,44 @@
 
 use super::super::binding::Binding;
 use super::super::model::{
-    Section, Stream, USER_DEFINED_PROPERTIES_FMTID, invalid, try_clone_property_set,
+    CodePage, Section, Stream, USER_DEFINED_PROPERTIES_FMTID, invalid, try_clone_property_set,
     try_clone_string, try_hash_set_with_capacity, try_vec_with_capacity,
 };
 use super::package::try_path_refs;
 use super::semantic::validate_section;
 use super::support::allocation;
-use crate::protection::reject_protected_container;
-use litchi_cfb::{OleError, OleFile, OleWriter};
+use crate::Error;
+use crate::protection::{Limits as ProtectionLimits, reject_protected_container};
+use litchi_cfb::{OleError, OleFile, OleFileLimits, OleWriter};
 use std::collections::HashMap;
 use std::io::Cursor;
 
 /// Transactional editor for standard OLE Property Set streams.
-pub struct Editor {
+pub struct Edit {
     original: Vec<u8>,
+    cfb_limits: OleFileLimits,
     streams: Vec<(Vec<String>, Vec<u8>)>,
     staged: HashMap<Vec<String>, Option<Vec<u8>>>,
 }
 
-impl Editor {
-    /// Opens a compound file for transactional Property Set editing.
+impl Edit {
+    /// Opens a compound file for transactional Property Set editing under an
+    /// explicit finite CFB ingress policy.
     ///
     /// # Errors
     ///
     /// Returns an error if `bytes` are not a readable unprotected compound
     /// file, a contained stream cannot be read, or editor storage cannot be
     /// allocated.
-    pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
+    pub fn new(bytes: Vec<u8>, limits: OleFileLimits) -> Result<Self, Error> {
         let streams = {
-            let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
-            reject_protected_container(&ole, "Property Set editing", ole.directory_entry_count())?;
+            let mut ole = OleFile::open(Cursor::new(bytes.as_slice()), limits)?;
+            let max_entries = ole.directory_entry_count();
+            reject_protected_container(
+                &ole,
+                "Property Set editing",
+                ProtectionLimits { max_entries },
+            )?;
             let paths = ole.list_streams();
             let mut streams = try_vec_with_capacity(paths.len(), "property-set editor streams")?;
             for path in paths {
@@ -43,6 +51,7 @@ impl Editor {
         };
         Ok(Self {
             original: bytes,
+            cfb_limits: limits,
             streams,
             staged: HashMap::new(),
         })
@@ -54,14 +63,14 @@ impl Editor {
     ///
     /// Returns an error if the backing stream cannot be parsed or the selected
     /// section cannot be cloned.
-    pub fn property_set(&self, kind: Binding) -> Result<Option<Section>, OleError> {
+    pub fn property_set(&self, kind: Binding) -> Result<Option<Section>, Error> {
         let Some(stream) = self.load_stream(kind)? else {
             return Ok(None);
         };
-        stream
+        Ok(stream
             .section(kind.format_identifier())
             .map(try_clone_property_set)
-            .transpose()
+            .transpose()?)
     }
 
     /// Applies an isolated typed edit to one bound property-set section.
@@ -70,17 +79,24 @@ impl Editor {
     ///
     /// Returns an error if loading, cloning, or validating the stream fails,
     /// `edit` returns an error, or the updated stream cannot be serialized.
-    pub fn update<F>(&mut self, kind: Binding, edit: F) -> Result<(), OleError>
+    pub fn update<F>(&mut self, kind: Binding, edit: F) -> Result<(), Error>
     where
-        F: FnOnce(&mut Section) -> Result<(), OleError>,
+        F: FnOnce(&mut Section) -> Result<(), Error>,
     {
         let mut stream = self.load_stream_for_rewrite(kind)?.unwrap_or_else(|| {
-            let base = if kind == Binding::UserDefinedProperties {
-                Binding::DocumentSummaryInformation.format_identifier()
+            if kind == Binding::UserDefinedProperties {
+                // The user-defined section lives second in the
+                // `DocumentSummaryInformation` stream, whose own section
+                // [MS-OSHARED] 2.3.3.2.2 requires to carry a code page: a
+                // blank one would make the stream unreadable to the typed
+                // `document_summary` owner.
+                let mut base =
+                    Section::new(Binding::DocumentSummaryInformation.format_identifier());
+                base.set_page(CodePage::WINDOWS_1252);
+                Stream::new(base)
             } else {
-                kind.format_identifier()
-            };
-            Stream::new(Section::new(base))
+                Stream::new(Section::new(kind.format_identifier()))
+            }
         });
         if stream.section(kind.format_identifier()).is_none() {
             stream.add_section(Section::new(kind.format_identifier()))?;
@@ -104,15 +120,9 @@ impl Editor {
     ///
     /// Returns an error if the section FMTID does not match `kind` or the
     /// replacement cannot be loaded, validated, or serialized.
-    pub fn replace(
-        &mut self,
-        kind: Binding,
-        section: Section,
-    ) -> Result<Option<Section>, OleError> {
+    pub fn replace(&mut self, kind: Binding, section: Section) -> Result<Option<Section>, Error> {
         if section.format_identifier != kind.format_identifier() {
-            return Err(invalid(
-                "Replacement section format ID does not match target",
-            ));
+            return Err(invalid("Replacement section format ID does not match target").into());
         }
         let previous = self.property_set(kind)?;
         self.update(kind, |target| {
@@ -128,7 +138,7 @@ impl Editor {
     ///
     /// Returns an error if the existing stream cannot be read or the retained
     /// document-summary stream cannot be serialized.
-    pub fn remove(&mut self, kind: Binding) -> Result<Option<Section>, OleError> {
+    pub fn remove(&mut self, kind: Binding) -> Result<Option<Section>, Error> {
         let Some(previous) = self.property_set(kind)? else {
             return Ok(None);
         };
@@ -150,11 +160,16 @@ impl Editor {
     ///
     /// Returns an error if composing a stream path, allocating output, or
     /// writing the replacement compound file fails.
-    pub fn finish(self) -> Result<Vec<u8>, OleError> {
+    pub fn finish(self) -> Result<Vec<u8>, Error> {
         if self.staged.is_empty() {
             return Ok(self.original);
         }
         let mut writer = OleWriter::new();
+        // Adopting the source keeps its root and storage class identifiers
+        // (a Word document's `Word.Document.8` CLSID, for one) and lets the
+        // writer reuse the source sector layout while the stream set still
+        // matches; a source it cannot adopt is serialized from scratch.
+        writer.adopt_source_layout(&self.original, self.cfb_limits)?;
         let written_capacity = self
             .streams
             .len()

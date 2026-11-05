@@ -122,7 +122,7 @@ fn slide() -> Vec<u8> {
 #[test]
 fn no_op_publication_replays_the_exact_slide_envelope() {
     let source = slide();
-    let snapshot = SlideSnapshot::parse(&source).expect("slide snapshot");
+    let snapshot = SlideSnapshot::parse(&source, &SlideLimits::default()).expect("slide snapshot");
     assert_eq!(snapshot.len(), 1);
     assert_eq!(
         snapshot.get(Id::new(7, 42)).unwrap().mode(),
@@ -141,7 +141,7 @@ fn no_op_publication_replays_the_exact_slide_envelope() {
 #[test]
 fn mode_publication_changes_only_the_fixed_build_field() {
     let source = slide();
-    let snapshot = SlideSnapshot::parse(&source).expect("slide snapshot");
+    let snapshot = SlideSnapshot::parse(&source, &SlideLimits::default()).expect("slide snapshot");
     let original_drawing = snapshot.drawing().to_vec();
     let original_prefix = source[..snapshot.build_range.start].to_vec();
     let original_suffix = source[snapshot.build_range.end..].to_vec();
@@ -172,7 +172,7 @@ fn mode_publication_changes_only_the_fixed_build_field() {
 #[test]
 fn publication_is_source_checked_and_supports_inverse_replay() {
     let source = slide();
-    let snapshot = SlideSnapshot::parse(&source).expect("slide snapshot");
+    let snapshot = SlideSnapshot::parse(&source, &SlideLimits::default()).expect("slide snapshot");
     let mut editor = snapshot.edit();
     editor
         .set_mode(Id::new(7, 42), BuildType::Down)
@@ -193,17 +193,18 @@ fn publication_is_source_checked_and_supports_inverse_replay() {
     let mut stale_bytes = source.clone();
     let last = stale_bytes.len() - 1;
     stale_bytes[last] ^= 1;
-    let stale = SlideSnapshot::parse(&stale_bytes).expect("stale valid slide");
+    let stale =
+        SlideSnapshot::parse(&stale_bytes, &SlideLimits::default()).expect("stale valid slide");
     assert!(commit.patch().apply(&stale).is_err());
 }
 
 #[test]
 fn invalid_shape_edit_is_failure_atomic_at_the_publication_boundary() {
     let source = slide();
-    let snapshot = SlideSnapshot::parse(&source).expect("slide snapshot");
+    let snapshot = SlideSnapshot::parse(&source, &SlideLimits::default()).expect("slide snapshot");
     let mut editor = snapshot.edit();
     assert!(editor.set_shape_id(Id::new(7, 42), 999).is_err());
-    assert!(!editor.is_changed());
+    assert!(editor.changes().is_empty());
     assert_eq!(
         editor.commit().unwrap().snapshot().bytes(),
         source.as_slice()
@@ -213,14 +214,14 @@ fn invalid_shape_edit_is_failure_atomic_at_the_publication_boundary() {
 #[test]
 fn malformed_or_ambiguous_owning_envelopes_are_rejected() {
     let source = slide();
-    assert!(SlideSnapshot::parse(&source[..source.len() - 1]).is_err());
+    assert!(SlideSnapshot::parse(&source[..source.len() - 1], &SlideLimits::default()).is_err());
 
     let mut duplicate = source.clone();
     duplicate.extend_from_slice(&[0]);
-    assert!(SlideSnapshot::parse(&duplicate).is_err());
+    assert!(SlideSnapshot::parse(&duplicate, &SlideLimits::default()).is_err());
 
     let no_slide = record(0x0F, 0, RecordType::Document.as_u16(), &source[8..]);
-    assert!(SlideSnapshot::parse(no_slide).is_err());
+    assert!(SlideSnapshot::parse(no_slide, &SlideLimits::default()).is_err());
 
     let malformed_build = record(0, 0, RecordType::BuildList.as_u16(), &[0; 3]);
     assert!(diagram_build::parse_bytes(&malformed_build).is_err());

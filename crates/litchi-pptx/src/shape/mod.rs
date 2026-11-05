@@ -3,6 +3,9 @@
 //! [`Scene`] indexes the full owner XML once, preserving inherited namespace
 //! aliases and markup-compatibility branch selection. Shape XML is exposed by
 //! checked spans into that processed owner; no element subtree is copied.
+//! A shape's local `DrawingML` story is decoded lazily by
+//! [`Common::text_body`]. Physical text-body coordinates remain in
+//! [`raw::text_body_span`], alongside the other source metadata accessors.
 //!
 //! ```
 //! use litchi_pptx::shape::{Scene, Shape};
@@ -12,7 +15,7 @@
 //!     xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
 //!     <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/></p:nvSpPr></p:sp>
 //! </p:spTree>"#;
-//! let scene = Scene::read(xml)?;
+//! let scene = Scene::read(xml, litchi_pptx::shape::Limits::DEFAULT)?;
 //! let Some(Shape::Auto(title)) = scene.get("Title")? else {
 //!     return Err("missing title shape".into());
 //! };
@@ -24,6 +27,9 @@
 pub mod classification;
 pub mod designer;
 pub mod diagram;
+pub mod math;
+pub mod owned;
+pub mod raw;
 pub mod text;
 pub mod theme;
 pub mod zoom;
@@ -32,30 +38,20 @@ mod model;
 mod reader;
 
 pub use model::{
-    Auto, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group, Ole,
-    PLACEHOLDER_TYPE_EXTENSION_URI, Picture, Placeholder, PlaceholderTypeExtension, Shape, Shapes,
-    Span, Table, Unknown,
+    Auto, BodyTextIndex, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group,
+    NonVisual, Ole, PLACEHOLDER_TYPE_EXTENSION_URI, Picture, Placeholder, PlaceholderTypeExtension,
+    Shape, Shapes, Span, Table, Unknown,
 };
 pub use reader::{Key, Limits, LookupError, Scene};
 
-/// Read a borrowed-by-default scene with conservative finite limits.
+/// Read a borrowed-by-default scene with caller-selected finite limits.
 ///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
 #[inline]
-pub fn read(xml: &[u8]) -> crate::Result<Scene<'_>> {
-    Scene::read(xml)
-}
-
-/// Read a scene using explicit finite limits.
-///
-/// # Errors
-///
-/// Returns an error if the input cannot be read or is malformed.
-#[inline]
-pub fn read_with(xml: &[u8], limits: Limits) -> crate::Result<Scene<'_>> {
-    Scene::read_with(xml, limits)
+pub fn read(xml: &[u8], limits: Limits) -> crate::Result<Scene<'_>> {
+    Scene::read(xml, limits)
 }
 
 #[cfg(test)]
@@ -84,7 +80,7 @@ mod tests {
                 </q:spTree></q:cSld>
             </q:sld>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("scene");
         assert!(!scene.is_rewritten());
         assert_eq!(scene.len(), 2);
 
@@ -113,7 +109,8 @@ mod tests {
     /// The scene reads, shape "Broken" keeps its placeholder without a type
     /// extension, and the one repair is recorded against shape 2.
     fn assert_type_extension_degraded(xml: &str, label: &str) {
-        let scene = Scene::read(xml.as_bytes()).unwrap_or_else(|error| panic!("{label}: {error}"));
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT)
+            .unwrap_or_else(|error| panic!("{label}: {error}"));
         let placeholder = scene
             .get("Broken")
             .expect("lookup")
@@ -154,8 +151,8 @@ mod tests {
             let xml = format!(
                 r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="9" name="Owner"/><p:nvPr><p:ph type="body"><p:extLst>{owner}<p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
             );
-            let scene =
-                Scene::read(xml.as_bytes()).unwrap_or_else(|error| panic!("{label}: {error}"));
+            let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT)
+                .unwrap_or_else(|error| panic!("{label}: {error}"));
             let placeholder = scene
                 .shape("Owner")
                 .expect("shape")
@@ -186,7 +183,7 @@ mod tests {
         let broken = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="9" name="Owner"/><p:nvPr><p:ph><p:extLst><p:ext uri="urn:x"><x:a></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        assert!(Scene::read(broken.as_bytes()).is_err());
+        assert!(Scene::read(broken.as_bytes(), Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -199,7 +196,7 @@ mod tests {
                 <p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Frame"/></p:nvGraphicFramePr><p:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></p:xfrm></p:graphicFrame>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("degraded scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("degraded scene");
         let bounded: Vec<_> = scene.iter().map(|s| s.bounds().is_some()).collect();
         assert_eq!(bounded, [false, false, false, true]);
         let repaired: Vec<_> = scene
@@ -221,7 +218,7 @@ mod tests {
                     <p:sp><p:nvSpPr><p:cNvPr id="3" name="Future"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:unknown/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp>
                 </p:spTree></p:cSld></p:sld>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("p232 scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("p232 scene");
         assert!(!scene.is_rewritten());
         assert_eq!(scene.xml(), xml.as_bytes());
         let cameo = scene
@@ -252,7 +249,7 @@ mod tests {
         let xml = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext><p:ext uri="urn:opaque"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("opaque extension sibling");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("opaque extension sibling");
         assert_eq!(
             scene
                 .shape("Cameo")
@@ -271,7 +268,7 @@ mod tests {
  "><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext><p:ext uri="urn:opaque"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         )
         .replace("\\t", "\t");
-        let scene = Scene::read(xml.as_bytes()).expect("schema token whitespace");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("schema token whitespace");
         assert_eq!(
             scene.xml(),
             xml.as_bytes(),
@@ -296,7 +293,7 @@ mod tests {
                 r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst>{payload}</p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
             );
             // `CT_Extension` content is `xsd:any` with any arity: legal.
-            let scene = Scene::read(malformed.as_bytes()).expect(payload);
+            let scene = Scene::read(malformed.as_bytes(), Limits::DEFAULT).expect(payload);
             assert!(scene.tolerance_report().is_clean(), "{payload}");
         }
     }
@@ -312,7 +309,8 @@ mod tests {
   </x:phTypeExt>
 </p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        let scene = Scene::read(indented.as_bytes()).expect("external indented p232 scene");
+        let scene = Scene::read(indented.as_bytes(), Limits::DEFAULT)
+            .expect("external indented p232 scene");
         assert_eq!(scene.xml(), indented.as_bytes());
         assert_eq!(
             scene
@@ -332,7 +330,8 @@ mod tests {
   </x:phTypeExt>
 </p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        let scene = Scene::read(opaque.as_bytes()).expect("opaque p232-shaped child");
+        let scene =
+            Scene::read(opaque.as_bytes(), Limits::DEFAULT).expect("opaque p232-shaped child");
         assert_eq!(scene.xml(), opaque.as_bytes());
         assert_eq!(
             scene
@@ -358,7 +357,7 @@ mod tests {
                 </mc:AlternateContent>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("p232 MCE scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("p232 MCE scene");
         assert!(scene.is_rewritten());
         let placeholder = scene
             .get("Cameo")
@@ -438,7 +437,8 @@ mod tests {
         let owner_uri = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="urn:wrong"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        let scene = Scene::read(owner_uri.as_bytes()).expect("foreign owner uri remains opaque");
+        let scene = Scene::read(owner_uri.as_bytes(), Limits::DEFAULT)
+            .expect("foreign owner uri remains opaque");
         assert_eq!(scene.xml(), owner_uri.as_bytes());
         assert_eq!(
             scene
@@ -474,7 +474,7 @@ mod tests {
                 <s:graphicFrame><s:nvGraphicFramePr><s:cNvPr id="8" name="Generic"/></s:nvGraphicFramePr></s:graphicFrame>
             </s:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("strict scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("strict scene");
         assert!(matches!(scene.at(0).expect("chart"), Shape::Chart(_)));
         assert!(matches!(scene.at(1).expect("frame"), Shape::Frame(_)));
     }
@@ -493,7 +493,7 @@ mod tests {
                 <p:cxnSp><p:nvCxnSpPr><p:cNvPr id="5" name="Line"/></p:nvCxnSpPr></p:cxnSp>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("nested scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("nested scene");
         let names: Vec<_> = scene.iter().filter_map(Shape::name).collect();
         assert_eq!(names, ["Outer", "First", "Inner", "Nested", "Line"]);
         let roots: Vec<_> = scene.roots().filter_map(Shape::name).collect();
@@ -527,7 +527,7 @@ mod tests {
                 <p:sp><p:nvSpPr><p:cNvPr id="10" name="Duplicate"/></p:nvSpPr></p:sp>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("MCE scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("MCE scene");
         assert!(scene.is_rewritten());
         assert_eq!(scene.len(), 2);
         assert!(matches!(scene.at(0).expect("content"), Shape::Content(_)));
@@ -546,7 +546,7 @@ mod tests {
                 <p:contentPart r:id="rIdOpaque"/>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("content-part scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("content-part scene");
         assert_eq!(scene.len(), 1);
         assert!(matches!(
             scene.at(0).expect("content part"),
@@ -566,7 +566,7 @@ mod tests {
                 <p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="11" name="Object"/></p:nvGraphicFramePr><a:graphic><a:graphicData><p:oleObj><p:pic><p:nvPicPr><p:cNvPr id="12" name="Fallback preview"/></p:nvPicPr></p:pic></p:oleObj></a:graphicData></a:graphic></p:graphicFrame>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("OLE scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("OLE scene");
         assert_eq!(scene.len(), 1);
         assert!(matches!(scene.at(0).expect("OLE"), Shape::Ole(_)));
         assert!(scene.get("Fallback preview").expect("lookup").is_none());
@@ -580,7 +580,7 @@ mod tests {
                 <p:pic><p:nvPicPr><p:cNvPr id="3" name="Same"/></p:nvPicPr></p:pic>
             </p:spTree>"#
         );
-        let scene = Scene::read(xml.as_bytes()).expect("scene");
+        let scene = Scene::read(xml.as_bytes(), Limits::DEFAULT).expect("scene");
         assert!(scene.get("Same").is_err());
         assert!(scene.at(2).is_err());
         assert!(matches!(

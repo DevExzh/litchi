@@ -14,11 +14,9 @@ pub mod validation;
 mod tests;
 
 pub use codec::{parse_comments, parse_persons, write_comments, write_persons};
-pub use edit::{Commit, Patch, Snapshot, SourcePart, SourceRelationship, Transaction, apply, read};
+pub use edit::{Snapshot, SourcePart, SourceRelationship};
 pub use package::{
-    load_from_worksheet, load_graph, load_people, remove_from_worksheet, remove_graph,
-    remove_people, store_graph, store_on_worksheet, store_people,
-    validate_graph as validate_package_graph,
+    load_from_worksheet, load_graph, load_people, validate_graph as validate_package_graph,
 };
 pub use semantic::{
     Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person, RawAttribute,

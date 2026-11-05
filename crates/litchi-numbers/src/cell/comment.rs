@@ -1,21 +1,18 @@
-//! Archive-free Numbers cell-comment values.
+//! Numbers cell comments: their archive-free values and the selector-first
+//! exact-source transaction families.
 //!
-//! Comment reply text and reply ordinals are semantic values. The package
-//! transaction namespace is re-exported here so callers do not need to know
-//! that the exact-source owner lives under the package adapter.
+//! [`crate::Package::edit_table_cell_comment`] stages a cell's comment
+//! ([`Edit`](crate::cell::comment::Edit)); [`crate::Package::edit_table_cell_comment_replies`] stages
+//! direct replies ([`transaction::Edit`](crate::cell::comment::transaction::Edit)).
 
-pub use crate::package::comments::CommentReply;
-pub use crate::package::comments::CommentReplyIndex;
+pub use crate::package::comments::{
+    Comment, CommentAuthor, CommentReply, CommentReplyIndex, CommentTimestamp, Commit, Diagnostics,
+    Edit, Error, LimitKind, Patch, Path, Refusal,
+};
 
 /// Selector-first exact-source transactions for direct comment replies.
 pub mod transaction {
-    pub use crate::package::comments::{
-        CommentReplyCommit, CommentReplyDiagnostics, CommentReplyEdit, CommentReplyError,
-        CommentReplyLimitKind, CommentReplyPatch, CommentReplyPath,
-    };
-    pub use crate::package::comments::{
-        CommentReplyCommit as Commit, CommentReplyDiagnostics as Diagnostics,
-        CommentReplyEdit as Edit, CommentReplyError as Error, CommentReplyLimitKind as LimitKind,
-        CommentReplyPatch as Patch, CommentReplyPath as Path,
+    pub use crate::package::comments::comments_reply::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

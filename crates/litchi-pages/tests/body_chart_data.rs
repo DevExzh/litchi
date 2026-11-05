@@ -2,7 +2,7 @@
 //! reader.
 
 use litchi_core::Position;
-use litchi_pages::{BodyChartDataError, BodyChartSelector, Package};
+use litchi_pages::{BodyChartSelector, Package, chart::data::Error as BodyChartDataError};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -66,7 +66,7 @@ fn selector_refuses_an_unmatched_body_chart() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;
     assert!(matches!(
         package.body_chart_data(BodyChartSelector::index(1)),
-        Err(BodyChartDataError::ChartNotFound { position })
+        Err(BodyChartDataError::Refused(litchi_pages::chart::data::Refusal::ChartNotFound { position }))
             if position == Position::new(1)
     ));
     Ok(())

@@ -1,6 +1,6 @@
 //! Lossless validated XML Schema time values used by core properties.
 
-use super::{MAX_PROPERTY_TEXT, keyword::collapse_xml_whitespace};
+use super::{MAX_PROPERTY_TEXT, collapse_xml_whitespace};
 use crate::{Error, Result};
 use chrono::{DateTime as ChronoDateTime, NaiveDateTime, SecondsFormat, Utc};
 use std::fmt;
@@ -375,9 +375,9 @@ fn invalid_parse(kind: &str, value: &str, error: impl fmt::Display) -> Error {
 fn reject_oversized(value: &str) -> Result<()> {
     if value.len() > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: value.len(),
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: value.len(),
         });
     }
     Ok(())
@@ -461,9 +461,9 @@ mod tests {
             assert!(matches!(
                 result,
                 Err(Error::Limit {
-                    resource: "core property text bytes",
-                    max: MAX_PROPERTY_TEXT,
-                    actual,
+                    kind: crate::LimitKind::CorePropertyTextBytes,
+                    maximum: MAX_PROPERTY_TEXT,
+                    observed: actual,
                 }) if actual == MAX_PROPERTY_TEXT + 1
             ));
         }

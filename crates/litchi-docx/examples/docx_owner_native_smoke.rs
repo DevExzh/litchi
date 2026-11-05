@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use litchi_docx::Package;
 use litchi_docx::glossary::{
     Catalog, Category, Conformance as GlossaryConformance, Entry, Gallery, Id as GlossaryId,
-    Insert, Kind, Name, Props,
+    Insert, Kind, Limits, Name, Props,
 };
 use litchi_docx::web::{Div, Id as DivId, Screen};
 
@@ -41,13 +41,14 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
     const BUILDING_BLOCK_TEXT: &str = "Litchi reusable native building block";
 
     let destination = directory.join("glossary-owner.dotx");
-    let mut package = Package::new_template()?;
-    package
-        .document_mut()?
+    let mut builder = litchi_docx::Builder::new_template()?;
+    builder
+        .document()?
         .add_heading("Litchi DOCX glossary owner", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph_with_text("This document carries a typed AutoText building block.");
+    let mut package = builder.build()?;
 
     let body = format!(
         r#"<w:docPartBody xmlns:w="{W}"><w:p><w:r><w:t>{BUILDING_BLOCK_TEXT}</w:t></w:r></w:p></w:docPartBody>"#
@@ -61,8 +62,16 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
         ..Props::new(Name::new("Litchi AutoText")?)
     };
     let mut catalog = Catalog::new();
-    catalog.add(Entry::new("Litchi AutoText", body.into_bytes())?.with_props(props)?)?;
-    let _ = package.put_glossary(catalog, GlossaryConformance::Transitional)?;
+    catalog.add(
+        Entry::new("Litchi AutoText", body.into_bytes(), &Limits::DEFAULT)?
+            .with_props(props, &Limits::DEFAULT)?,
+    )?;
+    let _ = {
+        let mut edit = package.edit_glossary();
+        let value = edit.put(catalog, GlossaryConformance::Transitional)?;
+        package = edit.commit()?.into_package();
+        value
+    };
     package.save(&destination)?;
 
     verify_glossary_docx(&destination)
@@ -91,13 +100,14 @@ fn verify_glossary_docx(path: &Path) -> Result<()> {
 
 fn create_docx(directory: &Path) -> Result<()> {
     let destination = directory.join("web-settings-owner.docx");
-    let mut package = Package::new()?;
-    package
-        .document_mut()?
+    let mut builder = litchi_docx::Builder::new()?;
+    builder
+        .document()?
         .add_heading("Litchi DOCX web-settings owner", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph_with_text("Typed web settings survived package authoring.");
+    let mut package = builder.build()?;
 
     let (mut settings, conformance) = package.web()?.unwrap_or_default();
     settings
@@ -113,7 +123,12 @@ fn create_docx(directory: &Path) -> Result<()> {
     let mut quote = Div::new(quote_id);
     quote.set_block_quote(true);
     settings.add(quote)?;
-    let _ = package.put_web(settings, conformance)?;
+    let _ = {
+        let mut edit = package.edit_web();
+        let value = edit.put(settings, conformance)?;
+        package = edit.commit()?.into_package();
+        value
+    };
     package.save(&destination)?;
 
     let reopened = Package::open(&destination)?;

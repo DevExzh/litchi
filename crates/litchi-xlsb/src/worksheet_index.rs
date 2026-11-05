@@ -47,7 +47,7 @@ pub(crate) fn maintain(
         require_index_part(index_part)?;
         if !index_part.rels().is_empty() {
             return Err(Error::InvalidRelationship(
-                "worksheet binary index part must not have relationships".to_string(),
+                "worksheet binary index part must not have relationships",
             ));
         }
         index_part.blob_arc()
@@ -59,9 +59,9 @@ pub(crate) fn maintain(
         after_worksheet,
         Limits::publication_default(),
     )?
-    .ok_or_else(|| {
+    .ok_or({
         Error::InvalidFormat(
-            "worksheet binary index maintenance unexpectedly removed an existing index".to_string(),
+            "worksheet binary index maintenance unexpectedly removed an existing index",
         )
     })?;
 
@@ -74,7 +74,10 @@ pub(crate) fn maintain(
     Ok(())
 }
 
-fn find_index_target(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<PackURI>> {
+pub(crate) fn find_index_target(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+) -> Result<Option<PackURI>> {
     let worksheet_part = package.get_part(worksheet)?;
     let mut matches = worksheet_part
         .rels()
@@ -85,18 +88,18 @@ fn find_index_target(package: &OpcPackage, worksheet: &PackURI) -> Result<Option
     };
     if matches.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "worksheet has multiple binary-index relationships".to_string(),
+            "worksheet has multiple binary-index relationships",
         ));
     }
     if relationship.is_external() {
         return Err(Error::InvalidRelationship(
-            "worksheet binary-index relationship cannot be external".to_string(),
+            "worksheet binary-index relationship cannot be external",
         ));
     }
     let target = relationship.target_partname()?;
     if target.is_equivalent_to(worksheet) {
         return Err(Error::InvalidRelationship(
-            "worksheet binary-index relationship targets its worksheet".to_string(),
+            "worksheet binary-index relationship targets its worksheet",
         ));
     }
 
@@ -124,7 +127,7 @@ fn find_index_target(package: &OpcPackage, worksheet: &PackURI) -> Result<Option
             if incoming_target.is_equivalent_to(&target) {
                 if !owner_is_worksheet {
                     return Err(Error::InvalidRelationship(
-                        "worksheet binary-index target has a non-worksheet owner".to_string(),
+                        "worksheet binary-index target has a non-worksheet owner",
                     ));
                 }
                 owners = owners.checked_add(1).ok_or(Error::CapacityOverflow {
@@ -143,13 +146,13 @@ fn find_index_target(package: &OpcPackage, worksheet: &PackURI) -> Result<Option
         }
         if incoming.target_partname()?.is_equivalent_to(&target) {
             return Err(Error::InvalidRelationship(
-                "worksheet binary-index target has a package owner".to_string(),
+                "worksheet binary-index target has a package owner",
             ));
         }
     }
     if owners != 1 {
         return Err(Error::InvalidRelationship(
-            "worksheet binary-index target does not have exactly one worksheet owner".to_string(),
+            "worksheet binary-index target does not have exactly one worksheet owner",
         ));
     }
     Ok(Some(target))
@@ -160,8 +163,7 @@ fn require_index_part(part: &dyn Part) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: BINARY_INDEX_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: BINARY_INDEX_CONTENT_TYPE,
         })
     }
 }

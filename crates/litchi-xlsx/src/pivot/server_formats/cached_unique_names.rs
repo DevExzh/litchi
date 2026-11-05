@@ -73,13 +73,21 @@ pub(super) fn scan_mce_branch(
                         return Err(invalid("MCE Choice has duplicate Requires attributes"));
                     }
                     if attribute.value.len() > limits.attribute_bytes {
-                        return Err(invalid("MCE Choice Requires exceeds its text limit"));
+                        return Err(Error::limit(
+                            LimitKind::AttributeBytes,
+                            attribute.value.len(),
+                            limits.attribute_bytes,
+                        ));
                     }
                     let decoded = attribute
                         .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
                         .map_err(|error| invalid(error.to_string()))?;
                     if decoded.len() > limits.attribute_bytes {
-                        return Err(invalid("MCE Choice Requires exceeds its text limit"));
+                        return Err(Error::limit(
+                            LimitKind::AttributeBytes,
+                            decoded.len(),
+                            limits.attribute_bytes,
+                        ));
                     }
                     let mut owned = String::new();
                     owned
@@ -103,7 +111,11 @@ pub(super) fn scan_mce_branch(
             }
             let requires = requires.ok_or_else(|| invalid("MCE Choice requires Requires"))?;
             if requires.len() > limits.attribute_bytes {
-                return Err(invalid("MCE Choice Requires exceeds its text limit"));
+                return Err(Error::limit(
+                    LimitKind::AttributeBytes,
+                    requires.len(),
+                    limits.attribute_bytes,
+                ));
             }
             let mut namespaces: Vec<NamespaceRef> = Vec::new();
             for prefix in requires.split([' ', '\t', '\r', '\n']) {
@@ -306,15 +318,6 @@ pub enum IndexBoundStatus {
     Unresolved,
 }
 
-/// Canonical advanced-layer cache selector name.
-pub type CacheSelector = PivotCacheSelector;
-
-/// Canonical advanced-layer field selector name.
-pub type FieldSelector<'a> = PivotCacheFieldSelector<'a>;
-
-/// Canonical advanced-layer diagnostic status name.
-pub type DiagnosticStatus = IndexBoundStatus;
-
 /// One typed `x15:cachedUniqueName` leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CachedUniqueName {
@@ -363,18 +366,6 @@ impl CachedUniqueNames {
     #[must_use]
     pub const fn index_bound_status(&self) -> IndexBoundStatus {
         self.index_bound
-    }
-
-    /// Canonical advanced-layer diagnostic status accessor.
-    #[must_use]
-    pub const fn diagnostic_status(&self) -> DiagnosticStatus {
-        self.index_bound_status()
-    }
-
-    /// Canonical advanced-layer entry accessor.
-    #[must_use]
-    pub fn entries(&self) -> &[CachedUniqueName] {
-        self.names()
     }
 }
 
@@ -455,25 +446,10 @@ impl Snapshot {
         graph.snapshot(cache_selector.into(), field_selector)
     }
 
-    /// Alias emphasizing that this state is tied to exact source bytes.
-    pub fn read<'a>(
-        package: &OpcPackage,
-        cache_selector: impl Into<PivotCacheSelector>,
-        field_selector: PivotCacheFieldSelector<'a>,
-    ) -> Result<Self> {
-        Self::load(package, cache_selector, field_selector)
-    }
-
     /// The typed diagnostic value.
     #[must_use]
     pub fn cached_unique_names(&self) -> &CachedUniqueNames {
         &self.value
-    }
-
-    /// Alias for callers using the element name.
-    #[must_use]
-    pub fn names(&self) -> &[CachedUniqueName] {
-        self.value.names()
     }
 
     /// The semantic cache ID.
@@ -492,18 +468,6 @@ impl Snapshot {
     #[must_use]
     pub const fn index_bound_status(&self) -> IndexBoundStatus {
         self.value.index_bound_status()
-    }
-
-    /// Canonical advanced-layer diagnostic status accessor.
-    #[must_use]
-    pub const fn diagnostic_status(&self) -> DiagnosticStatus {
-        self.value.diagnostic_status()
-    }
-
-    /// Canonical advanced-layer entry accessor.
-    #[must_use]
-    pub fn entries(&self) -> &[CachedUniqueName] {
-        self.names()
     }
 
     /// Whether the recognized payload was selected through an MCE branch.
@@ -575,7 +539,7 @@ struct AttributeSource {
 
 /// Failure-atomic existing-name edits.  The list length and every index are
 /// immutable in this batch; no structural index operation is exposed.
-pub struct Transaction<'a> {
+pub(crate) struct Transaction<'a> {
     target: &'a mut OpcPackage,
     before: Snapshot,
     staged: Vec<String>,
@@ -583,8 +547,9 @@ pub struct Transaction<'a> {
 }
 
 impl<'a> Transaction<'a> {
+    #[cfg(test)]
     /// Resolve a cache field and begin a source-bound transaction.
-    pub fn new<'selector>(
+    pub(crate) fn new<'selector>(
         target: &'a mut OpcPackage,
         cache_selector: impl Into<PivotCacheSelector>,
         field_selector: PivotCacheFieldSelector<'selector>,
@@ -592,12 +557,12 @@ impl<'a> Transaction<'a> {
         let before = Snapshot::load(target, cache_selector, field_selector)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.names().len())
+            .try_reserve_exact(before.cached_unique_names().names().len())
             .map_err(|source| Error::Allocation {
                 resource: "cached unique-name staged values",
                 source,
             })?;
-        for name in before.names() {
+        for name in before.cached_unique_names().names() {
             let mut copy = String::new();
             copy.try_reserve_exact(name.name.len())
                 .map_err(|source| Error::Allocation {
@@ -619,7 +584,7 @@ impl<'a> Transaction<'a> {
         before: Snapshot,
         staged: Vec<String>,
     ) -> Result<Self> {
-        if staged.len() != before.names().len() {
+        if staged.len() != before.cached_unique_names().names().len() {
             return Err(invalid(
                 "cached unique-name staged values do not match source length",
             ));
@@ -635,20 +600,9 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    /// Typed state captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Currently staged names in source order.
-    #[must_use]
-    pub fn names(&self) -> &[String] {
-        &self.staged
-    }
-
+    #[cfg(test)]
     /// Replace one existing name by its unique `index` attribute.
-    pub fn set_cached_unique_name(
+    pub(crate) fn set_cached_unique_name(
         &mut self,
         item_index: u32,
         value: impl AsRef<str>,
@@ -657,6 +611,7 @@ impl<'a> Transaction<'a> {
         validate_name_value(value, self.target.read_limits())?;
         let position = self
             .before
+            .cached_unique_names()
             .names()
             .iter()
             .position(|entry| entry.index == item_index)
@@ -680,8 +635,9 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
+    #[cfg(test)]
     /// Structural list changes are outside the unresolved index-bound scope.
-    pub fn insert_cached_unique_name(
+    pub(crate) fn insert_cached_unique_name(
         &mut self,
         _index: usize,
         _value: CachedUniqueName,
@@ -691,15 +647,20 @@ impl<'a> Transaction<'a> {
         ))
     }
 
+    #[cfg(test)]
     /// Structural list changes are outside the unresolved index-bound scope.
-    pub fn remove_cached_unique_name(&mut self, _item_index: u32) -> Result<CachedUniqueName> {
+    pub(crate) fn remove_cached_unique_name(
+        &mut self,
+        _item_index: u32,
+    ) -> Result<CachedUniqueName> {
         Err(invalid(
             "cachedUniqueNames structural removal requires the unresolved CT_Items bound",
         ))
     }
 
+    #[cfg(test)]
     /// Structural list changes are outside the unresolved index-bound scope.
-    pub fn set_cached_unique_name_index(&mut self, _old: u32, _new: u32) -> Result<()> {
+    pub(crate) fn set_cached_unique_name_index(&mut self, _old: u32, _new: u32) -> Result<()> {
         Err(invalid(
             "cachedUniqueNames index edits require the unresolved CT_Items bound",
         ))
@@ -707,8 +668,9 @@ impl<'a> Transaction<'a> {
 
     /// Whether a source name differs from the staged value.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.before
+            .cached_unique_names()
             .names()
             .iter()
             .zip(&self.staged)
@@ -716,10 +678,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate, rewrite, reopen, and publish the scalar edit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<SourceCommit> {
         if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            let patch = SourcePatch::new(self.before.clone(), self.before.clone());
+            return Ok(SourceCommit::new(self.before, patch, false));
         }
         ensure_editable(&self.before)?;
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
@@ -756,6 +718,7 @@ impl<'a> Transaction<'a> {
             PivotCacheFieldSelector::Ordinal(self.before.field_ordinal()),
         )?;
         if !after
+            .cached_unique_names()
             .names()
             .iter()
             .map(|entry| entry.name.as_str())
@@ -766,9 +729,9 @@ impl<'a> Transaction<'a> {
                 "cachedUniqueNames publication changed semantic state or source closure",
             ));
         }
-        let patch = Patch::new(self.before, after.clone());
+        let patch = SourcePatch::new(self.before, after.clone());
         *self.target = candidate;
-        Ok(Commit::new(after, patch, true))
+        Ok(SourceCommit::new(after, patch, true))
     }
 }
 
@@ -786,37 +749,37 @@ fn ensure_editable(snapshot: &Snapshot) -> Result<()> {
 
 /// An exact reversible source-bound patch.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct SourcePatch {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl SourcePatch {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 
     /// Required source state.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Resulting source state.
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether the patch preserves the exact source bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -824,7 +787,8 @@ impl Patch {
     }
 
     /// Apply after validating the complete source closure.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(
             package,
             PivotCacheSelector::Position(self.before.selection),
@@ -863,62 +827,135 @@ impl Patch {
 
 /// Committed source-bound edit.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct SourceCommit {
+    /// The resulting state, read only by the engine tests.
+    #[cfg(test)]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: SourcePatch,
     changed: bool,
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
+impl SourceCommit {
+    fn new(snapshot: Snapshot, patch: SourcePatch, changed: bool) -> Self {
+        #[cfg(not(test))]
+        drop(snapshot);
         Self {
+            #[cfg(test)]
             snapshot,
             patch,
             changed,
         }
     }
 
+    #[cfg(test)]
     /// Resulting snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Exact inverse-capable patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &SourcePatch {
         &self.patch
     }
 
     /// Whether the name value changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 }
 
-/// Source-bound ordinary Workbook edit.
-pub struct WorkbookTransaction {
+/// A staged cached unique-name edit of one PivotCache field of a
+/// [`crate::Package`], started by [`crate::Package::edit_pivot_cache`].
+/// Construction retains only the workbook owner and bounded semantic
+/// selectors.  The source graph and staged values are materialized by the
+/// first fallible getter or edit operation; a failed materialization remains
+/// retryable.  Dropping it discards it.
+pub struct Edit {
     source: Workbook,
+    cache_selector: PivotCacheSelector,
+    field_selector: OwnedFieldSelector,
+    materialized: Option<CachedEditState>,
+}
+
+#[derive(Debug)]
+struct CachedEditState {
     before: Snapshot,
     staged: Vec<String>,
 }
 
-impl WorkbookTransaction {
+#[derive(Debug)]
+enum OwnedFieldSelector {
+    Ordinal(usize),
+    Name(String),
+}
+
+impl OwnedFieldSelector {
+    fn new<'a>(selector: PivotCacheFieldSelector<'a>, limits: SourceLimits) -> Result<Self> {
+        match selector {
+            PivotCacheFieldSelector::Ordinal(ordinal) => Ok(Self::Ordinal(ordinal)),
+            PivotCacheFieldSelector::Name(name) => {
+                let maximum = caller_attribute_limit(limits);
+                if name.len() > maximum {
+                    return Err(Error::limit(LimitKind::AttributeBytes, name.len(), maximum));
+                }
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "cached unique-name field selector",
+                        source,
+                    })?;
+                owned.push_str(name);
+                Ok(Self::Name(owned))
+            },
+        }
+    }
+
+    fn borrowed(&self) -> PivotCacheFieldSelector<'_> {
+        match self {
+            Self::Ordinal(ordinal) => PivotCacheFieldSelector::Ordinal(*ordinal),
+            Self::Name(name) => PivotCacheFieldSelector::Name(name),
+        }
+    }
+}
+
+impl Edit {
     pub(crate) fn new<'selector>(
         source: &Workbook,
         cache_selector: impl Into<PivotCacheSelector>,
         field_selector: PivotCacheFieldSelector<'selector>,
     ) -> Result<Self> {
-        let before = Snapshot::load(source.pivot_package(), cache_selector, field_selector)?;
+        let cache_selector = cache_selector.into();
+        let field_selector =
+            OwnedFieldSelector::new(field_selector, source.pivot_package().read_limits())?;
+        Ok(Self {
+            source: source.clone(),
+            cache_selector,
+            field_selector,
+            materialized: None,
+        })
+    }
+
+    fn materialize(&mut self) -> Result<()> {
+        if self.materialized.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(
+            self.source.pivot_package(),
+            self.cache_selector,
+            self.field_selector.borrowed(),
+        )?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.names().len())
+            .try_reserve_exact(before.cached_unique_names().names().len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook cached unique-name staged values",
                 source,
             })?;
-        for name in before.names() {
+        for name in before.cached_unique_names().names() {
             let mut copy = String::new();
             copy.try_reserve_exact(name.name.len())
                 .map_err(|source| Error::Allocation {
@@ -928,17 +965,26 @@ impl WorkbookTransaction {
             copy.push_str(&name.name);
             staged.push(copy);
         }
-        Ok(Self {
-            source: source.clone(),
-            before,
-            staged,
-        })
+        self.materialized = Some(CachedEditState { before, staged });
+        Ok(())
+    }
+
+    fn state(&self) -> Result<&CachedEditState> {
+        self.materialized
+            .as_ref()
+            .ok_or_else(|| invalid("cached unique-name edit is not materialized"))
+    }
+
+    fn state_mut(&mut self) -> Result<&mut CachedEditState> {
+        self.materialized
+            .as_mut()
+            .ok_or_else(|| invalid("cached unique-name edit is not materialized"))
     }
 
     /// Typed source state at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &CachedUniqueNames {
-        self.before.cached_unique_names()
+    pub fn before(&mut self) -> Result<&CachedUniqueNames> {
+        self.materialize()?;
+        Ok(self.state()?.before.cached_unique_names())
     }
 
     /// Replace one existing unique name.
@@ -947,15 +993,19 @@ impl WorkbookTransaction {
         item_index: u32,
         value: impl AsRef<str>,
     ) -> Result<bool> {
+        self.materialize()?;
         let value = value.as_ref();
         validate_name_value(value, self.source.pivot_package().read_limits())?;
         let position = self
+            .state()?
             .before
+            .cached_unique_names()
             .names()
             .iter()
             .position(|entry| entry.index == item_index)
             .ok_or_else(|| invalid("cached unique-name index is out of range"))?;
         let slot = self
+            .state_mut()?
             .staged
             .get_mut(position)
             .ok_or_else(|| invalid("cached unique-name source order is incomplete"))?;
@@ -981,6 +1031,7 @@ impl WorkbookTransaction {
         _index: usize,
         _value: CachedUniqueName,
     ) -> Result<()> {
+        self.materialize()?;
         Err(invalid(
             "cachedUniqueNames structural insertion requires the unresolved CT_Items bound",
         ))
@@ -989,6 +1040,7 @@ impl WorkbookTransaction {
     /// Structural operations remain unavailable until the item-count anchor
     /// is resolved.
     pub fn remove_cached_unique_name(&mut self, _item_index: u32) -> Result<CachedUniqueName> {
+        self.materialize()?;
         Err(invalid(
             "cachedUniqueNames structural removal requires the unresolved CT_Items bound",
         ))
@@ -997,32 +1049,64 @@ impl WorkbookTransaction {
     /// Structural operations remain unavailable until the item-count anchor
     /// is resolved.
     pub fn set_cached_unique_name_index(&mut self, _old: u32, _new: u32) -> Result<()> {
+        self.materialize()?;
         Err(invalid(
             "cachedUniqueNames index edits require the unresolved CT_Items bound",
         ))
     }
 
-    /// Whether a staged name differs from source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before
-            .names()
-            .iter()
-            .zip(&self.staged)
-            .any(|(before, after)| before.name != *after)
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        self.materialize()?;
+        let before = self.state()?.before.cached_unique_names().names();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(before.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook reset cached unique-name values",
+                source,
+            })?;
+        for value in before {
+            let mut copy = String::new();
+            copy.try_reserve_exact(value.name.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "Workbook reset cached unique-name text",
+                    source,
+                })?;
+            copy.push_str(&value.name);
+            staged.push(copy);
+        }
+        self.state_mut()?.staged = staged;
+        Ok(())
     }
 
-    /// Commit to a new immutable Workbook snapshot.
-    pub fn commit(self) -> Result<WorkbookCommit> {
-        let changed = self.is_changed();
+    /// Validate and publish the staged names as a new package. An unchanged
+    /// edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
+    /// the rewrite and validation errors of the publication.
+    pub fn commit(mut self) -> Result<Commit> {
+        self.materialize()?;
+        let state = self
+            .materialized
+            .take()
+            .ok_or_else(|| invalid("cached unique-name edit is not materialized"))?;
+        let before = state.before;
+        let staged = state.staged;
+        let changed = before
+            .cached_unique_names()
+            .names()
+            .iter()
+            .zip(&staged)
+            .any(|(before, after)| before.name != *after);
         let source = self.source;
-        let before = self.before;
-        let staged = self.staged;
         if !changed {
             let workbook = source.clone();
-            let low_patch = Patch::new(before.clone(), before);
-            let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-            return Ok(WorkbookCommit::new(workbook, patch, false));
+            let low_patch = SourcePatch::new(before.clone(), before);
+            let patch = Patch::new(source, workbook.clone(), low_patch);
+            return Ok(package_commit(workbook, patch, false));
         }
         ensure_editable(&before)?;
         let mut candidate = source.pivot_package().clone();
@@ -1031,21 +1115,21 @@ impl WorkbookTransaction {
         let changed = committed.changed();
         let low_patch = committed.patch().clone();
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-        Ok(WorkbookCommit::new(workbook, patch, changed))
+        let patch = Patch::new(source, workbook.clone(), low_patch);
+        Ok(package_commit(workbook, patch, changed))
     }
 }
 
 /// Exact reversible ordinary Workbook patch.
 #[derive(Clone, Debug)]
-pub struct WorkbookPatch {
+pub struct Patch {
     before: Workbook,
     after: Workbook,
-    source_patch: Patch,
+    source_patch: SourcePatch,
 }
 
-impl WorkbookPatch {
-    fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
+impl Patch {
+    fn new(before: Workbook, after: Workbook, source_patch: SourcePatch) -> Self {
         Self {
             before,
             after,
@@ -1067,7 +1151,7 @@ impl WorkbookPatch {
 
     /// Whether the patch is a byte-exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.source_patch.is_empty()
     }
 
@@ -1082,8 +1166,9 @@ impl WorkbookPatch {
     }
 
     /// Apply after ordinary Workbook mutation-policy and source-readset checks.
-    pub fn apply(&self, source: &Workbook) -> Result<WorkbookCommit> {
-        source.ensure_mutation_allowed("apply_cached_unique_names_patch")?;
+    pub(crate) fn apply(&self, source: &crate::Package) -> Result<Commit> {
+        let source = source.workbook_ref();
+        source.ensure_mutation_allowed("apply_pivot_cache")?;
         let mut candidate = source.pivot_package().clone();
         let current = Snapshot::load(
             &candidate,
@@ -1095,8 +1180,8 @@ impl WorkbookPatch {
                 part: self.source_patch.before.cache_part().to_string(),
             });
         }
-        if self.is_empty() {
-            return Ok(WorkbookCommit::new(
+        if self.is_noop() {
+            return Ok(package_commit(
                 source.clone(),
                 Self::new(source.clone(), source.clone(), self.source_patch.clone()),
                 false,
@@ -1122,53 +1207,11 @@ impl WorkbookPatch {
             ));
         }
         let workbook = source.adopt_published_package(candidate)?;
-        Ok(WorkbookCommit::new(
+        Ok(package_commit(
             workbook.clone(),
             Self::new(source.clone(), workbook, self.source_patch.clone()),
             true,
         ))
-    }
-}
-
-/// Committed ordinary Workbook edit.
-#[derive(Clone, Debug)]
-pub struct WorkbookCommit {
-    workbook: Workbook,
-    patch: WorkbookPatch,
-    changed: bool,
-}
-
-impl WorkbookCommit {
-    fn new(workbook: Workbook, patch: WorkbookPatch, changed: bool) -> Self {
-        Self {
-            workbook,
-            patch,
-            changed,
-        }
-    }
-
-    /// Resulting immutable Workbook.
-    #[must_use]
-    pub fn workbook(&self) -> &Workbook {
-        &self.workbook
-    }
-
-    /// Resulting typed cache-field state.
-    #[must_use]
-    pub fn snapshot(&self) -> &CachedUniqueNames {
-        self.patch.after()
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &WorkbookPatch {
-        &self.patch
-    }
-
-    /// Whether a name changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
     }
 }
 
@@ -1179,34 +1222,6 @@ pub fn load<'a>(
     field_selector: PivotCacheFieldSelector<'a>,
 ) -> Result<Snapshot> {
     Snapshot::load(package, cache_selector, field_selector)
-}
-
-/// Start one low-level source-bound transaction.
-pub fn edit<'package, 'selector>(
-    package: &'package mut OpcPackage,
-    cache_selector: impl Into<PivotCacheSelector>,
-    field_selector: PivotCacheFieldSelector<'selector>,
-) -> Result<Transaction<'package>> {
-    Transaction::new(package, cache_selector, field_selector)
-}
-
-/// Apply an exact source-bound patch.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
-    patch.apply(package)
-}
-
-/// An ordinary semantic cache edit handle.
-#[derive(Clone, Debug)]
-pub struct PivotCacheEditHandle {
-    workbook: Workbook,
-    selector: PivotCacheSelector,
-}
-
-impl PivotCacheEditHandle {
-    /// Resolve a field and begin its source-bound transaction.
-    pub fn field<'a>(self, selector: PivotCacheFieldSelector<'a>) -> Result<WorkbookTransaction> {
-        WorkbookTransaction::new(&self.workbook, self.selector, selector)
-    }
 }
 
 /// Resolve an ordinary cache handle.
@@ -1220,15 +1235,34 @@ pub(crate) fn workbook_cache(
     }
 }
 
-/// Begin an ordinary cache edit handle.
-pub(crate) fn edit_workbook(
+/// Begin an ordinary edit of one cache field.
+pub(crate) fn edit_workbook<'a>(
     workbook: &Workbook,
-    selector: impl Into<PivotCacheSelector>,
-) -> PivotCacheEditHandle {
-    PivotCacheEditHandle {
-        workbook: workbook.clone(),
-        selector: selector.into(),
-    }
+    cache: impl Into<PivotCacheSelector>,
+    field: PivotCacheFieldSelector<'a>,
+) -> Result<Edit> {
+    Edit::new(workbook, cache, field)
+}
+
+crate::record::record_family!("cached unique-name");
+
+crate::record::limit_kinds!("cached unique-name", CachedUniqueNames {
+    /// Bytes of one attribute value.
+    AttributeBytes => "bytes of one cached unique-name attribute",
+    /// Encoded bytes of one cached unique name.
+    TextBytes => "bytes of one cached unique name",
+    /// UTF-16 code units of one cached unique name.
+    TextUnits => "UTF-16 units of one cached unique name",
+    /// Bytes of the retained `cachedUniqueNames` owner fragment.
+    FragmentBytes => "bytes of the cachedUniqueNames owner",
+});
+
+fn package_commit(workbook: Workbook, patch: Patch, changed: bool) -> Commit {
+    Commit::new(
+        crate::Package::from_workbook(workbook),
+        patch,
+        Diagnostics::new(changed),
+    )
 }
 
 struct Graph {
@@ -1237,7 +1271,7 @@ struct Graph {
     workbook_context: Arc<Vec<u8>>,
     caches: Vec<CacheInfo>,
     connections: Option<ConnectionInfo>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 struct CacheInfo {
@@ -1455,7 +1489,7 @@ fn parse_cache_field<'a>(
     cache: &SourcePart,
     cache_id: PivotCacheId,
     selector: PivotCacheFieldSelector<'a>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<SelectedField> {
     let scan = scan_xml_with_mce(
         cache.bytes.as_slice(),
@@ -1917,7 +1951,7 @@ fn find_f057_source_connection(
     scan: &XmlScan,
     root: &XmlElement,
     source: &XmlElement,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Option<String>> {
     let mut found = None;
     for ext_list in direct_children(scan, source, root.ns.as_ref(), b"extLst")? {
@@ -2058,7 +2092,7 @@ fn source_copy(
     Ok(copy)
 }
 
-fn validate_name_value(value: &str, limits: ReadLimits) -> Result<()> {
+fn validate_name_value(value: &str, limits: SourceLimits) -> Result<()> {
     // ST_Xstring permits SpreadsheetML escape sequences that decode to XML
     // control code points.  The source serializer re-encodes those units as
     // `_xHHHH_`; rejecting them here would make a valid decoded value
@@ -2066,16 +2100,19 @@ fn validate_name_value(value: &str, limits: ReadLimits) -> Result<()> {
     validate_decoded_name(value, limits)
 }
 
-fn validate_decoded_name(value: &str, limits: ReadLimits) -> Result<()> {
-    if value.encode_utf16().count() > MAX_UNIQUE_NAME_UTF16 {
-        return Err(invalid(
-            "cached unique-name exceeds 65,535 decoded UTF-16 units",
+fn validate_decoded_name(value: &str, limits: SourceLimits) -> Result<()> {
+    let units = value.encode_utf16().count();
+    if units > MAX_UNIQUE_NAME_UTF16 {
+        return Err(Error::limit(
+            LimitKind::TextUnits,
+            units,
+            MAX_UNIQUE_NAME_UTF16,
         ));
     }
     let encoded = escaped_xstring_len(value)?;
-    let caller = caller_attribute_limit(limits);
-    if encoded > caller || encoded > MAX_ATTRIBUTE_TEXT_BYTES {
-        return Err(invalid("cached unique-name exceeds its caller text limit"));
+    let maximum = caller_attribute_limit(limits).min(MAX_ATTRIBUTE_TEXT_BYTES);
+    if encoded > maximum {
+        return Err(Error::limit(LimitKind::TextBytes, encoded, maximum));
     }
     Ok(())
 }
@@ -2087,7 +2124,7 @@ fn rewrite_cache(
     maximum_total_bytes: u64,
     maximum_attribute_bytes: usize,
     current_total_bytes: u64,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>> {
     if staged.len() != before.entries.len() {
         return Err(invalid("cachedUniqueNames source order changed"));
@@ -2097,12 +2134,21 @@ fn rewrite_cache(
         .get(before.owner.clone())
         .ok_or_else(|| invalid("cachedUniqueNames owner range is invalid"))?;
     if owner.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("cachedUniqueNames owner fragment exceeds limit"));
+        return Err(Error::limit(
+            LimitKind::FragmentBytes,
+            owner.len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut output_len = source.len();
     let mut owner_len = owner.len();
     let mut changed = false;
-    for ((entry, previous), next) in before.entries.iter().zip(before.names()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.cached_unique_names().names())
+        .zip(staged)
+    {
         validate_name_value(next, limits)?;
         let encoded_len = escaped_xstring_len(next)?;
         if encoded_len > maximum_attribute_bytes || encoded_len > MAX_ATTRIBUTE_TEXT_BYTES {
@@ -2170,7 +2216,12 @@ fn rewrite_cache(
             source,
         })?;
     let mut cursor = 0usize;
-    for ((entry, previous), next) in before.entries.iter().zip(before.names()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.cached_unique_names().names())
+        .zip(staged)
+    {
         let range = &entry.name.value;
         output.extend_from_slice(
             source

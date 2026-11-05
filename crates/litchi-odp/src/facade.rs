@@ -3,26 +3,15 @@
 /// Unified source-checked presentation package transactions and history.
 pub mod edit {
     pub use crate::authoring::edit::{
-        Commit, CryptoCapability, CryptoOperation, CryptoRefusal, Domain, History,
-        MAX_MEDIA_CHANGES, MediaChange, MergePlan, Patch, SecurityPolicy, Selector, SlidePosition,
-        Snapshot, Transaction,
+        Commit, CryptoCapability, CryptoOperation, CryptoRefusal, Diagnostics, Domain, Edit,
+        History, LimitKind, MAX_MEDIA_CHANGES, MediaChange, MergePlan, PackageError as Error,
+        Patch, SecurityPolicy, Selector, SlidePosition,
     };
 }
 
 /// Bounded, inert embedded-object discovery.
 pub mod embedded {
     pub use litchi_odf_common::embedded::{Kind, Object, Parameter, Root, Source};
-}
-
-/// Source-bound flat-presentation reads and checked edits.
-pub mod flat {
-    #[allow(
-        clippy::module_name_repetitions,
-        reason = "re-exporting the flat presentation type under its own module is the intended public API shape"
-    )]
-    pub use crate::authoring::flat::{
-        Commit, FlatPresentation, Patch, Selector, Snapshot, Transaction,
-    };
 }
 
 /// Validated image-authoring values shared by builders and transactions.
@@ -50,6 +39,9 @@ pub mod master {
         reason = "re-exporting the master page type under its own module is the intended public API shape"
     )]
     pub use crate::package::MasterPage;
+    pub use crate::package::layout_master::{
+        MasterSummary as Summary, list_masters as list, parse_masters as parse,
+    };
     pub use litchi_odf_common::style::master::{Child, ChildKind, Kind, Master, Region};
 }
 
@@ -72,7 +64,6 @@ pub mod slide {
 }
 
 pub use crate::authoring::Builder;
-pub use crate::authoring::flat::FlatPresentation;
 pub use crate::package::{
     MasterPage, Presentation, SlideCatalogEntry, SourceBackedPresentation,
     SourceBackedPresentationCatalog,

@@ -5,29 +5,30 @@ use super::model::{Id, Snapshot, State};
 use crate::shape::Key;
 use crate::{Error, Result};
 
-/// Diagnostics emitted by a successful change-tracking edit.
+/// Tally emitted by a successful change-tracking edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Diagnostics {
+pub(crate) struct Tally {
     changed_identifiers: usize,
 }
 
-impl Diagnostics {
+impl Tally {
     /// Number of identifier elements added, replaced, or removed.
     #[inline]
     #[must_use]
-    pub const fn changed_identifiers(self) -> usize {
+    #[cfg(test)]
+    pub(crate) const fn changed_identifiers(self) -> usize {
         self.changed_identifiers
     }
 }
 
 /// Isolated edit over one immutable slide snapshot.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub(crate) struct Draft {
     original: Snapshot,
     working: State,
 }
 
-impl Edit {
+impl Draft {
     pub(super) fn new(original: Snapshot) -> Self {
         Self {
             working: original.state.clone(),
@@ -36,12 +37,12 @@ impl Edit {
     }
 
     /// Set or replace the slide creation identifier.
-    pub fn set_creation_id(&mut self, id: impl Into<Id>) {
+    pub(crate) fn set_creation_id(&mut self, id: impl Into<Id>) {
         *self.working.creation_id_mut() = Some(id.into());
     }
 
     /// Remove the slide creation identifier.
-    pub fn clear_creation_id(&mut self) {
+    pub(crate) fn clear_creation_id(&mut self) {
         *self.working.creation_id_mut() = None;
     }
 
@@ -51,7 +52,7 @@ impl Edit {
     ///
     /// Returns a typed error for a missing, ambiguous, out-of-range selector,
     /// or a value already used by another shape in this slide.
-    pub fn set_shape_modification_id<'a>(
+    pub(crate) fn set_shape_modification_id<'a>(
         &mut self,
         selector: impl Into<Key<'a>>,
         requested_id: impl Into<Id>,
@@ -83,7 +84,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed error for a missing, ambiguous, or out-of-range selector.
-    pub fn clear_shape_modification_id<'a>(&mut self, shape: impl Into<Key<'a>>) -> Result<()> {
+    pub(crate) fn clear_shape_modification_id<'a>(
+        &mut self,
+        shape: impl Into<Key<'a>>,
+    ) -> Result<()> {
         let position = resolve(&self.working, shape.into())?;
         if !self.working.shapes()[position].supports_modification_id() {
             return Err(Error::Invalid(
@@ -94,20 +98,13 @@ impl Edit {
         Ok(())
     }
 
-    /// Borrow the projected semantic state.
-    #[inline]
-    #[must_use]
-    pub const fn state(&self) -> &State {
-        &self.working
-    }
-
     /// Validate and consume the edit into an immutable commit.
     ///
     /// # Errors
     ///
     /// Returns an error when the staged XML cannot be losslessly patched or
     /// does not round-trip to the requested semantic state.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         self.working.validate()?;
         let before = self.original.state.clone();
         let mut target = self.original.source.clone();
@@ -130,29 +127,37 @@ impl Edit {
                 continue;
             }
             target = match new.modification_id() {
-                Some(id) => codec::set_shape(&target, position, id)?,
-                None => codec::remove_shape(&target, position)?,
+                Some(id) => {
+                    codec::set_shape_with_limits(&target, position, id, self.original.shape_limits)?
+                },
+                None => {
+                    codec::remove_shape_with_limits(&target, position, self.original.shape_limits)?
+                },
             };
             changed_identifiers += 1;
         }
 
-        let snapshot = Snapshot::from_source(self.original.owner.clone(), target.clone())?;
+        let snapshot = Snapshot::from_source_with_limits(
+            self.original.owner.clone(),
+            target.clone(),
+            self.original.shape_limits,
+        )?;
         if snapshot.state != self.working {
             return Err(Error::Invalid(
                 "change-tracking candidate did not round-trip to the requested state".into(),
             ));
         }
-        let patch = Patch {
+        let patch = Change {
             owner: self.original.owner,
             source: self.original.source,
             target,
             before,
             after: self.working,
         };
-        Ok(Commit {
+        Ok(Prepared {
             snapshot,
             patch,
-            diagnostics: Diagnostics {
+            diagnostics: Tally {
                 changed_identifiers,
             },
         })
@@ -161,81 +166,81 @@ impl Edit {
 
 /// Validated result of one change-tracking edit.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
     snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
+    diagnostics: Tally,
 }
 
-impl Commit {
+impl Prepared {
     /// Borrow the candidate snapshot.
     #[inline]
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the exact-source reversible patch.
     #[inline]
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Change {
         &self.patch
     }
 
     /// Return edit diagnostics.
     #[inline]
     #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    #[cfg(test)]
+    pub(crate) const fn diagnostics(&self) -> Tally {
         self.diagnostics
     }
 
-    /// Whether publication would change the slide XML.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
-    }
-
-    pub(super) fn into_parts(self) -> (Snapshot, Patch) {
+    pub(super) fn into_parts(self) -> (Snapshot, Change) {
         (self.snapshot, self.patch)
     }
 }
 
 /// Exact-source-checked reversible patch for one slide's identifiers.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     pub(super) owner: litchi_opc::PackURI,
     pub(super) source: Vec<u8>,
     pub(super) target: Vec<u8>,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     before: State,
     after: State,
 }
 
-impl Patch {
-    /// Semantic state required at the patch source.
-    #[inline]
-    #[must_use]
-    pub const fn before(&self) -> &State {
-        &self.before
-    }
-
+impl Change {
     /// Semantic state produced by the patch.
     #[inline]
     #[must_use]
-    pub const fn after(&self) -> &State {
+    pub(crate) const fn after(&self) -> &State {
         &self.after
     }
 
-    /// Whether source and target slide XML differ.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.source != self.target
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub(crate) fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Construct the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             owner: self.owner.clone(),
             source: self.target.clone(),

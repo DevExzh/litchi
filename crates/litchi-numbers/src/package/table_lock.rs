@@ -10,7 +10,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::table_info_codec::{self, WireResourceLimit};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{
     Error as ReadError, LEGACY_TABLE_INFO_MESSAGE_TYPE, Package, Resolved, TABLE_INFO_MESSAGE_TYPE,
@@ -25,7 +25,7 @@ const DRAWABLE_LOCKED_FIELD: u32 = 5;
 /// A finite resource enforced while reading or publishing a table-lock edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum TableLockLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete edited package output bytes.
@@ -60,7 +60,7 @@ pub enum TableLockLimitKind {
     WireWork,
 }
 
-impl fmt::Display for TableLockLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -84,26 +84,21 @@ impl fmt::Display for TableLockLimitKind {
 }
 
 /// Failure from a semantic table-lock read or immutable transaction.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum TableLockError {
-    /// The selected sheet does not exist in the rooted workbook.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// The selected sheet has no table matching the requested selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// The package source cannot publish a preservation-safe changed edit.
-    #[error("the Numbers package source does not support exact table-lock editing")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted semantic selection did not resolve to one supported native payload.
     #[error("the selected Numbers table has no unambiguous editable lock payload")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Numbers table-lock {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
-        kind: TableLockLimitKind,
+        kind: LimitKind,
         /// Observed or requested resource amount.
         observed: u64,
         /// Configured maximum.
@@ -123,11 +118,45 @@ pub enum TableLockError {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The selected sheet does not exist in the rooted workbook.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// The selected sheet has no table matching the requested selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// The package source cannot publish a preservation-safe changed edit.
+    #[error("the Numbers package source does not support exact table-lock editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 /// A mutable semantic setting staged against one immutable package snapshot.
 ///
 /// An equal-state commit preserves the source's exact lock-field presence.
 #[derive(Debug)]
-pub struct TableLockEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     sheet_position: usize,
     table_position: usize,
@@ -135,7 +164,7 @@ pub struct TableLockEdit<'a> {
     state: State,
 }
 
-impl TableLockEdit<'_> {
+impl Edit<'_> {
     /// Return the lock state that would be published by this edit.
     #[must_use]
     pub const fn state(&self) -> State {
@@ -172,14 +201,14 @@ impl TableLockEdit<'_> {
     ///
     /// Returns an error when the source is unsupported or inconsistent, a
     /// resource ceiling is exceeded, or candidate verification fails.
-    pub fn commit(self) -> Result<TableLockCommit, TableLockError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let source = physical_source(self.source)?;
         let source_bytes = source.__source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
         if self.before == self.state {
-            return Ok(TableLockCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: TableLockPatch {
+                patch: Patch {
                     source: source_bytes.clone(),
                     target: source_bytes,
                     source_fingerprint,
@@ -189,11 +218,11 @@ impl TableLockEdit<'_> {
                     before: self.before,
                     after: self.state,
                 },
-                diagnostics: TableLockDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source.source_is_exact() {
-            return Err(TableLockError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let package = rewrite_lock_state(
@@ -205,9 +234,9 @@ impl TableLockEdit<'_> {
         )?;
         let target = physical_source(&package)?.__source_owner();
         let target_fingerprint = fingerprint(&target);
-        Ok(TableLockCommit {
+        Ok(Commit {
             package,
-            patch: TableLockPatch {
+            patch: Patch {
                 source: source_bytes,
                 target,
                 source_fingerprint,
@@ -217,7 +246,7 @@ impl TableLockEdit<'_> {
                 before: self.before,
                 after: self.state,
             },
-            diagnostics: TableLockDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -227,7 +256,7 @@ impl TableLockEdit<'_> {
 /// Its inverse restores the source artifact exactly, including whether an
 /// unlocked table encoded the lock field as absent or explicit false.
 #[derive(Clone, PartialEq, Eq)]
-pub struct TableLockPatch {
+pub struct Patch {
     source: SharedBytes,
     target: SharedBytes,
     source_fingerprint: u64,
@@ -238,10 +267,10 @@ pub struct TableLockPatch {
     after: State,
 }
 
-impl fmt::Debug for TableLockPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("TableLockPatch")
+            .debug_struct("Patch")
             .field("sheet_position", &self.sheet_position)
             .field("table_position", &self.table_position)
             .field("before", &self.before)
@@ -250,7 +279,7 @@ impl fmt::Debug for TableLockPatch {
     }
 }
 
-impl TableLockPatch {
+impl Patch {
     /// Return the semantic state required before this patch can apply.
     #[must_use]
     pub const fn before(&self) -> State {
@@ -289,13 +318,13 @@ impl TableLockPatch {
 
 /// Compact evidence describing work performed by one committed transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TableLockDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl TableLockDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -334,13 +363,13 @@ impl TableLockDiagnostics {
 /// The fully reopened immutable result of one table-lock transaction.
 #[must_use = "a Numbers table-lock commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct TableLockCommit {
+pub struct Commit {
     package: Package,
-    patch: TableLockPatch,
-    diagnostics: TableLockDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl TableLockCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -353,15 +382,21 @@ impl TableLockCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &TableLockPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &TableLockDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -400,7 +435,7 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-    ) -> Result<State, TableLockError> {
+    ) -> Result<State, Error> {
         let (sheet_position, table_position) =
             self.resolve_table_selectors(sheet_selector, table)?;
         self.table_lock_at(sheet_position, table_position)
@@ -423,11 +458,11 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-    ) -> Result<TableLockEdit<'_>, TableLockError> {
+    ) -> Result<Edit<'_>, Error> {
         let (sheet_position, table_position) =
             self.resolve_table_selectors(sheet_selector, table)?;
         let before = self.table_lock_at(sheet_position, table_position)?;
-        Ok(TableLockEdit {
+        Ok(Edit {
             source: self,
             sheet_position,
             table_position,
@@ -447,43 +482,40 @@ impl Package {
     ///
     /// Returns an error when the patch does not match this exact artifact or
     /// when the target cannot be reopened and semantically verified.
-    pub fn apply_table_lock(
-        &self,
-        patch: &TableLockPatch,
-    ) -> Result<TableLockCommit, TableLockError> {
+    pub fn apply_table_lock(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = physical_source(self)?;
         if fingerprint(source.source_bytes()) != patch.source_fingerprint
             || source.source_bytes() != patch.source.as_ref()
             || self.table_lock_at(patch.sheet_position, patch.table_position)? != patch.before
         {
-            return Err(TableLockError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             if patch.source.as_ref() != patch.target.as_ref()
                 || patch.source_fingerprint != patch.target_fingerprint
             {
-                return Err(TableLockError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
-            return Ok(TableLockCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: TableLockDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source.source_is_exact() || fingerprint(&patch.target) != patch.target_fingerprint {
-            return Err(TableLockError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
 
         let candidate =
             Package::from_source_owner_with_options(patch.target.clone(), self.state.options)
                 .map_err(map_candidate_read_error)?;
         if candidate.table_lock_at(patch.sheet_position, patch.table_position)? != patch.after {
-            return Err(TableLockError::Verification);
+            return Err(Error::Verification);
         }
-        Ok(TableLockCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: TableLockDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 
@@ -491,29 +523,25 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-    ) -> Result<(usize, usize), TableLockError> {
+    ) -> Result<(usize, usize), Error> {
         let selected_sheet = self
             .state
             .document
             .sheet(sheet)
             .map_err(|error| map_read_error(ReadError::Semantic(error)))?
-            .ok_or(TableLockError::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let selected = selected_sheet
             .select(table.into())
-            .map_err(|_error| TableLockError::InvalidSource)?
-            .ok_or(TableLockError::TableNotFound)?;
+            .map_err(|_error| Error::InvalidSource)?
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
         let table_position = selected_sheet
             .tables()
             .position(|candidate| std::ptr::eq(candidate, selected))
-            .ok_or(TableLockError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok((selected_sheet.index(), table_position))
     }
 
-    fn table_lock_at(
-        &self,
-        sheet_position: usize,
-        table_position: usize,
-    ) -> Result<State, TableLockError> {
+    fn table_lock_at(&self, sheet_position: usize, table_position: usize) -> Result<State, Error> {
         let target = self.native_table_lock_target(sheet_position, table_position)?;
         Ok(State::from_locked(target.explicit_locked.unwrap_or(false)))
     }
@@ -522,23 +550,23 @@ impl Package {
         &self,
         sheet_position: usize,
         table_position: usize,
-    ) -> Result<NativeTarget, TableLockError> {
+    ) -> Result<NativeTarget, Error> {
         let document = Self::root_document(&self.state.components).map_err(map_read_error)?;
         let sheet_reference = document
             .sheet_references()
             .get(sheet_position)
-            .ok_or(TableLockError::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let sheet_object = self
             .state
             .index
             .resolve_ref_id(&self.state.components, sheet_reference.identifier())
             .map_err(map_read_error)?
-            .ok_or(TableLockError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let owner_message_index = unique_sheet_message_index(sheet_object.messages)?;
         let owner_message_type = sheet_object
             .messages
             .get(owner_message_index)
-            .ok_or(TableLockError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .type_;
         let owner_component_index = sheet_object.component_index;
         let owner_object_index = sheet_object.object_index;
@@ -555,7 +583,7 @@ impl Package {
                 .index
                 .resolve_ref_id(&self.state.components, drawable.identifier)
                 .map_err(map_read_error)?
-                .ok_or(TableLockError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let Some((message_index, message)) = unique_table_info(resolved)? else {
                 continue;
             };
@@ -576,30 +604,26 @@ impl Package {
                     explicit_locked: snapshot.locked(),
                 });
             }
-            table_index = table_index
-                .checked_add(1)
-                .ok_or(TableLockError::InvalidSource)?;
+            table_index = table_index.checked_add(1).ok_or(Error::InvalidSource)?;
         }
-        Err(TableLockError::TableNotFound)
+        Err(Error::Refused(Refusal::TableNotFound))
     }
 }
 
-fn unique_sheet_message_index(messages: &[RawMessage]) -> Result<usize, TableLockError> {
+fn unique_sheet_message_index(messages: &[RawMessage]) -> Result<usize, Error> {
     let sheet = unique_message_index(messages, super::SHEET_MESSAGE_TYPE)?;
     let form = unique_message_index(messages, super::FORM_BASED_SHEET_MESSAGE_TYPE)?;
     match (sheet, form) {
-        (Some(_), Some(_)) | (None, None) => Err(TableLockError::InvalidSource),
+        (Some(_), Some(_)) | (None, None) => Err(Error::InvalidSource),
         (Some((index, _)), None) | (None, Some((index, _))) => Ok(index),
     }
 }
 
-fn unique_table_info(
-    resolved: Resolved<'_>,
-) -> Result<Option<(usize, &RawMessage)>, TableLockError> {
+fn unique_table_info(resolved: Resolved<'_>) -> Result<Option<(usize, &RawMessage)>, Error> {
     let canonical = unique_message_index(resolved.messages, TABLE_INFO_MESSAGE_TYPE)?;
     let legacy = unique_message_index(resolved.messages, LEGACY_TABLE_INFO_MESSAGE_TYPE)?;
     match (canonical, legacy) {
-        (Some(_), Some(_)) => Err(TableLockError::InvalidSource),
+        (Some(_), Some(_)) => Err(Error::InvalidSource),
         (Some(message), None) | (None, Some(message)) => Ok(Some(message)),
         (None, None) => Ok(None),
     }
@@ -608,31 +632,31 @@ fn unique_table_info(
 fn unique_message_index(
     messages: &[RawMessage],
     message_type: u32,
-) -> Result<Option<(usize, &RawMessage)>, TableLockError> {
+) -> Result<Option<(usize, &RawMessage)>, Error> {
     let mut matches = messages
         .iter()
         .enumerate()
         .filter(|(_index, message)| message.type_ == message_type);
     let first = matches.next();
     if matches.next().is_some() {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(first)
 }
 
-fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapshot, TableLockError> {
+fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapshot, Error> {
     table_info_codec::decode_table_info(source, table_info_decode_options(source)).map_err(
         |error| {
             if let Some((observed, maximum)) = error.field_limit_values() {
-                return TableLockError::LimitExceeded {
-                    kind: TableLockLimitKind::WireFields,
+                return Error::Limit {
+                    kind: LimitKind::WireFields,
                     observed: usize_as_u64(observed),
                     maximum: usize_as_u64(maximum),
                 };
             }
             if let Some((observed, maximum)) = error.work_limit_values() {
-                return TableLockError::LimitExceeded {
-                    kind: TableLockLimitKind::WireWork,
+                return Error::Limit {
+                    kind: LimitKind::WireWork,
                     observed: usize_as_u64(observed),
                     maximum: usize_as_u64(maximum),
                 };
@@ -641,20 +665,20 @@ fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapsho
                 Some(WireResourceLimit::Bytes {
                     observed,
                     maximum: Some(maximum),
-                }) => TableLockError::LimitExceeded {
-                    kind: TableLockLimitKind::WireBytes,
+                }) => Error::Limit {
+                    kind: LimitKind::WireBytes,
                     observed: usize_as_u64(observed.unwrap_or_else(|| maximum.saturating_add(1))),
                     maximum: usize_as_u64(maximum),
                 },
                 Some(WireResourceLimit::Nesting {
                     observed,
                     maximum: Some(maximum),
-                }) => TableLockError::LimitExceeded {
-                    kind: TableLockLimitKind::WireNesting,
+                }) => Error::Limit {
+                    kind: LimitKind::WireNesting,
                     observed: u64::from(observed.unwrap_or_else(|| maximum.saturating_add(1))),
                     maximum: u64::from(maximum),
                 },
-                _ => TableLockError::InvalidSource,
+                _ => Error::InvalidSource,
             }
         },
     )
@@ -666,10 +690,10 @@ fn rewrite_lock_state(
     table_position: usize,
     before: State,
     after: State,
-) -> Result<Package, TableLockError> {
+) -> Result<Package, Error> {
     let target = source.native_table_lock_target(sheet_position, table_position)?;
     if State::from_locked(target.explicit_locked.unwrap_or(false)) != before {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_catalog = physical_source(source)?;
     validate_selected_ownership(source, target)?;
@@ -678,47 +702,47 @@ fn rewrite_lock_state(
         .components
         .catalog()
         .get_index(target.component_index)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let component_name = component.name();
     let entry = source_catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(TableLockError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     drop(stream);
     let object = archive
         .objects
         .get_mut(target.object_index)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.drawable_identifier) {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.message_index)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != target.message_type {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let snapshot = decode_table_info(&message.data)?;
     validate_selected_metadata(object, target.message_index)?;
     if snapshot.locked() != target.explicit_locked {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let explicit_before = target.explicit_locked;
     let patched = transform_length_delimited_field::<_, litchi_iwa_common::Error>(
@@ -735,11 +759,11 @@ fn rewrite_lock_state(
     )
     .map_err(map_wire_error)?;
     if State::from_locked(decode_table_info(&patched)?.locked().unwrap_or(false)) != after {
-        return Err(TableLockError::Verification);
+        return Err(Error::Verification);
     }
 
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -748,11 +772,9 @@ fn rewrite_lock_state(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     drop(rewritten);
     let output = source_catalog
         .package()
@@ -762,22 +784,21 @@ fn rewrite_lock_state(
         )
         .map_err(map_archive_error)?;
     drop(compressed);
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = source
+        .reopen_candidate(output.into())
         .map_err(map_candidate_read_error)?;
     if candidate.table_lock_at(sheet_position, table_position)? != after {
-        return Err(TableLockError::Verification);
+        return Err(Error::Verification);
     }
     Ok(candidate)
 }
 
-fn physical_source(
-    package: &Package,
-) -> Result<&litchi_iwa_archive::SourceCatalog, TableLockError> {
+fn physical_source(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     package
         .state
         .components
         .physical()
-        .ok_or(TableLockError::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn fingerprint(bytes: &[u8]) -> u64 {
@@ -792,12 +813,12 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 fn validate_selected_metadata(
     object: &litchi_iwa_core::ArchiveObject,
     message_index: usize,
-) -> Result<(), TableLockError> {
+) -> Result<(), Error> {
     let message = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || message.base_message_index.is_some()
         || !message.diff_merge_version.is_empty()
@@ -805,22 +826,19 @@ fn validate_selected_metadata(
         || !message.fields_to_remove.is_empty()
         || !message.diff_read_version.is_empty()
     {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn validate_selected_ownership(
-    package: &Package,
-    target: NativeTarget,
-) -> Result<(), TableLockError> {
+fn validate_selected_ownership(package: &Package, target: NativeTarget) -> Result<(), Error> {
     let catalog = package.state.components.catalog();
     let sheet_object = catalog
         .get_index(target.owner_component_index)
         .and_then(|component| component.archive().objects.get(target.owner_object_index))
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if sheet_object.archive_info.identifier != Some(target.owner_identifier) {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let sheet = super::sheet_projection(&sheet_object.messages, super::SemanticPath::Package)
         .map_err(map_read_error)?;
@@ -831,42 +849,42 @@ fn validate_selected_ownership(
         .count()
         != 1
     {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let sheet_message = sheet_object
         .archive_info
         .message_infos
         .get(target.owner_message_index)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if sheet_message.type_ != target.owner_message_type {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let owner_path: &[u32] = match target.owner_message_type {
         super::SHEET_MESSAGE_TYPE => &[2],
         super::FORM_BASED_SHEET_MESSAGE_TYPE => &[1, 2],
-        _ => return Err(TableLockError::InvalidSource),
+        _ => return Err(Error::InvalidSource),
     };
     if !message_declares_reference(sheet_message, target.drawable_identifier, owner_path)? {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let table_object = catalog
         .get_index(target.component_index)
         .and_then(|component| component.archive().objects.get(target.object_index))
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if table_object.archive_info.identifier != Some(target.drawable_identifier) {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let table_message = table_object
         .archive_info
         .message_infos
         .get(target.message_index)
-        .ok_or(TableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if table_message.type_ != target.message_type {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if !message_declares_reference(table_message, target.model_identifier, &[2])? {
-        return Err(TableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -875,12 +893,12 @@ fn message_declares_reference(
     message: &litchi_iwa_core::MessageInfo,
     identifier: u64,
     accepted_field_path: &[u32],
-) -> Result<bool, TableLockError> {
+) -> Result<bool, Error> {
     let mut declared = message.object_references.contains(&identifier);
     for field in &message.field_infos {
         if field.object_references.contains(&identifier) {
             if field.path.as_slice() != accepted_field_path {
-                return Err(TableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             declared = true;
         }
@@ -891,29 +909,27 @@ fn message_declares_reference(
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), TableLockError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_error| TableLockError::InvalidSource)?;
-        let remaining = source.get(offset..).ok_or(TableLockError::InvalidSource)?;
+        let offset =
+            usize::try_from(object.header_offset).map_err(|_error| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
         let (header_bytes, prefix_bytes) =
-            decode_varint_from_bytes(remaining).map_err(|_error| TableLockError::InvalidSource)?;
+            decode_varint_from_bytes(remaining).map_err(|_error| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(TableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_error| TableLockError::InvalidSource)?,
-            )
-            .ok_or(TableLockError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_error| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(TableLockError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(TableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -923,15 +939,15 @@ fn usize_as_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
-fn map_candidate_read_error(error: ReadError) -> TableLockError {
+fn map_candidate_read_error(error: ReadError) -> Error {
     match error {
         ReadError::InputTooLarge { observed, maximum }
         | ReadError::Archive(litchi_iwa_archive::Error::Limit {
             kind: litchi_iwa_archive::LimitKind::InputBytes,
             observed,
             maximum,
-        }) => TableLockError::LimitExceeded {
-            kind: TableLockLimitKind::OutputBytes,
+        }) => Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed,
             maximum,
         },
@@ -939,7 +955,8 @@ fn map_candidate_read_error(error: ReadError) -> TableLockError {
         | ReadError::Detection(_)
         | ReadError::Archive(_)
         | ReadError::MalformedPayload { .. }
-        | ReadError::NotNumbers
+        | ReadError::UnexpectedFormat { .. }
+        | ReadError::InvalidLimit { .. }
         | ReadError::Common(_)
         | ReadError::InvalidFormat(_)
         | ReadError::ParseError(_)
@@ -948,7 +965,7 @@ fn map_candidate_read_error(error: ReadError) -> TableLockError {
     }
 }
 
-fn map_read_error(error: ReadError) -> TableLockError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::Archive(archive_error) => map_archive_error(archive_error),
         ReadError::Common(wire_error) => map_wire_error(wire_error),
@@ -957,75 +974,66 @@ fn map_read_error(error: ReadError) -> TableLockError {
             observed,
             maximum,
             ..
-        } => TableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::SemanticLimitKind::Objects => TableLockLimitKind::PayloadObjects,
-                super::SemanticLimitKind::References => TableLockLimitKind::PayloadReferences,
+                super::SemanticLimitKind::Objects => LimitKind::PayloadObjects,
+                super::SemanticLimitKind::References => LimitKind::PayloadReferences,
                 super::SemanticLimitKind::OutputTextBytes
-                | super::SemanticLimitKind::FormulaWireBytes
-                | super::SemanticLimitKind::TextBytes => TableLockLimitKind::PayloadBytes,
+                | super::SemanticLimitKind::FormulaCategoryBytes
+                | super::SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
                 super::SemanticLimitKind::FormulaRenderDepth
-                | super::SemanticLimitKind::FormulaDepth => TableLockLimitKind::WireNesting,
+                | super::SemanticLimitKind::FormulaDepth => LimitKind::WireNesting,
                 super::SemanticLimitKind::FormulaRenderWork
-                | super::SemanticLimitKind::FormulaWork => TableLockLimitKind::WireWork,
+                | super::SemanticLimitKind::FormulaWork => LimitKind::WireWork,
                 super::SemanticLimitKind::Sheets
                 | super::SemanticLimitKind::Tables
-                | super::SemanticLimitKind::MaterializedCells => TableLockLimitKind::PayloadItems,
+                | super::SemanticLimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        ReadError::InputTooLarge { observed, maximum } => TableLockError::LimitExceeded {
-            kind: TableLockLimitKind::InputBytes,
+        ReadError::InputTooLarge { observed, maximum } => Error::Limit {
+            kind: LimitKind::InputBytes,
             observed,
             maximum,
         },
         ReadError::Io(_)
         | ReadError::Detection(_)
         | ReadError::MalformedPayload { .. }
-        | ReadError::NotNumbers
+        | ReadError::UnexpectedFormat { .. }
+        | ReadError::InvalidLimit { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::ParseError(_)
-        | ReadError::Semantic(_) => TableLockError::InvalidSource,
+        | ReadError::Semantic(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> TableLockError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => TableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => TableLockLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => TableLockLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => TableLockLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => TableLockLimitKind::PackageBytes,
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PackageBytes,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => TableLockLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => TableLockLimitKind::TotalEntryBytes,
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => TableLockLimitKind::PayloadBytes,
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    TableLockLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            TableLockError::Allocation { amount }
-        },
-        litchi_iwa_archive::Error::Reassembly(_) => TableLockError::UnsupportedSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => TableLockError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1033,23 +1041,21 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> TableLockError {
     clippy::needless_pass_by_value,
     reason = "this mapper is passed directly to Result::map_err"
 )]
-fn map_core_error(error: litchi_iwa_core::Error) -> TableLockError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => TableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => TableLockLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    TableLockLimitKind::PayloadMessages
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => TableLockLimitKind::PayloadItems,
-                litchi_iwa_core::LimitKind::HeaderNesting => TableLockLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
@@ -1059,20 +1065,16 @@ fn map_core_error(error: litchi_iwa_core::Error) -> TableLockError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    TableLockLimitKind::PayloadBytes
+                    LimitKind::PayloadBytes
                 },
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            TableLockError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => TableLockError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1080,34 +1082,29 @@ fn map_core_error(error: litchi_iwa_core::Error) -> TableLockError {
     clippy::needless_pass_by_value,
     reason = "this mapper is passed directly to Result::map_err"
 )]
-fn map_wire_error(error: litchi_iwa_common::Error) -> TableLockError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => TableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => TableLockLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => TableLockLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Fields => TableLockLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => TableLockLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => TableLockLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    TableLockLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            TableLockError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => TableLockError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1117,10 +1114,10 @@ mod tests {
 
     use litchi_iwa_archive::package::SharedBytes;
 
-    use super::{State, TableLockPatch, fingerprint};
+    use super::{Patch, State, fingerprint};
 
-    fn patch(source: SharedBytes, target: SharedBytes) -> TableLockPatch {
-        TableLockPatch {
+    fn patch(source: SharedBytes, target: SharedBytes) -> Patch {
+        Patch {
             source_fingerprint: fingerprint(source.as_ref()),
             target_fingerprint: fingerprint(target.as_ref()),
             source,

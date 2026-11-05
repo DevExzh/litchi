@@ -3,22 +3,31 @@
 use std::io::Cursor;
 
 use libfuzzer_sys::fuzz_target;
-use litchi_docx::ReadLimits;
-use litchi_docx::source_backed::{Package, tail_append::Limits};
+use litchi_docx::SourceLimits;
+use litchi_docx::source_backed::{
+    Package,
+    tail_append::{Commit, EditOptions, Error, Limits, Plan},
+};
 
-fn read_limits() -> ReadLimits {
-    ReadLimits::builder()
+fn publish<'package>(plan: Plan<'package>, output: &mut Vec<u8>) -> Result<Commit, Error> {
+    let commit = plan.commit()?;
+    commit.package().write_to(output).map_err(Error::Document)?;
+    Ok(commit)
+}
+
+fn read_limits() -> SourceLimits {
+    SourceLimits::builder()
         .max_input_bytes(256 * 1024)
         .unwrap()
-        .max_archive_members(32)
+        .max_members(32)
         .unwrap()
         .max_relationship_parts(32)
         .unwrap()
         .max_parts(32)
         .unwrap()
-        .max_archive_entry_bytes(128 * 1024)
+        .max_entry_bytes(128 * 1024)
         .unwrap()
-        .max_archive_total_bytes(256 * 1024)
+        .max_aggregate_bytes(256 * 1024)
         .unwrap()
         .max_archive_compressed_bytes(256 * 1024)
         .unwrap()
@@ -34,7 +43,7 @@ fn read_limits() -> ReadLimits {
         .unwrap()
         .max_total_relationship_xml_bytes(64 * 1024)
         .unwrap()
-        .max_xml_events(8192)
+        .max_events(8192)
         .unwrap()
         .build()
         .unwrap()
@@ -44,7 +53,10 @@ fuzz_target!(|data: &[u8]| {
     if data.len() > 64 * 1024 {
         return;
     }
-    let Ok(package) = Package::from_reader_with_limits(Cursor::new(data), read_limits()) else {
+    let Ok(package) = Package::from_reader_with_options(
+        Cursor::new(data),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    ) else {
         return;
     };
     let limits = Limits {
@@ -60,16 +72,20 @@ fuzz_target!(|data: &[u8]| {
         max_output_bytes: 256 * 1024,
         max_token_bytes: 8192,
     };
-    if let Ok(plan) = package.tail_append_noop().with_limits(limits).prepare() {
+    if let Ok(plan) = package
+        .tail_append_noop()
+        .with_options(EditOptions::new(limits))
+        .prepare()
+    {
         let mut output = Vec::new();
-        if let Ok(publication) = plan.write_to_stream(&mut output) {
-            assert!(publication.is_noop());
+        if let Ok(publication) = publish(plan, &mut output) {
+            assert!(publication.patch().is_noop());
             assert_eq!(output, data);
         }
     }
     let Ok(plan) = package
         .tail_append_plain_paragraph("fuzz <&> café")
-        .with_limits(limits)
+        .with_options(EditOptions::new(limits))
         .prepare()
     else {
         return;
@@ -81,14 +97,20 @@ fuzz_target!(|data: &[u8]| {
     assert_eq!(before.sect_pr_len, after.sect_pr_len);
     assert_eq!(before.sect_pr_sha256, after.sect_pr_sha256);
     let mut output = Vec::new();
-    if let Ok(publication) = plan.write_to_stream(&mut output) {
-        assert!(!publication.is_noop());
-        let current = Package::from_reader_with_limits(Cursor::new(&output), read_limits())
-            .expect("a successfully published bounded candidate must reopen");
+    if let Ok(publication) = publish(plan, &mut output) {
+        assert!(!publication.patch().is_noop());
+        let current = Package::from_reader_with_options(
+            Cursor::new(&output),
+            litchi_docx::OpenOptions::default().source_limits(read_limits()),
+        )
+        .expect("a successfully published bounded candidate must reopen");
         let mut restored = Vec::new();
-        publication
-            .write_inverse_to_stream(&current, &mut restored)
-            .expect("the exact published candidate must authorize its inverse");
+        current
+            .apply_tail_append(&publication.patch().inverse())
+            .expect("the exact published candidate must authorize its inverse")
+            .package()
+            .write_to(&mut restored)
+            .expect("the exact inverse candidate must publish");
         assert_eq!(restored, data);
     }
 });

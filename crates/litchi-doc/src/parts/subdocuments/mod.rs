@@ -11,6 +11,7 @@
 //! opened, resolved, or followed, and no subdocument content is ever loaded.
 
 mod codec;
+mod family;
 mod model;
 mod package;
 mod patch;
@@ -20,12 +21,16 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use family::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Result};
 pub use model::{
     Collection, FileNameKey, FileNameKeyError, FileNameMetadata, Kind, Name, Reference,
 };
-pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
 pub use patch::{Error as PatchError, SourceContext, SourceRanges, TablePatch, TableRange};
-pub use transaction::{
-    Commit, Error as TransactionError, FileNameSelector, Patch, ReferenceSelector, SelectionError,
-    Snapshot, Transaction,
-};
+pub use transaction::{FileNameSelector, ReferenceSelector, SelectionError};
+
+/// The part-level subdocument codec: the semantic [`record::Snapshot`] of the
+/// `SttbFnm`/`PlcfWKB` tables and its [`record::Edit`] staging, which
+/// publishes a new semantic snapshot; package edits go through [`Edit`].
+pub mod record {
+    pub use super::transaction::{Commit, Diagnostics, Edit, Error, Patch, Snapshot};
+}

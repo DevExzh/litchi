@@ -1,15 +1,16 @@
 //! Source-preserving `[Content_Types].xml` structural edits.
 
-use super::super::{OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits};
+use super::super::{OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, SourceLimits};
 use crate::Result;
 use crate::content_type::validate_content_type;
 use crate::error::OpcError;
-use crate::limits::ReadResource;
+use crate::limits::SourceLimitKind;
 use crate::source_backed::content_types_plan::collapse_xml_token;
 use crate::source_backed::escaped_xml_attribute_len;
 use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::sync::Arc as SharedArc;
 
@@ -36,6 +37,7 @@ pub struct ContentTypeEdit<'a> {
 pub struct ContentTypesEditPlan<'source> {
     source: &'source super::OwnedContentTypes,
     inner: crate::source_backed::content_types_plan::ContentTypesPlan<'source>,
+    limits: SourceLimits,
 }
 
 impl<'source> ContentTypesEditPlan<'source> {
@@ -65,35 +67,49 @@ impl<'source> ContentTypesEditPlan<'source> {
 
     /// Materialize one validated replacement XML buffer after caller limits
     /// have admitted the exact plan metrics.
-    pub fn materialize(self, limits: ReadLimits) -> Result<super::OwnedContentTypes> {
+    pub fn materialize(self, limits: SourceLimits) -> Result<super::OwnedContentTypes> {
         let source = self.source;
+        let limits = self.limits.min(limits);
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             self.inner.final_len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.inner.final_len() as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             self.inner.final_len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::Events,
             self.inner.event_count() as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         limits.check(
-            ReadResource::ContentTypeMappings,
+            SourceLimitKind::ContentTypeMappings,
             self.inner.mapping_count() as u64,
             limits.max_content_type_mappings() as u64,
         )?;
         if self.inner.is_noop() {
-            return Ok(source.clone());
+            // Materialization may use a stricter structural profile than the
+            // one used during planning, even when the token stays shared.
+            OwnedXmlPart::preflight_capture_with_limits(
+                &source.xml.name,
+                &source.xml.content_type,
+                source.bytes(),
+                limits,
+            )?;
+            let binding = SharedArc::clone(&source.binding);
+            crate::content_type::ContentTypeMap::from_xml(source.bytes(), limits)?;
+            return Ok(super::OwnedContentTypes {
+                xml: source.xml.with_limits(limits),
+                binding,
+            });
         }
         let bytes = self.inner.materialize_public(limits)?;
         let binding = SharedArc::new(crate::content_type::ContentTypeMap::from_xml(
@@ -127,7 +143,7 @@ impl super::OwnedContentTypes {
         &'source self,
         additions: &[ContentTypeEdit<'_>],
         removals: &[PackURI],
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<ContentTypesEditPlan<'source>> {
         self.plan_edit_with_defaults(additions, removals, &[], limits)
     }
@@ -141,22 +157,23 @@ impl super::OwnedContentTypes {
         additions: &[ContentTypeEdit<'_>],
         removals: &[PackURI],
         default_removals: &[&str],
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<ContentTypesEditPlan<'source>> {
+        let limits = self.xml.limits().min(limits);
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             self.xml.bytes().len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.xml.bytes().len() as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             self.xml.bytes().len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         preflight_content_type_edit_inputs(additions, removals, default_removals, limits)?;
         for addition in additions {
@@ -203,6 +220,7 @@ impl super::OwnedContentTypes {
         Ok(ContentTypesEditPlan {
             source: self,
             inner,
+            limits,
         })
     }
 }
@@ -229,12 +247,12 @@ fn preflight_content_type_edit_inputs(
     additions: &[ContentTypeEdit<'_>],
     removals: &[PackURI],
     default_removals: &[&str],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     if additions.len() > limits.max_content_type_mappings() {
-        return Err(OpcError::ReadLimit {
-            resource: ReadResource::ContentTypeMappings,
-            actual: additions.len() as u64,
+        return Err(OpcError::Limit {
+            kind: SourceLimitKind::ContentTypeMappings,
+            observed: additions.len() as u64,
             maximum: limits.max_content_type_mappings() as u64,
         });
     }
@@ -243,9 +261,9 @@ fn preflight_content_type_edit_inputs(
         .checked_add(default_removals.len())
         .ok_or_else(|| OpcError::InvalidContentTypesManifest("selector count overflows".into()))?;
     if removal_count > limits.max_content_type_mappings() {
-        return Err(OpcError::ReadLimit {
-            resource: ReadResource::ContentTypeMappings,
-            actual: removal_count as u64,
+        return Err(OpcError::Limit {
+            kind: SourceLimitKind::ContentTypeMappings,
+            observed: removal_count as u64,
             maximum: limits.max_content_type_mappings() as u64,
         });
     }
@@ -255,12 +273,12 @@ fn preflight_content_type_edit_inputs(
         let escaped_part_len = escaped_xml_attribute_len(addition.part_name.as_str())?;
         let escaped_content_type_len = escaped_xml_attribute_len(addition.content_type)?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             escaped_part_len as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             escaped_content_type_len as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -280,7 +298,7 @@ fn preflight_content_type_edit_inputs(
     for part in removals {
         let length = part.as_str().len();
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             length as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -290,7 +308,7 @@ fn preflight_content_type_edit_inputs(
     }
     for extension in default_removals {
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             extension.len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -299,7 +317,7 @@ fn preflight_content_type_edit_inputs(
         })?;
     }
     limits.check(
-        ReadResource::ContentTypesBytes,
+        SourceLimitKind::ContentTypesBytes,
         raw_bytes as u64,
         limits.max_content_types_bytes() as u64,
     )?;
@@ -315,8 +333,31 @@ pub(crate) fn without_part_overrides(
     parts: &[PackURI],
     max_output_bytes: usize,
 ) -> Result<OwnedXmlPart> {
-    let limits = ReadLimits::default();
-    let maximum = max_output_bytes.min(limits.max_content_types_bytes());
+    without_part_overrides_inner(source, parts, max_output_bytes, true)
+}
+
+/// Remove only explicit part overrides, retaining relationship-member
+/// overrides.  The graph owner uses this when its `.rels` member survives the
+/// edit and its lexical content-type declaration remains valid.
+pub(crate) fn without_part_overrides_only(
+    source: &OwnedXmlPart,
+    parts: &[PackURI],
+    max_output_bytes: usize,
+) -> Result<OwnedXmlPart> {
+    without_part_overrides_inner(source, parts, max_output_bytes, false)
+}
+
+fn without_part_overrides_inner(
+    source: &OwnedXmlPart,
+    parts: &[PackURI],
+    max_output_bytes: usize,
+    include_relationships: bool,
+) -> Result<OwnedXmlPart> {
+    let limits = source.limits();
+    let maximum = max_output_bytes
+        .min(limits.max_content_types_bytes())
+        .min(usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX))
+        .min(usize::try_from(limits.max_entry_bytes()).unwrap_or(usize::MAX));
     if source.bytes().len() > maximum {
         return Err(OpcError::InvalidContentTypesManifest(
             "content-types source exceeds the requested output limit".into(),
@@ -333,8 +374,15 @@ pub(crate) fn without_part_overrides(
         // upper bound before constructing another URI from a caller's name.
         selector_bytes = selector_bytes
             .checked_add(part.as_str().len())
-            .and_then(|total| total.checked_add(part.as_str().len()))
-            .and_then(|total| total.checked_add(27))
+            .and_then(|total| {
+                if include_relationships {
+                    total
+                        .checked_add(part.as_str().len())
+                        .and_then(|total| total.checked_add(27))
+                } else {
+                    Some(total)
+                }
+            })
             .ok_or_else(|| {
                 OpcError::InvalidContentTypesManifest(
                     "content-types removal selector size overflows".into(),
@@ -358,8 +406,10 @@ pub(crate) fn without_part_overrides(
         })?;
     for part in parts {
         removals.push(part.clone());
-        let relationships = part.rels_uri().map_err(OpcError::InvalidPackUri)?;
-        removals.push(relationships);
+        if include_relationships {
+            let relationships = part.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            removals.push(relationships);
+        }
     }
     removals
         .sort_unstable_by(|left, right| cmp_ascii_case_insensitive(left.as_str(), right.as_str()));
@@ -381,7 +431,8 @@ pub(crate) fn without_part_overrides(
         })?;
     loop {
         let start = content_types_offset(&reader, origin)?;
-        let event = reader.read_event()?;
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let is_opc_namespace = is_opc_content_types_namespace(&resolved_namespace);
         let end = content_types_offset(&reader, origin)?;
         if end < start || end > source.bytes().len() {
             return Err(OpcError::InvalidContentTypesManifest(
@@ -390,7 +441,9 @@ pub(crate) fn without_part_overrides(
         }
         match event {
             Event::Start(element) => {
-                if depth == 1 && element.local_name().as_ref() == b"Override" {
+                if depth == 1
+                    && is_opc_content_types_element(is_opc_namespace, &element, b"Override")
+                {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "non-empty content-type Overrides are unsupported for source removal"
                             .into(),
@@ -402,13 +455,21 @@ pub(crate) fn without_part_overrides(
                     )
                 })?;
             },
-            Event::Empty(element) if depth == 1 && element.local_name().as_ref() == b"Override" => {
+            Event::Empty(element)
+                if depth == 1
+                    && is_opc_content_types_element(is_opc_namespace, &element, b"Override") =>
+            {
                 let mut part_name = None;
                 for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| {
                         OpcError::InvalidContentTypesManifest(error.to_string())
                     })?;
-                    if attribute.key.as_ref() == b"PartName" {
+                    if attribute.key.as_ref() == b"PartName"
+                        && matches!(
+                            reader.resolver().resolve_attribute(attribute.key).0,
+                            ResolveResult::Unbound
+                        )
+                    {
                         let value = attribute
                             .decoded_and_normalized_value(
                                 quick_xml::XmlVersion::Implicit1_0,
@@ -458,13 +519,32 @@ pub(crate) fn without_part_overrides(
     source.update_elements(&updates, maximum)
 }
 
+fn is_opc_content_types_namespace(resolved_namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        resolved_namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::constants::namespace::OPC_CONTENT_TYPES.as_bytes()
+    )
+}
+
+fn is_opc_content_types_element(
+    is_opc_namespace: bool,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> bool {
+    is_opc_namespace && element.local_name().as_ref() == local_name
+}
+
 pub(crate) fn preflight_part_overrides(
     source: &OwnedXmlPart,
     overrides: &[(&PackURI, &str)],
     max_output_bytes: usize,
 ) -> Result<(usize, usize)> {
-    let limits = ReadLimits::default();
-    let maximum = max_output_bytes.min(limits.max_content_types_bytes());
+    let limits = source.limits();
+    let maximum = max_output_bytes
+        .min(limits.max_content_types_bytes())
+        .min(usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX))
+        .min(usize::try_from(limits.max_entry_bytes()).unwrap_or(usize::MAX));
     if source.bytes().len() > maximum {
         return Err(OpcError::InvalidContentTypesManifest(
             "content-types source exceeds the requested output limit".into(),
@@ -555,11 +635,12 @@ pub(crate) fn with_part_overrides(
     let mut root_empty = false;
     loop {
         let start = content_types_offset(&reader, origin)?;
-        let event = reader.read_event()?;
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let is_opc_namespace = is_opc_content_types_namespace(&resolved_namespace);
         let end = content_types_offset(&reader, origin)?;
         match event {
             Event::Start(element) if depth == 0 => {
-                if element.local_name().as_ref() != b"Types" {
+                if !is_opc_content_types_element(is_opc_namespace, &element, b"Types") {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content-types root must be Types".into(),
                     ));
@@ -569,7 +650,7 @@ pub(crate) fn with_part_overrides(
                 depth = 1;
             },
             Event::Empty(element) if depth == 0 => {
-                if element.local_name().as_ref() != b"Types" {
+                if !is_opc_content_types_element(is_opc_namespace, &element, b"Types") {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content-types root must be Types".into(),
                     ));
@@ -683,10 +764,11 @@ pub(crate) fn with_part_overrides(
         append_override_bytes(&mut bytes, &element_name, overrides);
     }
     bytes.extend_from_slice(&source.bytes()[range.end..]);
-    OwnedXmlPart::capture(
+    OwnedXmlPart::capture_with_limits(
         source.name.clone(),
         source.content_type.clone(),
         SharedArc::new(bytes),
+        source.limits(),
     )
 }
 
@@ -806,6 +888,23 @@ mod tests {
     }
 
     #[test]
+    fn foreign_override_namespace_is_opaque_to_source_removal() {
+        let bytes = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types" xmlns:x="urn:vendor"><x:Override PartName="/word/drop.xml" ContentType="application/x-vendor"/><Override PartName="/word/drop.xml" ContentType="application/xml"/></Types>"#;
+        let source = OwnedXmlPart::capture(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".into(),
+            std::sync::Arc::new(bytes.to_vec()),
+        )
+        .unwrap();
+        let output =
+            without_part_overrides_only(&source, &[PackURI::new("/word/drop.xml").unwrap()], 1024)
+                .unwrap();
+        let output = std::str::from_utf8(output.bytes()).unwrap();
+        assert!(output.contains("<x:Override PartName=\"/word/drop.xml\""));
+        assert!(!output.contains("ContentType=\"application/xml\""));
+    }
+
+    #[test]
     fn adds_overrides_without_normalizing_unrelated_manifest_bytes() {
         let source = OwnedXmlPart::capture(
             PackURI::new("/[Content_Types].xml").unwrap(),
@@ -839,7 +938,7 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
@@ -850,11 +949,11 @@ mod tests {
             content_type: "application/octet-stream",
         }];
         let plan = token
-            .plan_edit_with_defaults(&edits, &[dropped], &["svg"], ReadLimits::default())
+            .plan_edit_with_defaults(&edits, &[dropped], &["svg"], SourceLimits::default())
             .unwrap();
         assert_eq!(plan.mapping_count(), 2);
         let exact = plan.final_len().max(token.bytes().len());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_content_types_bytes(exact)
             .unwrap()
             .max_part_bytes(exact as u64)
@@ -890,7 +989,7 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
@@ -899,15 +998,19 @@ mod tests {
             part_name: &existing,
             content_type: "application/new",
         }];
-        assert!(token.plan_edit(&edit, &[], ReadLimits::default()).is_err());
+        assert!(
+            token
+                .plan_edit(&edit, &[], SourceLimits::default())
+                .is_err()
+        );
         let after = token
             .plan_edit(
                 &edit,
                 std::slice::from_ref(&existing),
-                ReadLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap()
-            .materialize(ReadLimits::default())
+            .materialize(SourceLimits::default())
             .unwrap();
         let text = std::str::from_utf8(after.bytes()).unwrap();
         assert!(text.contains("ContentType=\"application/new\""));
@@ -925,15 +1028,15 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
         let spaced = [" \tSVG\r\n"];
         let after = token
-            .plan_edit_with_defaults(&[], &[], &spaced, ReadLimits::default())
+            .plan_edit_with_defaults(&[], &[], &spaced, SourceLimits::default())
             .unwrap()
-            .materialize(ReadLimits::default())
+            .materialize(SourceLimits::default())
             .unwrap();
         assert!(
             !std::str::from_utf8(after.bytes())
@@ -944,13 +1047,13 @@ mod tests {
         let nbsp = ["\u{00a0}svg"];
         assert!(
             token
-                .plan_edit_with_defaults(&[], &[], &nbsp, ReadLimits::default())
+                .plan_edit_with_defaults(&[], &[], &nbsp, SourceLimits::default())
                 .is_err()
         );
         let duplicate = [" svg ", "SVG\n"];
         assert!(
             token
-                .plan_edit_with_defaults(&[], &[], &duplicate, ReadLimits::default())
+                .plan_edit_with_defaults(&[], &[], &duplicate, SourceLimits::default())
                 .is_err()
         );
     }
@@ -966,7 +1069,7 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
@@ -975,10 +1078,12 @@ mod tests {
             part_name: &added,
             content_type: "application/octet-stream",
         }];
-        let plan = token.plan_edit(&edits, &[], ReadLimits::default()).unwrap();
+        let plan = token
+            .plan_edit(&edits, &[], SourceLimits::default())
+            .unwrap();
         assert_eq!(plan.event_count(), 4);
         let exact = plan.final_len().max(token.bytes().len());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_content_types_bytes(exact)
             .unwrap()
             .max_part_bytes(exact as u64)
@@ -995,7 +1100,7 @@ mod tests {
                 .unwrap()
                 .contains("</ct:Types>")
         );
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_content_types_bytes(exact - 1)
             .unwrap()
             .max_part_bytes((exact - 1) as u64)
@@ -1049,6 +1154,35 @@ mod tests {
             with_part_overrides(&source, &[(&part, "application/inkml+xml")], 4096).unwrap();
         let text = std::str::from_utf8(output.bytes()).unwrap();
         assert!(text.ends_with("<!--tail--><?keep?>\n"));
+    }
+
+    #[test]
+    fn content_type_token_keeps_source_policy_for_authored_overrides() {
+        let bytes = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        let limits = SourceLimits::builder()
+            .max_content_types_bytes(bytes.len())
+            .unwrap()
+            .max_part_bytes(bytes.len() as u64)
+            .unwrap()
+            .max_entry_bytes(bytes.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let xml = OwnedXmlPart::capture_with_limits(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".to_owned(),
+            SharedArc::new(bytes.to_vec()),
+            limits,
+        )
+        .unwrap();
+        let binding =
+            SharedArc::new(crate::content_type::ContentTypeMap::from_xml(bytes, limits).unwrap());
+        let source = super::super::OwnedContentTypes { xml, binding };
+        let part = PackURI::new("/word/new.xml").unwrap();
+        assert!(
+            with_part_overrides(&source.xml, &[(&part, "application/xml")], usize::MAX,).is_err()
+        );
+        assert_eq!(source.xml.limits(), limits);
     }
 
     #[test]
@@ -1141,3 +1275,9 @@ mod tests {
         ));
     }
 }
+
+mod fragments;
+pub use fragments::{
+    ContentTypeFragment, ContentTypeFragmentEdit, ContentTypeFragmentKey, ContentTypeFragmentPlan,
+    ContentTypeFragments,
+};

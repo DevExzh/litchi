@@ -37,12 +37,13 @@
 //! Covers the full header kind set (odd/even/first-page), the automatic
 //! section flags (DOP fFacingPages, SEP sprmSFTitlePage), and the header
 //! picture pipeline (PICF block + PlcfSpaHdr + header-drawing picture frame).
+use litchi_doc::builder::Builder;
 use litchi_doc::shape::extract_drawing_shapes;
-use litchi_doc::writer::{FloatingPosition, Picture, Writer};
+use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
-    HeaderFooterParagraph, HeaderFooterType, HeaderKind, Package, ShapeHorizontalOrigin,
-    ShapeTextWrap, ShapeVerticalOrigin,
+    HeaderFooterParagraph, HeaderFooterType, HeaderKind, ShapeHorizontalOrigin, ShapeTextWrap,
+    ShapeVerticalOrigin, raw::Reader,
 };
 use litchi_odraw::shape::Kind;
 use std::io::{Cursor, Write};
@@ -96,7 +97,7 @@ fn jpeg_fixture() -> Vec<u8> {
 }
 
 fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body text").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("OddH")])
@@ -121,14 +122,14 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     cursor.into_inner()
 }
 
 #[test]
 fn even_and_first_page_header_text_boxes_round_trip() {
     let doc_bytes = write_doc_with_even_and_first_boxes();
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     assert!(document.text().unwrap().contains("Body text"));
@@ -183,7 +184,11 @@ fn even_and_first_page_header_text_boxes_round_trip() {
     assert_eq!(first.text(), "\u{8}\r\r");
 
     // Drawing layer: rectangle and ellipse with header-cluster spids.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let rectangle = shapes.iter().find(|s| s.shape_id == 2049).unwrap();
     assert_eq!(rectangle.shape_type, Kind::TextBox);
@@ -201,7 +206,11 @@ fn even_and_first_headers_set_section_flags() {
     use litchi_doc::parts::fib::FileInformationBlock;
 
     let doc_bytes = write_doc_with_even_and_first_boxes();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
@@ -226,7 +235,7 @@ fn even_and_first_headers_set_section_flags() {
 fn header_picture_round_trips_with_byte_identical_payload() {
     let png_bytes = make_png(32, 16);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     writer
         .insert_header_picture(
@@ -244,10 +253,10 @@ fn header_picture_round_trips_with_byte_identical_payload() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     // Two picture runs (the main-story floating JPEG anchor and the header
@@ -284,7 +293,11 @@ fn header_picture_round_trips_with_byte_identical_payload() {
     assert_eq!((spa.width(), spa.height()), (480, 240));
 
     // Drawing layer: the header picture frame plus the main one.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let header_pic = shapes.iter().find(|s| s.shape_id == 2049).unwrap();
     assert_eq!(header_pic.shape_type, Kind::Picture);

@@ -34,7 +34,7 @@ use std::{
 
 use litchi_core::{FileSource, OwnedSource, ReadAt, SourceVersion};
 use litchi_docx::{Package as OwnedPackage, source_backed::Package as SourcePackage};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -46,7 +46,7 @@ use crate::pptx_range_source::{
 
 const SCHEMA: &str = "docx_provider_lifecycle_v1";
 const TRACE_SCHEMA: &str = "docx_provider_lifecycle_v2";
-const TRACE_TIMING_SCOPE: &str = "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + two cache diagnostic snapshots + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, range counters and traces are outside";
+const TRACE_TIMING_SCOPE: &str = "Package::from_read_at_with_options + document + extract_text + two cache diagnostic snapshots + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, range counters and traces are outside";
 const TRACE_SETUP_SCOPE: &str = "all v1 setup plus fresh bounded read-ahead buffer and wrapper construction outside the clock; fixed window capacity is reported separately; unmanaged benchmark pilot only";
 const CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const CORPUS_VERSION: &str = "0188-media-v1";
@@ -67,7 +67,7 @@ const CACHE_MAX_ENTRIES: usize = 128;
 const MAX_TRACKED_RANGES: usize = 4_096;
 
 const PROVIDER_SCOPE: &str = "typed-owner source-backed DOCX provider baseline; direct comparison with the high-level filesystem facade is out of scope";
-const TIMING_SCOPE: &str = "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, counters, and diagnostics are outside";
+const TIMING_SCOPE: &str = "Package::from_read_at_with_options + document + extract_text + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, counters, and diagnostics are outside";
 const SETUP_SCOPE: &str = "corpus construction, source hashing, file staging, FileSource::open, instrumented wrapper construction, range-adapter construction, and limits construction are outside the clock";
 const FILE_SCOPE: &str = "FileSource is opened before each iteration and the staged file is recently written; this is a warm-cache/recent-file provider observation, not a filesystem-cold result";
 const READ_SCOPE: &str = "logical ReadAt calls observed by the named wrapper; counters are not physical filesystem or network I/O observations";
@@ -150,12 +150,12 @@ impl From<SourceVersion> for SourceVersionRecord {
 #[derive(Clone, Copy, Debug, Serialize)]
 struct LimitsRecord {
     max_input_bytes: u64,
-    max_archive_members: usize,
+    max_members: usize,
     max_archive_member_name_bytes: u64,
     max_archive_metadata_bytes: u64,
     max_archive_compressed_bytes: u64,
-    max_archive_entry_bytes: u64,
-    max_archive_total_bytes: u64,
+    max_entry_bytes: u64,
+    max_aggregate_bytes: u64,
     max_parts: usize,
     max_part_bytes: u64,
     max_total_part_bytes: u64,
@@ -167,9 +167,9 @@ struct LimitsRecord {
     max_relationships_per_part: usize,
     max_total_relationships: usize,
     max_relationship_graph_nodes: usize,
-    max_xml_events: usize,
+    max_events: usize,
     max_total_relationship_xml_events: usize,
-    max_xml_depth: usize,
+    max_depth: usize,
     max_xml_attribute_bytes: usize,
     max_relationship_target_bytes: usize,
     cache_max_bytes: usize,
@@ -177,15 +177,15 @@ struct LimitsRecord {
 }
 
 impl LimitsRecord {
-    fn from_limits(limits: ReadLimits, cache: SourceCacheLimits) -> Self {
+    fn from_limits(limits: SourceLimits, cache: SourceCacheLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
-            max_archive_members: limits.max_archive_members(),
+            max_members: limits.max_members(),
             max_archive_member_name_bytes: limits.max_archive_member_name_bytes(),
             max_archive_metadata_bytes: limits.max_archive_metadata_bytes(),
             max_archive_compressed_bytes: limits.max_archive_compressed_bytes(),
-            max_archive_entry_bytes: limits.max_archive_entry_bytes(),
-            max_archive_total_bytes: limits.max_archive_total_bytes(),
+            max_entry_bytes: limits.max_entry_bytes(),
+            max_aggregate_bytes: limits.max_aggregate_bytes(),
             max_parts: limits.max_parts(),
             max_part_bytes: limits.max_part_bytes(),
             max_total_part_bytes: limits.max_total_part_bytes(),
@@ -197,9 +197,9 @@ impl LimitsRecord {
             max_relationships_per_part: limits.max_relationships_per_part(),
             max_total_relationships: limits.max_total_relationships(),
             max_relationship_graph_nodes: limits.max_relationship_graph_nodes(),
-            max_xml_events: limits.max_xml_events(),
+            max_events: limits.max_events(),
             max_total_relationship_xml_events: limits.max_total_relationship_xml_events(),
-            max_xml_depth: limits.max_xml_depth(),
+            max_depth: limits.max_depth(),
             max_xml_attribute_bytes: limits.max_xml_attribute_bytes(),
             max_relationship_target_bytes: limits.max_relationship_target_bytes(),
             cache_max_bytes: cache.max_bytes(),
@@ -779,7 +779,7 @@ fn run_sample(
     corpus: &Corpus,
     file_path: Option<&Path>,
     sample_index: usize,
-    limits: ReadLimits,
+    limits: SourceLimits,
     cache: SourceCacheLimits,
 ) -> Result<SampleRecord, Box<dyn Error>> {
     let provider = provider(config, &corpus.bytes, file_path)?;
@@ -787,10 +787,11 @@ fn run_sample(
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
     let (actual_text, cache_record) = {
-        let package = SourcePackage::from_read_at_with_limits_and_cache_limits(
+        let package = SourcePackage::from_read_at_with_options(
             Arc::clone(&provider.source),
-            limits,
-            cache,
+            litchi_docx::OpenOptions::default()
+                .source_limits(limits)
+                .cache_limits(cache),
         )?;
         let open_cache = config.trace_ranges.then(|| package.cache_diagnostics());
         let document = package.document()?;
@@ -1173,7 +1174,7 @@ pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box
     let corpus = build_corpus()?;
     let staged = (config.provider == ProviderKind::File).then(|| stage_file(&corpus.bytes));
     let staged = staged.transpose()?;
-    let limits = ReadLimits::default();
+    let limits = SourceLimits::default();
     let cache = SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?;
     let mut rows = Vec::with_capacity(config.samples);
     for iteration in 0..config.warmup.saturating_add(config.samples) {
@@ -1355,7 +1356,7 @@ mod tests {
     #[test]
     fn read_ahead_lifecycle_preserves_text_and_reports_physical_overfetch() {
         let corpus = build_corpus().expect("accepted corpus");
-        let limits = ReadLimits::default();
+        let limits = SourceLimits::default();
         let cache = SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).expect("cache");
         let baseline =
             run_sample(&trace_config(&[]), &corpus, None, 0, limits, cache).expect("baseline");
@@ -1440,13 +1441,14 @@ mod tests {
 
     #[test]
     fn source_change_is_rejected_by_the_typed_owner() {
-        let mut package = OwnedPackage::new().expect("small DOCX package");
-        package
-            .document_mut()
+        let mut builder = litchi_docx::Builder::new().expect("small DOCX package");
+        builder
+            .document()
             .expect("document")
             .add_paragraph_with_text("source-change");
+        let package = builder.build().expect("finalized DOCX package");
         let mut bytes = Cursor::new(Vec::new());
-        package.to_stream(&mut bytes).expect("serialize DOCX");
+        package.write_to(&mut bytes).expect("serialize DOCX");
         let source: Arc<dyn ReadAt> = Arc::new(ChangingSource {
             inner: OwnedSource::new(bytes.into_inner()),
             reads: AtomicUsize::new(0),

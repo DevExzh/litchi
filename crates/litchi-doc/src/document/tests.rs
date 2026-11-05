@@ -2,22 +2,37 @@
 
 #[cfg(test)]
 mod lazy_auxiliary_tests {
-    use crate::package::Package;
+    use crate::builder::Builder;
     use crate::parts::fib::FileInformationBlock;
-    use crate::tracked_revision::Limits;
-    use crate::writer::Writer;
-    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+    use crate::raw::Reader;
+    use litchi_ole_common::object::{
+        Edit as PackageEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+    };
     use std::io::Cursor;
+
+    fn open_object(bytes: Vec<u8>) -> PackageEditor {
+        ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .unwrap()
+        .edit()
+        .unwrap()
+    }
 
     #[test]
     fn malformed_optional_auxiliary_tables_are_deferred_until_access() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Body").expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("fixture DOC");
-        let mut package =
-            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-                .expect("fixture package");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("fixture DOC");
+        let mut package = open_object(output.into_inner());
         let word_path = ["WordDocument".to_string()];
         let mut word = package
             .stream(&word_path)
@@ -39,14 +54,14 @@ mod lazy_auxiliary_tests {
         package
             .put_stream(&word_path, word)
             .expect("malformed optional pointers");
-        let bytes = package.finish().expect("fixture package finish");
+        let bytes = crate::package::object_edit_bytes(&package).expect("fixture package finish");
 
-        let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+        let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package
             .document()
             .expect("unrelated document open must not parse optional tables");
-        assert!(document.paragraph_groups_source.is_err());
-        assert!(document.dofr_records_source.is_err());
+        assert!(document.0.paragraph_groups_source.is_err());
+        assert!(document.0.dofr_records_source.is_err());
         assert!(document.saved_selection().is_err());
         let paragraph_error = document
             .paragraph_groups()
@@ -83,13 +98,15 @@ mod lazy_auxiliary_tests {
 
     #[test]
     fn deferred_auxiliary_sources_retain_only_selected_ranges() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Body").expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("fixture DOC");
-        let mut package =
-            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-                .expect("fixture package");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("fixture DOC");
+        let mut package = open_object(output.into_inner());
         let word_path = ["WordDocument".to_string()];
         let mut word = package
             .stream(&word_path)
@@ -125,11 +142,12 @@ mod lazy_auxiliary_tests {
         word[pointer + 4..pointer + 8]
             .copy_from_slice(&(u32::try_from(pgp.len()).expect("PGP length")).to_le_bytes());
         package.put_stream(&word_path, word).expect("PGP pointer");
-        let bytes = package.finish().expect("fixture package finish");
+        let bytes = crate::package::object_edit_bytes(&package).expect("fixture package finish");
 
-        let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+        let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package.document().expect("document open");
         let source = document
+            .0
             .paragraph_groups_source
             .as_ref()
             .expect("PGP range capture")
@@ -144,7 +162,7 @@ mod lazy_auxiliary_tests {
                 .expect("PGP metadata")
                 .is_empty()
         );
-        assert!(matches!(&document.dofr_records_source, Ok(None)));
+        assert!(matches!(&document.0.dofr_records_source, Ok(None)));
     }
 }
 
@@ -177,9 +195,10 @@ mod owned_mtef_tests {
     }
 }
 
-use crate::package::{Error as PackageError, Package};
+use crate::package::Error as PackageError;
 use crate::parts::fib::WORD_97_NFIB;
-use crate::{Image, ImageError, Writer};
+use crate::raw::Reader;
+use crate::{Builder, Image, ImageError};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -196,16 +215,17 @@ fn test_extract_png_image_from_doc() {
         .join("doc")
         .join("PngPicture.doc");
 
-    let mut pkg = Package::open(&doc_path).expect("open doc");
+    let mut pkg = Reader::open(&doc_path).expect("open doc");
     let doc = pkg.document().expect("load document");
     const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     let mut found_signature = doc
+        .0
         .word_document
         .windows(PNG_SIGNATURE.len())
         .any(|window| window == PNG_SIGNATURE);
 
-    if let Some(data_stream) = doc.data_stream.as_ref() {
+    if let Some(data_stream) = doc.0.data_stream.as_ref() {
         found_signature |= data_stream
             .windows(PNG_SIGNATURE.len())
             .any(|window| window == PNG_SIGNATURE);
@@ -219,11 +239,11 @@ fn test_extract_png_image_from_doc() {
 
 #[test]
 fn opened_document_exposes_versioned_document_properties() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().expect("load document");
     let properties = document
         .document_properties()
@@ -255,7 +275,7 @@ fn test_image_data_with_invalid_offset() {
         .join("doc")
         .join("PngPicture.doc");
 
-    let mut pkg = Package::open(&doc_path).expect("open doc");
+    let mut pkg = Reader::open(&doc_path).expect("open doc");
     let doc = pkg.document().expect("load document");
 
     let img = Image::new(u32::MAX);
@@ -272,7 +292,7 @@ fn test_image_data_with_invalid_offset() {
 fn word_6_documents_report_their_version_not_a_missing_stream() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/doc/word6-no-table-stream.doc");
-    let mut package = Package::open(&path).expect("the CFB container opens");
+    let mut package = Reader::open(&path).expect("the CFB container opens");
 
     match package.document() {
         Err(PackageError::UnsupportedVersion { nfib, name }) => {

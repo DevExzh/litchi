@@ -1,5 +1,6 @@
 use super::{Condition, ConditionSource, Expression, Key, Order, Range, Rule, Rules, Sort, Source};
-use crate::{Builder, MutableSpreadsheet, Spreadsheet};
+use crate::{Builder, Workbook, builder::Workbook as Draft};
+use litchi_odf_common::XmlStreamLimits;
 use std::io::{Cursor, Read, Write};
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:v="urn:example:vendor"><office:body><office:spreadsheet><t:table t:name="Input"/><t:database-ranges><t:database-range t:name="Sales" t:target-range-address="Input.A1:Input.B20"><t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/><t:filter t:condition-source="self"><t:filter-condition t:field-number="0" t:value="East" t:operator="="/></t:filter><t:sort><t:sort-by t:field-number="1" t:order="descending"/></t:sort><t:subtotal-rules><t:subtotal-rule t:group-by-field-number="0"><t:subtotal-field t:field-number="1" t:function="sum"/></t:subtotal-rule></t:subtotal-rules></t:database-range></t:database-ranges><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
@@ -10,6 +11,8 @@ fn package(xml: &str) -> Vec<u8> {
     Builder::new()
         .content_xml(xml)
         .build()
+        .expect("test fixture or operation should succeed")
+        .to_bytes()
         .expect("test fixture or operation should succeed")
 }
 
@@ -106,14 +109,15 @@ fn known_parent_fixture(parent: &str, child: &str) -> String {
 }
 
 fn assert_contextual_change_is_refused(xml: &str) {
-    let location = super::codec::locate(xml).expect("context fixture should be well formed");
+    let location = super::codec::locate(xml, &XmlStreamLimits::owner_default_value())
+        .expect("context fixture should be well formed");
     assert!(
         location.opaque,
         "known child context must be admitted as opaque"
     );
 
     let bytes = package(xml);
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).expect("outer package should open");
+    let spreadsheet = Workbook::from_bytes(bytes.clone()).expect("outer package should open");
     let catalog = spreadsheet.database_ranges();
     if catalog.is_err() {
         // A typed parser may refuse a malformed expression outright.  That is
@@ -122,14 +126,18 @@ fn assert_contextual_change_is_refused(xml: &str) {
         return;
     }
 
-    let mut noop = MutableSpreadsheet::from_bytes(bytes.clone()).expect("package should open");
-    let before = noop.spreadsheet().content_xml().to_owned();
+    let mut noop = Workbook::from_bytes(bytes.clone())
+        .map(Draft::from_workbook)
+        .expect("package should open");
+    let before = noop.workbook().content_xml().to_owned();
     noop.edit_database_ranges(|_| Ok(()))
         .expect("opaque no-op should preserve source");
-    assert_eq!(noop.spreadsheet().content_xml(), before);
+    assert_eq!(noop.workbook().content_xml(), before);
 
-    let mut changed = MutableSpreadsheet::from_bytes(bytes).expect("package should open");
-    let before = changed.spreadsheet().content_xml().to_owned();
+    let mut changed = Workbook::from_bytes(bytes)
+        .map(Draft::from_workbook)
+        .expect("package should open");
+    let before = changed.workbook().content_xml().to_owned();
     let result = changed.edit_database_ranges(|editor| {
         editor.update("Sales", |range| {
             range.name = Some("Changed".to_string());
@@ -140,13 +148,13 @@ fn assert_contextual_change_is_refused(xml: &str) {
         result.is_err(),
         "opaque context must refuse a changed rewrite"
     );
-    assert_eq!(changed.spreadsheet().content_xml(), before);
+    assert_eq!(changed.workbook().content_xml(), before);
 }
 
 #[test]
 fn catalog_reads_owned_filter_sort_and_subtotal_metadata() {
     let bytes = package(XML);
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).expect("fixture should open");
+    let spreadsheet = Workbook::from_bytes(bytes.clone()).expect("fixture should open");
     let catalog = spreadsheet.database_ranges().expect("catalog should parse");
     assert!(catalog.has_owner());
     assert_eq!(catalog.len(), 1);
@@ -173,11 +181,13 @@ fn catalog_reads_owned_filter_sort_and_subtotal_metadata() {
 
 #[test]
 fn clone_staged_crud_inserts_and_removes_owner_atomically() {
-    let mut mutable = MutableSpreadsheet::from_bytes(package(WITHOUT_OWNER)).expect("open");
+    let mut mutable = Workbook::from_bytes(package(WITHOUT_OWNER))
+        .map(Draft::from_workbook)
+        .expect("open");
     mutable
         .edit_database_ranges(|editor| editor.add(range("Sales")))
         .expect("insert should succeed");
-    let content = mutable.spreadsheet().content_xml();
+    let content = mutable.workbook().content_xml();
     assert!(content.contains("database-ranges"));
     assert!(content.find("database-ranges").unwrap() < content.find("t:shapes").unwrap());
     mutable
@@ -193,11 +203,13 @@ fn clone_staged_crud_inserts_and_removes_owner_atomically() {
 #[test]
 fn insertion_keeps_database_ranges_after_tracked_changes() {
     let xml = WITHOUT_OWNER.replace("<t:shapes/>", "<t:tracked-changes/><t:shapes/>");
-    let mut mutable = MutableSpreadsheet::from_bytes(package(&xml)).expect("open");
+    let mut mutable = Workbook::from_bytes(package(&xml))
+        .map(Draft::from_workbook)
+        .expect("open");
     mutable
         .edit_database_ranges(|editor| editor.add(range("Sales")))
         .expect("insertion should succeed");
-    let content = mutable.spreadsheet().content_xml();
+    let content = mutable.workbook().content_xml();
     assert!(content.find("t:tracked-changes").unwrap() < content.find("database-ranges").unwrap());
     assert!(content.find("database-ranges").unwrap() < content.find("t:shapes").unwrap());
 }
@@ -208,7 +220,10 @@ fn builder_stages_database_range_without_external_execution() {
     builder
         .add_database_range(range("Sales"))
         .expect("builder insertion should succeed");
-    let spreadsheet = Spreadsheet::from_bytes(builder.build().expect("build should succeed"))
+    let spreadsheet = builder
+        .build()
+        .expect("build should succeed")
+        .workbook()
         .expect("reopen should succeed");
     let catalog = spreadsheet.database_ranges().expect("catalog should parse");
     assert_eq!(
@@ -223,11 +238,11 @@ fn explicit_empty_owner_is_distinct_from_absence() {
         "<t:shapes/>",
         "<t:database-ranges/><!-- retained --><t:shapes/>",
     );
-    let spreadsheet = Spreadsheet::from_bytes(package(&xml)).expect("open");
+    let spreadsheet = Workbook::from_bytes(package(&xml)).expect("open");
     let catalog = spreadsheet.database_ranges().expect("catalog");
     assert!(catalog.has_owner());
     assert!(catalog.is_empty());
-    let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet);
+    let mut mutable = Draft::from_workbook(spreadsheet);
     mutable
         .edit_database_ranges(|editor| editor.add(range("Sales")))
         .expect("replace empty owner");
@@ -240,7 +255,8 @@ fn explicit_empty_owner_is_distinct_from_absence() {
 #[test]
 fn inherited_namespace_on_empty_owner_is_injected_before_close_token() {
     let xml = WITHOUT_OWNER.replace("<t:shapes/>", "<t:database-ranges/><t:shapes/>");
-    let location = super::codec::locate(&xml).expect("host should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("host should be located");
     let owner = location
         .container
         .as_ref()
@@ -251,9 +267,12 @@ fn inherited_namespace_on_empty_owner_is_injected_before_close_token() {
         "<t:database-ranges xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"/>"
     );
     assert!(
-        crate::model::database_range::parse_database_ranges(&fragment)
-            .unwrap()
-            .is_empty()
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .unwrap()
+        .is_empty()
     );
 }
 
@@ -263,14 +282,21 @@ fn owner_fragment_ignores_quoted_greater_than_in_attributes() {
         "<t:shapes/>",
         r#"<t:database-ranges t:future="quoted > marker"/><t:shapes/>"#,
     );
-    let location = super::codec::locate(&xml).expect("host should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("host should be located");
     let owner = location
         .container
         .as_ref()
         .expect("owner should be located");
     let fragment = super::codec::owner_fragment(&xml, owner).expect("owner should be sliced");
     assert!(fragment.contains("quoted > marker"));
-    assert!(crate::model::database_range::parse_database_ranges(&fragment).is_ok());
+    assert!(
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -279,14 +305,21 @@ fn owner_fragment_does_not_treat_quoted_namespace_text_as_a_declaration() {
         "<t:shapes/>",
         r#"<t:database-ranges t:future="value xmlns:t=not-a-declaration"/><t:shapes/>"#,
     );
-    let location = super::codec::locate(&xml).expect("host should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("host should be located");
     let owner = location
         .container
         .as_ref()
         .expect("owner should be located");
     let fragment = super::codec::owner_fragment(&xml, owner).expect("owner should be sliced");
     assert!(fragment.contains("xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\""));
-    assert!(crate::model::database_range::parse_database_ranges(&fragment).is_ok());
+    assert!(
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -295,12 +328,14 @@ fn unknown_owner_markup_blocks_changed_edit_but_noop_is_byte_exact() {
         "</t:database-range>",
         "<v:future v:flag=\"keep\"/><!-- future --></t:database-range>",
     );
-    let mut mutable = MutableSpreadsheet::from_bytes(package(&xml)).expect("open");
-    let before = mutable.spreadsheet().content_xml().to_owned();
+    let mut mutable = Workbook::from_bytes(package(&xml))
+        .map(Draft::from_workbook)
+        .expect("open");
+    let before = mutable.workbook().content_xml().to_owned();
     mutable
         .edit_database_ranges(|_| Ok(()))
         .expect("no-op should preserve opaque owner");
-    assert_eq!(mutable.spreadsheet().content_xml(), before);
+    assert_eq!(mutable.workbook().content_xml(), before);
     let error = mutable.edit_database_ranges(|editor| {
         editor.update("Sales", |range| {
             range.name = Some("Changed".to_string());
@@ -308,7 +343,7 @@ fn unknown_owner_markup_blocks_changed_edit_but_noop_is_byte_exact() {
         })
     });
     assert!(error.is_err());
-    assert_eq!(mutable.spreadsheet().content_xml(), before);
+    assert_eq!(mutable.workbook().content_xml(), before);
 }
 
 #[test]
@@ -317,12 +352,14 @@ fn opaque_source_leaf_comment_allows_exact_noop_but_not_changed_rewrite() {
         r#"<t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/>"#,
         r#"<t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"><!-- retained --></t:database-source-query>"#,
     );
-    let mut mutable = MutableSpreadsheet::from_bytes(package(&xml)).expect("open");
-    let before = mutable.spreadsheet().content_xml().to_owned();
+    let mut mutable = Workbook::from_bytes(package(&xml))
+        .map(Draft::from_workbook)
+        .expect("open");
+    let before = mutable.workbook().content_xml().to_owned();
     mutable
         .edit_database_ranges(|_| Ok(()))
         .expect("opaque no-op should preserve source");
-    assert_eq!(mutable.spreadsheet().content_xml(), before);
+    assert_eq!(mutable.workbook().content_xml(), before);
 
     let result = mutable.edit_database_ranges(|editor| {
         editor.update("Sales", |range| {
@@ -331,7 +368,7 @@ fn opaque_source_leaf_comment_allows_exact_noop_but_not_changed_rewrite() {
         })
     });
     assert!(result.is_err());
-    assert_eq!(mutable.spreadsheet().content_xml(), before);
+    assert_eq!(mutable.workbook().content_xml(), before);
 }
 
 #[test]
@@ -340,7 +377,7 @@ fn contextual_read_refuses_known_children_nested_under_source_leaves() {
         r#"<t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/>"#,
         r#"<t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"><t:database-source-table t:database-name="sales.odb" t:database-table-name="nested"/></t:database-source-query>"#,
     );
-    let spreadsheet = Spreadsheet::from_bytes(package(&xml)).expect("outer package should open");
+    let spreadsheet = Workbook::from_bytes(package(&xml)).expect("outer package should open");
     assert!(spreadsheet.database_ranges().is_err());
 }
 
@@ -370,7 +407,8 @@ fn every_known_parent_context_marks_wrong_table_children_opaque() {
     ];
     for (parent, child) in cases {
         let xml = known_parent_fixture(parent, child);
-        let location = super::codec::locate(&xml).expect("context fixture should be located");
+        let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+            .expect("context fixture should be located");
         assert!(
             location.opaque,
             "wrong table:{child} under table:{parent} was not opaque"
@@ -384,9 +422,10 @@ fn valid_expanded_name_parent_contexts_remain_editable() {
         r#"<t:filter-condition t:field-number="0" t:value="East" t:operator="="/>"#,
         r#"<t:filter-and><t:filter-condition t:field-number="0" t:value="East" t:operator="="><t:filter-set-item t:value="East"/></t:filter-condition><t:filter-or><t:filter-condition t:field-number="1" t:value="West" t:operator="="/></t:filter-or></t:filter-and>"#,
     );
-    let location = super::codec::locate(&xml).expect("valid context fixture should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("valid context fixture should be located");
     assert!(!location.opaque);
-    let spreadsheet = Spreadsheet::from_bytes(package(&xml)).expect("valid package should open");
+    let spreadsheet = Workbook::from_bytes(package(&xml)).expect("valid package should open");
     assert!(spreadsheet.database_ranges().is_ok());
 }
 
@@ -425,7 +464,7 @@ fn known_children_in_wrong_parents_never_silently_drop_on_public_edit() {
     for (label, xml) in cases {
         assert_contextual_change_is_refused(&xml);
         assert!(
-            super::codec::locate(&xml)
+            super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
                 .expect("context fixture should be located")
                 .opaque,
             "{label} should be opaque"
@@ -436,13 +475,20 @@ fn known_children_in_wrong_parents_never_silently_drop_on_public_edit() {
 #[test]
 fn signed_database_range_noop_is_exact_but_changed_publication_is_refused() {
     let bytes = signed_package(XML);
-    let mut noop = MutableSpreadsheet::from_bytes(bytes.clone()).expect("signed source opens");
+    let mut noop = Workbook::from_bytes(bytes.clone())
+        .map(Draft::from_workbook)
+        .expect("signed source opens");
     noop.edit_database_ranges(|_| Ok(()))
         .expect("signed no-op should be accepted");
-    assert_eq!(noop.to_bytes(), bytes);
+    assert_eq!(
+        noop.build().expect("the draft builds").as_bytes().to_vec(),
+        bytes
+    );
 
-    let mut changed = MutableSpreadsheet::from_bytes(bytes).expect("signed source opens");
-    let before = changed.spreadsheet().content_xml().to_owned();
+    let mut changed = Workbook::from_bytes(bytes)
+        .map(Draft::from_workbook)
+        .expect("signed source opens");
+    let before = changed.workbook().content_xml().to_owned();
     let result = changed.edit_database_ranges(|editor| {
         editor.update("Sales", |range| {
             range.target_range_address = "Input.A1:Input.C1".to_string();
@@ -450,7 +496,7 @@ fn signed_database_range_noop_is_exact_but_changed_publication_is_refused() {
         })
     });
     assert!(result.is_err());
-    assert_eq!(changed.spreadsheet().content_xml(), before);
+    assert_eq!(changed.workbook().content_xml(), before);
 }
 
 #[test]
@@ -462,29 +508,28 @@ fn facade_rejects_overbudget_owner_before_materializing_snapshot_graph() {
             "<t:database-ranges><t:database-range t:target-range-address=\"{oversized_target}\"/></t:database-ranges><t:shapes/>"
         ),
     );
-    let spreadsheet = Spreadsheet::from_bytes(package(&xml)).expect("facade should open source");
+    let spreadsheet = Workbook::from_bytes(package(&xml)).expect("facade should open source");
     assert!(spreadsheet.database_range_snapshot().is_err());
 }
 
 #[test]
-fn owned_snapshot_patch_inverse_and_conflict_are_atomic() -> litchi_core::Result<()> {
-    let snapshot = crate::database_range::Snapshot::from_bytes(package(WITHOUT_OWNER))?;
+fn owned_snapshot_commit_adds_the_owner() -> litchi_core::Result<()> {
+    let snapshot = crate::database_range::Snapshot::from_bytes(
+        package(WITHOUT_OWNER),
+        &XmlStreamLimits::owner_default_value(),
+    )?;
     let mut edit = snapshot.edit();
     edit.editor().add(range("Sales"))?;
     let commit = edit.commit()?;
-    assert!(commit.changed());
+    assert_ne!(commit.snapshot().as_bytes(), snapshot.as_bytes());
     assert!(commit.snapshot().has_owner());
     assert_eq!(commit.snapshot().ranges()[0].name.as_deref(), Some("Sales"));
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), snapshot.as_bytes());
-    let other = crate::database_range::Snapshot::from_bytes(package(XML))?;
-    assert!(commit.patch().apply(&other).is_err());
     Ok(())
 }
 
 #[test]
 fn failed_typed_update_leaves_staged_catalog_unchanged() {
-    let spreadsheet = Spreadsheet::from_bytes(package(WITHOUT_OWNER)).expect("open");
+    let spreadsheet = Workbook::from_bytes(package(WITHOUT_OWNER)).expect("open");
     let catalog = spreadsheet.database_ranges().expect("catalog");
     let mut transaction = catalog.transaction();
     let result = transaction.editor().update(0, |range| {

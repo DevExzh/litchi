@@ -2,7 +2,7 @@
 
 use super::invalid;
 use super::model::{CONTENT_TYPE, MAX_PART_BYTES, REL, STRICT_REL, XmlMapConformance, XmlMapInfo};
-use litchi_core::sheet::Result;
+use crate::error::Result;
 use litchi_opc::{OpcPackage, PackURI};
 
 /// Discovers and parses the single Custom XML Maps part related to the workbook.
@@ -26,7 +26,13 @@ pub fn load_from_package_with_conformance(
 /// Existing malformed XML Maps relationships are rejected before mutation. The
 /// writer never resolves inline schema references, opens bound files, or applies
 /// a mapping to worksheet cells.
-pub fn store_in_package(
+///
+/// A value and conformance equal to the stored ones publish nothing, so a
+/// signed package keeps its signature byte for byte. Any other store changes
+/// the package, so a signed package is refused with a boxed
+/// [`crate::Error::Signed`] before anything is changed: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn store_in_package(
     package: &mut OpcPackage,
     value: &XmlMapInfo,
     conformance: XmlMapConformance,
@@ -56,7 +62,11 @@ pub(super) fn store_xml_in_package(
     conformance: XmlMapConformance,
 ) -> Result<()> {
     if xml.len() > MAX_PART_BYTES {
-        return Err(invalid("custom XML maps part exceeds 32 MiB"));
+        return Err(crate::Error::limit(
+            super::LimitKind::PartBytes,
+            xml.len(),
+            MAX_PART_BYTES,
+        ));
     }
     let workbook_uri = main_workbook_uri(package)?;
     let existing = xml_maps_relationship(package, &workbook_uri)?;
@@ -64,6 +74,7 @@ pub(super) fn store_xml_in_package(
     if let Some(existing) = existing {
         validate_xml_maps_graph(package, &workbook_uri, Some(&existing))?;
         validate_xml_maps_part(package, &existing.part_name)?;
+        crate::signature_policy::ensure_unsigned(package)?;
         package
             .get_part_mut(&existing.part_name)?
             .set_blob(xml.to_vec());
@@ -82,6 +93,7 @@ pub(super) fn store_xml_in_package(
         let part_name = next_xml_maps_part_name(package)?;
         let relationship_id = next_xml_maps_relationship_id(package, &workbook_uri)?;
         let target = part_name.relative_ref(workbook_uri.base_uri());
+        crate::signature_policy::ensure_unsigned(package)?;
         package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
             part_name,
             CONTENT_TYPE.into(),
@@ -97,8 +109,6 @@ pub(super) fn store_xml_in_package(
                 false,
             );
     }
-
-    package.unsign();
     Ok(())
 }
 
@@ -106,7 +116,12 @@ pub(super) fn store_xml_in_package(
 ///
 /// No mapping is applied to worksheet data. A target that remains referenced by
 /// another package part is retained.
-pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+///
+/// A workbook without XML Maps is left untouched and returns `false`, signed
+/// or not. Removing the part changes the package, so a signed package is
+/// refused with a boxed [`crate::Error::Signed`]: remove the signature
+/// explicitly first ([`OpcPackage::unsign`]).
+pub(crate) fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     let workbook_uri = main_workbook_uri(package)?;
     let Some(existing) = xml_maps_relationship(package, &workbook_uri)? else {
         validate_xml_maps_graph(package, &workbook_uri, None)?;
@@ -114,6 +129,7 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     };
     validate_xml_maps_graph(package, &workbook_uri, Some(&existing))?;
     validate_xml_maps_part(package, &existing.part_name)?;
+    crate::signature_policy::ensure_unsigned(package)?;
 
     package
         .get_part_mut(&workbook_uri)?
@@ -122,7 +138,6 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     if !package_part_is_referenced(package, &existing.part_name) {
         package.remove_part(&existing.part_name);
     }
-    package.unsign();
     Ok(true)
 }
 
@@ -283,7 +298,7 @@ fn next_xml_maps_part_name(package: &OpcPackage) -> Result<PackURI> {
         } else {
             format!("/xl/xmlMaps{suffix}.xml")
         };
-        let candidate = PackURI::new(&name)?;
+        let candidate = PackURI::new(&name).map_err(invalid)?;
         match package.get_part(&candidate) {
             Ok(_) => {},
             Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),

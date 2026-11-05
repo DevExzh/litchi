@@ -1,0 +1,2 @@
+format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
+ppt+xls	get/query	native legs, new vs baseline build (noise bound)		after/before (native leg)				µs	1.016	0.961–1.016	none	no-budget	0263	curated:0263-registry-schema-export.md §6 'Medians of all samples': 'Native legs moved 0.961–1.016 in the same runs'	

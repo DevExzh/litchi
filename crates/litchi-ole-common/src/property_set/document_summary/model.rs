@@ -5,7 +5,7 @@ use super::super::codec::PropertySetReader;
 use super::super::model::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value, try_clone_property_set,
 };
-use super::transaction::Transaction;
+use super::transaction::Edit;
 use super::validation::validate_section;
 use crate::vba_signature;
 use litchi_cfb::{OleError, OleFile};
@@ -190,9 +190,9 @@ impl Snapshot {
     ///
     /// Returns an error if reading or parsing the stream fails, or its section
     /// does not satisfy the typed invariants.
-    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, OleError> {
+    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, crate::Error> {
         let stream = ole.property_set(Binding::DocumentSummaryInformation)?;
-        Self::from_stream(&stream)
+        Ok(Self::from_stream(&stream)?)
     }
 
     /// Borrows the complete generic section, including opaque properties.
@@ -245,13 +245,13 @@ impl Snapshot {
         self.vba_signature_with(vba_signature::Limits::default())
     }
 
-    /// Starts a source-bound transactional edit.
+    /// Starts a source-bound edit.
     ///
     /// # Errors
     ///
     /// Returns an error if the source section cannot be cloned for isolation.
-    pub fn transaction(&self) -> Result<Transaction<'_>, OleError> {
-        Transaction::from_snapshot(self)
+    pub fn edit(&self) -> Result<Edit<'_>, OleError> {
+        Edit::from_snapshot(self)
     }
 
     /// Consumes the view and returns its complete generic section.

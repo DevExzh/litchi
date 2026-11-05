@@ -23,7 +23,7 @@ impl Revision {
 
 /// Reversible, exact-source whole-CFB patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     pub(crate) base: Revision,
     pub(crate) target: Revision,
     pub(crate) before: Arc<[u8]>,
@@ -32,29 +32,33 @@ pub struct Patch {
     pub(crate) limits: PackageLimits,
 }
 
+#[allow(
+    dead_code,
+    reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+)]
 impl Patch {
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         &self.before
     }
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         &self.after
     }
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before == self.after
     }
 
@@ -63,7 +67,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() == self.target && current.bytes() == self.after.as_ref() {
             return Ok(current.clone());
         }
@@ -81,7 +85,7 @@ impl Patch {
     ///
     /// Returns an error if `current` is neither the base source nor the exact
     /// already-applied target of this patch.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
@@ -91,7 +95,7 @@ impl Patch {
     ///
     /// Returns an error if `current` is neither the target nor the exact base
     /// source of this patch.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() == self.base && current.bytes() == self.before.as_ref() {
             return Ok(current.clone());
         }
@@ -104,7 +108,7 @@ impl Patch {
     }
 
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         let mut changes = self.changes.clone();
         changes.reverse();
         Self {

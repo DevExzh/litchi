@@ -1,0 +1,56 @@
+[
+  {
+    "median_us": 3524.4426,
+    "min_us": 3515.4928,
+    "samples": 31,
+    "scenario": "doc/source_set"
+  },
+  {
+    "median_us": 1579478.631,
+    "min_us": 1071697.276,
+    "samples": 7,
+    "scenario": "doc/batch1k_ops"
+  },
+  {
+    "median_us": 1509616.193,
+    "min_us": 1459584.115,
+    "samples": 7,
+    "scenario": "doc/batch1k_leaf"
+  },
+  {
+    "median_us": 208.8792,
+    "min_us": 207.85920000000002,
+    "samples": 31,
+    "scenario": "xls/source_cells1"
+  },
+  {
+    "median_us": 263.05740000000003,
+    "min_us": 261.4316,
+    "samples": 31,
+    "scenario": "xls/source_cells100"
+  },
+  {
+    "median_us": 1207.895,
+    "min_us": 1204.9127999999998,
+    "samples": 31,
+    "scenario": "xls/source_comments1"
+  },
+  {
+    "median_us": 1731.018,
+    "min_us": 1717.538,
+    "samples": 31,
+    "scenario": "xls/source_comments256"
+  },
+  {
+    "median_us": 66.9484,
+    "min_us": 66.3424,
+    "samples": 31,
+    "scenario": "xls/source_hide7"
+  },
+  {
+    "median_us": 299.19780000000003,
+    "min_us": 297.5856,
+    "samples": 31,
+    "scenario": "rtf/source_append"
+  }
+]

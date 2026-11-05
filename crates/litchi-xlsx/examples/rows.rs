@@ -1,11 +1,9 @@
 use std::env;
 use std::error::Error;
 
-use litchi_xlsx::Workbook;
-
 fn main() -> Result<(), Box<dyn Error>> {
     let output = env::args().nth(1).ok_or("usage: rows <output.xlsx>")?;
-    let source = Workbook::new()?;
+    let source = litchi_xlsx::Package::new()?;
     let mut edit = source.edit()?;
     let mut sheet = edit.sheet("Sheet1")?.ok_or("missing Sheet1")?;
     sheet
@@ -19,7 +17,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let committed = edit.commit()?;
     let sheet = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("missing committed Sheet1")?;
     let tall = sheet.row(1)?;
@@ -28,10 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let outlined = sheet.row(3)?;
     assert_eq!(outlined.outline().get(), 1);
     assert!(outlined.collapsed());
-    committed.workbook().save(&output)?;
+    committed.package().save(&output)?;
     println!(
         "saved {} semantic changes to {output}",
-        committed.patch().len()
+        committed.patch().operation_count()
     );
     Ok(())
 }

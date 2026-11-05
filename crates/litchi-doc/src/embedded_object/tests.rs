@@ -1,17 +1,28 @@
 //! Regression tests for the DOC embedded-object model and codec.
 
 use super::Limits;
+use super::Snapshot;
 use super::codec::{discover_targets, validate_existing_fields};
 use super::model::{FieldMarker, Info, Kind};
 use super::storage::{OBJECT_POOL, is_object_storage_name};
-use super::{Snapshot, TransactionError};
-use crate::writer::Writer;
+use super::transaction::TransactionError;
+use crate::builder::Builder;
 use litchi_cfb::OleWriter;
-use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
+use litchi_ole_common::object::link::Limits as LinkLimits;
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Target, Targets,
+};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as OleStreamLimits, OleNativeStream, OlePresentationStream,
 };
 use std::io::Cursor;
+
+fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+    ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+        .unwrap()
+        .edit()
+        .unwrap()
+}
 
 #[test]
 fn object_pool_target_names_follow_decimal_storage_form() {
@@ -142,15 +153,15 @@ fn snapshot_clones_share_the_first_public_source_view_allocation() {
 }
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("embedded metadata").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     normalize_word2002_dop(output.into_inner())
 }
 
 fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(bytes, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let word = package.stream(&word_path).unwrap();
     let fib = crate::parts::fib::FileInformationBlock::parse(word).unwrap();
@@ -190,12 +201,12 @@ fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
     word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     package.put_stream(&word_path, word).unwrap();
     package.put_stream(&table_path, table).unwrap();
-    package.finish().unwrap()
+    crate::package::object_edit_bytes(&package).unwrap()
 }
 
 fn protected_doc(source: Vec<u8>) -> Vec<u8> {
     const DOP_INDEX: usize = 31;
-    let mut package = ObjectEditor::open(source, Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(source, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let table_name = {
         let word = package.stream(&word_path).unwrap();
@@ -221,7 +232,7 @@ fn protected_doc(source: Vec<u8>) -> Vec<u8> {
     word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     package.put_stream(&word_path, word).unwrap();
     package.put_stream(&table_path, table).unwrap();
-    package.finish().unwrap()
+    crate::package::object_edit_bytes(&package).unwrap()
 }
 
 fn picture_data(marker: u32) -> Vec<u8> {
@@ -292,14 +303,18 @@ fn ole2_test_object(marker: u8) -> Vec<u8> {
     let presentation = OlePresentationStream::new(
         ClipboardFormat::Standard(CF_DIB),
         [marker, marker.wrapping_add(1)],
+        OleStreamLimits::default(),
     )
     .unwrap()
-    .to_bytes()
+    .to_bytes(litchi_ole_common::ole_streams::Limits::default())
     .unwrap();
-    let native = OleNativeStream::new([marker.wrapping_add(2), marker.wrapping_add(3)])
-        .unwrap()
-        .to_bytes()
-        .unwrap();
+    let native = OleNativeStream::new(
+        [marker.wrapping_add(2), marker.wrapping_add(3)],
+        OleStreamLimits::default(),
+    )
+    .unwrap()
+    .to_bytes(litchi_ole_common::ole_streams::Limits::default())
+    .unwrap();
     object_cfb_with_ole2_streams(
         &comp_obj,
         &ole,
@@ -388,6 +403,48 @@ fn malformed_known_metadata_remains_lossless_unknown_bytes() {
 }
 
 #[test]
+fn public_object_callback_preserves_typed_failure_and_discards_candidate() {
+    use litchi_ole_common::{Error as ObjectError, LimitKind};
+    let mut editor = super::Editor::open(base_doc(), Limits::default()).unwrap();
+    editor
+        .add(super::WriteOptions::new(
+            77,
+            object_cfb(
+                &crate::writer::ole_metadata::generate_compobj_stream(),
+                &crate::writer::ole_metadata::generate_ole_stream(),
+                &[0, 0, 3, 0, 0, 0],
+                &[],
+            ),
+            picture_data(77),
+        ))
+        .unwrap();
+    let bytes = editor.finish().unwrap();
+    let source = crate::Package::from_bytes(&bytes).unwrap();
+    let mut edit = source.edit_embedded_objects().unwrap();
+    let error = edit
+        .update_link(77, LinkLimits::default(), |link| {
+            link.set_cache_hint(true);
+            Err(ObjectError::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: 2,
+                maximum: 1,
+            })
+        })
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        super::Error::Package(crate::Error::Object(ObjectError::Limit {
+            kind: LimitKind::StreamBytes,
+            observed: 2,
+            maximum: 1,
+        }))
+    ));
+    let committed = edit.commit().unwrap();
+    assert!(committed.patch().is_noop());
+    assert_eq!(committed.package().to_bytes().unwrap(), bytes);
+}
+
+#[test]
 fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
     let mut comp_obj = crate::writer::ole_metadata::generate_compobj_stream();
     comp_obj.extend_from_slice(&[0xA1, 0xB2, 0xC3]);
@@ -408,7 +465,7 @@ fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
 
     let mut transaction = source.edit();
     transaction
-        .update_link(77, |link| {
+        .update_link(77, LinkLimits::default(), |link| {
             link.set_cache_hint(true);
             Ok(())
         })
@@ -457,7 +514,11 @@ fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
         0x1000
     );
 
-    let mut ole_file = litchi_cfb::OleFile::open(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let mut ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(commit.snapshot().bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole_file
             .open_stream(&["ObjectPool", "_77", "VendorMetadata"])
@@ -489,14 +550,17 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
     let ole = crate::writer::ole_metadata::generate_ole_stream();
     let obj_info = [0x00, 0x00, 0x03, 0x00, 0x00, 0x00];
     let unknown = [0xFA, 0xCE, 0xD0, 0x0C];
-    let presentation =
-        OlePresentationStream::new(ClipboardFormat::Standard(CF_DIB), [0x10, 0x20, 0x30])
-            .unwrap()
-            .to_bytes()
-            .unwrap();
-    let native = OleNativeStream::new([0x40, 0x50, 0x60])
+    let presentation = OlePresentationStream::new(
+        ClipboardFormat::Standard(CF_DIB),
+        [0x10, 0x20, 0x30],
+        OleStreamLimits::default(),
+    )
+    .unwrap()
+    .to_bytes(OleStreamLimits::default())
+    .unwrap();
+    let native = OleNativeStream::new([0x40, 0x50, 0x60], OleStreamLimits::default())
         .unwrap()
-        .to_bytes()
+        .to_bytes(litchi_ole_common::ole_streams::Limits::default())
         .unwrap();
 
     let mut editor = super::Editor::open(base_doc(), Limits::default()).unwrap();
@@ -517,22 +581,40 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
     let source = Snapshot::open(editor.finish().unwrap(), Limits::default()).unwrap();
     let reference = source.objects().unwrap().into_iter().next().unwrap();
 
-    let source_presentation = source.presentation(77, 0).unwrap().unwrap();
+    let source_presentation = source
+        .presentation(77, 0, litchi_ole_common::ole_streams::Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(source_presentation.data(), [0x10, 0x20, 0x30]);
     assert_eq!(
         source
-            .presentation_for(&reference, 0)
+            .presentation_for(
+                &reference,
+                0,
+                litchi_ole_common::ole_streams::Limits::default()
+            )
             .unwrap()
             .unwrap()
             .bytes(),
         source_presentation.bytes()
     );
     assert_eq!(
-        source.native(77).unwrap().unwrap().data(),
+        source
+            .native(77, litchi_ole_common::ole_streams::Limits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
         [0x40, 0x50, 0x60]
     );
     assert_eq!(
-        source.native_for(&reference).unwrap().unwrap().data(),
+        source
+            .native_for(
+                &reference,
+                litchi_ole_common::ole_streams::Limits::default()
+            )
+            .unwrap()
+            .unwrap()
+            .data(),
         [0x40, 0x50, 0x60]
     );
 
@@ -541,8 +623,8 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
         max_data_bytes: 2,
         max_toc_entries: 1,
     };
-    assert!(source.presentation_with_limits(77, 0, small).is_err());
-    assert!(source.native_with_limits(77, small).is_err());
+    assert!(source.presentation(77, 0, small).is_err());
+    assert!(source.native(77, small).is_err());
 
     let mut stream_edit = source_presentation.edit();
     stream_edit.set_width(640).unwrap();
@@ -555,25 +637,45 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
         .apply_presentation_patch_for(&reference, 0, stream_commit.patch())
         .unwrap();
     transaction
-        .update_native_for(&reference, |native| {
-            native.set_data([0xCC, 0xDD]).map(|_| ())
-        })
+        .update_native_for(
+            &reference,
+            litchi_ole_common::ole_streams::Limits::default(),
+            |native| native.set_data([0xCC, 0xDD]).map(|_| ()),
+        )
         .unwrap();
     let commit = transaction.commit().unwrap();
     assert!(commit.changed());
     assert!(!commit.patch().is_noop());
     assert_eq!(
-        source.presentation(77, 0).unwrap().unwrap().data(),
+        source
+            .presentation(77, 0, litchi_ole_common::ole_streams::Limits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
         [0x10, 0x20, 0x30]
     );
     let after = commit.snapshot();
-    let after_presentation = after.presentation(77, 0).unwrap().unwrap();
+    let after_presentation = after
+        .presentation(77, 0, litchi_ole_common::ole_streams::Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(after_presentation.data(), [0xAA, 0xBB]);
     assert_eq!(after_presentation.width(), 640);
     assert_eq!(after_presentation.height(), 480);
-    assert_eq!(after.native(77).unwrap().unwrap().data(), [0xCC, 0xDD]);
+    assert_eq!(
+        after
+            .native(77, litchi_ole_common::ole_streams::Limits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
+        [0xCC, 0xDD]
+    );
 
-    let mut ole_file = litchi_cfb::OleFile::open(Cursor::new(after.bytes())).unwrap();
+    let mut ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(after.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole_file
             .open_stream(&["ObjectPool", "_77", "\u{1}CompObj"])
@@ -604,7 +706,13 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
     assert!(!typed_stale.is_changed().unwrap());
 
     let mut noop = source.edit();
-    noop.update_presentation(77, 0, |_| Ok(())).unwrap();
+    noop.update_presentation(
+        77,
+        0,
+        litchi_ole_common::ole_streams::Limits::default(),
+        |_| Ok(()),
+    )
+    .unwrap();
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.changed());
     assert!(noop_commit.patch().is_noop());
@@ -616,25 +724,39 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
     let original_presentation_data = source_presentation.data().to_vec();
     let original_presentation_width = source_presentation.width();
     let original_presentation_height = source_presentation.height();
-    let original_native_data = source.native(77).unwrap().unwrap().data().to_vec();
+    let original_native_data = source
+        .native(77, litchi_ole_common::ole_streams::Limits::default())
+        .unwrap()
+        .unwrap()
+        .data()
+        .to_vec();
     let mut reverted = source.edit();
     reverted
-        .update_presentation(77, 0, |presentation| {
-            presentation.set_width(640)?;
-            presentation.set_height(480)?;
-            presentation.set_data([0x01, 0x02])?;
-            presentation.set_width(original_presentation_width)?;
-            presentation.set_height(original_presentation_height)?;
-            presentation.set_data(original_presentation_data)?;
-            Ok(())
-        })
+        .update_presentation(
+            77,
+            0,
+            litchi_ole_common::ole_streams::Limits::default(),
+            |presentation| {
+                presentation.set_width(640)?;
+                presentation.set_height(480)?;
+                presentation.set_data([0x01, 0x02])?;
+                presentation.set_width(original_presentation_width)?;
+                presentation.set_height(original_presentation_height)?;
+                presentation.set_data(original_presentation_data)?;
+                Ok(())
+            },
+        )
         .unwrap();
     reverted
-        .update_native(77, |native| {
-            native.set_data([0x03, 0x04])?;
-            native.set_data(original_native_data)?;
-            Ok(())
-        })
+        .update_native(
+            77,
+            litchi_ole_common::ole_streams::Limits::default(),
+            |native| {
+                native.set_data([0x03, 0x04])?;
+                native.set_data(original_native_data)?;
+                Ok(())
+            },
+        )
         .unwrap();
     let reverted_commit = reverted.commit().unwrap();
     assert!(!reverted_commit.changed());
@@ -654,7 +776,11 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
         ))
         .unwrap();
     let malformed = Snapshot::open(malformed_editor.finish().unwrap(), Limits::default()).unwrap();
-    assert!(malformed.presentation(88, 0).is_err());
+    assert!(
+        malformed
+            .presentation(88, 0, litchi_ole_common::ole_streams::Limits::default())
+            .is_err()
+    );
 }
 
 #[test]
@@ -737,13 +863,22 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
 
     let mut forged_name = first.clone();
     forged_name.storage_name = second.storage_name.clone();
-    assert!(source.native_for(&forged_name).is_err());
+    assert!(
+        source
+            .native_for(
+                &forged_name,
+                litchi_ole_common::ole_streams::Limits::default()
+            )
+            .is_err()
+    );
     let mut transaction = source.edit();
     assert!(
         transaction
-            .update_native_for(&forged_name, |native| {
-                native.set_data([0xF0, 0xF1]).map(|_| ())
-            })
+            .update_native_for(
+                &forged_name,
+                litchi_ole_common::ole_streams::Limits::default(),
+                |native| { native.set_data([0xF0, 0xF1]).map(|_| ()) }
+            )
             .is_err()
     );
     assert!(!transaction.is_changed().unwrap());
@@ -751,25 +886,54 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
 
     let mut forged_id = first.clone();
     forged_id.storage_id = second.storage_id;
-    assert!(source.presentation_for(&forged_id, 0).is_err());
-    assert_eq!(source.native(77).unwrap().unwrap().data(), [0x12, 0x13]);
-    assert_eq!(source.native(88).unwrap().unwrap().data(), [0x22, 0x23]);
+    assert!(
+        source
+            .presentation_for(
+                &forged_id,
+                0,
+                litchi_ole_common::ole_streams::Limits::default()
+            )
+            .is_err()
+    );
+    assert_eq!(
+        source
+            .native(77, litchi_ole_common::ole_streams::Limits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
+        [0x12, 0x13]
+    );
+    assert_eq!(
+        source
+            .native(88, litchi_ole_common::ole_streams::Limits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
+        [0x22, 0x23]
+    );
 
     let target = Target::new("_77", [OBJECT_POOL, "_77"]).unwrap();
-    let mut object_editor = ObjectEditor::open(
+    let mut object_editor = open_object(
         source.bytes().to_vec(),
         Targets::one(target),
         Limits::default(),
-    )
-    .unwrap();
+    );
     object_editor
         .add_storage(
             Target::new("_00077", [OBJECT_POOL, "_00077"]).unwrap(),
             ole2_test_object(0x30),
         )
         .unwrap();
-    let ambiguous = Snapshot::open(object_editor.finish().unwrap(), Limits::default()).unwrap();
-    let ole_file = litchi_cfb::OleFile::open(Cursor::new(ambiguous.bytes())).unwrap();
+    let ambiguous = Snapshot::open(
+        crate::package::object_edit_bytes(&object_editor).unwrap(),
+        Limits::default(),
+    )
+    .unwrap();
+    let ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(ambiguous.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(
         ole_file
             .list_directory_entries(&[OBJECT_POOL])
@@ -784,13 +948,22 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
         .into_iter()
         .find(|reference| reference.storage_id == 77)
         .unwrap();
-    assert!(ambiguous.native_for(&ambiguous_reference).is_err());
+    assert!(
+        ambiguous
+            .native_for(
+                &ambiguous_reference,
+                litchi_ole_common::ole_streams::Limits::default()
+            )
+            .is_err()
+    );
     let mut ambiguous_transaction = ambiguous.edit();
     assert!(
         ambiguous_transaction
-            .update_native_for(&ambiguous_reference, |native| {
-                native.set_data([0xF2, 0xF3]).map(|_| ())
-            })
+            .update_native_for(
+                &ambiguous_reference,
+                litchi_ole_common::ole_streams::Limits::default(),
+                |native| { native.set_data([0xF2, 0xF3]).map(|_| ()) }
+            )
             .is_err()
     );
     assert!(!ambiguous_transaction.is_changed().unwrap());
@@ -918,7 +1091,11 @@ fn replacing_a_storage_keeps_the_field_reference_and_reparses_opaque_payloads() 
     let commit = transaction.commit().unwrap();
     assert_eq!(commit.snapshot().objects().unwrap()[0].storage_id, 101);
 
-    let mut ole_file = litchi_cfb::OleFile::open(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let mut ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(commit.snapshot().bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole_file
             .open_stream(&["ObjectPool", "_101", "VendorMetadata"])
@@ -949,10 +1126,9 @@ fn snapshot_rejects_a_field_whose_objectpool_owner_was_removed() {
     let bytes = editor.finish().unwrap();
 
     let target = Target::new("_123", [OBJECT_POOL, "_123"]).unwrap();
-    let mut object_editor =
-        ObjectEditor::open(bytes, Targets::one(target), Limits::default()).unwrap();
+    let mut object_editor = open_object(bytes, Targets::one(target), Limits::default());
     object_editor.remove_storage("_123").unwrap();
-    let orphaned = object_editor.finish().unwrap();
+    let orphaned = crate::package::object_edit_bytes(&object_editor).unwrap();
 
     assert!(Snapshot::open(orphaned, Limits::default()).is_err());
 }

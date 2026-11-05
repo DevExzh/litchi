@@ -1,0 +1,5213 @@
+{
+  "format": "xlsx",
+  "elements": [
+    {
+      "format": "xlsx",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "<sheet>"
+        },
+        {
+          "element": "namedrange",
+          "pathSegment": "namedrange"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keywords": {
+          "type": "list",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "workbook.date1904": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "activeTab": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.template": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.manager": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.company": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.application": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.pages": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.words": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.characters": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.totalTime": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "calc.mode": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "calculation properties are read by the eager owner only"
+        },
+        "firstSheet": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "the workbook views are not retained by the source-backed catalog"
+        }
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>",
+          "<sheet>!<A1>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "column",
+          "pathSegment": "col"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "pivottable",
+          "pathSegment": "pivottable"
+        },
+        {
+          "element": "slicer",
+          "pathSegment": "slicer"
+        },
+        {
+          "element": "sparkline",
+          "pathSegment": "sparkline"
+        },
+        {
+          "element": "dataValidation",
+          "pathSegment": "dataValidation"
+        },
+        {
+          "element": "conditionalFormatting",
+          "pathSegment": "cf"
+        },
+        {
+          "element": "autofilter",
+          "pathSegment": "autofilter"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "rowbreak",
+          "pathSegment": "rowbreak"
+        },
+        {
+          "element": "colbreak",
+          "pathSegment": "colbreak"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "visibility": {
+          "type": "enum",
+          "values": [
+            "visible",
+            "hidden",
+            "veryHidden"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "merge": {
+          "type": "scalar",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "autoFilter": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "freeze": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "sheet views are read by the leaf (L-XLSX-R2) but not projected yet"
+        },
+        "zoom": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "sheet views are read by the leaf (L-XLSX-R2) but not projected yet"
+        },
+        "autoFilter": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "the auto-filter is read by the leaf (L-XLSX-R2) but not projected yet"
+        },
+        "tabColor": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "sheet properties are not readable on the source-backed owner yet"
+        },
+        "protect": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "sheet protection is not readable on the source-backed owner yet"
+        },
+        "printArea": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "print settings are not projected yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "cell",
+      "parent": [
+        "sheet",
+        "range"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "Number",
+            "String",
+            "SharedString",
+            "Boolean",
+            "Error",
+            "InlineString",
+            "Date",
+            "Unknown"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "evaluated": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "arrayformula": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "arrayref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "empty": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "aliases": [
+            "bold"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "aliases": [
+            "italic"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "aliases": [
+            "font.strike",
+            "font.strikethrough",
+            "strikethrough"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "aliases": [
+            "color"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "aliases": [
+            "font.superscript"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "aliases": [
+            "font.subscript"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "aliases": [
+            "size",
+            "fontsize"
+          ],
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 5194300
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "aliases": [
+            "font",
+            "fontname"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "aliases": [
+            "bgcolor",
+            "bg"
+          ],
+          "colorContext": "spreadsheet",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fillPattern": {
+          "type": "enum",
+          "values": [
+            "none",
+            "solid",
+            "mediumGray",
+            "darkGray",
+            "lightGray",
+            "darkHorizontal",
+            "darkVertical",
+            "darkDown",
+            "darkUp",
+            "darkGrid",
+            "darkTrellis",
+            "lightHorizontal",
+            "lightVertical",
+            "lightDown",
+            "lightUp",
+            "lightGrid",
+            "lightTrellis",
+            "gray125",
+            "gray0625"
+          ],
+          "valueAliases": {
+            "gray25": "lightGray",
+            "gray50": "mediumGray",
+            "gray75": "darkGray"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fillBg": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.left": {
+          "type": "enum",
+          "aliases": [
+            "border.left.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.left.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.right": {
+          "type": "enum",
+          "aliases": [
+            "border.right.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.right.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.top": {
+          "type": "enum",
+          "aliases": [
+            "border.top.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.top.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.bottom": {
+          "type": "enum",
+          "aliases": [
+            "border.bottom.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.bottom.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.diagonal": {
+          "type": "enum",
+          "aliases": [
+            "border.diagonal.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.diagonal.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.diagonalUp": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "border.diagonalDown": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "aliases": [
+            "wrap",
+            "wraptext"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "aliases": [
+            "halign",
+            "align"
+          ],
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "valueAliases": {
+            "centeracrossselection": "centerContinuous"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "aliases": [
+            "valign"
+          ],
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.textRotation": {
+          "type": "int",
+          "aliases": [
+            "rotation",
+            "textrotation",
+            "alignment.rotation"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.indent": {
+          "type": "int",
+          "aliases": [
+            "indent"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "aliases": [
+            "shrinktofit",
+            "shrink",
+            "alignment.shrink"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.readingOrder": {
+          "type": "enum",
+          "aliases": [
+            "readingorder",
+            "direction",
+            "dir"
+          ],
+          "values": [
+            "context",
+            "ltr",
+            "rtl"
+          ],
+          "valueAliases": {
+            "0": "context",
+            "1": "ltr",
+            "2": "rtl",
+            "contextdependent": "context",
+            "lefttoright": "ltr",
+            "righttoleft": "rtl"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "protection.locked": {
+          "type": "bool",
+          "aliases": [
+            "locked"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "protection.hidden": {
+          "type": "bool",
+          "aliases": [
+            "formulahidden"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "quotePrefix": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numberformat": {
+          "type": "string",
+          "aliases": [
+            "numfmt",
+            "format"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "merge": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "mergeAnchor": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.outline": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.shadow": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.condense": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.extend": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.charset": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.family": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 5
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.scheme": {
+          "type": "enum",
+          "values": [
+            "none",
+            "major",
+            "minor"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.relativeIndent": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alignment.justifyLastLine": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "aliases": [
+            "text"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "aliases": [
+            "border.all.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "runs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "ref": {
+          "type": "string",
+          "aliases": [
+            "address"
+          ],
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "link": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "display": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "computedValue": {
+          "code": "unsupported_capability",
+          "followUp": "M4 follow-up: project computed values in cell views",
+          "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results (record 0266)"
+        },
+        "link": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "hyperlink targets are not resolved into cell properties yet"
+        },
+        "tooltip": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "hyperlink targets are not resolved into cell properties yet"
+        },
+        "display": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "hyperlink targets are not resolved into cell properties yet"
+        },
+        "phonetic": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "the XLSX cell model does not keep phonetic runs"
+        },
+        "richtext": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "the XLSX cell model flattens rich-text runs into plain text"
+        },
+        "alt": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "in-cell pictures are not read"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "range",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>:<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        }
+      ],
+      "properties": {
+        "merge": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "aliases": [
+            "text"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "formula": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.bold": {
+          "type": "bool",
+          "aliases": [
+            "bold"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "aliases": [
+            "italic"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "bool",
+          "aliases": [
+            "font.strike",
+            "font.strikethrough",
+            "strikethrough"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting",
+            "none"
+          ],
+          "valueAliases": {
+            "0": "none",
+            "1": "single",
+            "dbl": "double",
+            "doubleacct": "doubleAccounting",
+            "false": "none",
+            "no": "none",
+            "off": "none",
+            "on": "single",
+            "singleacct": "singleAccounting",
+            "true": "single",
+            "yes": "single"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "aliases": [
+            "font",
+            "fontname"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "aliases": [
+            "size",
+            "fontsize"
+          ],
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 5194300
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "superscript": {
+          "type": "bool",
+          "aliases": [
+            "font.superscript"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "subscript": {
+          "type": "bool",
+          "aliases": [
+            "font.subscript"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "aliases": [
+            "color"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.outline": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.shadow": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.condense": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.extend": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.charset": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.family": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 5
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.scheme": {
+          "type": "enum",
+          "values": [
+            "none",
+            "major",
+            "minor"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "aliases": [
+            "halign",
+            "align"
+          ],
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "valueAliases": {
+            "centeracrossselection": "centerContinuous"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "aliases": [
+            "valign"
+          ],
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "aliases": [
+            "wrap",
+            "wraptext"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.textRotation": {
+          "type": "int",
+          "aliases": [
+            "rotation",
+            "textrotation",
+            "alignment.rotation"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.indent": {
+          "type": "int",
+          "aliases": [
+            "indent"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 255
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "aliases": [
+            "shrinktofit",
+            "shrink",
+            "alignment.shrink"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.readingOrder": {
+          "type": "enum",
+          "aliases": [
+            "readingorder",
+            "direction",
+            "dir"
+          ],
+          "values": [
+            "context",
+            "ltr",
+            "rtl"
+          ],
+          "valueAliases": {
+            "0": "context",
+            "1": "ltr",
+            "2": "rtl",
+            "contextdependent": "context",
+            "lefttoright": "ltr",
+            "righttoleft": "rtl"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.relativeIndent": {
+          "type": "int",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.justifyLastLine": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "protection.locked": {
+          "type": "bool",
+          "aliases": [
+            "locked"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "protection.hidden": {
+          "type": "bool",
+          "aliases": [
+            "formulahidden"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "quotePrefix": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "numberformat": {
+          "type": "string",
+          "aliases": [
+            "numfmt",
+            "format"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "string",
+          "aliases": [
+            "bgcolor",
+            "bg"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fillPattern": {
+          "type": "enum",
+          "values": [
+            "none",
+            "solid",
+            "mediumGray",
+            "darkGray",
+            "lightGray",
+            "darkHorizontal",
+            "darkVertical",
+            "darkDown",
+            "darkUp",
+            "darkGrid",
+            "darkTrellis",
+            "lightHorizontal",
+            "lightVertical",
+            "lightDown",
+            "lightUp",
+            "lightGrid",
+            "lightTrellis",
+            "gray125",
+            "gray0625"
+          ],
+          "valueAliases": {
+            "gray25": "lightGray",
+            "gray50": "mediumGray",
+            "gray75": "darkGray"
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fillBg": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "aliases": [
+            "border.all.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.left": {
+          "type": "enum",
+          "aliases": [
+            "border.left.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.left.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.right": {
+          "type": "enum",
+          "aliases": [
+            "border.right.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.right.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.top": {
+          "type": "enum",
+          "aliases": [
+            "border.top.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.top.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.bottom": {
+          "type": "enum",
+          "aliases": [
+            "border.bottom.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.bottom.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.diagonal": {
+          "type": "enum",
+          "aliases": [
+            "border.diagonal.style"
+          ],
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.diagonal.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.diagonalUp": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.diagonalDown": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "string",
+            "number",
+            "boolean",
+            "date",
+            "error",
+            "richtext"
+          ],
+          "valueAliases": {
+            "bool": "boolean",
+            "err": "error",
+            "num": "number",
+            "rich": "richtext",
+            "str": "string"
+          },
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "runs": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "ref": {
+          "type": "string",
+          "aliases": [
+            "address"
+          ],
+          "add": false,
+          "set": false,
+          "get": false
+        }
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "row",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "<sheet>!N:N"
+        ],
+        "positional": [
+          "/<sheet>/row[N]"
+        ]
+      },
+      "properties": {
+        "height": {
+          "type": "length",
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 5194300
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 7
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "customHeight": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outline": {
+          "type": "int",
+          "aliases": [
+            "group",
+            "outlinelevel"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 7
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ],
+        "headerColumns": true
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "column",
+      "parent": "sheet",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/col[<letters>]",
+          "<sheet>!B:B"
+        ],
+        "positional": [
+          "/<sheet>/col[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "number",
+          "constraint": {
+            "min": 0.0,
+            "max": 255.0
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "customWidth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 7
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "outline": {
+          "type": "int",
+          "aliases": [
+            "group",
+            "outlinelevel"
+          ],
+          "constraint": {
+            "min": 0,
+            "max": 7
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "numberformat": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R4x)",
+          "reason": "column styles are not readable on the source-backed owner yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "table",
+      "parent": [
+        "sheet",
+        "workbook"
+      ],
+      "elementAliases": [
+        "listobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/table[@name=<name>]",
+          "/table[@name=<name>]"
+        ],
+        "positional": [
+          "/<sheet>/table[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "displayName": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedRows": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedCols": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headerRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "totalRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "columns": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "namedrange",
+      "parent": "workbook",
+      "elementAliases": [
+        "definedname"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/namedrange[<name>]",
+          "/namedrange[@name=<name>]"
+        ],
+        "positional": [
+          "/namedrange[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "volatile": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "comment",
+      "parent": "sheet",
+      "elementAliases": [
+        "note"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/comment[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchoredTo": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "runs": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "catTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "dataRange": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "axisTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "x": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 1048575
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 1048575
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "int",
+          "constraint": {
+            "min": 1,
+            "max": 16384
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "int",
+          "constraint": {
+            "min": 1,
+            "max": 1048576
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "colors": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dataLabels": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "labelPos": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "varyColors": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "gapWidth": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overlap": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "holeSize": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstSliceAngle": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "scatterStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "radarStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smooth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "explosion": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend.overlay": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "autoTitleDeleted": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisMin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisMax": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "majorUnit": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "gridlines": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minorGridlines": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "comboTypes": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "comboSplit": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "marker": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "markerSize": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showMarkers": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineWidth": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "view3d": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "increaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "decreaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "totalColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binCount": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binSize": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "intervalClosed": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "quartileMethod": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "parentLabelLayout": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "series1": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series2": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series3": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series4": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series5": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series6": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series7": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series8": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series9": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series10": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series11": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series12": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series13": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series14": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series15": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series16": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series17": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series18": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series19": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series20": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series1.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/series[K]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/axis[@role=<role>]",
+          "/<sheet>/chart[N]/axis[N]"
+        ]
+      },
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "number",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "number",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "pivottable",
+      "parent": "sheet",
+      "elementAliases": [
+        "pivot"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/pivottable[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "pivot tables are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "slicer",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/slicer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "slicers are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "sparkline",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/sparkline[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "sparkline groups are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "dataValidation",
+      "parent": "sheet",
+      "elementAliases": [
+        "validation"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/dataValidation[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula1": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula2": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "allowBlank": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showError": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showInput": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "promptTitle": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "prompt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "errorStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "inCellDropdown": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "conditionalFormatting",
+      "parent": "sheet",
+      "elementAliases": [
+        "cf"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/cf[N]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "priority": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "stopIfTrue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dxfId": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "operator": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "value2": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rank": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "percent": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bottom": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "aboveAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "equalAverage": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "stdDev": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "period": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxLength": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showValue": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "maxColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "midpoint": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "iconset": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "reverse": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.underline": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "negativeColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: Office 2010 conditional-format extensions",
+            "reason": "the core conditional-format writer refuses x14 extension rules, so data-bar negative and axis styling cannot be authored yet"
+          }
+        },
+        "axisColor": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: Office 2010 conditional-format extensions",
+            "reason": "the core conditional-format writer refuses x14 extension rules, so data-bar negative and axis styling cannot be authored yet"
+          }
+        },
+        "axisPosition": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: Office 2010 conditional-format extensions",
+            "reason": "the core conditional-format writer refuses x14 extension rules, so data-bar negative and axis styling cannot be authored yet"
+          }
+        },
+        "direction": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: Office 2010 conditional-format extensions",
+            "reason": "the core conditional-format writer refuses x14 extension rules, so data-bar negative and axis styling cannot be authored yet"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "autofilter",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/autofilter"
+        ]
+      },
+      "properties": {
+        "range": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "criteria0": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "hyperlink",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/hyperlink[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "location": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "display": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "mergeCell",
+      "parent": "sheet",
+      "elementAliases": [
+        "merge",
+        "mergedrange"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/mergeCell[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "merged ranges are not listed as nodes yet; cells report them as `merge`"
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "picture",
+      "parent": "sheet",
+      "elementAliases": [
+        "image",
+        "media"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "decorative": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchorMode": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contentType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fileSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "crop": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "opacity": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "shape",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/shape[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "geometry": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "line": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "drawing",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "align": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "valign": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "rotation": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "flip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hyperlink": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "flipH": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipV": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "flipBoth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "margin": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "gradientFill": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "shadow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "glow": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "reflection": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        },
+        "softEdge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": false,
+          "writeGap": {
+            "code": "unsupported_property",
+            "followUp": "record 0320 follow-up: drawing effects, crops and gradient fills",
+            "reason": "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet"
+          }
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "ole",
+      "parent": "sheet",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/ole[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "OLE objects are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "rowbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/rowbreak[N]"
+        ]
+      },
+      "properties": {
+        "row": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "colbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/colbreak[N]"
+        ]
+      },
+      "properties": {
+        "col": {
+          "type": "scalar",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "manual": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsx",
+      "element": "run",
+      "parent": "cell",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/<A1>/run[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "aliases": [
+            "font.bold"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "aliases": [
+            "font.italic"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "aliases": [
+            "font.strike"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting",
+            "none"
+          ],
+          "valueAliases": {
+            "0": "none",
+            "1": "single",
+            "dbl": "double",
+            "doubleacct": "doubleAccounting",
+            "false": "none",
+            "no": "none",
+            "off": "none",
+            "on": "single",
+            "singleacct": "singleAccounting",
+            "true": "single",
+            "yes": "single"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "aliases": [
+            "font.size",
+            "fontsize"
+          ],
+          "unit": "pt",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 5194300
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "aliases": [
+            "font.color"
+          ],
+          "colorContext": "spreadsheet",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "aliases": [
+            "font.name",
+            "fontname"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "cell",
+      "context": "gradient-fill-projection",
+      "code": "unsupported_capability",
+      "followUp": "M1 XLSX lossless scalar gradient property projection",
+      "reason": "ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format"
+    },
+    {
+      "subject": "element",
+      "element": "detectedtable",
+      "code": "unsupported_capability",
+      "followUp": "0339-F5 (deferred-P1): header-row table detection in queries",
+      "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
+    },
+    {
+      "subject": "element",
+      "element": "smartart",
+      "code": "unsupported_capability",
+      "followUp": "0339-F6 (deferred-P1): a worksheet-drawing diagram model in litchi-xlsx",
+      "reason": "litchi-xlsx reads and writes pictures, shapes and charts in worksheet drawings but has no diagram model; a SmartArt frame is kept as it is and is not a node"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 XLSX template creation",
+      "reason": "the XLSX creator currently authors ordinary workbooks and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the XLSX creator emits Transitional packages and refuses Strict requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "unrepresentable-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (OOXML document properties, record 0253)",
+      "reason": "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "save",
+      "element": "workbook",
+      "context": "execution-context-budgeting",
+      "code": "unsupported_capability",
+      "followUp": "managed OOXML open and publication (record 0008 A1)",
+      "reason": "OpenOptions::execution checks open-boundary cancellation only; unified opens do not yet retain a managed owner for publication budgeting"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "range",
+      "context": "merge-native-preservation-guards",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX dependency-aware and compatibility-aware merge edits",
+      "reason": "native merge edits refuse follower content, overlapping geometry, table intersections, group formulas and unmodeled or compatibility-owned payloads instead of discarding them"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "column",
+      "context": "unit-qualified-width-input",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX OfficeCLI column width input conversion",
+      "reason": "column width accepts native character-unit numbers; OfficeCLI unit-qualified width conversion remains pending"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "workbook",
+      "context": "row-column-table-targets",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX row/column payload and table write admission",
+      "reason": "row and column layout properties support scoped selectors; whole-row/column cell payloads, styles, table-driven keys and table writes remain pending"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "workbook",
+      "context": "structural-and-coalesced-commands",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX structure and native transaction coalescing",
+      "reason": "worksheet lifecycle commands and distinct direct cell payload coalescing are integrated; other structural targets, broader coalescing and read commands remain pending"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "officecli-input-conventions",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX OfficeCLI input policy",
+      "reason": "cell values preserve typed scalar input; formulas use native formula text without a leading equals sign; OfficeCLI string inference and extended clear modes remain pending"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "number-format-input-repair",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX explicit number-format compatibility input policy",
+      "reason": "numberformat accepts checked native codes and OfficeCLI keyword aliases; malformed quotes are rejected under strict defaults rather than repaired by dropping trailing characters"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "fill-replacement-opaque-content",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX lossless replacement of extended fill children",
+      "reason": "typed solid, pattern and gradient fills support whole-fill replacement; a changed replacement refuses opaque content inside the replaced pattern or gradient child, while exact no-ops retain it"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "border-color-without-line",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX explicit invisible-border color authoring policy",
+      "reason": "border colors require a resulting visible line; strict input admission rejects colors OfficeCLI silently discards on an unstyled side; clearing a line retains existing source color markup"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "border-opaque-content",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX lossless replacement of extended border content",
+      "reason": "granular border edits preserve unrelated markup; removing a side or color refuses opaque content that would be discarded"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "cell",
+      "context": "border-color-projection",
+      "code": "unsupported_capability",
+      "followUp": "M1 XLSX complete scalar border color projection",
+      "reason": "ordinary border color readback follows OfficeCLI RGB projection; native theme, indexed, automatic colors and tints remain available through Node::cell_format"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "border-native-only-edges",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX logical and interior border property vocabulary",
+      "reason": "the native border editor supports Strict start/end edges, interior edges and outline; the unified OfficeCLI vocabulary currently exposes physical left/right, top/bottom and diagonal edges only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "style-resource-compaction",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX generated style resource lifecycle",
+      "reason": "cell formatting edits reuse matching resources and retain existing stylesheet records; reverting formatting across separate commits can retain unused generated records"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "font-authoring-profile",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX stylesheet creation, markup compatibility and inherited formatting",
+      "reason": "supported cell formatting edits preserve proven Ignorable markup and require existing direct font and cell-format tables; alternate content, unproven directives, escaped namespace bindings and inherited formatting remain unsupported"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "non-worksheet-tabs",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX non-worksheet tab removal",
+      "reason": "worksheet removal uses native dependency guards; removal of chart, dialog and macro tabs remains pending"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "officecli-sheet-input-conventions",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSX sheet creation property and replay conventions",
+      "reason": "sheet creation supports name, hidden and explicit placement, defaulting name to Sheet plus catalog count plus one; ifExists, placeholder claiming and additional sheet properties remain pending"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": true
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
+}

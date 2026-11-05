@@ -373,7 +373,7 @@ fn lookup_oracle_matches_all_retained_rows() {
             row_number.checked_sub(1).expect("one-based row") as usize,
             column_number.checked_sub(1).expect("one-based column") as usize,
         );
-        let expression = Expression::parse(formula)
+        let expression = Expression::parse(formula, &Default::default())
             .unwrap_or_else(|error| panic!("{case}: {formula} should parse: {error}"));
         let resolver = LookupOracleResolver::new();
         let context = Context::new(&execution, position).with_mode(mode);

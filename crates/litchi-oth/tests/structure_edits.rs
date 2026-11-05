@@ -1,10 +1,10 @@
 use litchi_core::Position;
-use litchi_oth::{Builder, Patch, Template};
+use litchi_oth::{Builder, Package, Patch};
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:foo="urn:future:example"><office:body><office:text><text:section text:name="s"><text:p>section &amp; old</text:p><foo:future foo:value="keep"/></text:section><text:note text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>note old</text:p></text:note-body></text:note><office:annotation office:name="a"><text:p>annotation old</text:p></office:annotation><foo:section><text:p>foreign owner</text:p></foo:section></office:text></office:body></office:document-content>"#;
 
-fn template() -> Template {
-    Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap()
+fn template() -> Package {
+    Builder::new().content_xml(CONTENT).build().unwrap()
 }
 
 #[test]
@@ -17,34 +17,59 @@ fn section_note_annotation_splices_are_source_bound_and_reversible() {
     edit.set_annotation_text(Position::new(0), "annotation new")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(
         commit
-            .template()
+            .package()
+            .document()
             .content_xml()
             .contains("section new &amp; text")
     );
-    assert!(commit.template().content_xml().contains("note new"));
-    assert!(commit.template().content_xml().contains("annotation new"));
     assert!(
         commit
-            .template()
+            .package()
+            .document()
+            .content_xml()
+            .contains("note new")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("annotation new")
+    );
+    assert!(
+        commit
+            .package()
+            .document()
             .content_xml()
             .contains("foo:future foo:value=\"keep\"")
     );
-    assert!(commit.template().content_xml().contains("foreign owner"));
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("foreign owner")
+    );
     assert_eq!(commit.patch().structure_changes().len(), 3);
 
     let wire = commit.patch().to_bytes().unwrap();
     let durable = Patch::from_bytes(&wire).unwrap();
     assert_eq!(durable.structure_changes().len(), 3);
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        commit.template().as_bytes()
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -56,8 +81,8 @@ fn structural_noop_and_rich_structure_refusal_are_atomic() {
     noop.set_section_text(Position::new(0), "section & old")
         .unwrap();
     let commit = noop.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.template().as_bytes(), source.as_bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 
     let rich = Builder::new()
         .content_xml(
@@ -70,7 +95,6 @@ fn structural_noop_and_rich_structure_refusal_are_atomic() {
         )
         .build()
         .unwrap();
-    let rich = Template::from_bytes(rich).unwrap();
     assert!(
         rich.edit()
             .set_section_text(Position::new(0), "refuse")
@@ -95,8 +119,7 @@ fn structure_lifecycle_and_table_append_are_durable_and_exactly_reversible() {
         "<text:note text:note-class=\"footnote\">",
         "<text:note text:id=\"n0\" text:note-class=\"footnote\">",
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(&source_xml).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(&source_xml).build().unwrap();
     let mut edit = source.edit();
     edit.append_section("created", "new section").unwrap();
     edit.append_note("n1", litchi_oth::note::NoteClass::Endnote, "2", "new note")
@@ -108,7 +131,7 @@ fn structure_lifecycle_and_table_append_are_durable_and_exactly_reversible() {
     edit.remove_note(Position::new(0)).unwrap();
     edit.remove_annotation(Position::new(0)).unwrap();
     let commit = edit.commit().unwrap();
-    let body = commit.template().text_body().unwrap();
+    let body = commit.package().document().text_body().unwrap();
     assert_eq!(body.sections().unwrap().len(), 1);
     assert_eq!(body.sections().unwrap()[0].name(), Some("created"));
     assert_eq!(body.notes().unwrap().len(), 1);
@@ -125,12 +148,17 @@ fn structure_lifecycle_and_table_append_are_durable_and_exactly_reversible() {
     assert_eq!(commit.patch().structure_lifecycle_changes().len(), 4 + 3);
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        commit.template().as_bytes()
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -141,16 +169,13 @@ fn structural_lifecycle_rejects_ambiguous_or_referenced_identity() {
         "<foo:section><text:p>foreign owner</text:p></foo:section>",
         "<foo:section xlink:href=\"s\"><text:p>foreign owner</text:p></foo:section>",
     );
-    let source = Template::from_bytes(
-        Builder::new()
-            .content_xml(source_xml.replace(
-                "xmlns:foo=\"urn:future:example\"",
-                "xmlns:foo=\"urn:future:example\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"",
-            ))
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let source = Builder::new()
+        .content_xml(source_xml.replace(
+            "xmlns:foo=\"urn:future:example\"",
+            "xmlns:foo=\"urn:future:example\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"",
+        ))
+        .build()
+        .unwrap();
     assert!(source.edit().remove_section(Position::new(0)).is_err());
 }
 
@@ -166,8 +191,7 @@ fn semantic_references_decode_xml_and_uri_forms_before_removal() {
             "</text:section><foo:reference xlink:href=\"#s%31\"/>",
         )
         .replace("text:name=\"s\"", "text:name=\"s1\"");
-    let source =
-        Template::from_bytes(Builder::new().content_xml(source_xml).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(source_xml).build().unwrap();
     assert!(source.edit().remove_section(Position::new(0)).is_err());
 
     let source_xml = CONTENT
@@ -180,8 +204,7 @@ fn semantic_references_decode_xml_and_uri_forms_before_removal() {
             "</text:section><foo:reference text2:section-name=\"s&#x31;\"/>",
         )
         .replace("text:name=\"s\"", "text:name=\"s1\"");
-    let source =
-        Template::from_bytes(Builder::new().content_xml(source_xml).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(source_xml).build().unwrap();
     assert!(source.edit().remove_section(Position::new(0)).is_err());
 }
 
@@ -191,14 +214,13 @@ fn removing_an_earlier_structure_remaps_later_text_identity_and_patch_wire() {
         "</text:section>",
         "</text:section><text:section text:name=\"later\"><text:p>later old</text:p></text:section>",
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(source_xml).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(source_xml).build().unwrap();
     let mut edit = source.edit();
     edit.remove_section(Position::new(0)).unwrap();
     edit.set_section_text(Position::new(1), "later new")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let body = commit.template().text_body().unwrap();
+    let body = commit.package().document().text_body().unwrap();
     let sections = body.sections().unwrap();
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].name(), Some("later"));
@@ -210,12 +232,17 @@ fn removing_an_earlier_structure_remaps_later_text_identity_and_patch_wire() {
 
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        commit.template().as_bytes()
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -242,8 +269,7 @@ fn lifecycle_join_refuses_same_tail_and_delete_text_overlap() {
         "<text:note text:note-class=\"footnote\">",
         "<text:note text:id=\"n0\" text:note-class=\"footnote\">",
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(&source_xml).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(&source_xml).build().unwrap();
     let mut left = source.edit();
     left.append_table("left", "one").unwrap();
     let mut right = source.edit();

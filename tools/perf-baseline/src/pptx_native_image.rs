@@ -19,7 +19,7 @@ use std::{
 };
 
 use litchi_core::{FileSource, OwnedSource, ReadAt, Resource};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -896,11 +896,12 @@ fn run_iteration(
         .clone();
     let opened = {
         let started = Instant::now();
-        let view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        let view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
             source_for_view,
-            ReadLimits::default(),
-            cache_limits,
-            managed.context.clone(),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits)
+                .execution_context(managed.context.clone()),
         );
         let elapsed = duration_ns(started)?;
         (view, elapsed)

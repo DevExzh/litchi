@@ -4,12 +4,14 @@
 //! OPC catalog and mandatory presentation root, then resolves only slide
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
+pub mod primary;
+
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[cfg(test)]
 use std::cell::Cell;
@@ -22,8 +24,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
-    SourceCacheLimits, SourceLineage, SourceTopologyPlan, TargetMode,
+    PackURI, Part, PartData, PartView, Relationships, SourceBackedPackage, SourceCacheLimits,
+    SourceLimits, SourceLineage, SourceTopologyPlan, TargetMode,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -35,12 +37,18 @@ use crate::{Error, Result};
 
 use litchi_drawingml::svg_blip::SvgBlip;
 
+pub mod modern_comments;
+pub mod raw;
+pub mod related;
+pub mod scenes;
+pub mod sections;
+
 mod svg_lifecycle;
 
-pub use svg_lifecycle::{
-    SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
-    SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment, SourceSvgAttachmentReplacement,
-};
+pub(crate) use svg_lifecycle::SourceBackedSvgAttachmentPatch;
+pub use svg_lifecycle::{AttachedSvg, SvgAttachment, SvgAttachmentReplacement};
+#[cfg(test)]
+mod engine_tests;
 
 #[cfg(test)]
 thread_local! {
@@ -50,6 +58,7 @@ thread_local! {
     static SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS: Cell<usize> = const { Cell::new(0) };
     static SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS: Cell<usize> = const { Cell::new(0) };
     static SOURCE_PICTURE_TARGET_RESOLUTIONS: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_LASER_SCANS: Cell<usize> = const { Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -96,6 +105,16 @@ fn source_picture_target_resolutions() -> usize {
     SOURCE_PICTURE_TARGET_RESOLUTIONS.get()
 }
 
+#[cfg(test)]
+fn reset_source_laser_scans() {
+    SOURCE_LASER_SCANS.set(0);
+}
+
+#[cfg(test)]
+fn source_laser_scans() -> usize {
+    SOURCE_LASER_SCANS.get()
+}
+
 /// Maximum number of existing slides in one source-backed batch edit.
 pub const MAX_SOURCE_BACKED_SLIDE_BATCH: usize = 32;
 
@@ -111,16 +130,26 @@ pub(super) struct SourceSlideData {
 
 pub(super) struct SourceInner {
     pub(super) package: SourceBackedPackage,
+    scenes: scenes::SceneCache,
     // Retain the pinned mandatory root without relying on the OPC payload cache.
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
-    pub(super) limits: ReadLimits,
+    pub(super) limits: SourceLimits,
+    /// Non-default semantic codec policies selected at ingress.  Keep this
+    /// with the deferred owner so related-part reads and source-backed edits
+    /// use the same policy as eager and owning projections.
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Every non-structural defect repaired while the source was opened, in
     /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
     /// then the slide-list repairs of audit finding 6.7. Repairs a
     /// deferred slide read performs surface at that read's own entry point.
     /// See [`crate::leniency`].
     pub(super) tolerance: crate::leniency::ToleranceReport,
+    /// Whether the slide list met the strict, pre-leniency contract at open:
+    /// the tolerant scan repaired nothing, so the retained slide graph is the
+    /// one [`SourceBackedPresentationEditor`] would build. Read by
+    /// [`SourceBackedPresentation::try_into_editor`].
+    strict_slide_list: bool,
 }
 
 struct SourceCatalog {
@@ -353,13 +382,17 @@ struct SlideClosure {
 enum SourcePayload {
     Original(PartData),
     Edited(Arc<Vec<u8>>),
+    ReservedEdit {
+        bytes: Arc<Vec<u8>>,
+        reservation: Arc<litchi_core::Reservation>,
+    },
 }
 
 impl SourcePayload {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Original(data) => data.as_bytes(),
-            Self::Edited(data) => data.as_slice(),
+            Self::Edited(data) | Self::ReservedEdit { bytes: data, .. } => data.as_slice(),
         }
     }
 
@@ -371,13 +404,44 @@ impl SourcePayload {
     fn edited_bytes(&self) -> Option<Arc<Vec<u8>>> {
         match self {
             Self::Original(_) => None,
-            Self::Edited(data) => Some(Arc::clone(data)),
+            Self::Edited(data) | Self::ReservedEdit { bytes: data, .. } => Some(Arc::clone(data)),
         }
     }
 
+    #[cfg(test)]
     fn is_edited(&self) -> bool {
-        matches!(self, Self::Edited(_))
+        matches!(self, Self::Edited(_) | Self::ReservedEdit { .. })
     }
+}
+
+/// Move an edit-owned payload into a replay recipient's execution scope.
+///
+/// The source patch keeps its original reservation until the patch itself is
+/// dropped.  A replay therefore reserves the same transient envelope from
+/// the recipient before replacing the copied source token.  If admission
+/// fails, the copied token is dropped and the target is never published.
+fn rebase_payload_reservation(
+    payload: SourcePayload,
+    context: Option<&ExecutionContext>,
+) -> Result<SourcePayload> {
+    let SourcePayload::ReservedEdit { bytes, reservation } = payload else {
+        return Ok(payload);
+    };
+    let Some(context) = context else {
+        return Ok(SourcePayload::Edited(bytes));
+    };
+    let replacement = context
+        .reserve(litchi_core::Resource::Memory, reservation.amount())
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })?;
+    Ok(SourcePayload::ReservedEdit {
+        bytes,
+        reservation: Arc::new(replacement),
+    })
 }
 
 fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
@@ -392,9 +456,534 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
     })
 }
 
+fn capture_laser_usage(xml: &[u8], limits: crate::laser::Limits) -> Result<crate::laser::Usage> {
+    #[cfg(test)]
+    SOURCE_LASER_SCANS.set(SOURCE_LASER_SCANS.get().saturating_add(1));
+    let mut usage = crate::laser::Usage::default();
+    crate::laser::read(0, xml, &limits, &mut usage)?;
+    Ok(usage)
+}
+
+fn merge_laser_usage(
+    usage: &mut crate::laser::Usage,
+    addition: crate::laser::Usage,
+    limits: crate::laser::Limits,
+) -> Result<()> {
+    // Check each aggregate independently before using the compact ledger's
+    // all-or-nothing addition.  `Usage::checked_add` intentionally returns
+    // only `Option`, so a single generic overflow must not be misreported as
+    // an XML-byte failure when the trace or point counter overflowed.
+    if usage
+        .total_slide_xml_bytes()
+        .checked_add(addition.total_slide_xml_bytes())
+        .is_none()
+    {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: usize::MAX,
+            maximum: limits.max_total_slide_xml_bytes(),
+        });
+    }
+    if usage
+        .trace_count()
+        .checked_add(addition.trace_count())
+        .is_none()
+    {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Traces),
+            observed: usize::MAX,
+            maximum: limits.max_trace_count(),
+        });
+    }
+    if usage
+        .point_count()
+        .checked_add(addition.point_count())
+        .is_none()
+    {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+            observed: usize::MAX,
+            maximum: limits.max_point_count(),
+        });
+    }
+    let next = usage
+        .checked_add(addition)
+        .expect("aggregate counters were checked immediately above");
+    if next.total_slide_xml_bytes() > limits.max_total_slide_xml_bytes() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: next.total_slide_xml_bytes(),
+            maximum: limits.max_total_slide_xml_bytes(),
+        });
+    }
+    if next.trace_count() > limits.max_trace_count() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Traces),
+            observed: next.trace_count(),
+            maximum: limits.max_trace_count(),
+        });
+    }
+    if next.point_count() > limits.max_point_count() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+            observed: next.point_count(),
+            maximum: limits.max_point_count(),
+        });
+    }
+    *usage = next;
+    Ok(())
+}
+
+/// Return the managed transient-memory ceiling without reusing the source
+/// output ceiling. Serialized output and derived scene memory are independent
+/// resource dimensions.
+#[inline]
+fn managed_memory_limit(context: &ExecutionContext) -> usize {
+    usize::try_from(context.budget().limit(litchi_core::Resource::Memory)).unwrap_or(usize::MAX)
+}
+
+fn reserve_source_memory(
+    context: &ExecutionContext,
+    amount: usize,
+    maximum: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let amount = u64::try_from(amount).map_err(|_| Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+        observed: usize::MAX,
+        maximum,
+    })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })
+}
+
+/// Reserve the full transient envelope of a source-backed text-box edit
+/// before parsing or authoring. The scene is indexed once before authoring and
+/// the candidate is indexed again during semantic readback, so both bounded
+/// scene policies plus the escaped fragment and lexical output stay inside
+/// the caller's execution-budget admission. The source output ceiling still
+/// bounds the candidate bytes, while derived scene memory is governed by the
+/// execution context rather than that semantic output limit.
+fn reserve_source_text_box(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    // Physical output policy applies even without a managed context. Reject
+    // an impossible output before charging the shared execution budget.
+    let output_bound =
+        crate::opened::text_box_output_bound(input_bytes, text_bytes, max_output_bytes)?;
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    // The caller's semantic output ceiling and the managed execution budget
+    // are independent policies.  Output admission above already ran first;
+    // use the context's memory ceiling for the transient envelope so a
+    // modest output limit does not reject a valid edit merely because its
+    // scene indexes need more bytes than the serialized candidate.
+    let maximum = managed_memory_limit(context);
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let fragment_bound = output_bound.checked_sub(input_bytes).ok_or_else(|| {
+        Error::internal(
+            "reserve_source_text_box",
+            "output bound is below the admitted input bytes",
+        )
+    })?;
+    let transient = output_bound
+        .checked_add(fragment_bound)
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(transient))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum,
+        });
+    }
+    reserve_source_memory(context, amount, maximum)
+}
+
+/// Reserve the source shape-removal scene/index, candidate, and semantic
+/// readback envelope before the native codec allocates either scene.
+fn reserve_source_shape_removal(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = managed_memory_limit(context);
+    // The exact retained length is checked by the native stage before it
+    // allocates the candidate. This reservation only uses the output ceiling
+    // to bound its transient envelope, never as the memory ceiling.
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let output_bound = input_bytes.min(max_output_bytes);
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(output_bound))
+        .and_then(|size| size.checked_add(4096))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum,
+        });
+    }
+    reserve_source_memory(context, amount, maximum)
+}
+
+/// Reserve the transient parse, lexical rewrite, and semantic read-back
+/// envelope for one source-backed slide metadata edit before the shared
+/// codec allocates its candidate XML.
+fn reserve_source_slide_properties(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    name: Option<&str>,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let output_maximum = max_output_bytes;
+    let name_bytes = name.map_or(0, str::len);
+    // Attribute escaping can expand each input byte to a six-byte entity. A
+    // small fixed charge covers a newly inserted attribute; the native stage
+    // still applies the exact output-byte limit before allocating the result.
+    let conservative_output_bound = input_bytes
+        .checked_add(name_bytes.checked_mul(6).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: output_maximum,
+        })?)
+        .and_then(|size| size.checked_add(16))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: output_maximum,
+        })?;
+    // The native stage applies the exact output limit after it knows whether
+    // each requested attribute is a no-op, replacement, insertion, or
+    // shortening.  Admission must not reject a valid shortening merely
+    // because this conservative preallocation envelope exceeds that limit.
+    let output_bound = conservative_output_bound.min(max_output_bytes);
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = managed_memory_limit(context);
+    // The exact attribute splice can shorten or be a no-op, so its native
+    // output check remains the authoritative output admission. This envelope
+    // uses the source ceiling only to bound candidate-shaped memory.
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(output_bound))
+        .and_then(|size| size.checked_add(name_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(4096))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum,
+        });
+    }
+    reserve_source_memory(context, amount, maximum)
+}
+
+fn reserve_source_shape_properties(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    if replacements.len() > crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: replacements.len(),
+            maximum: crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+        });
+    }
+    let text_maximum = crate::opened::Limits::default().max_text_bytes();
+    let text_bytes = replacements.iter().try_fold(0usize, |sum, replacement| {
+        sum.checked_add(replacement.text().map_or(0, str::len))
+            .ok_or(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum: text_maximum,
+            })
+    })?;
+    if text_bytes > text_maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text_bytes,
+            maximum: text_maximum,
+        });
+    }
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = managed_memory_limit(context);
+    // Three simultaneously live scene indexes, replacement plans, escaped
+    // text, and intermediate/output buffers fit inside this conservative
+    // envelope. Geometry stages release their prior candidate before the next
+    // shape. The reservation follows the final immutable payload.
+    let output_bound = text_bytes
+        .checked_mul(6)
+        .and_then(|size| size.checked_add(input_bytes))
+        .and_then(|size| size.checked_add(replacements.len().checked_mul(512)?))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?
+        .min(max_output_bytes);
+    let amount = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(output_bound.checked_mul(196)?))
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(4096))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum,
+        });
+    }
+    reserve_source_memory(context, amount, maximum)
+}
+
+fn reserve_source_shape_text_chunks(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    admission: crate::opened::ChunkAdmission,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let replacements = admission.selections();
+    let text_bytes = admission.text_bytes();
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = managed_memory_limit(context);
+    // Chunk callers perform output admission before this reservation. The
+    // scalar output bound remains separate from the managed memory ceiling.
+    let output_bound = input_bytes
+        .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?)
+        .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?
+        .min(max_output_bytes);
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(output_bound))
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
+        .and_then(|size| size.checked_add(4096))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum,
+        });
+    }
+    reserve_source_memory(context, amount, maximum)
+}
+
+fn reserve_source_shape_property_chunks(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    admission: crate::opened::ChunkAdmission,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let replacements = admission.selections();
+    let text_bytes = admission.text_bytes();
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = managed_memory_limit(context);
+    let output_bound = input_bytes
+        .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?)
+        .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?
+        .min(max_output_bytes);
+    let amount = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(output_bound.checked_mul(196)?))
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
+        .and_then(|size| size.checked_add(4096))
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum,
+        });
+    }
+    reserve_source_memory(context, amount, maximum)
+}
+
 #[cfg(any(unix, windows))]
 fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
     Ok(Arc::new(FileSource::open(path)?))
+}
+
+/// Admit a deferred OPC package from `source` under `options`.
+fn source_backed_package(
+    source: Arc<dyn ReadAt>,
+    options: crate::OpenOptions,
+) -> Result<SourceBackedPackage> {
+    let crate::OpenOptions {
+        source_limits,
+        cache_limits,
+        execution_context,
+        ..
+    } = options;
+    Ok(match (cache_limits, execution_context) {
+        (None, None) => SourceBackedPackage::from_read_at(
+            source,
+            source_limits,
+            SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?,
+        (Some(cache), None) => SourceBackedPackage::from_read_at(
+            source,
+            source_limits,
+            cache,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?,
+        (None, Some(context)) => SourceBackedPackage::from_read_at(
+            source,
+            source_limits,
+            SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
+        )?,
+        (Some(cache), Some(context)) => SourceBackedPackage::from_read_at(
+            source,
+            source_limits,
+            cache,
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
+        )?,
+    })
 }
 
 /// Read-only PPTX catalog and selected-slide access over a positional source.
@@ -408,6 +997,16 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 pub struct SourceBackedPresentation {
     pub(super) inner: Arc<SourceInner>,
 }
+
+// Risk R3 of unified-ops record 0003: the unified `Pptx` handle shares these
+// owners across threads, so they must stay `Send + Sync`.
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedPresentation>();
+    assert_send_sync::<SourceSlide>();
+    assert_send_sync::<SourceBackedPresentationEditor>();
+    assert_send_sync::<SourceBackedIntoEditorError>();
+};
 
 /// A lifetime-free read-only slide handle from [`SourceBackedPresentation`].
 ///
@@ -669,7 +1268,8 @@ enum PictureQueryResult {
 /// Focused slide edits retain their existing package topology. The SVG picture
 /// transaction is the bounded exception: it may replace the two media Parts
 /// and their owning slide relationship targets as one checked closure.
-pub struct SourceBackedPresentationEditor {
+#[derive(Clone)]
+pub(crate) struct SourceBackedPresentationEditor {
     pub(super) package: SourceBackedPackage,
     // Retain the catalog validated at open so each selected slide does not
     // reparse the immutable presentation root and rebuild the complete slide
@@ -679,40 +1279,64 @@ pub struct SourceBackedPresentationEditor {
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     package_relationships: Arc<[RelationshipBinding]>,
     presentation_binding: Arc<PartBinding>,
-    pub(super) limits: ReadLimits,
+    pub(super) limits: SourceLimits,
+    /// The ingress-selected semantic policies must stay attached to the
+    /// deferred owner.  Source limits alone cannot recover content-family
+    /// ceilings when a snapshot is projected or replayed.
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 }
 
 /// An immutable exact-source snapshot of one slide XML part.
 #[derive(Clone)]
-pub struct SourceBackedSlideSnapshot {
+pub(crate) struct SourceBackedSlideSnapshot {
     position: usize,
     part_uri: PackURI,
     xml: SourcePayload,
     closure: SlideClosure,
     max_output_bytes: usize,
+    protection_limits: crate::presentation_properties::metadata::protection::Limits,
+    /// Preserve the complete ingress semantic bundle with the exact source
+    /// image.  A snapshot may outlive its presentation projection.
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     source_version: SourceVersion,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
+    /// The source-selected laser policy. Usage is parsed only when a laser
+    /// aggregate or replay boundary needs it, not for unrelated snapshots.
+    laser_limits: crate::laser::Limits,
+    /// Lazily cached laser usage for this exact XML under `laser_limits`.
+    laser_usage: Arc<OnceLock<crate::laser::Usage>>,
+    /// Markup compatibility enclosed in shape-tree children admits only
+    /// whole top-level shape removal (record 0303).
+    mce: crate::presentation::transition::SlideMce,
 }
 
 /// An isolated focused edit of one exact-source slide snapshot.
-pub struct SourceBackedSlideEdit {
+pub(crate) struct SourceBackedSlideEdit {
     source: SourceBackedSlideSnapshot,
     working: SourcePayload,
     operation_used: bool,
     context: Option<ExecutionContext>,
+    /// The source policy is restored when the edit is frozen.  The focused
+    /// editor may temporarily lower its output bound to a caller's exact
+    /// retained-patch budget without changing patch identity.
+    source_max_output_bytes: usize,
 }
 
 /// A reversible, exact-source-checked one-slide XML patch.
 #[derive(Clone)]
-pub struct SourceBackedSlidePatch {
+pub(crate) struct SourceBackedSlidePatch {
     before: SourceBackedSlideSnapshot,
     after: SourceBackedSlideSnapshot,
 }
 
 /// A checked source-backed slide edit ready for publication.
-pub struct SourceBackedSlideCommit {
+pub(crate) struct SourceBackedSlideCommit {
     snapshot: SourceBackedSlideSnapshot,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     patch: SourceBackedSlidePatch,
 }
 
@@ -723,14 +1347,14 @@ pub struct SourceBackedSlideCommit {
 /// newly-added `/ppt/media/` Part URIs; the transaction keeps the relationship
 /// IDs stable and updates the slide relationship closure atomically.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceSvgReplacement {
+pub struct SvgReplacement {
     svg: Vec<u8>,
     raster: Vec<u8>,
     svg_part_uri: Option<PackURI>,
     raster_part_uri: Option<PackURI>,
 }
 
-impl SourceSvgReplacement {
+impl SvgReplacement {
     /// Create a replacement that retains both current media Part URIs.
     #[must_use]
     pub fn new(svg: impl Into<Vec<u8>>, raster: impl Into<Vec<u8>>) -> Self {
@@ -768,7 +1392,7 @@ impl SourceSvgReplacement {
 }
 
 #[derive(Clone)]
-pub struct SourceBackedSvgSnapshot {
+pub struct SvgImage {
     slide: SourceBackedSlideSnapshot,
     image_position: usize,
     svg_relationship_id: String,
@@ -779,13 +1403,13 @@ pub struct SourceBackedSvgSnapshot {
     raster_part_uri: PackURI,
     svg: SourcePayload,
     raster: SourcePayload,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 /// An exact-source transaction over one embedded PPTX SVG picture and its
 /// raster compatibility fallback.
-pub struct SourceBackedSvgEdit {
-    source: SourceBackedSvgSnapshot,
+pub(crate) struct SourceBackedSvgEdit {
+    source: SvgImage,
     svg_part_uri: PackURI,
     raster_part_uri: PackURI,
     svg: SourcePayload,
@@ -795,19 +1419,20 @@ pub struct SourceBackedSvgEdit {
 
 /// A reversible exact-source patch for one PPTX SVG picture closure.
 #[derive(Clone)]
-pub struct SourceBackedSvgPatch {
-    before: SourceBackedSvgSnapshot,
-    after: SourceBackedSvgSnapshot,
+pub(crate) struct SourceBackedSvgPatch {
+    before: SvgImage,
+    after: SvgImage,
 }
 
 /// A checked source-backed SVG picture transaction ready for publication.
-pub struct SourceBackedSvgCommit {
-    snapshot: SourceBackedSvgSnapshot,
+pub(crate) struct SourceBackedSvgCommit {
+    snapshot: SvgImage,
     patch: SourceBackedSvgPatch,
 }
 
 /// A bounded multi-slide shape-text edit borrowing its deferred source.
-pub struct SourceBackedSlideBatchEdit<'a> {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchEdit<'a> {
     editor: &'a SourceBackedPresentationEditor,
     commits: Vec<SourceBackedSlideCommit>,
     text_bytes: usize,
@@ -815,23 +1440,27 @@ pub struct SourceBackedSlideBatchEdit<'a> {
 
 /// An immutable exact-source snapshot of a selected slide set.
 #[derive(Clone)]
-pub struct SourceBackedSlideBatchSnapshot {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchSnapshot {
     slides: Box<[SourceBackedSlideSnapshot]>,
 }
 
 /// A reversible, exact-source-checked multi-slide XML patch.
 #[derive(Clone)]
-pub struct SourceBackedSlideBatchPatch {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchPatch {
     before: SourceBackedSlideBatchSnapshot,
     after: SourceBackedSlideBatchSnapshot,
 }
 
 /// A checked source-backed multi-slide edit ready for publication.
-pub struct SourceBackedSlideBatchCommit {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchCommit {
     snapshot: SourceBackedSlideBatchSnapshot,
     patch: SourceBackedSlideBatchPatch,
 }
 
+#[cfg(test)]
 enum FastApply<T> {
     Applied(T),
     Recapture,
@@ -870,267 +1499,85 @@ fn record_test_semantic_slide_part_read() {
 }
 
 impl SourceBackedPresentation {
-    /// Open a PPTX from a regular filesystem path without slurping its bytes.
+    /// Open a positional PPTX file under the default finite policies.
     ///
-    /// The path is adapted to the same immutable positional source used by
-    /// [`Self::from_read_at`]. The open file handle, rather than the pathname,
-    /// remains the source identity for the lifetime of this snapshot.
-    #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
-    }
-
-    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read, cache, and
-    /// hierarchical execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            file_source(path)?,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a PPTX from a regular filesystem path.
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[cfg(any(unix, windows))]
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read, cache, and
-    /// hierarchical execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open an ordinary PPTX package from a caller-provided positional source.
+    /// Open a positional PPTX file under explicit ingress options: source
+    /// limits, a payload-cache policy and an execution context.
     ///
     /// # Errors
     ///
-    /// Returns an error when the source, OPC catalog, presentation root, or
-    /// presentation-to-slide graph is malformed.
+    /// Returns an error if the input exceeds the policies, cannot be read or
+    /// is malformed.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        Self::from_read_at_with_options(file_source(path)?, options)
+    }
+
+    /// Admit a positional source under the default finite policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_options(source, crate::OpenOptions::default())
     }
 
-    /// Open a PPTX source from a sequential reader using the standard bounded
-    /// OPC read policy.
-    ///
-    /// The reader is consumed once into the source-backed positional owner;
-    /// slide payloads remain deferred until a selected slide is read.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_reader(reader)?,
-            ReadLimits::default(),
-        )
-    }
-
-    /// Open a PPTX source from a sequential reader with explicit OPC limits.
-    ///
-    /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
-    /// payloads remain deferred after the presentation graph is indexed.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
-            limits,
-        )
-    }
-
-    /// Open from a positional source with explicit OPC resource limits.
+    /// Admit a positional source under explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error when the source exceeds `limits`, changes while being
-    /// read, or does not contain a coherent PresentationML catalog.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    /// Returns an error if the input exceeds the policies, cannot be read or
+    /// is malformed.
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits.clone();
         Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
+            source_backed_package(source, options)?,
             limits,
+            semantic_limits,
         )
     }
 
-    /// Open from a positional source with an explicit finite payload-cache
-    /// policy. This compatibility path remains unmanaged; use one of the
-    /// `*_with_execution_context` constructors when cache payloads must be
-    /// charged to a caller-owned hierarchical budget.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
-            ReadLimits::default(),
-        )
+    /// Read a PPTX stream into a retained source under the default finite
+    /// policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open from a positional source with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
+    /// Read a PPTX stream into a retained source under explicit source
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, which need a positional source, and an error if the input
+    /// exceeds the source limits, cannot be read or is malformed.
+    pub fn from_reader_with_options<R: Read>(
+        reader: R,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
+        let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits.clone();
         Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
-            )?,
+            SourceBackedPackage::from_reader(reader, limits, SourceCacheLimits::default(), None)?,
             limits,
-        )
-    }
-
-    /// Open from a positional source with an explicit caller execution
-    /// context. Lazy slide payloads and cache retention remain attached to
-    /// that context; no executor or global scheduler is created by this
-    /// facade.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(source, limits, context)
-    }
-
-    /// Open from a positional source with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_read_at_with_execution_context(source, limits, context)?,
-            limits,
-        )
-    }
-
-    /// Open from a positional source with explicit read, cache, and
-    /// hierarchical execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?,
-            limits,
+            semantic_limits,
         )
     }
 
@@ -1144,29 +1591,151 @@ impl SourceBackedPresentation {
     /// coherent PresentationML presentation.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
         let limits = package.read_limits();
-        Self::from_source_backed_package_with_limits(package, limits)
+        Self::from_source_backed_package_with_limits(package, limits, None)
     }
 
     fn from_source_backed_package_with_limits(
         package: SourceBackedPackage,
-        limits: ReadLimits,
+        limits: SourceLimits,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     ) -> Result<Self> {
         package.check_execution()?;
         let mut tolerance = crate::leniency::ToleranceReport::default();
         // OPC manifest repairs (audit findings 8.5-8.9) were applied while
         // the deferred package was opened; they come first.
         tolerance.append_package(package.tolerance_report());
+        let repairs_before_catalog = tolerance.total();
         let catalog = source_catalog(&package, Some(&mut tolerance))?;
         package.check_execution()?;
+        let strict_slide_list = tolerance.total() == repairs_before_catalog;
 
         Ok(Self {
             inner: Arc::new(SourceInner {
+                scenes: scenes::SceneCache::for_package(&package),
                 package,
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
                 limits,
+                semantic_limits,
                 tolerance,
+                strict_slide_list,
             }),
+        })
+    }
+
+    /// Borrow the validated deferred OPC package this presentation reads from.
+    ///
+    /// This is the package indexed when the presentation was opened: no ZIP
+    /// directory, content-type catalog, or relationship graph is rebuilt.
+    /// Borrowed package services, such as
+    /// [`SourceBackedPackage::source_artifact`], read through the same
+    /// positional source and observe the same source-version fence.
+    #[must_use]
+    pub fn source_backed_package(&self) -> &SourceBackedPackage {
+        &self.inner.package
+    }
+
+    /// Convert this read-only presentation into a
+    /// [`SourceBackedPresentationEditor`] over the same, already indexed
+    /// source-backed package.
+    ///
+    /// The ZIP central directory, OPC catalog, presentation root, and slide
+    /// graph validated at open are reused: no source byte is re-read for
+    /// indexing and no part payload is loaded. Only the package and
+    /// presentation relationship bindings the editor's publication planner
+    /// needs are copied from the retained in-memory catalog. When the slide
+    /// list needed a lenient repair at open, the editor's strict slide-list
+    /// contract is applied again over the retained root, exactly as
+    /// [`SourceBackedPresentationEditor::from_read_at`] would apply it, and
+    /// its refusal is reported.
+    ///
+    /// The editor takes ownership of the package because publication consumes
+    /// it, so the conversion succeeds only while this value is the sole owner
+    /// of the opened source: no clone of it and no [`SourceSlide`] from it is
+    /// alive.
+    ///
+    /// # Errors
+    ///
+    /// Returns the presentation unchanged inside [`SourceBackedIntoEditorError`]:
+    /// - without an error when it is shared ([`SourceBackedIntoEditorError::is_shared`]);
+    /// - with the typed cancellation, source-change, allocation, or strict
+    ///   slide-list error that prevented the conversion.
+    #[cfg(test)]
+    pub(crate) fn try_into_editor(
+        self,
+    ) -> std::result::Result<SourceBackedPresentationEditor, SourceBackedIntoEditorError> {
+        let seed = match self.editor_seed() {
+            Ok(seed) => seed,
+            Err(error) => {
+                return Err(SourceBackedIntoEditorError {
+                    presentation: self,
+                    error: Some(error),
+                });
+            },
+        };
+        let inner = match Arc::try_unwrap(self.inner) {
+            Ok(inner) => inner,
+            Err(inner) => {
+                return Err(SourceBackedIntoEditorError {
+                    presentation: Self { inner },
+                    error: None,
+                });
+            },
+        };
+        let SourceInner {
+            scenes: _,
+            package,
+            _presentation,
+            slides,
+            limits,
+            semantic_limits,
+            tolerance: _,
+            strict_slide_list: _,
+        } = inner;
+        let (presentation, slides) = match seed.strict_catalog {
+            Some((presentation, slides)) => (presentation, slides),
+            None => (_presentation, slides),
+        };
+        Ok(SourceBackedPresentationEditor {
+            package,
+            _presentation: presentation,
+            slides,
+            package_relationships: seed.package_relationships,
+            presentation_binding: seed.presentation_binding,
+            limits,
+            semantic_limits,
+        })
+    }
+
+    /// Everything fallible [`Self::try_into_editor`] needs, computed while
+    /// the presentation is still borrowed so a failure can return it intact.
+    fn editor_seed(&self) -> Result<EditorSeed> {
+        let package = &self.inner.package;
+        package.check_execution()?;
+        package.source_version()?;
+        if !self.inner.strict_slide_list {
+            // The lenient open repaired the slide list; the editor refuses
+            // such a list. Rebuild the strict catalog over the same indexed
+            // package so the refusal (or, defensively, the strict graph) is
+            // exactly the editor's own.
+            let catalog = source_catalog(package, None)?;
+            package.check_execution()?;
+            package.source_version()?;
+            return Ok(EditorSeed {
+                package_relationships: Arc::from(catalog.package_relationships),
+                presentation_binding: Arc::new(catalog.presentation_binding),
+                strict_catalog: Some((catalog.presentation, catalog.slides)),
+            });
+        }
+        let package_relationships = Arc::from(relationship_bindings(package, package.rels())?);
+        let view = package.main_document_part()?;
+        let presentation_binding = Arc::new(part_binding(package, &view)?);
+        package.check_execution()?;
+        package.source_version()?;
+        Ok(EditorSeed {
+            package_relationships,
+            presentation_binding,
+            strict_catalog: None,
         })
     }
 
@@ -1228,7 +1797,7 @@ impl SourceBackedPresentation {
     pub fn properties_with_tolerance(
         &self,
         tolerance: &mut crate::leniency::ToleranceReport,
-    ) -> Result<Option<litchi_ooxml_common::Props>> {
+    ) -> Result<Option<litchi_core::Metadata>> {
         self.inner.package.check_execution()?;
         let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
         let properties = litchi_ooxml_common::properties::read_source_backed_with_report(
@@ -1246,11 +1815,16 @@ impl SourceBackedPresentation {
     /// The mandatory presentation root was loaded and retained while the
     /// source catalog was opened; this method parses only that pinned root.
     pub fn slide_size(&self) -> Result<(i64, i64)> {
-        self.inner.package.check_execution()?;
-        let size = PresentationPart::from_part(&self.inner._presentation)?.slide_size()?;
-        self.inner.package.check_execution()?;
-        self.inner.package.source_version()?;
-        Ok(size)
+        related::with_fences(&self.inner, || {
+            let root = &self.inner._presentation;
+            let part = related::load_part(
+                &self.inner,
+                root.partname(),
+                root.content_type(),
+                crate::notes::MAX_PRESENTATION_XML,
+            )?;
+            PresentationPart::from_part(&part)?.slide_size()
+        })
     }
 
     /// Iterate lightweight slide handles without reading slide payloads.
@@ -1365,262 +1939,142 @@ impl SourceBackedPresentation {
     }
 }
 
+/// The editor-only catalog state [`SourceBackedPresentation::try_into_editor`]
+/// derives from the retained catalog before taking ownership of the package.
+struct EditorSeed {
+    package_relationships: Arc<[RelationshipBinding]>,
+    presentation_binding: Arc<PartBinding>,
+    /// The strict presentation root and slide graph, present only when the
+    /// open-time slide list needed a lenient repair.
+    strict_catalog: Option<(SourcePart, Box<[Arc<SourceSlideData>]>)>,
+}
+
+/// Why [`SourceBackedPresentation::try_into_editor`] could not convert a
+/// presentation. The presentation is returned unchanged and stays readable.
+pub(crate) struct SourceBackedIntoEditorError {
+    presentation: SourceBackedPresentation,
+    error: Option<Error>,
+}
+
+impl SourceBackedIntoEditorError {
+    /// Whether the conversion was refused only because another clone of the
+    /// presentation, or a [`SourceSlide`] from it, still shares the source.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn is_shared(&self) -> bool {
+        self.error.is_none()
+    }
+
+    /// The typed error that prevented the conversion, or `None` when the
+    /// presentation was merely shared.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn error(&self) -> Option<&Error> {
+        self.error.as_ref()
+    }
+
+    /// Split into the unchanged presentation and the optional typed error.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn into_parts(self) -> (SourceBackedPresentation, Option<Error>) {
+        (self.presentation, self.error)
+    }
+}
+
+impl std::fmt::Debug for SourceBackedIntoEditorError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SourceBackedIntoEditorError")
+            .field("slide_count", &self.presentation.slide_count())
+            .field("error", &self.error)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for SourceBackedIntoEditorError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.error {
+            Some(error) => write!(
+                formatter,
+                "cannot convert the source-backed presentation into an editor: {error}"
+            ),
+            None => formatter
+                .write_str("cannot convert a shared source-backed presentation into an editor"),
+        }
+    }
+}
+
+impl std::error::Error for SourceBackedIntoEditorError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        let error: &(dyn std::error::Error + 'static) = self.error.as_ref()?;
+        Some(error)
+    }
+}
+
 impl SourceBackedPresentationEditor {
-    /// Open a PPTX from a regular filesystem path without slurping its bytes.
+    /// Open a positional PPTX file under the default finite policies.
     ///
-    /// The path is adapted to the same immutable positional source used by
-    /// [`Self::from_read_at`]. The open file handle remains the source
-    /// identity for the lifetime of this owning editor.
-    #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
-    }
-
-    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read, cache, and
-    /// hierarchical execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            file_source(path)?,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a PPTX from a regular filesystem path.
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read, cache, and
-    /// hierarchical execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open an ordinary PPTX source for a bounded one-slide edit.
+    /// # Errors
     ///
-    /// Opening validates the OPC catalog, presentation root, and slide graph
-    /// without materializing ordinary slide payloads.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+    /// Returns an error if the input cannot be read or is malformed.
+    #[cfg(any(unix, windows))]
+    #[cfg(test)]
+    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a PPTX source-backed editor from a sequential reader using the
-    /// standard bounded OPC read policy.
+    /// Open a positional PPTX file under explicit ingress options: source
+    /// limits, a payload-cache policy and an execution context.
     ///
-    /// The reader is consumed once into the source-backed positional owner;
-    /// slide payloads remain deferred until a selected slide is captured.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
-    }
-
-    /// Open a PPTX source-backed editor from a sequential reader with
-    /// explicit OPC limits.
+    /// # Errors
     ///
-    /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
-    /// payloads remain deferred after the presentation graph is indexed.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
-            limits,
-        )
-    }
-
-    /// Open an ordinary PPTX source with explicit OPC resource limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
-            limits,
-        )
-    }
-
-    /// Open a source-backed editor with an explicit finite payload-cache
-    /// policy. This compatibility path remains unmanaged.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
+    /// Returns an error if the input exceeds the policies, cannot be read or
+    /// is malformed.
+    #[cfg(any(unix, windows))]
+    #[cfg(test)]
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
-            ReadLimits::default(),
-        )
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
-    /// Open a source-backed editor with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
+    /// Admit a positional source under the default finite policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    #[cfg(test)]
+    pub(crate) fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
+        Self::from_read_at_with_options(source, crate::OpenOptions::default())
+    }
+
+    /// Admit a positional source under explicit ingress options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds the policies, cannot be read or
+    /// is malformed.
+    #[cfg(test)]
+    pub(crate) fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
-            )?,
+        let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits.clone();
+        Self::from_source_backed_package_with_semantic_limits(
+            source_backed_package(source, options)?,
             limits,
-        )
-    }
-
-    /// Open a source-backed editor with an explicit caller execution context.
-    /// Lazy payloads remain budget-managed for the lifetime of snapshots and
-    /// edits, and no hidden executor is installed.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(source, limits, context)
-    }
-
-    /// Open a source-backed editor with explicit read and execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_execution_context(source, limits, context)?,
-            limits,
-        )
-    }
-
-    /// Open a source-backed editor with explicit read, cache, and hierarchical
-    /// execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?,
-            limits,
+            semantic_limits,
         )
     }
 
     /// Build an owning editor from a validated deferred OPC package.
-    fn from_source_backed_package(
+    #[cfg(test)]
+    fn from_source_backed_package_with_semantic_limits(
         package: SourceBackedPackage,
-        limits: ReadLimits,
+        limits: SourceLimits,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     ) -> Result<Self> {
         package.check_execution()?;
         // The lossless editor keeps the strict slide-list contract.
@@ -1635,12 +2089,14 @@ impl SourceBackedPresentationEditor {
             package_relationships,
             presentation_binding,
             limits,
+            semantic_limits,
         })
     }
 
     /// Number of logical slides in presentation order.
     #[must_use]
-    pub fn slide_count(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn slide_count(&self) -> usize {
         self.slides.len()
     }
 
@@ -1649,7 +2105,8 @@ impl SourceBackedPresentationEditor {
     /// Opening loads the presentation root; capturing one slide loads that
     /// selected slide only. The diagnostic exposes no member identities.
     #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
+    #[cfg(test)]
+    pub(crate) fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
         self.package.cache_diagnostics()
     }
 
@@ -1661,7 +2118,8 @@ impl SourceBackedPresentationEditor {
     /// [`Self::cache_diagnostics`], observing the snapshot does not load a
     /// part. The infallible method remains available for compatibility
     /// callers.
-    pub fn try_cache_diagnostics(
+    #[cfg(test)]
+    pub(crate) fn try_cache_diagnostics(
         &self,
     ) -> std::result::Result<
         litchi_opc::SourceCacheDiagnostics,
@@ -1675,13 +2133,14 @@ impl SourceBackedPresentationEditor {
     /// A direct transition's supported MCE owner is excluded while validating
     /// semantic shape offsets; unrelated markup-compatibility branch
     /// selection remains refused.
-    pub fn slide_snapshot(&self, position: usize) -> Result<SourceBackedSlideSnapshot> {
+    pub(crate) fn slide_snapshot(&self, position: usize) -> Result<SourceBackedSlideSnapshot> {
         self.package.check_execution()?;
         self.slide_snapshot_for(position, "slide_snapshot")
     }
 
     /// Begin an isolated focused edit of one existing slide.
-    pub fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
+    #[cfg(test)]
+    pub(crate) fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
         self.package.check_execution()?;
         self.slide_snapshot_for(position, "edit_slide")?
             .edit_checked()
@@ -1694,7 +2153,17 @@ impl SourceBackedPresentationEditor {
     /// branches, and ambiguous dependency closures are refused before an edit
     /// handle is returned. The slide XML remains source-backed; only the media
     /// Parts and their owning relationship targets belong to the transaction.
-    pub fn edit_svg_image(
+    #[cfg(test)]
+    pub(crate) fn edit_svg_image(
+        &self,
+        slide_position: usize,
+        image_position: usize,
+    ) -> Result<SourceBackedSvgEdit> {
+        self.svg_image_edit(slide_position, image_position)
+    }
+
+    /// The SVG picture transaction behind [`Self::edit_svg_image`].
+    pub(crate) fn svg_image_edit(
         &self,
         slide_position: usize,
         image_position: usize,
@@ -1710,7 +2179,8 @@ impl SourceBackedPresentationEditor {
     /// The edit supports at most [`MAX_SOURCE_BACKED_SLIDE_BATCH`] distinct
     /// slides and the ordinary opened-presentation aggregate text budget.
     #[must_use]
-    pub fn edit_slides(&self) -> SourceBackedSlideBatchEdit<'_> {
+    #[cfg(test)]
+    pub(crate) fn edit_slides(&self) -> SourceBackedSlideBatchEdit<'_> {
         SourceBackedSlideBatchEdit {
             editor: self,
             commits: Vec::new(),
@@ -1724,7 +2194,8 @@ impl SourceBackedPresentationEditor {
     /// raw-copies every other source ZIP member. A no-op reproduces the whole
     /// source artifact byte for byte; changed signed sources are refused by
     /// the underlying OPC publisher.
-    pub fn publish_slide_commit_to_stream<W: Write>(
+    #[cfg(test)]
+    pub(crate) fn publish_slide_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSlideCommit,
@@ -1748,6 +2219,7 @@ impl SourceBackedPresentationEditor {
             },
         };
         self.package.check_execution()?;
+        crate::source_limits::validate_xml_limits(target.xml.as_bytes(), self.limits)?;
         if let Some(replacement) = target.xml.edited_bytes() {
             self.package.write_part_overlay_shared_to_stream(
                 writer,
@@ -1771,11 +2243,11 @@ impl SourceBackedPresentationEditor {
     /// Parts are added only when explicitly selected by the replacement; old
     /// unreferenced media Parts are removed as part of the same dependency
     /// closure. No-op commits use the exact source publication path.
-    pub fn publish_svg_commit_to_stream<W: Write>(
+    pub(crate) fn publish_svg_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSvgCommit,
-    ) -> Result<SourceBackedSvgSnapshot> {
+    ) -> Result<SvgImage> {
         self.package.check_execution()?;
         let current = self.svg_snapshot_for(
             commit.patch.before.slide.position,
@@ -1783,7 +2255,7 @@ impl SourceBackedPresentationEditor {
             "publish_svg_commit_to_stream",
         )?;
         if !current.same_source(&commit.patch.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = commit.patch.apply(&current)?;
         if target.same_source(&current) {
@@ -1796,21 +2268,13 @@ impl SourceBackedPresentationEditor {
         Ok(target)
     }
 
-    /// Compatibility alias naming the selected media operation explicitly.
-    pub fn publish_svg_image_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &SourceBackedSvgCommit,
-    ) -> Result<SourceBackedSvgSnapshot> {
-        self.publish_svg_commit_to_stream(writer, commit)
-    }
-
     /// Publish one exact-source-checked multi-slide commit to a stream.
     ///
     /// Only changed selected slide XML members are regenerated. Selected
     /// no-ops and every unselected member retain their raw ZIP records. An
     /// all-no-op commit reproduces the complete source artifact byte for byte.
-    pub fn publish_slide_batch_commit_to_stream<W: Write>(
+    #[cfg(test)]
+    pub(crate) fn publish_slide_batch_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSlideBatchCommit,
@@ -1854,6 +2318,9 @@ impl SourceBackedPresentationEditor {
             },
         };
         self.package.check_execution()?;
+        for slide in target.slides() {
+            crate::source_limits::validate_xml_limits(slide.xml.as_bytes(), self.limits)?;
+        }
         let mut replacements = Vec::new();
         let changed_slides = target
             .slides()
@@ -1877,6 +2344,7 @@ impl SourceBackedPresentationEditor {
         Ok(target)
     }
 
+    #[cfg(test)]
     fn recapture_and_apply_slide_batch(
         &self,
         patch: &SourceBackedSlideBatchPatch,
@@ -1900,6 +2368,7 @@ impl SourceBackedPresentationEditor {
         patch.apply(&current)
     }
 
+    #[cfg(test)]
     fn validate_retained_raw_slide_snapshot(
         &self,
         snapshot: SourceBackedSlideSnapshot,
@@ -1908,10 +2377,10 @@ impl SourceBackedPresentationEditor {
         self.package.check_execution()?;
         let SourceBackedSlideSnapshot { closure, xml, .. } = snapshot;
         let SourcePayload::Original(raw) = xml else {
-            return Err(Error::UnsafeEdit {
+            return Err(Error::internal(
                 operation,
-                reason: "publication raw snapshot must retain original source bytes",
-            });
+                "publication raw snapshot must retain original source bytes",
+            ));
         };
         let part = SourcePart::from_binding(&closure.slide.slide, raw)?;
         #[cfg(test)]
@@ -1919,7 +2388,13 @@ impl SourceBackedPresentationEditor {
         SlidePart::from_part(&part)?;
         #[cfg(test)]
         record_test_semantic_scene_read();
-        crate::presentation::transition::validate_source(part.source_data().as_bytes(), operation)?;
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        crate::presentation::transition::admit_source_with_limits(
+            part.source_data().as_bytes(),
+            operation,
+            semantic.shape(),
+            semantic.transition(),
+        )?;
         self.package.check_execution()?;
         let _source_version = self.package.source_version()?;
         Ok(())
@@ -1948,7 +2423,10 @@ impl SourceBackedPresentationEditor {
                 #[cfg(test)]
                 record_test_semantic_scene_read();
                 {
-                    let _scene = crate::shape::Scene::read(raw.as_bytes())?;
+                    let _scene = crate::shape::Scene::read(
+                        raw.as_bytes(),
+                        crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+                    )?;
                 }
                 let part = SourcePart::from_view(&view, raw)?;
                 #[cfg(test)]
@@ -1958,6 +2436,8 @@ impl SourceBackedPresentationEditor {
                 return Err(error.into());
             },
         };
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        let laser_limits = semantic.laser().constrained_by_source(self.limits);
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
@@ -1968,10 +2448,22 @@ impl SourceBackedPresentationEditor {
                 presentation_xml: self._presentation.data.clone(),
                 slide: data.binding.clone(),
             },
-            max_output_bytes: source_slide_output_limit(self.limits),
+            max_output_bytes: source_slide_output_limit(
+                self.limits,
+                crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+            ),
+            protection_limits:
+                crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                    self.limits,
+                ),
+            semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
             context,
+            laser_limits,
+            laser_usage: Arc::new(OnceLock::new()),
+            // Read and publication snapshots are never edited.
+            mce: crate::presentation::transition::SlideMce::Plain,
         })
     }
 
@@ -1991,7 +2483,7 @@ impl SourceBackedPresentationEditor {
         slide_position: usize,
         image_position: usize,
         operation: &'static str,
-    ) -> Result<SourceBackedSvgSnapshot> {
+    ) -> Result<SvgImage> {
         let slide = self.slide_snapshot_for(slide_position, operation)?;
         self.capture_svg_snapshot(slide, image_position, operation)
     }
@@ -2000,14 +2492,22 @@ impl SourceBackedPresentationEditor {
         &self,
         slide: SourceBackedSlideSnapshot,
         image_position: usize,
-        _operation: &'static str,
-    ) -> Result<SourceBackedSvgSnapshot> {
+        operation: &'static str,
+    ) -> Result<SvgImage> {
         self.package.check_execution()?;
+        if slide.mce != crate::presentation::transition::SlideMce::Plain {
+            return Err(crate::presentation::transition::enclosed_edit_refusal(
+                operation,
+            ));
+        }
         let view = self.package.part(&slide.part_uri)?;
         let source_part = SourcePart::from_view(&view, view.data()?)?;
         validate_source_slide_root(&source_part)?;
         validate_full_slide_picture_relationships(&self.package, source_part.blob())?;
-        let scene = crate::shape::Scene::read(source_part.blob())?;
+        let scene = crate::shape::Scene::read(
+            source_part.blob(),
+            crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+        )?;
         let mut picture_xmls = Vec::new();
         picture_xmls
             .try_reserve(scene.len())
@@ -2125,7 +2625,7 @@ impl SourceBackedPresentationEditor {
         }
         self.package.check_execution()?;
         self.package.source_version()?;
-        Ok(SourceBackedSvgSnapshot {
+        Ok(SvgImage {
             slide,
             image_position,
             svg_relationship_id: svg.id.clone(),
@@ -2160,7 +2660,14 @@ impl SourceBackedPresentationEditor {
         let context = self.package.execution_context();
         #[cfg(test)]
         record_test_semantic_scene_read();
-        crate::presentation::transition::validate_source(raw.as_bytes(), operation)?;
+        crate::source_limits::validate_xml_limits(raw.as_bytes(), self.limits)?;
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        let mce = crate::presentation::transition::admit_source_with_limits(
+            raw.as_bytes(),
+            operation,
+            semantic.shape(),
+            semantic.transition(),
+        )?;
         let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
@@ -2175,6 +2682,7 @@ impl SourceBackedPresentationEditor {
         let SourcePart { data: raw, .. } = part;
         self.package.check_execution()?;
         let source_version = self.package.source_version()?;
+        let laser_limits = semantic.laser().constrained_by_source(self.limits);
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
@@ -2185,10 +2693,21 @@ impl SourceBackedPresentationEditor {
                 presentation_xml: self._presentation.data.clone(),
                 slide: data.binding.clone(),
             },
-            max_output_bytes: source_slide_output_limit(self.limits),
+            max_output_bytes: source_slide_output_limit(
+                self.limits,
+                crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+            ),
+            protection_limits:
+                crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                    self.limits,
+                ),
+            semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
             context,
+            laser_limits,
+            laser_usage: Arc::new(OnceLock::new()),
+            mce,
         })
     }
 }
@@ -2196,7 +2715,7 @@ impl SourceBackedPresentationEditor {
 impl SourceBackedSlideSnapshot {
     /// Checked zero-based slide position in the presentation catalog.
     #[must_use]
-    pub const fn position(&self) -> usize {
+    pub(crate) const fn position(&self) -> usize {
         self.position
     }
 
@@ -2210,9 +2729,12 @@ impl SourceBackedSlideSnapshot {
     /// direct-slide capability. Supported PowerPoint extension transitions are
     /// read through their typed MCE choice and fallback without selecting any
     /// unrelated slide markup.
-    pub fn transition(&self) -> Result<Option<crate::transition::Transition>> {
+    pub(crate) fn transition(&self) -> Result<Option<crate::transition::Transition>> {
         self.check_execution()?;
-        let mut transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
+        let mut transition = crate::presentation::transition::read_direct_with_limits(
+            self.xml.as_bytes(),
+            crate::open_options::selected(self.semantic_limits.as_ref()).transition(),
+        )?;
         if let Some(transition) = transition.as_mut() {
             transition.locate_in_part(self.part_uri.as_str());
         }
@@ -2222,46 +2744,183 @@ impl SourceBackedSlideSnapshot {
 
     /// Start an isolated focused edit from this exact source snapshot.
     #[must_use]
-    pub fn edit(&self) -> SourceBackedSlideEdit {
+    pub(crate) fn edit(&self) -> SourceBackedSlideEdit {
         SourceBackedSlideEdit {
             source: self.clone(),
             working: self.xml.clone(),
             operation_used: false,
             context: self.context.clone(),
+            source_max_output_bytes: self.max_output_bytes,
         }
     }
 
     /// Check the retained caller execution policy before creating an edit
     /// handle. The infallible [`Self::edit`] constructor remains available for
     /// compatibility because it performs no payload I/O.
-    pub fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
+    #[cfg(test)]
+    pub(crate) fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
         self.check_execution()?;
         Ok(self.edit())
+    }
+
+    /// Start a checked focused edit under a caller-selected output bound.
+    ///
+    /// The bound controls every candidate XML builder and reservation during
+    /// staging.  The immutable source identity keeps its original physical
+    /// output policy when the edit is committed, so changing the transient
+    /// admission ceiling cannot manufacture a patch conflict.
+    pub(crate) fn edit_checked_with_max_patch_bytes(
+        &self,
+        maximum: usize,
+    ) -> Result<SourceBackedSlideEdit> {
+        self.check_execution()?;
+        let mut edit = self.edit();
+        edit.source.max_output_bytes = edit.source.max_output_bytes.min(maximum);
+        edit.source_max_output_bytes = self.max_output_bytes;
+        Ok(edit)
     }
 
     fn check_execution(&self) -> Result<()> {
         check_execution_context(self.context.as_ref())
     }
 
+    #[cfg(test)]
+    fn laser_usage(&self) -> Result<crate::laser::Usage> {
+        if let Some(usage) = self.laser_usage.get() {
+            return Ok(*usage);
+        }
+        let usage = capture_laser_usage(self.xml.as_bytes(), self.laser_limits)?;
+        let _ = self.laser_usage.set(usage);
+        Ok(usage)
+    }
+
     fn same_source(&self, other: &Self) -> bool {
         self.position == other.position
             && self.part_uri == other.part_uri
-            && self.source_version == other.source_version
-            && self.lineage == other.lineage
             && self.xml.as_bytes() == other.xml.as_bytes()
             && self.closure.package_relationships == other.closure.package_relationships
             && self.closure.presentation == other.closure.presentation
             && self.closure.presentation_xml.as_bytes() == other.closure.presentation_xml.as_bytes()
             && self.closure.slide == other.closure.slide
-            && self.max_output_bytes == other.max_output_bytes
+    }
+
+    /// Rebase an edited source image onto the recipient's retained policy.
+    /// Equal source bytes are the patch scope; a profile difference is a
+    /// destination admission question, never a source conflict.
+    fn rebase_policy(&self, recipient: &Self) -> Result<Self> {
+        let mut usage = crate::laser::Usage::default();
+        self.rebase_policy_with_usage(recipient, &mut usage)
+    }
+
+    fn rebase_policy_with_usage(
+        &self,
+        recipient: &Self,
+        usage: &mut crate::laser::Usage,
+    ) -> Result<Self> {
+        let mut target = self.clone();
+        // A replayed candidate always belongs to the recipient's execution
+        // scope, even when its semantic and output profiles compare equal.
+        // A managed reservation belongs to the source edit's budget until the
+        // recipient admits the replay. Rehome an equivalent token below so
+        // the published candidate is charged to the recipient instead.
+        target.context = recipient.context.clone();
+        target.max_output_bytes = recipient.max_output_bytes;
+        target.semantic_limits = recipient.semantic_limits.clone();
+        let same_laser_policy = target.laser_limits == recipient.laser_limits;
+        target.laser_limits = recipient.laser_limits;
+        if !same_laser_policy {
+            target.laser_usage = Arc::new(OnceLock::new());
+        }
+        target.xml = rebase_payload_reservation(target.xml, recipient.context.as_ref())?;
+        if target.xml.as_bytes().len() > recipient.max_output_bytes {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: target.xml.as_bytes().len(),
+                maximum: recipient.max_output_bytes,
+            });
+        }
+        let semantic = crate::open_options::selected(recipient.semantic_limits.as_ref());
+        target.mce = crate::presentation::transition::admit_source_with_limits(
+            target.xml.as_bytes(),
+            "apply",
+            semantic.shape(),
+            semantic.transition(),
+        )?;
+        let slide_usage = if same_laser_policy {
+            match self.laser_usage.get().copied() {
+                Some(usage) => usage,
+                None => capture_laser_usage(target.xml.as_bytes(), recipient.laser_limits)?,
+            }
+        } else {
+            capture_laser_usage(target.xml.as_bytes(), recipient.laser_limits)?
+        };
+        merge_laser_usage(usage, slide_usage, recipient.laser_limits)?;
+        if same_laser_policy && self.laser_usage.get().is_none() {
+            let _ = self.laser_usage.set(slide_usage);
+        }
+        if !same_laser_policy {
+            let _ = target.laser_usage.set(slide_usage);
+        }
+        Ok(target)
     }
 }
 
 impl SourceBackedSlideEdit {
     /// Exact immutable slide snapshot against which this edit was created.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideSnapshot {
         &self.source
+    }
+
+    /// Replace the authored slide name and/or visibility attributes in one
+    /// source-backed slide operation.
+    ///
+    /// `name` targets `p:cSld@name`; `hidden` targets the inverse of
+    /// `p:sld@show`. Omitted fields are preserved byte-for-byte. The shared
+    /// codec retains all unrelated root, shape, and opaque XML, and an equal
+    /// value is an exact no-op.
+    pub(crate) fn set_slide_properties(
+        &mut self,
+        name: Option<&str>,
+        hidden: Option<bool>,
+    ) -> Result<bool> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_slide_properties")?;
+        if name.is_none() && hidden.is_none() {
+            return Ok(false);
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_slide_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let reservation = reserve_source_slide_properties(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            name,
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        let xml = crate::opened::stage_slide_properties(
+            self.working.as_bytes(),
+            name,
+            hidden,
+            self.source.max_output_bytes,
+        )?;
+        let changed = xml.is_some();
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
     }
 
     /// Set or replace this existing slide's direct typed transition.
@@ -2270,7 +2929,7 @@ impl SourceBackedSlideEdit {
     /// supplied value may use the supported PowerPoint extension vocabulary
     /// and custom duration. Unknown transition effects are refused. An equal
     /// modeled value is an exact byte no-op.
-    pub fn set_transition(&mut self, value: &crate::transition::Transition) -> Result<bool> {
+    pub(crate) fn set_transition(&mut self, value: &crate::transition::Transition) -> Result<bool> {
         self.stage_transition(Some(value), "set_transition")
     }
 
@@ -2278,7 +2937,7 @@ impl SourceBackedSlideEdit {
     ///
     /// An absent direct transition is an exact byte no-op. Inherited
     /// layout/master state is not removed or rewritten.
-    pub fn clear_transition(&mut self) -> Result<bool> {
+    pub(crate) fn clear_transition(&mut self) -> Result<bool> {
         self.stage_transition(None, "clear_transition")
     }
 
@@ -2289,17 +2948,20 @@ impl SourceBackedSlideEdit {
     ) -> Result<bool> {
         self.check_execution()?;
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
-        let (xml, changed) = crate::presentation::transition::stage(
+        let (xml, changed) = crate::presentation::transition::stage_with_limits(
             self.working.as_bytes(),
             self.source.closure.presentation_xml.as_bytes(),
             value,
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).transition(),
             operation,
+            self.source.protection_limits,
         )?;
         if let Some(xml) = xml {
             self.working = SourcePayload::Edited(Arc::new(xml));
@@ -2313,7 +2975,8 @@ impl SourceBackedSlideEdit {
     ///
     /// Structure, formatting, opaque XML, relationships, and every other ZIP
     /// member remain outside this edit's closure.
-    pub fn set_shape_text<'k>(
+    #[cfg(test)]
+    pub(crate) fn set_shape_text<'k>(
         &mut self,
         shape: impl Into<crate::shape::Key<'k>>,
         text: impl AsRef<str>,
@@ -2321,6 +2984,63 @@ impl SourceBackedSlideEdit {
         let text = text.as_ref();
         let replacement = crate::opened::ShapeTextReplacement::new(shape.into(), text);
         Ok(self.set_shape_texts(std::slice::from_ref(&replacement))? != 0)
+    }
+
+    /// Remove one direct top-level shape from this exact source slide.
+    ///
+    /// A whole top-level group may be removed as one opaque root; selecting a
+    /// grouped descendant is refused. Connector endpoints and animation
+    /// targets that still point at any removed identity are also refused.
+    /// Source-backed removal keeps the slide relationship table and any now
+    /// unreachable Parts intact so the exact source topology remains
+    /// reversible; the eager package editor may prune that closure separately.
+    pub(crate) fn remove_shape<'k>(
+        &mut self,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<bool> {
+        self.check_execution()?;
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "remove_shape",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let reservation = reserve_source_shape_removal(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        // A slide that encloses markup compatibility in shape children is
+        // spliced on its source bytes (record 0303).
+        let (xml, changed) = if self.source.mce == crate::presentation::transition::SlideMce::Plain
+        {
+            crate::opened::stage_shape_removal_with_limits(
+                self.working.as_bytes(),
+                shape.into(),
+                self.source.max_output_bytes,
+                crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+            )?
+        } else {
+            crate::opened::stage_enclosed_shape_removal_with_limits(
+                self.working.as_bytes(),
+                shape.into(),
+                self.source.max_output_bytes,
+                crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+            )?
+        };
+        let Some(xml) = xml else {
+            return Ok(false);
+        };
+        self.check_execution()?;
+        let bytes = Arc::new(xml);
+        self.working = match reservation {
+            Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+            None => SourcePayload::Edited(bytes),
+        };
+        self.operation_used = true;
+        Ok(changed != 0)
     }
 
     /// Atomically replace visible text in a bounded set of shapes.
@@ -2332,25 +3052,28 @@ impl SourceBackedSlideEdit {
     ///
     /// An empty batch is a no-op and does not consume the edit capability. A
     /// successful nonempty batch, including an all-equal batch, consumes it.
-    pub fn set_shape_texts(
+    pub(crate) fn set_shape_texts(
         &mut self,
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
     ) -> Result<usize> {
         self.check_execution()?;
+        self.refuse_enclosed("set_shape_texts")?;
         if replacements.is_empty() {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_texts",
-                reason: "source-backed slide edits support one atomic shape text operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_texts",
+                "source-backed slide edits support one atomic shape text operation",
+            ));
         }
-        let (xml, changed) = crate::opened::stage_shape_texts(
+        let (xml, changed) = crate::opened::stage_shape_texts_with_limits(
             self.working.as_bytes(),
             replacements,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         if let Some(xml) = xml {
             self.working = SourcePayload::Edited(Arc::new(xml));
@@ -2360,23 +3083,394 @@ impl SourceBackedSlideEdit {
         Ok(changed)
     }
 
+    /// Atomically replace text from several already bounded same-slide
+    /// batches in one scene read, rewrite, and read-back.
+    ///
+    /// Every inner slice retains the ordinary 256-selector and aggregate text
+    /// limits of [`Self::set_shape_texts`]. The chunks must identify a
+    /// globally disjoint set of shapes; the native codec validates that
+    /// contract before publishing the single candidate payload. The number of
+    /// chunks and the aggregate selection count are bounded by the native
+    /// scene shape limit.
+    /// Aggregate replacement text is bounded by the slide output-byte limit.
+    pub(crate) fn set_shape_text_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::ShapeTextReplacement<'_>]],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_shape_text_chunks")?;
+        let shape_limits =
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape();
+        if chunks.len() > shape_limits.shapes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::TextReplacements,
+                ),
+                observed: chunks.len(),
+                maximum: shape_limits.shapes(),
+            });
+        }
+        if chunks.iter().all(|chunk| chunk.is_empty()) {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_text_chunks",
+                "source-backed slide edits support one atomic shape text operation",
+            ));
+        }
+        let admission = crate::opened::admit_shape_text_chunks(
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        debug_assert!(admission.selections() != 0);
+        let reservation = reserve_source_shape_text_chunks(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            admission,
+            self.source.max_output_bytes,
+        )?;
+        let (xml, changed) = crate::opened::stage_shape_text_chunks_admitted_with_limits(
+            self.working.as_bytes(),
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            admission,
+            shape_limits,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Atomically update text and bounds on selected shapes of this slide.
+    ///
+    /// Only existing direct DrawingML transforms are edited. The operation
+    /// retains opaque XML and applies all requested properties together.
+    /// An empty batch does not consume this focused edit's operation allowance.
+    pub(crate) fn set_shape_properties(
+        &mut self,
+        replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_shape_properties")?;
+        if replacements.is_empty() {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let reservation = reserve_source_shape_properties(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            replacements,
+            self.source.max_output_bytes,
+        )?;
+        let (xml, changed) = crate::opened::stage_shape_properties_with_limits(
+            self.working.as_bytes(),
+            replacements,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Atomically replace text and/or bounds from several already bounded
+    /// same-slide property batches in one scene read, rewrite, and read-back.
+    /// Every inner slice retains the ordinary per-call property limits.
+    /// Aggregate replacement text is bounded by the slide output-byte limit.
+    pub(crate) fn set_shape_property_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::ShapePropertiesReplacement<'_>]],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_shape_property_chunks")?;
+        let shape_limits =
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape();
+        if chunks.len() > shape_limits.shapes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ShapeProperties,
+                ),
+                observed: chunks.len(),
+                maximum: shape_limits.shapes(),
+            });
+        }
+        if chunks.iter().all(|chunk| chunk.is_empty()) {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_property_chunks",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let admission = crate::opened::admit_shape_property_chunks(
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        debug_assert!(admission.selections() != 0);
+        let reservation = reserve_source_shape_property_chunks(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            admission,
+            self.source.max_output_bytes,
+        )?;
+        let (xml, changed) = crate::opened::stage_shape_property_chunks_admitted_with_limits(
+            self.working.as_bytes(),
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            admission,
+            shape_limits,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Apply a bounded batch of rich text edits to this exact source slide.
+    ///
+    /// See [`crate::opened::Edit::set_text_properties`]. Only the selected
+    /// slide payload changes, so the source-backed proof path still applies.
+    pub(crate) fn set_text_properties(
+        &mut self,
+        edits: &[crate::opened::TextAssignment<'_>],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_text_properties")?;
+        if edits.is_empty() {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_text_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let (xml, changed) = crate::opened::stage_text_properties_with_limits(
+            self.working.as_bytes(),
+            edits,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            self.working = SourcePayload::Edited(Arc::new(xml));
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Insert or remove one paragraph or run of a text body of this exact
+    /// source slide (record 0333); see
+    /// [`crate::opened::Edit::insert_paragraph`]. Only the selected slide
+    /// payload changes. Notes-page bodies live in another part and are
+    /// refused.
+    pub(crate) fn change_text_body(
+        &mut self,
+        body: crate::opened::TextBody,
+        change: &crate::opened::TextChange<'_>,
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("text_structure")?;
+        if matches!(body, crate::opened::TextBody::Notes { .. }) {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "text_structure",
+                "source-backed slide edits do not stage notes pages",
+            ));
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "text_structure",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let xml = crate::opened::stage_text_structure_with_limits(
+            self.working.as_bytes(),
+            body,
+            change,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+        )?;
+        self.check_execution()?;
+        self.working = SourcePayload::Edited(Arc::new(xml));
+        self.operation_used = true;
+        Ok(1)
+    }
+
+    /// Apply several bounded batches of rich text edits to this exact source
+    /// slide in one pass (record 0333); see
+    /// [`crate::opened::Edit::set_text_property_chunks`].
+    pub(crate) fn set_text_property_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
+    ) -> Result<usize> {
+        self.text_property_chunks(chunks, None)
+    }
+
+    pub(crate) fn text_property_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
+        mut changes: Option<&mut Vec<bool>>,
+    ) -> Result<usize> {
+        self.check_execution()?;
+        self.refuse_enclosed("set_text_properties")?;
+        if chunks.iter().all(|chunk| chunk.is_empty()) {
+            if let Some(changes) = changes.as_deref_mut() {
+                changes.clear();
+            }
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_text_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let (xml, changed) = crate::opened::stage_text_property_chunks_with_limits(
+            self.working.as_bytes(),
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            changes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            self.working = SourcePayload::Edited(Arc::new(xml));
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Add one plain DrawingML text box to this exact source slide.
+    ///
+    /// The operation is staged against the retained slide bytes and then
+    /// semantically read back before the edit is published. It does not build
+    /// an eager package or rewrite any related Part, so the surrounding source
+    /// XML remains eligible for the source-backed durable proof path.
+    pub(crate) fn add_text_box(
+        &mut self,
+        text: impl AsRef<str>,
+        bounds: (i64, i64, i64, i64),
+    ) -> Result<u32> {
+        self.check_execution()?;
+        self.refuse_enclosed("add_text_box")?;
+        if self.operation_used {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "add_text_box",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
+        }
+        let text = text.as_ref();
+        crate::opened::validate_text_box_input(text, bounds)?;
+        let reservation = reserve_source_text_box(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            text.len(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        let (xml, shape_id) = crate::opened::stage_text_box(
+            self.working.as_bytes(),
+            text,
+            bounds,
+            self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
+        )?;
+        self.check_execution()?;
+        let bytes = Arc::new(xml);
+        self.working = match reservation {
+            Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+            None => SourcePayload::Edited(bytes),
+        };
+        self.operation_used = true;
+        Ok(shape_id)
+    }
+
     fn check_execution(&self) -> Result<()> {
         check_execution_context(self.context.as_ref())
     }
 
+    /// Markup compatibility enclosed in shape children admits only whole
+    /// top-level shape removal; every other edit keeps the guard
+    /// (record 0303).
+    fn refuse_enclosed(&self, operation: &'static str) -> Result<()> {
+        if self.source.mce == crate::presentation::transition::SlideMce::Plain {
+            Ok(())
+        } else {
+            Err(crate::presentation::transition::enclosed_edit_refusal(
+                operation,
+            ))
+        }
+    }
+
     fn into_commit(self) -> SourceBackedSlideCommit {
+        let mut source = self.source;
+        source.max_output_bytes = self.source_max_output_bytes;
+        let working = self.working;
+        let unchanged = working.as_bytes() == source.xml.as_bytes();
         let snapshot = SourceBackedSlideSnapshot {
-            position: self.source.position,
-            part_uri: self.source.part_uri.clone(),
-            xml: self.working,
-            closure: self.source.closure.clone(),
-            max_output_bytes: self.source.max_output_bytes,
-            source_version: self.source.source_version,
-            lineage: self.source.lineage.clone(),
-            context: self.source.context.clone(),
+            position: source.position,
+            part_uri: source.part_uri.clone(),
+            xml: working,
+            closure: source.closure.clone(),
+            max_output_bytes: self.source_max_output_bytes,
+            protection_limits: source.protection_limits,
+            semantic_limits: source.semantic_limits.clone(),
+            source_version: source.source_version,
+            lineage: source.lineage.clone(),
+            context: source.context.clone(),
+            laser_limits: source.laser_limits,
+            laser_usage: if unchanged {
+                Arc::clone(&source.laser_usage)
+            } else {
+                Arc::new(OnceLock::new())
+            },
+            mce: source.mce,
         };
         let patch = SourceBackedSlidePatch {
-            before: self.source,
+            before: source,
             after: snapshot.clone(),
         };
         SourceBackedSlideCommit { snapshot, patch }
@@ -2384,12 +3478,13 @@ impl SourceBackedSlideEdit {
 
     /// Validate and freeze this isolated edit for source-backed publication.
     #[must_use]
-    pub fn commit(self) -> SourceBackedSlideCommit {
+    #[cfg(test)]
+    pub(crate) fn commit(self) -> SourceBackedSlideCommit {
         self.into_commit()
     }
 
     /// Check cancellation and freeze this isolated edit for publication.
-    pub fn commit_checked(self) -> Result<SourceBackedSlideCommit> {
+    pub(crate) fn commit_checked(self) -> Result<SourceBackedSlideCommit> {
         self.check_execution()?;
         let commit = self.into_commit();
         commit.snapshot.check_execution()?;
@@ -2400,31 +3495,32 @@ impl SourceBackedSlideEdit {
 impl SourceBackedSlidePatch {
     /// Exact immutable source required by this patch.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideSnapshot {
         &self.before
     }
 
-    /// Exact immutable target produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSlideSnapshot {
-        &self.after
+    fn is_changed(&self) -> bool {
+        !self.before.same_source(&self.after)
     }
 
-    /// Whether this patch changes the selected slide XML bytes.
+    /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.before.same_source(&self.after)
+    #[cfg(test)]
+    pub(crate) fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse slide patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
+    #[cfg(test)]
     fn try_apply_fast(
         &self,
         source: &SourceBackedSlideSnapshot,
@@ -2436,14 +3532,17 @@ impl SourceBackedSlidePatch {
     }
 
     /// Apply only to the exact raw slide source captured by this patch.
-    pub fn apply(&self, source: &SourceBackedSlideSnapshot) -> Result<SourceBackedSlideSnapshot> {
+    pub(crate) fn apply(
+        &self,
+        source: &SourceBackedSlideSnapshot,
+    ) -> Result<SourceBackedSlideSnapshot> {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
-            self.after.clone()
+            self.after.rebase_policy(source)?
         } else {
             source.clone()
         })
@@ -2453,24 +3552,32 @@ impl SourceBackedSlidePatch {
 impl SourceBackedSlideCommit {
     /// Candidate snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSlideSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SourceBackedSlideSnapshot {
         &self.snapshot
     }
 
     /// Exact-source slide patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSlidePatch {
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &SourceBackedSlidePatch {
         &self.patch
     }
 
-    /// Whether the selected slide XML changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
-impl SourceBackedSvgSnapshot {
+impl SvgImage {
     /// Zero-based presentation position of the owning slide.
     #[must_use]
     pub const fn slide_position(&self) -> usize {
@@ -2521,7 +3628,7 @@ impl SourceBackedSvgSnapshot {
 
     /// Start an isolated edit from this exact SVG source snapshot.
     #[must_use]
-    pub fn edit(&self) -> SourceBackedSvgEdit {
+    pub(crate) fn edit(&self) -> SourceBackedSvgEdit {
         SourceBackedSvgEdit {
             source: self.clone(),
             svg_part_uri: self.svg_part_uri.clone(),
@@ -2548,14 +3655,13 @@ impl SourceBackedSvgSnapshot {
             && self.raster_part_uri == other.raster_part_uri
             && self.svg.as_bytes() == other.svg.as_bytes()
             && self.raster.as_bytes() == other.raster.as_bytes()
-            && self.limits == other.limits
     }
 }
 
 impl SourceBackedSvgEdit {
     /// Exact immutable source snapshot against which this edit was created.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgSnapshot {
+    pub(crate) const fn source(&self) -> &SvgImage {
         &self.source
     }
 
@@ -2565,12 +3671,13 @@ impl SourceBackedSvgEdit {
     /// URIs are applied as relationship-target changes during publication. An
     /// equal payload and equal target URI is an exact no-op, retaining the
     /// original managed source allocation.
-    pub fn replace(&mut self, replacement: SourceSvgReplacement) -> Result<bool> {
+    pub(crate) fn replace(&mut self, replacement: SvgReplacement) -> Result<bool> {
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "replace_svg_image",
-                reason: "source-backed SVG edits support one atomic replacement",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "replace_svg_image",
+                "source-backed SVG edits support one atomic replacement",
+            ));
         }
         let svg_part_uri = replacement
             .svg_part_uri
@@ -2618,8 +3725,8 @@ impl SourceBackedSvgEdit {
 
     /// Validate and freeze this isolated SVG transaction.
     #[must_use]
-    pub fn commit(self) -> SourceBackedSvgCommit {
-        let snapshot = SourceBackedSvgSnapshot {
+    pub(crate) fn commit(self) -> SourceBackedSvgCommit {
+        let snapshot = SvgImage {
             slide: self.source.slide.clone(),
             image_position: self.source.image_position,
             svg_relationship_id: self.source.svg_relationship_id.clone(),
@@ -2640,7 +3747,7 @@ impl SourceBackedSvgEdit {
     }
 
     /// Check the retained execution policy and freeze this transaction.
-    pub fn commit_checked(self) -> Result<SourceBackedSvgCommit> {
+    pub(crate) fn commit_checked(self) -> Result<SourceBackedSvgCommit> {
         self.source.slide.check_execution()?;
         let commit = self.commit();
         commit.snapshot.slide.check_execution()?;
@@ -2649,27 +3756,32 @@ impl SourceBackedSvgEdit {
 }
 
 impl SourceBackedSvgPatch {
-    /// Exact immutable source required by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgSnapshot {
-        &self.before
+    /// The slide and picture positions this patch addresses.
+    pub(crate) fn location(&self) -> (usize, usize) {
+        (self.before.slide.position, self.before.image_position)
     }
 
-    /// Exact immutable target produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSvgSnapshot {
-        &self.after
+    /// The commit that publishes this patch.
+    pub(crate) fn to_commit(&self) -> SourceBackedSvgCommit {
+        SourceBackedSvgCommit {
+            snapshot: self.after.clone(),
+            patch: self.clone(),
+        }
     }
 
-    /// Whether the media payload or relationship target changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub(crate) fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse SVG patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -2677,47 +3789,67 @@ impl SourceBackedSvgPatch {
     }
 
     /// Apply only to the exact source snapshot captured by this patch.
-    pub fn apply(&self, source: &SourceBackedSvgSnapshot) -> Result<SourceBackedSvgSnapshot> {
+    pub(crate) fn apply(&self, source: &SvgImage) -> Result<SvgImage> {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
-        Ok(if self.is_changed() {
-            self.after.clone()
+        if !self.is_changed() {
+            return Ok(source.clone());
+        }
+        let mut target = self.after.clone();
+        target.slide = if self.after.slide.same_source(&source.slide) {
+            // An SVG/media-only change does not alter slide XML. Keep the
+            // recipient snapshot verbatim so opaque slide markup is not
+            // newly admitted under its semantic profile.
+            source.slide.clone()
         } else {
-            source.clone()
-        })
+            self.after.slide.rebase_policy(&source.slide)?
+        };
+        target.limits = source.limits;
+        check_svg_replacement_payload(&target.limits, target.svg.as_bytes().len(), true)?;
+        check_svg_replacement_payload(&target.limits, target.raster.as_bytes().len(), false)?;
+        Ok(target)
     }
 }
 
 impl SourceBackedSvgCommit {
     /// Candidate SVG transaction snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SvgImage {
         &self.snapshot
     }
 
     /// Exact-source SVG patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSvgPatch {
+    pub(crate) const fn patch(&self) -> &SourceBackedSvgPatch {
         &self.patch
     }
 
-    /// Whether the media payload or relationship target changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchEdit<'_> {
     /// Atomically replace visible text in one bounded shape set on one slide.
     ///
     /// A slide position may be selected only once in the outer batch. An empty
     /// shape batch is a no-op and does not select the slide. The return value
     /// is the number of shapes whose text bytes changed.
-    pub fn set_shape_texts(
+    #[cfg(test)]
+    pub(crate) fn set_shape_texts(
         &mut self,
         position: usize,
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
@@ -2737,15 +3869,17 @@ impl SourceBackedSlideBatchEdit<'_> {
             .iter()
             .any(|commit| commit.snapshot.position == position)
         {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_texts",
-                reason: "a source-backed slide batch may select each slide only once",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_texts",
+                "a source-backed slide batch may select each slide only once",
+            ));
         }
         if self.commits.len() >= MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(Error::Limit {
-                resource: "source-backed slide batch selections",
-                limit: MAX_SOURCE_BACKED_SLIDE_BATCH,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+                observed: self.commits.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: MAX_SOURCE_BACKED_SLIDE_BATCH,
             });
         }
         let added_text_bytes = replacements
@@ -2754,21 +3888,24 @@ impl SourceBackedSlideBatchEdit<'_> {
                 total
                     .checked_add(replacement.text().len())
                     .ok_or(Error::Limit {
-                        resource: "source-backed slide batch replacement text",
-                        limit: crate::opened::Limits::default().max_text_bytes(),
+                        kind: crate::opened::LimitKind::TextBytes,
+                        observed: usize::MAX,
+                        maximum: crate::opened::Limits::default().max_text_bytes(),
                     })
             })?;
         let text_bytes = self
             .text_bytes
             .checked_add(added_text_bytes)
             .ok_or(Error::Limit {
-                resource: "source-backed slide batch replacement text",
-                limit: crate::opened::Limits::default().max_text_bytes(),
+                kind: crate::opened::LimitKind::TextBytes,
+                observed: usize::MAX,
+                maximum: crate::opened::Limits::default().max_text_bytes(),
             })?;
         if text_bytes > crate::opened::Limits::default().max_text_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed slide batch replacement text",
-                limit: crate::opened::Limits::default().max_text_bytes(),
+                kind: crate::opened::LimitKind::TextBytes,
+                observed: text_bytes,
+                maximum: crate::opened::Limits::default().max_text_bytes(),
             });
         }
 
@@ -2787,13 +3924,15 @@ impl SourceBackedSlideBatchEdit<'_> {
     }
 
     /// Validate and freeze this selected slide set for publication.
-    pub fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
+    #[cfg(test)]
+    pub(crate) fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
         self.editor.package.check_execution()?;
         if self.commits.is_empty() {
-            return Err(Error::UnsafeEdit {
-                operation: "commit_slide_batch",
-                reason: "a source-backed slide batch requires at least one selected slide",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "commit_slide_batch",
+                "a source-backed slide batch requires at least one selected slide",
+            ));
         }
         self.commits
             .sort_unstable_by_key(|commit| commit.snapshot.position);
@@ -2833,18 +3972,22 @@ impl SourceBackedSlideBatchEdit<'_> {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchSnapshot {
     /// Number of selected slides in this exact-source snapshot.
     #[must_use]
-    pub const fn slide_count(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) const fn slide_count(&self) -> usize {
         self.slides.len()
     }
 
     /// Selected slide snapshots in ascending presentation order.
-    pub fn slides(&self) -> impl ExactSizeIterator<Item = &SourceBackedSlideSnapshot> {
+    #[cfg(test)]
+    pub(crate) fn slides(&self) -> impl ExactSizeIterator<Item = &SourceBackedSlideSnapshot> {
         self.slides.iter()
     }
 
+    #[cfg(test)]
     fn same_source(&self, other: &Self) -> bool {
         self.slides.len() == other.slides.len()
             && self
@@ -2854,6 +3997,7 @@ impl SourceBackedSlideBatchSnapshot {
                 .all(|(left, right)| left.same_source(right))
     }
 
+    #[cfg(test)]
     fn check_execution(&self) -> Result<()> {
         for slide in &self.slides {
             slide.check_execution()?;
@@ -2862,34 +4006,31 @@ impl SourceBackedSlideBatchSnapshot {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchPatch {
     /// Exact immutable selected slide set required by this patch.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideBatchSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideBatchSnapshot {
         &self.before
     }
 
-    /// Exact immutable selected slide set produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSlideBatchSnapshot {
-        &self.after
-    }
-
-    /// Whether any selected slide XML bytes change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse multi-slide patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
+    #[cfg(test)]
     fn try_apply_fast(
         &self,
         source: &SourceBackedSlideBatchSnapshot,
@@ -2901,40 +4042,75 @@ impl SourceBackedSlideBatchPatch {
     }
 
     /// Apply only to the exact selected slide set captured by this patch.
-    pub fn apply(
+    #[cfg(test)]
+    pub(crate) fn apply(
         &self,
         source: &SourceBackedSlideBatchSnapshot,
     ) -> Result<SourceBackedSlideBatchSnapshot> {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
-        Ok(if self.is_changed() {
-            self.after.clone()
-        } else {
-            source.clone()
+        if !self.is_changed() {
+            return Ok(source.clone());
+        }
+        let mut slides = Vec::new();
+        slides
+            .try_reserve_exact(self.after.slides.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch replay snapshots",
+                source,
+            })?;
+        let mut usage = crate::laser::Usage::default();
+        for (after, recipient) in self.after.slides.iter().zip(source.slides.iter()) {
+            if after.same_source(recipient) {
+                // The patch did not change this slide. Preserve the
+                // recipient snapshot without re-admitting opaque XML under a
+                // possibly tighter semantic profile, but charge its source
+                // admission ledger to the same selected batch scope.
+                merge_laser_usage(&mut usage, recipient.laser_usage()?, recipient.laser_limits)?;
+                slides.push(recipient.clone());
+            } else {
+                // One usage ledger covers every selected slide in this batch;
+                // changed slides are re-admitted under the recipient policy,
+                // while unchanged slides contribute their captured source
+                // usage above without a second XML scan.
+                slides.push(after.rebase_policy_with_usage(recipient, &mut usage)?);
+            }
+        }
+        Ok(SourceBackedSlideBatchSnapshot {
+            slides: slides.into_boxed_slice(),
         })
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchCommit {
     /// Candidate selected slide set after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSlideBatchSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SourceBackedSlideBatchSnapshot {
         &self.snapshot
     }
 
     /// Exact-source multi-slide patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSlideBatchPatch {
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &SourceBackedSlideBatchPatch {
         &self.patch
     }
 
-    /// Whether any selected slide XML bytes change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
@@ -2945,15 +4121,12 @@ fn stage_svg_payload(current: &SourcePayload, replacement: Vec<u8>) -> SourcePay
     SourcePayload::Edited(Arc::new(replacement))
 }
 
-fn check_svg_replacement_payload(limits: &ReadLimits, bytes: usize, svg: bool) -> Result<()> {
+fn check_svg_replacement_payload(limits: &SourceLimits, bytes: usize, svg: bool) -> Result<()> {
     if bytes as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: if svg {
-                "SVG replacement Part bytes"
-            } else {
-                "raster replacement Part bytes"
-            },
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: bytes,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     if svg && bytes == 0 {
@@ -2980,8 +4153,8 @@ fn validate_svg_media_uri(uri: &PackURI) -> Result<()> {
 
 fn build_svg_topology_plan(
     package: &SourceBackedPackage,
-    current: &SourceBackedSvgSnapshot,
-    target: &SourceBackedSvgSnapshot,
+    current: &SvgImage,
+    target: &SvgImage,
 ) -> Result<SourceTopologyPlan> {
     if !target.slide.same_source(&current.slide)
         || target.image_position != current.image_position
@@ -2990,7 +4163,7 @@ fn build_svg_topology_plan(
         || target.raster_relationship_id != current.raster_relationship_id
         || target.raster_relationship_type != current.raster_relationship_type
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let owner = current.slide.part_uri.clone();
     let mut plan = SourceTopologyPlan::new();
@@ -3211,6 +4384,21 @@ impl SourceSlide {
         Ok(name)
     }
 
+    /// Return the authored `p:cSld@name`, without the physical slide-part
+    /// URI fallback returned by [`Self::name`].
+    ///
+    /// Only this selected slide's XML is loaded. Source-version and caller
+    /// execution checks surround the read, including when the payload is
+    /// already resident in the bounded source cache.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        self.owner.package.check_execution()?;
+        let part = self.part()?;
+        let name = SlidePart::from_part(&part)?.authored_name()?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
+        Ok(name)
+    }
+
     /// Read the selected slide's name and flattened text with one bounded
     /// source-part load.
     ///
@@ -3234,8 +4422,9 @@ impl SourceSlide {
         let raw_xml_limit = SlidePart::semantic_text_raw_xml_limit();
         if declared > raw_xml_limit as u64 {
             return Err(Error::Limit {
-                resource: "semantic slide raw XML bytes",
-                limit: raw_xml_limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                maximum: raw_xml_limit,
             });
         }
         let part = self.load_part(&view)?;
@@ -3323,7 +4512,10 @@ impl SourceSlide {
                 return Err(error);
             }
         }
-        let scene = match crate::shape::Scene::read(part.blob()) {
+        let scene = match crate::shape::Scene::read(
+            part.blob(),
+            crate::open_options::selected(self.owner.semantic_limits.as_ref()).shape(),
+        ) {
             Ok(scene) => scene,
             Err(Error::MarkupCompatibility(_)) => {
                 return self.query_images_from_raw_owner(&part, &view, mode);
@@ -4145,7 +5337,16 @@ fn attach_svg_relationship(
         inherited_namespaces,
         max_output_bytes,
     )?;
-    let blip = litchi_drawingml::svg_blip::read(&fragment)?;
+    let input_limit = usize::try_from(max_output_bytes)
+        .unwrap_or(usize::MAX)
+        .min(litchi_drawingml::svg_blip::MAX_XML_BYTES);
+    let blip = litchi_drawingml::svg_blip::read(
+        &fragment,
+        litchi_drawingml::svg_blip::Limits::new(
+            input_limit,
+            litchi_drawingml::svg_blip::MAX_XML_BYTES,
+        ),
+    )?;
     let (id, external) = match (blip.embedded(), blip.linked()) {
         (Some(id), None) => (id.as_str().to_owned(), false),
         (None, Some(id)) => (id.as_str().to_owned(), true),
@@ -4267,10 +5468,11 @@ fn validate_blip_attributes(
         }
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&namespace) {
-            return Err(Error::UnsafeEdit {
-                operation: "picture relationship parsing",
-                reason: "markup-compatibility attributes are refused",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "picture relationship parsing",
+                "markup-compatibility attributes are refused",
+            ));
         }
         // Extracted p:pic fragments omit ancestor namespace declarations; the
         // full-package caller validates the inherited relationship binding.
@@ -4577,10 +5779,11 @@ fn validate_full_slide_picture_relationships(
             // direct-owner/MCE rules; this relationship pass only rejects a
             // document type declaration, which cannot be preserved safely.
             Event::DocType(_) => {
-                return Err(Error::UnsafeEdit {
-                    operation: "source-backed picture inventory",
-                    reason: "DOCTYPE content is refused",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "source-backed picture inventory",
+                    "DOCTYPE content is refused",
+                ));
             },
             Event::PI(_) => {},
             Event::Eof => break,
@@ -4614,10 +5817,11 @@ fn validate_full_slide_blip_attributes(
         let key = attribute.key.as_ref();
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&namespace) {
-            return Err(Error::UnsafeEdit {
-                operation: "source-backed picture inventory",
-                reason: "markup-compatibility attributes are refused",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "source-backed picture inventory",
+                "markup-compatibility attributes are refused",
+            ));
         }
         let relationship_namespace = match &namespace {
             ResolveResult::Bound(Namespace(value))
@@ -4896,15 +6100,15 @@ fn validate_slide_graph(
     Ok(slides.into_boxed_slice())
 }
 
-fn source_slide_output_limit(limits: ReadLimits) -> usize {
+fn source_slide_output_limit(limits: SourceLimits, shape_limits: crate::shape::Limits) -> usize {
     let bounded = limits
         .max_part_bytes()
-        .min(limits.max_archive_entry_bytes())
+        .min(limits.max_entry_bytes())
         .min(limits.max_total_part_bytes())
-        .min(limits.max_archive_total_bytes());
+        .min(limits.max_aggregate_bytes());
     usize::try_from(bounded)
         .unwrap_or(usize::MAX)
-        .min(crate::shape::Limits::DEFAULT.output_bytes())
+        .min(shape_limits.output_bytes())
 }
 
 /// Build the source catalog. With `tolerance` the slide list is read with
@@ -4995,18 +6199,22 @@ fn clone_relationship_text(value: &str, resource: &'static str) -> Result<String
 
 #[cfg(test)]
 mod tests {
+    mod primary;
+    mod scenes;
     #[cfg(any(unix, windows))]
     use std::fs;
     use std::io;
     use std::num::{NonZeroU64, NonZeroUsize};
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+    use std::sync::{Arc, OnceLock};
 
     use litchi_core::{
-        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
-        SourceVersion,
+        Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
+        ReadAt, Resource, SourceVersion,
     };
-    use litchi_opc::{PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+    use litchi_opc::{
+        PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits,
+    };
     use soapberry_zip::office::StreamingArchiveWriter;
     #[cfg(any(unix, windows))]
     use tempfile::NamedTempFile;
@@ -5015,8 +6223,8 @@ mod tests {
         SourceBackedPresentation, SourceBackedPresentationEditor, SourceBackedSlideBatchCommit,
         SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
         SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImageTarget, SourcePayload,
-        reset_source_catalog_builds, reset_source_picture_query_counters,
-        reset_test_semantic_scene_reads, source_catalog_builds,
+        reset_source_catalog_builds, reset_source_laser_scans, reset_source_picture_query_counters,
+        reset_test_semantic_scene_reads, source_catalog_builds, source_laser_scans,
         source_picture_descriptor_reserve_calls, source_picture_descriptor_reserve_items,
         source_picture_query_all, source_picture_query_selected, source_picture_target_resolutions,
         test_semantic_scene_reads, test_semantic_slide_part_reads,
@@ -5209,7 +6417,17 @@ mod tests {
     }
 
     fn source_backed_pptx() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        source_backed_pptx_with_slide_list(
+            r#"<p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/>"#,
+        )
+    }
+
+    fn source_backed_pptx_with_slide_list(slide_list: &str) -> Vec<u8> {
+        let presentation = format!(
+            r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>{slide_list}</p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#
+        );
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -5223,10 +6441,7 @@ mod tests {
             )
             .unwrap();
         writer
-            .write_stored(
-                "ppt/presentation.xml",
-                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#,
-            )
+            .write_stored("ppt/presentation.xml", presentation.as_bytes())
             .unwrap();
         writer
             .write_stored(
@@ -5267,9 +6482,14 @@ mod tests {
             xml: SourcePayload::Edited(Arc::new(after_xml)),
             closure: before.closure.clone(),
             max_output_bytes: before.max_output_bytes,
+            protection_limits: before.protection_limits,
+            semantic_limits: before.semantic_limits.clone(),
             source_version: before.source_version,
             lineage: before.lineage.clone(),
             context: before.context.clone(),
+            laser_limits: before.laser_limits,
+            laser_usage: Arc::new(OnceLock::new()),
+            mce: before.mce,
         };
         (before, after)
     }
@@ -5307,7 +6527,8 @@ mod tests {
     }
 
     fn source_backed_pptx_with_core_properties() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -5421,7 +6642,8 @@ mod tests {
         media_content_type: Option<&str>,
         media_relationships: Option<&[u8]>,
     ) -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let media_default = media_content_type.map_or_else(String::new, |content_type| {
             format!(r#"<Default Extension="png" ContentType="{content_type}"/>"#)
         });
@@ -5481,7 +6703,7 @@ mod tests {
         )
     }
 
-    fn svg_picture_pptx() -> Vec<u8> {
+    pub(super) fn svg_picture_pptx() -> Vec<u8> {
         svg_picture_pptx_with_extension(&format!(
             r#"<a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#
         ))
@@ -5500,7 +6722,8 @@ mod tests {
                     "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:asvg=\"{SVG_NAMESPACE}\""
                 ),
             );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -5578,9 +6801,14 @@ mod tests {
     }
 
     fn source_backed_root_and_second_slide_bytes() -> (u64, u64) {
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_backed_pptx())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let presentation = package.main_document_part().unwrap();
         let root = presentation.data().unwrap().as_bytes().len() as u64;
         let second = package
@@ -5613,7 +6841,14 @@ mod tests {
         let source = Arc::new(CorePropertyCountingSource::new(
             source_backed_pptx_with_core_properties(),
         ));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let presentation = SourceBackedPresentation::from_source_backed_package(package).unwrap();
         assert_eq!(source.core_payload_reads.load(Ordering::SeqCst), 0);
         assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);
@@ -5643,13 +6878,13 @@ mod tests {
         let exact_source = Arc::new(CountingSource::new(archive.clone()));
         let (exact_budget, _cancel, exact_context) =
             source_backed_context(root_bytes + second_bytes);
-        let exact_editor =
-            SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-                exact_source.clone(),
-                ReadLimits::default(),
-                exact_context,
-            )
-            .unwrap();
+        let exact_editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            exact_source.clone(),
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(exact_context),
+        )
+        .unwrap();
         assert_eq!(exact_editor.cache_diagnostics().retained_entries, 1);
         let snapshot = exact_editor.slide_snapshot(1).unwrap();
         assert_eq!(snapshot.position(), 1);
@@ -5666,13 +6901,13 @@ mod tests {
         let under_source = Arc::new(CountingSource::new(archive));
         let (under_budget, _cancel, under_context) =
             source_backed_context(root_bytes + second_bytes - 1);
-        let under_editor =
-            SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-                under_source.clone(),
-                ReadLimits::default(),
-                under_context,
-            )
-            .unwrap();
+        let under_editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            under_source.clone(),
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(under_context),
+        )
+        .unwrap();
         assert!(under_editor.slide_snapshot(1).is_err());
         assert_eq!(under_source.second_payload_reads.load(Ordering::SeqCst), 0);
         drop(under_editor);
@@ -5680,14 +6915,60 @@ mod tests {
     }
 
     #[test]
+    fn selected_semantic_bundle_survives_source_editor_and_snapshot_projection() {
+        let comments = crate::comments::Limits {
+            max_nodes: crate::comments::Limits::DEFAULT.max_nodes - 1,
+            ..crate::comments::Limits::DEFAULT
+        };
+        let options = crate::OpenOptions::default().comments_limits(comments);
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            options.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            presentation
+                .inner
+                .semantic_limits
+                .as_ref()
+                .expect("selected semantic profile")
+                .comments(),
+            comments
+        );
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            options,
+        )
+        .unwrap();
+        assert_eq!(
+            editor
+                .semantic_limits
+                .as_ref()
+                .expect("editor profile")
+                .comments(),
+            comments
+        );
+        let snapshot = editor.slide_snapshot(0).unwrap();
+        assert_eq!(
+            snapshot
+                .semantic_limits
+                .as_ref()
+                .expect("snapshot profile")
+                .comments(),
+            comments
+        );
+    }
+
+    #[test]
     fn managed_editor_exact_noop_keeps_source_bytes_and_budgeted_handles() {
         let archive = source_backed_pptx();
         let source = Arc::new(CountingSource::new(archive.clone()));
         let (budget, _cancel, context) = source_backed_context(archive.len() as u64);
-        let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
             source,
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let mut edit = editor.edit_slide(0).unwrap();
@@ -5701,6 +6982,432 @@ mod tests {
         assert_eq!(output, archive);
         drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn replay_rehomes_edit_reservation_into_recipient_context() {
+        let archive = source_backed_pptx();
+        let (source_budget, _source_cancel, source_context) = source_backed_context(u64::MAX);
+        let source = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive.clone())),
+            crate::OpenOptions::default().execution_context(source_context),
+        )
+        .unwrap();
+        let mut edit = source.edit_slide(0).unwrap();
+        assert!(
+            edit.set_slide_properties(Some("Rebased reservation"), None)
+                .unwrap()
+        );
+        let commit = edit.commit_checked().unwrap();
+        let patch = commit.patch().clone();
+
+        let (recipient_budget, _recipient_cancel, recipient_context) =
+            source_backed_context(u64::MAX);
+        let recipient = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive.clone())),
+            crate::OpenOptions::default().execution_context(recipient_context),
+        )
+        .unwrap();
+        let recipient_slide = recipient.slide_snapshot(0).unwrap();
+        let before_apply = recipient_budget.used(Resource::Memory);
+        let applied = patch.apply(&recipient_slide).unwrap();
+
+        assert!(matches!(&applied.xml, SourcePayload::ReservedEdit { .. }));
+        assert!(recipient_budget.used(Resource::Memory) > before_apply);
+        drop(applied);
+        assert_eq!(recipient_budget.used(Resource::Memory), before_apply);
+
+        let memory_limit = (archive.len() as u64).checked_mul(1024).unwrap();
+        let (limited_budget, _limited_cancel, limited_context) =
+            source_backed_context(memory_limit);
+        let limited_recipient = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive.clone())),
+            crate::OpenOptions::default().execution_context(limited_context.clone()),
+        )
+        .unwrap();
+        let limited_slide = limited_recipient.slide_snapshot(0).unwrap();
+        let required = match &patch.after.xml {
+            SourcePayload::ReservedEdit { reservation, .. } => reservation.amount(),
+            _ => panic!("the source property edit must retain its reservation"),
+        };
+        let used_before_blocker = limited_budget.used(Resource::Memory);
+        let available = memory_limit.checked_sub(used_before_blocker).unwrap();
+        assert!(available >= required);
+        let blocker_amount = available - required + 1;
+        let blocker = limited_context
+            .reserve(Resource::Memory, blocker_amount)
+            .unwrap();
+        let source_before_failure = source_budget.used(Resource::Memory);
+        let recipient_before_failure = limited_budget.used(Resource::Memory);
+        assert!(matches!(
+            patch.apply(&limited_slide),
+            Err(Error::Opc(litchi_opc::OpcError::Execution(
+                ExecutionError::ResourceLimit(_)
+            )))
+        ));
+        assert_eq!(source_budget.used(Resource::Memory), source_before_failure);
+        assert_eq!(
+            limited_budget.used(Resource::Memory),
+            recipient_before_failure
+        );
+        drop(blocker);
+        let retried = patch.apply(&limited_slide).unwrap();
+        drop(retried);
+        drop(limited_slide);
+        drop(limited_recipient);
+        assert_eq!(limited_budget.used(Resource::Memory), 0);
+
+        drop(recipient_slide);
+        drop(recipient);
+        drop(patch);
+        drop(commit);
+        drop(source);
+        assert_eq!(recipient_budget.used(Resource::Memory), 0);
+        assert_eq!(source_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn source_edit_reservations_keep_output_and_memory_dimensions_independent() {
+        const INPUT_BYTES: usize = 8192;
+        const TIGHT_OUTPUT: usize = 128;
+        const MEMORY: u64 = 4 * 1024 * 1024;
+        let text_replacement = [crate::opened::ShapeTextReplacement::at(0, "x")];
+        let text_chunks = [&text_replacement[..]];
+        let admission = crate::opened::admit_shape_text_chunks(
+            &text_chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            TIGHT_OUTPUT,
+        )
+        .unwrap();
+        let replacements =
+            [
+                crate::opened::ShapePropertiesReplacement::new(litchi_core::Position::new(0))
+                    .with_text("x"),
+            ];
+        let property_chunks = [&replacements[..]];
+        let property_admission = crate::opened::admit_shape_property_chunks(
+            &property_chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            TIGHT_OUTPUT,
+        )
+        .unwrap();
+        let text_box_output = INPUT_BYTES + 4096 + 6;
+
+        fn assert_admitted(result: crate::Result<Option<Arc<litchi_core::Reservation>>>) {
+            assert!(result.unwrap().is_some());
+        }
+
+        let (budget, _cancel, context) = source_backed_context(MEMORY);
+        // A small serialized-output ceiling must not become the managed
+        // transient-memory ceiling. Every source-backed reservation keeps the
+        // caller's output bound in its own arithmetic and charges the context
+        // memory budget independently.
+        assert_admitted(super::reserve_source_shape_removal(
+            Some(&context),
+            INPUT_BYTES,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_slide_properties(
+            Some(&context),
+            INPUT_BYTES,
+            Some("name"),
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_shape_properties(
+            Some(&context),
+            INPUT_BYTES,
+            &replacements,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_shape_text_chunks(
+            Some(&context),
+            INPUT_BYTES,
+            admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_shape_property_chunks(
+            Some(&context),
+            INPUT_BYTES,
+            property_admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_text_box(
+            Some(&context),
+            INPUT_BYTES,
+            1,
+            text_box_output,
+        ));
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        // Unmanaged callers do not reserve transient memory, while retaining
+        // the same checked input/output admission path.
+        assert!(
+            super::reserve_source_shape_removal(None, INPUT_BYTES, TIGHT_OUTPUT)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_slide_properties(None, INPUT_BYTES, Some("name"), TIGHT_OUTPUT,)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_shape_properties(None, INPUT_BYTES, &replacements, TIGHT_OUTPUT,)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_shape_text_chunks(None, INPUT_BYTES, admission, TIGHT_OUTPUT,)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_shape_property_chunks(
+                None,
+                INPUT_BYTES,
+                property_admission,
+                TIGHT_OUTPUT,
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert!(
+            super::reserve_source_text_box(None, INPUT_BYTES, 1, text_box_output)
+                .unwrap()
+                .is_none()
+        );
+
+        let root_budget = Budget::root(
+            "pptx-source-parent-budget",
+            Limits::new(1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let child_budget = root_budget.child(
+            "pptx-source-child-budget",
+            Limits::new(MEMORY, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (_cancel, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::MIN,
+            NonZeroUsize::MIN,
+            NonZeroU64::new(MEMORY).unwrap(),
+            0,
+        )
+        .unwrap();
+        let tight_context = ExecutionContext::new(child_budget, cancellation, execution_limits);
+
+        fn assert_hierarchical_limit(result: crate::Result<Option<Arc<litchi_core::Reservation>>>) {
+            assert!(matches!(
+                result,
+                Err(Error::Opc(litchi_opc::OpcError::Execution(
+                    ExecutionError::ResourceLimit(_)
+                )))
+            ));
+        }
+        assert_hierarchical_limit(super::reserve_source_shape_removal(
+            Some(&tight_context),
+            INPUT_BYTES,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_slide_properties(
+            Some(&tight_context),
+            INPUT_BYTES,
+            Some("name"),
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_properties(
+            Some(&tight_context),
+            INPUT_BYTES,
+            &replacements,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_text_chunks(
+            Some(&tight_context),
+            INPUT_BYTES,
+            admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_property_chunks(
+            Some(&tight_context),
+            INPUT_BYTES,
+            property_admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_text_box(
+            Some(&tight_context),
+            INPUT_BYTES,
+            1,
+            text_box_output,
+        ));
+        assert_eq!(root_budget.used(Resource::Memory), 0);
+        assert_eq!(tight_context.budget().used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn source_slide_property_edit_accepts_valid_tight_output_with_managed_memory() {
+        const MEMORY: u64 = 4 * 1024 * 1024;
+        let archive = source_backed_pptx();
+        let baseline = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        let input_bytes = baseline.slide_snapshot(0).unwrap().xml.as_bytes().len();
+        drop(baseline);
+
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            input_bytes,
+            input_bytes.checked_add(128).unwrap(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let (budget, _cancel, context) = source_backed_context(MEMORY);
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive)),
+            crate::OpenOptions::default()
+                .shape_limits(tight_shape)
+                .execution_context(context),
+        )
+        .unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(edit.set_slide_properties(Some("x"), None).unwrap());
+        let commit = edit.commit_checked().unwrap();
+        assert!(commit.is_changed());
+        drop(commit);
+        drop(editor);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    fn publish_first_slide_update(editor: SourceBackedPresentationEditor) -> Vec<u8> {
+        let commit = changed_slide_commit(&editor, 0, "First slide", "Updated slide");
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        output
+    }
+
+    #[test]
+    fn presentation_converts_into_editor_without_reindexing() {
+        reset_source_catalog_builds();
+        let archive = source_backed_pptx();
+        let source = Arc::new(CountingSource::new(archive.clone()));
+        let shared: Arc<dyn ReadAt> = source.clone();
+        let presentation = SourceBackedPresentation::from_read_at(shared).unwrap();
+        assert!(presentation.tolerance_report().is_clean());
+        assert_eq!(source_catalog_builds(), 1);
+        let reads = source.read_calls.load(Ordering::SeqCst);
+
+        let editor = presentation.try_into_editor().unwrap();
+        assert_eq!(
+            source_catalog_builds(),
+            1,
+            "the open-time catalog is reused"
+        );
+        assert_eq!(
+            source.read_calls.load(Ordering::SeqCst),
+            reads,
+            "conversion reads no source byte"
+        );
+        assert_eq!(editor.slide_count(), 2);
+
+        let converted = publish_first_slide_update(editor);
+        let direct = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        assert_eq!(converted, publish_first_slide_update(direct));
+        assert_ne!(converted, archive);
+    }
+
+    #[test]
+    fn converted_editor_reproduces_the_source_on_a_no_op() {
+        let archive = source_backed_pptx();
+        let presentation =
+            SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(archive.clone())))
+                .unwrap();
+        let editor = presentation.try_into_editor().unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(!edit.clear_transition().unwrap());
+        let commit = edit.commit();
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(output, archive);
+    }
+
+    #[test]
+    fn shared_presentation_is_returned_unchanged() {
+        let presentation = SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+
+        let clone = presentation.clone();
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(refused.is_shared());
+        assert!(refused.error().is_none());
+        let (presentation, error) = refused.into_parts();
+        assert!(error.is_none());
+        assert_eq!(
+            presentation.slide(1).unwrap().text().unwrap(),
+            "Second slide"
+        );
+        drop(clone);
+
+        let slide = presentation.slide(0).unwrap();
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(refused.is_shared(), "a live slide handle shares the source");
+        let presentation = refused.into_parts().0;
+        drop(slide);
+
+        assert!(presentation.try_into_editor().is_ok());
+    }
+
+    #[test]
+    fn changed_source_refuses_conversion_and_keeps_the_presentation() {
+        let source = Arc::new(CountingSource::new(source_backed_pptx()));
+        let shared: Arc<dyn ReadAt> = source.clone();
+        let presentation = SourceBackedPresentation::from_read_at(shared).unwrap();
+        source.changed();
+
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(!refused.is_shared());
+        assert!(
+            matches!(
+                refused.error(),
+                Some(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+            ),
+            "{refused:?}"
+        );
+        assert!(std::error::Error::source(&refused).is_some());
+        let (presentation, _) = refused.into_parts();
+        assert_eq!(presentation.slide_count(), 2);
+    }
+
+    #[test]
+    fn repaired_slide_list_gets_the_editor_strict_refusal() {
+        let archive = source_backed_pptx_with_slide_list(
+            r#"<p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/><p:sldId id="258" r:id="rId1"/>"#,
+        );
+        let presentation =
+            SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(archive.clone())))
+                .unwrap();
+        assert!(!presentation.tolerance_report().is_clean());
+        assert_eq!(presentation.slide_count(), 2);
+
+        let Err(direct) =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(archive)))
+        else {
+            panic!("the editor's strict slide-list contract refuses the repaired list");
+        };
+        let refused = presentation.try_into_editor().err().unwrap();
+        assert!(!refused.is_shared());
+        assert_eq!(refused.error().unwrap().to_string(), direct.to_string());
+        assert_eq!(refused.into_parts().0.slide_count(), 2);
     }
 
     #[test]
@@ -5765,7 +7472,175 @@ mod tests {
     }
 
     #[test]
-    fn foreign_identical_source_recaptures_semantically_before_rejecting() {
+    fn batch_replay_preserves_unchanged_recipient_slide_policy() {
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before_first, after_first) =
+            changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        let before_second = editor.slide_snapshot(1).unwrap();
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            before_second.xml.as_bytes().len().saturating_sub(1),
+            defaults.output_bytes(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let tight_options = crate::OpenOptions::default().shape_limits(tight_shape);
+        let mut tight_second = before_second.clone();
+        tight_second.semantic_limits = tight_options.semantic_limits.clone();
+        let unchanged_second = before_second.clone();
+        let patch = SourceBackedSlideBatchPatch {
+            before: SourceBackedSlideBatchSnapshot {
+                slides: vec![before_first.clone(), before_second].into_boxed_slice(),
+            },
+            after: SourceBackedSlideBatchSnapshot {
+                slides: vec![after_first, unchanged_second].into_boxed_slice(),
+            },
+        };
+        let recipient = SourceBackedSlideBatchSnapshot {
+            slides: vec![before_first, tight_second.clone()].into_boxed_slice(),
+        };
+
+        let applied = patch
+            .apply(&recipient)
+            .expect("unchanged recipient slides are not newly admitted");
+        assert_eq!(
+            applied.slides[1].semantic_limits,
+            tight_second.semantic_limits
+        );
+        assert_eq!(
+            applied.slides[0].xml.as_bytes(),
+            patch.after.slides[0].xml.as_bytes()
+        );
+    }
+
+    #[test]
+    fn source_laser_usage_is_lazy_and_cached_for_same_policy_replay() {
+        reset_source_laser_scans();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before, after) = changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        assert_eq!(source_laser_scans(), 0);
+
+        let patch = SourceBackedSlidePatch {
+            before: before.clone(),
+            after,
+        };
+        let first = patch.apply(&before).unwrap();
+        assert_eq!(source_laser_scans(), 1);
+        drop(first);
+        let second = patch.apply(&before).unwrap();
+        assert_eq!(source_laser_scans(), 1);
+        drop(second);
+    }
+
+    #[test]
+    fn source_laser_usage_caches_different_policy_result_after_admission() {
+        reset_source_laser_scans();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before, after) = changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        let defaults = crate::laser::Limits::DEFAULT;
+        let profile = crate::laser::Limits::new(
+            defaults.max_slide_xml_bytes(),
+            defaults.max_total_slide_xml_bytes() - 1,
+            defaults.max_trace_count(),
+            defaults.max_point_count(),
+            defaults.max_xml_nodes(),
+            defaults.max_xml_depth(),
+            defaults.max_output_bytes(),
+        )
+        .unwrap();
+        let options = crate::OpenOptions::default().laser_limits(profile);
+        let mut recipient = before.clone();
+        recipient.semantic_limits = options.semantic_limits.clone();
+        recipient.laser_limits = profile.constrained_by_source(SourceLimits::default());
+        let patch = SourceBackedSlidePatch { before, after };
+
+        let published = patch.apply(&recipient).unwrap();
+        assert_eq!(source_laser_scans(), 1);
+        assert_eq!(
+            published.laser_usage().unwrap().total_slide_xml_bytes(),
+            published.xml.as_bytes().len()
+        );
+        assert_eq!(source_laser_scans(), 1);
+    }
+
+    #[test]
+    fn batch_replay_charges_unchanged_laser_usage_in_selected_scope() {
+        reset_source_laser_scans();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before_first, after_first) =
+            changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        let before_second = editor.slide_snapshot(1).unwrap();
+        let total = before_first
+            .xml
+            .as_bytes()
+            .len()
+            .checked_add(before_second.xml.as_bytes().len())
+            .unwrap();
+        let defaults = crate::laser::Limits::DEFAULT;
+        let profile = crate::laser::Limits::new(
+            defaults.max_slide_xml_bytes(),
+            total.saturating_sub(1),
+            defaults.max_trace_count(),
+            defaults.max_point_count(),
+            defaults.max_xml_nodes(),
+            defaults.max_xml_depth(),
+            defaults.max_output_bytes(),
+        )
+        .unwrap();
+        let options = crate::OpenOptions::default().laser_limits(profile);
+        let retained_profile = profile.constrained_by_source(SourceLimits::default());
+        let mut recipient_first = before_first.clone();
+        recipient_first.semantic_limits = options.semantic_limits.clone();
+        recipient_first.laser_limits = retained_profile;
+        let mut recipient_second = before_second.clone();
+        recipient_second.semantic_limits = options.semantic_limits.clone();
+        recipient_second.laser_limits = retained_profile;
+        let patch = SourceBackedSlideBatchPatch {
+            before: SourceBackedSlideBatchSnapshot {
+                slides: vec![before_first, before_second].into_boxed_slice(),
+            },
+            after: SourceBackedSlideBatchSnapshot {
+                slides: vec![after_first, recipient_second.clone()].into_boxed_slice(),
+            },
+        };
+        let expected_observed = patch.after.slides[0]
+            .xml
+            .as_bytes()
+            .len()
+            .checked_add(patch.after.slides[1].xml.as_bytes().len())
+            .unwrap();
+        let recipient = SourceBackedSlideBatchSnapshot {
+            slides: vec![recipient_first, recipient_second].into_boxed_slice(),
+        };
+
+        assert!(matches!(
+            patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            }) if observed == expected_observed && maximum == total - 1
+        ));
+        assert_eq!(source_laser_scans(), 2);
+    }
+
+    #[test]
+    fn foreign_identical_source_replays_by_content_without_recapture() {
         reset_test_semantic_scene_reads();
         let archive = source_backed_pptx();
         let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
@@ -5781,13 +7656,78 @@ mod tests {
             SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(archive)))
                 .unwrap();
         let mut output = Vec::new();
+        assert!(
+            foreign
+                .publish_slide_commit_to_stream(&mut output, &commit)
+                .is_ok()
+        );
+        assert_eq!(test_semantic_scene_reads(), 0);
+        assert_eq!(test_semantic_slide_part_reads(), 0);
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn local_replay_matches_content_across_profiles_and_revalidates_the_recipient() {
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let source_len = editor.slide_snapshot(0).unwrap().xml.as_bytes().len();
+        let replacement = "x".repeat(source_len);
+        let (before, after) = changed_slide_snapshots(&editor, 0, "First slide", &replacement);
+        let patch = SourceBackedSlidePatch {
+            before: before.clone(),
+            after: after.clone(),
+        };
+
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            source_len,
+            defaults.output_bytes(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let tight_options = crate::OpenOptions::default().shape_limits(tight_shape);
+        let mut tight_recipient = before.clone();
+        tight_recipient.semantic_limits = tight_options.semantic_limits.clone();
         assert!(matches!(
-            foreign.publish_slide_commit_to_stream(&mut output, &commit),
-            Err(Error::StaleSource)
+            patch.apply(&tight_recipient),
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                maximum,
+                ..
+            }) if maximum == source_len
         ));
-        assert_eq!(test_semantic_scene_reads(), 1);
-        assert_eq!(test_semantic_slide_part_reads(), 1);
-        assert!(output.is_empty());
+
+        let loose_shape = crate::shape::Limits::new(
+            source_len.saturating_mul(4),
+            defaults.output_bytes(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let loose_options = crate::OpenOptions::default().shape_limits(loose_shape);
+        let mut loose_recipient = before.clone();
+        loose_recipient.semantic_limits = loose_options.semantic_limits.clone();
+        let applied = patch.apply(&loose_recipient).unwrap();
+        assert_eq!(applied.xml.as_bytes(), after.xml.as_bytes());
+        assert_eq!(applied.semantic_limits, loose_recipient.semantic_limits);
+
+        let noop = SourceBackedSlidePatch {
+            before: before.clone(),
+            after: before,
+        };
+        let replayed_noop = noop.apply(&tight_recipient).unwrap();
+        assert_eq!(replayed_noop.xml.as_bytes(), tight_recipient.xml.as_bytes());
+        assert_eq!(
+            replayed_noop.semantic_limits,
+            tight_recipient.semantic_limits
+        );
     }
 
     #[test]
@@ -5822,10 +7762,11 @@ mod tests {
     fn managed_source_cancellation_refuses_cached_semantic_reads() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
         let (budget, cancellation_source, context) = source_backed_context(u64::MAX);
-        let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
             source,
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let slide = presentation.slide(0).unwrap();
@@ -5849,10 +7790,11 @@ mod tests {
     fn managed_presentation_diagnostics_report_cache_mode_and_release_on_drop() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
         let (budget, _cancel, context) = source_backed_context(u64::MAX);
-        let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
             source,
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let opening = presentation.cache_diagnostics();
@@ -5872,10 +7814,11 @@ mod tests {
     fn try_cache_diagnostics_for_presentation_is_exact_and_payload_free() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
         let (budget, _cancel, context) = source_backed_context(u64::MAX);
-        let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
             source.clone(),
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let opening_reads = source.second_payload_reads.load(Ordering::SeqCst);
@@ -5921,10 +7864,11 @@ mod tests {
     fn try_cache_diagnostics_for_editor_is_exact_and_releases_selected_budget() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
         let (budget, _cancel, context) = source_backed_context(u64::MAX);
-        let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
             source.clone(),
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let opening_reads = source.second_payload_reads.load(Ordering::SeqCst);
@@ -5962,12 +7906,13 @@ mod tests {
     fn managed_selected_slide_payload_is_evictable_after_view_drop() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
         let (_budget, _cancel, context) = source_backed_context(u64::MAX);
-        let cache_limits = litchi_opc::SourceCacheLimits::new(usize::MAX, 2).unwrap();
-        let presentation = SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        let cache_limits = SourceCacheLimits::new(usize::MAX, 2).unwrap();
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
             source,
-            ReadLimits::default(),
-            cache_limits,
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits)
+                .execution_context(context),
         )
         .unwrap();
 
@@ -5986,7 +7931,7 @@ mod tests {
     }
 
     #[test]
-    fn identical_foreign_source_closure_is_rejected_by_lineage() {
+    fn identical_foreign_source_closure_replays_by_content() {
         let first = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
             source_backed_pptx(),
         )))
@@ -5996,20 +7941,24 @@ mod tests {
         )))
         .unwrap();
         let mut edit = first.edit_slide(0).unwrap();
-        assert!(!edit.clear_transition().unwrap());
+        assert!(
+            edit.set_slide_properties(Some("Updated slide"), None)
+                .unwrap()
+        );
         let patch = edit.commit_checked().unwrap().patch().clone();
         let foreign = second.slide_snapshot(0).unwrap();
 
-        assert!(matches!(patch.apply(&foreign), Err(Error::StaleSource)));
+        assert!(patch.apply(&foreign).is_ok());
     }
 
     #[test]
     fn managed_snapshot_edit_and_patch_checks_are_cooperatively_cancelled() {
         let (_budget, cancellation_source, context) = source_backed_context(u64::MAX);
-        let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(CountingSource::new(source_backed_pptx())),
-            ReadLimits::default(),
-            context,
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let snapshot = editor.slide_snapshot(0).unwrap();
@@ -6577,9 +8526,9 @@ mod tests {
         )));
         let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
         let result = presentation.slide(0).unwrap().images();
-        assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
+        assert!(matches!(result, Err(Error::Refused(_))));
         let result = presentation.slide(0).unwrap().image(0);
-        assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
+        assert!(matches!(result, Err(Error::Refused(_))));
 
         let source = Arc::new(PictureCountingSource::new(picture_pptx(
             &picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
@@ -6618,14 +8567,17 @@ mod tests {
         ));
 
         let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1024)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPresentation::from_read_at_with_limits(source.clone(), limits),
-            Err(Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+            SourceBackedPresentation::from_read_at_with_options(
+                source.clone(),
+                crate::OpenOptions::default().source_limits(limits)
+            ),
+            Err(Error::Opc(litchi_opc::OpcError::Limit { .. }))
         ));
         assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
     }
@@ -6649,10 +8601,12 @@ mod tests {
         cancellation_source.cancel();
 
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_execution_context(
+            SourceBackedPackage::from_read_at(
                 source.clone(),
-                ReadLimits::default(),
-                context,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context)
             ),
             Err(litchi_opc::OpcError::Cancelled)
         ));
@@ -6684,10 +8638,12 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
-            ReadLimits::default(),
-            context,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let presentation = SourceBackedPresentation::from_source_backed_package(package).unwrap();
@@ -6721,16 +8677,20 @@ mod tests {
     #[test]
     fn opening_retains_caller_part_limits_without_reading_slide_payloads() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1024)
             .unwrap()
             .build()
             .unwrap();
 
         assert!(matches!(
-            SourceBackedPresentation::from_read_at_with_limits(source.clone(), limits),
-            Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: ReadResource::PartBytes,
+            SourceBackedPresentation::from_read_at_with_options(
+                source.clone(),
+                crate::OpenOptions::default().source_limits(limits)
+            ),
+            Err(Error::Opc(litchi_opc::OpcError::Limit {
+                kind: SourceLimitKind::PartBytes,
+                observed: 131326,
                 maximum: 1024,
                 ..
             }))
@@ -6743,10 +8703,10 @@ mod tests {
     fn filesystem_path_constructors_keep_the_source_positional() {
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
-        let cache = litchi_opc::SourceCacheLimits::new(archive.len(), 8).unwrap();
+        let cache = SourceCacheLimits::new(archive.len(), 8).unwrap();
 
         assert_eq!(
-            SourceBackedPresentation::from_path(file.path())
+            SourceBackedPresentation::open(file.path())
                 .unwrap()
                 .slide_count(),
             2
@@ -6758,56 +8718,40 @@ mod tests {
             2
         );
         assert_eq!(
-            SourceBackedPresentation::from_path_with_limits(file.path(), ReadLimits::default())
-                .unwrap()
-                .slide_count(),
-            2
-        );
-        assert_eq!(
-            SourceBackedPresentation::from_path_with_cache_limits(file.path(), cache)
-                .unwrap()
-                .slide_count(),
-            2
-        );
-        assert_eq!(
-            SourceBackedPresentation::from_path_with_limits_and_cache_limits(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                cache,
+                crate::OpenOptions::default().source_limits(SourceLimits::default())
             )
             .unwrap()
             .slide_count(),
             2
         );
         assert_eq!(
-            SourceBackedPresentation::open_with_limits_and_cache_limits(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                cache,
+                crate::OpenOptions::default().cache_limits(cache)
             )
             .unwrap()
             .slide_count(),
             2
         );
-
-        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
         assert_eq!(
-            SourceBackedPresentation::from_path_with_execution_context(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
             )
             .unwrap()
             .slide_count(),
             2
         );
-
-        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
         assert_eq!(
-            SourceBackedPresentation::from_path_with_limits_and_execution_context(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                context,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
             )
             .unwrap()
             .slide_count(),
@@ -6816,11 +8760,38 @@ mod tests {
 
         let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
         assert_eq!(
-            SourceBackedPresentation::open_with_limits_and_cache_limits_and_execution_context(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                cache,
-                context,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context)
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+
+        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        assert_eq!(
+            SourceBackedPresentation::open_with_options(
+                file.path(),
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context)
+            )
+            .unwrap()
+            .slide_count(),
+            2
+        );
+
+        let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
+        assert_eq!(
+            SourceBackedPresentation::open_with_options(
+                file.path(),
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
+                    .execution_context(context)
             )
             .unwrap()
             .slide_count(),
@@ -6828,7 +8799,7 @@ mod tests {
         );
 
         assert_eq!(
-            SourceBackedPresentationEditor::from_path(file.path())
+            SourceBackedPresentationEditor::open(file.path())
                 .unwrap()
                 .slide_count(),
             2
@@ -6840,10 +8811,11 @@ mod tests {
             2
         );
         assert_eq!(
-            SourceBackedPresentationEditor::from_path_with_limits_and_cache_limits(
+            SourceBackedPresentationEditor::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                cache,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
             )
             .unwrap()
             .slide_count(),
@@ -6851,11 +8823,12 @@ mod tests {
         );
         let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
         assert_eq!(
-            SourceBackedPresentationEditor::open_with_limits_and_cache_limits_and_execution_context(
+            SourceBackedPresentationEditor::open_with_options(
                 file.path(),
-                ReadLimits::default(),
-                cache,
-                context,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
+                    .execution_context(context)
             )
             .unwrap()
             .slide_count(),
@@ -6867,7 +8840,7 @@ mod tests {
     #[test]
     fn filesystem_listing_keeps_slide_payloads_cold() {
         let file = temporary_source(&source_backed_pptx());
-        let presentation = SourceBackedPresentation::from_path(file.path()).unwrap();
+        let presentation = SourceBackedPresentation::open(file.path()).unwrap();
         let opening = presentation.cache_diagnostics();
         assert_eq!(opening.retained_entries, 1);
 
@@ -6886,7 +8859,7 @@ mod tests {
     #[test]
     fn filesystem_selected_image_loads_only_the_slide_and_media_closure() {
         let file = temporary_source(&embedded_picture_pptx());
-        let presentation = SourceBackedPresentation::from_path(file.path()).unwrap();
+        let presentation = SourceBackedPresentation::open(file.path()).unwrap();
         let slide = presentation.slide(0).unwrap();
         assert_eq!(presentation.cache_diagnostics().retained_entries, 1);
 
@@ -6909,15 +8882,15 @@ mod tests {
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
         let (budget, _cancellation_source, context) = source_backed_context(u64::MAX);
-        let cache = litchi_opc::SourceCacheLimits::new(archive.len(), 8).unwrap();
-        let presentation =
-            SourceBackedPresentation::from_path_with_limits_and_cache_limits_and_execution_context(
-                file.path(),
-                ReadLimits::default(),
-                cache,
-                context,
-            )
-            .unwrap();
+        let cache = SourceCacheLimits::new(archive.len(), 8).unwrap();
+        let presentation = SourceBackedPresentation::open_with_options(
+            file.path(),
+            crate::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache)
+                .execution_context(context),
+        )
+        .unwrap();
         assert!(presentation.cache_diagnostics().budget_managed);
         assert!(budget.used(Resource::Memory) > 0);
         assert_eq!(
@@ -6934,7 +8907,7 @@ mod tests {
     fn filesystem_editor_preserves_exact_noop_and_one_slide_overlay() {
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
-        let editor = SourceBackedPresentationEditor::from_path(file.path()).unwrap();
+        let editor = SourceBackedPresentationEditor::open(file.path()).unwrap();
         let mut noop = editor.edit_slide(0).unwrap();
         assert!(!noop.clear_transition().unwrap());
         let noop = noop.commit();
@@ -6959,8 +8932,9 @@ mod tests {
             .unwrap();
         assert_ne!(output, archive);
 
-        let source = litchi_opc::OpcPackage::from_bytes(&archive).unwrap();
-        let candidate = litchi_opc::OpcPackage::from_bytes(&output).unwrap();
+        let source = litchi_opc::OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap();
+        let candidate =
+            litchi_opc::OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         for part in source
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -6978,11 +8952,11 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let missing = directory.path().join("missing.pptx");
         assert!(matches!(
-            SourceBackedPresentation::from_path(&missing),
+            SourceBackedPresentation::open(&missing),
             Err(Error::Io(error)) if error.kind() == io::ErrorKind::NotFound
         ));
         assert!(matches!(
-            SourceBackedPresentationEditor::from_path(directory.path()),
+            SourceBackedPresentationEditor::open(directory.path()),
             Err(Error::Io(error))
                 if matches!(
                     error.kind(),
@@ -6994,17 +8968,20 @@ mod tests {
 
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1024)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPresentation::from_path_with_limits(file.path(), limits),
-            Err(Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+            SourceBackedPresentation::open_with_options(
+                file.path(),
+                crate::OpenOptions::default().source_limits(limits)
+            ),
+            Err(Error::Opc(litchi_opc::OpcError::Limit { .. }))
         ));
 
-        let editor = SourceBackedPresentationEditor::from_path(file.path()).unwrap();
+        let editor = SourceBackedPresentationEditor::open(file.path()).unwrap();
         let mut edit = editor.edit_slide(0).unwrap();
         assert!(
             edit.set_transition(&crate::transition::Transition::new(
@@ -7033,7 +9010,7 @@ mod tests {
         let replacement = directory.path().join("replacement.pptx");
         fs::write(&path, source_backed_pptx()).unwrap();
         fs::hard_link(&path, &pinned).unwrap();
-        let presentation = SourceBackedPresentation::from_path(&path).unwrap();
+        let presentation = SourceBackedPresentation::open(&path).unwrap();
         let first_slide = presentation.slide(0).unwrap();
         fs::write(&replacement, b"not a PPTX").unwrap();
         fs::rename(&replacement, &path).unwrap();
@@ -7045,7 +9022,7 @@ mod tests {
             first_slide.text(),
             Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
         ));
-        assert!(SourceBackedPresentation::from_path(&path).is_err());
+        assert!(SourceBackedPresentation::open(&path).is_err());
     }
 }
 
@@ -7058,15 +9035,13 @@ mod tests {
 mod picture_fragment_tests {
     use crate::Error;
     use crate::shape::{Scene, Shape};
+    use litchi_opc::SourceLimits;
 
     /// Parse one standalone picture descriptor under the output bound a
     /// source-backed editor passes: the part-byte ceiling of the default read
     /// policy.
     fn parse_picture_relationship(xml: &[u8]) -> crate::Result<super::PictureRelationship> {
-        super::parse_picture_relationship_with_limit(
-            xml,
-            litchi_opc::ReadLimits::default().max_part_bytes(),
-        )
+        super::parse_picture_relationship_with_limit(xml, SourceLimits::default().max_part_bytes())
     }
 
     const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -7097,7 +9072,7 @@ mod picture_fragment_tests {
     fn self_contained_picture_descriptors_parse_for_any_producer_prefix() {
         for (p, a, r) in [("p", "a", "r"), ("q", "d", "rel")] {
             let xml = slide(p, a, r);
-            let scene = Scene::read(xml.as_bytes()).unwrap();
+            let scene = Scene::read(xml.as_bytes(), crate::shape::Limits::DEFAULT).unwrap();
             assert!(scene.is_rewritten(), "{p}: the MCE input must be rewritten");
             let shape = scene.at(0).unwrap();
             assert!(matches!(shape, Shape::Picture(_)));
@@ -7111,7 +9086,7 @@ mod picture_fragment_tests {
     #[test]
     fn a_borrowed_span_does_not_re_declare_an_unconventional_ancestor_prefix() {
         let xml = slide("q", "d", "rel");
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), crate::shape::Limits::DEFAULT).unwrap();
         let borrowed = scene.at(0).unwrap().xml().unwrap();
         assert!(
             !borrowed

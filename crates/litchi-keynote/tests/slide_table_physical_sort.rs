@@ -25,9 +25,7 @@ use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::physical_sort::{
     ColumnIndex, Direction, Error, LimitKind, Order, Path, RowRange, Rule, Scope,
@@ -97,8 +95,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     field
@@ -110,7 +112,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -385,7 +391,12 @@ fn table_model(
     .encode_to_vec();
     if with_unknowns {
         append_varint_field(&mut payload, 99, 0xfeed_beef)?;
-        append_length_delimited_field(&mut payload, 100, b"physical-sort-unknown")?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            b"physical-sort-unknown",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -704,7 +715,10 @@ fn source_package_with_tiles(
         )?,
     ]);
 
-    let document_bytes = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let document_bytes = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     let metadata_bytes = SnappyStream::compress(
         &Archive {
             objects: vec![object(
@@ -714,7 +728,8 @@ fn source_package_with_tiles(
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -739,24 +754,26 @@ fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn metadata_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata component")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -778,14 +795,18 @@ fn rewrite_document(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -802,14 +823,16 @@ fn rewrite_document_stream(
     package: &[u8],
     mutate: impl FnOnce(&mut Vec<u8>) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let mut stream = SnappyStream::decompress(entry.data())?.as_bytes().to_vec();
+    let mut stream = SnappyStream::decompress(entry.data(), Default::default())?
+        .as_bytes()
+        .to_vec();
     mutate(&mut stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -823,12 +846,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata component")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata = archive
         .object_mut(METADATA_OBJECT)
         .ok_or("missing metadata object")?;
@@ -845,8 +871,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: payload.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             METADATA_MEMBER,
@@ -865,13 +893,14 @@ fn rewrite_table_info(package: &[u8], locked: bool) -> TestResult<Vec<u8>> {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: table_info_payload(locked),
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
 fn rewrite_entry(package: &[u8], name: &str, data: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(name, data)],
         Limits::default(),
@@ -885,13 +914,19 @@ fn rewrite_model_wire(package: &[u8], field: u32, payload: &[u8]) -> TestResult<
             .ok_or("missing table model")?;
         let message = model.messages.first().ok_or("missing model message")?;
         let mut bytes = message.data.clone();
-        append_length_delimited_field(&mut bytes, field, payload)?;
+        append_length_delimited_field(
+            &mut bytes,
+            field,
+            payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             0,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: bytes,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -923,6 +958,7 @@ fn rewrite_object_wire(
                 type_: message_type,
                 data: bytes,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -956,14 +992,24 @@ fn rewrite_repeated_child_wire(
 
 fn valid_cfuuid_owner_payload() -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &[1u8; 16])?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &[1u8; 16],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn valid_sort_tracker_payload() -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
     let reference = reference(FORMULAS).encode_to_vec();
-    append_length_delimited_field(&mut payload, 1, &reference)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -974,7 +1020,12 @@ fn valid_uuid_owner_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &uuid)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &uuid,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -1027,6 +1078,7 @@ fn rewrite_tile_cell(
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1047,7 +1099,7 @@ fn rewrite_numeric_body_keys(package: &[u8], values: [f64; BODY_COUNT]) -> TestR
             let mut cells = fixture_row_cells(row)?;
             let mut cell = BncCell::minimal();
             cell.set_plain_number(value)?;
-            cells[0] = Some(cell.encode());
+            cells[0] = Some(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
             let (storage, offsets) = encode_row(&cells);
             row.cell_storage_buffer = Some(storage);
             row.cell_offsets = Some(offsets);
@@ -1058,6 +1110,7 @@ fn rewrite_numeric_body_keys(package: &[u8], values: [f64; BODY_COUNT]) -> TestR
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1080,6 +1133,7 @@ fn rewrite_padded_offsets(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1108,6 +1162,7 @@ fn rewrite_pre_bnc_sidecars(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1136,6 +1191,7 @@ fn rewrite_pre_bnc_only(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1169,6 +1225,7 @@ fn rewrite_string_entry_sidecars(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_DATA_LIST_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1189,6 +1246,7 @@ fn rewrite_uid_map(
                 type_: COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1216,6 +1274,7 @@ fn rewrite_formula_registry(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_DATA_LIST_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1276,6 +1335,7 @@ fn source_with_aggregate_only_optional_format(
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         model.archive_info.message_infos[0]
             .object_references
@@ -1509,7 +1569,8 @@ fn numeric_body_key_markers(package: &[u8]) -> TestResult<Vec<(u64, String)>> {
                 .ok_or("missing BNC storage")?;
             let offsets = row.cell_offsets.as_ref().ok_or("missing BNC offsets")?;
             let (start, end) = cell_span_bounds(storage, offsets, 0)?;
-            let view = BncCellView::parse(&storage[start..end])?;
+            let view =
+                BncCellView::parse(&storage[start..end], &litchi_numbers_wire::Limits::DEFAULT)?;
             let bits = match view.cached_scalar() {
                 Some(CachedScalar::Number(value)) => value.get().to_bits(),
                 _ => return Err("body key is not a cached numeric scalar".into()),
@@ -1571,8 +1632,8 @@ fn uid_map_indexes(package: &[u8]) -> TestResult<(Vec<u32>, Vec<u32>, Vec<u32>, 
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for entry in before.iter() {
         if PREVIEWS.contains(&entry.name()) {
             assert!(
@@ -1651,7 +1712,7 @@ fn assert_canonical_source_admitted(source: &[u8]) -> TestResult {
 #[test]
 fn canonical_fixture_has_exact_metadata_and_unrelated_entries() -> TestResult {
     let source = source(Scope::EntireTable)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     assert_eq!(
         catalog.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
         vec![
@@ -1791,7 +1852,12 @@ fn aggregate_only_optional_format_routes_are_validated_and_preserved() -> TestRe
         OPTIONAL_FORMATS,
         TABLE_DATA_LIST_MESSAGE_TYPE,
         |bytes| {
-            append_length_delimited_field(bytes, 100, b"opaque optional format state")?;
+            append_length_delimited_field(
+                bytes,
+                100,
+                b"opaque optional format state",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(())
         },
     )?;
@@ -1809,7 +1875,12 @@ fn aggregate_only_optional_format_routes_are_validated_and_preserved() -> TestRe
         OPTIONAL_CUSTOM_FORMATS,
         TABLE_DATA_LIST_MESSAGE_TYPE,
         |bytes| {
-            append_length_delimited_field(bytes, 4, &reference(TILE).encode_to_vec())?;
+            append_length_delimited_field(
+                bytes,
+                4,
+                &reference(TILE).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(())
         },
     )?;
@@ -1828,8 +1899,8 @@ fn physical_transaction_types_are_archive_free_and_send_sync() {
     assert_send_sync_debug::<RowRange>();
     assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::transaction::Edit<'static>>(
     );
-    assert_send_sync_debug::<litchi_keynote::SlideTablePhysicalSortCommit>();
-    assert_send_sync_debug::<litchi_keynote::SlideTablePhysicalSortPatch>();
+    assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::transaction::Commit>();
+    assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::transaction::Patch>();
     assert_send_sync_debug::<litchi_keynote::slide::table::physical_sort::Diagnostics>();
     assert_send_sync_debug::<Error>();
     assert_send_sync_debug::<LimitKind>();
@@ -1907,8 +1978,13 @@ fn full_sort_moves_body_rows_and_sparse_headers_but_not_header_or_footer() -> Te
     );
     assert_locality(&source, &target)?;
     assert_eq!(
-        Catalog::from_bytes(&source)?.iter().count(),
-        Catalog::from_bytes(&target)?.iter().count() + PREVIEWS.len()
+        Catalog::from_bytes(&source, Default::default())?
+            .iter()
+            .count(),
+        Catalog::from_bytes(&target, Default::default())?
+            .iter()
+            .count()
+            + PREVIEWS.len()
     );
     Ok(())
 }
@@ -1919,11 +1995,13 @@ fn duplicate_sort_keys_are_stable_and_selected_ranges_are_body_relative() -> Tes
     let package = Package::from_bytes(&selected)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::ScopeMismatch {
-            configured: Scope::SelectedRows,
-            requested: Scope::EntireTable,
-            ..
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::ScopeMismatch {
+                configured: Scope::SelectedRows,
+                requested: Scope::EntireTable,
+                ..
+            }
+        ))
     ));
     let commit = package.execute_slide_table_sort_order_to_rows(
         SlideSelector::name("Tables"),
@@ -1946,7 +2024,7 @@ fn duplicate_sort_keys_are_stable_and_selected_ranges_are_body_relative() -> Tes
         ]
     );
     assert!(
-        Catalog::from_bytes(&target)?
+        Catalog::from_bytes(&target, Default::default())?
             .iter()
             .all(|entry| !PREVIEWS.contains(&entry.name()))
     );
@@ -1993,7 +2071,7 @@ fn cross_tile_row_moves_are_rejected_before_publication() -> TestResult {
     let before = package_bytes(&package)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedTopology { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { .. }))
     ));
     assert_source_unchanged(&package, &before)?;
     Ok(())
@@ -2013,7 +2091,7 @@ fn exact_noop_repeated_sort_preserves_every_byte_and_preview() -> TestResult {
     assert_eq!(second.diagnostics().moved_rows(), 0);
     assert_eq!(package_bytes(second.package())?, target);
     assert!(
-        Catalog::from_bytes(&target)?
+        Catalog::from_bytes(&target, Default::default())?
             .iter()
             .all(|entry| !PREVIEWS.contains(&entry.name()))
     );
@@ -2077,25 +2155,29 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
     let package = Package::from_bytes(&entire_source)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(usize::MAX, 0usize),
-        Err(Error::SlidePositionNotFound { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::SlidePositionNotFound { .. }))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(SlideSelector::name(""), 0usize),
-        Err(Error::EmptySlideName)
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(SlideSelector::name("missing"), 0usize),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, usize::MAX),
-        Err(Error::TablePositionNotFound { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::TablePositionNotFound { .. }))
     ));
     let selected_source = source(Scope::SelectedRows)?;
     let selected = Package::from_bytes(&selected_source)?;
     assert!(matches!(
         selected.execute_slide_table_sort_order_to_rows(0usize, 0usize, RowRange::new(4, 6)?),
-        Err(Error::RowRangeOutOfBounds { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::RowRangeOutOfBounds { .. }))
     ));
     let absent = Package::from_bytes(&source_package(Scope::EntireTable, false, false)?)?;
     let absent = rewrite_document(&package_bytes(&absent)?, |archive| {
@@ -2111,19 +2193,24 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
     let absent = Package::from_bytes(&absent)?;
     assert!(matches!(
         absent.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::SortOrderMissing { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::SortOrderMissing { .. }
+        ))
     ));
     let locked = Package::from_bytes(&rewrite_table_info(&entire_source, true)?)?;
     let before = package_bytes(&locked)?;
     assert!(matches!(
         locked.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::TableLocked { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::TableLocked { .. }
+        ))
     ));
     assert_source_unchanged(&locked, &before)?;
     Ok(())
@@ -2203,6 +2290,7 @@ fn unsupported_row_affine_and_malformed_storage_fail_before_publication() -> Tes
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -2226,10 +2314,12 @@ fn formula_registry_and_imported_data_are_rejected_atomically() -> TestResult {
     let formula_before = package_bytes(&formula_package)?;
     assert!(matches!(
         formula_package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedFeature {
-            feature: UnsupportedFeature::Formula,
-            ..
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                feature: UnsupportedFeature::Formula,
+                ..
+            }
+        ))
     ));
     assert_source_unchanged(&formula_package, &formula_before)?;
 
@@ -2238,10 +2328,10 @@ fn formula_registry_and_imported_data_are_rejected_atomically() -> TestResult {
     let imported_before = package_bytes(&imported_package)?;
     assert!(matches!(
         imported_package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedDependency {
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedDependency {
             feature: UnsupportedFeature::RowAffineDependency,
             ..
-        })
+        }))
     ));
     assert_source_unchanged(&imported_package, &imported_before)?;
     Ok(())
@@ -2327,7 +2417,7 @@ fn string_entry_sidecars_are_rejected_atomically() -> TestResult {
     let before = package_bytes(&package)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedTopology { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { .. }))
     ));
     assert_source_unchanged(&package, &before)?;
     Ok(())
@@ -2401,21 +2491,36 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
         (
             "tile root",
             rewrite_object_wire(&source, TILE, TILE_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque tile state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque tile state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
         (
             "tile row",
             rewrite_repeated_child_wire(&source, TILE, TILE_MESSAGE_TYPE, 5, 0, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque row state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque row state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
         (
             "row-header bucket root",
             rewrite_object_wire(&source, ROW_HEADERS, HEADER_BUCKET_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque bucket state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque bucket state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
@@ -2428,7 +2533,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
                 2,
                 0,
                 |bytes| {
-                    append_length_delimited_field(bytes, 100, b"opaque header state")?;
+                    append_length_delimited_field(
+                        bytes,
+                        100,
+                        b"opaque header state",
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     Ok(())
                 },
             )?,
@@ -2436,7 +2546,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
         (
             "UID-map root",
             rewrite_object_wire(&source, UID_MAP, COLUMN_ROW_UID_MAP_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque UID state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque UID state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
@@ -2449,7 +2564,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
                 4,
                 0,
                 |bytes| {
-                    append_length_delimited_field(bytes, 100, b"opaque UUID state")?;
+                    append_length_delimited_field(
+                        bytes,
+                        100,
+                        b"opaque UUID state",
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     Ok(())
                 },
             )?,

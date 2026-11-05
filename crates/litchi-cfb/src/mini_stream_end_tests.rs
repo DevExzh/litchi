@@ -29,8 +29,8 @@
 )]
 
 use super::*;
-use crate::SharedOleFile;
 use crate::writer::{OleWriter, SectorLayoutFallback};
+use crate::{OleFileLimits, SharedOleFile, SharedOleFileLimits};
 use litchi_core::SourceVersion;
 use std::collections::BTreeMap;
 use std::io::Cursor;
@@ -119,7 +119,7 @@ struct Layout {
 
 impl Layout {
     fn of(bytes: &[u8]) -> Self {
-        let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut file = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
         let mut mini_streams = Vec::new();
         let mut contents = Vec::new();
         for path in file.list_streams() {
@@ -305,6 +305,7 @@ fn shared(bytes: &[u8]) -> Result<SharedOleFile, OleError> {
     SharedOleFile::open_owned(
         Arc::from(bytes.to_vec().into_boxed_slice()),
         SourceVersion::new(769, 0),
+        SharedOleFileLimits::default(),
     )
 }
 
@@ -313,9 +314,9 @@ fn shared(bytes: &[u8]) -> Result<SharedOleFile, OleError> {
 /// shared reader's bounded direct read, root mini-stream cache, ranges and
 /// cursor.
 fn assert_every_reader_returns(label: &str, bytes: &[u8], expected: &[(Vec<String>, Vec<u8>)]) {
-    let mut ole =
-        OleFile::open(Cursor::new(bytes)).unwrap_or_else(|error| panic!("{label}: {error}"));
-    let compared = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())
+        .unwrap_or_else(|error| panic!("{label}: {error}"));
+    let compared = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     let candidate = FileBytes(bytes);
     let mut comparer = compared.stream_comparer(&candidate);
     let cached = shared(bytes).unwrap();
@@ -382,7 +383,7 @@ fn assert_every_reader_returns(label: &str, bytes: &[u8], expected: &[(Vec<Strin
 
 /// Both opens refuse `bytes` with the same message, `message` when given.
 fn assert_refused(label: &str, bytes: &[u8], message: Option<&str>) {
-    let cursor = OleFile::open(Cursor::new(bytes))
+    let cursor = OleFile::open(Cursor::new(bytes), OleFileLimits::default())
         .err()
         .unwrap_or_else(|| panic!("{label}: OleFile::open admitted it"))
         .to_string();
@@ -403,7 +404,12 @@ fn assert_refused(label: &str, bytes: &[u8], message: Option<&str>) {
 fn assert_round_trip(label: &str, bytes: &[u8], expected: &[(Vec<String>, Vec<u8>)]) {
     let layout = Layout::of(bytes);
     let mut writer = OleWriter::with_sector_size(layout.sector_size).unwrap();
-    assert!(writer.adopt_source_layout(bytes).unwrap(), "{label}");
+    assert!(
+        writer
+            .adopt_source_layout(bytes, OleFileLimits::default())
+            .unwrap(),
+        "{label}"
+    );
     for (path, data) in expected {
         let refs: Vec<&str> = path.iter().map(String::as_str).collect();
         writer.create_stream(&refs, data).unwrap();
@@ -689,7 +695,8 @@ fn a_real_producer_stream_ending_in_the_partial_mini_sector_reads() {
     // them (leniency audit F7.7) and the unmodified file opens. Normalizing
     // those fields to ENDOFCHAIN, and nothing else, gives the conformant
     // file the checks below examine.
-    let unmodified = OleFile::open(Cursor::new(original.as_slice())).unwrap();
+    let unmodified =
+        OleFile::open(Cursor::new(original.as_slice()), OleFileLimits::default()).unwrap();
     let report = unmodified.tolerance_report();
     assert_eq!(report.total(), 11);
     assert!(
@@ -795,7 +802,7 @@ fn every_admitted_fixture_stream_reads_through_every_reader() {
     let (mut files, mut opened, mut streams) = (0usize, 0usize, 0usize);
     for (label, bytes) in compound_files("test-data") {
         files += 1;
-        match OleFile::open(Cursor::new(bytes.as_slice())) {
+        match OleFile::open(Cursor::new(bytes.as_slice()), OleFileLimits::default()) {
             Err(error) => {
                 assert_eq!(
                     shared(&bytes).err().map(|error| error.to_string()),
@@ -915,7 +922,7 @@ fn every_stream_of_an_admitted_faulted_file_reads_through_every_reader() {
             (fat_sectors[entry / per_sector] + 1) * sector_size + entry % per_sector * 4
         };
         let fat_len = fat_sectors.len() * sector_size / 4;
-        let minifat_len = OleFile::open(Cursor::new(clean.as_slice()))
+        let minifat_len = OleFile::open(Cursor::new(clean.as_slice()), OleFileLimits::default())
             .unwrap()
             .minifat
             .len();
@@ -989,7 +996,9 @@ fn every_stream_of_an_admitted_faulted_file_reads_through_every_reader() {
                 }
             }
             let label = format!("{label}, case {case}");
-            let Ok(mut file) = OleFile::open(Cursor::new(bytes.as_slice())) else {
+            let Ok(mut file) =
+                OleFile::open(Cursor::new(bytes.as_slice()), OleFileLimits::default())
+            else {
                 refused += 1;
                 assert!(shared(&bytes).is_err(), "{label}: the opens disagree");
                 continue;

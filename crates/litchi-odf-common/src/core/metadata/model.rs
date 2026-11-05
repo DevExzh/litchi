@@ -189,6 +189,7 @@ impl Metadata {
             template,
             statistics,
             generator,
+            language,
             ..
         } = self;
 
@@ -208,40 +209,6 @@ impl Metadata {
             (None, None) => (None, None),
         };
 
-        let keywords = if keywords.is_empty() {
-            None
-        } else if keywords.len() == 1 {
-            keywords.into_iter().next()
-        } else {
-            let keyword_bytes = keywords
-                .iter()
-                .try_fold(0usize, |total, keyword| total.checked_add(keyword.len()))
-                .ok_or_else(|| {
-                    Error::InvalidFormat("ODF metadata keyword size overflow".to_string())
-                })?;
-            let bytes = keyword_bytes
-                .checked_add((keywords.len() - 1).checked_mul(2).ok_or_else(|| {
-                    Error::InvalidFormat("ODF metadata keyword size overflow".to_string())
-                })?)
-                .ok_or_else(|| {
-                    Error::InvalidFormat("ODF metadata keyword size overflow".to_string())
-                })?;
-            let mut joined = String::new();
-            joined
-                .try_reserve_exact(bytes)
-                .map_err(|source| Error::Allocation {
-                    resource: "ODF common metadata keywords",
-                    source,
-                })?;
-            for (index, keyword) in keywords.into_iter().enumerate() {
-                if index != 0 {
-                    joined.push_str(", ");
-                }
-                joined.push_str(&keyword);
-            }
-            Some(joined)
-        };
-
         Ok(CoreMetadata {
             title,
             author,
@@ -251,13 +218,15 @@ impl Metadata {
             template: template.and_then(|template| template.href),
             last_modified_by,
             revision: editing_cycles,
-            created: Self::parse_date(creation_date),
-            modified: Self::parse_date(modification_date),
+            created: Self::parse_date(creation_date).map(litchi_core::metadata::Timestamp::Utc),
+            modified: Self::parse_date(modification_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
             page_count: parse_u32_count(statistics.page_count),
             word_count: parse_u32_count(statistics.word_count),
             character_count: parse_u32_count(statistics.character_count),
             application: generator,
-            last_printed_time: Self::parse_date(print_date),
+            last_printed: Self::parse_date(print_date).map(litchi_core::metadata::Timestamp::Utc),
+            language,
             ..Default::default()
         })
     }
@@ -273,22 +242,22 @@ impl From<Metadata> for CoreMetadata {
             title: odf_meta.title,
             author,
             subject: odf_meta.subject,
-            keywords: if odf_meta.keywords.is_empty() {
-                None
-            } else {
-                Some(odf_meta.keywords.join(", "))
-            },
+            keywords: odf_meta.keywords,
             description: odf_meta.description,
             template: odf_meta.template.and_then(|template| template.href),
             last_modified_by: odf_meta.creator,
             revision: odf_meta.editing_cycles,
-            created: Metadata::parse_date(odf_meta.creation_date),
-            modified: Metadata::parse_date(odf_meta.modification_date),
+            created: Metadata::parse_date(odf_meta.creation_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
+            modified: Metadata::parse_date(odf_meta.modification_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
             page_count: parse_u32_count(odf_meta.statistics.page_count),
             word_count: parse_u32_count(odf_meta.statistics.word_count),
             character_count: parse_u32_count(odf_meta.statistics.character_count),
             application: odf_meta.generator,
-            last_printed_time: Metadata::parse_date(odf_meta.print_date),
+            last_printed: Metadata::parse_date(odf_meta.print_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
+            language: odf_meta.language,
             ..Default::default()
         }
     }

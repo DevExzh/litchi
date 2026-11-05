@@ -3,6 +3,7 @@
 use super::RECIPIENT_CONTENT_TYPE;
 use super::model::{Recipients, invalid};
 use crate::Result;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_opc::part::Part;
 
 /// Opaque mail-merge source to relate from `settings.xml`.
@@ -34,7 +35,7 @@ impl Recipients {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn extract_from_part(part: &dyn Part) -> Result<Self> {
+    pub fn extract_from_part(part: &dyn Part, limits: &MceLimits) -> Result<Self> {
         if part.content_type() != RECIPIENT_CONTENT_TYPE {
             return Err(invalid(format!(
                 "invalid mail-merge recipient-data content type '{}'",
@@ -46,7 +47,8 @@ impl Recipients {
                 "mail-merge recipient-data part cannot have relationships",
             ));
         }
-        let xml = litchi_ooxml_common::mce::process_part(part)?;
-        Self::parse_xml(xml.as_ref())
+        let processed = process_markup_compatibility(part.blob(), &Capabilities::default(), limits)
+            .map_err(crate::Error::Mce)?;
+        Self::parse_xml(processed.xml.as_ref(), limits)
     }
 }

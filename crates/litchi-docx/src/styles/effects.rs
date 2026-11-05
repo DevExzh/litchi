@@ -13,14 +13,23 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{
-    ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, ReadLimits,
-    ReadResource, RelationshipEdit, TargetMode, validate_source_xml_bytes,
+    ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, RelationshipEdit,
+    SourceLimitKind, SourceLimits, TargetMode, validate_source_xml_bytes,
 };
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 
+use crate::Result;
 use crate::styles::{Style, Styles, Type};
-use crate::{Error, Result};
+
+#[path = "effects/edit.rs"]
+mod edit;
+#[path = "effects/limit.rs"]
+mod limit;
+#[path = "effects/raw.rs"]
+pub mod raw;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind};
+pub use limit::Limits;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[cfg(test)]
@@ -60,14 +69,6 @@ mod test_trace {
         COUNTS.with(|counts| {
             let mut value = counts.get();
             value.loads = value.loads.saturating_add(1);
-            counts.set(value);
-        });
-    }
-
-    pub(super) fn record_candidate_clone() {
-        COUNTS.with(|counts| {
-            let mut value = counts.get();
-            value.candidate_clones = value.candidate_clones.saturating_add(1);
             counts.set(value);
         });
     }
@@ -284,15 +285,12 @@ impl Resource {
     /// The source must have a w:styles root in either the Transitional or
     /// Strict WordprocessingML namespace. Unknown children and attributes are
     /// retained in the exact source bytes.
-    pub fn new(xml: impl Into<Vec<u8>>) -> Result<Self> {
-        let xml = Arc::new(xml.into());
+    pub fn new(xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
+        let xml = xml.into();
+        raw::admit_xml(&xml, limits)?;
+        let xml = Arc::new(xml);
         let conformance = validate_xml(&xml, None)?;
         Self::from_shared_with_conformance(xml, conformance)
-    }
-
-    /// Alias for Resource::new emphasizing its source-backed nature.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::new(xml)
     }
 
     /// Borrow the exact authored XML source.
@@ -337,7 +335,7 @@ impl Resource {
     pub(crate) fn from_part(
         part: &dyn Part,
         expected: Conformance,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         if part.content_type() != CONTENT_TYPE {
             return Err(Error::ContentType {
@@ -364,7 +362,7 @@ impl Resource {
     pub(crate) fn from_shared_with_conformance_limits(
         xml: Arc<Vec<u8>>,
         expected: Conformance,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         let conformance = validate_xml_with_limits(&xml, Some(expected), limits)?;
         let styles = StyleDefinitions::from_xml(&xml)?;
@@ -412,8 +410,8 @@ impl Snapshot {
     }
 
     /// Construct a snapshot from a standalone XML resource.
-    pub fn from_xml(owner: Owner, xml: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::new(owner, Some(Resource::new(xml)?))
+    pub fn from_xml(owner: Owner, xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
+        Self::new(owner, Some(Resource::new(xml, limits)?))
     }
 
     /// Semantic owner represented by this snapshot.
@@ -447,8 +445,8 @@ impl Snapshot {
 
     /// Start an isolated edit over this optional resource.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             base: self.clone(),
             next: self.resource.clone(),
         }
@@ -478,21 +476,14 @@ impl Snapshot {
 
 /// An isolated replacement transaction over one owner-wide resource state.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Draft {
     base: Snapshot,
     next: Option<Resource>,
 }
 
-impl Transaction {
-    /// Borrow the currently staged optional resource.
-    #[inline]
-    #[must_use]
-    pub const fn resource(&self) -> Option<&Resource> {
-        self.next.as_ref()
-    }
-
+impl Draft {
     /// Replace the complete resource, or pass None to stage removal.
-    pub fn replace_resource(&mut self, resource: Option<Resource>) -> Result<&mut Self> {
+    pub(crate) fn replace_resource(&mut self, resource: Option<Resource>) -> Result<&mut Self> {
         if let Some(resource) = &resource {
             if resource.conformance() != self.base.conformance {
                 return Err(Error::InvalidFormat(
@@ -504,20 +495,14 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Clear the staged resource.
-    pub fn clear_resource(&mut self) -> &mut Self {
-        self.next = None;
-        self
-    }
-
     /// Whether the staged owner state differs from its source snapshot.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         !same_resource(self.base.resource.as_ref(), self.next.as_ref())
     }
 
     /// Validate and produce a source-checked commit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<DraftCommit> {
         let changed = self.is_changed();
         if !changed {
             let patch = Patch {
@@ -529,11 +514,7 @@ impl Transaction {
                 after_graph: self.base.graph.clone(),
                 package_bound: self.base.graph.is_some(),
             };
-            return Ok(Commit {
-                snapshot: self.base,
-                patch,
-                changed: false,
-            });
+            return Ok(DraftCommit { patch });
         }
 
         let after_graph = graph_after_transaction(&self.base, self.next.as_ref())?;
@@ -556,73 +537,25 @@ impl Transaction {
             after_graph,
             package_bound,
         };
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        Ok(DraftCommit { patch })
     }
 }
 
-/// A successful source-bound owner publication.
+/// The patch a draft computed.
 #[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
+pub(crate) struct DraftCommit {
     patch: Patch,
-    changed: bool,
 }
 
-impl Commit {
-    /// Whether the transaction changed the owner resource.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Alias for [`Self::changed`].
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed()
-    }
-
-    /// Borrow the owner snapshot produced by the edit.
-    #[inline]
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the owner snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the reversible source patch.
-    #[inline]
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible source patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
+impl DraftCommit {
+    pub(crate) fn into_patch(self) -> Patch {
         self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 }
 
 /// A source-checked reversible replacement/removal patch.
 ///
-/// Package-bound patches retain the originating package's [`ReadLimits`]. Applying
+/// Package-bound patches retain the originating package's [`SourceLimits`]. Applying
 /// one to a package opened with a different limit profile fails its source
 /// precondition; create a fresh edit from that package instead.
 #[derive(Debug, Clone)]
@@ -698,28 +631,11 @@ impl Patch {
         })
     }
 
-    /// Apply this source-checked patch atomically to its owner in a package.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        apply_patch(package, self.owner, self)
-    }
-
-    /// Apply the exact inverse of this patch atomically to a package.
-    pub fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.inverse().apply(package)
-    }
-
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         same_resource(self.before.as_ref(), self.after.as_ref())
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 }
 
@@ -735,7 +651,7 @@ pub(crate) struct GraphToken {
     target_relationships: Option<OwnedRelationships>,
     content_types: OwnedContentTypes,
     aggregate: AggregateMetrics,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -770,7 +686,7 @@ struct AggregateEdit {
 
 fn project_aggregate_metrics(
     current: AggregateMetrics,
-    limits: ReadLimits,
+    limits: SourceLimits,
     edit: AggregateEdit,
 ) -> Result<AggregateMetrics> {
     let parts = apply_signed_delta(current.parts, edit.part_delta, "part count")?;
@@ -809,7 +725,7 @@ fn project_aggregate_metrics(
     if let Some(length) = edit.added_part_len {
         check_limit(
             limits,
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             u64::try_from(length)
                 .map_err(|_| invalid("stylesWithEffects part byte count overflows u64"))?,
             limits.max_part_bytes(),
@@ -817,63 +733,63 @@ fn project_aggregate_metrics(
     }
     check_limit(
         limits,
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         parts as u64,
         limits.max_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalPartBytes,
+        SourceLimitKind::TotalPartBytes,
         total_part_bytes,
         limits.max_total_part_bytes(),
     )?;
     check_limit(
         limits,
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         relationship_parts as u64,
         limits.max_relationship_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         total_relationships as u64,
         limits.max_total_relationships() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::RelationshipGraphNodes,
+        SourceLimitKind::RelationshipGraphNodes,
         relationship_graph_nodes as u64,
         limits.max_relationship_graph_nodes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         relationship_xml_bytes,
         limits.max_total_relationship_xml_bytes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         relationship_xml_events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::ContentTypesBytes,
+        SourceLimitKind::ContentTypesBytes,
         edit.content_type_len as u64,
         limits.max_content_types_bytes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::ContentTypeMappings,
+        SourceLimitKind::ContentTypeMappings,
         edit.content_type_mappings as u64,
         limits.max_content_type_mappings() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::XmlEvents,
+        SourceLimitKind::Events,
         edit.content_type_events as u64,
-        limits.max_xml_events() as u64,
+        limits.max_events() as u64,
     )?;
     Ok(AggregateMetrics {
         parts,
@@ -1305,7 +1221,7 @@ fn capture_aggregate_metrics(package: &OpcPackage) -> Result<AggregateMetrics> {
         })?)
         .ok_or_else(|| invalid("stylesWithEffects relationship count overflow"))?;
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    let root_token = package.source_relationships_with_limits(&root, limits)?;
+    let root_token = package.source_relationships(&root, limits)?;
     let mut relationship_parts = usize::from(root_token.member_present());
     let mut relationship_xml_bytes = 0_u64;
     let mut relationship_xml_events = 0_usize;
@@ -1315,7 +1231,7 @@ fn capture_aggregate_metrics(package: &OpcPackage) -> Result<AggregateMetrics> {
         relationship_xml_events = relationship_metrics(root_token.bytes())?.0;
     }
     for part in package.iter_parts() {
-        let token = package.source_relationships_with_limits(part.partname(), limits)?;
+        let token = package.source_relationships(part.partname(), limits)?;
         if token.member_present() {
             relationship_parts = relationship_parts
                 .checked_add(1)
@@ -1341,37 +1257,37 @@ fn capture_aggregate_metrics(package: &OpcPackage) -> Result<AggregateMetrics> {
     };
     check_limit(
         limits,
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         metrics.parts as u64,
         limits.max_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalPartBytes,
+        SourceLimitKind::TotalPartBytes,
         metrics.total_part_bytes,
         limits.max_total_part_bytes(),
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         metrics.total_relationships as u64,
         limits.max_total_relationships() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         metrics.relationship_parts as u64,
         limits.max_relationship_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         metrics.relationship_xml_bytes,
         limits.max_total_relationship_xml_bytes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         metrics.relationship_xml_events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
@@ -1389,15 +1305,13 @@ fn capture_graph_token(
     };
     let relationships = source
         .as_ref()
-        .map(|source| package.source_relationships_with_limits(source, package.read_limits()))
+        .map(|source| package.source_relationships(source, package.read_limits()))
         .transpose()?;
-    let content_types = package.source_content_types_with_limits(package.read_limits())?;
+    let content_types = package.source_content_types(package.read_limits())?;
     let aggregate = capture_aggregate_metrics(package)?;
     let binding = graph.binding(owner);
     let target_relationships = binding
-        .map(|binding| {
-            package.source_relationships_with_limits(&binding.target, package.read_limits())
-        })
+        .map(|binding| package.source_relationships(&binding.target, package.read_limits()))
         .transpose()?;
     let (planned_target, planned_relationship_id) = if binding.is_none() {
         let planned_target = source
@@ -1432,18 +1346,26 @@ fn capture_graph_token(
 
 /// Load a complete owner-wide effects snapshot. Absence is represented by a
 /// present snapshot whose resource() is None.
-pub fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
+pub(crate) fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
+    load_with_limits(package, owner, package.read_limits())
+}
+
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    owner: Owner,
+    limits: SourceLimits,
+) -> Result<Snapshot> {
     #[cfg(test)]
     test_trace::record_load();
 
-    let graph = inspect_graph(package)?;
+    let graph = inspect_graph_with_limits(package, None, limits)?;
     let resource = graph
         .binding(owner)
         .map(|binding| {
             Resource::from_part(
                 package.get_part(&binding.target)?,
                 graph.conformance,
-                package.read_limits(),
+                limits,
             )
         })
         .transpose()?;
@@ -1454,34 +1376,6 @@ pub fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
         graph.conformance,
         graph_token,
     ))
-}
-
-/// Source-backed spelling of load.
-pub fn load_snapshot(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
-    load(package, owner)
-}
-
-/// Apply a source-checked patch atomically to one package owner.
-pub fn apply_patch(package: &mut OpcPackage, owner: Owner, patch: &Patch) -> Result<Snapshot> {
-    let current = load(package, owner)?;
-    if patch.owner != owner {
-        return Err(Error::InvalidFormat(
-            "stylesWithEffects patch owner does not match the requested package owner".to_owned(),
-        ));
-    }
-    let projected = patch.apply_to_snapshot(&current)?;
-    if current.same_state(&projected) {
-        return Ok(current);
-    }
-
-    let mut candidate = {
-        #[cfg(test)]
-        test_trace::record_candidate_clone();
-        package.clone()
-    };
-    let published = apply_projected_patch(&mut candidate, owner, patch, projected, Some(package))?;
-    *package = candidate;
-    Ok(published)
 }
 
 /// Apply a patch to the exact candidate clone owned by the package facade.
@@ -1618,7 +1512,7 @@ fn readback_existing_resource_replacement(
         ));
     }
     let limits = package.read_limits();
-    let target_relationships = package.source_relationships_with_limits(&binding.target, limits)?;
+    let target_relationships = package.source_relationships(&binding.target, limits)?;
     if desired_graph.target_relationships.as_ref() != Some(&target_relationships) {
         return Err(invalid(
             "stylesWithEffects replacement graph target metadata differs from its source",
@@ -1640,15 +1534,13 @@ fn readback_existing_resource_replacement(
     ))
 }
 
-/// Apply a committed source patch to one package owner.
-pub fn apply_commit(package: &mut OpcPackage, owner: Owner, commit: Commit) -> Result<Snapshot> {
-    apply_patch(package, owner, &commit.patch)
-}
-
-/// Add or replace one owner resource. The operation returns false for an
-/// exact source/conformance no-op and therefore leaves signatures untouched.
-pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result<bool> {
-    let graph = inspect_graph(package)?;
+pub(crate) fn put_with_limits(
+    package: &mut OpcPackage,
+    owner: Owner,
+    resource: Resource,
+    limits: SourceLimits,
+) -> Result<bool> {
+    let graph = inspect_graph_with_limits(package, None, limits)?;
     if resource.conformance != graph.conformance {
         return Err(invalid(
             "stylesWithEffects resource conformance does not match the package",
@@ -1660,7 +1552,7 @@ pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result
             Resource::from_part(
                 package.get_part(&binding.target)?,
                 graph.conformance,
-                package.read_limits(),
+                limits,
             )
         })
         .transpose()?;
@@ -1674,9 +1566,9 @@ pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result
     }
 
     let mut candidate = package.clone();
-    publish_resource(&mut candidate, owner, Some(resource), None, None)?;
+    publish_resource_with_limits(&mut candidate, owner, Some(resource), None, None, limits)?;
     candidate.validate_signature_edit_from(package)?;
-    let published = load(&candidate, owner)?;
+    let published = load_with_limits(&candidate, owner, limits)?;
     if published.resource().is_none() {
         return Err(invalid("staged stylesWithEffects resource disappeared"));
     }
@@ -1684,16 +1576,19 @@ pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result
     Ok(true)
 }
 
-/// Remove one owner resource. Missing resources are an exact no-op.
-pub fn remove(package: &mut OpcPackage, owner: Owner) -> Result<bool> {
-    let graph = inspect_graph(package)?;
+pub(crate) fn remove_with_limits(
+    package: &mut OpcPackage,
+    owner: Owner,
+    limits: SourceLimits,
+) -> Result<bool> {
+    let graph = inspect_graph_with_limits(package, None, limits)?;
     if graph.binding(owner).is_none() {
         return Ok(false);
     }
     let mut candidate = package.clone();
-    publish_resource(&mut candidate, owner, None, None, None)?;
+    publish_resource_with_limits(&mut candidate, owner, None, None, None, limits)?;
     candidate.validate_signature_edit_from(package)?;
-    let published = load(&candidate, owner)?;
+    let published = load_with_limits(&candidate, owner, limits)?;
     if published.resource().is_some() {
         return Err(invalid("staged stylesWithEffects resource was not removed"));
     }
@@ -1708,9 +1603,29 @@ fn publish_resource(
     desired_graph: Option<&GraphToken>,
     validated_resource: Option<&Resource>,
 ) -> Result<()> {
-    let graph = inspect_graph_with_validated_resource(
+    let limits = package.read_limits();
+    publish_resource_with_limits(
+        package,
+        owner,
+        resource,
+        desired_graph,
+        validated_resource,
+        limits,
+    )
+}
+
+fn publish_resource_with_limits(
+    package: &mut OpcPackage,
+    owner: Owner,
+    resource: Option<Resource>,
+    desired_graph: Option<&GraphToken>,
+    validated_resource: Option<&Resource>,
+    limits: SourceLimits,
+) -> Result<()> {
+    let graph = inspect_graph_with_limits(
         package,
         validated_resource.map(|resource| (owner, resource)),
+        limits,
     )?;
     let source = match owner {
         Owner::MainDocument => graph.main.clone(),
@@ -1722,7 +1637,6 @@ fn publish_resource(
         })?,
     };
     let binding = graph.binding(owner).cloned();
-    let limits = package.read_limits();
     if let Some(desired_graph) = desired_graph {
         if desired_graph.owner != owner || desired_graph.source.as_deref() != Some(source.as_str())
         {
@@ -1734,10 +1648,9 @@ fn publish_resource(
 
     match (binding, resource) {
         (Some(binding), Some(resource)) => {
-            validate_resource_for_package(&resource, package, graph.conformance)?;
+            validate_resource_for_package(&resource, graph.conformance, limits)?;
             if let Some(desired) = desired_graph {
-                let target_relationships =
-                    package.source_relationships_with_limits(&binding.target, limits)?;
+                let target_relationships = package.source_relationships(&binding.target, limits)?;
                 if desired.target.as_deref() != Some(binding.target.as_str())
                     || desired.relationship_id.as_deref() != Some(binding.relationship_id.as_str())
                     || desired.target_relationships.as_ref() != Some(&target_relationships)
@@ -1747,7 +1660,7 @@ fn publish_resource(
                     ));
                 }
             }
-            let relationship_token = package.source_relationships_with_limits(&source, limits)?;
+            let relationship_token = package.source_relationships(&source, limits)?;
             let relationship_len = relationship_token.bytes().len();
             let (relationship_events, relationship_count) =
                 relationship_metrics(relationship_token.bytes())?;
@@ -1787,11 +1700,9 @@ fn publish_resource(
                 )));
             }
 
-            let current_relationships =
-                package.source_relationships_with_limits(&source, limits)?;
-            let current_content_types = package.source_content_types_with_limits(limits)?;
-            let target_relationships =
-                package.source_relationships_with_limits(&binding.target, limits)?;
+            let current_relationships = package.source_relationships(&source, limits)?;
+            let current_content_types = package.source_content_types(limits)?;
+            let target_relationships = package.source_relationships(&binding.target, limits)?;
             let relationship_part_delta = -i64::from(target_relationships.member_present());
             let (replacement_relationships, replacement_content_types) = if let Some(
                 desired_graph,
@@ -1850,7 +1761,7 @@ fn publish_resource(
                 )?;
                 check_limit(
                     limits,
-                    ReadResource::ContentTypesBytes,
+                    SourceLimitKind::ContentTypesBytes,
                     content_type_len as u64,
                     limits.max_content_types_bytes() as u64,
                 )?;
@@ -1875,16 +1786,16 @@ fn publish_resource(
             )?;
             check_limit(
                 limits,
-                ReadResource::ContentTypesBytes,
+                SourceLimitKind::ContentTypesBytes,
                 replacement_content_types.bytes().len() as u64,
                 limits.max_content_types_bytes() as u64,
             )?;
-            package.try_replace_content_types_with_limits(
+            package.try_replace_content_types(
                 current_content_types.bytes(),
                 &replacement_content_types,
                 limits,
             )?;
-            package.try_replace_relationships_with_limits(
+            package.try_replace_relationships(
                 &current_relationships,
                 &replacement_relationships,
                 limits,
@@ -1892,10 +1803,9 @@ fn publish_resource(
             package.remove_part(&binding.target);
         },
         (None, Some(resource)) => {
-            validate_resource_for_package(&resource, package, graph.conformance)?;
-            let current_relationships =
-                package.source_relationships_with_limits(&source, limits)?;
-            let current_content_types = package.source_content_types_with_limits(limits)?;
+            validate_resource_for_package(&resource, graph.conformance, limits)?;
+            let current_relationships = package.source_relationships(&source, limits)?;
+            let current_content_types = package.source_content_types(limits)?;
             let (
                 target,
                 relationship_id,
@@ -1964,7 +1874,7 @@ fn publish_resource(
                 )?;
                 check_limit(
                     limits,
-                    ReadResource::ContentTypesBytes,
+                    SourceLimitKind::ContentTypesBytes,
                     content_type_len as u64,
                     limits.max_content_types_bytes() as u64,
                 )?;
@@ -1993,7 +1903,7 @@ fn publish_resource(
             )?;
             check_limit(
                 limits,
-                ReadResource::ContentTypesBytes,
+                SourceLimitKind::ContentTypesBytes,
                 replacement_content_types.bytes().len() as u64,
                 limits.max_content_types_bytes() as u64,
             )?;
@@ -2017,8 +1927,8 @@ fn publish_resource(
             )?;
             if let Some(target_relationships) = target_relationships {
                 let current_target_relationships =
-                    package.source_relationships_with_limits(&target_name, limits)?;
-                package.try_replace_relationships_with_limits(
+                    package.source_relationships(&target_name, limits)?;
+                package.try_replace_relationships(
                     &current_target_relationships,
                     &target_relationships,
                     limits,
@@ -2032,21 +1942,21 @@ fn publish_resource(
 
 fn validate_resource_for_package(
     resource: &Resource,
-    package: &OpcPackage,
     conformance: Conformance,
+    limits: SourceLimits,
 ) -> Result<()> {
     if resource.conformance != conformance {
         return Err(invalid(
             "stylesWithEffects resource conformance does not match the package",
         ));
     }
-    validate_xml_with_limits(&resource.xml, Some(conformance), package.read_limits()).map(|_| ())
+    validate_xml_with_limits(&resource.xml, Some(conformance), limits).map(|_| ())
 }
 
 fn validate_effects_part_for_package(
     part: &dyn Part,
     conformance: Conformance,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::ContentType {
@@ -2060,7 +1970,7 @@ fn validate_effects_part_for_package(
 fn validate_effects_part_for_graph(
     part: &dyn Part,
     conformance: Conformance,
-    limits: ReadLimits,
+    limits: SourceLimits,
     validated_resource: Option<&Resource>,
 ) -> Result<()> {
     if let Some(resource) = validated_resource {
@@ -2109,7 +2019,7 @@ fn preflight_package_limits(
     }
     check_limit(
         limits,
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         final_parts as u64,
         limits.max_parts() as u64,
     )?;
@@ -2125,7 +2035,7 @@ fn preflight_package_limits(
     }
     check_limit(
         limits,
-        ReadResource::RelationshipGraphNodes,
+        SourceLimitKind::RelationshipGraphNodes,
         final_graph_nodes as u64,
         limits.max_relationship_graph_nodes() as u64,
     )?;
@@ -2150,14 +2060,14 @@ fn preflight_package_limits(
             .ok_or_else(|| invalid("stylesWithEffects replacement part bytes overflow"))?;
         check_limit(
             limits,
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             new_part_len as u64,
             limits.max_part_bytes(),
         )?;
     }
     check_limit(
         limits,
-        ReadResource::TotalPartBytes,
+        SourceLimitKind::TotalPartBytes,
         total_part_bytes,
         limits.max_total_part_bytes(),
     )?;
@@ -2171,7 +2081,7 @@ fn preflight_package_limits(
             .ok_or_else(|| invalid("stylesWithEffects relationship count overflow"))?;
     }
     let mut relationship_events = 0usize;
-    let root_token = package.source_relationships_with_limits(&root, limits)?;
+    let root_token = package.source_relationships(&root, limits)?;
     let mut relationship_parts = usize::from(root_token.member_present());
     if root_token.member_present() {
         relationship_bytes = relationship_bytes
@@ -2182,7 +2092,7 @@ fn preflight_package_limits(
             .ok_or_else(|| invalid("stylesWithEffects relationship event count overflow"))?;
     }
     for part in package.iter_parts() {
-        let token = package.source_relationships_with_limits(part.partname(), limits)?;
+        let token = package.source_relationships(part.partname(), limits)?;
         let removed_part = old_target
             .as_ref()
             .is_some_and(|target| same_uri(target, part.partname()));
@@ -2250,25 +2160,25 @@ fn preflight_package_limits(
     }
     check_limit(
         limits,
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         final_relationship_parts as u64,
         limits.max_relationship_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         relationship_count as u64,
         limits.max_total_relationships() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         relationship_events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         relationship_bytes,
         limits.max_total_relationship_xml_bytes() as u64,
     )?;
@@ -2301,7 +2211,7 @@ fn enqueue_relationship_graph_target(
     target: PackURI,
     visited: &mut HashSet<Vec<u8>>,
     work_queue: &mut Vec<PackURI>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     let key = canonical_uri_key(&target)?;
     if visited.contains(&key) {
@@ -2313,7 +2223,7 @@ fn enqueue_relationship_graph_target(
         .ok_or_else(|| invalid("stylesWithEffects relationship graph node count overflows"))?;
     check_limit(
         limits,
-        ReadResource::RelationshipGraphNodes,
+        SourceLimitKind::RelationshipGraphNodes,
         next as u64,
         limits.max_relationship_graph_nodes() as u64,
     )?;
@@ -2517,13 +2427,17 @@ fn next_relationship_id(package: &OpcPackage, source: &PackURI) -> Result<String
     ))
 }
 
-fn inspect_graph(package: &OpcPackage) -> Result<GraphState> {
-    inspect_graph_with_validated_resource(package, None)
-}
-
 fn inspect_graph_with_validated_resource(
     package: &OpcPackage,
     validated: Option<(Owner, &Resource)>,
+) -> Result<GraphState> {
+    inspect_graph_with_limits(package, validated, package.read_limits())
+}
+
+fn inspect_graph_with_limits(
+    package: &OpcPackage,
+    validated: Option<(Owner, &Resource)>,
+    limits: SourceLimits,
 ) -> Result<GraphState> {
     let conformance = package_conformance(package)?;
     let main_part = package.main_document_part()?;
@@ -2651,12 +2565,7 @@ fn inspect_graph_with_validated_resource(
                 .filter(|binding| same_uri(&binding.target, target))
                 .map(|_| resource)
         });
-        validate_effects_part_for_graph(
-            part,
-            conformance,
-            package.read_limits(),
-            validated_resource,
-        )?;
+        validate_effects_part_for_graph(part, conformance, limits, validated_resource)?;
     }
 
     Ok(GraphState {
@@ -2861,15 +2770,15 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 fn check_limit(
-    _limits: ReadLimits,
-    resource: ReadResource,
+    _limits: SourceLimits,
+    resource: SourceLimitKind,
     actual: u64,
     maximum: u64,
 ) -> Result<()> {
     if actual > maximum {
-        return Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource,
-            actual,
+        return Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         }));
     }
@@ -2877,13 +2786,13 @@ fn check_limit(
 }
 
 fn validate_xml(xml: &[u8], expected: Option<Conformance>) -> Result<Conformance> {
-    let bounded_limits = ReadLimits::builder()
+    let bounded_limits = SourceLimits::builder()
         .max_part_bytes(
             u64::try_from(MAX_XML_BYTES)
                 .map_err(|_| invalid("stylesWithEffects XML byte bound overflows u64"))?,
         )?
-        .max_xml_events(MAX_XML_EVENTS)?
-        .max_xml_depth(MAX_XML_DEPTH)?
+        .max_events(MAX_XML_EVENTS)?
+        .max_depth(MAX_XML_DEPTH)?
         .build()?;
     validate_xml_with_limits(xml, expected, bounded_limits)
 }
@@ -2891,16 +2800,18 @@ fn validate_xml(xml: &[u8], expected: Option<Conformance>) -> Result<Conformance
 fn validate_xml_with_limits(
     xml: &[u8],
     expected: Option<Conformance>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Conformance> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(invalid(format!(
-            "stylesWithEffects XML exceeds {MAX_XML_BYTES} bytes"
-        )));
+        return Err(crate::Error::StylesWithEffectsLimit {
+            kind: LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_XML_BYTES,
+        });
     }
     check_limit(
         limits,
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         xml.len() as u64,
         limits.max_part_bytes(),
     )?;
@@ -2921,15 +2832,17 @@ fn validate_xml_with_limits(
             .checked_add(1)
             .ok_or_else(|| invalid("stylesWithEffects XML event count overflow"))?;
         if events > MAX_XML_EVENTS {
-            return Err(invalid(format!(
-                "stylesWithEffects XML exceeds {MAX_XML_EVENTS} events"
-            )));
+            return Err(crate::Error::StylesWithEffectsLimit {
+                kind: LimitKind::XmlEvents,
+                actual: events,
+                maximum: MAX_XML_EVENTS,
+            });
         }
         check_limit(
             limits,
-            ReadResource::XmlEvents,
+            SourceLimitKind::Events,
             events as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         match event {
             Event::Start(start) => {
@@ -2957,15 +2870,17 @@ fn validate_xml_with_limits(
                     .checked_add(1)
                     .ok_or_else(|| invalid("stylesWithEffects XML depth overflow"))?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(invalid(format!(
-                        "stylesWithEffects XML exceeds {MAX_XML_DEPTH} nesting levels"
-                    )));
+                    return Err(crate::Error::StylesWithEffectsLimit {
+                        kind: LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_XML_DEPTH,
+                    });
                 }
                 check_limit(
                     limits,
-                    ReadResource::XmlDepth,
+                    SourceLimitKind::Depth,
                     depth as u64,
-                    limits.max_xml_depth() as u64,
+                    limits.max_depth() as u64,
                 )?;
             },
             Event::Empty(empty) => {
@@ -3082,7 +2997,7 @@ mod tests {
             offset..offset,
             br#"<w:style w:type="paragraph" w:styleId="EffectsCountProbe"><w:name w:val="Effects Count Probe"/></w:style>"#.iter().copied(),
         );
-        Resource::from_xml(xml).expect("changed effects resource")
+        Resource::new(xml, &Limits::DEFAULT).expect("changed effects resource")
     }
 
     fn changed_patch(snapshot: &Snapshot) -> (Patch, Resource) {
@@ -3100,7 +3015,7 @@ mod tests {
 
     #[test]
     fn staged_facade_reuses_snapshot_and_skips_nested_effects_clone() {
-        let mut package = crate::Package::from_reader(Cursor::new(FIXTURE.to_vec()))
+        let package = crate::Package::from_reader(Cursor::new(FIXTURE.to_vec()))
             .expect("open effects fixture");
         let snapshot = package
             .styles_with_effects(Owner::MainDocument)
@@ -3108,39 +3023,17 @@ mod tests {
         let (patch, expected) = changed_patch(&snapshot);
 
         test_trace::reset();
-        let applied = package
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        let commit = package
+            .apply_styles_with_effects(&patch)
             .expect("apply staged effects patch");
         let counts = test_trace::take();
+        let applied = commit
+            .package()
+            .styles_with_effects(Owner::MainDocument)
+            .expect("reload effects");
 
         assert_eq!(counts.loads, 1);
         assert_eq!(counts.candidate_clones, 0);
-        assert_eq!(counts.projection_builds, 1);
-        assert_eq!(counts.readbacks, 1);
-        assert_eq!(counts.graph_validations, 4);
-        assert_eq!(
-            applied
-                .resource()
-                .expect("published effects resource")
-                .xml_bytes(),
-            expected.xml_bytes()
-        );
-    }
-
-    #[test]
-    fn direct_patch_retains_nested_effects_candidate_clone() {
-        let mut package = OpcPackage::from_vec(FIXTURE.to_vec()).expect("open effects fixture");
-        let snapshot = load(&package, Owner::MainDocument).expect("load effects fixture");
-        let (patch, expected) = changed_patch(&snapshot);
-
-        test_trace::reset();
-        let applied = patch
-            .apply(&mut package)
-            .expect("apply direct effects patch");
-        let counts = test_trace::take();
-
-        assert_eq!(counts.loads, 1);
-        assert_eq!(counts.candidate_clones, 1);
         assert_eq!(counts.projection_builds, 1);
         assert_eq!(counts.readbacks, 1);
         assert_eq!(counts.graph_validations, 4);
@@ -3159,12 +3052,12 @@ mod tests {
             Owner::MainDocument,
             br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
                 .to_vec(),
-        )
+        &Limits::DEFAULT)
         .expect("standalone effects snapshot");
-        let replacement = Resource::from_xml(
+        let replacement = Resource::new(
             br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="probe"/></w:styles>"#
                 .to_vec(),
-        )
+        &Limits::DEFAULT)
         .expect("standalone replacement resource");
         let mut edit = current.edit();
         edit.replace_resource(Some(replacement))
@@ -3192,7 +3085,9 @@ mod tests {
         const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rOwner" Type="urn:litchi:test" Target="word/owner.xml"/></Relationships>"#;
         const OWNER_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rLeaf" Type="urn:litchi:test" Target="leaf.xml"/></Relationships>"#;
         const OWNER_PAYLOAD: &[u8] = b"<effects-graph-owner/>";
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored("[Content_Types].xml", MANIFEST)
             .expect("manifest");
@@ -3216,7 +3111,8 @@ mod tests {
                 .expect("stored owner payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes).expect("corruption is deferred to first decode")
+        OpcPackage::from_vec(bytes, SourceLimits::default())
+            .expect("corruption is deferred to first decode")
     }
 
     // Review of the 0759 merge: the graph walk decoded every owner only to

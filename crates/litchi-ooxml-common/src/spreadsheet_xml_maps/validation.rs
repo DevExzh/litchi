@@ -13,27 +13,9 @@ use crate::Result;
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn validate_xml_map_info(info: &XmlMapInfo) -> Result<()> {
-    validate_xml_map_info_with_limits(info, &XmlMapLimits::DEFAULT)
-}
-
-/// Validate a `MapInfo` value using caller-selected resource ceilings.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn validate_xml_map_info_with_limits(info: &XmlMapInfo, limits: &XmlMapLimits) -> Result<()> {
-    let info = XmlMapInfoRef::from_owned_with_limits(info, limits)?;
-    validate_xml_map_info_ref_with_limits(&info, limits)
-}
-
-/// Validate a borrowed `MapInfo` projection using default resource ceilings.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn validate_xml_map_info_ref(info: &XmlMapInfoRef<'_>) -> Result<()> {
-    validate_xml_map_info_ref_with_limits(info, &XmlMapLimits::DEFAULT)
+pub fn validate_xml_map_info(info: &XmlMapInfo, limits: &XmlMapLimits) -> Result<()> {
+    let info = XmlMapInfoRef::from_owned(info, limits)?;
+    validate_xml_map_info_ref(&info, limits)
 }
 
 /// Validate a borrowed `MapInfo` projection using caller-selected ceilings.
@@ -41,10 +23,7 @@ pub fn validate_xml_map_info_ref(info: &XmlMapInfoRef<'_>) -> Result<()> {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn validate_xml_map_info_ref_with_limits(
-    info: &XmlMapInfoRef<'_>,
-    limits: &XmlMapLimits,
-) -> Result<()> {
+pub fn validate_xml_map_info_ref(info: &XmlMapInfoRef<'_>, limits: &XmlMapLimits) -> Result<()> {
     bounded(info.selection_namespaces, limits)?;
     if info.schemas.is_empty() || info.schemas.len() > limits.max_schemas {
         return Err(invalid("MapInfo requires 1..4096 Schema children"));

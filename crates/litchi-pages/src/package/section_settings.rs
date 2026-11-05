@@ -3,12 +3,10 @@
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::Entry};
+use litchi_iwa_archive::package::Entry;
 use litchi_iwa_common::{
     decode_varint_from_bytes,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::SnappyStream;
 use litchi_iwa_protos::pages_section_codec::{
@@ -84,7 +82,7 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             0,
         );
         return Ok(Commit::from_parts(
-            source.snapshot(),
+            source.clone(),
             patch,
             Diagnostics::unchanged(),
         ));
@@ -97,9 +95,11 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource {
-            path: Path::section(position),
-        });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedSource {
+                path: Path::section(position),
+            },
+        ));
     }
 
     let payload = transaction::selected_payload(source, target)?;
@@ -156,7 +156,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     }
     if patch.is_noop() {
         return Ok(Commit::from_parts(
-            source.snapshot(),
+            source.clone(),
             patch.clone(),
             Diagnostics::unchanged(),
         ));
@@ -183,11 +183,11 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             .saturating_add(128),
         Path::Package,
     )?;
-    let catalog = SourceCatalog::from_shared_bytes_with_limits(
-        Arc::clone(patch.target_artifact()),
-        source.state.source.limits(),
-    )
-    .map_err(transaction::map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::clone(patch.target_artifact()))
+        .map_err(transaction::map_archive_error)?;
     let candidate =
         Package::from_source_catalog(catalog).map_err(transaction::map_package_error)?;
     let (_candidate_target, candidate_settings) =
@@ -289,7 +289,7 @@ fn map_decode_error(
         ),
         _ => return Error::InvalidSource { path },
     };
-    Error::LimitExceeded {
+    Error::Limit {
         path,
         kind,
         observed,
@@ -412,14 +412,13 @@ fn rewrite_payload(
         ),
     ];
     let path = Path::Package;
-    let rewritten =
-        patch_nested_fields_batched_with_limits(source, &edits, transaction::wire_limits(package)?)
-            .map_err(transaction::map_wire_error)?;
+    let rewritten = patch_nested_fields_batched(source, &edits, transaction::wire_limits(package)?)
+        .map_err(transaction::map_wire_error)?;
     budget.charge_work(
         source
             .len()
             .checked_add(rewritten.len())
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 path,
                 kind: crate::section::settings::LimitKind::WireWork,
                 observed: u64::MAX,
@@ -447,10 +446,12 @@ fn validate_changed_dependencies(
     let hide_changed =
         before.first_page_hides_header_footer() != after.first_page_hides_header_footer();
     if inherit_changed && target.position.get() == 0 {
-        return Err(Error::UnsupportedDependency {
-            path: Path::section(target.position),
-            kind: crate::section::settings::DependencyKind::PreviousSectionTemplates,
-        });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedDependency {
+                path: Path::section(target.position),
+                kind: crate::section::settings::DependencyKind::PreviousSectionTemplates,
+            },
+        ));
     }
     if !(inherit_changed || first_changed || even_odd_changed || hide_changed) {
         return Ok(());
@@ -537,13 +538,15 @@ fn required_reference(
     budget: &mut transaction::TransactionBudget,
 ) -> Result<u64, Error> {
     let path = Path::section(position);
-    let view = WireView::parse_with_limits(payload, transaction::wire_limits(package)?)
+    let view = WireView::parse(payload, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     budget.charge_fields(view.len(), path)?;
     budget.charge_work(payload.len(), path)?;
     let mut selected = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = selected.next() else {
-        return Err(Error::UnsupportedDependency { path, kind });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedDependency { path, kind },
+        ));
     };
     if selected.next().is_some() || field.wire_type() != 2 {
         return Err(Error::InvalidSource { path });
@@ -565,13 +568,15 @@ fn validate_template(
 ) -> Result<(), Error> {
     let path = Path::section(position);
     let Some(object) = object_index.get(identifier, path, budget)? else {
-        return Err(Error::UnsupportedDependency { path, kind });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedDependency { path, kind },
+        ));
     };
     let (message_index, message) =
         transaction::unique_message(object, transaction::TEMPLATE_MESSAGE_TYPE, path)?;
     transaction::validate_selected_metadata(object, message_index, path)?;
     budget.charge_work(message.data.len(), path)?;
-    let view = WireView::parse_with_limits(&message.data, transaction::wire_limits(package)?)
+    let view = WireView::parse(&message.data, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     budget.charge_fields(view.len(), path)?;
     // Template drawables and UUID paths remain preservation-only. The native
@@ -733,7 +738,7 @@ fn validate_storage(
         return Err(Error::InvalidSource { path });
     }
     transaction::validate_selected_metadata(object, message_index, path)?;
-    let view = WireView::parse_with_limits(&message.data, transaction::wire_limits(package)?)
+    let view = WireView::parse(&message.data, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     budget.charge_fields(view.len(), path)?;
     budget.charge_work(message.data.len(), path)?;
@@ -745,7 +750,9 @@ fn validate_storage(
             field.number(),
             9 | 11 | 15 | 16 | 17 | 21 | 22 | 23 | 25 | 26
         ) {
-            return Err(Error::UnsupportedDependency { path, kind });
+            return Err(Error::Refused(
+                crate::section::settings::Refusal::UnsupportedDependency { path, kind },
+            ));
         }
     }
     Ok(())
@@ -1065,7 +1072,7 @@ fn selected_component_stream(package: &Package, name: &str) -> Result<SnappyStre
             path: Path::Package,
         });
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -1102,7 +1109,7 @@ fn normalized_message_length(
     target_index: usize,
     package: &Package,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(header, transaction::wire_limits(package)?)
+    let view = WireView::parse(header, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     let reserve = header.len().saturating_add(48);
     let mut output = Vec::new();
@@ -1122,9 +1129,8 @@ fn normalized_message_length(
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message =
-            WireView::parse_with_limits(field.payload(), transaction::wire_limits(package)?)
-                .map_err(transaction::map_wire_error)?;
+        let message = WireView::parse(field.payload(), transaction::wire_limits(package)?)
+            .map_err(transaction::map_wire_error)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -1158,9 +1164,8 @@ fn unchanged_section_fields_preserved(
     additionally_ignored_field: Option<u32>,
 ) -> Result<bool, Error> {
     let limits = transaction::wire_limits(package)?;
-    let left = WireView::parse_with_limits(source, limits).map_err(transaction::map_wire_error)?;
-    let right =
-        WireView::parse_with_limits(candidate, limits).map_err(transaction::map_wire_error)?;
+    let left = WireView::parse(source, limits).map_err(transaction::map_wire_error)?;
+    let right = WireView::parse(candidate, limits).map_err(transaction::map_wire_error)?;
     let mut left_fields = left.fields().filter(|field| {
         Some(field.number()) != additionally_ignored_field
             && !owned_field_changed(field.number(), before, after)
@@ -1401,10 +1406,19 @@ mod tests {
                 type_: 10_143,
                 data: Vec::new(),
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = aggregate;
         for (field_number, references) in declarations {
-            let mut field = FieldInfo::new(vec![field_number]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![field_number],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references = references;
             object.archive_info.message_infos[0].field_infos.push(field);
         }
@@ -1468,7 +1482,7 @@ mod tests {
         let (attempt, usage) = repeated_metadata_attempt(8_192, Some(large.transaction_work - 1))?;
         assert!(matches!(
             attempt,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: crate::section::settings::LimitKind::TransactionWork,
                 ..
             })

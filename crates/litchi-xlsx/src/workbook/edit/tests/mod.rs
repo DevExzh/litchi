@@ -7,4 +7,5 @@ mod support;
 mod tabs;
 mod transactions;
 mod web;
+mod worksheet_edit_state;
 mod worksheets;

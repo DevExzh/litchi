@@ -188,8 +188,12 @@ pub fn parse<'a>(
     Ok(Inventory::new(main, title, notes, handout, unknown))
 }
 
-/// Discover the Document record from the existing Presentation parser and
+/// Discover the live Document record of the existing Presentation parser and
 /// validate all persist references against its current mapping.
+///
+/// The live `DocumentContainer` is the one the current `UserEdit` chain maps
+/// the document persist identifier to; an incrementally saved presentation
+/// also carries the superseded Document records of its earlier edits.
 ///
 /// Parsed persist objects are supplied explicitly because `RecordParser` exposes
 /// references but not physical stream offsets. This keeps the owner zero-copy
@@ -202,19 +206,8 @@ pub fn parse_presentation<'a>(
     presentation: &'a Presentation,
     objects: &Objects<'a>,
 ) -> Result<Inventory<'a>> {
-    let documents: Vec<&Record> = presentation
-        .parser
-        .find_records_ref()
-        .into_iter()
-        .filter(|record| record.record_type == RecordType::Document)
-        .collect();
-    if documents.len() != 1 {
-        return Err(Error::Corrupted(format!(
-            "presentation must contain exactly one DocumentContainer; found {}",
-            documents.len()
-        )));
-    }
-    parse(documents[0], objects, &presentation.persist_mapping)
+    let document = presentation.live_document_ref()?;
+    parse(document, objects, &presentation.inner.persist_mapping)
 }
 
 fn validate_children_cover(record: &Record) -> Result<()> {

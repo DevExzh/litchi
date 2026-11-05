@@ -31,7 +31,7 @@ fn fields(values: &[u32]) -> Vec<u8> {
 
 fn encode(rule: &Rule<'_>) -> Vec<u8> {
     let mut encoded = Vec::new();
-    rule.write_to(&mut encoded)
+    rule.write_to(&mut encoded, crate::Limits::default())
         .expect("Vec writing cannot fail");
     encoded
 }
@@ -45,7 +45,7 @@ fn decodes_and_reencodes_connector_rules() {
         &fields(&[7, 11, 13, 17, 19, 23]),
     );
 
-    let rule = parse(&bytes).expect("valid connector rule");
+    let rule = parse(&bytes, crate::Limits::default()).expect("valid connector rule");
     let connector = rule.as_connector().expect("connector variant");
     assert_eq!(connector.rule_id(), 7);
     assert_eq!(connector.start_shape_id(), 11);
@@ -64,7 +64,7 @@ fn decodes_arc_and_callout_rules() {
         (RecordKind::CalloutRule.raw(), Kind::Callout),
     ] {
         let bytes = record(0, 0, kind, &fields(&[31, 37]));
-        let rule = parse(&bytes).expect("valid two-field rule");
+        let rule = parse(&bytes, crate::Limits::default()).expect("valid two-field rule");
 
         assert_eq!(rule.kind(), expected);
         assert_eq!(rule.raw_kind(), kind);
@@ -87,7 +87,7 @@ fn decodes_arc_and_callout_rules() {
 #[test]
 fn preserves_unknown_rule_bytes_and_header() {
     let bytes = record(3, 0x0ABC, 0xF1FE, &[0x00, 0xFF, 0x11, 0x22, 0x33]);
-    let rule = parse(&bytes).expect("unknown extension record");
+    let rule = parse(&bytes, crate::Limits::default()).expect("unknown extension record");
 
     assert_eq!(rule.kind(), Kind::Opaque(0xF1FE));
     let opaque = rule.as_opaque().expect("opaque variant");
@@ -101,10 +101,11 @@ fn preserves_unknown_rule_bytes_and_header() {
 #[test]
 fn parses_a_preparsed_record_without_copying() {
     let bytes = record(0, 0, RecordKind::ArcRule.raw(), &fields(&[41, 43]));
-    let (record, consumed) = Record::parse(&bytes, 0).expect("valid record");
+    let (record, consumed) =
+        Record::parse(&bytes, 0, crate::Limits::default()).expect("valid record");
     assert_eq!(consumed, bytes.len());
 
-    let rule = from_record(record).expect("valid arc rule");
+    let rule = from_record(record, crate::Limits::default()).expect("valid arc rule");
     assert_eq!(rule.as_arc().map(|value| value.shape_id()), Some(43));
 }
 
@@ -112,12 +113,10 @@ fn parses_a_preparsed_record_without_copying() {
 fn rejects_malformed_headers_and_non_rules() {
     let connector_body = fields(&[1, 2, 3, 4, 5, 6]);
     assert!(matches!(
-        parse(&record(
-            0,
-            0,
-            RecordKind::ConnectorRule.raw(),
-            &connector_body
-        )),
+        parse(
+            &record(0, 0, RecordKind::ConnectorRule.raw(), &connector_body),
+            crate::Limits::default()
+        ),
         Err(Error::MalformedShape {
             reason: "connector rule version is invalid"
         })
@@ -125,7 +124,7 @@ fn rejects_malformed_headers_and_non_rules() {
 
     let wrong_length = record(0, 0, RecordKind::ArcRule.raw(), &fields(&[1]));
     assert!(matches!(
-        parse(&wrong_length),
+        parse(&wrong_length, crate::Limits::default()),
         Err(Error::MalformedShape {
             reason: "arc rule length is invalid"
         })
@@ -133,7 +132,7 @@ fn rejects_malformed_headers_and_non_rules() {
 
     let shape = record(2, 0, RecordKind::Sp.raw(), &fields(&[1, 2]));
     assert!(matches!(
-        parse(&shape),
+        parse(&shape, crate::Limits::default()),
         Err(Error::MalformedShape {
             reason: "record is not an OfficeArt solver rule"
         })
@@ -143,14 +142,14 @@ fn rejects_malformed_headers_and_non_rules() {
 #[test]
 fn rejects_truncation_and_top_level_trailing_data() {
     assert!(matches!(
-        parse(&[0, 0, 0x12]),
+        parse(&[0, 0, 0x12], crate::Limits::default()),
         Err(Error::TruncatedHeader { .. })
     ));
 
     let mut bytes = record(0, 0, RecordKind::ArcRule.raw(), &fields(&[1, 2]));
     bytes.push(0xAA);
     assert!(matches!(
-        parse(&bytes),
+        parse(&bytes, crate::Limits::default()),
         Err(Error::TrailingData { offset }) if offset == 16
     ));
 }

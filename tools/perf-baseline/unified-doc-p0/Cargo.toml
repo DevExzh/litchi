@@ -1,0 +1,23 @@
+[package]
+name = "unified-doc-p0-baseline"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "../../../crates/litchi-core" }
+litchi-doc = { path = "../../../crates/litchi-doc" }
+litchi-ops = { path = "../../../crates/litchi-ops", default-features = false, features = ["doc"] }
+
+[[bin]]
+name = "unified-doc-p0-baseline"
+path = "../../../crates/litchi-ops/examples/doc_p0_bench.rs"
+
+[features]
+default = ["doc"]
+doc = []
+
+[profile.release]
+debug = 1
+
+[workspace]

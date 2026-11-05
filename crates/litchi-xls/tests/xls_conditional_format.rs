@@ -1,13 +1,13 @@
 use litchi_xls::writer::{
-    ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
-    ConditionalFormatRule, ConditionalFormatType, ConditionalPattern, FillPattern, Writer,
+    Builder, ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
+    ConditionalFormatRule, ConditionalFormatType, ConditionalPattern, FillPattern,
 };
-use litchi_xls::{ConditionalComparison, ConditionalRuleKind, Workbook};
+use litchi_xls::{ConditionalComparison, ConditionalRuleKind, raw::Reader};
 use std::io::Cursor;
 
 #[test]
 fn grouped_ordered_legacy_rules_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("CF").unwrap();
     writer
         .add_conditional_format_group(
@@ -57,8 +57,8 @@ fn grouped_ordered_legacy_rules_round_trip() {
         )
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let groups = workbook.xls_worksheet(0).unwrap().conditional_formattings();
     assert_eq!(groups.len(), 1);
     assert_eq!(groups[0].ranges().len(), 3);
@@ -77,7 +77,7 @@ fn grouped_ordered_legacy_rules_round_trip() {
 
 #[test]
 fn grouped_api_rejects_cardinality_and_formula_shape() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("CF").unwrap();
     let range = ConditionalFormatRange {
         first_row: 0,

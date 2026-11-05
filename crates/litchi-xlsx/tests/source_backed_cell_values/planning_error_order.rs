@@ -37,8 +37,11 @@ fn source_with_sheets(sheet1: &str, sheet2: &str) -> Vec<u8> {
     // correctly refuses it, so construct the adversarial ZIP at its lower
     // container boundary, as the other source-backed refusal tests do.
     let source = two_sheets();
-    let archive = ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let bytes = match member {
             "xl/worksheets/sheet1.xml" => sheet1.as_bytes().to_vec(),
@@ -51,8 +54,11 @@ fn source_with_sheets(sheet1: &str, sheet2: &str) -> Vec<u8> {
 }
 
 fn error_from_edit_sheets(editor: &SourceBackedEditor) -> Error {
-    match editor.edit_sheets(["Sheet1".into(), "Sheet2".into()]) {
-        Ok(_) => panic!("invalid worksheet unexpectedly accepted by edit_sheets"),
+    match editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("invalid worksheet unexpectedly committed"),
         Err(error) => error,
     }
 }
@@ -119,13 +125,13 @@ fn assert_error_case(case: &ErrorCase) {
         .commit()
         .unwrap();
     assert!(
-        !unaffected.changed(),
+        !unaffected.diagnostics().changed(),
         "unaffected sheet changed: {}",
         case.name
     );
-    assert_eq!(unaffected.snapshot().len(), 1);
+    assert_eq!(unaffected.patch().after().len(), 1);
     assert_eq!(
-        unaffected.snapshot().value(0, address("A1")),
+        unaffected.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("7").unwrap()))
     );
 }
@@ -368,12 +374,19 @@ fn public_multi_sheet_edit_sheets_accepts_supported_namespace_forms_and_pi() {
             .unwrap()
             .commit()
             .unwrap();
-        assert!(!commit.changed(), "{label} valid control changed");
-        assert_eq!(commit.snapshot().len(), 2, "{label} selected sheet count");
-        assert_eq!(commit.snapshot().sheet_name(0), Some("Sheet1"));
-        assert_eq!(commit.snapshot().sheet_name(1), Some("Sheet2"));
+        assert!(
+            !commit.diagnostics().changed(),
+            "{label} valid control changed"
+        );
         assert_eq!(
-            commit.snapshot().value(0, address("A1")),
+            commit.patch().after().len(),
+            2,
+            "{label} selected sheet count"
+        );
+        assert_eq!(commit.patch().after().sheet_name(0), Some("Sheet1"));
+        assert_eq!(commit.patch().after().sheet_name(1), Some("Sheet2"));
+        assert_eq!(
+            commit.patch().after().value(0, address("A1")),
             Some(&Value::Number(Number::new("7").unwrap())),
             "{label} first-sheet value",
         );
@@ -450,10 +463,10 @@ fn later_selected_worksheet_failure_does_not_publish_the_first_snapshot() {
                 .unwrap()
                 .commit()
                 .unwrap();
-            assert!(!good.changed(), "{label}");
-            assert_eq!(good.snapshot().len(), 1);
+            assert!(!good.diagnostics().changed(), "{label}");
+            assert_eq!(good.patch().after().len(), 1);
             assert_eq!(
-                good.snapshot().value(0, address("A1")),
+                good.patch().after().value(0, address("A1")),
                 Some(&Value::Number(Number::new("7").unwrap()))
             );
             assert_eq!(source.bytes, bytes, "{label}");
@@ -472,8 +485,11 @@ fn first_error_across_selected_worksheets_follows_workbook_order() {
     // later worksheet's validator cannot override the first worksheet's raw
     // failure, even when the caller supplies selectors in the opposite order.
     for selectors in [["Sheet1", "Sheet2"], ["Sheet2", "Sheet1"]] {
-        let error = match editor.edit_sheets(selectors.map(Selector::from)) {
-            Ok(_) => panic!("both faulty worksheets unexpectedly accepted"),
+        let error = match editor
+            .edit_sheets(selectors.map(Selector::from))
+            .and_then(|edit| edit.commit())
+        {
+            Ok(_) => panic!("both faulty worksheets unexpectedly committed"),
             Err(error) => error,
         };
         assert_expected_error(
@@ -482,8 +498,11 @@ fn first_error_across_selected_worksheets_follows_workbook_order() {
             "workbook error order",
         );
     }
-    let error = match editor.edit_sheets(["Sheet2".into()]) {
-        Ok(_) => panic!("second faulty worksheet unexpectedly accepted"),
+    let error = match editor
+        .edit_sheets(["Sheet2".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("second faulty worksheet unexpectedly committed"),
         Err(error) => error,
     };
     assert_expected_error(

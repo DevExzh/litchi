@@ -8,7 +8,7 @@
 use std::{borrow::Cow, collections::BTreeSet, ops::Range, str, sync::Arc};
 
 use litchi_core::{Error, Resource, Result};
-use litchi_odf_common::ResolvedReader;
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     XmlVersion,
     events::{BytesDecl, BytesPI, BytesStart, Event},
@@ -216,9 +216,11 @@ impl<'a> SourceEntry<'a> {
     /// every unselected byte.  The result is checked before allocation.
     pub(crate) fn patch_metadata(&self, patch: &Patch, max_output: usize) -> Result<Vec<u8>> {
         if !self.owner().is_mutable() {
-            return Err(Error::Unsupported(
-                "ODS common data styles are read-only".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.data_style.source",
+                "ODS common data styles are read-only",
+            )));
         }
         self.source_slice(&self.range, "data-style source range")?;
         patch_metadata(self, patch, max_output)
@@ -244,7 +246,26 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
     }
     let xml = str::from_utf8(source)
         .map_err(|_| invalid_error("ODS data-style owner is not UTF-8 XML"))?;
-    let mut reader = ResolvedReader::from_xml(xml);
+    let token_bytes = limits
+        .body_bytes
+        .max(limits.text_bytes)
+        .max(limits.metadata_bytes)
+        .max(64 * 1024);
+    let token_bytes = token_bytes.min(64 * 1024 * 1024);
+    let xml_limits = XmlStreamLimits::new(
+        limits.owner_bytes as u64,
+        limits.owner_depth,
+        limits.owner_elements,
+        // The style owner keeps a format-level element ceiling of 1,048,576,
+        // while the common raw reader's aggregate attribute dimension has a
+        // deliberately lower immutable ceiling.  Keep those dimensions
+        // independent: the local element counter below still enforces the
+        // full owner limit, and the reader only intersects its own attribute
+        // envelope with the shared ceiling.
+        limits.owner_elements.min(1_000_000),
+        token_bytes,
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -2376,7 +2397,7 @@ fn parse_body_attributes(
             b"display-factor" => {
                 let parsed = match Double::from_lexical(&value) {
                     Ok(value) => value,
-                    Err(Error::Unsupported(_)) => {
+                    Err(Error::Unsupported(_) | Error::Refused(_)) => {
                         opaque = true;
                         continue;
                     },
@@ -2485,7 +2506,7 @@ fn parse_body_attributes(
 fn parse_i64_or_opaque(value: &str, label: &str, opaque: &mut bool) -> Result<Option<i64>> {
     match super::parse_integer(value, label) {
         Ok(value) => Ok(Some(value)),
-        Err(Error::Unsupported(_)) => {
+        Err(Error::Unsupported(_) | Error::Refused(_)) => {
             *opaque = true;
             Ok(None)
         },
@@ -2496,7 +2517,7 @@ fn parse_i64_or_opaque(value: &str, label: &str, opaque: &mut bool) -> Result<Op
 fn parse_positive_or_opaque(value: &str, label: &str, opaque: &mut bool) -> Result<Option<u64>> {
     match super::parse_positive(value, label) {
         Ok(value) => Ok(Some(value)),
-        Err(Error::Unsupported(_)) => {
+        Err(Error::Unsupported(_) | Error::Refused(_)) => {
             *opaque = true;
             Ok(None)
         },
@@ -3333,8 +3354,8 @@ fn checked_position(reader: &ResolvedReader<'_>) -> Result<usize> {
         .map_err(|_| invalid_error("ODS data-style XML position exceeds usize"))
 }
 
-fn xml_error(error: quick_xml::Error) -> Error {
-    invalid_error(format!("ODS data-style XML parsing error: {error}"))
+fn xml_error(error: litchi_odf_common::Error) -> Error {
+    litchi_odf_common::map_resolved_reader_error(error, "ODS data-style XML parsing error")
 }
 
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {

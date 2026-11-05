@@ -104,15 +104,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// The package has no physical source that can back an exact patch.
-    #[error("this Keynote source does not support physical show-settings edits")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The source package or selected show payload is structurally invalid.
     #[error("the Keynote source cannot be edited safely")]
     InvalidSource,
     /// A finite retained resource ceiling was exceeded.
     #[error("Keynote show-settings {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -132,6 +133,33 @@ pub enum Error {
     /// The patch does not belong to this exact immutable package artifact.
     #[error("the Keynote show-settings patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The package has no physical source that can back an exact patch.
+    #[error("this Keynote source does not support physical show-settings edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A mutable settings snapshot staged against one immutable Keynote package.
@@ -211,7 +239,7 @@ impl<'a> Edit<'a> {
         }
 
         if !source_catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let RewriteResult {
             package,
@@ -398,6 +426,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.
@@ -763,7 +797,7 @@ fn validate_component_framing(
         return Err(Error::InvalidSource);
     }
     let physical_limits = package.state.options.archive();
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
@@ -828,7 +862,7 @@ fn rewrite_package_settings(
     let source_catalog = editable_source_catalog(source)?;
     let selected = select_rooted_show(source, true, false)?;
     if selected.identifier == 0 {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let show_identifier = selected.identifier;
     let component_name = selected.component_name.ok_or(Error::InvalidSource)?;
@@ -856,13 +890,13 @@ fn rewrite_package_settings(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     drop(stream);
     let object = archive
@@ -886,7 +920,7 @@ fn rewrite_package_settings(
     archive
         .object_mut(show_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SHOW_MESSAGE_TYPE,
@@ -895,11 +929,10 @@ fn rewrite_package_settings(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten_archive).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)?;
     drop(rewritten_archive);
     let preview_plan =
         super::rendering_invalidation::root_preview_deletions(source_catalog.package())
@@ -1293,7 +1326,7 @@ fn rewrite_show_payload(
     after: Settings,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output_length = 0usize;
     let mut output_fields = view.len();
     let mut seen_scalars = 0u32;
@@ -1361,7 +1394,7 @@ fn rewrite_show_payload(
         return Err(output_limit_error(output_length, limits));
     }
     if output_fields > limits.max_fields() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
@@ -1435,7 +1468,7 @@ fn rewrite_show_payload(
     reason = "semantic equality intentionally treats positive and negative zero as the same setting"
 )]
 fn inspect_size_payload(source: &[u8], limits: WireLimits) -> Result<usize, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field_work = view
         .len()
         .checked_mul(2)
@@ -1471,7 +1504,7 @@ fn rewrite_size_payload(
     after: Size,
     limits: WireLimits,
 ) -> Result<(Vec<u8>, usize), Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field_work = view
         .len()
         .checked_mul(2)
@@ -1616,14 +1649,14 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
 fn physical_source_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
 fn editable_source_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     let source = physical_source_catalog(package)?;
     if !source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     Ok(source)
 }
@@ -1648,7 +1681,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Entries,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -1665,7 +1698,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1679,7 +1712,7 @@ fn map_read_error(error: ReadError) -> Error {
         ReadError::Archive(archive_error) => map_archive_error(archive_error),
         ReadError::Io(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
@@ -1693,7 +1726,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1711,14 +1744,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1732,7 +1758,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -1757,11 +1783,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1775,7 +1797,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1791,13 +1813,12 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_to_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
 fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::OutputBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_output_bytes()),
@@ -1805,7 +1826,7 @@ fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
 }
 
 fn work_limit_error(observed: usize, limits: WireLimits) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::WireWork,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_rewrite_work()),

@@ -7,12 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    MAX_PARAGRAPH_DROP_CAP_LINES, ParagraphDropCap, ParagraphDropCapKind, RtfDocument, RtfWriter,
-    StyleBlock,
+    MAX_PARAGRAPH_DROP_CAP_LINES, ParagraphDropCap, ParagraphDropCapKind, StyleBlock, write::Writer,
 };
 
-fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
+fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
     document
         .blocks()
         .iter()
@@ -22,11 +22,14 @@ fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> 
 
 #[test]
 fn parses_group_inheritance_and_pard_reset() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\ansi\pard\dropcapli3\dropcapt1 Outer\par "#,
-        r#"{\dropcapt2 Inner\par }Tail\par "#,
-        r#"{\pard Reset\par }}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi\pard\dropcapli3\dropcapt1 Outer\par "#,
+            r#"{\dropcapt2 Inner\par }Tail\par "#,
+            r#"{\pard Reset\par }}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let outer = block(&document, "Outer").paragraph.drop_cap.unwrap();
     assert_eq!(outer.kind(), ParagraphDropCapKind::InText);
@@ -40,12 +43,15 @@ fn parses_group_inheritance_and_pard_reset() {
 
 #[test]
 fn body_style_and_default_round_trip_canonically() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\ansi"#,
-        r#"{\stylesheet{\s7\dropcapli2\dropcapt2 Drop;}}"#,
-        r#"{\*\defpap\dropcapli4\dropcapt1}"#,
-        r#"\pard\dropcapt2\dropcapli2 Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi"#,
+            r#"{\stylesheet{\s7\dropcapli2\dropcapt2 Drop;}}"#,
+            r#"{\*\defpap\dropcapli4\dropcapt1}"#,
+            r#"\pard\dropcapt2\dropcapli2 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let expected = ParagraphDropCap::new(ParagraphDropCapKind::Margin, 2).unwrap();
     assert_eq!(block(&document, "Body").paragraph.drop_cap, Some(expected));
@@ -69,18 +75,14 @@ fn body_style_and_default_round_trip_canonically() {
         Some(ParagraphDropCap::new(ParagraphDropCapKind::InText, 4).unwrap())
     );
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r"\dropcapli2\dropcapt2"));
     assert!(text.contains(r"\dropcapli4\dropcapt1"));
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(block(&reparsed, "Body").paragraph.drop_cap, Some(expected));
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -99,7 +101,10 @@ fn rejects_missing_partial_invalid_and_oversized_values() {
         r"{\rtf1{\stylesheet{\s1\dropcapli2 Bad;}}X}",
         r"{\rtf1{\*\defpap\dropcapt1}X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
     assert!(ParagraphDropCap::new(ParagraphDropCapKind::InText, 0).is_err());
     assert!(

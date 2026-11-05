@@ -14,6 +14,68 @@ pub const MAX_NODES: usize = 256;
 /// Maximum number of typed color transforms in one color choice.
 pub const MAX_TRANSFORMS: usize = 64;
 
+/// Caller-selected bounds for one raw color fragment.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[must_use]
+pub struct Limits {
+    pub max_xml_bytes: usize,
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub max_transforms: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_transforms: MAX_TRANSFORMS,
+    };
+
+    #[must_use]
+    pub const fn new(
+        max_xml_bytes: usize,
+        max_depth: usize,
+        max_nodes: usize,
+        max_transforms: usize,
+    ) -> Self {
+        Self {
+            max_xml_bytes,
+            max_depth,
+            max_nodes,
+            max_transforms,
+        }
+    }
+
+    pub(crate) fn validate(self) -> Result<Self> {
+        for (kind, value, maximum) in [
+            (
+                crate::LimitKind::XmlBytes,
+                self.max_xml_bytes,
+                MAX_XML_BYTES,
+            ),
+            (crate::LimitKind::XmlDepth, self.max_depth, MAX_DEPTH),
+            (crate::LimitKind::XmlNodes, self.max_nodes, MAX_NODES),
+            (
+                crate::LimitKind::ColorTransforms,
+                self.max_transforms,
+                MAX_TRANSFORMS,
+            ),
+        ] {
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 const MIN_PERCENTAGE: i32 = -100_000;
 const MAX_PERCENTAGE: i32 = 100_000;
 const MAX_POSITIVE_ANGLE: u32 = 21_600_000;
@@ -87,7 +149,7 @@ pub(super) fn parse_positive_angle(value: &str) -> Result<u32> {
 /// The standard stores values as thousandths of a percent. Office also reads
 /// a human-readable percent sign form; accepting both keeps the shared owner
 /// useful for real-world files while always writing the canonical integer form.
-fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
+pub(crate) fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
     let value = value.trim();
     if let Some(value) = value.strip_suffix('%') {
         let value = value.trim();
@@ -160,12 +222,14 @@ fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
 }
 
 /// Validate and return the original fragment without allocating a copy.
-pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "DrawingML color XML",
-            limit: MAX_XML_BYTES,
-        });
+pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(Error::limit(
+            crate::LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
 
     let mut reader = Reader::from_reader(xml);
@@ -173,6 +237,7 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
+    let mut transforms = 0usize;
 
     loop {
         let event = reader
@@ -183,11 +248,24 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
-                if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color nodes",
-                        limit: MAX_NODES,
-                    });
+                if nodes > limits.max_nodes {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
+                }
+                if is_transform_name(element.local_name().as_ref()) {
+                    transforms = transforms.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML color transform count overflow".into())
+                    })?;
+                    if transforms > limits.max_transforms {
+                        return Err(Error::limit(
+                            crate::LimitKind::ColorTransforms,
+                            transforms,
+                            limits.max_transforms,
+                        ));
+                    }
                 }
                 if stack.is_empty() {
                     if root_seen {
@@ -197,23 +275,37 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                     }
                     root_seen = true;
                 }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color depth",
-                        limit: MAX_DEPTH,
-                    });
+                if stack.len() >= limits.max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        stack.len().saturating_add(1),
+                        limits.max_depth,
+                    ));
                 }
                 stack.push(element.name().as_ref().to_vec());
             },
-            Event::Empty(_) => {
+            Event::Empty(element) => {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
-                if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color nodes",
-                        limit: MAX_NODES,
-                    });
+                if nodes > limits.max_nodes {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
+                }
+                if is_transform_name(element.local_name().as_ref()) {
+                    transforms = transforms.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML color transform count overflow".into())
+                    })?;
+                    if transforms > limits.max_transforms {
+                        return Err(Error::limit(
+                            crate::LimitKind::ColorTransforms,
+                            transforms,
+                            limits.max_transforms,
+                        ));
+                    }
                 }
                 if stack.is_empty() {
                     if root_seen {
@@ -223,6 +315,13 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                     }
                     root_seen = true;
                     root_closed = true;
+                }
+                if stack.len() >= limits.max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        stack.len().saturating_add(1),
+                        limits.max_depth,
+                    ));
                 }
             },
             Event::End(element) => {
@@ -277,4 +376,38 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
         ));
     }
     Ok(xml)
+}
+
+fn is_transform_name(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"alpha"
+            | b"alphaMod"
+            | b"alphaOff"
+            | b"blue"
+            | b"blueMod"
+            | b"blueOff"
+            | b"comp"
+            | b"gamma"
+            | b"gray"
+            | b"green"
+            | b"greenMod"
+            | b"greenOff"
+            | b"hue"
+            | b"hueMod"
+            | b"hueOff"
+            | b"inv"
+            | b"invGamma"
+            | b"lum"
+            | b"lumMod"
+            | b"lumOff"
+            | b"red"
+            | b"redMod"
+            | b"redOff"
+            | b"sat"
+            | b"satMod"
+            | b"satOff"
+            | b"shade"
+            | b"tint"
+    )
 }

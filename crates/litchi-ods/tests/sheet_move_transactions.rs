@@ -6,8 +6,8 @@
 use litchi_core::Result;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
-    Spreadsheet,
-    document::{Patch, SheetPosition, Snapshot},
+    Package,
+    document::{Patch, SheetPosition},
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -32,7 +32,7 @@ fn table(name: &str, token: &str) -> String {
 }
 
 fn package(content_xml: &str, additions: &[(&str, &[u8], &str)]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(constants::ODF_SPREADSHEET)
         .expect("fixed ODS mimetype");
@@ -55,7 +55,8 @@ fn package(content_xml: &str, additions: &[(&str, &[u8], &str)]) -> Vec<u8> {
 }
 
 fn names(bytes: &[u8]) -> Result<Vec<String>> {
-    Ok(Spreadsheet::from_bytes(bytes.to_vec())?
+    Ok(Package::from_bytes(bytes)?
+        .workbook()?
         .sheets()
         .iter()
         .map(|sheet| sheet.name.clone())
@@ -83,12 +84,13 @@ fn first_middle_last_moves_preserve_exact_fragments_and_durable_inverse() -> Res
         table("C", "gamma")
     );
     let source = package(&content(&tables, ""), &[]);
-    let source_xml = Spreadsheet::from_bytes(source.clone())?
+    let source_xml = Package::from_bytes(&source)?
+        .workbook()?
         .content_xml()
         .to_string();
     let source_fragments = fragments(&source_xml);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     edit.move_sheet("A", SheetPosition::Last)?;
     assert_eq!(names(edit.as_bytes())?, ["B", "C", "A"]);
     edit.move_sheet("C", SheetPosition::First)?;
@@ -97,7 +99,8 @@ fn first_middle_last_moves_preserve_exact_fragments_and_durable_inverse() -> Res
     assert_eq!(names(edit.as_bytes())?, ["C", "A", "B"]);
     let commit = edit.commit()?;
 
-    let target_xml = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?
+    let target_xml = Package::from_bytes(commit.package().as_bytes())?
+        .workbook()?
         .content_xml()
         .to_string();
     assert_eq!(
@@ -110,26 +113,26 @@ fn first_middle_last_moves_preserve_exact_fragments_and_durable_inverse() -> Res
     );
     assert!(target_xml.contains("<!--gap-a-->"));
     assert!(target_xml.contains("<!--gap-b-->"));
-    let identical = raw_identical_members(&source, commit.snapshot().as_bytes())
+    let identical = raw_identical_members(&source, commit.package().as_bytes())
         .ok_or_else(|| litchi_core::Error::InvalidFormat("raw comparison failed".to_string()))?;
     assert!(identical.contains("Pictures/untouched.bin"));
 
     let wire = commit.patch().to_deterministic_json()?;
     let durable = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        durable.apply(&snapshot)?.snapshot().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(&durable)?.into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse = Patch::from_deterministic_json(
         &durable.inverse().to_deterministic_json()?,
         snapshot.limits(),
     )?;
     assert_eq!(
-        inverse.apply(commit.snapshot())?.snapshot().as_bytes(),
+        commit.package().apply(&inverse)?.into_package().as_bytes(),
         source
     );
-    let stale = Snapshot::from_bytes(package(&content(&table("Other", "x"), ""), &[]))?;
-    assert!(durable.apply(&stale).is_err());
+    let stale = Package::from_bytes(&package(&content(&table("Other", "x"), ""), &[]))?;
+    assert!(stale.apply(&durable).is_err());
     Ok(())
 }
 
@@ -137,12 +140,12 @@ fn first_middle_last_moves_preserve_exact_fragments_and_durable_inverse() -> Res
 fn exact_noop_bypasses_changed_source_refusals() -> Result<()> {
     let tables = r#"<t:table t:name="A" t:protected="true"/><t:table t:name="B"/>"#;
     let source = package(&content(tables, ""), &[]);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     edit.move_sheet("A", SheetPosition::First)?;
     let commit = edit.commit()?;
-    assert!(!commit.patch().changed());
-    assert_eq!(commit.snapshot().as_bytes(), source);
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().as_bytes(), source);
     Ok(())
 }
 
@@ -152,21 +155,21 @@ fn missing_duplicate_and_out_of_range_refusals_are_atomic() -> Result<()> {
         &content(&format!("{}{}", table("A", "a"), table("B", "b")), ""),
         &[],
     );
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     assert!(edit.move_sheet("missing", SheetPosition::First).is_err());
     assert!(
         edit.move_sheet("A", SheetPosition::Index(usize::MAX))
             .is_err()
     );
     assert_eq!(edit.as_bytes(), source);
-    assert!(!edit.commit()?.patch().changed());
+    assert!(edit.commit()?.patch().is_noop());
 
     let duplicate = package(
         &content(&format!("{}{}", table("A", "a"), table("A", "b")), ""),
         &[],
     );
-    assert!(Snapshot::from_bytes(duplicate).is_err());
+    assert!(Package::from_bytes(&duplicate).is_err());
     Ok(())
 }
 
@@ -217,8 +220,8 @@ fn dependency_mce_unknown_namespace_and_settings_refuse_before_staging() -> Resu
     ];
     for content_xml in cases {
         let source = package(&content_xml, &[]);
-        let snapshot = Snapshot::from_bytes(source.clone())?;
-        let mut edit = snapshot.edit();
+        let snapshot = Package::from_bytes(&source)?;
+        let mut edit = snapshot.edit()?;
         assert!(edit.move_sheet("A", SheetPosition::Last).is_err());
         assert_eq!(edit.as_bytes(), source);
     }
@@ -227,8 +230,8 @@ fn dependency_mce_unknown_namespace_and_settings_refuse_before_staging() -> Resu
         &content(&format!("{}{}", table("A", "a"), table("B", "b")), ""),
         &[("settings.xml", b"<settings/>", "text/xml")],
     );
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     assert!(edit.move_sheet("A", SheetPosition::Last).is_err());
     assert_eq!(edit.as_bytes(), source);
 
@@ -240,8 +243,8 @@ fn dependency_mce_unknown_namespace_and_settings_refuse_before_staging() -> Resu
             &content(&format!("{}{}", table("A", "a"), table("B", "b")), ""),
             &[(path, b"<opaque/>", "text/xml")],
         );
-        let snapshot = Snapshot::from_bytes(source.clone())?;
-        let mut edit = snapshot.edit();
+        let snapshot = Package::from_bytes(&source)?;
+        let mut edit = snapshot.edit()?;
         assert!(edit.move_sheet("A", SheetPosition::Last).is_err());
         assert_eq!(edit.as_bytes(), source);
     }
@@ -259,8 +262,8 @@ fn changed_signed_and_protected_sources_refuse_publication() -> Result<()> {
             "text/xml",
         )],
     );
-    let signed = Snapshot::from_bytes(signed)?;
-    let mut edit = signed.edit();
+    let signed = Package::from_bytes(&signed)?;
+    let mut edit = signed.edit()?;
     edit.move_sheet("A", SheetPosition::Last)?;
     assert!(edit.commit().is_err());
 
@@ -271,8 +274,8 @@ fn changed_signed_and_protected_sources_refuse_publication() -> Result<()> {
         ),
         &[],
     );
-    let protected = Snapshot::from_bytes(protected.clone())?;
-    let mut edit = protected.edit();
+    let protected = Package::from_bytes(&protected)?;
+    let mut edit = protected.edit()?;
     assert!(edit.move_sheet("A", SheetPosition::Last).is_err());
     assert_eq!(edit.as_bytes(), protected.as_bytes());
     Ok(())
@@ -285,8 +288,8 @@ fn sheet_count_work_bound_refuses_before_replacement_allocation() -> Result<()> 
         tables.push_str(&format!(r#"<t:table t:name="S{index}"/>"#));
     }
     let source = package(&content(&tables, ""), &[]);
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     assert!(edit.move_sheet("S0", SheetPosition::Last).is_err());
     assert_eq!(edit.as_bytes(), source);
     Ok(())

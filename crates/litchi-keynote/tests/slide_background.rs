@@ -18,7 +18,7 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldType, MessageInfo, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tss};
-use litchi_keynote::{Background, Package, Position, SlideSelector};
+use litchi_keynote::{Background, OpenOptions, Package, Position, SlideSelector, SourceLimits};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -59,11 +59,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn solid(red: f32, green: f32, blue: f32, alpha: f32, color_space: RgbColorSpace) -> Background {
@@ -174,19 +178,29 @@ fn fill_payload(background: &Background) -> Vec<u8> {
 }
 
 fn replace_first_length_delimited(data: &[u8], number: u32, payload: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(data)?;
+    let view = WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(data.len() + payload.len());
     let mut replaced = false;
     for field in view.fields() {
         if field.number() == number && !replaced {
-            append_length_delimited_field(&mut output, number, payload)?;
+            append_length_delimited_field(
+                &mut output,
+                number,
+                payload,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             replaced = true;
         } else {
             output.extend_from_slice(field.raw());
         }
     }
     if !replaced {
-        append_length_delimited_field(&mut output, number, payload)?;
+        append_length_delimited_field(
+            &mut output,
+            number,
+            payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(output)
 }
@@ -520,12 +534,12 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing synthetic component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(
@@ -534,7 +548,7 @@ fn message_payload(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(package, member)?)?;
+    let archive = Archive::parse(&component_stream(package, member)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -721,16 +735,16 @@ fn explicit_none_over_inherited_none_is_a_reversible_direct_override() -> TestRe
 fn selector_missing_and_ambiguous_fail_without_mutating_source() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let mut stream = component_stream(&bytes, SECOND_SLIDE_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let second = archive
         .object_mut(SECOND_SLIDE_ID)
         .ok_or_else(|| io::Error::other("missing second slide"))?;
     let mut slide = kn::SlideArchive::decode(second.messages[0].data.as_slice())?;
     slide.name = Some("Alpha".to_owned());
     second.messages[0].data = slide.encode_to_vec();
-    stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             SECOND_SLIDE_MEMBER,
             &compressed,
@@ -778,7 +792,7 @@ fn shared_variation_is_copy_on_write_and_unselected_slide_is_unchanged() -> Test
 #[test]
 fn unsupported_backgrounds_are_preserved_and_refuse_changed_edits_atomically() -> TestResult<()> {
     let canonical = native_gradient_payload(&gradient());
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut gradient_payload = view
         .fields()
         .find(|field| field.number() == 2)
@@ -812,18 +826,24 @@ fn unsupported_backgrounds_are_preserved_and_refuse_changed_edits_atomically() -
         package
             .edit_slide_background(0usize)?
             .set(Background::Unsupported),
-        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+        Err(litchi_keynote::background::Error::Refused(
+            litchi_keynote::background::Refusal::UnsupportedSource
+        ))
     ));
     assert!(matches!(
         package
             .edit_slide_background(0usize)?
             .set_solid(green_color())?
             .commit(),
-        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+        Err(litchi_keynote::background::Error::Refused(
+            litchi_keynote::background::Refusal::UnsupportedSource
+        ))
     ));
     assert!(matches!(
         package.edit_slide_background(0usize)?.clear()?.commit(),
-        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+        Err(litchi_keynote::background::Error::Refused(
+            litchi_keynote::background::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -843,14 +863,14 @@ fn unknown_style_and_fill_fields_survive_a_background_rewrite() -> TestResult<()
         false,
     )?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let base_style = archive
         .object_mut(BASE_STYLE_ID)
         .ok_or_else(|| io::Error::other("missing base style"))?;
     append_unknown(&mut base_style.messages[0].data, UNKNOWN_STYLE_FIELD, 7_301)?;
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -875,7 +895,7 @@ fn unknown_style_and_fill_fields_survive_a_background_rewrite() -> TestResult<()
         rewritten_slide.style.identifier,
         STYLE_MESSAGE_TYPE,
     )?;
-    let style_view = WireView::parse(&style)?;
+    let style_view = WireView::parse(&style, litchi_iwa_common::WireLimits::DEFAULT)?;
     let parent_style = message_payload(
         &exact_bytes(commit.package())?,
         STYLESHEET_MEMBER,
@@ -883,18 +903,20 @@ fn unknown_style_and_fill_fields_survive_a_background_rewrite() -> TestResult<()
         STYLE_MESSAGE_TYPE,
     )?;
     assert!(
-        WireView::parse(&parent_style)?
+        WireView::parse(&parent_style, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_STYLE_FIELD)
     );
     let fill = style_view
         .fields()
         .find(|field| field.number() == 11)
-        .and_then(|field| WireView::parse(field.payload()).ok())
+        .and_then(|field| {
+            WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT).ok()
+        })
         .and_then(|properties| properties.fields().find(|field| field.number() == 1))
         .ok_or_else(|| io::Error::other("rewritten fill missing"))?;
     assert!(
-        WireView::parse(fill.payload())?
+        WireView::parse(fill.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_FILL_FIELD)
     );
@@ -964,15 +986,15 @@ fn package_metadata_registers_new_style_and_inverse_restores_it() -> TestResult<
 fn malformed_background_is_rejected_and_edits_are_atomic() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let mut style_stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&style_stream)?;
+    let mut archive = Archive::parse(&style_stream, Default::default())?;
     let style = archive
         .object_mut(BASE_STYLE_ID)
         .ok_or_else(|| io::Error::other("missing base style"))?;
     let malformed = [0x0a, 0x02, 0x08, 0x01];
     style.messages[0].data = style_payload(None, false, Some(&malformed), Some(7_304))?;
-    style_stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&style_stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    style_stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&style_stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -991,7 +1013,7 @@ fn malformed_background_is_rejected_and_edits_are_atomic() -> TestResult<()> {
 fn companion_style_messages_fail_closed_without_mutation() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let style = archive
         .object_mut(BASE_STYLE_ID)
         .ok_or_else(|| io::Error::other("missing base style"))?;
@@ -999,14 +1021,14 @@ fn companion_style_messages_fail_closed_without_mutation() -> TestResult<()> {
     style
         .archive_info
         .message_infos
-        .push(MessageInfo::new(991, u32::try_from(payload.len())?));
+        .push(MessageInfo::new(991, payload.len(), litchi_iwa_core::Limits::default()).unwrap());
     style.messages.push(RawMessage {
         type_: 991,
         data: payload,
     });
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1031,7 +1053,7 @@ fn source_style_merge_and_diff_metadata_fail_closed_atomically() -> TestResult<(
     for use_diff_metadata in [false, true] {
         let mut bytes = synthetic_package()?;
         let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let style = archive
             .object_mut(BASE_STYLE_ID)
             .ok_or_else(|| io::Error::other("missing base style"))?;
@@ -1042,9 +1064,9 @@ fn source_style_merge_and_diff_metadata_fail_closed_atomically() -> TestResult<(
         } else {
             style.archive_info.should_merge = Some(true);
         }
-        let stream = archive.to_bytes()?;
-        let compressed = SnappyStream::compress(&stream)?;
-        bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+        let stream = archive.to_bytes(Default::default())?;
+        let compressed = SnappyStream::compress(&stream, Default::default())?;
+        bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 STYLESHEET_MEMBER,
                 &compressed,
@@ -1072,7 +1094,7 @@ fn reset_rejects_aggregate_only_fill_resource_metadata_atomically() -> TestResul
     for data_reference in [false, true] {
         let mut bytes = synthetic_package()?;
         let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let style = archive
             .object_mut(VARIATION_STYLE_ID)
             .ok_or_else(|| io::Error::other("missing variation style"))?;
@@ -1082,9 +1104,9 @@ fn reset_rejects_aggregate_only_fill_resource_metadata_atomically() -> TestResul
         } else {
             info.object_references.push(90_001);
         }
-        let stream = archive.to_bytes()?;
-        let compressed = SnappyStream::compress(&stream)?;
-        bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+        let stream = archive.to_bytes(Default::default())?;
+        let compressed = SnappyStream::compress(&stream, Default::default())?;
+        bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 STYLESHEET_MEMBER,
                 &compressed,
@@ -1111,16 +1133,21 @@ fn reset_rejects_identity_edges_attributed_to_fill_metadata_atomically() -> Test
     for reference in [BASE_STYLE_ID, STYLESHEET_ID] {
         let mut bytes = synthetic_package()?;
         let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let style = archive
             .object_mut(VARIATION_STYLE_ID)
             .ok_or_else(|| io::Error::other("missing variation style"))?;
-        let mut field = FieldInfo::new(vec![11, 1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![11, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(reference);
         style.archive_info.message_infos[0].field_infos.push(field);
-        let stream = archive.to_bytes()?;
-        let compressed = SnappyStream::compress(&stream)?;
-        bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+        let stream = archive.to_bytes(Default::default())?;
+        let compressed = SnappyStream::compress(&stream, Default::default())?;
+        bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 STYLESHEET_MEMBER,
                 &compressed,
@@ -1146,7 +1173,7 @@ fn reset_rejects_identity_edges_attributed_to_fill_metadata_atomically() -> Test
 fn non_selected_stylesheet_owner_prevents_style_culling() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let owner = object(
         82,
         STYLESHEET_MESSAGE_TYPE,
@@ -1162,9 +1189,9 @@ fn non_selected_stylesheet_owner_prevents_style_culling() -> TestResult<()> {
         .object_references
         .push(VARIATION_STYLE_ID);
     archive.objects.push(owner);
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1191,7 +1218,7 @@ fn non_selected_stylesheet_owner_prevents_style_culling() -> TestResult<()> {
     assert_eq!(commit.package().slide_background("Beta")?, green());
     let changed_stylesheet = component_stream(&changed, STYLESHEET_MEMBER)?;
     assert!(
-        Archive::parse(&changed_stylesheet)?
+        Archive::parse(&changed_stylesheet, Default::default())?
             .object(VARIATION_STYLE_ID)
             .is_some()
     );
@@ -1202,19 +1229,20 @@ fn non_selected_stylesheet_owner_prevents_style_culling() -> TestResult<()> {
 fn unknown_other_style_field_prevents_selected_style_culling() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let mut owner_payload = style_payload(None, false, None, None)?;
     append_length_delimited_field(
         &mut owner_payload,
         UNKNOWN_STYLE_FIELD,
         &reference(VARIATION_STYLE_ID).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     archive
         .objects
         .push(object(82, STYLE_MESSAGE_TYPE, owner_payload)?);
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1227,15 +1255,18 @@ fn unknown_other_style_field_prevents_selected_style_culling() -> TestResult<()>
     assert_eq!(commit.package().slide_background("Beta")?, white());
     let changed = exact_bytes(commit.package())?;
     let stylesheet = component_stream(&changed, STYLESHEET_MEMBER)?;
-    let archive = Archive::parse(&stylesheet)?;
+    let archive = Archive::parse(&stylesheet, Default::default())?;
     assert!(archive.object(VARIATION_STYLE_ID).is_some());
     let owner = archive
         .object(82)
         .ok_or_else(|| io::Error::other("missing other style owner"))?;
     assert!(
-        WireView::parse(&owner.messages[0].data)?
-            .fields()
-            .any(|field| field.number() == UNKNOWN_STYLE_FIELD)
+        WireView::parse(
+            &owner.messages[0].data,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == UNKNOWN_STYLE_FIELD)
     );
     Ok(())
 }
@@ -1244,9 +1275,9 @@ fn unknown_other_style_field_prevents_selected_style_culling() -> TestResult<()>
 fn other_style_stylesheet_reference_prevents_selected_style_culling() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let owner_payload = style_payload(None, false, None, None)?;
-    let owner_view = WireView::parse(&owner_payload)?;
+    let owner_view = WireView::parse(&owner_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_payload = owner_view
         .fields()
         .find(|field| field.number() == 1)
@@ -1261,9 +1292,9 @@ fn other_style_stylesheet_reference_prevents_selected_style_culling() -> TestRes
     archive
         .objects
         .push(object(82, STYLE_MESSAGE_TYPE, owner_payload)?);
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1276,7 +1307,7 @@ fn other_style_stylesheet_reference_prevents_selected_style_culling() -> TestRes
     assert_eq!(commit.package().slide_background("Beta")?, white());
     let changed = exact_bytes(commit.package())?;
     let stylesheet = component_stream(&changed, STYLESHEET_MEMBER)?;
-    let archive = Archive::parse(&stylesheet)?;
+    let archive = Archive::parse(&stylesheet, Default::default())?;
     assert!(archive.object(VARIATION_STYLE_ID).is_some());
     assert!(archive.object(82).is_some());
     Ok(())
@@ -1287,7 +1318,7 @@ fn unsupported_slide_style_metadata_refs_fail_closed_atomically() -> TestResult<
     for variant in 0..4 {
         let mut bytes = synthetic_package()?;
         let stream = component_stream(&bytes, FIRST_SLIDE_MEMBER)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let slide = archive
             .object_mut(FIRST_SLIDE_ID)
             .ok_or_else(|| io::Error::other("missing first slide"))?;
@@ -1296,7 +1327,12 @@ fn unsupported_slide_style_metadata_refs_fail_closed_atomically() -> TestResult<
                 .object_references
                 .push(BASE_STYLE_ID),
             1 => {
-                let mut field = FieldInfo::new(vec![99]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.object_references.push(BASE_STYLE_ID);
                 slide.archive_info.message_infos[0].field_infos.push(field);
             },
@@ -1304,15 +1340,20 @@ fn unsupported_slide_style_metadata_refs_fail_closed_atomically() -> TestResult<
                 .data_references
                 .push(BASE_STYLE_ID),
             _ => {
-                let mut field = FieldInfo::new(vec![1]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.r#type = Some(FieldType::DataReference);
                 field.object_references.push(BASE_STYLE_ID);
                 slide.archive_info.message_infos[0].field_infos.push(field);
             },
         }
-        let stream = archive.to_bytes()?;
-        let compressed = SnappyStream::compress(&stream)?;
-        bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+        let stream = archive.to_bytes(Default::default())?;
+        let compressed = SnappyStream::compress(&stream, Default::default())?;
+        bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 FIRST_SLIDE_MEMBER,
                 &compressed,
@@ -1338,7 +1379,7 @@ fn unsupported_slide_style_metadata_refs_fail_closed_atomically() -> TestResult<
 fn unknown_slide_field_prevents_style_retargeting_atomically() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, FIRST_SLIDE_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let slide = archive
         .object_mut(FIRST_SLIDE_ID)
         .ok_or_else(|| io::Error::other("missing first slide"))?;
@@ -1346,10 +1387,11 @@ fn unknown_slide_field_prevents_style_retargeting_atomically() -> TestResult<()>
         &mut slide.messages[0].data,
         UNKNOWN_STYLE_FIELD,
         &reference(BASE_STYLE_ID).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             FIRST_SLIDE_MEMBER,
             &compressed,
@@ -1374,7 +1416,7 @@ fn unknown_slide_field_prevents_style_retargeting_atomically() -> TestResult<()>
 fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let stylesheet = archive
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;
@@ -1384,10 +1426,16 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
         ..tss::stylesheet_archive::VersionedStyles::default()
     });
     stylesheet.messages[0].data = payload.encode_to_vec();
-    stylesheet.archive_info.message_infos[0].field_infos = vec![FieldInfo::new(vec![14])];
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    stylesheet.archive_info.message_infos[0].field_infos = vec![
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![14], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    ];
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1396,16 +1444,19 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
     )?;
 
     let source_stylesheet = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let source_archive = Archive::parse(&source_stylesheet)?;
+    let source_archive = Archive::parse(&source_stylesheet, Default::default())?;
     let source_object = source_archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing source stylesheet"))?;
-    let source_versioned = WireView::parse(&source_object.messages[0].data)?
-        .fields()
-        .find(|field| field.number() == 14)
-        .ok_or_else(|| io::Error::other("missing versioned stylesheet branch"))?
-        .raw()
-        .to_vec();
+    let source_versioned = WireView::parse(
+        &source_object.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 14)
+    .ok_or_else(|| io::Error::other("missing versioned stylesheet branch"))?
+    .raw()
+    .to_vec();
     let source_fields = source_object.archive_info.message_infos[0]
         .field_infos
         .clone();
@@ -1420,16 +1471,19 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
 
     let changed = exact_bytes(commit.package())?;
     let changed_stylesheet = component_stream(&changed, STYLESHEET_MEMBER)?;
-    let changed_archive = Archive::parse(&changed_stylesheet)?;
+    let changed_archive = Archive::parse(&changed_stylesheet, Default::default())?;
     let changed_object = changed_archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing changed stylesheet"))?;
-    let changed_versioned = WireView::parse(&changed_object.messages[0].data)?
-        .fields()
-        .find(|field| field.number() == 14)
-        .ok_or_else(|| io::Error::other("missing changed versioned branch"))?
-        .raw()
-        .to_vec();
+    let changed_versioned = WireView::parse(
+        &changed_object.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 14)
+    .ok_or_else(|| io::Error::other("missing changed versioned branch"))?
+    .raw()
+    .to_vec();
     assert_eq!(changed_versioned, source_versioned);
     assert_eq!(
         changed_object.archive_info.message_infos[0].field_infos,
@@ -1458,12 +1512,12 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
 fn unknown_style_child_entry_prevents_cull_and_survives_cow_insertion() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let stylesheet = archive
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;
     let stylesheet_data = stylesheet.messages[0].data.clone();
-    let child = WireView::parse(&stylesheet_data)?
+    let child = WireView::parse(&stylesheet_data, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 5)
         .ok_or_else(|| io::Error::other("missing stylesheet child entry"))?
@@ -1473,9 +1527,9 @@ fn unknown_style_child_entry_prevents_cull_and_survives_cow_insertion() -> TestR
     append_unknown(&mut child_with_unknown, UNKNOWN_CHILD_FIELD, 73)?;
     stylesheet.messages[0].data =
         replace_first_length_delimited(&stylesheet_data, 5, &child_with_unknown)?;
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1505,21 +1559,24 @@ fn unknown_style_child_entry_prevents_cull_and_survives_cow_insertion() -> TestR
     assert_ne!(rewritten_slide.style.identifier, VARIATION_STYLE_ID);
 
     let changed_stylesheet = component_stream(&changed, STYLESHEET_MEMBER)?;
-    let changed_archive = Archive::parse(&changed_stylesheet)?;
+    let changed_archive = Archive::parse(&changed_stylesheet, Default::default())?;
     assert!(changed_archive.object(VARIATION_STYLE_ID).is_some());
     let stylesheet = changed_archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing changed stylesheet"))?;
-    let child_entries = WireView::parse(&stylesheet.messages[0].data)?
-        .fields()
-        .filter(|field| field.number() == 5)
-        .map(|field| field.payload().to_vec())
-        .collect::<Vec<_>>();
+    let child_entries = WireView::parse(
+        &stylesheet.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == 5)
+    .map(|field| field.payload().to_vec())
+    .collect::<Vec<_>>();
     assert!(!child_entries.is_empty(), "culled stylesheet child entry");
     let mut unknown_entry_found = false;
     let mut replacement_entry_found = false;
     for child in child_entries {
-        let child_view = WireView::parse(&child)?;
+        let child_view = WireView::parse(&child, litchi_iwa_common::WireLimits::DEFAULT)?;
         unknown_entry_found |= child_view
             .fields()
             .any(|field| field.number() == UNKNOWN_CHILD_FIELD && field.payload() == [73]);
@@ -1539,11 +1596,14 @@ fn unknown_style_child_entry_prevents_cull_and_survives_cow_insertion() -> TestR
 fn unknown_nested_reference_fields_survive_style_retargeting() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, FIRST_SLIDE_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let slide = archive
         .object_mut(FIRST_SLIDE_ID)
         .ok_or_else(|| io::Error::other("missing first slide"))?;
-    let view = WireView::parse(&slide.messages[0].data)?;
+    let view = WireView::parse(
+        &slide.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut reference_payload = view
         .fields()
         .find(|field| field.number() == 1)
@@ -1553,9 +1613,9 @@ fn unknown_nested_reference_fields_survive_style_retargeting() -> TestResult<()>
     append_unknown(&mut reference_payload, 99, 73)?;
     slide.messages[0].data =
         replace_first_length_delimited(&slide.messages[0].data, 1, &reference_payload)?;
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             FIRST_SLIDE_MEMBER,
             &compressed,
@@ -1574,13 +1634,13 @@ fn unknown_nested_reference_fields_survive_style_retargeting() -> TestResult<()>
         FIRST_SLIDE_ID,
         SLIDE_MESSAGE_TYPE,
     )?;
-    let slide_view = WireView::parse(&slide)?;
+    let slide_view = WireView::parse(&slide, litchi_iwa_common::WireLimits::DEFAULT)?;
     let reference = slide_view
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("rewritten style reference missing"))?;
     assert!(
-        WireView::parse(reference.payload())?
+        WireView::parse(reference.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99 && field.payload() == [73])
     );
@@ -1591,11 +1651,14 @@ fn unknown_nested_reference_fields_survive_style_retargeting() -> TestResult<()>
 fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let stylesheet = archive
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;
-    let view = WireView::parse(&stylesheet.messages[0].data)?;
+    let view = WireView::parse(
+        &stylesheet.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut rewritten = Vec::new();
     for field in view.fields() {
         if field.number() == 1
@@ -1603,15 +1666,20 @@ fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestR
         {
             let mut reference_payload = field.payload().to_vec();
             append_unknown(&mut reference_payload, UNKNOWN_STYLE_FIELD, 73)?;
-            append_length_delimited_field(&mut rewritten, 1, &reference_payload)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                1,
+                &reference_payload,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             rewritten.extend_from_slice(field.raw());
         }
     }
     stylesheet.messages[0].data = rewritten;
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1624,21 +1692,26 @@ fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestR
     assert_eq!(commit.package().slide_background("Beta")?, white());
     let changed = exact_bytes(commit.package())?;
     let stylesheet = component_stream(&changed, STYLESHEET_MEMBER)?;
-    let archive = Archive::parse(&stylesheet)?;
+    let archive = Archive::parse(&stylesheet, Default::default())?;
     assert!(archive.object(VARIATION_STYLE_ID).is_some());
     let stylesheet = archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing rewritten stylesheet"))?;
-    let retained_extension = WireView::parse(&stylesheet.messages[0].data)?
-        .fields()
-        .filter(|field| field.number() == 1)
-        .any(|field| {
-            WireView::parse(field.payload()).is_ok_and(|reference| {
+    let retained_extension = WireView::parse(
+        &stylesheet.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == 1)
+    .any(|field| {
+        WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT).is_ok_and(
+            |reference| {
                 reference.fields().any(|nested| {
                     nested.number() == UNKNOWN_STYLE_FIELD && nested.payload() == [73]
                 })
-            })
-        });
+            },
+        )
+    });
     assert!(retained_extension);
     Ok(())
 }
@@ -1647,24 +1720,27 @@ fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestR
 fn stylesheet_cull_flag_is_authoritative() -> TestResult<()> {
     let mut bytes = synthetic_package()?;
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let base = archive
         .object_mut(BASE_STYLE_ID)
         .ok_or_else(|| io::Error::other("missing base style"))?;
-    base.messages[0].data = WireView::parse(&base.messages[0].data)?
-        .fields()
-        .filter(|field| field.number() != UNKNOWN_STYLE_FIELD)
-        .flat_map(|field| field.raw().iter().copied())
-        .collect();
+    base.messages[0].data = WireView::parse(
+        &base.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() != UNKNOWN_STYLE_FIELD)
+    .flat_map(|field| field.raw().iter().copied())
+    .collect();
     let stylesheet = archive
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;
     let mut stylesheet_payload = tss::StylesheetArchive::decode(&*stylesheet.messages[0].data)?;
     stylesheet_payload.can_cull_styles = Some(false);
     stylesheet.messages[0].data = stylesheet_payload.encode_to_vec();
-    let stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             STYLESHEET_MEMBER,
             &compressed,
@@ -1694,7 +1770,7 @@ fn stylesheet_cull_flag_is_authoritative() -> TestResult<()> {
         .commit()?;
     let stylesheet = component_stream(&exact_bytes(second.package())?, STYLESHEET_MEMBER)?;
     assert!(
-        Archive::parse(&stylesheet)?
+        Archive::parse(&stylesheet, Default::default())?
             .object(retained_style)
             .is_some()
     );
@@ -1710,14 +1786,15 @@ fn output_limits_are_atomic() -> TestResult<()> {
         .set(green())?
         .commit()?;
     let target_length = exact_bytes(target.package())?.len();
-    let limits = Limits::new(
-        u64::try_from(target_length - 1)?,
-        32,
-        1_024 * 1_024,
-        1_024 * 1_024,
-        1_024 * 1_024,
-    )?;
-    let limited = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_length - 1)?)?
+        .max_entries(32)?
+        .max_entry_bytes(1_024 * 1_024)?
+        .max_aggregate_bytes(1_024 * 1_024)?
+        .max_component_bytes(1_024 * 1_024)?
+        .build()?;
+    let limited =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))?;
     let source_bytes = exact_bytes(&limited)?;
     let result = limited
         .edit_slide_background(0usize)?

@@ -9,7 +9,7 @@ use crate::namespace::is_wordprocessing_namespace;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::fmt::Write as FmtWrite;
 
@@ -31,6 +31,74 @@ pub(crate) fn parse_paragraph(xml: &[u8]) -> Result<Extensions> {
 /// Parse row-level extension attributes from one complete `w:tr`.
 pub(crate) fn parse_row(xml: &[u8]) -> Result<Ids> {
     parse_root(xml, b"tr", false).map(|(ids, _)| ids)
+}
+
+/// Read the `paraId`/`textId` pair from the start tag of the `w:p` element
+/// that `xml` begins with, resolving prefixes with `inherited`, the bindings
+/// in scope where the paragraph appears.
+///
+/// Only the start tag is read, so the cost is the tag's, not the
+/// paragraph's. The tag's extension attributes are checked exactly as
+/// [`parse_paragraph`] checks them; the rest of the paragraph is not read.
+fn parse_paragraph_start_impl(xml: &[u8], inherited: &[(Option<Vec<u8>>, Vec<u8>)]) -> Result<Ids> {
+    let mut reader = NsReader::from_reader(xml);
+    for (prefix, namespace) in inherited {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|error| Error::Xml(error.to_string()))?;
+    }
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let resolver = reader.resolver();
+                let (namespace, _) = resolver.resolve_element(element.name());
+                if !is_word_root(&namespace, &element, b"p") {
+                    return Err(Error::InvalidFormat(format!(
+                        "Word extension XML must have one {:?} root",
+                        b"p"
+                    )));
+                }
+                let mut para_id = None;
+                let mut text_id = None;
+                let mut no_spell_err = None;
+                parse_attributes(
+                    &element,
+                    resolver,
+                    reader.decoder(),
+                    true,
+                    &mut para_id,
+                    &mut text_id,
+                    &mut no_spell_err,
+                )?;
+                return Ids::from_parts(para_id, text_id);
+            },
+            Event::Text(text) => {
+                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(Error::InvalidFormat(
+                        "Word extension XML has text outside its root".into(),
+                    ));
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::InvalidFormat(
+                    "Word extension XML cannot contain a DTD or processing instruction".into(),
+                ));
+            },
+            Event::Eof | Event::End(_) => {
+                return Err(Error::InvalidFormat(
+                    "Word extension XML is missing a complete root".into(),
+                ));
+            },
+            Event::CData(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
+        }
+    }
 }
 
 fn parse_root(
@@ -270,4 +338,17 @@ fn append_namespace_attributes(xml: &mut String) -> Result<()> {
         " xmlns:w14=\"{WORD_2010_NAMESPACE}\" xmlns:mc=\"{MC_NAMESPACE}\" mc:Ignorable=\"w14\""
     )?;
     Ok(())
+}
+
+pub(crate) fn parse_paragraph_start(
+    xml: &[u8],
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Ids> {
+    parse_paragraph_start_impl(xml, inherited).map_err(|error| match error {
+        Error::Xml(_) => Error::Xml("malformed paragraph extension XML".into()),
+        Error::InvalidFormat(_) => {
+            Error::InvalidFormat("invalid paragraph extension attributes".into())
+        },
+        other => other,
+    })
 }

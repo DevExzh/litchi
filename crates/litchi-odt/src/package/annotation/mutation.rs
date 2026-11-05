@@ -5,23 +5,25 @@ use super::model::{Annotation, AnnotationAnchor, AnnotationHost, AnnotationPosit
 use super::scan::scan as scan_xml;
 use super::{bounds, invalid, invalid_error};
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 
 pub(crate) fn add_xml(
     content: &str,
     host: AnnotationHost,
     anchor: &AnnotationAnchor,
     annotation: &Annotation,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, usize)> {
     validate_anchor_host(host, anchor)?;
     annotation.validate()?;
-    let scan = scan_xml(content, host)?;
+    let scan = scan_xml(content, host, limits)?;
     validate_new_name(&scan, annotation.name())?;
     if anchor.end.is_some() && annotation.name().is_none() {
         return invalid("a ranged annotation requires a non-empty office:name");
     }
     let start_site = site_for(&scan, &anchor.start)?;
     let start_at = insertion_position(start_site);
-    let fragment = serialize(annotation)?;
+    let fragment = serialize(annotation, limits)?;
     let updated = if let Some(end_position) = &anchor.end {
         let end_site = site_for(&scan, end_position)?;
         let end_at = insertion_position(end_site);
@@ -52,7 +54,7 @@ pub(crate) fn add_xml(
         .iter()
         .filter(|record| record.span.start < start_at)
         .count();
-    scan_xml(&updated, host)?;
+    scan_xml(&updated, host, limits)?;
     Ok((updated, index))
 }
 
@@ -61,9 +63,10 @@ pub(crate) fn replace_xml(
     host: AnnotationHost,
     index: usize,
     annotation: &Annotation,
+    limits: &XmlStreamLimits,
 ) -> Result<String> {
     annotation.validate()?;
-    let scan = scan_xml(content, host)?;
+    let scan = scan_xml(content, host, limits)?;
     let record = scan
         .records
         .get(index)
@@ -87,15 +90,20 @@ pub(crate) fn replace_xml(
         vec![Edit {
             start: record.span.start,
             end: record.span.end,
-            replacement: serialize(annotation)?,
+            replacement: serialize(annotation, limits)?,
         }],
     )?;
-    scan_xml(&updated, host)?;
+    scan_xml(&updated, host, limits)?;
     Ok(updated)
 }
 
-pub(crate) fn remove_xml(content: &str, host: AnnotationHost, index: usize) -> Result<String> {
-    let scan = scan_xml(content, host)?;
+pub(crate) fn remove_xml(
+    content: &str,
+    host: AnnotationHost,
+    index: usize,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
+    let scan = scan_xml(content, host, limits)?;
     let record = scan
         .records
         .get(index)
@@ -113,7 +121,7 @@ pub(crate) fn remove_xml(content: &str, host: AnnotationHost, index: usize) -> R
         });
     }
     let updated = apply_edits(content, edits)?;
-    scan_xml(&updated, host)?;
+    scan_xml(&updated, host, limits)?;
     Ok(updated)
 }
 
@@ -122,8 +130,9 @@ pub(crate) fn reorder_xml(
     host: AnnotationHost,
     from: usize,
     to: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<String> {
-    let scan = scan_xml(content, host)?;
+    let scan = scan_xml(content, host, limits)?;
     let first = scan
         .records
         .get(from)
@@ -152,7 +161,7 @@ pub(crate) fn reorder_xml(
     updated.push_str(&content[left.span.end..right.span.start]);
     updated.push_str(&content[left.span.start..left.span.end]);
     updated.push_str(&content[right.span.end..]);
-    scan_xml(&updated, host)?;
+    scan_xml(&updated, host, limits)?;
     Ok(updated)
 }
 

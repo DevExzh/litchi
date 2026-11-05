@@ -110,34 +110,44 @@ pub(super) fn parse_cell_reference(value: &str) -> Result<(u32, u32)> {
     for character in normalized.chars() {
         if character.is_ascii_alphabetic() {
             if digit_seen {
-                return Err(Error::InvalidCellReference(normalized));
+                return Err(Error::InvalidCellReference(
+                    "the cell reference is not valid",
+                ));
             }
             column.push(character);
         } else if character.is_ascii_digit() {
             digit_seen = true;
             row.push(character);
         } else {
-            return Err(invalid("cell reference", normalized));
+            return Err(invalid("cell reference", "unexpected value"));
         }
     }
     if column.is_empty() || row.is_empty() {
-        return Err(Error::InvalidCellReference(normalized));
+        return Err(Error::InvalidCellReference(
+            "the cell reference is not valid",
+        ));
     }
     let mut column_index = 0_u32;
     for character in column.bytes() {
         if !character.is_ascii_uppercase() {
-            return Err(Error::InvalidCellReference(normalized));
+            return Err(Error::InvalidCellReference(
+                "the cell reference is not valid",
+            ));
         }
         column_index = column_index
             .checked_mul(26)
             .and_then(|value| value.checked_add(u32::from(character - b'A' + 1)))
-            .ok_or_else(|| Error::InvalidCellReference(normalized.clone()))?;
+            .ok_or(Error::InvalidCellReference(
+                "the cell reference is not valid",
+            ))?;
     }
     let row_index = row
         .parse::<u32>()
-        .map_err(|_| Error::InvalidCellReference(normalized.clone()))?;
+        .map_err(|_| Error::InvalidCellReference("the cell reference is not valid"))?;
     if row_index == 0 || column_index == 0 {
-        return Err(Error::InvalidCellReference(normalized));
+        return Err(Error::InvalidCellReference(
+            "the cell reference is not valid",
+        ));
     }
     Ok((row_index - 1, column_index - 1))
 }
@@ -148,8 +158,9 @@ pub(super) fn parse_sqref_header(
     data: &[u8],
     record: &'static str,
     maximum_ranges: usize,
+    limits: crate::raw::Limits,
 ) -> Result<(Vec<FrtRange>, usize)> {
-    let mut cursor = FrtCursor::new(data, record);
+    let mut cursor = FrtCursor::new(data, record, limits)?;
     if cursor.read_u32()? != 0x02 {
         return Err(invalid(record, "FRTHeader is not sqref-only"));
     }
@@ -158,15 +169,12 @@ pub(super) fn parse_sqref_header(
     }
     let flags = cursor.read_u32()?;
     if flags & 0x02 == 0 || flags & !0x0001_000f != 0 {
-        return Err(invalid(
-            record,
-            format!("invalid FRTSqref flags 0x{flags:08X}"),
-        ));
+        return Err(invalid(record, "invalid FRTSqref flags"));
     }
     let count = usize::try_from(cursor.read_u32()? as i32)
         .map_err(|_| invalid(record, "NULL range collection"))?;
     if count == 0 || count > maximum_ranges || count > cursor.remaining() / 16 {
-        return Err(invalid(record, format!("invalid range count {count}")));
+        return Err(invalid(record, "invalid range count"));
     }
     let mut ranges = Vec::with_capacity(count);
     for _ in 0..count {
@@ -186,13 +194,14 @@ pub(super) fn parse_sqref_header(
     Ok((ranges, cursor.offset))
 }
 
-pub(super) fn serialize_sqref_header(ranges: &[FrtRange]) -> Result<Vec<u8>> {
+pub(super) fn serialize_sqref_header(
+    ranges: &[FrtRange],
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     if ranges.is_empty() || ranges.len() > i32::MAX as usize {
-        return Err(invalid(
-            "FRTHeader",
-            format!("invalid range count {}", ranges.len()),
-        ));
+        return Err(invalid("FRTHeader", "invalid range count"));
     }
+    admit_payload(ranges.len().saturating_mul(16).saturating_add(16), limits)?;
     let mut data = Vec::with_capacity(16 + ranges.len() * 16);
     data.extend_from_slice(&2u32.to_le_bytes());
     data.extend_from_slice(&1u32.to_le_bytes());
@@ -217,30 +226,25 @@ pub(crate) fn parse_formula_header(
     data: &[u8],
     record: &'static str,
     maximum_formulas: usize,
+    limits: crate::raw::Limits,
 ) -> Result<(Vec<ParsedFormula>, usize)> {
-    let mut cursor = FrtCursor::new(data, record);
+    let mut cursor = FrtCursor::new(data, record, limits)?;
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
-        return Err(invalid(
-            record,
-            format!("invalid FRTHeader flags 0x{flags:08X}"),
-        ));
+        return Err(invalid(record, "invalid FRTHeader flags"));
     }
     let mut formulas = Vec::new();
     if flags & 0x04 != 0 {
         let count = usize::try_from(cursor.read_u32()?)
             .map_err(|_| invalid(record, "FRT formula count overflow"))?;
         if count == 0 || count > maximum_formulas {
-            return Err(invalid(
-                record,
-                format!("FRT formula count {count} is outside 1..={maximum_formulas}"),
-            ));
+            return Err(invalid(record, "FRT formula count is outside 1..="));
         }
         formulas
             .try_reserve(count)
             .map_err(|_| Error::Unrecognized {
-                typ: record.to_string(),
-                val: "formula allocation exceeds bounded capacity".to_string(),
+                typ: record,
+                val: "formula allocation exceeds bounded capacity",
             })?;
         for _ in 0..count {
             formulas.push(cursor.read_formula()?);
@@ -252,15 +256,10 @@ pub(crate) fn parse_formula_header(
 pub(super) fn serialize_formula_header(
     formulas: &[ParsedFormula],
     maximum_formulas: usize,
+    limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
-        return Err(invalid(
-            "FRTHeader",
-            format!(
-                "formula count {} exceeds {maximum_formulas}",
-                formulas.len()
-            ),
-        ));
+        return Err(invalid("FRTHeader", "formula count exceeds"));
     }
     let mut data = Vec::new();
     data.extend_from_slice(&if formulas.is_empty() { 0u32 } else { 4u32 }.to_le_bytes());
@@ -274,10 +273,9 @@ pub(super) fn serialize_formula_header(
     );
     for formula in formulas {
         if formula.rgce.is_empty() || formula.rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "FRT formula token length {} is outside 1..={MAX_CELL_FORMULA_BYTES}",
-                formula.rgce.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "FRT formula token length is outside its allowed range",
+            ));
         }
         data.extend_from_slice(&2u32.to_le_bytes());
         data.extend_from_slice(
@@ -293,6 +291,7 @@ pub(super) fn serialize_formula_header(
         data.extend_from_slice(&formula.rgce);
         data.extend_from_slice(&formula.rgcb);
     }
+    admit_payload(data.len(), limits)?;
     Ok(data)
 }
 
@@ -303,12 +302,17 @@ struct FrtCursor<'a> {
 }
 
 impl<'a> FrtCursor<'a> {
-    pub(super) fn new(data: &'a [u8], record: &'static str) -> Self {
-        Self {
+    pub(super) fn new(
+        data: &'a [u8],
+        record: &'static str,
+        limits: crate::raw::Limits,
+    ) -> Result<Self> {
+        admit_payload(data.len(), limits)?;
+        Ok(Self {
             data,
             offset: 0,
             record,
-        }
+        })
     }
 
     fn take(&mut self, count: usize) -> Result<&'a [u8]> {
@@ -341,19 +345,16 @@ impl<'a> FrtCursor<'a> {
     fn read_formula(&mut self) -> Result<ParsedFormula> {
         let flags = self.read_u32()?;
         if flags != 2 {
-            return Err(invalid(
-                self.record,
-                format!("invalid FRTFormula flags 0x{flags:08X}"),
-            ));
+            return Err(invalid(self.record, "invalid FRTFormula flags"));
         }
         let cce = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula token length overflow"))?;
         let cb = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula ancillary length overflow"))?;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "FRT formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
-            )));
+            return Err(Error::InvalidFormula(
+                "FRT formula token length is outside its allowed range",
+            ));
         }
         Ok(ParsedFormula {
             rgce: self.take(cce)?.to_vec(),
@@ -362,7 +363,9 @@ impl<'a> FrtCursor<'a> {
     }
 }
 
-pub fn parse_rule_extension_guid(data: &[u8]) -> Result<[u8; 16]> {
+/// Parse the fixed 20-byte `BrtCFRuleExt` payload under an explicit raw profile.
+pub fn parse_rule_extension_guid(data: &[u8], limits: crate::raw::Limits) -> Result<[u8; 16]> {
+    admit_payload(data.len(), limits)?;
     if data.len() != 20 {
         return Err(Error::InvalidLength {
             expected: 20,
@@ -381,12 +384,17 @@ pub fn serialize_rule_extension_guid(guid: [u8; 16]) -> [u8; 20] {
     data
 }
 
-pub(super) fn write_nullable_string(data: &mut Vec<u8>, value: Option<&str>) -> Result<()> {
+pub(super) fn write_nullable_string(
+    data: &mut Vec<u8>,
+    value: Option<&str>,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     let Some(value) = value else {
         data.extend_from_slice(&u32::MAX.to_le_bytes());
         return Ok(());
     };
     let units = value.encode_utf16().collect::<Vec<_>>();
+    admit_units(units.len(), limits, 0)?;
     data.extend_from_slice(
         &u32::try_from(units.len())
             .map_err(|_| invalid("XLNullableWideString", "string length overflow"))?
@@ -402,15 +410,23 @@ pub(crate) struct CfCursor<'a> {
     data: &'a [u8],
     offset: usize,
     record: &'static str,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> CfCursor<'a> {
-    pub(crate) fn new(data: &'a [u8], record: &'static str) -> Self {
-        Self {
+    /// Admit one record payload under the caller's raw profile.
+    pub(crate) fn new(
+        data: &'a [u8],
+        record: &'static str,
+        limits: crate::raw::Limits,
+    ) -> Result<Self> {
+        let limits = admit_payload(data.len(), limits)?;
+        Ok(Self {
             data,
             offset: 0,
             record,
-        }
+            limits,
+        })
     }
 
     fn take(&mut self, size: usize) -> Result<&'a [u8]> {
@@ -442,7 +458,7 @@ impl<'a> CfCursor<'a> {
         match self.read_u8()? {
             0 => Ok(false),
             1 => Ok(true),
-            value => Err(invalid(self.record, format!("invalid Boolean {value}"))),
+            _value => Err(invalid(self.record, "invalid Boolean")),
         }
     }
 
@@ -478,7 +494,7 @@ impl<'a> CfCursor<'a> {
         match self.read_u32()? {
             0 => Ok(false),
             1 => Ok(true),
-            value => Err(invalid(self.record, format!("invalid Boolean {value}"))),
+            _value => Err(invalid(self.record, "invalid Boolean")),
         }
     }
 
@@ -488,6 +504,7 @@ impl<'a> CfCursor<'a> {
             return Ok(None);
         }
         let count = count as usize;
+        admit_units(count, self.limits, self.offset.saturating_sub(4))?;
         let bytes = self.take(
             count
                 .checked_mul(2)
@@ -501,15 +518,15 @@ impl<'a> CfCursor<'a> {
             .collect::<Vec<_>>();
         String::from_utf16(&units)
             .map(Some)
-            .map_err(|error| Error::Encoding(format!("invalid UTF-16: {error}")))
+            .map_err(|_error| Error::Encoding("invalid UTF-16"))
     }
 
     pub(super) fn read_formula(&mut self) -> Result<ParsedFormula> {
         let cce = self.read_u32()? as usize;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "conditional-format formula length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
-            )));
+            return Err(Error::InvalidFormula(
+                "conditional-format formula length is outside its allowed range",
+            ));
         }
         let rgce = self.take(cce)?.to_vec();
         let cb = self.read_u32()? as usize;
@@ -528,7 +545,7 @@ impl<'a> CfCursor<'a> {
         if !(minimum..=maximum).contains(&count)
             || count > self.data.len().saturating_sub(self.offset) / 16
         {
-            return Err(invalid(self.record, format!("invalid range count {count}")));
+            return Err(invalid(self.record, "invalid range count"));
         }
         let mut ranges = Vec::with_capacity(count);
         for _ in 0..count {
@@ -558,4 +575,17 @@ impl<'a> CfCursor<'a> {
             })
         }
     }
+}
+
+/// Validate `limits` and admit one payload or output of `length` bytes.
+pub(crate) fn admit_payload(
+    length: usize,
+    limits: crate::raw::Limits,
+) -> Result<crate::raw::Limits> {
+    Ok(limits.admit(length)?)
+}
+
+/// Refuse a declared or emitted string longer than the UTF-16-unit ceiling.
+pub(crate) fn admit_units(units: usize, limits: crate::raw::Limits, offset: usize) -> Result<()> {
+    Ok(limits.admit_units(units, offset)?)
 }

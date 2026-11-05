@@ -732,11 +732,6 @@ impl<'a> ContentPartSource<'a> {
         &self.owner
     }
 
-    /// Alias for [`Self::owner_element`] used by range-oriented callers.
-    pub const fn owner_range(&self) -> ByteRange {
-        self.owner.range()
-    }
-
     /// Required `r:id` value authored by the owner.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -802,22 +797,10 @@ pub struct SourceDrawing<'a> {
 }
 
 impl<'a> SourceDrawing<'a> {
-    /// Scan a worksheet drawing in source order.
-    pub fn scan(source: &'a [u8]) -> Result<Self> {
-        Self::scan_with_ordinal(source, 0)
-    }
-
-    /// Scan a worksheet drawing with the caller's semantic drawing ordinal.
-    pub fn scan_with_ordinal(source: &'a [u8], drawing_ordinal: usize) -> Result<Self> {
-        Self::scan_with_limits(source, drawing_ordinal, ScanLimits::default())
-    }
-
-    /// Scan with explicit finite source/output limits.
-    pub fn scan_with_limits(
-        source: &'a [u8],
-        drawing_ordinal: usize,
-        limits: ScanLimits,
-    ) -> Result<Self> {
+    /// Scan a worksheet drawing in source order, with the caller's semantic
+    /// drawing ordinal, under finite source and output limits
+    /// ([`ScanLimits::default`] for the standard ones).
+    pub fn scan(source: &'a [u8], drawing_ordinal: usize, limits: ScanLimits) -> Result<Self> {
         Scanner::new(source, drawing_ordinal, limits)?.run()
     }
 
@@ -2667,7 +2650,11 @@ fn project_svg_owner<'a>(
     // Keep the host range authoritative and resolve inherited names through
     // the persistent context.  Namespace completion remains an explicit,
     // bounded export operation on the owner.
-    let value = match svg_blip::read_contextual(fragment, context) {
+    let value = match svg_blip::read_contextual(
+        fragment,
+        context,
+        svg_blip::Limits::new(maximum, MAX_FRAGMENT_BYTES),
+    ) {
         Ok(value) => value,
         Err(_) => return Ok(SvgOwnerState::Refused),
     };

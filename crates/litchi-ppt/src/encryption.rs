@@ -1,7 +1,7 @@
 //! Office Binary Document RC4 `CryptoAPI` handling for legacy `PowerPoint` files.
 
 use super::current_user::CurrentUser;
-use super::package::{EncryptionKind, Error, RecordLimits, Result};
+use super::package::{EncryptionKind, Error, Result, SourceLimits};
 use litchi_crypto::rc4 as office_rc4;
 use litchi_crypto::rc4::{Context, Error as CryptoError, Flags};
 use rand::{TryRng, rngs::SysRng};
@@ -19,6 +19,55 @@ pub enum EncryptionProfile {
         /// RC4 key size in bits. Supported values are 40 through 128 in steps of eight.
         key_bits: u16,
     },
+}
+
+/// Caller-owned entropy for one PPT CryptoAPI RC4 authoring attempt.
+///
+/// A canonical [`crate::Builder`] never obtains encryption salt or verifier
+/// bytes from an ambient random source. Supply one token for each encrypted
+/// build or low-level [`crate::raw::encode`] attempt. The token is consumed
+/// even when the attempt later fails, so a caller must provide a fresh token
+/// for the next attempt.
+///
+/// [`generate`](Self::generate) is the explicit convenience constructor for
+/// operating-system randomness. [`from_bytes`](Self::from_bytes) is useful for
+/// deterministic tests and reproducible pipelines.
+pub struct EncryptionEntropy {
+    salt: Zeroizing<[u8; 16]>,
+    verifier: Zeroizing<[u8; 16]>,
+}
+
+impl EncryptionEntropy {
+    /// Generate fresh salt and verifier bytes using the operating-system RNG.
+    pub fn generate() -> Result<Self> {
+        Ok(Self {
+            salt: random_16("PPT CryptoAPI salt")?,
+            verifier: random_16("PPT CryptoAPI verifier")?,
+        })
+    }
+
+    /// Construct deterministic entropy from caller-provided bytes.
+    ///
+    /// Reusing salt and verifier bytes with the same password is unsafe for
+    /// distinct encrypted documents. Production callers should normally use
+    /// [`Self::generate`] for every attempt.
+    #[must_use]
+    pub fn from_bytes(salt: [u8; 16], verifier: [u8; 16]) -> Self {
+        Self {
+            salt: Zeroizing::new(salt),
+            verifier: Zeroizing::new(verifier),
+        }
+    }
+}
+
+fn random_16(label: &str) -> Result<Zeroizing<[u8; 16]>> {
+    let mut bytes = Zeroizing::new([0_u8; 16]);
+    SysRng.try_fill_bytes(bytes.as_mut()).map_err(|_error| {
+        Error::Io(std::io::Error::other(format!(
+            "operating-system randomness unavailable for {label}"
+        )))
+    })?;
+    Ok(bytes)
 }
 
 impl EncryptionProfile {
@@ -58,24 +107,17 @@ pub(crate) fn validate_writer_password(
 pub(crate) fn prepare_writer_encryption(
     profile: EncryptionProfile,
     password: &str,
+    entropy: &EncryptionEntropy,
 ) -> std::result::Result<WriterEncryptionMaterial, String> {
     validate_writer_password(profile, password)?;
     let EncryptionProfile::CryptoApiRc4 { key_bits } = profile;
-    let mut salt = Zeroizing::new([0u8; 16]);
-    let mut verifier = Zeroizing::new([0u8; 16]);
-    SysRng.try_fill_bytes(salt.as_mut()).map_err(|_err| {
-        "operating-system randomness unavailable for PPT CryptoAPI salt".to_string()
-    })?;
-    SysRng.try_fill_bytes(verifier.as_mut()).map_err(|_err| {
-        "operating-system randomness unavailable for PPT CryptoAPI verifier".to_string()
-    })?;
     let (encryption_info, crypto) = office_rc4::build_header(
         password,
         usize::from(key_bits),
         Flags::CRYPTO_API | Flags::DOC_PROPERTIES,
         CRYPTO_API_PROVIDER,
-        &salt,
-        &verifier,
+        &entropy.salt,
+        &entropy.verifier,
     )
     .map_err(|error| map_crypto_error(error).to_string())?;
     let data_len = u32::try_from(encryption_info.len())
@@ -273,6 +315,7 @@ pub(super) struct EncryptedPresentation {
     pub live_offsets: Vec<usize>,
     pub mappings: Vec<(u32, u32)>,
     pub crypto: Context,
+    pub profile: EncryptionProfile,
 }
 
 #[derive(Clone, Copy)]
@@ -297,7 +340,7 @@ pub(super) fn decrypt_powerpoint_document(
     document: &mut Vec<u8>,
     current_user_data: Option<&[u8]>,
     password: Option<&str>,
-    limits: RecordLimits,
+    limits: SourceLimits,
 ) -> Result<Option<EncryptedPresentation>> {
     let Some(current_user_bytes) = current_user_data else {
         return Ok(None);
@@ -413,6 +456,15 @@ pub(super) fn decrypt_powerpoint_document(
         "CryptSession10Container",
     )?;
     let header = office_rc4::parse_header(session_data).map_err(map_crypto_error)?;
+    let key_bits = u16::try_from(header.key_bits()).map_err(|_error| {
+        Error::MalformedEncryptionHeader(
+            "CryptoAPI RC4 key size does not fit in profile".to_string(),
+        )
+    })?;
+    let profile = EncryptionProfile::CryptoApiRc4 { key_bits };
+    profile
+        .validate()
+        .map_err(Error::MalformedEncryptionHeader)?;
     let verified_password = password.ok_or(Error::PasswordRequired)?;
     let crypto = office_rc4::verify(&header, verified_password)
         .map_err(map_crypto_error)?
@@ -454,10 +506,19 @@ pub(super) fn decrypt_powerpoint_document(
         let total = 8usize
             .checked_add(data_len)
             .ok_or_else(|| Error::Corrupted("persist record length overflow".to_string()))?;
-        if data_len > limits.max_record_payload_bytes || total > limits.max_record_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "encrypted persist record {persist_id} exceeds its record-size limit"
-            )));
+        if data_len > limits.max_record_payload_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: data_len,
+                maximum: limits.max_record_payload_bytes,
+            });
+        }
+        if total > limits.max_record_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: total,
+                maximum: limits.max_record_bytes,
+            });
         }
         let end = offset
             .checked_add(total)
@@ -492,13 +553,14 @@ pub(super) fn decrypt_powerpoint_document(
         live_offsets,
         mappings,
         crypto,
+        profile,
     }))
 }
 
 pub(super) fn decrypt_pictures(
     data: &mut Vec<u8>,
     crypto: &Context,
-    limits: RecordLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     let mut clear = Vec::new();
     clear
@@ -508,14 +570,17 @@ pub(super) fn decrypt_pictures(
     let mut record_offset = 0usize;
     let mut record_count = 0usize;
     while record_offset < clear.len() {
-        record_count = record_count
-            .checked_add(1)
-            .ok_or_else(|| Error::ResourceLimit("picture record count overflow".to_string()))?;
+        record_count = record_count.checked_add(1).ok_or(Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: limits.max_records,
+        })?;
         if record_count > limits.max_records {
-            return Err(Error::ResourceLimit(format!(
-                "picture record count exceeds limit {}",
-                limits.max_records
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: record_count,
+                maximum: limits.max_records,
+            });
         }
         decrypt_picture_segment(&mut clear, record_offset, 8, crypto)?;
         let header = record_header(&clear, record_offset)?;
@@ -524,10 +589,19 @@ pub(super) fn decrypt_pictures(
             .and_then(|value| value.checked_add(header.data_len))
             .ok_or_else(|| Error::Corrupted("picture record range overflow".to_string()))?;
         let total = end - record_offset;
-        if header.data_len > limits.max_record_payload_bytes || total > limits.max_record_bytes {
-            return Err(Error::ResourceLimit(
-                "encrypted picture record exceeds its record-size limit".to_string(),
-            ));
+        if header.data_len > limits.max_record_payload_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: header.data_len,
+                maximum: limits.max_record_payload_bytes,
+            });
+        }
+        if total > limits.max_record_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: total,
+                maximum: limits.max_record_bytes,
+            });
         }
         if end > clear.len() {
             return Err(Error::Corrupted(
@@ -590,13 +664,13 @@ pub(super) fn decrypt_pictures(
 }
 
 fn parse_persist_directory(data: &[u8], offset: usize) -> Result<Vec<(u32, u32)>> {
-    parse_persist_directory_with_limits(data, offset, RecordLimits::default())
+    parse_persist_directory_with_limits(data, offset, SourceLimits::default())
 }
 
 fn parse_persist_directory_with_limits(
     data: &[u8],
     offset: usize,
-    limits: RecordLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<(u32, u32)>> {
     let header = record_header(data, offset)?;
     if !matches!(header.record_type, 6001 | 6002) || header.version != 0 {
@@ -627,10 +701,11 @@ fn parse_persist_directory_with_limits(
         }
         for index in 0..count {
             if mappings.len() >= limits.max_records {
-                return Err(Error::ResourceLimit(format!(
-                    "persist mapping count exceeds limit {}",
-                    limits.max_records
-                )));
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::Events,
+                    observed: mappings.len().saturating_add(1),
+                    maximum: limits.max_records,
+                });
             }
             let persist_offset = le_u32(payload, cursor)?;
             cursor += 4;
@@ -666,6 +741,7 @@ fn map_crypto_error(error: CryptoError) -> Error {
         CryptoError::UnsupportedAlgorithm => {
             Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => Error::MalformedEncryptionHeader("CryptoAPI RC4 error".to_string()),
     }
 }
 
@@ -727,7 +803,7 @@ fn checked_slice_mut<'a>(
 )]
 mod tests {
     use super::*;
-    use crate::{OpenOptions, Package};
+    use crate::{OpenOptions, raw::Reader};
     use std::path::{Path, PathBuf};
 
     fn poi_fixture(name: &str) -> PathBuf {
@@ -745,7 +821,7 @@ mod tests {
 
     #[test]
     fn encrypted_presentation_requires_password() {
-        let mut package = Package::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
+        let mut package = Reader::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
         assert!(matches!(
             package.presentation(),
             Err(Error::PasswordRequired)
@@ -754,9 +830,11 @@ mod tests {
 
     #[test]
     fn encrypted_presentation_rejects_wrong_password() {
-        let mut package = Package::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
+        let mut package = Reader::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
         assert!(matches!(
             package.presentation_with_options(OpenOptions {
+                source_limits: SourceLimits::default(),
+                source_limits_explicit: false,
                 password: Some("wrong"),
                 ..Default::default()
             }),
@@ -771,9 +849,11 @@ mod tests {
             "Password_Protected-56-hello.ppt",
             "Password_Protected-np-hello.ppt",
         ] {
-            let mut package = Package::open(poi_fixture(name)).unwrap();
+            let mut package = Reader::open(poi_fixture(name)).unwrap();
             let presentation = package
                 .presentation_with_options(OpenOptions {
+                    source_limits: SourceLimits::default(),
+                    source_limits_explicit: false,
                     password: Some("hello"),
                     ..Default::default()
                 })
@@ -784,9 +864,11 @@ mod tests {
 
     #[test]
     fn opens_poi_cryptoapi_content_oracle() {
-        let mut package = Package::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap();
+        let mut package = Reader::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap();
         let presentation = package
             .presentation_with_options(OpenOptions {
+                source_limits: SourceLimits::default(),
+                source_limits_explicit: false,
                 password: Some("crypto"),
                 ..Default::default()
             })
@@ -800,15 +882,18 @@ mod tests {
         use sha1::{Digest, Sha1};
         use std::fs::File;
 
-        let mut encrypted_ole =
-            OleFile::open(File::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap()).unwrap();
+        let mut encrypted_ole = OleFile::open(
+            File::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap(),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let mut document = encrypted_ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = encrypted_ole.open_stream(&["Current User"]).unwrap();
         let state = decrypt_powerpoint_document(
             &mut document,
             Some(&current_user),
             Some("crypto"),
-            RecordLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap()
         .unwrap();
@@ -816,10 +901,12 @@ mod tests {
         decrypt_pictures(
             &mut encrypted_pictures,
             &state.crypto,
-            RecordLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap();
-        let images = litchi_odraw::image::delay(&encrypted_pictures).unwrap();
+        let images =
+            litchi_odraw::image::delay(&encrypted_pictures, litchi_odraw::image::Limits::default())
+                .unwrap();
         let hashes: Vec<String> = images
             .iter()
             .map(|image| {
@@ -860,14 +947,18 @@ mod tests {
         let error = parse_persist_directory_with_limits(
             &data,
             offset,
-            RecordLimits {
+            SourceLimits {
                 max_records: 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         )
         .unwrap_err();
-        assert!(
-            matches!(error, Error::ResourceLimit(message) if message.contains("persist mapping"))
-        );
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            }
+        ));
     }
 }

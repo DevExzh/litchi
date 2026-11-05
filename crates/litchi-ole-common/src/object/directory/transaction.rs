@@ -6,6 +6,7 @@ use super::model::{EntryKind, Links, Metadata, Sid};
 use super::patch::Patch;
 use super::snapshot::Snapshot;
 use super::validation;
+use crate::Error;
 use crate::property_set::Guid;
 use litchi_cfb::{DirectoryEntry, OleError};
 
@@ -33,12 +34,12 @@ impl Revision {
 
 /// An isolated, failure-atomic edit over one directory snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Catalog,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.catalog_clone(),
@@ -65,7 +66,7 @@ impl Transaction {
 
     /// Whether the current raw directory catalog differs from the source.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         !self.candidate.raw_equal(self.source.catalog())
     }
 
@@ -76,14 +77,14 @@ impl Transaction {
     ///
     /// Returns an error when the SID is absent, the name is invalid, or the
     /// resulting catalog violates its retained resource limits.
-    pub fn set_name(&mut self, sid: Sid, name: impl Into<String>) -> Result<&mut Self, OleError> {
+    pub fn set_name(&mut self, sid: Sid, name: impl Into<String>) -> Result<&mut Self, Error> {
         let replacement_name = name.into();
         validation::validate_name_for_edit(&replacement_name, self.source.limits())?;
         let index = self.index(sid)?;
         if sid.raw() == 0 {
-            return Err(OleError::InvalidFormat(
+            return Err(Error::Cfb(OleError::InvalidFormat(
                 "CFB SID-zero Root Entry name is immutable".into(),
-            ));
+            )));
         }
         self.update_raw(move |entries| {
             entries[index].name = replacement_name;
@@ -97,7 +98,7 @@ impl Transaction {
     ///
     /// Returns an error when the SID is absent, a link is self-referential, or
     /// the resulting catalog violates CFB invariants or resource limits.
-    pub fn set_links(&mut self, sid: Sid, links: Links) -> Result<&mut Self, OleError> {
+    pub fn set_links(&mut self, sid: Sid, links: Links) -> Result<&mut Self, Error> {
         validate_links(sid, links)?;
         let index = self.index(sid)?;
         self.update_raw(move |entries| {
@@ -115,7 +116,7 @@ impl Transaction {
     /// Returns an error when the SID is absent or opaque, the replacement has
     /// a different SID, or the resulting catalog violates CFB invariants or
     /// resource limits.
-    pub fn set_metadata(&mut self, sid: Sid, metadata: Metadata) -> Result<&mut Self, OleError> {
+    pub fn set_metadata(&mut self, sid: Sid, metadata: Metadata) -> Result<&mut Self, Error> {
         let index = self.index(sid)?;
         let before = self
             .candidate
@@ -123,9 +124,9 @@ impl Transaction {
             .and_then(|projection| projection.metadata)
             .ok_or_else(|| opaque_metadata(sid))?;
         if metadata.sid() != sid {
-            return Err(OleError::InvalidFormat(
+            return Err(Error::Cfb(OleError::InvalidFormat(
                 "CFB directory metadata replacement must retain its SID".into(),
-            ));
+            )));
         }
         validation::validate(metadata)?;
         self.update_raw(move |entries| {
@@ -139,11 +140,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::set_metadata`].
-    pub fn replace_metadata(
-        &mut self,
-        sid: Sid,
-        metadata: Metadata,
-    ) -> Result<&mut Self, OleError> {
+    pub fn replace_metadata(&mut self, sid: Sid, metadata: Metadata) -> Result<&mut Self, Error> {
         self.set_metadata(sid, metadata)
     }
 
@@ -156,9 +153,9 @@ impl Transaction {
     ///
     /// Returns an error when the SID is absent or opaque, `edit` fails, or the
     /// resulting metadata violates CFB invariants or resource limits.
-    pub fn update_metadata<F>(&mut self, sid: Sid, edit: F) -> Result<&mut Self, OleError>
+    pub fn update_metadata<F>(&mut self, sid: Sid, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut Metadata) -> Result<(), OleError>,
+        F: FnOnce(&mut Metadata) -> Result<(), Error>,
     {
         let index = self.index(sid)?;
         let before = self
@@ -177,11 +174,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::update_metadata`].
-    pub fn set_class_id(
-        &mut self,
-        sid: Sid,
-        class_id: Option<Guid>,
-    ) -> Result<&mut Self, OleError> {
+    pub fn set_class_id(&mut self, sid: Sid, class_id: Option<Guid>) -> Result<&mut Self, Error> {
         self.update_metadata(sid, |metadata| {
             metadata.set_class_id(class_id);
             Ok(())
@@ -193,7 +186,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::update_metadata`].
-    pub fn set_kind(&mut self, sid: Sid, kind: EntryKind) -> Result<&mut Self, OleError> {
+    pub fn set_kind(&mut self, sid: Sid, kind: EntryKind) -> Result<&mut Self, Error> {
         self.update_metadata(sid, |metadata| {
             metadata.set_kind(kind);
             Ok(())
@@ -205,7 +198,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::update_metadata`].
-    pub fn set_start_sector(&mut self, sid: Sid, value: u32) -> Result<&mut Self, OleError> {
+    pub fn set_start_sector(&mut self, sid: Sid, value: u32) -> Result<&mut Self, Error> {
         self.update_metadata(sid, |metadata| {
             metadata.set_start_sector(value);
             Ok(())
@@ -217,7 +210,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::update_metadata`].
-    pub fn set_stream_size(&mut self, sid: Sid, value: u64) -> Result<&mut Self, OleError> {
+    pub fn set_stream_size(&mut self, sid: Sid, value: u64) -> Result<&mut Self, Error> {
         self.update_metadata(sid, |metadata| {
             metadata.set_stream_size(value);
             Ok(())
@@ -229,7 +222,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::update_metadata`].
-    pub fn set_uses_mini_stream(&mut self, sid: Sid, value: bool) -> Result<&mut Self, OleError> {
+    pub fn set_uses_mini_stream(&mut self, sid: Sid, value: bool) -> Result<&mut Self, Error> {
         self.update_metadata(sid, |metadata| {
             metadata.set_uses_mini_stream(value);
             Ok(())
@@ -246,27 +239,11 @@ impl Transaction {
     ///
     /// Returns an error when `edit` fails or its changes violate CFB
     /// invariants or the transaction's resource limits.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut [DirectoryEntry]) -> Result<(), OleError>,
+        F: FnOnce(&mut [DirectoryEntry]) -> Result<(), Error>,
     {
         self.update_raw(edit)
-    }
-
-    /// Captures the current candidate as a validated snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a changed candidate no longer validates under the
-    /// transaction's retained CFB resource limits.
-    pub fn snapshot(&self) -> Result<Snapshot, OleError> {
-        self.materialize()
-    }
-
-    /// Discards the candidate and returns its source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate without mutating its source.
@@ -275,15 +252,16 @@ impl Transaction {
     ///
     /// Returns an error when a changed candidate no longer validates under the
     /// transaction's retained CFB resource limits.
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(&self.source, &snapshot);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn update_raw<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    fn update_raw<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut [DirectoryEntry]) -> Result<(), OleError>,
+        F: FnOnce(&mut [DirectoryEntry]) -> Result<(), Error>,
     {
         let mut entries = Vec::new();
         entries
@@ -291,7 +269,8 @@ impl Transaction {
             .map_err(|source| OleError::Allocation {
                 resource: "CFB directory transaction entries",
                 source,
-            })?;
+            })
+            .map_err(Error::from)?;
         entries.extend(self.candidate.raw_entries().iter().cloned());
         edit(&mut entries)?;
         let candidate = Catalog::from_entries(entries, self.source.limits())?;
@@ -299,14 +278,17 @@ impl Transaction {
         Ok(self)
     }
 
-    fn index(&self, sid: Sid) -> Result<usize, OleError> {
+    fn index(&self, sid: Sid) -> Result<usize, Error> {
         self.candidate.index_of(sid).ok_or_else(|| {
-            OleError::InvalidFormat(format!("CFB directory SID {} is not present", sid.raw()))
+            Error::Cfb(OleError::InvalidFormat(format!(
+                "CFB directory SID {} is not present",
+                sid.raw()
+            )))
         })
     }
 
-    fn materialize(&self) -> Result<Snapshot, OleError> {
-        if !self.is_changed() {
+    fn materialize(&self) -> Result<Snapshot, Error> {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
         let catalog = Catalog::from_entries_shared(
@@ -317,50 +299,12 @@ impl Transaction {
     }
 }
 
-/// A successful directory publication containing its reversible patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the raw directory source changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the committed snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the commit into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Runs one source-checked directory edit atomically.
 ///
@@ -368,31 +312,31 @@ impl Commit {
 ///
 /// Returns an error when `edit` fails or its changes violate CFB invariants or
 /// the snapshot's retained resource limits.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;
     transaction.commit()
 }
 
-fn validate_links(sid: Sid, links: Links) -> Result<(), OleError> {
+fn validate_links(sid: Sid, links: Links) -> Result<(), Error> {
     if [links.left(), links.right(), links.child()]
         .into_iter()
         .flatten()
         .any(|link| link == sid)
     {
-        return Err(OleError::InvalidFormat(
+        return Err(Error::Cfb(OleError::InvalidFormat(
             "CFB directory metadata contains a self-referential link".into(),
-        ));
+        )));
     }
     Ok(())
 }
 
-fn opaque_metadata(sid: Sid) -> OleError {
-    OleError::InvalidFormat(format!(
+fn opaque_metadata(sid: Sid) -> Error {
+    Error::Cfb(OleError::InvalidFormat(format!(
         "CFB directory SID {} has no typed metadata projection",
         sid.raw()
-    ))
+    )))
 }

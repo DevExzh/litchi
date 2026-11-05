@@ -4,26 +4,18 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use litchi_crypto::ooxml::{self, Limits, Mode};
+use litchi_crypto::ooxml::{self, Mode};
 use litchi_ooxml_common::package_encryption::PackageEncryption;
-use litchi_opc::{PackageWriter, ReadLimits};
+use litchi_opc::{PackageWriter, SourceLimits};
 
 use super::Package;
 use crate::{Error, Result};
 
 impl Package {
-    /// Return the mode retained from encrypted ingress or the latest
-    /// successful encrypted file save.
+    /// Return the mode retained from encrypted ingress.
     #[must_use]
     pub const fn encryption(&self) -> Option<Mode> {
         self.encryption.mode()
-    }
-
-    /// Alias for [`Self::encryption`]. Byte-only encryption and explicit plain
-    /// output do not change this source-or-successful-save mode.
-    #[must_use]
-    pub const fn encryption_mode(&self) -> Option<Mode> {
-        self.encryption()
     }
 
     /// Open an ordinary or encrypted package using a password and safe limits.
@@ -32,27 +24,26 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        Self::open_with_password_and_limits(
-            path,
-            password,
-            Limits::default(),
-            ReadLimits::default(),
-        )
+        Self::open_with_password_and_options(path, password, crate::OpenOptions::default())
     }
 
-    /// Open an ordinary or encrypted package with independent crypto and OPC limits.
+    /// Open an ordinary or encrypted package with explicit ingress options.
+    ///
+    /// The options' encryption limits bound the outer container and
+    /// decryption; their source limits bound the clear OPC archive.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_with_password_and_limits<P: AsRef<Path>>(
+    /// Returns [`Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input cannot be read or is malformed.
+    pub fn open_with_password_and_options<P: AsRef<Path>>(
         path: P,
         password: &str,
-        encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let input = File::open(path)?;
-        Self::from_reader_with_password_and_limits(input, password, encryption_limits, opc_limits)
+        Self::from_reader_with_password_and_options(input, password, options)
     }
 
     /// Read an ordinary or encrypted package using a password and safe limits.
@@ -61,56 +52,25 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
-        Self::from_reader_with_password_and_limits(
-            reader,
-            password,
-            Limits::default(),
-            ReadLimits::default(),
-        )
+        Self::from_reader_with_password_and_options(reader, password, crate::OpenOptions::default())
     }
 
-    /// Read an ordinary or encrypted package with independent crypto and OPC limits.
+    /// Read an ordinary or encrypted package with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_reader_with_password_and_limits<R: Read>(
+    /// Returns [`Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input cannot be read or is malformed.
+    pub fn from_reader_with_password_and_options<R: Read>(
         reader: R,
         password: &str,
-        encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        let opened = ooxml::load_with(reader, password, &encryption_limits)?;
-        Self::from_opened_encryption(opened, opc_limits)
-    }
-
-    /// Open an owned ordinary or encrypted package buffer using a password.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_password(bytes: Vec<u8>, password: &str) -> Result<Self> {
-        Self::from_vec_with_password_and_limits(
-            bytes,
-            password,
-            Limits::default(),
-            ReadLimits::default(),
-        )
-    }
-
-    /// Open an owned package buffer with independent crypto and OPC limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_password_and_limits(
-        bytes: Vec<u8>,
-        password: &str,
-        encryption_limits: Limits,
-        opc_limits: ReadLimits,
-    ) -> Result<Self> {
-        let opened = ooxml::open_with(bytes, password, &encryption_limits)?;
-        Self::from_opened_encryption(opened, opc_limits)
+        options.check_owning()?;
+        let opened = ooxml::load(reader, password, &options.encryption_limits)?;
+        let mut package = Self::from_opened_encryption(opened, options.source_limits)?;
+        package.encryption_limits = options.encryption_limits;
+        Ok(package)
     }
 
     /// Open a borrowed ordinary or encrypted package buffer using a password.
@@ -119,25 +79,21 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_password(bytes: &[u8], password: &str) -> Result<Self> {
-        Self::from_bytes_with_password_and_limits(
-            bytes,
-            password,
-            Limits::default(),
-            ReadLimits::default(),
-        )
+        Self::from_bytes_with_password_and_options(bytes, password, crate::OpenOptions::default())
     }
 
-    /// Open a borrowed package buffer with independent crypto and OPC limits.
+    /// Open a borrowed package buffer with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_password_and_limits(
+    /// Returns [`Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input cannot be read or is malformed.
+    pub fn from_bytes_with_password_and_options(
         bytes: &[u8],
         password: &str,
-        encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(bytes.len())
@@ -146,7 +102,10 @@ impl Package {
                 source,
             })?;
         owned.extend_from_slice(bytes);
-        Self::from_vec_with_password_and_limits(owned, password, encryption_limits, opc_limits)
+        let opened = ooxml::open(owned, password, &options.encryption_limits)?;
+        let mut package = Self::from_opened_encryption(opened, options.source_limits)?;
+        package.encryption_limits = options.encryption_limits;
+        Ok(package)
     }
 
     /// Explicitly serialize a clear OPC package, permitting an encryption downgrade.
@@ -154,10 +113,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn to_plain_bytes(&mut self) -> Result<Vec<u8>> {
-        self.flush_presentation()?;
-        let bytes = PackageWriter::to_bytes(&self.opc)?;
-        Ok(bytes)
+    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
+        Ok(PackageWriter::to_bytes(&self.opc)?)
     }
 
     /// Explicitly save a clear OPC package, permitting an encryption downgrade.
@@ -165,7 +122,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save_plain<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_plain_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -177,154 +134,127 @@ impl Package {
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn save_plain_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: litchi_core::Durability,
     ) -> Result<()> {
-        self.flush_presentation()?;
         PackageWriter::write_with_durability(path, &self.opc, durability)?;
         Ok(())
     }
 
-    /// Serialize and encrypt the package in the selected mode.
+    /// Serialize and encrypt the package in the selected mode, under the
+    /// encryption limits the package was opened with.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
-        self.to_encrypted_with_limits(password, mode, Limits::default())
+    pub fn to_encrypted(&self, password: &str, mode: Mode) -> Result<Vec<u8>> {
+        self.encrypt_inner(password, mode)
     }
 
-    /// Serialize and encrypt the package in the selected mode under explicit limits.
+    /// Serialize and encrypt using the retained input mode, under the
+    /// encryption limits the package was opened with.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
-    pub fn to_encrypted_with_limits(
-        &mut self,
-        password: &str,
-        mode: Mode,
-        limits: Limits,
-    ) -> Result<Vec<u8>> {
-        self.encrypt_inner(password, mode, &limits)
+    /// Returns the encryption-policy error for a package without a retained
+    /// mode, and an error if the operation fails.
+    pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
+        let mode = self.retained_mode("to_reencrypted")?;
+        self.encrypt_inner(password, mode)
     }
 
-    /// Compatibility alias for [`Self::to_encrypted`].
+    /// Write the package encrypted in its retained mode.
+    ///
+    /// The clear ZIP is staged under the retained encryption limits'
+    /// `max_plaintext_bytes` before the native crypto writer runs. The
+    /// writer receives ciphertext only after encryption succeeds. This does
+    /// not change the package.
     ///
     /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn to_encrypted_bytes(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
-        self.to_encrypted(password, mode)
-    }
-
-    /// Serialize and encrypt using the retained input/output mode.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
-        self.to_reencrypted_with_limits(password, Limits::default())
-    }
-
-    /// Serialize and encrypt using the retained mode under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn to_reencrypted_with_limits(
-        &mut self,
-        password: &str,
-        limits: Limits,
-    ) -> Result<Vec<u8>> {
-        let mode =
-            self.encryption
-                .require_retained_mode()
-                .map_err(|source| Error::EncryptionPolicy {
-                    operation: "to_reencrypted",
-                    source,
-                })?;
-        let bytes = self.encrypt_inner(password, mode, &limits)?;
-        Ok(bytes)
-    }
-
-    /// Compatibility alias for [`Self::to_reencrypted`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn to_reencrypted_bytes(&mut self, password: &str) -> Result<Vec<u8>> {
-        self.to_reencrypted(password)
+    /// Refuses a package without a retained mode. Crypto policy, allocation
+    /// and sink failures retain their typed sources.
+    pub fn write_reencrypted(&self, mut writer: impl Write, password: &str) -> Result<()> {
+        let mode = self.retained_mode("write_reencrypted")?;
+        let limits = &self.encryption_limits;
+        let mut clear = ClearBuffer {
+            bytes: zeroize::Zeroizing::new(Vec::new()),
+            limit: limits.max_plaintext_bytes,
+            failure: None,
+        };
+        let staged = PackageWriter::write_to(&mut clear, &self.opc);
+        if let Some(error) = clear.failure.take() {
+            return Err(error);
+        }
+        staged?;
+        let encrypted = ooxml::encrypt(std::mem::take(&mut *clear.bytes), password, mode, limits)?;
+        writer.write_all(&encrypted)?;
+        writer.flush()?;
+        Ok(())
     }
 
     /// Atomically save the package encrypted in the selected mode.
+    ///
+    /// The package is unchanged: its retained mode stays the one it was
+    /// opened with.
     ///
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn save_encrypted<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         password: &str,
         mode: Mode,
     ) -> Result<()> {
-        self.save_encrypted_with_limits(path, password, mode, Limits::default())
-    }
-
-    /// Atomically save selected-mode encryption under explicit crypto limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the output cannot be encoded or written.
-    pub fn save_encrypted_with_limits<P: AsRef<Path>>(
-        &mut self,
-        path: P,
-        password: &str,
-        mode: Mode,
-        limits: Limits,
-    ) -> Result<()> {
-        let bytes = self.encrypt_inner(password, mode, &limits)?;
-        atomic_replace(path.as_ref(), &bytes)?;
-        self.encryption.mark_encrypted(mode);
-        Ok(())
+        let bytes = self.encrypt_inner(password, mode)?;
+        atomic_replace(path.as_ref(), &bytes)
     }
 
     /// Atomically save the package encrypted in its retained mode.
     ///
     /// # Errors
     ///
-    /// Returns an error if the output cannot be encoded or written.
-    pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
-        self.save_reencrypted_with_limits(path, password, Limits::default())
+    /// Returns the encryption-policy error for a package without a retained
+    /// mode, and an error if the output cannot be encoded or written.
+    pub fn save_reencrypted<P: AsRef<Path>>(&self, path: P, password: &str) -> Result<()> {
+        let bytes = self.to_reencrypted(password)?;
+        atomic_replace(path.as_ref(), &bytes)
     }
 
-    /// Atomically save retained-mode encryption under explicit crypto limits.
+    fn retained_mode(&self, operation: &'static str) -> Result<Mode> {
+        self.encryption
+            .require_retained_mode()
+            .map_err(|source| Error::EncryptionPolicy { operation, source })
+    }
+
+    /// Open a package that was already decrypted, keeping its encryption
+    /// mode.
+    ///
+    /// `opened` comes from [`litchi_crypto::ooxml::open`] or one of its limit
+    /// and policy variants. The package keeps the source mode exactly as
+    /// [`Self::from_reader_with_password_and_options`] does, so plain output
+    /// stays refused until the caller chooses re-encryption or plaintext.
+    /// This lets one decryption serve both a caller's own classification of
+    /// the clear package and the open.
     ///
     /// # Errors
     ///
-    /// Returns an error if the output cannot be encoded or written.
-    pub fn save_reencrypted_with_limits<P: AsRef<Path>>(
-        &mut self,
-        path: P,
-        password: &str,
-        limits: Limits,
-    ) -> Result<()> {
-        let mode =
-            self.encryption
-                .require_retained_mode()
-                .map_err(|source| Error::EncryptionPolicy {
-                    operation: "save_reencrypted",
-                    source,
-                })?;
-        let bytes = self.encrypt_inner(password, mode, &limits)?;
-        atomic_replace(path.as_ref(), &bytes)?;
-        self.encryption.mark_encrypted(mode);
-        Ok(())
+    /// Returns an error if the clear package violates the selected source
+    /// limits or is not a valid PPTX package.
+    pub fn from_decrypted(opened: ooxml::Opened, options: crate::OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        let mut package = Self::from_opened_encryption(opened, options.source_limits)?;
+        package.encryption_limits = options.encryption_limits;
+        Ok(package)
     }
 
-    fn from_opened_encryption(opened: ooxml::Opened, limits: ReadLimits) -> Result<Self> {
+    fn from_opened_encryption(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
         let mode = opened.mode();
-        let mut package = Self::from_vec_with_limits(opened.into_bytes(), limits)?;
+        let mut package = Self::from_opc_package_with_provenance(
+            litchi_opc::OpcPackage::from_vec(opened.into_bytes(), limits)?,
+            true,
+        )?;
         package.encryption = match mode {
             Some(mode) => PackageEncryption::encrypted(mode),
             None => PackageEncryption::plain(),
@@ -332,10 +262,14 @@ impl Package {
         Ok(package)
     }
 
-    fn encrypt_inner(&mut self, password: &str, mode: Mode, limits: &Limits) -> Result<Vec<u8>> {
-        self.flush_presentation()?;
+    fn encrypt_inner(&self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         let clear = PackageWriter::to_bytes(&self.opc)?;
-        Ok(ooxml::encrypt_with(clear, password, mode, limits)?)
+        Ok(ooxml::encrypt(
+            clear,
+            password,
+            mode,
+            &self.encryption_limits,
+        )?)
     }
 }
 
@@ -345,4 +279,48 @@ fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<()> {
         Ok(())
     })?;
     Ok(())
+}
+
+/// Fallible, bounded clear staging; failed serialization erases staged bytes.
+struct ClearBuffer {
+    bytes: zeroize::Zeroizing<Vec<u8>>,
+    limit: usize,
+    failure: Option<Error>,
+}
+impl Write for ClearBuffer {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let next = self.bytes.len().checked_add(bytes.len());
+        if next.is_none_or(|next| next > self.limit) {
+            self.failure = Some(Error::from(ooxml::Error::Limit {
+                resource: "plaintext",
+                actual: next.unwrap_or(usize::MAX) as u64,
+                maximum: self.limit as u64,
+            }));
+            return Err(std::io::Error::other(
+                "clear package exceeds encryption limit",
+            ));
+        }
+        let next = next.unwrap_or(self.limit);
+        if next > self.bytes.capacity() {
+            let capacity = self
+                .bytes
+                .capacity()
+                .saturating_mul(2)
+                .max(next)
+                .min(self.limit);
+            let additional = capacity - self.bytes.len();
+            if let Err(source) = self.bytes.try_reserve_exact(additional) {
+                self.failure = Some(Error::Allocation {
+                    resource: "clear encryption staging",
+                    source,
+                });
+                return Err(std::io::Error::other("clear package allocation failed"));
+            }
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }

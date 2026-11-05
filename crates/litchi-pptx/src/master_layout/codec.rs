@@ -105,8 +105,9 @@ fn escaped_xml_len(value: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         length.checked_add(extra).ok_or(Error::Limit {
-            resource: "generated slide layout escaped XML bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: MAX_PART_XML_BYTES,
         })
     })
 }
@@ -115,8 +116,9 @@ fn escape_xml_fallible(value: &str) -> Result<String> {
     let length = escaped_xml_len(value)?;
     if length > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "generated slide layout escaped XML bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length,
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     let mut escaped = String::new();
@@ -199,12 +201,14 @@ pub(super) fn layout_xml(
             .any(|placeholder| placeholder.type_extension.is_some()),
     )
     .map_err(|_| Error::Limit {
-        resource: "generated slide layout bytes",
-        limit: MAX_PART_XML_BYTES,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: MAX_PART_XML_BYTES,
     })?;
     length.write_str(SP_TREE_HEADER).map_err(|_| Error::Limit {
-        resource: "generated slide layout bytes",
-        limit: MAX_PART_XML_BYTES,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: MAX_PART_XML_BYTES,
     })?;
     for (offset, spec) in placeholders.iter().enumerate() {
         length
@@ -214,8 +218,9 @@ pub(super) fn layout_xml(
                 false,
             )?)
             .map_err(|_| Error::Limit {
-                resource: "generated slide layout bytes",
-                limit: MAX_PART_XML_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: usize::MAX,
+                maximum: MAX_PART_XML_BYTES,
             })?;
     }
     length
@@ -223,13 +228,15 @@ pub(super) fn layout_xml(
             "</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>",
         )
         .map_err(|_| Error::Limit {
-            resource: "generated slide layout bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: MAX_PART_XML_BYTES,
         })?;
     if length.length > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "generated slide layout bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length.length,
+            maximum: MAX_PART_XML_BYTES,
         });
     }
 
@@ -394,13 +401,15 @@ fn placeholder_shape_len_from_escaped(
         escaped_text,
     )
     .map_err(|_| Error::Limit {
-        resource: "generated placeholder shape bytes",
-        limit: MAX_PART_XML_BYTES,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: MAX_PART_XML_BYTES,
     })?;
     if length.length > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "generated placeholder shape bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length.length,
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     Ok(length.length)
@@ -765,13 +774,15 @@ pub(super) fn replace_span(xml: &[u8], span: &ElementSpan, replacement: &[u8]) -
         .checked_sub(span.end - span.start)
         .and_then(|length| length.checked_add(replacement.len()))
         .ok_or(Error::Limit {
-            resource: "generated slide layout bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: span.start,
+            maximum: MAX_PART_XML_BYTES,
         })?;
     if target_len > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "generated slide layout bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: target_len,
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     let mut output = Vec::new();
@@ -792,13 +803,15 @@ pub(super) fn insert_bytes(xml: &[u8], offset: usize, value: &[u8]) -> Result<Ve
         return Err(invalid("insertion offset is outside the owner XML"));
     }
     let target_len = xml.len().checked_add(value.len()).ok_or(Error::Limit {
-        resource: "generated slide layout bytes",
-        limit: MAX_PART_XML_BYTES,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: offset,
+        maximum: MAX_PART_XML_BYTES,
     })?;
     if target_len > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "generated slide layout bytes",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: target_len,
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     let mut output = Vec::new();

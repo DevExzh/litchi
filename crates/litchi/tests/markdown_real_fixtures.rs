@@ -1,8 +1,11 @@
+//! Markdown of authored DOCX fixtures through `litchi::open` (M0a step S8c
+//! ported this test from the facade's `Document`).
+
 #![cfg(all(feature = "docx", feature = "markdown"))]
 
 use std::path::PathBuf;
 
-use litchi::{Document, markdown::ToMarkdown};
+use litchi::markdown::ToMarkdown;
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -14,7 +17,7 @@ fn fixture(name: &str) -> PathBuf {
 /// intentionally contain only CommonMark-required whitespace: paragraph
 /// separation is two newlines and no renderer indentation is permitted.
 #[test]
-fn real_docx_plain_paragraphs_have_compact_golden_markdown() -> litchi_core::Result<()> {
+fn real_docx_plain_paragraphs_have_compact_golden_markdown() -> litchi::Result<()> {
     for (name, expected) in [
         ("documentProperties.docx", "Hello World\\!\n\n"),
         ("documentProtection_no_protection.docx", "Non protetto.\n\n"),
@@ -24,7 +27,7 @@ fn real_docx_plain_paragraphs_have_compact_golden_markdown() -> litchi_core::Res
         ),
     ] {
         assert_eq!(
-            Document::open(fixture(name))?.to_markdown()?,
+            litchi::open(fixture(name))?.to_markdown()?,
             expected,
             "{name}"
         );

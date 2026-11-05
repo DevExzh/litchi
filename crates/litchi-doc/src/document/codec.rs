@@ -119,7 +119,11 @@ impl Document {
 
         for (stream_name, data) in mtef_data {
             let formula = litchi_formula::Formula::new();
-            let mut parser = litchi_formula::MtefParser::new(formula.arena(), data);
+            let mut parser = litchi_formula::MtefParser::new(
+                formula.arena(),
+                data,
+                litchi_formula::mtef::Limits::DEFAULT,
+            );
 
             if parser.is_valid() {
                 match parser.parse() {
@@ -179,7 +183,7 @@ impl Document {
         // In a more sophisticated implementation, we'd match specific text patterns
         // to specific MTEF streams
 
-        for parsed_ast in self.parsed_mtef.values() {
+        for parsed_ast in self.0.parsed_mtef.values() {
             if !parsed_ast.is_empty() {
                 return Some(Arc::clone(parsed_ast));
             }

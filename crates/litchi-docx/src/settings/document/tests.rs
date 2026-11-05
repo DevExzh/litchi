@@ -7,6 +7,7 @@ use crate::settings::{
     ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag, NoteNumberingRestart,
     NotePosition, ProofState, ProofingState, ProtectionType, ThemeFontLanguages, View,
 };
+use litchi_ooxml_common::mce::Limits as MceLimits;
 use litchi_opc::PackURI;
 use litchi_opc::part::{BlobPart, Part};
 use std::mem::size_of;
@@ -833,15 +834,17 @@ fn rejects_invalid_attached_template_graphs() {
 #[test]
 fn patches_only_the_attached_template_element() {
     let xml = br#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:opaque"><!--keep--><q:zoom q:percent="125"/><q:attachedTemplate rel:id="old"><x:ignored/></q:attachedTemplate><x:opaque><![CDATA[a < b]]></x:opaque></q:settings>"#;
-    let replaced = patch_attached_template(xml, Some("new-id")).unwrap();
+    let replaced = patch_attached_template(xml, Some("new-id"), &MceLimits::default()).unwrap();
     assert_eq!(
         String::from_utf8(replaced).unwrap(),
         r#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:opaque"><!--keep--><q:zoom q:percent="125"/><q:attachedTemplate rel:id="new-id"/><x:opaque><![CDATA[a < b]]></x:opaque></q:settings>"#
     );
 
     let empty = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
-    let inserted =
-        String::from_utf8(patch_attached_template(empty, Some("rId7")).unwrap()).unwrap();
+    let inserted = String::from_utf8(
+        patch_attached_template(empty, Some("rId7"), &MceLimits::default()).unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         inserted,
         r#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:attachedTemplate r:id="rId7" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"/></s:settings>"#
@@ -854,16 +857,20 @@ fn patches_document_variables_without_touching_unrelated_settings() {
     let mut variables = Variables::new();
     variables.insert("Company & Team", "A < B").unwrap();
     variables.insert("empty", "").unwrap();
-    let patched = String::from_utf8(patch_document_variables(xml, &variables).unwrap()).unwrap();
+    let patched = String::from_utf8(
+        patch_document_variables(xml, &variables, &MceLimits::default()).unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         patched,
         r#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--before--><q:compat/><q:docVars><q:docVar q:name="Company &amp; Team" q:val="A &lt; B"/><q:docVar q:name="empty" q:val=""/></q:docVars><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#
     );
 
     variables.clear();
-    let removed =
-        String::from_utf8(patch_document_variables(patched.as_bytes(), &variables).unwrap())
-            .unwrap();
+    let removed = String::from_utf8(
+        patch_document_variables(patched.as_bytes(), &variables, &MceLimits::default()).unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         removed,
         r#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--before--><q:compat/><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#
@@ -876,13 +883,32 @@ fn inserts_document_variables_into_empty_strict_root_in_schema_order() {
     variables.insert("strict", "value").unwrap();
     let empty = br#"<settings xmlns="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
     assert_eq!(
-        String::from_utf8(patch_document_variables(empty, &variables).unwrap()).unwrap(),
+        String::from_utf8(
+            patch_document_variables(empty, &variables, &MceLimits::default()).unwrap(),
+        )
+        .unwrap(),
         r#"<settings xmlns="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:docVars xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:docVar w:name="strict" w:val="value"/></w:docVars></settings>"#
     );
 
     let ordered = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:compat/><s:rsids/></s:settings>"#;
     assert_eq!(
-        String::from_utf8(patch_document_variables(ordered, &variables).unwrap()).unwrap(),
+        String::from_utf8(
+            patch_document_variables(ordered, &variables, &MceLimits::default()).unwrap(),
+        )
+        .unwrap(),
         r#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:compat/><s:docVars><s:docVar s:name="strict" s:val="value"/></s:docVars><s:rsids/></s:settings>"#
     );
+}
+
+#[test]
+fn settings_variable_patch_checks_output_before_allocating() {
+    let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/></w:settings>"#;
+    let mut variables = Variables::new();
+    variables.insert("name", "value").unwrap();
+    let limits = MceLimits {
+        max_output_bytes: xml.len(),
+        ..MceLimits::default()
+    };
+    assert!(patch_document_variables(xml, &variables, &limits).is_err());
+    assert!(patch_attached_template(xml, None, &limits).is_ok());
 }

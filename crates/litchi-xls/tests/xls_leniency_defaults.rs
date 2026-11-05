@@ -3,7 +3,7 @@
 //!
 //! Every case builds a conforming workbook with the crate writer, plants
 //! exactly one cataloged non-conformity in its Workbook stream, and opens it
-//! through both public read paths — the eager [`Workbook`] and the
+//! through both public read paths — the eager [`litchi_xls::raw::Reader`] and the
 //! source-backed [`SourceBackedWorkbook`] — asserting that the workbook
 //! opens, that the repair is recorded with its location, and that the same
 //! workbook without the deviation records nothing.
@@ -15,9 +15,9 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::{
-    CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
+    Builder, CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
     PaletteDefect, SharedStringDefect, SheetDefect, SheetNameDefect, SourceBackedOptions,
-    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
+    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, raw::Reader,
 };
 
 const CODEPAGE: u16 = 0x0042;
@@ -57,12 +57,16 @@ struct Stream {
 
 impl Stream {
     /// The Workbook stream of a workbook the crate writer built.
-    fn from_writer(build: impl FnOnce(&mut Writer)) -> Self {
-        let mut writer = Writer::new();
+    fn from_writer(build: impl FnOnce(&mut Builder)) -> Self {
+        let mut writer = Builder::new();
         build(&mut writer);
         let mut bytes = Vec::new();
-        writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
-        let stream = OleFile::open(Cursor::new(&bytes))
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut Cursor::new(&mut bytes))
+            .unwrap();
+        let stream = OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
             .unwrap()
             .open_stream(&["Workbook"])
             .unwrap();
@@ -175,17 +179,17 @@ fn try_open_both(
     package: &[u8],
     leniency: Leniency,
 ) -> (
-    Result<Workbook<Cursor<Vec<u8>>>, String>,
+    Result<Reader<Cursor<Vec<u8>>>, String>,
     Result<ToleranceReport, String>,
 ) {
-    let workbook = Workbook::new_with_options(
+    let workbook = Reader::new_with_options(
         Cursor::new(package.to_vec()),
-        OpenOptions::new().with_leniency(leniency),
+        OpenOptions::new().leniency(leniency),
     )
     .map_err(|error| error.to_string());
     let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(package.to_vec())),
-        SourceBackedOptions::new().with_leniency(leniency),
+        SourceBackedOptions::new().leniency(leniency),
     )
     .map(|owner| owner.tolerance_report())
     .map_err(|error| error.to_string());
@@ -194,7 +198,7 @@ fn try_open_both(
 
 /// Open `package` through both public read paths under `leniency` and return
 /// the eager workbook plus both reports.
-fn open_both(package: &[u8], leniency: Leniency) -> (Workbook<Cursor<Vec<u8>>>, ToleranceReport) {
+fn open_both(package: &[u8], leniency: Leniency) -> (Reader<Cursor<Vec<u8>>>, ToleranceReport) {
     let (workbook, owner) = try_open_both(package, leniency);
     (
         workbook.expect("the eager open applies the repair"),
@@ -208,7 +212,7 @@ fn assert_repairs_under(
     package: &[u8],
     leniency: Leniency,
     expected: &[(Defect, u32, u32)],
-) -> Workbook<Cursor<Vec<u8>>> {
+) -> Reader<Cursor<Vec<u8>>> {
     let (workbook, source_report) = open_both(package, leniency);
     for (path, report) in [
         ("eager", workbook.tolerance_report()),
@@ -230,7 +234,7 @@ fn assert_repairs_under(
 
 /// Both read paths open `package` under the *default* policy and record
 /// exactly the `expected` repairs, in order. Returns the eager workbook.
-fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<Cursor<Vec<u8>>> {
+fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Reader<Cursor<Vec<u8>>> {
     assert_repairs_under(package, Leniency::default(), expected)
 }
 
@@ -240,7 +244,7 @@ fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<C
 fn assert_eager_repairs(
     package: &[u8],
     expected: &[(Defect, u32, u32)],
-) -> Workbook<Cursor<Vec<u8>>> {
+) -> Reader<Cursor<Vec<u8>>> {
     let (workbook, source_report) = open_both(package, Leniency::default());
     let found = workbook
         .tolerance_report()
@@ -523,7 +527,7 @@ fn a_palette_whose_length_contradicts_its_count_is_still_refused() {
     let mut payload = palette_payload(56, 0);
     payload.truncate(payload.len() - 4);
     let (package, _) = with_palettes(&[payload]);
-    let Err(error) = Workbook::new(Cursor::new(package)) else {
+    let Err(error) = Reader::new(Cursor::new(package)) else {
         panic!("record framing stays a hard error");
     };
     let error = error.to_string();
@@ -544,10 +548,10 @@ fn with_font_fields(nth: usize, weight: u16, charset: u8) -> Vec<u8> {
     stream.package()
 }
 
-fn open_eager(package: &[u8], leniency: Leniency) -> Result<Workbook<Cursor<Vec<u8>>>, String> {
-    Workbook::new_with_options(
+fn open_eager(package: &[u8], leniency: Leniency) -> Result<Reader<Cursor<Vec<u8>>>, String> {
+    Reader::new_with_options(
         Cursor::new(package.to_vec()),
-        OpenOptions::new().with_leniency(leniency),
+        OpenOptions::new().leniency(leniency),
     )
     .map_err(|error| error.to_string())
 }
@@ -1046,10 +1050,13 @@ fn container_repairs_join_the_workbook_report_on_both_paths() {
     let package = shrink_probe(conformant);
     // The container report, in discovery order: the over-long chain, then
     // the two sectors it carries past the declared size.
-    let container = OleFile::open(Cursor::new(package.clone()))
-        .unwrap()
-        .tolerance_report()
-        .clone();
+    let container = OleFile::open(
+        Cursor::new(package.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap()
+    .tolerance_report()
+    .clone();
     assert!(container.contains(litchi_cfb::AllocationDefect::ChainLongerThanSize));
     let expected = container
         .defects()
@@ -1059,8 +1066,8 @@ fn container_repairs_join_the_workbook_report_on_both_paths() {
     let workbook = assert_repairs(&package, &expected);
     assert_eq!(workbook.sheets()[0].name(), "Sheet1");
     // The eager path built from an already-opened container folds it too.
-    let ole = OleFile::open(Cursor::new(package)).unwrap();
-    let workbook = Workbook::from_ole_file(ole).unwrap();
+    let ole = OleFile::open(Cursor::new(package), litchi_cfb::OleFileLimits::default()).unwrap();
+    let workbook = Reader::from_ole_file(ole).unwrap();
     assert_eq!(workbook.tolerance_report().defects().len(), expected.len());
 }
 
@@ -1152,4 +1159,68 @@ fn property_set_repairs_join_the_eager_workbook_report() {
     let summary = workbook.summary_information().unwrap().unwrap();
     assert!(!summary.tolerance_report().is_clean());
     assert_eq!(workbook.tolerance_report().defects().len(), 1);
+}
+
+// ---------------------------------------------------------------------------
+// Record 0316: worksheet-record repairs
+// ---------------------------------------------------------------------------
+
+const WINDOW2: u16 = 0x023E;
+const FORMULA: u16 = 0x0006;
+
+/// A WINDOW2 page-break zoom of 1 (as `SimpleWithColours.xls` stores it) reads
+/// as the default zoom, keeps the worksheet, and is recorded at the record's
+/// offset with the raw value. MS-XLS notes 144/145 document Excel truncating
+/// the field into a byte.
+#[test]
+fn an_out_of_range_window_zoom_reads_as_the_default_zoom() {
+    let mut stream = Stream::simple();
+    stream.payload_mut(WINDOW2, 0)[10..12].copy_from_slice(&1u16.to_le_bytes());
+    let offset = stream.offset_of_kind(WINDOW2, 0);
+    let workbook = assert_eager_repairs(
+        &stream.package(),
+        &[(
+            Defect::Worksheet(litchi_xls::WorksheetDefect::ZoomLevel),
+            offset,
+            1,
+        )],
+    );
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert_eq!(
+        worksheet
+            .worksheet_view()
+            .unwrap()
+            .page_break_zoom_percent(),
+        None
+    );
+    assert_eq!(
+        worksheet.get_cell(0, 0).unwrap().value(),
+        &CellValue::Float(42.5)
+    );
+}
+
+/// A Formula that sets `fShrFmla` while carrying its own tokens reads as an
+/// ordinary formula; the stale flag is recorded at the cell.
+#[test]
+fn a_stale_shared_formula_flag_is_ignored() {
+    let mut stream = Stream::from_writer(|writer| {
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_number(sheet, 0, 0, 2.0).unwrap();
+        writer.write_formula(sheet, 1, 0, "A1*3").unwrap();
+    });
+    assert_clean(&stream.package());
+    let flags = &mut stream.payload_mut(FORMULA, 0)[14..16];
+    let value = u16::from_le_bytes([flags[0], flags[1]]) | 0x0008;
+    flags.copy_from_slice(&value.to_le_bytes());
+    let workbook = assert_eager_repairs(
+        &stream.package(),
+        &[(
+            Defect::Worksheet(litchi_xls::WorksheetDefect::SharedFormulaFlag),
+            1,
+            0,
+        )],
+    );
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert!(worksheet.get_cell(1, 0).is_some());
+    assert!(worksheet.formula_metadata_defects().is_empty());
 }

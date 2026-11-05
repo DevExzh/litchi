@@ -6,11 +6,14 @@ use litchi_iwa_archive::{Limits, package::Catalog, package::EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
+use litchi_numbers::table::lock::Commit as TableLockCommit;
+use litchi_numbers::table::lock::Diagnostics as TableLockDiagnostics;
+use litchi_numbers::table::lock::Edit as TableLockEdit;
+use litchi_numbers::table::lock::Error as TableLockError;
+use litchi_numbers::table::lock::LimitKind as TableLockLimitKind;
+use litchi_numbers::table::lock::Patch as TableLockPatch;
 use litchi_numbers::table::lock::State as LockState;
-use litchi_numbers::{
-    Package, SheetSelector, TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError,
-    TableLockLimitKind, TableLockPatch, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -89,6 +92,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -116,11 +120,17 @@ fn table_info_payload(model: u64, locked: Option<bool>, unknowns: bool) -> TestR
         litchi_iwa_common::wire::append_varint_field(&mut drawable, 97, 9_997)?;
     }
     let mut payload = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 1, &drawable)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     litchi_iwa_common::wire::append_length_delimited_field(
         &mut payload,
         2,
         &reference(model).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     if unknowns {
         litchi_iwa_common::wire::append_varint_field(&mut payload, 98, 9_998)?;
@@ -150,6 +160,7 @@ fn table_info_object(
                 data: format!("after-table-info-{identifier}").into_bytes(),
             },
         ],
+        Default::default(),
     )?;
     object.archive_info.message_infos[1].object_references = vec![model];
     Ok(object)
@@ -173,6 +184,7 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -180,8 +192,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -202,8 +214,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&rewritten)?.to_bytes()?, rewritten);
-    Ok(SnappyStream::compress(&rewritten)?)
+    assert_eq!(
+        Archive::parse(&rewritten, Default::default())?.to_bytes(Default::default())?,
+        rewritten
+    );
+    Ok(SnappyStream::compress(&rewritten, Default::default())?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -250,7 +265,8 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![root, first_sheet, second_sheet],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let tables = component_with_unknown_header(
         vec![
@@ -295,9 +311,11 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: b"unrelated Numbers component".to_vec(),
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -311,7 +329,7 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -332,12 +350,12 @@ fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic Numbers component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -346,10 +364,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, name)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, &compressed)], Limits::default())?)
 }
 
@@ -370,13 +389,19 @@ fn with_selected_unknown_padding(package: &[u8], length: usize) -> TestResult<Ve
                 value.wrapping_mul(0x9e37_79b9_7f4a_7c15).rotate_left(17) as u8
             })
             .collect::<Vec<_>>();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 96, &padding)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            96,
+            &padding,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         object.replace_message_preserving_header(
             index,
             RawMessage {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -425,6 +450,7 @@ fn with_dense_tables(package: &[u8], count: usize) -> TestResult<Vec<u8>> {
                 type_: SHEET_MESSAGE_TYPE,
                 data: sheet.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -451,12 +477,18 @@ fn with_form_based_first_sheet(package: &[u8]) -> TestResult<Vec<u8>> {
                 }
                 .encode_to_vec(),
             },
+            Default::default(),
         )?;
         let message_info = &mut object.archive_info.message_infos[message_index];
         message_info
             .object_references
             .retain(|identifier| *identifier != ABSENT_INFO);
-        let mut nested_drawables = FieldInfo::new(vec![1, 2]);
+        let mut nested_drawables = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         nested_drawables.object_references = vec![ABSENT_INFO];
         message_info.field_infos.push(nested_drawables);
         Ok(())
@@ -481,6 +513,7 @@ fn with_legacy_table_infos(package: &[u8], identifiers: &[u64]) -> TestResult<Ve
                     type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
                     data: payload,
                 },
+                Default::default(),
             )?;
         }
         Ok(())
@@ -493,7 +526,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Numbers object"))?;
@@ -504,9 +537,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -514,7 +547,10 @@ fn with_overlong_object_length_prefix(
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(package, TABLES_MEMBER)?)?;
+    let archive = Archive::parse(
+        &component_stream(package, TABLES_MEMBER)?,
+        Default::default(),
+    )?;
     Ok(archive
         .object(identifier)
         .and_then(|object| {
@@ -530,7 +566,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, TABLES_MEMBER)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Numbers object"))?;
@@ -544,16 +580,18 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn assert_only_tables_component_changed(before: &[u8], after: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before.iter().collect::<Vec<_>>();
     let after_entries = after.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -614,7 +652,9 @@ fn semantic_sheet_and_table_selectors_distinguish_absent_false_and_true() -> Tes
     );
     assert!(matches!(
         dense.table_lock(SheetSelector::index(0), TableSelector::index(35)),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
     Ok(())
 }
@@ -625,19 +665,27 @@ fn missing_selectors_are_typed_and_duplicate_names_fail_ingress() -> TestResult 
     let package = Package::from_bytes(&bytes)?;
     assert!(matches!(
         package.table_lock("Missing sheet", ABSENT_TABLE_NAME),
-        Err(TableLockError::SheetNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(SheetSelector::index(2), TableSelector::index(0)),
-        Err(TableLockError::SheetNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(FIRST_SHEET_NAME, "Missing table"),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(SheetSelector::index(0), TableSelector::index(3)),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
 
     let duplicate_name = rewrite_component(&bytes, TABLES_MEMBER, |archive| {
@@ -655,6 +703,7 @@ fn missing_selectors_are_typed_and_duplicate_names_fail_ingress() -> TestResult 
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: table_model(ABSENT_TABLE_NAME).encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -769,12 +818,12 @@ fn changed_lock_preserves_locality_unknowns_headers_and_exact_inverse() -> TestR
         raw_fields(&target_payload, 98)?,
         raw_fields(&source_payload, 98)?
     );
-    let source_drawable = WireView::parse(&source_payload)?
+    let source_drawable = WireView::parse(&source_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("source drawable field is missing"))?
         .canonical_payload()?;
-    let target_drawable = WireView::parse(&target_payload)?
+    let target_drawable = WireView::parse(&target_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("target drawable field is missing"))?
@@ -846,12 +895,12 @@ fn flat_legacy_table_info_edits_preserve_presence_locality_and_exact_inverse() -
     );
     let absent_payload = message_payload(&bytes, ABSENT_INFO, LEGACY_TABLE_INFO_MESSAGE_TYPE)?;
     let false_payload = message_payload(&bytes, FALSE_INFO, LEGACY_TABLE_INFO_MESSAGE_TYPE)?;
-    let absent_drawable = WireView::parse(&absent_payload)?
+    let absent_drawable = WireView::parse(&absent_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("legacy absent drawable is missing"))?
         .canonical_payload()?;
-    let false_drawable = WireView::parse(&false_payload)?
+    let false_drawable = WireView::parse(&false_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("legacy false drawable is missing"))?
@@ -896,10 +945,13 @@ fn flat_legacy_table_info_edits_preserve_presence_locality_and_exact_inverse() -
             .iter()
             .find(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing canonical table-info message"))?;
-        object.push_message(RawMessage {
-            type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
-            data: canonical.data.clone(),
-        })?;
+        object.push_message(
+            RawMessage {
+                type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
+                data: canonical.data.clone(),
+            },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     match Package::from_bytes(&dual) {
@@ -937,7 +989,7 @@ fn stale_tampered_replayed_and_cross_selector_patches_conflict() -> TestResult {
         Err(TableLockError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -971,7 +1023,7 @@ fn malformed_selected_and_rooted_aliases_fail_closed_while_detached_refs_are_pre
             .find(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing table-info message"))?
             .clone();
-        object.push_message(duplicate)?;
+        object.push_message(duplicate, Default::default())?;
         Ok(())
     })?;
     assert!(Package::from_bytes(&duplicate_payload).is_err());
@@ -1002,6 +1054,7 @@ fn malformed_selected_and_rooted_aliases_fail_closed_while_detached_refs_are_pre
                 type_: SHEET_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[index]
             .object_references
@@ -1133,7 +1186,9 @@ fn legacy_nested_index_reads_and_noops_but_refuses_changed_publication() -> Test
     changed.lock();
     assert!(matches!(
         changed.commit(),
-        Err(TableLockError::UnsupportedSource)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(package.exact_bytes(), legacy);
     Ok(())
@@ -1157,12 +1212,21 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     let bytes = growth_fixture
         .ok_or_else(|| io::Error::other("could not construct a growing lock-edit fixture"))?;
     let input_bytes = u64::try_from(bytes.len())?;
-    let limits = Limits::new(input_bytes, 32, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(input_bytes)
+        .and_then(|b| b.max_members(32))
+        .and_then(|b| b.max_entry_bytes(1024 * 1024))
+        .and_then(|b| b.max_aggregate_bytes(1024 * 1024))
+        .and_then(|b| b.max_component_bytes(1024 * 1024))
+        .and_then(|b| b.build())?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_numbers::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
     edit.lock();
     match edit.commit() {
-        Err(TableLockError::LimitExceeded {
+        Err(TableLockError::Limit {
             kind: TableLockLimitKind::OutputBytes,
             ..
         }) => {},
@@ -1233,10 +1297,10 @@ fn debug_and_error_text_are_redacted_from_authored_and_physical_names() -> TestR
         assert!(!patch_debug.contains(redacted));
     }
     for error in [
-        TableLockError::SheetNotFound,
-        TableLockError::TableNotFound,
+        TableLockError::Refused(litchi_numbers::table::lock::Refusal::SheetNotFound),
+        TableLockError::Refused(litchi_numbers::table::lock::Refusal::TableNotFound),
         TableLockError::PatchConflict,
-        TableLockError::LimitExceeded {
+        TableLockError::Limit {
             kind: TableLockLimitKind::OutputBytes,
             observed: 11,
             maximum: 10,

@@ -1,7 +1,5 @@
 //! Typed RTF 1.9.1 section page borders.
 
-use crate::{RtfError, RtfResult};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PageBorderStyle {
     #[default]
@@ -98,7 +96,7 @@ impl PageBorder {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.width > 75 {
             return invalid("RTF page-border width must be in 0..=75 twips");
         }
@@ -205,7 +203,7 @@ impl PageBorders {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_option_value(&mut self, value: i32) -> RtfResult<()> {
+    pub fn set_option_value(&mut self, value: i32) -> crate::Result<()> {
         if !(0..=255).contains(&value) || value & !0x2b != 0 {
             return invalid("RTF pgbrdropt contains reserved or out-of-range bits");
         }
@@ -231,7 +229,7 @@ impl PageBorders {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         for border in [self.top, self.left, self.bottom, self.right]
             .into_iter()
             .flatten()
@@ -242,6 +240,6 @@ impl PageBorders {
     }
 }
 
-fn invalid<T>(message: impl Into<String>) -> RtfResult<T> {
-    Err(RtfError::MalformedDocument(message.into()))
+fn invalid<T>(message: impl Into<String>) -> crate::Result<T> {
+    Err(crate::Error::MalformedDocument(message.into()))
 }

@@ -481,10 +481,10 @@ fn stream_snapshot_noop_is_exact_and_exposes_opaque_records() {
     );
 
     let commit = snapshot.edit().commit().expect("no-op commit");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().source_fingerprint(), snapshot.fingerprint());
-    assert_eq!(commit.snapshot().bytes(), bytes.as_slice());
+    assert_eq!(commit.package().bytes(), bytes.as_slice());
 }
 
 #[test]
@@ -501,18 +501,18 @@ fn stream_transaction_edits_typed_value_and_preserves_unknown_bytes() {
         .set_value(0, Value::Number(58.25))
         .expect("stage value");
     let commit = transaction.commit().expect("commit value");
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().records()[0].value, Value::Number(58.25));
-    assert_eq!(commit.snapshot().records().len(), 2);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.package().records()[0].value, Value::Number(58.25));
+    assert_eq!(commit.package().records().len(), 2);
     let unknown_after = commit
-        .snapshot()
+        .package()
         .unknown_records()
         .map(|record| (record.record_type(), record.payload().to_vec()))
         .collect::<Vec<_>>();
     assert_eq!(unknown_after, unknown_before);
 
     let applied = commit.patch().apply(&snapshot).expect("apply patch");
-    assert_eq!(applied, *commit.snapshot());
+    assert_eq!(applied, *commit.package());
     let reverted = commit
         .patch()
         .inverse()
@@ -526,7 +526,12 @@ fn stream_transaction_is_failure_atomic_and_rejects_stale_sources() {
     let bytes = source_stream();
     let snapshot = Snapshot::parse(bytes.clone()).expect("parse source stream");
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().expect("candidate snapshot").finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("candidate snapshot")
+        .finish();
 
     assert!(transaction.set_value(99, Value::Integer(1)).is_err());
     assert!(
@@ -543,7 +548,15 @@ fn stream_transaction_is_failure_atomic_and_rejects_stale_sources() {
             )
             .is_err()
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 
     let mut transaction = snapshot.edit();
     transaction.set_value(0, Value::Integer(9)).unwrap();
@@ -564,9 +577,22 @@ fn stream_transaction_is_failure_atomic_and_rejects_stale_sources() {
 fn removing_prefix_owner_is_atomic_and_insertions_are_bounded() {
     let snapshot = Snapshot::parse(source_stream()).expect("parse source stream");
     let mut removal = snapshot.edit();
-    let before = removal.snapshot().unwrap().finish();
+    let before = removal
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     assert!(removal.remove(0).is_err());
-    assert_eq!(removal.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        removal
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 
     let inserted = Record {
         common_prefix_len: 0,
@@ -578,8 +604,8 @@ fn removing_prefix_owner_is_atomic_and_insertions_are_bounded() {
     let mut transaction = snapshot.edit();
     transaction.push(inserted.clone()).unwrap();
     let commit = transaction.commit().unwrap();
-    assert_eq!(commit.snapshot().records().len(), 3);
-    assert_eq!(commit.snapshot().records()[2], inserted);
+    assert_eq!(commit.package().records().len(), 3);
+    assert_eq!(commit.package().records()[2], inserted);
 }
 
 #[test]

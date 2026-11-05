@@ -11,8 +11,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
-use litchi_ppt::Package;
-use litchi_ppt::writer::Writer;
+use litchi_ppt::raw::Reader;
+use litchi_ppt::writer::Builder;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
@@ -53,19 +53,20 @@ fn scratch_directory() -> ScratchDirectory {
 #[test]
 fn every_level_publishes_the_default_save_bytes() {
     let directory = scratch_directory();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 40, 10, 300, 30, "save durability 0761")
         .unwrap();
+    let package = writer.build().unwrap();
     let reference = directory.join("reference.ppt");
-    writer.save(&reference).unwrap();
+    package.save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
 
     for durability in LEVELS {
         let destination = directory.join(format!("{}.ppt", durability.as_str()));
         std::fs::write(&destination, b"old destination").unwrap();
-        writer
+        package
             .save_with_durability(&destination, durability)
             .unwrap();
         assert_eq!(
@@ -75,6 +76,6 @@ fn every_level_publishes_the_default_save_bytes() {
         );
     }
 
-    Package::open(directory.join("no-sync.ppt")).unwrap();
+    Reader::open(directory.join("no-sync.ppt")).unwrap();
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 4);
 }

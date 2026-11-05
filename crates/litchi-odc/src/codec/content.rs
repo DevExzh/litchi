@@ -10,14 +10,15 @@ const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 
 /// Validate a UTF-8 content part before authoring it into a package.
 pub(crate) fn validate(xml: &str) -> Result<()> {
-    let chart = read(xml)?;
+    let limits = crate::Limits::default();
+    let chart = read(xml, limits.options().xml_limits_value())?;
     let _ = chart.chart_class()?;
     if let Some(plot_area) = chart.plot_area() {
         for axis in plot_area.axes() {
             let _ = axis.dimension()?;
         }
     }
-    validate_tree(&chart, crate::Limits::default())?;
+    validate_tree(&chart, limits)?;
     Ok(())
 }
 

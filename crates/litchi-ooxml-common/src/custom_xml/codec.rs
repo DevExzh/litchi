@@ -1,16 +1,24 @@
 //! Bounded, namespace-aware codecs for Custom XML Data Storage.
 
-use crate::mce::{Capabilities, Limits, Name, process_markup_compatibility};
+use crate::mce::{
+    Capabilities, Limits as MceLimits, Name, OffsetLimits, process_markup_compatibility,
+    process_markup_compatibility_with_source_offsets,
+};
 use crate::xml::decode_xml_reference;
 use crate::xml_name;
 use crate::{Error, Result};
+
+use super::limit::LimitKind;
 use litchi_opc::ContentType;
+use litchi_opc::SourceLimits;
 use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
+use super::errors::unsupported_content;
 use super::model::{
     Conformance, MAX_DEPTH, MAX_ELEMENTS, MAX_PART_BYTES, MAX_PROPS_BYTES, MAX_SCHEMA_REFS,
     MAX_STRING_BYTES, Props, STRICT_NAMESPACE, STRICT_PROPS_RELATIONSHIP, STRICT_RELATIONSHIP,
@@ -23,23 +31,19 @@ use crate::xml::attributes::BytesStartExt as _;
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn read_props(xml: &[u8]) -> Result<Props> {
-    require_at_most("custom XML properties bytes", xml.len(), MAX_PROPS_BYTES)?;
-    let mut capabilities = Capabilities::ooxml_baseline();
-    capabilities
-        .understand_namespace(TRANSITIONAL_NAMESPACE)
-        .understand_namespace(STRICT_NAMESPACE);
-    let limits = Limits {
-        max_input_bytes: MAX_PROPS_BYTES,
-        max_output_bytes: MAX_PROPS_BYTES.saturating_mul(2),
-        max_depth: MAX_DEPTH,
-        max_namespace_bindings: 4096,
-        max_directive_tokens: 4096,
-        max_choices_per_alternate: 1024,
-        max_attributes_per_element: crate::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
-    };
-    let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
-    parse_props_xml(processed.xml.as_ref())
+pub fn read_props(xml: &[u8], source_limits: &SourceLimits) -> Result<Props> {
+    let (capabilities, limits) = properties_mce_context(source_limits);
+    require_at_most(
+        LimitKind::PropertiesBytes,
+        xml.len(),
+        limits.max_input_bytes,
+    )?;
+    if crate::mce::admission::mentions_namespace(xml) {
+        check_source_profile(xml, source_limits)?;
+    }
+    let processed = process_markup_compatibility(xml, &capabilities, &limits)
+        .map_err(map_properties_mce_error)?;
+    parse_props_xml(processed.xml.as_ref(), limits.max_depth, source_limits)
 }
 
 /// Serialize properties in stable schema order.
@@ -47,9 +51,18 @@ pub fn read_props(xml: &[u8]) -> Result<Props> {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn write_props(props: &Props, conformance: Conformance) -> Result<Vec<u8>> {
+pub fn write_props(
+    props: &Props,
+    conformance: Conformance,
+    source_limits: &SourceLimits,
+) -> Result<Vec<u8>> {
     validate_props(props)?;
     let output_len = props_output_len(props, conformance)?;
+    require_at_most(
+        LimitKind::SerializedPropertiesBytes,
+        output_len,
+        max_properties_bytes(source_limits),
+    )?;
     let mut out = Vec::with_capacity(output_len);
     out.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     out.extend_from_slice(b"<ds:datastoreItem xmlns:ds=\"");
@@ -68,137 +81,1488 @@ pub fn write_props(props: &Props, conformance: Conformance) -> Result<Vec<u8>> {
     }
     out.extend_from_slice(b"</ds:datastoreItem>");
     if out.len() != output_len {
-        return invalid("custom XML properties size calculation disagrees with serialization");
+        return Err(Error::Internal(
+            "custom XML properties size calculation disagrees with serialization",
+        ));
     }
+    debug_assert_eq!(out.len(), output_len);
     Ok(out)
 }
 
-/// Rewrite the typed properties projection while retaining source markup when
-/// the schema-reference topology is unchanged. The bounded lexical patch is
-/// deliberately limited to the known `itemID` attribute; structural schema
-/// edits use the deterministic writer and never interpret extension XML.
+/// Rewrite the typed properties projection while retaining source markup.
+/// Known attributes are located from a namespace-aware XML parse and changed
+/// in place. Structural schema edits use bounded lexical patches as long as
+/// the source has an unambiguous schema-reference topology; opaque content
+/// inside that topology is refused only when changing its shape would make
+/// lossless placement ambiguous.
 pub(super) fn rewrite_props(
     source: &[u8],
     before: &Props,
     after: &Props,
-    conformance: Conformance,
+    _conformance: Conformance,
+    source_limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
+    require_at_most(
+        LimitKind::SerializedPropertiesBytes,
+        source.len(),
+        max_properties_bytes(source_limits),
+    )?;
     if before == after {
         return Ok(source.to_vec());
     }
-    if read_props(source)? != *before {
-        return invalid("custom XML properties source projection is stale");
+    if read_props(source, source_limits)? != *before {
+        return Err(Error::Internal(
+            "custom XML properties source projection is stale",
+        ));
     }
-    if before.schemas == after.schemas
-        && let Some((value_start, value_end)) = item_id_span(source)?
-    {
-        let mut output = Vec::with_capacity(
-            source
-                .len()
-                .saturating_sub(value_end.saturating_sub(value_start))
-                .saturating_add(escaped_attr_len(&after.id)?),
-        );
-        output.extend_from_slice(&source[..value_start]);
-        push_escaped_attr(&mut output, &after.id);
-        output.extend_from_slice(&source[value_end..]);
-        if read_props(&output).is_ok_and(|props| props == *after) {
-            return Ok(output);
+    if before.schemas == after.schemas {
+        validate_props(after)?;
+        let item_id = scan_item_id_span(source, source_limits)?;
+        let edits = vec![LexicalEdit {
+            start: item_id.0,
+            end: item_id.1,
+            replacement: Replacement::Attribute(&after.id),
+        }];
+        return apply_property_edits(source, edits, after, source_limits, false);
+    }
+    let layout = scan_properties_layout(source, source_limits)?;
+    let Some(item_id) = layout.item_id else {
+        return Err(Error::Internal(
+            "custom XML properties itemID splice layout is missing",
+        ));
+    };
+
+    let mut edits = vec![LexicalEdit {
+        start: item_id.0,
+        end: item_id.1,
+        replacement: Replacement::Attribute(&after.id),
+    }];
+    let source_schema_count = layout
+        .schema_refs
+        .as_ref()
+        .map_or(0, |schema_refs| schema_refs.refs.len());
+    if source_schema_count != before.schemas.len() {
+        return Err(unsupported_content(
+            "custom_xml.set_properties",
+            "the Custom XML properties schema markup is opaque",
+        ));
+    }
+    if let Some(schema_refs) = &layout.schema_refs {
+        for (index, (before_schema, after_schema)) in
+            before.schemas.iter().zip(&after.schemas).enumerate()
+        {
+            if before_schema != after_schema {
+                let (start, end) = schema_refs.refs[index].uri;
+                edits.push(LexicalEdit {
+                    start,
+                    end,
+                    replacement: Replacement::Attribute(after_schema),
+                });
+            }
+        }
+        if after.schemas.len() < before.schemas.len() {
+            if schema_refs.refs[after.schemas.len()..]
+                .iter()
+                .any(|schema_ref| schema_ref.opaque)
+            {
+                return Err(unsupported_content(
+                    "custom_xml.set_properties",
+                    "the Custom XML properties schema markup is opaque",
+                ));
+            }
+            for schema_ref in &schema_refs.refs[after.schemas.len()..] {
+                edits.push(LexicalEdit {
+                    start: schema_ref.start,
+                    end: schema_ref.end,
+                    replacement: Replacement::Empty,
+                });
+            }
+        } else if after.schemas.len() > before.schemas.len() {
+            let values = &after.schemas[before.schemas.len()..];
+            if schema_refs.empty {
+                edits.push(LexicalEdit {
+                    start: schema_refs.start,
+                    end: schema_refs.end,
+                    replacement: Replacement::ExpandEmpty {
+                        source,
+                        start: schema_refs.start,
+                        end: schema_refs.end,
+                        qname: &schema_refs.qname,
+                        content: SchemaRefsContent::Generated {
+                            namespace: &layout.root_namespace,
+                            qname: &schema_refs.qname,
+                            values,
+                        },
+                        attribute: None,
+                    },
+                });
+            } else {
+                edits.push(LexicalEdit {
+                    start: schema_refs.insertion_start,
+                    end: schema_refs.insertion_end,
+                    replacement: Replacement::SchemaRefs {
+                        values,
+                        namespace: &layout.root_namespace,
+                        qname: &schema_refs.qname,
+                    },
+                });
+            }
+        }
+    } else if !after.schemas.is_empty() {
+        if layout.root_empty {
+            let item = edits.pop().ok_or(Error::Internal(
+                "custom XML properties itemID edit is missing",
+            ))?;
+            let attribute = match item.replacement {
+                Replacement::Attribute(value) => Some((item.start, item.end, value)),
+                _ => {
+                    return Err(Error::Internal(
+                        "custom XML properties itemID edit has an invalid replacement",
+                    ));
+                },
+            };
+            edits.clear();
+            edits.push(LexicalEdit {
+                start: layout.root_start,
+                end: layout.root_start_end,
+                replacement: Replacement::ExpandEmpty {
+                    source,
+                    start: layout.root_start,
+                    end: layout.root_start_end,
+                    qname: &layout.root_qname,
+                    content: SchemaRefsContent::GeneratedContainer {
+                        namespace: &layout.root_namespace,
+                        root_qname: &layout.root_qname,
+                        values: &after.schemas,
+                    },
+                    attribute,
+                },
+            });
+        } else {
+            let Some(root_end) = layout.root_end else {
+                return Err(Error::Internal(
+                    "custom XML properties root close layout is missing",
+                ));
+            };
+            edits.push(LexicalEdit {
+                start: root_end.0,
+                end: root_end.0,
+                replacement: Replacement::GeneratedSchemaRefs {
+                    namespace: &layout.root_namespace,
+                    root_qname: &layout.root_qname,
+                    values: &after.schemas,
+                },
+            });
         }
     }
-    write_props(after, conformance)
+    apply_property_edits(source, edits, after, source_limits, true)
 }
 
-fn item_id_span(source: &[u8]) -> Result<Option<(usize, usize)>> {
-    let mut start = None;
-    let mut position = 0usize;
-    while let Some(offset) = source
-        .get(position..)
-        .and_then(|tail| tail.iter().position(|b| *b == b'<'))
-    {
-        let tag_start = position + offset;
-        if source.get(tag_start + 1) == Some(&b'?')
-            || source.get(tag_start + 1) == Some(&b'!')
-            || source.get(tag_start + 1) == Some(&b'/')
-        {
-            position = tag_start.saturating_add(2);
-            continue;
-        }
-        start = Some(tag_start);
-        break;
-    }
-    let Some(tag_start) = start else {
-        return Ok(None);
+fn max_properties_bytes(source_limits: &SourceLimits) -> usize {
+    MAX_PROPS_BYTES.min(usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX))
+}
+
+fn properties_mce_context(source_limits: &SourceLimits) -> (Capabilities, MceLimits) {
+    let maximum = max_properties_bytes(source_limits);
+    let mut capabilities = Capabilities::ooxml_baseline();
+    capabilities
+        .understand_namespace(TRANSITIONAL_NAMESPACE)
+        .understand_namespace(STRICT_NAMESPACE);
+    let mut limits = MceLimits {
+        max_input_bytes: maximum,
+        max_output_bytes: maximum.saturating_mul(2),
+        max_depth: MAX_DEPTH.min(source_limits.max_depth()),
+        max_namespace_bindings: 4096,
+        max_directive_tokens: 4096,
+        max_choices_per_alternate: 1024,
+        max_attributes_per_element: crate::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
-    let mut quote = None;
-    let mut tag_end = None;
-    for (offset, byte) in source[tag_start..].iter().enumerate() {
-        match (quote, *byte) {
-            (None, b'\'' | b'"') => quote = Some(*byte),
-            (Some(value), byte) if value == byte => quote = None,
-            (None, b'>') => {
-                tag_end = Some(tag_start + offset);
-                break;
+    limits.max_output_bytes = maximum;
+    (capabilities, limits)
+}
+
+fn map_properties_mce_error(error: crate::mce::Error) -> Error {
+    match error {
+        crate::mce::Error::LimitExceeded {
+            kind:
+                crate::mce::LimitKind::SourceBytes
+                | crate::mce::LimitKind::InputBytes
+                | crate::mce::LimitKind::OutputBytes,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::PropertiesBytes),
+            observed,
+            maximum,
+        },
+        crate::mce::Error::LimitExceeded {
+            kind: crate::mce::LimitKind::Depth,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::Depth),
+            observed,
+            maximum,
+        },
+        other => Error::Mce(other),
+    }
+}
+
+fn check_source_profile(xml: &[u8], source_limits: &SourceLimits) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_comments = true;
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut events = 0usize;
+    let mut version = XmlVersion::Implicit1_0;
+    let mut event_seen = false;
+
+    loop {
+        let event = reader.read_event_into(&mut buffer)?;
+        if matches!(&event, Event::Eof) {
+            break;
+        }
+        events = events.checked_add(1).ok_or_else(|| {
+            source_limit(LimitKind::XmlEvents, usize::MAX, source_limits.max_events())
+        })?;
+        if events > source_limits.max_events() {
+            return Err(source_limit(
+                LimitKind::XmlEvents,
+                events,
+                source_limits.max_events(),
+            ));
+        }
+        match event {
+            Event::Decl(declaration) => {
+                if event_seen {
+                    return invalid("custom XML properties have a late XML declaration");
+                }
+                version = validate_declaration(&declaration)?;
+            },
+            Event::Start(element) => {
+                check_source_element_bounds(
+                    source_limits,
+                    depth,
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    source_limit(LimitKind::Depth, usize::MAX, source_limits.max_depth())
+                })?;
+            },
+            Event::Empty(element) => {
+                check_source_element_bounds(
+                    source_limits,
+                    depth,
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::Invalid("custom XML properties have an unexpected end tag".into())
+                })?;
             },
             _ => {},
         }
+        event_seen = true;
+        buffer.clear();
     }
-    let Some(tag_end) = tag_end else {
-        return invalid("custom XML properties root tag is incomplete");
+    if depth != 0 {
+        return Err(Error::Invalid(
+            "custom XML properties have an incomplete root".into(),
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct PropertiesLayout {
+    item_id: Option<(usize, usize)>,
+    schema_refs: Option<SchemaRefsLayout>,
+    root_end: Option<(usize, usize)>,
+    root_start: usize,
+    root_start_end: usize,
+    root_empty: bool,
+    root_qname: Vec<u8>,
+    root_namespace: String,
+}
+
+#[derive(Debug, Clone)]
+struct SchemaRefsLayout {
+    qname: Vec<u8>,
+    refs: Vec<SchemaRefLayout>,
+    insertion_start: usize,
+    insertion_end: usize,
+    empty: bool,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SchemaRefLayout {
+    start: usize,
+    end: usize,
+    uri: (usize, usize),
+    opaque: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LayoutKind {
+    Root,
+    SchemaRefs,
+    SchemaRef,
+    Opaque,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LayoutFrame {
+    kind: LayoutKind,
+    schema_ref: Option<usize>,
+    source_start: Option<usize>,
+}
+
+#[derive(Debug)]
+struct LexicalEdit<'a> {
+    start: usize,
+    end: usize,
+    replacement: Replacement<'a>,
+}
+
+#[derive(Debug, Clone)]
+struct SourceElementLayout {
+    qname: Vec<u8>,
+    start: usize,
+    open_end: usize,
+    close_start: Option<usize>,
+    end: usize,
+    attribute: Option<(usize, usize)>,
+}
+
+#[derive(Debug)]
+enum Replacement<'a> {
+    Empty,
+    Attribute(&'a str),
+    SchemaRefs {
+        values: &'a [String],
+        namespace: &'a str,
+        qname: &'a [u8],
+    },
+    GeneratedSchemaRefs {
+        namespace: &'a str,
+        root_qname: &'a [u8],
+        values: &'a [String],
+    },
+    ExpandEmpty {
+        source: &'a [u8],
+        start: usize,
+        end: usize,
+        qname: &'a [u8],
+        content: SchemaRefsContent<'a>,
+        attribute: Option<(usize, usize, &'a str)>,
+    },
+}
+
+#[derive(Debug)]
+enum SchemaRefsContent<'a> {
+    Generated {
+        namespace: &'a str,
+        qname: &'a [u8],
+        values: &'a [String],
+    },
+    GeneratedContainer {
+        namespace: &'a str,
+        root_qname: &'a [u8],
+        values: &'a [String],
+    },
+}
+
+fn scan_source_elements(
+    source: &[u8],
+    source_limits: &SourceLimits,
+) -> Result<(Vec<u32>, HashMap<usize, SourceElementLayout>)> {
+    scan_source_elements_mode(source, source_limits, true)
+}
+
+fn scan_source_item_elements(
+    source: &[u8],
+    source_limits: &SourceLimits,
+) -> Result<(Vec<u32>, HashMap<usize, SourceElementLayout>)> {
+    scan_source_elements_mode(source, source_limits, false)
+}
+
+fn scan_source_elements_mode(
+    source: &[u8],
+    source_limits: &SourceLimits,
+    include_schema_refs: bool,
+) -> Result<(Vec<u32>, HashMap<usize, SourceElementLayout>)> {
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_comments = true;
+    let mut buffer = Vec::new();
+    let mut stack: Vec<Option<usize>> = Vec::new();
+    let mut offsets = Vec::new();
+    let mut elements = HashMap::new();
+    let mut events = 0usize;
+    let mut version = XmlVersion::Implicit1_0;
+
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_| Error::Internal("custom XML properties event offset overflow"))?;
+        let event = reader.read_event_into(&mut buffer)?;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| Error::Internal("custom XML properties event offset overflow"))?;
+        if !matches!(&event, Event::Eof) {
+            events = events.checked_add(1).ok_or_else(|| {
+                source_limit(LimitKind::XmlEvents, usize::MAX, source_limits.max_events())
+            })?;
+            if events > source_limits.max_events() {
+                return Err(source_limit(
+                    LimitKind::XmlEvents,
+                    events,
+                    source_limits.max_events(),
+                ));
+            }
+        }
+        match event {
+            Event::Decl(declaration) => {
+                version = validate_declaration(&declaration)?;
+            },
+            Event::Start(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
+                check_source_element_bounds(
+                    source_limits,
+                    stack.len(),
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                let local_name = element.local_name();
+                let candidate = is_layout_candidate(local_name.as_ref())
+                    && (include_schema_refs || local_name.as_ref() == b"datastoreItem");
+                if candidate {
+                    let namespace = resolved_namespace(resolved, "element")?;
+                    let attribute_name = match local_name.as_ref() {
+                        b"datastoreItem" => Some(b"itemID".as_slice()),
+                        b"schemaRef" => Some(b"uri".as_slice()),
+                        _ => None,
+                    };
+                    let attribute = match attribute_name {
+                        Some(name) => known_attribute_span(
+                            source,
+                            event_start,
+                            event_end,
+                            &element,
+                            &reader,
+                            namespace,
+                            name,
+                        )?,
+                        None => None,
+                    };
+                    let offset = u32::try_from(event_start).map_err(|_| {
+                        Error::Internal("custom XML properties source offset overflow")
+                    })?;
+                    offsets.push(offset);
+                    elements.insert(
+                        event_start,
+                        SourceElementLayout {
+                            qname: element.name().as_ref().to_vec(),
+                            start: event_start,
+                            open_end: event_end,
+                            close_start: None,
+                            end: event_end,
+                            attribute,
+                        },
+                    );
+                    stack.push(Some(event_start));
+                } else {
+                    stack.push(None);
+                }
+            },
+            Event::Empty(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
+                check_source_element_bounds(
+                    source_limits,
+                    stack.len(),
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                let local_name = element.local_name();
+                if is_layout_candidate(local_name.as_ref())
+                    && (include_schema_refs || local_name.as_ref() == b"datastoreItem")
+                {
+                    let namespace = resolved_namespace(resolved, "element")?;
+                    let attribute_name = match local_name.as_ref() {
+                        b"datastoreItem" => Some(b"itemID".as_slice()),
+                        b"schemaRef" => Some(b"uri".as_slice()),
+                        _ => None,
+                    };
+                    let attribute = match attribute_name {
+                        Some(name) => known_attribute_span(
+                            source,
+                            event_start,
+                            event_end,
+                            &element,
+                            &reader,
+                            namespace,
+                            name,
+                        )?,
+                        None => None,
+                    };
+                    let offset = u32::try_from(event_start).map_err(|_| {
+                        Error::Internal("custom XML properties source offset overflow")
+                    })?;
+                    offsets.push(offset);
+                    elements.insert(
+                        event_start,
+                        SourceElementLayout {
+                            qname: element.name().as_ref().to_vec(),
+                            start: event_start,
+                            open_end: event_end,
+                            close_start: None,
+                            end: event_end,
+                            attribute,
+                        },
+                    );
+                }
+            },
+            Event::End(_) => {
+                if let Some(Some(start)) = stack.pop() {
+                    let element = elements.get_mut(&start).ok_or(Error::Internal(
+                        "custom XML properties source element layout is missing",
+                    ))?;
+                    element.close_start = Some(event_start);
+                    element.end = event_end;
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok((offsets, elements))
+}
+
+fn is_layout_candidate(local_name: &[u8]) -> bool {
+    matches!(local_name, b"datastoreItem" | b"schemaRefs" | b"schemaRef")
+}
+
+fn check_source_element_bounds(
+    source_limits: &SourceLimits,
+    depth: usize,
+    element: &BytesStart<'_>,
+    version: XmlVersion,
+    decoder: Decoder,
+) -> Result<()> {
+    let observed_depth = depth
+        .checked_add(1)
+        .ok_or_else(|| source_limit(LimitKind::Depth, usize::MAX, source_limits.max_depth()))?;
+    if observed_depth > source_limits.max_depth() {
+        return Err(source_limit(
+            LimitKind::Depth,
+            observed_depth,
+            source_limits.max_depth(),
+        ));
+    }
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let raw_bytes = attribute
+            .key
+            .as_ref()
+            .len()
+            .checked_add(attribute.value.as_ref().len())
+            .ok_or_else(|| {
+                source_limit(
+                    LimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    source_limits.max_xml_attribute_bytes(),
+                )
+            })?;
+        if raw_bytes > source_limits.max_xml_attribute_bytes() {
+            return Err(source_limit(
+                LimitKind::XmlAttributeBytes,
+                raw_bytes,
+                source_limits.max_xml_attribute_bytes(),
+            ));
+        }
+        let decoded = attribute
+            .decoded_and_normalized_value(version, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let decoded_bytes = decoded.len();
+        if decoded_bytes > source_limits.max_xml_attribute_bytes() {
+            return Err(source_limit(
+                LimitKind::XmlAttributeBytes,
+                decoded_bytes,
+                source_limits.max_xml_attribute_bytes(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn source_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    limit(kind, maximum, observed)
+}
+
+fn active_properties_offsets(
+    source: &[u8],
+    source_limits: &SourceLimits,
+    offsets: &[u32],
+    retain_processed_xml: bool,
+) -> Result<crate::mce::ActiveOffsetOutput> {
+    let (capabilities, processing) = properties_mce_context(source_limits);
+    let limits = OffsetLimits {
+        max_source_bytes: max_properties_bytes(source_limits),
+        max_offsets: offsets.len().max(1),
+        max_marked_bytes: max_properties_bytes(source_limits),
+        processing,
     };
-    let mut cursor = tag_start + 1;
-    while cursor < tag_end && !matches!(source[cursor], b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>')
+    process_markup_compatibility_with_source_offsets(
+        source,
+        offsets,
+        &capabilities,
+        &limits,
+        retain_processed_xml,
+    )
+    .map_err(map_properties_mce_error)
+}
+
+fn active_properties_view(
+    source: &[u8],
+    source_limits: &SourceLimits,
+    offsets: &[u32],
+) -> Result<crate::mce::ActiveOffsetOutput> {
+    active_properties_offsets(source, source_limits, offsets, true)
+}
+
+fn scan_item_id_span(source: &[u8], source_limits: &SourceLimits) -> Result<(usize, usize)> {
+    let (offsets, source_elements) = scan_source_item_elements(source, source_limits)?;
+    let active = active_properties_offsets(source, source_limits, &offsets, false)?;
+    let source_start = active
+        .selected_offsets
+        .first()
+        .copied()
+        .ok_or(Error::Internal(
+            "custom XML properties selected source root is missing",
+        ))?;
+    let source_element = source_elements.get(
+        &usize::try_from(source_start)
+            .map_err(|_| Error::Internal("custom XML properties source offset overflow"))?,
+    );
+    source_element
+        .ok_or(Error::Internal(
+            "custom XML properties selected source root is missing",
+        ))?
+        .attribute
+        .ok_or(Error::Internal(
+            "custom XML properties itemID splice layout is missing",
+        ))
+}
+
+fn scan_properties_layout(source: &[u8], source_limits: &SourceLimits) -> Result<PropertiesLayout> {
+    let (offsets, source_elements) = scan_source_elements(source, source_limits)?;
+    let active = active_properties_view(source, source_limits, &offsets)?;
+    let mut reader = NsReader::from_reader(active.xml.as_slice());
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_comments = true;
+    let mut buffer = Vec::new();
+    let mut stack = Vec::new();
+    let mut selected_source_starts = active.selected_offsets.iter().copied();
+    let mut layout = PropertiesLayout {
+        item_id: None,
+        schema_refs: None,
+        root_end: None,
+        root_start: 0,
+        root_start_end: 0,
+        root_empty: false,
+        root_qname: Vec::new(),
+        root_namespace: String::new(),
+    };
+
+    loop {
+        let event = reader.read_event_into(&mut buffer)?;
+        match event {
+            Event::Start(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
+                let namespace = resolved_namespace(resolved, "element")?;
+                let local_name = element.local_name();
+                let source_element = if is_layout_candidate(local_name.as_ref()) {
+                    let source_start = usize::try_from(selected_source_starts.next().ok_or(
+                        Error::Internal("custom XML properties selected source element is missing"),
+                    )?)
+                    .map_err(|_| Error::Internal("custom XML properties source offset overflow"))?;
+                    Some(source_elements.get(&source_start).ok_or(Error::Internal(
+                        "custom XML properties selected source element is missing",
+                    ))?)
+                } else {
+                    None
+                };
+                let parent = stack.last().map(|frame: &LayoutFrame| frame.kind);
+                let (kind, schema_ref) = if stack.is_empty()
+                    && layout.root_qname.is_empty()
+                    && local_name.as_ref() == b"datastoreItem"
+                {
+                    let source_element = source_element.ok_or(Error::Internal(
+                        "custom XML properties source root layout is missing",
+                    ))?;
+                    layout.root_namespace = std::str::from_utf8(namespace)
+                        .map_err(|error| Error::Xml(error.to_string()))?
+                        .into();
+                    layout.root_qname = source_element.qname.clone();
+                    layout.root_start = source_element.start;
+                    layout.root_start_end = source_element.open_end;
+                    layout.item_id = source_element.attribute;
+                    (LayoutKind::Root, None)
+                } else if parent == Some(LayoutKind::Root)
+                    && namespace == layout.root_namespace.as_bytes()
+                    && local_name.as_ref() == b"schemaRefs"
+                {
+                    let source_element = source_element.ok_or(Error::Internal(
+                        "custom XML properties source schemaRefs layout is missing",
+                    ))?;
+                    if layout.schema_refs.is_some() {
+                        return Err(Error::Internal(
+                            "custom XML properties layout has duplicate schemaRefs",
+                        ));
+                    }
+                    layout.schema_refs = Some(SchemaRefsLayout {
+                        qname: source_element.qname.clone(),
+                        refs: Vec::new(),
+                        insertion_start: source_element.open_end,
+                        insertion_end: source_element.open_end,
+                        empty: false,
+                        start: source_element.start,
+                        end: source_element.open_end,
+                    });
+                    (LayoutKind::SchemaRefs, None)
+                } else if parent == Some(LayoutKind::SchemaRefs)
+                    && namespace == layout.root_namespace.as_bytes()
+                    && local_name.as_ref() == b"schemaRef"
+                {
+                    let source_element = source_element.ok_or(Error::Internal(
+                        "custom XML properties source schemaRef layout is missing",
+                    ))?;
+                    let uri = source_element.attribute.ok_or(Error::Internal(
+                        "custom XML properties schemaRef URI layout is missing",
+                    ))?;
+                    let opaque = has_unknown_attributes(&element, &reader, namespace, b"uri")?;
+                    let schema_refs = layout.schema_refs.as_mut().ok_or(Error::Internal(
+                        "custom XML properties schemaRefs layout is missing",
+                    ))?;
+                    let schema_ref = schema_refs.refs.len();
+                    schema_refs.refs.push(SchemaRefLayout {
+                        start: source_element.start,
+                        end: source_element.open_end,
+                        uri,
+                        opaque,
+                    });
+                    (LayoutKind::SchemaRef, Some(schema_ref))
+                } else {
+                    mark_opaque(&mut layout, &stack);
+                    (LayoutKind::Opaque, None)
+                };
+                stack.push(LayoutFrame {
+                    kind,
+                    schema_ref,
+                    source_start: source_element.map(|element| element.start),
+                });
+            },
+            Event::Empty(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
+                let namespace = resolved_namespace(resolved, "element")?;
+                let local_name = element.local_name();
+                let source_element = if is_layout_candidate(local_name.as_ref()) {
+                    let source_start = usize::try_from(selected_source_starts.next().ok_or(
+                        Error::Internal("custom XML properties selected source element is missing"),
+                    )?)
+                    .map_err(|_| Error::Internal("custom XML properties source offset overflow"))?;
+                    Some(source_elements.get(&source_start).ok_or(Error::Internal(
+                        "custom XML properties selected source element is missing",
+                    ))?)
+                } else {
+                    None
+                };
+                let parent = stack.last().map(|frame: &LayoutFrame| frame.kind);
+                if stack.is_empty()
+                    && layout.root_qname.is_empty()
+                    && local_name.as_ref() == b"datastoreItem"
+                {
+                    let source_element = source_element.ok_or(Error::Internal(
+                        "custom XML properties source root layout is missing",
+                    ))?;
+                    layout.root_namespace = std::str::from_utf8(namespace)
+                        .map_err(|error| Error::Xml(error.to_string()))?
+                        .into();
+                    layout.root_qname = source_element.qname.clone();
+                    layout.root_start = source_element.start;
+                    layout.root_start_end = source_element.open_end;
+                    layout.root_empty = true;
+                    layout.item_id = source_element.attribute;
+                } else if parent == Some(LayoutKind::Root)
+                    && namespace == layout.root_namespace.as_bytes()
+                    && local_name.as_ref() == b"schemaRefs"
+                {
+                    let source_element = source_element.ok_or(Error::Internal(
+                        "custom XML properties source schemaRefs layout is missing",
+                    ))?;
+                    layout.schema_refs = Some(SchemaRefsLayout {
+                        qname: source_element.qname.clone(),
+                        refs: Vec::new(),
+                        insertion_start: source_element.start,
+                        insertion_end: source_element.end,
+                        empty: true,
+                        start: source_element.start,
+                        end: source_element.end,
+                    });
+                } else if parent == Some(LayoutKind::SchemaRefs)
+                    && namespace == layout.root_namespace.as_bytes()
+                    && local_name.as_ref() == b"schemaRef"
+                {
+                    let source_element = source_element.ok_or(Error::Internal(
+                        "custom XML properties source schemaRef layout is missing",
+                    ))?;
+                    let uri = source_element.attribute.ok_or(Error::Internal(
+                        "custom XML properties schemaRef URI layout is missing",
+                    ))?;
+                    let opaque = has_unknown_attributes(&element, &reader, namespace, b"uri")?;
+                    let schema_refs = layout.schema_refs.as_mut().ok_or(Error::Internal(
+                        "custom XML properties schemaRefs layout is missing",
+                    ))?;
+                    schema_refs.refs.push(SchemaRefLayout {
+                        start: source_element.start,
+                        end: source_element.end,
+                        uri,
+                        opaque,
+                    });
+                } else {
+                    mark_opaque(&mut layout, &stack);
+                }
+            },
+            Event::End(_) => {
+                let frame = stack.pop().ok_or(Error::Internal(
+                    "custom XML properties layout has an unmatched end",
+                ))?;
+                let source_element = frame
+                    .source_start
+                    .and_then(|start| source_elements.get(&start));
+                match frame.kind {
+                    LayoutKind::Root => {
+                        let source_element = source_element.ok_or(Error::Internal(
+                            "custom XML properties source root close layout is missing",
+                        ))?;
+                        let close_start = source_element.close_start.ok_or(Error::Internal(
+                            "custom XML properties source root close layout is missing",
+                        ))?;
+                        layout.root_end = Some((close_start, source_element.end));
+                    },
+                    LayoutKind::SchemaRefs => {
+                        let source_element = source_element.ok_or(Error::Internal(
+                            "custom XML properties source schemaRefs close layout is missing",
+                        ))?;
+                        let close_start = source_element.close_start.ok_or(Error::Internal(
+                            "custom XML properties source schemaRefs close layout is missing",
+                        ))?;
+                        let schema_refs = layout.schema_refs.as_mut().ok_or(Error::Internal(
+                            "custom XML properties schemaRefs layout is missing",
+                        ))?;
+                        schema_refs.insertion_start = close_start;
+                        schema_refs.insertion_end = close_start;
+                        schema_refs.end = source_element.end;
+                    },
+                    LayoutKind::SchemaRef => {
+                        let source_element = source_element.ok_or(Error::Internal(
+                            "custom XML properties source schemaRef close layout is missing",
+                        ))?;
+                        let schema_refs = layout.schema_refs.as_mut().ok_or(Error::Internal(
+                            "custom XML properties schemaRefs layout is missing",
+                        ))?;
+                        if let Some(index) = frame.schema_ref {
+                            schema_refs.refs[index].end = source_element.end;
+                        }
+                    },
+                    LayoutKind::Opaque => {},
+                }
+            },
+            Event::Comment(_) => {
+                if stack
+                    .iter()
+                    .any(|frame| matches!(frame.kind, LayoutKind::SchemaRef))
+                {
+                    mark_opaque(&mut layout, &stack);
+                }
+            },
+            Event::Eof => break,
+            Event::Text(text) if !is_xml_whitespace(text.as_ref()) => {
+                if stack
+                    .iter()
+                    .any(|frame| matches!(frame.kind, LayoutKind::SchemaRef))
+                {
+                    mark_opaque(&mut layout, &stack);
+                }
+            },
+            Event::CData(text) if !is_xml_whitespace(text.as_ref()) => {
+                if stack
+                    .iter()
+                    .any(|frame| matches!(frame.kind, LayoutKind::SchemaRef))
+                {
+                    mark_opaque(&mut layout, &stack);
+                }
+            },
+            Event::GeneralRef(_) | Event::PI(_) => {
+                if stack
+                    .iter()
+                    .any(|frame| matches!(frame.kind, LayoutKind::SchemaRef))
+                {
+                    mark_opaque(&mut layout, &stack);
+                }
+            },
+            Event::Decl(_) => {},
+            Event::DocType(_) => {
+                return Err(Error::Internal(
+                    "custom XML properties layout encountered a forbidden declaration",
+                ));
+            },
+            Event::Text(_) | Event::CData(_) => {},
+        }
+        buffer.clear();
+    }
+    Ok(layout)
+}
+
+fn mark_opaque(layout: &mut PropertiesLayout, stack: &[LayoutFrame]) {
+    if let Some(frame) = stack
+        .iter()
+        .rev()
+        .find(|frame| matches!(frame.kind, LayoutKind::SchemaRef))
     {
+        if let (Some(schema_refs), Some(index)) = (layout.schema_refs.as_mut(), frame.schema_ref) {
+            if let Some(schema_ref) = schema_refs.refs.get_mut(index) {
+                schema_ref.opaque = true;
+            }
+        }
+    }
+}
+
+fn has_unknown_attributes(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    namespace: &[u8],
+    known_local_name: &[u8],
+) -> Result<bool> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if is_namespace_declaration(attribute.key.as_ref()) {
+            continue;
+        }
+        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        if resolved_namespace(resolved, "attribute")? != namespace
+            || local.as_ref() != known_local_name
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn known_attribute_span(
+    source: &[u8],
+    event_start: usize,
+    event_end: usize,
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    namespace: &[u8],
+    local_name: &[u8],
+) -> Result<Option<(usize, usize)>> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if is_namespace_declaration(attribute.key.as_ref()) {
+            continue;
+        }
+        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        if resolved_namespace(resolved, "attribute")? == namespace && local.as_ref() == local_name {
+            return raw_attribute_value_span(
+                source,
+                event_start,
+                event_end,
+                attribute.key.as_ref(),
+            );
+        }
+    }
+    Ok(None)
+}
+
+fn raw_attribute_value_span(
+    source: &[u8],
+    event_start: usize,
+    event_end: usize,
+    wanted_name: &[u8],
+) -> Result<Option<(usize, usize)>> {
+    let content_start = event_start.checked_add(1).ok_or(Error::Internal(
+        "custom XML properties attribute offset overflow",
+    ))?;
+    let content_end = event_end.checked_sub(1).ok_or(Error::Internal(
+        "custom XML properties attribute offset underflow",
+    ))?;
+    let content = source
+        .get(content_start..content_end)
+        .ok_or(Error::Internal(
+            "custom XML properties attribute range is invalid",
+        ))?;
+    let mut cursor = 0usize;
+    while cursor < content.len() && !content[cursor].is_ascii_whitespace() {
         cursor += 1;
     }
-    while cursor < tag_end {
-        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+    loop {
+        while cursor < content.len() && content[cursor].is_ascii_whitespace() {
             cursor += 1;
         }
-        if cursor >= tag_end || source[cursor] == b'/' {
-            break;
+        if cursor >= content.len() || content[cursor] == b'/' {
+            return Ok(None);
         }
         let name_start = cursor;
-        while cursor < tag_end
-            && !source[cursor].is_ascii_whitespace()
-            && !matches!(source[cursor], b'=' | b'/' | b'>')
+        while cursor < content.len()
+            && !content[cursor].is_ascii_whitespace()
+            && content[cursor] != b'='
         {
             cursor += 1;
         }
-        let name = &source[name_start..cursor];
-        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+        let name = &content[name_start..cursor];
+        while cursor < content.len() && content[cursor].is_ascii_whitespace() {
             cursor += 1;
         }
-        if cursor >= tag_end || source[cursor] != b'=' {
-            return invalid("custom XML properties root attribute is malformed");
+        if cursor >= content.len() || content[cursor] != b'=' {
+            return Err(Error::Internal(
+                "custom XML properties attribute layout is malformed",
+            ));
         }
         cursor += 1;
-        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+        while cursor < content.len() && content[cursor].is_ascii_whitespace() {
             cursor += 1;
         }
-        let Some(&delimiter) = source.get(cursor) else {
-            return invalid("custom XML properties root attribute has no value");
-        };
+        let delimiter = *content.get(cursor).ok_or(Error::Internal(
+            "custom XML properties attribute value is missing",
+        ))?;
         if !matches!(delimiter, b'\'' | b'"') {
-            return invalid("custom XML properties root attribute is unquoted");
+            return Err(Error::Internal(
+                "custom XML properties attribute value is unquoted",
+            ));
         }
         cursor += 1;
         let value_start = cursor;
-        while cursor < tag_end && source[cursor] != delimiter {
+        while cursor < content.len() && content[cursor] != delimiter {
             cursor += 1;
         }
-        if cursor >= tag_end {
-            return invalid("custom XML properties root attribute is unterminated");
+        if cursor >= content.len() {
+            return Err(Error::Internal(
+                "custom XML properties attribute value is unterminated",
+            ));
         }
-        if name
-            .rsplit(|byte| *byte == b':')
-            .next()
-            .is_some_and(|local| local == b"itemID")
-        {
-            return Ok(Some((value_start, cursor)));
+        if name == wanted_name {
+            return Ok(Some((content_start + value_start, content_start + cursor)));
         }
         cursor += 1;
     }
-    Ok(None)
+}
+
+fn apply_property_edits<'a>(
+    source: &[u8],
+    mut edits: Vec<LexicalEdit<'a>>,
+    after: &Props,
+    source_limits: &SourceLimits,
+    verify_readback: bool,
+) -> Result<Vec<u8>> {
+    edits.sort_unstable_by_key(|edit| edit.start);
+    let mut output_len = source.len();
+    let mut previous_end = 0usize;
+    for edit in &edits {
+        if edit.start < previous_end || edit.end < edit.start || edit.end > source.len() {
+            return Err(Error::Internal(
+                "custom XML properties lexical edits overlap",
+            ));
+        }
+        let removed = edit.end - edit.start;
+        output_len = output_len.checked_sub(removed).ok_or(Error::Internal(
+            "custom XML properties output length underflow",
+        ))?;
+        output_len = output_len
+            .checked_add(replacement_len(&edit.replacement)?)
+            .ok_or_else(|| {
+                limit(
+                    LimitKind::SerializedPropertiesBytes,
+                    max_properties_bytes(source_limits),
+                    usize::MAX,
+                )
+            })?;
+        previous_end = edit.end;
+    }
+    require_at_most(
+        LimitKind::SerializedPropertiesBytes,
+        output_len,
+        max_properties_bytes(source_limits),
+    )?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "Custom XML properties rewrite",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for edit in edits {
+        output.extend_from_slice(&source[cursor..edit.start]);
+        write_replacement(&mut output, &edit.replacement)?;
+        cursor = edit.end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    if output.len() != output_len {
+        return Err(Error::Internal(
+            "custom XML properties lexical rewrite length disagrees",
+        ));
+    }
+    if verify_readback {
+        let parsed = read_props(&output, source_limits)?;
+        if parsed != *after {
+            return Err(Error::Internal(
+                "custom XML properties lexical rewrite did not read back as requested",
+            ));
+        }
+    }
+    Ok(output)
+}
+
+fn replacement_len(replacement: &Replacement<'_>) -> Result<usize> {
+    match replacement {
+        Replacement::Empty => Ok(0),
+        Replacement::Attribute(value) => escaped_attr_len(value),
+        Replacement::SchemaRefs {
+            values,
+            namespace,
+            qname,
+        } => generated_schema_refs_content_len(values, namespace, qname),
+        Replacement::GeneratedSchemaRefs {
+            namespace,
+            root_qname,
+            values,
+        } => generated_schema_refs_len(namespace, root_qname, values),
+        Replacement::ExpandEmpty {
+            source,
+            start,
+            end,
+            qname,
+            content,
+            attribute,
+        } => {
+            let slash = (*end).checked_sub(2).ok_or(Error::Internal(
+                "custom XML empty-element range is too short",
+            ))?;
+            if source.get(slash..*end) != Some(b"/>".as_slice()) {
+                return Err(Error::Internal(
+                    "custom XML empty-element closing layout is invalid",
+                ));
+            }
+            let mut opening_len = slash
+                .checked_sub(*start)
+                .ok_or(Error::Internal("custom XML empty-element range is invalid"))?;
+            if let Some((attribute_start, attribute_end, value)) = attribute {
+                if *attribute_start < *start
+                    || *attribute_end < *attribute_start
+                    || *attribute_end > slash
+                {
+                    return Err(Error::Internal(
+                        "custom XML empty-element attribute range is invalid",
+                    ));
+                }
+                opening_len = opening_len
+                    .checked_sub(attribute_end - attribute_start)
+                    .ok_or_else(|| {
+                        limit(
+                            LimitKind::SerializedPropertiesBytes,
+                            MAX_PROPS_BYTES,
+                            usize::MAX,
+                        )
+                    })?;
+                opening_len = opening_len
+                    .checked_add(escaped_attr_len(value)?)
+                    .ok_or_else(|| {
+                        limit(
+                            LimitKind::SerializedPropertiesBytes,
+                            MAX_PROPS_BYTES,
+                            usize::MAX,
+                        )
+                    })?;
+            }
+            let mut output_len = opening_len.checked_add(1).ok_or_else(|| {
+                limit(
+                    LimitKind::SerializedPropertiesBytes,
+                    MAX_PROPS_BYTES,
+                    usize::MAX,
+                )
+            })?;
+            output_len = output_len
+                .checked_add(schema_refs_content_len_from_content(content)?)
+                .ok_or_else(|| {
+                    limit(
+                        LimitKind::SerializedPropertiesBytes,
+                        MAX_PROPS_BYTES,
+                        usize::MAX,
+                    )
+                })?;
+            output_len = output_len
+                .checked_add(qname.len().checked_add(3).ok_or_else(|| {
+                    limit(
+                        LimitKind::SerializedPropertiesBytes,
+                        MAX_PROPS_BYTES,
+                        usize::MAX,
+                    )
+                })?)
+                .ok_or_else(|| {
+                    limit(
+                        LimitKind::SerializedPropertiesBytes,
+                        MAX_PROPS_BYTES,
+                        usize::MAX,
+                    )
+                })?;
+            Ok(output_len)
+        },
+    }
+}
+
+fn schema_refs_content_len_from_content(content: &SchemaRefsContent<'_>) -> Result<usize> {
+    match content {
+        SchemaRefsContent::Generated {
+            namespace,
+            qname,
+            values,
+        } => {
+            let mut length = 0usize;
+            for value in values.iter() {
+                add_len(
+                    &mut length,
+                    generated_schema_ref_len(namespace, qname, value)?,
+                )?;
+            }
+            Ok(length)
+        },
+        SchemaRefsContent::GeneratedContainer {
+            namespace,
+            root_qname,
+            values,
+        } => generated_schema_refs_len(namespace, root_qname, values),
+    }
+}
+
+fn generated_schema_refs_content_len(
+    values: &[String],
+    namespace: &str,
+    qname: &[u8],
+) -> Result<usize> {
+    let mut length = 0usize;
+    for value in values {
+        add_len(
+            &mut length,
+            generated_schema_ref_len(namespace, qname, value)?,
+        )?;
+    }
+    Ok(length)
+}
+
+fn generated_schema_refs_len(
+    namespace: &str,
+    root_qname: &[u8],
+    values: &[String],
+) -> Result<usize> {
+    let prefix = qname_prefix(root_qname).unwrap_or(b"ds");
+    let mut length = 1usize
+        .checked_add(prefix.len())
+        .and_then(|length| length.checked_add(b":schemaRefs".len()))
+        .ok_or_else(|| {
+            limit(
+                LimitKind::SerializedPropertiesBytes,
+                MAX_PROPS_BYTES,
+                usize::MAX,
+            )
+        })?;
+    if qname_prefix(root_qname).is_none() {
+        add_len(&mut length, b" xmlns:ds=\"".len())?;
+        add_len(&mut length, escaped_attr_len(namespace)?)?;
+        add_len(&mut length, 1)?;
+    }
+    add_len(&mut length, 1)?;
+    for value in values {
+        add_len(
+            &mut length,
+            generated_schema_ref_len(namespace, root_qname, value)?,
+        )?;
+    }
+    add_len(&mut length, 2)?;
+    add_len(&mut length, prefix.len())?;
+    add_len(&mut length, b":schemaRefs>".len())?;
+    Ok(length)
+}
+
+fn generated_schema_ref_len(namespace: &str, qname: &[u8], value: &str) -> Result<usize> {
+    let prefix = qname_prefix(qname).unwrap_or(b"ds");
+    let mut length = if qname_prefix(qname).is_some() {
+        b"<".len()
+            .checked_add(prefix.len())
+            .and_then(|length| length.checked_add(b":schemaRef ".len()))
+            .and_then(|length| length.checked_add(prefix.len()))
+            .and_then(|length| length.checked_add(b":uri=\"".len()))
+            .ok_or_else(|| {
+                limit(
+                    LimitKind::SerializedPropertiesBytes,
+                    MAX_PROPS_BYTES,
+                    usize::MAX,
+                )
+            })?
+    } else {
+        let mut length = b"<schemaRef xmlns:ds=\"".len();
+        add_len(&mut length, escaped_attr_len(namespace)?)?;
+        add_len(&mut length, b"\" ds:uri=\"".len())?;
+        length
+    };
+    add_len(&mut length, escaped_attr_len(value)?)?;
+    add_len(&mut length, b"\"/>".len())?;
+    Ok(length)
+}
+
+fn write_replacement(output: &mut Vec<u8>, replacement: &Replacement<'_>) -> Result<()> {
+    match replacement {
+        Replacement::Empty => {},
+        Replacement::Attribute(value) => push_escaped_attr(output, value),
+        Replacement::SchemaRefs {
+            values,
+            namespace,
+            qname,
+        } => write_generated_schema_refs_content(output, namespace, qname, values),
+        Replacement::GeneratedSchemaRefs {
+            namespace,
+            root_qname,
+            values,
+        } => write_generated_schema_refs(output, namespace, root_qname, values)?,
+        Replacement::ExpandEmpty {
+            source,
+            start,
+            end,
+            qname,
+            content,
+            attribute,
+        } => {
+            let slash = (*end).checked_sub(2).ok_or(Error::Internal(
+                "custom XML empty-element range is too short",
+            ))?;
+            if source.get(slash..*end) != Some(b"/>".as_slice()) {
+                return Err(Error::Internal(
+                    "custom XML empty-element closing layout is invalid",
+                ));
+            }
+            if let Some((attribute_start, attribute_end, value)) = attribute {
+                output.extend_from_slice(&source[*start..*attribute_start]);
+                push_escaped_attr(output, value);
+                output.extend_from_slice(&source[*attribute_end..slash]);
+            } else {
+                output.extend_from_slice(&source[*start..slash]);
+            }
+            output.push(b'>');
+            write_schema_refs_content_from_content(output, content)?;
+            output.extend_from_slice(b"</");
+            output.extend_from_slice(qname);
+            output.push(b'>');
+        },
+    }
+    Ok(())
+}
+
+fn write_schema_refs_content_from_content(
+    output: &mut Vec<u8>,
+    content: &SchemaRefsContent<'_>,
+) -> Result<()> {
+    match content {
+        SchemaRefsContent::Generated {
+            namespace,
+            qname,
+            values,
+        } => {
+            for value in values.iter() {
+                write_generated_schema_ref(output, namespace, qname, value);
+            }
+            Ok(())
+        },
+        SchemaRefsContent::GeneratedContainer {
+            namespace,
+            root_qname,
+            values,
+        } => {
+            // The root-empty path has no existing schemaRefs wrapper to
+            // expand, so emit the complete requested container here.
+            write_generated_schema_refs(output, namespace, root_qname, values)
+        },
+    }
+}
+
+fn write_generated_schema_refs_content(
+    output: &mut Vec<u8>,
+    namespace: &str,
+    qname: &[u8],
+    values: &[String],
+) {
+    for value in values {
+        write_generated_schema_ref(output, namespace, qname, value);
+    }
+}
+
+fn write_generated_schema_refs(
+    output: &mut Vec<u8>,
+    namespace: &str,
+    root_qname: &[u8],
+    values: &[String],
+) -> Result<()> {
+    let prefix = qname_prefix(root_qname).unwrap_or(b"ds");
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(prefix);
+    output.extend_from_slice(b":schemaRefs");
+    if qname_prefix(root_qname).is_none() {
+        output.extend_from_slice(b" xmlns:ds=\"");
+        push_escaped_attr(output, namespace);
+        output.extend_from_slice(b"\"");
+    }
+    output.push(b'>');
+    for value in values {
+        write_generated_schema_ref(output, namespace, root_qname, value);
+    }
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(prefix);
+    output.extend_from_slice(b":schemaRefs>");
+    Ok(())
+}
+
+fn write_generated_schema_ref(output: &mut Vec<u8>, namespace: &str, qname: &[u8], value: &str) {
+    let prefix = qname_prefix(qname).unwrap_or(b"ds");
+    output.extend_from_slice(b"<");
+    if qname_prefix(qname).is_some() {
+        output.extend_from_slice(prefix);
+        output.extend_from_slice(b":schemaRef ");
+        output.extend_from_slice(prefix);
+        output.extend_from_slice(b":uri=\"");
+    } else {
+        output.extend_from_slice(b"schemaRef xmlns:ds=\"");
+        push_escaped_attr(output, namespace);
+        output.extend_from_slice(b"\" ds:uri=\"");
+    }
+    push_escaped_attr(output, value);
+    output.extend_from_slice(b"\"/>");
+}
+
+fn qname_prefix(qname: &[u8]) -> Option<&[u8]> {
+    qname
+        .iter()
+        .position(|byte| *byte == b':')
+        .map(|index| &qname[..index])
 }
 
 /// Validate a typed properties value without serializing it.
@@ -211,7 +1575,7 @@ pub fn validate_props(props: &Props) -> Result<()> {
         return invalid(format!("custom XML itemID '{}' is not ST_Guid", props.id));
     }
     require_at_most(
-        "custom XML schema references",
+        LimitKind::SchemaReferences,
         props.schemas.len(),
         MAX_SCHEMA_REFS,
     )?;
@@ -221,16 +1585,12 @@ pub fn validate_props(props: &Props) -> Result<()> {
             return invalid("custom XML schema reference URI must not be empty");
         }
         validate_xml_chars(schema)?;
-        string_bytes = string_bytes.checked_add(schema.len()).ok_or_else(|| {
-            limit(
-                "custom XML property string bytes",
-                MAX_STRING_BYTES,
-                usize::MAX,
-            )
-        })?;
+        string_bytes = string_bytes
+            .checked_add(schema.len())
+            .ok_or_else(|| limit(LimitKind::PropertyStringBytes, MAX_STRING_BYTES, usize::MAX))?;
     }
     require_at_most(
-        "custom XML property string bytes",
+        LimitKind::PropertyStringBytes,
         string_bytes,
         MAX_STRING_BYTES,
     )
@@ -259,8 +1619,11 @@ pub fn valid_guid(value: &str) -> bool {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn validate_payload(xml: &[u8]) -> Result<Name> {
-    require_at_most("custom XML payload bytes", xml.len(), MAX_PART_BYTES)?;
+pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name> {
+    let max_part_bytes = max_payload_bytes(source_limits);
+    let max_depth = MAX_DEPTH.min(source_limits.max_depth());
+    let max_elements = MAX_ELEMENTS.min(source_limits.max_events());
+    require_at_most(LimitKind::PayloadBytes, xml.len(), max_part_bytes)?;
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
@@ -282,8 +1645,15 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
                 version = validate_declaration(&declaration)?;
             },
             Event::Start(element) => {
-                require_nested_depth(depth)?;
-                elements = bump_elements(elements)?;
+                check_source_element_bounds(
+                    source_limits,
+                    depth,
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                require_nested_depth(depth, max_depth)?;
+                elements = bump_elements(elements, max_elements)?;
                 let name = inspect_element(&reader, &element, version, depth == 0)?;
                 if depth == 0 {
                     if closed_root || root.is_some() {
@@ -293,11 +1663,18 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
                 }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("custom XML depth", MAX_DEPTH, usize::MAX))?;
+                    .ok_or_else(|| limit(LimitKind::Depth, max_depth, usize::MAX))?;
             },
             Event::Empty(element) => {
-                require_nested_depth(depth)?;
-                elements = bump_elements(elements)?;
+                check_source_element_bounds(
+                    source_limits,
+                    depth,
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                require_nested_depth(depth, max_depth)?;
+                elements = bump_elements(elements, max_elements)?;
                 let name = inspect_element(&reader, &element, version, depth == 0)?;
                 if depth == 0 {
                     if closed_root || root.is_some() {
@@ -357,6 +1734,10 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
         return invalid("custom XML payload has no complete root element");
     }
     root.ok_or_else(|| Error::Invalid("custom XML payload has no root".into()))
+}
+
+fn max_payload_bytes(source_limits: &SourceLimits) -> usize {
+    MAX_PART_BYTES.min(usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX))
 }
 
 /// Validate that a Custom XML data-part content type is a well-formed XML media type.
@@ -504,7 +1885,7 @@ fn resolved_namespace<'a>(result: ResolveResult<'a>, kind: &str) -> Result<&'a [
     }
 }
 
-fn parse_props_xml(xml: &[u8]) -> Result<Props> {
+fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -> Result<Props> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
@@ -517,9 +1898,22 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
     let mut closed_root = false;
     let mut version = XmlVersion::Implicit1_0;
     let mut event_seen = false;
+    let mut events = 0usize;
 
     loop {
         let event = reader.read_event_into(&mut buffer)?;
+        if !matches!(&event, Event::Eof) {
+            events = events.checked_add(1).ok_or_else(|| {
+                source_limit(LimitKind::XmlEvents, usize::MAX, source_limits.max_events())
+            })?;
+            if events > source_limits.max_events() {
+                return Err(source_limit(
+                    LimitKind::XmlEvents,
+                    events,
+                    source_limits.max_events(),
+                ));
+            }
+        }
         match event {
             Event::Decl(declaration) => {
                 if event_seen {
@@ -528,7 +1922,14 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 version = validate_declaration(&declaration)?;
             },
             Event::Start(element) => {
-                require_nested_depth(contexts.len())?;
+                check_source_element_bounds(
+                    source_limits,
+                    contexts.len(),
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                require_nested_depth(contexts.len(), max_depth)?;
                 let element = resolve_props_element(&reader, &element, version)?;
                 let context = props_start(
                     &element,
@@ -541,7 +1942,14 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 contexts.push(context);
             },
             Event::Empty(element) => {
-                require_nested_depth(contexts.len())?;
+                check_source_element_bounds(
+                    source_limits,
+                    contexts.len(),
+                    &element,
+                    version,
+                    reader.decoder(),
+                )?;
+                require_nested_depth(contexts.len(), max_depth)?;
                 let element = resolve_props_element(&reader, &element, version)?;
                 props_start(
                     &element,
@@ -667,10 +2075,11 @@ fn props_start(
             if root_namespace.as_deref() == Some(element.namespace.as_str())
                 && element.local_name == "schemaRef" =>
         {
-            let next = schemas.len().checked_add(1).ok_or_else(|| {
-                limit("custom XML schema references", MAX_SCHEMA_REFS, usize::MAX)
-            })?;
-            require_at_most("custom XML schema references", next, MAX_SCHEMA_REFS)?;
+            let next = schemas
+                .len()
+                .checked_add(1)
+                .ok_or_else(|| limit(LimitKind::SchemaReferences, MAX_SCHEMA_REFS, usize::MAX))?;
+            require_at_most(LimitKind::SchemaReferences, next, MAX_SCHEMA_REFS)?;
             reject_attributes_except(element, &[(element.namespace.as_str(), "uri")]);
             schemas.push(required_attr(element, &element.namespace, "uri")?.into());
             Ok(PropsContext::Schema)
@@ -814,11 +2223,7 @@ fn props_output_len(props: &Props, conformance: Conformance) -> Result<usize> {
         add_len(&mut total, SCHEMAS_END.len())?;
     }
     add_len(&mut total, ROOT_END.len())?;
-    require_at_most(
-        "custom XML serialized properties bytes",
-        total,
-        MAX_PROPS_BYTES,
-    )?;
+    require_at_most(LimitKind::SerializedPropertiesBytes, total, MAX_PROPS_BYTES)?;
     Ok(total)
 }
 
@@ -832,7 +2237,7 @@ fn escaped_attr_len(value: &str) -> Result<usize> {
         };
         total.checked_add(width).ok_or_else(|| {
             limit(
-                "custom XML serialized properties bytes",
+                LimitKind::SerializedPropertiesBytes,
                 MAX_PROPS_BYTES,
                 usize::MAX,
             )
@@ -843,7 +2248,7 @@ fn escaped_attr_len(value: &str) -> Result<usize> {
 fn add_len(total: &mut usize, value: usize) -> Result<()> {
     *total = total.checked_add(value).ok_or_else(|| {
         limit(
-            "custom XML serialized properties bytes",
+            LimitKind::SerializedPropertiesBytes,
             MAX_PROPS_BYTES,
             usize::MAX,
         )
@@ -926,39 +2331,36 @@ fn valid_encoding_name(value: &str) -> bool {
         && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
-fn require_nested_depth(depth: usize) -> Result<()> {
-    if depth >= MAX_DEPTH {
-        Err(limit(
-            "custom XML depth",
-            MAX_DEPTH,
-            depth.saturating_add(1),
-        ))
+fn require_nested_depth(depth: usize, maximum: usize) -> Result<()> {
+    if depth >= maximum {
+        let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+        Err(limit(LimitKind::Depth, maximum, observed))
     } else {
         Ok(())
     }
 }
 
-fn bump_elements(elements: usize) -> Result<usize> {
+fn bump_elements(elements: usize, maximum: usize) -> Result<usize> {
     let next = elements
         .checked_add(1)
-        .ok_or_else(|| limit("custom XML elements", MAX_ELEMENTS, usize::MAX))?;
-    require_at_most("custom XML elements", next, MAX_ELEMENTS)?;
+        .ok_or_else(|| limit(LimitKind::Elements, maximum, usize::MAX))?;
+    require_at_most(LimitKind::Elements, next, maximum)?;
     Ok(next)
 }
 
-pub(super) fn require_at_most(resource: &'static str, actual: usize, max: usize) -> Result<()> {
+pub(super) fn require_at_most(kind: LimitKind, actual: usize, max: usize) -> Result<()> {
     if actual > max {
-        Err(limit(resource, max, actual))
+        Err(limit(kind, max, actual))
     } else {
         Ok(())
     }
 }
 
-pub(super) fn limit(resource: &'static str, max: usize, actual: usize) -> Error {
+pub(super) fn limit(kind: LimitKind, max: usize, actual: usize) -> Error {
     Error::Limit {
-        resource,
-        max,
-        actual,
+        kind: crate::LimitKind::CustomXml(kind),
+        maximum: max,
+        observed: actual,
     }
 }
 

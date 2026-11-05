@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use litchi_iwa_cache::WeightedCache;
 pub use litchi_iwa_cache::{GetOrInsertError, ParseError};
-use litchi_iwa_core::{Archive, ArchiveLimits};
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
 use litchi_iwa_package::{Entry, EntryStore, Error as EntryStoreError, Patch};
 
 /// Package entries plus an index and bounded parsed-component cache.
@@ -265,7 +265,11 @@ pub fn is_legacy_operation_storage(name: &str, data: &[u8]) -> bool {
 }
 
 fn new_archive_cache(archive_limits: ArchiveLimits) -> WeightedCache<String, Archive> {
-    WeightedCache::new(archive_limits.max_archive_bytes()).unwrap_or_else(|error| {
+    WeightedCache::new(
+        archive_limits.max_archive_bytes(),
+        WeightedCache::<String, Archive>::DEFAULT_MAX_FLIGHTS,
+    )
+    .unwrap_or_else(|error| {
         unreachable!("validated IWA archive limits cannot create a zero-weight cache: {error}")
     })
 }
@@ -277,7 +281,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
 
-    use litchi_iwa_core::{Archive, ArchiveLimits};
+    use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
     use litchi_iwa_package::{Entry, EntryChangeKind};
 
     use super::{EntryStoreError, PackageState};

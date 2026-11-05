@@ -7,6 +7,57 @@ use quick_xml::{Reader, events::BytesStart, events::Event};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+/// Caller-selected bounds for the arbitrary-XML `blip` scanner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum XML bytes inspected by [`find_first_embed`].
+    pub max_input_bytes: usize,
+    /// Maximum relationship identifier retained by the scanner.
+    pub max_relationship_id_bytes: usize,
+}
+
+impl Limits {
+    /// Historical scanner policy.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: 64 * 1024 * 1024,
+        max_relationship_id_bytes: 256,
+    };
+
+    /// Construct a scanner policy.
+    #[must_use]
+    pub const fn new(max_input_bytes: usize, max_relationship_id_bytes: usize) -> Self {
+        Self {
+            max_input_bytes,
+            max_relationship_id_bytes,
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        if self.max_input_bytes == 0 {
+            return Err(Error::invalid_limit(
+                crate::LimitKind::InputBytes,
+                self.max_input_bytes,
+                Self::DEFAULT.max_input_bytes,
+            ));
+        }
+        if self.max_relationship_id_bytes == 0 || self.max_relationship_id_bytes > 256 {
+            return Err(Error::invalid_limit(
+                crate::LimitKind::AttributeValueBytes,
+                self.max_relationship_id_bytes,
+                256,
+            ));
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// Write an embedded-image reference, escaping the relationship ID.
 /// # Errors
 ///
@@ -68,17 +119,37 @@ pub fn read_embed(element: &BytesStart<'_>) -> Result<Option<String>> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn find_first_embed(xml: &[u8]) -> Result<Option<String>> {
+pub fn find_first_embed(xml: &[u8], limits: Limits) -> Result<Option<String>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_input_bytes {
+        return Err(Error::limit(
+            crate::LimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes,
+        ));
+    }
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);
 
     loop {
         match reader.read_event() {
             Ok(Event::Start(element) | Event::Empty(element)) => {
-                if element.local_name().as_ref() == b"blip"
-                    && let Some(relationship_id) = read_embed(&element)?
-                {
-                    return Ok(Some(relationship_id));
+                if element.local_name().as_ref() == b"blip" {
+                    for attribute in element.checked_attributes() {
+                        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                        if attribute.key.local_name().as_ref() == b"embed"
+                            && attribute.value.len() > limits.max_relationship_id_bytes
+                        {
+                            return Err(Error::limit(
+                                crate::LimitKind::AttributeValueBytes,
+                                attribute.value.len(),
+                                limits.max_relationship_id_bytes,
+                            ));
+                        }
+                    }
+                    if let Some(relationship_id) = read_embed(&element)? {
+                        return Ok(Some(relationship_id));
+                    }
                 }
             },
             Ok(Event::Eof) => return Ok(None),
@@ -99,13 +170,13 @@ mod tests {
         assert_eq!(xml, r#"<a:blip r:embed="rId&lt;&amp;&quot;"/>"#);
 
         assert_eq!(
-            find_first_embed(br#"<a:blip r:embed="rId7"/>"#).expect("valid blip"),
+            find_first_embed(br#"<a:blip r:embed="rId7"/>"#, Limits::DEFAULT).expect("valid blip"),
             Some("rId7".to_owned())
         );
     }
 
     #[test]
     fn malformed_attributes_are_not_silently_discarded() {
-        assert!(find_first_embed(br#"<a:blip r:embed="unterminated/>"#).is_err());
+        assert!(find_first_embed(br#"<a:blip r:embed="unterminated/>"#, Limits::DEFAULT).is_err());
     }
 }

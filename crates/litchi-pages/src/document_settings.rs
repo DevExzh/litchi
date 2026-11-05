@@ -15,7 +15,9 @@
 
 use crate::{document_options, footnote};
 
-pub use crate::package::document_settings::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::document_settings::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};
 
 /// Validated combined settings for Pages document and footnote formatters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

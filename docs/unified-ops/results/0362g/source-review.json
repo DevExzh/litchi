@@ -1,0 +1,28 @@
+{
+  "candidate_commit": "e3aa14d255573f5ca51c4cd9f96a698eb8c1b1cb",
+  "reviewer": "root coordinator",
+  "disposition": "source review complete; returned for original-baseline inverse replay regression",
+  "implementation": [
+    "Replay keeps the exact source Vec instead of converting it to a temporary Arc slice.",
+    "Length and recorded content root still authenticate independent-copy replay.",
+    "Source freshness is fenced before consulting the signature memo.",
+    "Candidate length is admitted before rebuilding replay output, including strict recipient policies.",
+    "No-op returns the unchanged receiver plus its no-op patch and diagnostics.",
+    "Changed publication preserves receiver source limits and leniency and the closed unsigned-publication proof.",
+    "Native edit capture and its retention model are unchanged by e3aa."
+  ],
+  "regression_checks": [
+    "independent-copy forward/inverse exact bytes",
+    "changed positional source refusal",
+    "oversized growing replay under strict recipient input limit",
+    "signed source admission/error precedence"
+  ],
+  "validation": {
+    "unique_passes": 2109,
+    "ignored": 3,
+    "commands": 6,
+    "manifest": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-release-source-20261021/manifest.json",
+    "manifest_sha256": "d35767eb9b513ddc7f0080a3947d272b15f92d785ce26e127e30f9ef74aaf6fe"
+  },
+  "performance": "Must independently pass matched-Sip replay comparison and original-baseline first-commit/steady/replay/retention comparison. No old returned measurements are pooled with this candidate."
+}

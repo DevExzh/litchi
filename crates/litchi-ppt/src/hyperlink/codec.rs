@@ -6,8 +6,8 @@ use super::model::{
     MacroNameAtom,
 };
 use crate::consts::RecordType;
-use crate::package::{Error, Result};
-use crate::records::Record;
+use crate::package::{Error, Result, SourceLimits};
+use crate::records::{Record, RecordParseSession};
 use std::borrow::Cow;
 
 impl InteractiveInfoAtom {
@@ -166,10 +166,9 @@ impl Interaction {
     ///
     /// # Errors
     ///
-    /// Returns an error if the container is malformed; see
-    /// [`Self::parse_with_limits`].
-    pub fn parse(record: &Record) -> Result<Self> {
-        Self::parse_with_limits(record, InteractionLimits::default())
+    /// Returns an error if the container is malformed or exceeds `limits`.
+    pub fn parse(record: &Record, limits: &InteractionLimits) -> Result<Self> {
+        Self::parse_with_limits(record, *limits)
     }
 
     /// Parse a container with explicit record and `MacroNameAtom` bounds.
@@ -179,7 +178,7 @@ impl Interaction {
     /// Returns an error if the record header is malformed, the container
     /// exceeds `limits`, the child records are missing, duplicated, or
     /// malformed, or an atom payload is invalid.
-    pub fn parse_with_limits(record: &Record, limits: InteractionLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(record: &Record, limits: InteractionLimits) -> Result<Self> {
         if record.record_type != RecordType::InteractiveInfo
             || record.record_type_raw != RecordType::InteractiveInfo.as_u16()
             || record.version != 0x0f
@@ -187,15 +186,46 @@ impl Interaction {
         {
             return corrupted("InteractiveInfo has an invalid record header or length");
         }
-        if record.data.len().saturating_add(8) > limits.max_record_bytes {
-            return corrupted("InteractiveInfo exceeds the configured record size limit");
+        if record.data.len() > limits.max_record_payload_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: record.data.len(),
+                maximum: limits.max_record_payload_bytes,
+            });
         }
+        if record.data.len() > limits.max_aggregate_payload_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregatePayloadBytes,
+                observed: record.data.len(),
+                maximum: limits.max_aggregate_payload_bytes,
+            });
+        }
+        if record
+            .data
+            .len()
+            .checked_add(8)
+            .is_none_or(|size| size > limits.max_record_bytes)
+        {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: record.data.len().saturating_add(8),
+                maximum: limits.max_record_bytes,
+            });
+        }
+        let source_limits = interaction_source_limits(limits)?;
+        let mut session = RecordParseSession::new(source_limits, record.data.len())?;
         let trigger = match record.instance {
             0 => InteractionTrigger::Click,
             1 => InteractionTrigger::MouseOver,
             _ => return corrupted("InteractiveInfo has an invalid trigger instance"),
         };
-        let children = Record::parse_sequence_strict(&record.data, "interactive information")?;
+        let children = if !record.children.is_empty() || record.data.is_empty() {
+            session.account_existing_tree(record, 0)?;
+            Cow::Borrowed(&record.children)
+        } else {
+            session.account_existing(record, 0)?;
+            Cow::Owned(session.parse_sequence(&record.data, "interactive information", 1)?)
+        };
         if !matches!(children.len(), 1 | 2) {
             return corrupted("InteractiveInfo has an invalid child count");
         }
@@ -252,9 +282,9 @@ impl Interaction {
     /// # Errors
     ///
     /// Returns an error if the bytes are not exactly one well-formed
-    /// `InteractiveInfo` container; see [`Self::parse_bytes_with_limits`].
-    pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::parse_bytes_with_limits(bytes, InteractionLimits::default())
+    /// `InteractiveInfo` container within `limits`.
+    pub fn parse_bytes(bytes: &[u8], limits: &InteractionLimits) -> Result<Self> {
+        Self::parse_bytes_with_limits(bytes, *limits)
     }
 
     /// Parse one exact complete container from bounded bytes.
@@ -263,11 +293,12 @@ impl Interaction {
     ///
     /// Returns an error if the bytes exceed `limits`, contain trailing bytes
     /// after the record, or the container itself is malformed.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: InteractionLimits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(bytes: &[u8], limits: InteractionLimits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return corrupted("InteractiveInfo exceeds the configured record size limit");
         }
-        let (record, consumed) = Record::parse_strict(bytes, 0)?;
+        let (record, consumed) =
+            Record::parse_strict_with_limits(bytes, 0, interaction_source_limits(limits)?)?;
         if consumed != bytes.len() {
             return corrupted("InteractiveInfo has trailing bytes");
         }
@@ -320,23 +351,20 @@ impl Interaction {
     /// Returns an error if the macro name data is inconsistent or exceeds the
     /// configured limits, or the serialized container would exceed the
     /// configured record size limit.
-    pub fn validate_with_limits(&self, limits: InteractionLimits) -> Result<()> {
+    pub(crate) fn validate_with_limits(&self, limits: InteractionLimits) -> Result<()> {
         let macro_name = self.validated_macro_name_data(limits)?;
-        validate_serialized_interaction_size(
-            macro_name.as_ref().map(|data| data.len()),
-            limits.max_record_bytes,
-        )?;
+        validate_serialized_interaction_size(macro_name.as_ref().map(|data| data.len()), limits)?;
         Ok(())
     }
 
-    /// Serialize canonical headers and exact atom/name payloads with default limits.
+    /// Serialize canonical headers and exact atom/name payloads within `limits`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the interaction fails validation or serialization;
-    /// see [`Self::to_bytes_with_limits`].
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.to_bytes_with_limits(InteractionLimits::default())
+    /// Returns an error if the interaction fails validation or serialization
+    /// within `limits`.
+    pub fn to_bytes(&self, limits: &InteractionLimits) -> Result<Vec<u8>> {
+        self.to_bytes_with_limits(*limits)
     }
 
     /// Serialize canonical headers and exact atom/name payloads with explicit limits.
@@ -346,12 +374,9 @@ impl Interaction {
     /// Returns an error if the macro name data is inconsistent or exceeds the
     /// configured limits, or the serialized records exceed the configured
     /// record size limit.
-    pub fn to_bytes_with_limits(&self, limits: InteractionLimits) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes_with_limits(&self, limits: InteractionLimits) -> Result<Vec<u8>> {
         let macro_name = self.validated_macro_name_data(limits)?;
-        validate_serialized_interaction_size(
-            macro_name.as_ref().map(|data| data.len()),
-            limits.max_record_bytes,
-        )?;
+        validate_serialized_interaction_size(macro_name.as_ref().map(|data| data.len()), limits)?;
         let atom_payload = self.atom().to_payload();
         let mut children = encode_record(
             0,
@@ -388,10 +413,16 @@ impl Interaction {
                 Ok(Some(Cow::Borrowed(data)))
             },
             (Some(text), None) => {
-                let atom = MacroNameAtom::new(text.clone())?;
-                if atom.raw_utf16().len() > limits.max_macro_name_bytes {
+                let bytes = text
+                    .encode_utf16()
+                    .count()
+                    .checked_mul(2)
+                    .ok_or_else(|| Error::Corrupted("MacroNameAtom length overflows".into()))?;
+                if bytes > limits.max_macro_name_bytes {
                     return corrupted("MacroNameAtom exceeds the configured size limit");
                 }
+                let atom = MacroNameAtom::new(text.clone())?;
+                debug_assert_eq!(atom.raw_utf16().len(), bytes);
                 Ok(Some(Cow::Owned(atom.raw_utf16)))
             },
             (None, Some(_)) => corrupted("MacroNameAtom exact data is present without text"),
@@ -404,9 +435,10 @@ impl Interaction {
     ///
     /// Returns an error if the interaction fails to serialize or the
     /// serialized bytes do not parse back as one complete record.
-    pub fn to_record(&self) -> Result<Record> {
-        let bytes = self.to_bytes()?;
-        let (record, consumed) = Record::parse_strict(&bytes, 0)?;
+    pub fn to_record(&self, limits: &InteractionLimits) -> Result<Record> {
+        let bytes = self.to_bytes(limits)?;
+        let (record, consumed) =
+            Record::parse_strict_with_limits(&bytes, 0, interaction_source_limits(*limits)?)?;
         if consumed != bytes.len() {
             return corrupted("serialized InteractiveInfo was only partially parsed");
         }
@@ -452,7 +484,11 @@ impl Interaction {
         limits: InteractionLimits,
     ) -> Result<Vec<Self>> {
         let mut interactions = Vec::new();
-        for record in Record::parse_sequence_strict(data, "shape ClientData")? {
+        for record in Record::parse_sequence_strict_with_limits(
+            data,
+            "shape ClientData",
+            interaction_source_limits(limits)?,
+        )? {
             if record.record_type != RecordType::InteractiveInfo {
                 continue;
             }
@@ -477,7 +513,7 @@ impl HyperlinkExtension {
     /// Returns an error if the record header is malformed, the child count is
     /// invalid, the hyperlink reference is null, or a child atom is malformed
     /// or has nonzero reserved bits.
-    pub fn parse(record: &Record) -> Result<(u32, Self)> {
+    pub fn parse(record: &Record, limits: &SourceLimits) -> Result<(u32, Self)> {
         if record.record_type != RecordType::ExternalHyperlink9
             || record.version != 0x0f
             || record.instance != 0
@@ -486,7 +522,16 @@ impl HyperlinkExtension {
                 "ExHyperlink9Container has an invalid record header".to_string(),
             ));
         }
-        let children = Record::parse_sequence_strict(&record.data, "PowerPoint 9 hyperlink")?;
+        ensure_record_size(record, limits, "ExHyperlink9Container")?;
+        let children = if !record.children.is_empty() || record.data.is_empty() {
+            Cow::Borrowed(&record.children)
+        } else {
+            Cow::Owned(Record::parse_sequence_strict_with_limits(
+                &record.data,
+                "PowerPoint 9 hyperlink",
+                *limits,
+            )?)
+        };
         if !matches!(children.len(), 2 | 3) {
             return Err(Error::Corrupted(
                 "ExHyperlink9Container has an invalid child count".to_string(),
@@ -505,7 +550,7 @@ impl HyperlinkExtension {
                     "ScreenTipAtom has an invalid record header".to_string(),
                 ));
             }
-            (Some(parse_unicode_string(&tip.data)?), 2)
+            (Some(parse_unicode_string(&tip.data, limits)?), 2)
         } else {
             (None, 1)
         };
@@ -546,7 +591,7 @@ impl Hyperlink {
     /// Returns an error if the record header is malformed, the hyperlink atom
     /// is missing or has a zero ID, or a string child is unexpected,
     /// duplicated, out of order, or not valid UTF-16.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &SourceLimits) -> Result<Self> {
         if record.record_type != RecordType::ExternalHyperlink
             || record.version != 0x0f
             || record.instance != 0
@@ -555,7 +600,16 @@ impl Hyperlink {
                 "ExHyperlinkContainer has an invalid record header".to_string(),
             ));
         }
-        let children = Record::parse_sequence_strict(&record.data, "external hyperlink")?;
+        ensure_record_size(record, limits, "ExHyperlinkContainer")?;
+        let children = if !record.children.is_empty() || record.data.is_empty() {
+            Cow::Borrowed(&record.children)
+        } else {
+            Cow::Owned(Record::parse_sequence_strict_with_limits(
+                &record.data,
+                "external hyperlink",
+                *limits,
+            )?)
+        };
         let Some(atom) = children.first() else {
             return Err(Error::Corrupted(
                 "ExHyperlinkContainer is missing ExHyperlinkAtom".to_string(),
@@ -584,7 +638,7 @@ impl Hyperlink {
                 ));
             }
             previous_instance = Some(child.instance);
-            let value = Some(parse_unicode_string(&child.data)?);
+            let value = Some(parse_unicode_string(&child.data, limits)?);
             match child.instance {
                 0 => friendly_name = value,
                 1 => target = value,
@@ -609,31 +663,34 @@ impl Hyperlink {
 impl Hyperlinks {
     /// Discover base hyperlinks and merge all `___PPT9` hyperlink extensions.
     ///
+    /// `limits` bounds every nested record sequence and retained hyperlink
+    /// string before it is decoded.
+    ///
     /// # Errors
     ///
     /// Returns an error if the record tree is malformed, a hyperlink or
     /// extension record is invalid, or an extension references an unknown or
     /// duplicate hyperlink ID.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut lists = Vec::new();
-        collect_records(root, RecordType::ExObjList, &mut lists);
+        collect_records(root, RecordType::ExObjList, &mut lists, limits)?;
         if lists.len() > 1 {
             return Err(Error::Corrupted(
                 "Record tree contains multiple external-object lists".to_string(),
             ));
         }
         let mut result = if let Some(list) = lists.first() {
-            Self::parse_external_object_list(list)?
+            Self::parse_external_object_list(list, limits)?
         } else {
             Self::default()
         };
 
         let mut extension_ids = Vec::new();
-        for record in root.versioned_binary_tag_records(9)? {
+        for record in root.versioned_binary_tag_records(9, limits)? {
             if record.record_type != RecordType::ExternalHyperlink9 {
                 continue;
             }
-            let (id, extension) = HyperlinkExtension::parse(&record)?;
+            let (id, extension) = HyperlinkExtension::parse(&record, limits)?;
             if extension_ids.contains(&id) {
                 return Err(Error::Corrupted(
                     "PowerPoint 9 contains duplicate hyperlink extensions".to_string(),
@@ -662,7 +719,7 @@ impl Hyperlinks {
             .find(|hyperlink| hyperlink.id == id)
     }
 
-    fn parse_external_object_list(record: &Record) -> Result<Self> {
+    fn parse_external_object_list(record: &Record, limits: &SourceLimits) -> Result<Self> {
         if record.record_type != RecordType::ExObjList
             || record.version != 0x0f
             || record.instance != 0
@@ -671,7 +728,16 @@ impl Hyperlinks {
                 "ExObjListContainer has an invalid record header".to_string(),
             ));
         }
-        let children = Record::parse_sequence_strict(&record.data, "external-object list")?;
+        ensure_record_size(record, limits, "ExObjListContainer")?;
+        let children = if !record.children.is_empty() || record.data.is_empty() {
+            Cow::Borrowed(&record.children)
+        } else {
+            Cow::Owned(Record::parse_sequence_strict_with_limits(
+                &record.data,
+                "external-object list",
+                *limits,
+            )?)
+        };
         let Some(atom) = children.first() else {
             return Err(Error::Corrupted(
                 "ExObjListContainer is missing ExObjListAtom".to_string(),
@@ -698,7 +764,7 @@ impl Hyperlinks {
             if child.record_type != RecordType::ExternalHyperlink {
                 continue;
             }
-            let hyperlink = Hyperlink::parse(child)?;
+            let hyperlink = Hyperlink::parse(child, limits)?;
             if hyperlinks
                 .iter()
                 .any(|existing: &Hyperlink| existing.id == hyperlink.id)
@@ -726,7 +792,7 @@ impl Hyperlinks {
 
 fn validate_serialized_interaction_size(
     macro_name_bytes: Option<usize>,
-    max_record_bytes: usize,
+    limits: InteractionLimits,
 ) -> Result<()> {
     let macro_record_len = macro_name_bytes
         .map(|size| {
@@ -739,10 +805,56 @@ fn validate_serialized_interaction_size(
     let complete_len = 32usize
         .checked_add(macro_record_len)
         .ok_or_else(|| Error::Corrupted("InteractiveInfo length overflows".into()))?;
-    if complete_len > max_record_bytes {
-        return corrupted("InteractiveInfo exceeds the configured record size limit");
+    let payload_len = complete_len
+        .checked_sub(8)
+        .ok_or_else(|| Error::Corrupted("InteractiveInfo length underflows".into()))?;
+    if payload_len > limits.max_record_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            observed: payload_len,
+            maximum: limits.max_record_payload_bytes,
+        });
+    }
+    let aggregate_payload_len = payload_len
+        .checked_add(16)
+        .and_then(|value| value.checked_add(macro_name_bytes.unwrap_or(0)))
+        .ok_or_else(|| Error::Corrupted("InteractiveInfo aggregate length overflows".into()))?;
+    if aggregate_payload_len > limits.max_aggregate_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::AggregatePayloadBytes,
+            observed: aggregate_payload_len,
+            maximum: limits.max_aggregate_payload_bytes,
+        });
+    }
+    if complete_len > limits.max_record_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordBytes,
+            observed: complete_len,
+            maximum: limits.max_record_bytes,
+        });
     }
     Ok(())
+}
+
+pub(crate) fn interaction_source_limits(limits: InteractionLimits) -> Result<SourceLimits> {
+    let payload_bytes = limits
+        .max_record_bytes
+        .checked_sub(8)
+        .ok_or_else(|| {
+            Error::Corrupted("interaction record limit is smaller than its header".into())
+        })?
+        .min(limits.max_record_payload_bytes);
+    SourceLimits::builder()
+        .max_input_bytes(limits.max_record_bytes)
+        .and_then(|builder| builder.max_entry_bytes(limits.max_record_bytes))
+        .and_then(|builder| builder.max_aggregate_bytes(limits.max_record_bytes))
+        .and_then(|builder| builder.max_record_bytes(limits.max_record_bytes))
+        .and_then(|builder| builder.max_events(limits.max_events))
+        .and_then(|builder| builder.max_depth(limits.max_depth))
+        .and_then(|builder| builder.max_record_payload_bytes(payload_bytes))
+        .and_then(|builder| builder.max_aggregate_payload_bytes(limits.max_aggregate_payload_bytes))
+        .and_then(|builder| builder.build())
+        .map_err(|error| Error::Corrupted(format!("invalid interaction limits: {error}")))
 }
 
 fn action_value(value: InteractionAction) -> u8 {
@@ -901,7 +1013,16 @@ fn parse_hyperlink_atom(record: &Record) -> Result<u32> {
     ]))
 }
 
-fn parse_unicode_string(data: &[u8]) -> Result<String> {
+fn parse_unicode_string(data: &[u8], limits: &SourceLimits) -> Result<String> {
+    if data.len() > limits.max_record_payload_bytes()
+        || data.len() > limits.max_aggregate_payload_bytes()
+        || data
+            .len()
+            .checked_add(8)
+            .is_none_or(|size| size > limits.max_record_bytes())
+    {
+        return corrupted("Hyperlink string exceeds the configured record size limit");
+    }
     if data.len() & 1 != 0 {
         return Err(Error::Corrupted(
             "Hyperlink string has an odd byte length".to_string(),
@@ -919,11 +1040,49 @@ fn parse_unicode_string(data: &[u8]) -> Result<String> {
         .map_err(|_err| Error::Corrupted("Hyperlink string is invalid UTF-16".to_string()))
 }
 
-fn collect_records<'a>(record: &'a Record, record_type: RecordType, records: &mut Vec<&'a Record>) {
-    if record.record_type == record_type {
-        records.push(record);
+fn ensure_record_size(record: &Record, limits: &SourceLimits, context: &str) -> Result<()> {
+    if record.data.len() > limits.max_record_payload_bytes()
+        || record.data.len() > limits.max_aggregate_payload_bytes()
+        || record
+            .data
+            .len()
+            .checked_add(8)
+            .is_none_or(|size| size > limits.max_record_bytes())
+    {
+        return corrupted(format!(
+            "{context} exceeds the configured record size limit"
+        ));
     }
-    for child in &record.children {
-        collect_records(child, record_type, records);
+    Ok(())
+}
+
+fn collect_records<'a>(
+    root: &'a Record,
+    record_type: RecordType,
+    records: &mut Vec<&'a Record>,
+    limits: &SourceLimits,
+) -> Result<()> {
+    let mut session = RecordParseSession::new(*limits, 0)?;
+    let mut pending = Vec::new();
+    pending
+        .try_reserve(1)
+        .map_err(|_error| Error::AllocationFailed("hyperlink traversal stack"))?;
+    pending.push((root, 0usize));
+    while let Some((record, depth)) = pending.pop() {
+        session.account_existing(record, depth)?;
+        if record.record_type == record_type {
+            records
+                .try_reserve(1)
+                .map_err(|_error| Error::AllocationFailed("hyperlink record table"))?;
+            records.push(record);
+        }
+        let child_depth = depth
+            .checked_add(1)
+            .ok_or_else(|| Error::Corrupted("hyperlink traversal depth overflows".into()))?;
+        pending
+            .try_reserve(record.children.len())
+            .map_err(|_error| Error::AllocationFailed("hyperlink traversal stack"))?;
+        pending.extend(record.children.iter().map(|child| (child, child_depth)));
     }
+    Ok(())
 }

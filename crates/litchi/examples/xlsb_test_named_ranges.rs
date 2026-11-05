@@ -9,15 +9,15 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test NR: Creating XLSB with named ranges...");
 
-    let mut workbook = WorkbookWriter::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut workbook = Builder::new();
+    let mut sheet = builder::Worksheet::new("Data");
 
     // Create some data
     sheet.set_cell(0, 0, CellValue::String("Product".to_string()));
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_named_range(hidden_range);
 
     let file = File::create("xlsb_test_named_ranges.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_named_ranges.xlsb");
     println!("  - Open in Excel and use Name Manager (Formulas > Name Manager) to verify");

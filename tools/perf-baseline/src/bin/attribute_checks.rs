@@ -87,16 +87,19 @@ fn outcome<T, E: std::fmt::Display>(
 }
 
 fn read_opc(bytes: &[u8]) -> String {
-    outcome(litchi_opc::OpcPackage::from_bytes(bytes), |package| {
-        // The package keeps its parts in a hash map, whose order differs from
-        // one process to the next: digest them in name order.
-        let mut parts: Vec<String> = package
-            .iter_parts()
-            .map(|part| format!("{} {}\n", part.partname(), part.content_type()))
-            .collect();
-        parts.sort_unstable();
-        sha256_hex(parts.concat().as_bytes())
-    })
+    outcome(
+        litchi_opc::OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()),
+        |package| {
+            // The package keeps its parts in a hash map, whose order differs from
+            // one process to the next: digest them in name order.
+            let mut parts: Vec<String> = package
+                .iter_parts()
+                .map(|part| format!("{} {}\n", part.partname(), part.content_type()))
+                .collect();
+            parts.sort_unstable();
+            sha256_hex(parts.concat().as_bytes())
+        },
+    )
 }
 
 fn read_docx(bytes: &[u8]) -> String {
@@ -124,11 +127,11 @@ fn read_pptx(bytes: &[u8]) -> String {
 }
 
 fn read_xlsx(bytes: &[u8]) -> String {
-    let cells = litchi_xlsx::Workbook::from_bytes(bytes.to_vec())
+    let cells = litchi_xlsx::Package::from_bytes(bytes)
         .map_err(|error| error.to_string())
         .and_then(|workbook| {
             let mut summary = String::new();
-            for sheet in workbook.sheets() {
+            for sheet in workbook.workbook().sheets() {
                 let cells = sheet
                     .cells("A1:XFD1048576")
                     .map_err(|error| error.to_string())?;
@@ -188,7 +191,9 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
         let Ok(bytes) = std::fs::read(path) else {
             continue;
         };
-        let Ok(archive) = ArchiveReader::new(&bytes) else {
+        let Ok(archive) =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
+        else {
             continue;
         };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
@@ -245,7 +250,7 @@ fn collect_packages(root: &Path, packages: &mut Vec<PathBuf>) -> Result<(), Box<
             return Ok(());
         };
         if bytes.starts_with(b"PK\x03\x04")
-            && ArchiveReader::new(&bytes)
+            && ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
                 .is_ok_and(|archive| archive.contains("[Content_Types].xml"))
         {
             packages.push(root.to_owned());
@@ -406,7 +411,8 @@ fn replace_member(
     member: &str,
     replacement: &[u8],
 ) -> Option<Vec<u8>> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in names {
         if name == member {
             writer.write_stored(name, replacement).ok()?;
@@ -442,7 +448,8 @@ fn relationship_declarations(n: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let _ = write!(rels, " xmlns:p{index}=\"u\"");
     }
     rels.push_str("/></Relationships>");
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", CONTENT_TYPES.as_bytes())?;
     writer.write_stored("_rels/.rels", rels.as_bytes())?;
     writer.write_stored("probe.xml", b"<probe/>")?;

@@ -15,6 +15,8 @@ pub mod validation;
 mod tests;
 
 pub use model::{Asset, Data, Link, Model, Preview, Scene, Shape, Unknown};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 /// The `a:graphicData/@uri` value used by a `PresentationML` 3D model frame.
 pub const GRAPHIC_URI: &str = litchi_drawingml::model3d::NAMESPACE;

@@ -37,6 +37,7 @@ zerocopy-derive    = { workspace = true }
 zeroize            = { workspace = true }
 
 [dev-dependencies]
+chrono = { workspace = true }
 flate2 = { workspace = true }
 
 [lints]

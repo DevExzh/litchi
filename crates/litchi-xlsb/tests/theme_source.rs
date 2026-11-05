@@ -17,7 +17,7 @@ use litchi_core::{
 };
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::{ReadLimits, SourceBackedWorkbook};
+use litchi_xlsb::{SourceBackedWorkbook, SourceLimits};
 
 #[derive(Debug)]
 struct Source {
@@ -104,10 +104,11 @@ fn stale_source_refuses_theme_without_payload_reads() {
 fn cancelled_source_refuses_theme_without_payload_reads() {
     let source = Source::fixture();
     let (cancellation, context) = context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let before = source.reads.load(Ordering::SeqCst);
@@ -138,13 +139,14 @@ fn theme_access_materializes_only_the_selected_theme_part() {
 #[test]
 fn malformed_unselected_worksheet_does_not_block_theme_access() {
     let source = Source::fixture();
-    let mut package = OpcPackage::from_reader(Cursor::new(&source.bytes)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(&source.bytes), SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
         .unwrap()
         .set_blob(vec![0xff]);
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
     assert!(workbook.theme().unwrap().is_some());
     assert!(
@@ -160,30 +162,38 @@ fn malformed_unselected_worksheet_does_not_block_theme_access() {
 #[test]
 fn theme_byte_limit_is_checked_before_payload_reads() {
     let source = Source::fixture();
-    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let open = |limits| {
+        SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            litchi_xlsb::OpenOptions::new()
+                .semantic_limits(litchi_xlsb::SemanticLimits::new().theme(limits)),
+        )
+        .unwrap()
+    };
+    let below = open(litchi_xlsb::theme::Limits::new(7_645, 100_000, 128));
+    let exact = open(litchi_xlsb::theme::Limits::new(7_646, 100_000, 128));
     let before = source.reads.load(Ordering::SeqCst);
-    let limits = litchi_xlsb::theme::Limits::new(7_645, 100_000, 128);
     assert!(matches!(
-        workbook.theme_with_limits(limits),
-        Err(PackageError::LimitExceeded {
-            actual: 7_646,
+        below.theme(),
+        Err(PackageError::Limit {
+            observed: 7_646,
             maximum: 7_645,
             ..
         })
     ));
     assert_eq!(source.reads.load(Ordering::SeqCst), before);
-    let exact = litchi_xlsb::theme::Limits::new(7_646, 100_000, 128);
-    assert!(workbook.theme_with_limits(exact).unwrap().is_some());
+    assert!(exact.theme().unwrap().is_some());
 }
 
 #[test]
 fn managed_theme_view_retains_captured_data_after_workbook_drop() {
     let source = Source::fixture();
     let (_cancellation, context) = context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        ReadLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let view = workbook.theme().unwrap().unwrap();
@@ -202,7 +212,8 @@ fn managed_theme_view_retains_captured_data_after_workbook_drop() {
 #[test]
 fn theme_image_relationships_do_not_materialize_image_payloads() {
     let fixture = Source::fixture();
-    let mut package = OpcPackage::from_reader(Cursor::new(&fixture.bytes)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(&fixture.bytes), SourceLimits::default()).unwrap();
     let image_name = PackURI::new("/xl/media/theme-test.png").unwrap();
     package
         .try_add_part(Box::new(litchi_opc::BlobPart::new(
@@ -233,7 +244,7 @@ fn theme_image_relationships_do_not_materialize_image_payloads() {
         )
         .unwrap();
     let mut bytes = Vec::new();
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     let source = Arc::new(Source {
         bytes,
         reads: AtomicUsize::new(0),

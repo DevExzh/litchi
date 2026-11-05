@@ -7,7 +7,7 @@ use crate::core::PackageWriter;
 use crate::elements::parser::OrderElement;
 
 fn document(content: &str) -> Document {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())
@@ -16,7 +16,9 @@ fn document(content: &str) -> Document {
 }
 
 fn raw_package(content: &[u8]) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("mimetype", constants::ODF_TEXT.as_bytes())
         .unwrap();
@@ -29,14 +31,18 @@ fn raw_package(content: &[u8]) -> Vec<u8> {
 #[test]
 fn prepared_detection_transfers_the_same_archive_index_into_semantic_open() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>prepared</t:p></o:text></o:body></o:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(
+        bytes.clone(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap();
     let index_identity = prepared.prepared_index_identity();
     let document = Document::from_prepared_package(prepared).unwrap();
 
@@ -51,13 +57,16 @@ fn prepared_detection_transfers_the_same_archive_index_into_semantic_open() {
 #[test]
 fn prepared_detection_rejects_a_wrong_family_before_semantic_open() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())
         .unwrap();
-    let prepared = litchi_odf_common::detect::prepared(writer.finish_to_bytes().unwrap())
-        .expect("valid ODS package should be detected");
+    let prepared = litchi_odf_common::detect::prepared(
+        writer.finish_to_bytes().unwrap(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .expect("valid ODS package should be detected");
 
     assert!(Document::from_prepared_package(prepared).is_err());
 }
@@ -69,7 +78,7 @@ fn prepared_detection_rejects_junk_and_malformed_odt_content_xml() {
         br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#.as_slice(),
         &[0xff, 0xfe][..],
     ] {
-        let prepared = litchi_odf_common::detect::prepared(raw_package(content))
+        let prepared = litchi_odf_common::detect::prepared(raw_package(content), litchi_odf_common::SourceLimits::default())
             .expect("archive structure should prepare before XML validation");
         assert!(Document::from_prepared_package(prepared).is_err());
     }
@@ -89,7 +98,7 @@ fn prepared_semantic_open_rejects_invalid_xml_references_and_late_declarations()
         br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>&#x110000;</o:text></o:body></o:document-content>"#.as_slice(),
         br#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text>ok</o:text></o:body></o:document-content><?xml version="1.0"?>"#.as_slice(),
     ] {
-        let prepared = litchi_odf_common::detect::prepared(raw_package(content))
+        let prepared = litchi_odf_common::detect::prepared(raw_package(content), litchi_odf_common::SourceLimits::default())
             .expect("archive structure should prepare before XML validation");
         assert!(Document::from_prepared_package(prepared).is_err());
     }
@@ -198,12 +207,14 @@ fn conformant_fixture_opens_with_an_empty_tolerance_report() {
     let document = Document::from_bytes(bytes.clone()).unwrap();
     assert!(document.tolerance_report().is_clean());
     assert_eq!(document.tolerance_report().total(), 0);
-    let prepared = litchi_odf_common::detect::prepared(bytes).unwrap();
+    let prepared =
+        litchi_odf_common::detect::prepared(bytes, litchi_odf_common::SourceLimits::default())
+            .unwrap();
     let document = Document::from_prepared_package(prepared).unwrap();
     assert!(document.tolerance_report().is_clean());
 
     // Path-based open and the positional source-backed facade.
-    let document = Document::open(&path).unwrap();
+    let document = crate::Package::open(&path).unwrap().document().unwrap();
     assert!(document.tolerance_report().is_clean());
     let source = std::sync::Arc::new(litchi_core::OwnedSource::new(std::fs::read(&path).unwrap()));
     let source_document = super::SourceBackedDocument::from_read_at(source).unwrap();

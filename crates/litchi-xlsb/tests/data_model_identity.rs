@@ -10,9 +10,9 @@ use std::io::Cursor;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
-use litchi_xlsb::data_model::{Definition, Model, ReadLimits, Relationship, Table};
+use litchi_xlsb::builder::{self, Builder};
+use litchi_xlsb::data_model::{Definition, Model, Relationship, SemanticLimits, Table};
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 
 const XLDM_PAGE_SIZE: usize = 4096;
 const CRC_SIZE: usize = 4;
@@ -79,15 +79,21 @@ fn connections() -> Connections {
 }
 
 fn package_with_model(definition: Definition, payload: Vec<u8>) -> Package {
-    let mut writer = WorkbookWriter::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut writer = Builder::new();
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(definition, payload).expect("model"))
+        .set_data_model(
+            Model::from_bytes(definition, payload, SemanticLimits::DEFAULT).expect("model"),
+        )
         .expect("set Data Model");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn complete_package(self_relationship: bool) -> Package {
@@ -117,8 +123,10 @@ fn complete_payload_named_inner(name: &str, with_relationship: bool) -> Vec<u8> 
         return build_identity_storage(&source);
     }
     let storage_bytes = build_identity_storage(&source);
-    let storage = litchi_xldm::inspect_shared(&storage_bytes).expect("XLDM storage");
-    let metadata = litchi_xldm::metadata::inspect(&storage).expect("metadata closure");
+    let storage = litchi_xldm::inspect_shared(&storage_bytes, &litchi_xldm::Limits::DEFAULT)
+        .expect("XLDM storage");
+    let metadata = litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+        .expect("metadata closure");
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
         .expect("native closure");
     let generated =
@@ -343,8 +351,9 @@ fn signed_complete_package() -> Package {
 
 fn assert_inner_table_name(package: &Package, expected: &str) {
     let part = package_part_bytes(package, MODEL_URI);
-    let storage = litchi_xldm::inspect(&part).expect("XLDM storage");
-    let metadata = litchi_xldm::metadata::inspect(&storage).expect("metadata closure");
+    let storage = litchi_xldm::inspect(&part, &litchi_xldm::Limits::DEFAULT).expect("XLDM storage");
+    let metadata = litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+        .expect("metadata closure");
     let table = metadata
         .files
         .iter()
@@ -355,7 +364,7 @@ fn assert_inner_table_name(package: &Package, expected: &str) {
 
 fn inner_member_bytes(package: &Package) -> BTreeMap<String, Vec<u8>> {
     let part = package_part_bytes(package, MODEL_URI);
-    let storage = litchi_xldm::inspect(&part).expect("XLDM storage");
+    let storage = litchi_xldm::inspect(&part, &litchi_xldm::Limits::DEFAULT).expect("XLDM storage");
     storage
         .files
         .iter()
@@ -838,16 +847,19 @@ fn complete_xldm140_rename_updates_outer_identity_relationships_and_inner_closur
         OLD_TABLE_NAME
     );
 
-    let mut transaction = before.edit();
+    let mut transaction = source.edit_data_model().expect("source snapshot");
     assert!(
         transaction
             .rename_table(TABLE_ID, NEW_TABLE_NAME)
             .expect("stage table rename")
     );
     let commit = transaction.commit().expect("commit table rename");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
-    let changed = source.apply_data_model(&commit).expect("apply rename");
+    let changed = source
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("apply rename");
     let after = changed.data_model().expect("changed snapshot");
     let definition = after.definition().expect("changed definition");
     assert_eq!(definition.tables[0].id, TABLE_ID);
@@ -880,7 +892,7 @@ fn complete_xldm140_rename_updates_outer_identity_relationships_and_inner_closur
     assert_eq!(preserved_members(&changed), preserved);
     assert_ne!(changed.to_bytes().unwrap(), source_bytes);
 
-    let reopened = Package::from_bytes(changed.to_bytes().unwrap()).expect("reopen changed");
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).expect("reopen changed");
     assert_eq!(
         reopened.data_model().unwrap().definition().unwrap().tables[0].name,
         NEW_TABLE_NAME
@@ -892,41 +904,52 @@ fn complete_xldm140_rename_updates_outer_identity_relationships_and_inner_closur
 fn exact_same_name_is_a_noop_and_preserves_package_bytes() {
     let source = complete_package(false);
     let source_bytes = source.to_bytes().expect("source bytes");
-    let before = source.data_model().expect("snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("snapshot");
     assert!(
         !transaction
             .rename_table(TABLE_ID, OLD_TABLE_NAME)
             .expect("exact name no-op")
     );
     let commit = transaction.commit().expect("no-op commit");
-    assert!(!commit.changed());
-    let applied = source.apply_data_model(&commit).expect("no-op apply");
+    assert!(!commit.diagnostics().changed());
+    let applied = source
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("no-op apply");
     assert_eq!(applied.to_bytes().unwrap(), source_bytes);
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
 }
 
 #[test]
 fn rename_patch_inverse_restores_exact_source_and_rejects_stale_source() {
     let source = complete_package(false);
     let source_bytes = source.to_bytes().expect("source bytes");
-    let before = source.data_model().expect("snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("snapshot");
     transaction
         .rename_table(TABLE_ID, NEW_TABLE_NAME)
         .expect("stage rename");
     let commit = transaction.commit().expect("commit");
-    let changed = source.apply_data_model(&commit).expect("apply");
+    let changed = source
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("apply");
     let restored = changed
-        .apply_data_model_patch(&commit.patch().inverse())
+        .apply_data_model(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let stale = package_with_corrupted_model_source(source.clone());
-    assert!(
-        stale.apply_data_model(&commit).is_err(),
-        "stale source must be refused"
-    );
+    let error = stale
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect_err("stale source must be refused");
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::PatchConflict { part: "data model" }
+    ));
     assert_eq!(
         stale.to_bytes().unwrap(),
         package_with_corrupted_model_source(source)
@@ -941,15 +964,19 @@ fn signed_source_allows_exact_noop_but_refuses_identity_change() {
     assert!(signed.opc_package().is_signed());
     let source_bytes = signed.to_bytes().expect("signed source bytes");
 
-    let snapshot = signed.data_model().expect("signed snapshot");
-    let noop = snapshot.edit().commit().expect("signed no-op commit");
+    let noop = signed
+        .edit_data_model()
+        .expect("signed snapshot")
+        .commit()
+        .expect("signed no-op commit");
     signed
-        .apply_data_model(&noop)
+        .apply_data_model(noop.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("signed no-op application");
     assert!(signed.opc_package().is_signed());
     assert_eq!(signed.to_bytes().unwrap(), source_bytes);
 
-    let mut transaction = signed.data_model().expect("signed snapshot").edit();
+    let mut transaction = signed.edit_data_model().expect("signed snapshot");
     transaction
         .rename_table(TABLE_ID, NEW_TABLE_NAME)
         .expect("stage signed rename");
@@ -961,13 +988,18 @@ fn signed_source_allows_exact_noop_but_refuses_identity_change() {
 #[test]
 fn unknown_table_id_and_invalid_names_refuse_without_draft_mutation() {
     let source = complete_package(false);
-    let before = source.data_model().expect("snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("snapshot");
     assert!(transaction.rename_table("missing", NEW_TABLE_NAME).is_err());
     assert!(transaction.rename_table(TABLE_ID, "").is_err());
     assert!(transaction.rename_table(TABLE_ID, "bad\0name").is_err());
     assert_eq!(
-        transaction.definition().expect("draft definition").tables[0].name,
+        transaction
+            .definition()
+            .expect("draft definition")
+            .expect("model")
+            .tables[0]
+            .name,
         OLD_TABLE_NAME
     );
 }
@@ -975,11 +1007,11 @@ fn unknown_table_id_and_invalid_names_refuse_without_draft_mutation() {
 #[test]
 fn duplicate_outer_name_refuses_atomically() {
     let source = duplicate_name_package();
-    let before = source.data_model().expect("snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("snapshot");
     assert!(transaction.rename_table(TABLE_ID, "Other").is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
 }
@@ -987,14 +1019,17 @@ fn duplicate_outer_name_refuses_atomically() {
 #[test]
 fn case_variant_outer_relationship_endpoints_are_rewritten() {
     let source = case_variant_endpoint_package();
-    let before = source.data_model().expect("case-variant source snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source
+        .edit_data_model()
+        .expect("case-variant source snapshot");
     transaction
         .rename_table(TABLE_ID, NEW_TABLE_NAME)
         .expect("case-variant endpoint rename");
     let commit = transaction.commit().expect("case-variant commit");
     let changed = source
-        .apply_data_model(&commit)
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("case-variant apply");
     let changed_snapshot = changed.data_model().unwrap();
     let definition = changed_snapshot.definition().unwrap();
@@ -1012,12 +1047,17 @@ fn outer_inner_name_mismatch_refuses_without_repairing_source() {
         build_identity_storage(&complete_distinct_id_storage_entries()),
     );
     let source_bytes = source.to_bytes().expect("source bytes");
-    let before = source.data_model().expect("mismatched source snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source
+        .edit_data_model()
+        .expect("mismatched source snapshot");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
-    assert_eq!(transaction.definition().unwrap().tables[0].name, "Sales");
     assert_eq!(
-        transaction.payload().unwrap(),
+        transaction.definition().unwrap().expect("model").tables[0].name,
+        "Sales"
+    );
+    assert_eq!(
+        transaction.payload().unwrap().expect("payload"),
         package_part_bytes(&source, MODEL_URI)
     );
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
@@ -1026,14 +1066,17 @@ fn outer_inner_name_mismatch_refuses_without_repairing_source() {
 #[test]
 fn escaped_table_name_updates_outer_and_inner_xml() {
     let source = complete_package(false);
-    let before = source.data_model().expect("source snapshot");
+
     let escaped = "A&B<escaped-name>";
-    let mut transaction = before.edit();
+    let mut transaction = source.edit_data_model().expect("source snapshot");
     transaction
         .rename_table(TABLE_ID, escaped)
         .expect("escaped table name");
     let commit = transaction.commit().expect("escaped commit");
-    let changed = source.apply_data_model(&commit).expect("escaped apply");
+    let changed = source
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("escaped apply");
     let changed_snapshot = changed.data_model().unwrap();
     assert_eq!(
         changed_snapshot.definition().unwrap().tables[0].name,
@@ -1053,12 +1096,12 @@ fn escaped_table_name_updates_outer_and_inner_xml() {
 #[test]
 fn oversized_table_name_refuses_without_draft_mutation() {
     let source = complete_package(false);
-    let before = source.data_model().expect("source snapshot");
+
     let too_long = "x".repeat(32 * 1024 + 1);
-    let mut transaction = before.edit();
+    let mut transaction = source.edit_data_model().expect("source snapshot");
     assert!(transaction.rename_table(TABLE_ID, &too_long).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
 }
@@ -1066,8 +1109,8 @@ fn oversized_table_name_refuses_without_draft_mutation() {
 #[test]
 fn rename_then_time_grouping_updates_both_outer_and_inner_identity() {
     let source = complete_package(false);
-    let before = source.data_model().expect("source snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("source snapshot");
     transaction
         .rename_table(TABLE_ID, NEW_TABLE_NAME)
         .expect("rename first");
@@ -1075,7 +1118,10 @@ fn rename_then_time_grouping_updates_both_outer_and_inner_identity() {
         .add_time_grouping(time_grouping(NEW_TABLE_NAME))
         .expect("time grouping after rename");
     let commit = transaction.commit().expect("combined commit");
-    let changed = source.apply_data_model(&commit).expect("combined apply");
+    let changed = source
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("combined apply");
     let changed_snapshot = changed.data_model().unwrap();
     let definition = changed_snapshot.definition().unwrap();
     assert_eq!(definition.time_groupings[0].table_name, NEW_TABLE_NAME);
@@ -1085,8 +1131,8 @@ fn rename_then_time_grouping_updates_both_outer_and_inner_identity() {
 #[test]
 fn time_grouping_then_rename_updates_both_outer_and_inner_identity() {
     let source = complete_package(false);
-    let before = source.data_model().expect("source snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("source snapshot");
     transaction
         .add_time_grouping(time_grouping(OLD_TABLE_NAME))
         .expect("time grouping first");
@@ -1094,7 +1140,10 @@ fn time_grouping_then_rename_updates_both_outer_and_inner_identity() {
         .rename_table(TABLE_ID, NEW_TABLE_NAME)
         .expect("rename after time grouping");
     let commit = transaction.commit().expect("combined commit");
-    let changed = source.apply_data_model(&commit).expect("combined apply");
+    let changed = source
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("combined apply");
     let changed_snapshot = changed.data_model().unwrap();
     let definition = changed_snapshot.definition().unwrap();
     assert_eq!(definition.time_groupings[0].table_name, NEW_TABLE_NAME);
@@ -1105,28 +1154,31 @@ fn time_grouping_then_rename_updates_both_outer_and_inner_identity() {
 fn opaque_payload_replacement_then_rename_refuses_without_source_repair() {
     let source = complete_package(false);
     let replacement = complete_payload_named("Other");
-    let before = source.data_model().expect("source snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("source snapshot");
     transaction
         .replace_payload(replacement.clone())
         .expect("stage opaque replacement");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
-    assert_eq!(transaction.payload().unwrap(), replacement.as_slice());
+    assert_eq!(
+        transaction.payload().unwrap().expect("payload"),
+        replacement.as_slice()
+    );
 }
 
 #[test]
 fn incomplete_opaque_model_refuses_table_identity_edits_and_preserves_source() {
     let source = opaque_package();
     let source_bytes = source.to_bytes().expect("source bytes");
-    let before = source.data_model().expect("snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("snapshot");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
@@ -1142,8 +1194,8 @@ fn tabular150_model_profile_refuses_xldm140_identity_edit() {
     replace_utf16_once(&mut bytes, ">140<", ">150<");
     part.set_blob(bytes);
     let source = Package::from_opc(opc).expect("tabular profile package");
-    let before = source.data_model().expect("tabular source snapshot");
-    let mut transaction = before.edit();
+
+    let mut transaction = source.edit_data_model().expect("tabular source snapshot");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
 }
 
@@ -1151,12 +1203,13 @@ fn tabular150_model_profile_refuses_xldm140_identity_edit() {
 fn caller_rewrite_limit_refuses_before_publication() {
     let source = complete_package(false);
     let source_bytes = source.to_bytes().expect("source bytes");
-    let mut limits = ReadLimits::DEFAULT;
+    let mut limits = SemanticLimits::DEFAULT;
     limits.max_rewrite_bytes = package_part_bytes(&source, WORKBOOK_URI).len();
-    let before = source
-        .data_model_with_limits(limits)
+    let mut transaction = source
+        .edit_data_model_with_options(
+            litchi_xlsb::data_model::EditOptions::default().limits(limits),
+        )
         .expect("source under caller rewrite limit");
-    let mut transaction = before.edit();
     transaction
         .rename_table(TABLE_ID, "A considerably longer table name")
         .expect("stage rename");
@@ -1170,15 +1223,16 @@ fn caller_model_part_limit_refuses_before_draft_change() {
     let source_bytes = source.to_bytes().expect("source bytes");
     let payload_len = package_part_bytes(&source, MODEL_URI).len();
     let long_name = "x".repeat(32 * 1024 - 1);
-    let mut limits = ReadLimits::DEFAULT;
+    let mut limits = SemanticLimits::DEFAULT;
     limits.max_part_bytes = payload_len;
-    let before = source
-        .data_model_with_limits(limits)
+    let mut transaction = source
+        .edit_data_model_with_options(
+            litchi_xlsb::data_model::EditOptions::default().limits(limits),
+        )
         .expect("source under exact model-part limit");
-    let mut transaction = before.edit();
     assert!(transaction.rename_table(TABLE_ID, &long_name).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
@@ -1189,7 +1243,7 @@ fn native_date_fixture_has_no_model_and_is_not_positive_identity_evidence() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ooxml/xlsb/date.xlsb");
     let bytes = std::fs::read(path).expect("native date fixture");
-    let package = Package::from_bytes(bytes).expect("native package");
+    let package = Package::from_bytes(&bytes).expect("native package");
     let snapshot = package.data_model().expect("native snapshot");
     assert!(!snapshot.is_present());
 }

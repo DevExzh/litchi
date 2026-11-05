@@ -7,10 +7,10 @@
 //! # Reading Archives
 //!
 //! ```rust,no_run
-//! use soapberry_zip::office::ArchiveReader;
+//! use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
 //!
 //! let data = std::fs::read("document.docx")?;
-//! let archive = ArchiveReader::new(&data)?;
+//! let archive = ArchiveReader::new(&data, ArchiveLimits::default())?;
 //!
 //! // Read a specific file
 //! let content = archive.read("word/document.xml")?;
@@ -25,9 +25,9 @@
 //! # Writing Archives
 //!
 //! ```rust,no_run
-//! use soapberry_zip::office::StreamingArchiveWriter;
+//! use soapberry_zip::office::{StreamingArchiveLimits, StreamingArchiveWriter};
 //!
-//! let mut writer = StreamingArchiveWriter::new();
+//! let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
 //! writer.write_stored("mimetype", b"application/vnd.oasis.opendocument.text")?;
 //! writer.write_deflated("content.xml", b"<office:document-content>...</office:document-content>")?;
 //! let bytes = writer.finish_to_bytes()?;
@@ -785,15 +785,11 @@ fn archive_reader_storage_requirements(
     };
     let mut add_map = |capacity: usize, entry_bytes: usize| -> Result<(), Error> {
         let bytes = capacity
-            .checked_mul(
-                entry_bytes
-                    .checked_add(map_slot_overhead)
-                    .ok_or_else(|| {
-                        Error::from(ErrorKind::InvalidInput {
-                            msg: "archive reader map census overflows usize".to_string(),
-                        })
-                    })?,
-            )
+            .checked_mul(entry_bytes.checked_add(map_slot_overhead).ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive reader map census overflows usize".to_string(),
+                })
+            })?)
             .and_then(|bytes| bytes.checked_mul(2))
             .ok_or_else(|| {
                 Error::from(ErrorKind::InvalidInput {
@@ -1755,6 +1751,46 @@ impl<'a, R> Iterator for IndexedArchiveNames<'a, R> {
 
 impl<R> ExactSizeIterator for IndexedArchiveNames<'_, R> {}
 
+/// Central-directory facts for one preservation entry.
+///
+/// This is a borrowed, metadata-only projection. It includes directory
+/// records, which the ordinary file index intentionally omits, and does not
+/// read or allocate member payloads. The values are the declarations already
+/// retained while the indexed archive's central-directory pass runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreservationEntryMetadata {
+    raw_name_len: u64,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    directory: bool,
+}
+
+impl PreservationEntryMetadata {
+    /// Returns the raw central-directory member-name length in bytes.
+    #[must_use]
+    pub const fn raw_name_len(self) -> u64 {
+        self.raw_name_len
+    }
+
+    /// Returns the declared compressed payload size.
+    #[must_use]
+    pub const fn compressed_size(self) -> u64 {
+        self.compressed_size
+    }
+
+    /// Returns the declared uncompressed payload size.
+    #[must_use]
+    pub const fn uncompressed_size(self) -> u64 {
+        self.uncompressed_size
+    }
+
+    /// Returns whether this central record represents a directory.
+    #[must_use]
+    pub const fn is_directory(self) -> bool {
+        self.directory
+    }
+}
+
 /// Reusable decoder state for one sequential operation over an indexed ZIP
 /// archive.
 ///
@@ -2054,6 +2090,17 @@ pub const VERIFIED_ENTRY_READER_BUFFER_SIZE: usize = 16 * 1024;
 // layouts; it is a bound, not the measured size of one particular machine.
 const FLATE2_DEFLATE_INPUT_BUFFER_SIZE: usize = 32 * 1024;
 const ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES: usize = 64 * 1024;
+
+/// Heap scratch envelope for the configured flate2 read decoder, excluding
+/// the caller's output buffer. Includes its input buffer and zlib-rs state.
+#[doc(hidden)]
+pub const DEFLATE_READ_SCRATCH_UPPER_BOUND_BYTES: usize =
+    FLATE2_DEFLATE_INPUT_BUFFER_SIZE + ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES;
+
+/// Allocation requests for the configured read decoder's input buffer and
+/// single zlib-rs state/window block, excluding the caller's output buffer.
+#[doc(hidden)]
+pub const DEFLATE_READ_SCRATCH_ALLOCATIONS: usize = 2;
 
 // Precompressed transfer captures are source reads rather than callback
 // decoder buffers. Keep their requests bounded to one 64 KiB range so a
@@ -2849,17 +2896,12 @@ fn complete_verified_callback<T, E>(
 }
 
 impl<'data> ArchiveReader<'data> {
-    /// Create a new archive reader from a byte slice.
+    /// Create a reader from a byte slice with explicit resource limits.
     ///
     /// This parses the ZIP central directory and builds an index for fast
     /// file lookup. The actual file contents are not decompressed until
     /// accessed via `read()`.
-    pub fn new(data: &'data [u8]) -> Result<Self, Error> {
-        Self::new_with_limits(data, ArchiveLimits::default())
-    }
-
-    /// Create a reader with explicit resource limits.
-    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
+    pub fn new(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
         let archive = ZipArchive::from_slice(data)?;
 
         // Admit a bounded number of physical central records before retaining
@@ -3403,7 +3445,7 @@ impl<'data> ArchiveReader<'data> {
     /// decompression cache.
     ///
     /// Archive limits are admission limits: the member's declared metadata
-    /// and size were checked by [`Self::new_with_limits`] before this method
+    /// and size were checked by [`Self::new`] before this method
     /// can be called. Since this method does not allocate payload storage, it
     /// does not create a separate materialization budget charge.
     ///
@@ -3686,7 +3728,7 @@ impl<'data> ArchiveReader<'data> {
     pub fn read_string(&self, name: &str) -> Result<String, Error> {
         let bytes = self.read(name)?;
         String::from_utf8(bytes).map_err(|e| {
-            Error::from(ErrorKind::Io(std::io::Error::new(
+            Error::from(ErrorKind::IO(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 e,
             )))
@@ -3932,46 +3974,26 @@ where
     /// another EOCD search. `scratch` is used as the fast path while scanning
     /// the existing central directory; valid records larger than that
     /// recommendation use a bounded fallible spill buffer.
-    pub fn preservation_index<'archive>(
-        &'archive self,
-        scratch: &mut [u8],
-    ) -> Result<PreservationIndex<'archive, R>, Error> {
-        self.preservation_index_with_limits(scratch, ArchiveLimits::default())
-    }
-
     /// Build a raw-member preservation index under explicit archive limits.
     ///
     /// Metadata and member-name limits are applied to every retained source
     /// central record, including directory records, because preservation must
     /// own their exact raw metadata even though ordinary file indexes exclude
     /// directories. The file-count limit retains its non-directory meaning.
-    pub fn preservation_index_with_limits<'archive>(
+    pub fn preservation_index<'archive>(
         &'archive self,
         scratch: &mut [u8],
         limits: ArchiveLimits,
     ) -> Result<PreservationIndex<'archive, R>, Error> {
-        PreservationIndex::new_with_limits(&self.archive, scratch, limits)
-    }
-
-    /// Locate and index a positional ZIP source with default resource limits.
-    ///
-    /// `end_offset` is the exclusive source length used by the ZIP locator.
-    /// Call [`Self::from_zip_archive_with_limits`] when the caller has already
-    /// located the archive and wants to avoid another EOCD search.
-    pub fn from_reader(reader: R, end_offset: u64) -> Result<Self, Error> {
-        Self::from_reader_with_limits(reader, end_offset, ArchiveLimits::default())
+        PreservationIndex::new(&self.archive, scratch, limits)
     }
 
     /// Locate and index a positional ZIP source with explicit resource limits.
     ///
     /// The central directory is located and scanned once. Payload bytes are not
     /// read or decompressed during construction.
-    pub fn from_reader_with_limits(
-        reader: R,
-        end_offset: u64,
-        limits: ArchiveLimits,
-    ) -> Result<Self, Error> {
-        Self::from_reader_with_limits_and_policy(
+    pub fn from_reader(reader: R, end_offset: u64, limits: ArchiveLimits) -> Result<Self, Error> {
+        Self::from_reader_with_policy(
             reader,
             end_offset,
             limits,
@@ -3981,21 +4003,13 @@ where
 
     /// Locate and index a positional ZIP source with explicit limits and
     /// validation policy.
-    pub fn from_reader_with_limits_and_policy(
+    pub fn from_reader_with_policy(
         reader: R,
         end_offset: u64,
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<Self, Error> {
-        LocatedArchive::locate(reader, end_offset)?.index_with_limits_and_policy(limits, policy)
-    }
-
-    /// Build an index from an already located ZIP archive using default limits.
-    ///
-    /// This is the preferred constructor for callers that retain one validated
-    /// positional ZIP locator result as their physical-package state.
-    pub fn from_zip_archive(archive: ZipArchive<R>) -> Result<Self, Error> {
-        Self::from_zip_archive_with_limits(archive, ArchiveLimits::default())
+        LocatedArchive::locate(reader, end_offset)?.index_with_policy(limits, policy)
     }
 
     /// Build an index from an already located ZIP archive with explicit limits.
@@ -4003,30 +4017,23 @@ where
     /// Every central-directory entry is validated and classified exactly once.
     /// Directories are retained only for metadata lookup; non-directory entries
     /// receive stable opaque [`EntryId`] values.
-    pub fn from_zip_archive_with_limits(
-        archive: ZipArchive<R>,
-        limits: ArchiveLimits,
-    ) -> Result<Self, Error> {
-        Self::from_zip_archive_with_limits_and_policy(
-            archive,
-            limits,
-            ArchiveValidationPolicy::Normalized,
-        )
+    pub fn from_zip_archive(archive: ZipArchive<R>, limits: ArchiveLimits) -> Result<Self, Error> {
+        Self::from_zip_archive_with_policy(archive, limits, ArchiveValidationPolicy::Normalized)
     }
 
     /// Build an index from an already located ZIP archive with explicit limits
     /// and validation policy.
-    pub fn from_zip_archive_with_limits_and_policy(
+    pub fn from_zip_archive_with_policy(
         archive: ZipArchive<R>,
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<Self, Error> {
-        Self::from_zip_archive_with_limits_policy_and_prefill(archive, limits, policy, None)
+        Self::from_zip_archive_with_policy_and_prefill(archive, limits, policy, None)
     }
 
-    /// [`Self::from_zip_archive_with_limits_and_policy`], reusing the locator's
+    /// [`Self::from_zip_archive_with_policy`], reusing the locator's
     /// central-directory prefill as the scan buffer when it took one.
-    fn from_zip_archive_with_limits_policy_and_prefill(
+    fn from_zip_archive_with_policy_and_prefill(
         archive: ZipArchive<R>,
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
@@ -4629,6 +4636,32 @@ where
         self.order.iter().map(|&entry_id| {
             let name = self.entries[entry_id.0].name.as_str();
             (entry_id, name)
+        })
+    }
+
+    /// Iterate all central-directory entries in physical local-header order.
+    ///
+    /// Unlike [`Self::file_entries`], this includes directory records. The
+    /// returned values borrow only metadata retained during indexing; the
+    /// iterator performs no source reads, payload decompression or allocation.
+    #[must_use]
+    pub fn preservation_entries(
+        &self,
+    ) -> impl ExactSizeIterator<Item = PreservationEntryMetadata> + '_ {
+        self.layout.iter().map(|entry| {
+            let (raw_name_len, directory) = match &entry.name {
+                IndexedLayoutName::Entry(entry_id) => (
+                    self.entries[entry_id.0].info.central_name.len() as u64,
+                    false,
+                ),
+                IndexedLayoutName::Directory(name) => (name.len() as u64, true),
+            };
+            PreservationEntryMetadata {
+                raw_name_len,
+                compressed_size: entry.wayfinder.compressed_size_hint(),
+                uncompressed_size: entry.wayfinder.uncompressed_size_hint(),
+                directory,
+            }
         })
     }
 
@@ -5659,7 +5692,7 @@ where
 /// A positional ZIP source whose end of central directory has been located,
 /// before an [`IndexedArchive`] reserves any per-entry storage for it.
 ///
-/// [`IndexedArchive::from_reader_with_limits`] locates and indexes in one
+/// [`IndexedArchive::from_reader`] locates and indexes in one
 /// call. A caller that must admit the declared central-directory entry count
 /// first (directories included, which [`ArchiveLimits::max_files`] does not
 /// count) locates here, checks [`Self::declared_entries`], and only then
@@ -5713,18 +5746,18 @@ where
     }
 
     /// Index the located archive with explicit resource limits.
-    pub fn index_with_limits(self, limits: ArchiveLimits) -> Result<IndexedArchive<R>, Error> {
-        self.index_with_limits_and_policy(limits, ArchiveValidationPolicy::Normalized)
+    pub fn index(self, limits: ArchiveLimits) -> Result<IndexedArchive<R>, Error> {
+        self.index_with_policy(limits, ArchiveValidationPolicy::Normalized)
     }
 
     /// Index the located archive with explicit resource limits and
     /// validation policy.
-    pub fn index_with_limits_and_policy(
+    pub fn index_with_policy(
         self,
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<IndexedArchive<R>, Error> {
-        IndexedArchive::from_zip_archive_with_limits_policy_and_prefill(
+        IndexedArchive::from_zip_archive_with_policy_and_prefill(
             self.archive,
             limits,
             policy,
@@ -6517,7 +6550,7 @@ fn streaming_limit_io_error(
 
 fn streaming_limit_from_error(error: &Error) -> Option<StreamingLimitExceeded> {
     let io_error = match error.kind() {
-        ErrorKind::IO(error) | ErrorKind::Io(error) => error,
+        ErrorKind::IO(error) => error,
         _ => return None,
     };
     streaming_limit_from_io_error(io_error)
@@ -6581,7 +6614,7 @@ impl std::fmt::Display for StreamingArchiveFailure {
 impl std::error::Error for StreamingArchiveFailure {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self.error.kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => Some(error),
+            ErrorKind::IO(error) => Some(error),
             _ => Some(&self.error),
         }
     }
@@ -7210,12 +7243,7 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
 
 impl StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
     /// Create a new streaming archive writer that writes to memory.
-    pub fn new() -> Self {
-        Self::with_limits(StreamingArchiveLimits::default())
-    }
-
-    /// Create a new in-memory writer with explicit finite metadata limits.
-    pub fn with_limits(limits: StreamingArchiveLimits) -> Self {
+    pub fn new(limits: StreamingArchiveLimits) -> Self {
         let output_counter = Arc::new(AtomicU64::new(0));
         Self {
             archive: ZipArchiveWriter::new(BoundedOutput::new(
@@ -7243,13 +7271,7 @@ impl StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
 
 impl<W: Write> StreamingArchiveWriter<W> {
     /// Create a new streaming archive writer with a custom writer.
-    pub fn with_writer(writer: W) -> Self {
-        Self::with_writer_and_limits(writer, StreamingArchiveLimits::default())
-    }
-
-    /// Create a new streaming archive writer with a custom writer and
-    /// explicit metadata limits.
-    pub fn with_writer_and_limits(writer: W, limits: StreamingArchiveLimits) -> Self {
+    pub fn with_writer(writer: W, limits: StreamingArchiveLimits) -> Self {
         let output_counter = Arc::new(AtomicU64::new(0));
         Self {
             archive: ZipArchiveWriter::new(BoundedOutput::new(
@@ -7288,7 +7310,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
     ///
     /// Returns an error for invalid limits or failure to initialize scratch.
     /// Construction does not write to the output sink.
-    pub fn with_writer_and_limits_and_spool<S>(
+    pub fn with_writer_and_spool<S>(
         writer: W,
         limits: StreamingArchiveLimits,
         spool: S,
@@ -7328,7 +7350,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
     /// plan advances only after that member's central record has been
     /// published. Unlike the ordinary writer, this mode does not retain a
     /// growing normalized-name set.
-    pub fn with_writer_and_limits_and_spool_and_name_plan<S>(
+    pub fn with_writer_and_spool_and_name_plan<S>(
         writer: W,
         limits: StreamingArchiveLimits,
         spool: S,
@@ -8369,12 +8391,6 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 }
 
-impl Default for StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 // Ensure ArchiveReader can be borrowed by a local parallel-read session.
 // This is a compile-time assertion
 const _: () = {
@@ -8394,10 +8410,14 @@ const _: () = {
 ///
 /// # Example
 /// ```rust,no_run
-/// use soapberry_zip::office::LazyArchiveReader;
+/// use soapberry_zip::office::{ArchiveLimits, LazyArchiveCacheLimits, LazyArchiveReader};
 ///
 /// let data = std::fs::read("document.docx")?;
-/// let archive = LazyArchiveReader::new(&data)?;
+/// let archive = LazyArchiveReader::new(
+///     &data,
+///     ArchiveLimits::default(),
+///     LazyArchiveCacheLimits::default(),
+/// )?;
 ///
 /// // Files are decompressed on first access and cached
 /// let content = archive.read("word/document.xml")?;
@@ -8431,12 +8451,17 @@ impl LazyArchiveCacheLimits {
     /// Default aggregate bytes occupied by active-flight keys.
     pub const DEFAULT_MAX_FLIGHT_KEY_BYTES: usize = 256 * 1024;
 
-    /// Construct finite cache limits.
+    /// Construct finite cache and active-flight limits.
     ///
     /// # Errors
     ///
-    /// Returns [`ErrorKind::InvalidInput`] when either limit is zero.
-    pub fn new(max_bytes: usize, max_entries: usize) -> Result<Self, Error> {
+    /// Returns [`ErrorKind::InvalidInput`] when any limit is zero.
+    pub fn new(
+        max_bytes: usize,
+        max_entries: usize,
+        max_active_flights: usize,
+        max_flight_key_bytes: usize,
+    ) -> Result<Self, Error> {
         if max_bytes == 0 {
             return Err(ErrorKind::InvalidInput {
                 msg: "lazy archive cache byte limit must be non-zero".to_string(),
@@ -8449,47 +8474,33 @@ impl LazyArchiveCacheLimits {
             }
             .into());
         }
+        if max_active_flights == 0 {
+            return Err(ErrorKind::InvalidInput {
+                msg: "lazy archive active-flight limit must be non-zero".to_string(),
+            }
+            .into());
+        }
+        if max_flight_key_bytes == 0 {
+            return Err(ErrorKind::InvalidInput {
+                msg: "lazy archive active-flight key-byte limit must be non-zero".to_string(),
+            }
+            .into());
+        }
         Ok(Self {
             max_bytes,
             max_entries,
-            max_active_flights: Self::DEFAULT_MAX_ACTIVE_FLIGHTS,
-            max_flight_key_bytes: Self::DEFAULT_MAX_FLIGHT_KEY_BYTES,
+            max_active_flights,
+            max_flight_key_bytes,
         })
     }
 
-    /// Construct finite cache and active-flight limits.
+    /// Replace the active-flight object and key-byte limits in this policy.
     ///
     /// The active-flight count bounds retained flight objects, while the
     /// aggregate key-byte limit bounds the names retained by those flights.
     /// A request that cannot become a flight falls back to a direct read and
     /// therefore preserves the reader's ordinary typed result.
-    pub fn new_with_active_flight_limits(
-        max_bytes: usize,
-        max_entries: usize,
-        max_active_flights: usize,
-        max_flight_key_bytes: usize,
-    ) -> Result<Self, Error> {
-        Self::new(max_bytes, max_entries)?
-            .with_active_flight_limits(max_active_flights, max_flight_key_bytes)
-    }
-
-    /// Alias for [`Self::new_with_active_flight_limits`].
-    pub fn new_with_flight_limits(
-        max_bytes: usize,
-        max_entries: usize,
-        max_active_flights: usize,
-        max_flight_key_bytes: usize,
-    ) -> Result<Self, Error> {
-        Self::new_with_active_flight_limits(
-            max_bytes,
-            max_entries,
-            max_active_flights,
-            max_flight_key_bytes,
-        )
-    }
-
-    /// Add explicit active-flight object and key-byte limits to this policy.
-    pub fn with_active_flight_limits(
+    pub fn active_flight_limits(
         mut self,
         max_active_flights: usize,
         max_flight_key_bytes: usize,
@@ -8511,42 +8522,27 @@ impl LazyArchiveCacheLimits {
         Ok(self)
     }
 
-    /// Alias for [`Self::with_active_flight_limits`].
-    pub fn with_flight_limits(
-        self,
-        max_active_flights: usize,
-        max_flight_key_bytes: usize,
-    ) -> Result<Self, Error> {
-        self.with_active_flight_limits(max_active_flights, max_flight_key_bytes)
-    }
-
     /// Maximum total decompressed bytes retained by the cache.
     #[must_use]
-    pub const fn max_bytes(self) -> usize {
+    pub const fn max_bytes_value(self) -> usize {
         self.max_bytes
     }
 
     /// Maximum number of completed payloads retained by the cache.
     #[must_use]
-    pub const fn max_entries(self) -> usize {
+    pub const fn max_entries_value(self) -> usize {
         self.max_entries
     }
 
     /// Maximum number of concurrently retained same-member flights.
     #[must_use]
-    pub const fn max_active_flights(self) -> usize {
+    pub const fn max_active_flights_value(self) -> usize {
         self.max_active_flights
     }
 
     /// Maximum aggregate bytes occupied by active-flight keys.
     #[must_use]
-    pub const fn max_flight_key_bytes(self) -> usize {
-        self.max_flight_key_bytes
-    }
-
-    /// Alias for [`Self::max_flight_key_bytes`].
-    #[must_use]
-    pub const fn max_active_key_bytes(self) -> usize {
+    pub const fn max_flight_key_bytes_value(self) -> usize {
         self.max_flight_key_bytes
     }
 }
@@ -8624,11 +8620,11 @@ impl LazyCacheState {
 
     fn insert(&mut self, name: String, data: Arc<Vec<u8>>, limits: LazyArchiveCacheLimits) {
         let weight = data.len();
-        if weight > limits.max_bytes() {
+        if weight > limits.max_bytes_value() {
             return;
         }
-        while self.entries.len() >= limits.max_entries()
-            || self.total_bytes.saturating_add(weight) > limits.max_bytes()
+        while self.entries.len() >= limits.max_entries_value()
+            || self.total_bytes.saturating_add(weight) > limits.max_bytes_value()
         {
             if !self.evict_oldest() {
                 return;
@@ -8767,31 +8763,14 @@ pub struct LazyArchiveReader<'data> {
 }
 
 impl<'data> LazyArchiveReader<'data> {
-    /// Create a new lazy archive reader from a byte slice.
-    pub fn new(data: &'data [u8]) -> Result<Self, Error> {
-        Self::new_with_limits(data, ArchiveLimits::default())
-    }
-
-    /// Create a lazy reader with explicit resource limits.
-    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
-        Self::new_with_limits_and_cache_limits(data, limits, LazyArchiveCacheLimits::default())
-    }
-
-    /// Create a lazy reader with explicit cache limits.
-    pub fn new_with_cache_limits(
-        data: &'data [u8],
-        cache_limits: LazyArchiveCacheLimits,
-    ) -> Result<Self, Error> {
-        Self::new_with_limits_and_cache_limits(data, ArchiveLimits::default(), cache_limits)
-    }
-
-    /// Create a lazy reader with explicit archive and cache limits.
-    pub fn new_with_limits_and_cache_limits(
+    /// Create a new lazy archive reader from a byte slice with explicit
+    /// archive and cache limits.
+    pub fn new(
         data: &'data [u8],
         limits: ArchiveLimits,
         cache_limits: LazyArchiveCacheLimits,
     ) -> Result<Self, Error> {
-        let inner = ArchiveReader::new_with_limits(data, limits)?;
+        let inner = ArchiveReader::new(data, limits)?;
         Ok(Self {
             inner,
             cache: std::sync::Mutex::new(LazyCacheState::default()),
@@ -8805,6 +8784,18 @@ impl<'data> LazyArchiveReader<'data> {
     #[must_use]
     pub const fn cache_limits(&self) -> LazyArchiveCacheLimits {
         self.cache_limits
+    }
+
+    /// Return the exact immutable byte slice used to build this reader.
+    ///
+    /// This is a source-identity view only; it does not copy or validate the
+    /// archive. Package owners use it when transferring an already-admitted
+    /// physical reader into an owned, deferred package without rebuilding the
+    /// central-directory index.
+    #[inline]
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.inner.archive.as_bytes()
     }
 
     /// Whether any central-directory entry declares ZIP encryption through
@@ -8938,10 +8929,10 @@ impl<'data> LazyArchiveReader<'data> {
         accounting: &mut ZipOperationAccounting,
         read_member: &mut dyn FnMut(&str, &mut ZipOperationAccounting) -> Result<Vec<u8>, Error>,
     ) -> Result<std::sync::Arc<Vec<u8>>, Error> {
-        if name.len() > self.cache_limits.max_flight_key_bytes() {
+        if name.len() > self.cache_limits.max_flight_key_bytes_value() {
             return Err(lazy_flight_key_limit_error(
                 name.len(),
-                self.cache_limits.max_flight_key_bytes(),
+                self.cache_limits.max_flight_key_bytes_value(),
             ));
         }
         let lookup = lookup_member_name(name)?;
@@ -8949,10 +8940,10 @@ impl<'data> LazyArchiveReader<'data> {
             return Err(ErrorKind::FileNotFound(lookup.name.into_owned()).into());
         }
         let normalized = lookup.name.into_owned();
-        if normalized.len() > self.cache_limits.max_flight_key_bytes() {
+        if normalized.len() > self.cache_limits.max_flight_key_bytes_value() {
             return Err(lazy_flight_key_limit_error(
                 normalized.len(),
-                self.cache_limits.max_flight_key_bytes(),
+                self.cache_limits.max_flight_key_bytes_value(),
             ));
         }
 
@@ -8968,13 +8959,13 @@ impl<'data> LazyArchiveReader<'data> {
                     LazyCacheLookup::Hit(data)
                 } else if let Some(flight) = cache.flights.get(&normalized) {
                     LazyCacheLookup::Wait(Arc::clone(flight))
-                } else if cache.active_flights >= self.cache_limits.max_active_flights()
+                } else if cache.active_flights >= self.cache_limits.max_active_flights_value()
                     || cache
                         .active_key_bytes
                         .checked_add(normalized.len())
                         .is_none()
                     || cache.active_key_bytes + normalized.len()
-                        > self.cache_limits.max_flight_key_bytes()
+                        > self.cache_limits.max_flight_key_bytes_value()
                 {
                     // The active-flight policy is a coordination budget, not
                     // a read correctness limit. Once it is full, decompress
@@ -9581,7 +9572,7 @@ mod tests {
         )
         .unwrap_err();
         match error.kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => {
+            ErrorKind::IO(error) => {
                 assert_eq!(error.kind(), io::ErrorKind::InvalidData);
             },
             other => panic!("expected invalid read-count error, got {other:?}"),
@@ -9622,24 +9613,24 @@ mod tests {
 
     #[test]
     fn test_round_trip_stored() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("test.txt", b"Hello, World!").unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert!(reader.contains("test.txt"));
         assert_eq!(reader.read("test.txt").unwrap(), b"Hello, World!");
     }
 
     #[test]
     fn test_round_trip_deflated() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_deflated("content.xml", b"<root>Hello</root>")
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert!(reader.contains("content.xml"));
         assert_eq!(reader.read("content.xml").unwrap(), b"<root>Hello</root>");
     }
@@ -9649,12 +9640,12 @@ mod tests {
         let payload = (0..(STREAM_COPY_BUFFER_SIZE * 2 + 37))
             .map(|index| (index as u8).wrapping_mul(31))
             .collect::<Vec<_>>();
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", &payload).unwrap();
         writer.write_deflated("deflated.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut stored = ShortWriter::new(7);
         assert_eq!(
             reader.read_to("stored.bin", &mut stored).unwrap(),
@@ -9674,14 +9665,14 @@ mod tests {
     fn accounting_distinguishes_store_deflate_and_lazy_cache_work() {
         let stored_payload = b"stored payload";
         let deflated_payload = b"deflated payload with enough bytes to exercise accounting";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", stored_payload).unwrap();
         writer
             .write_deflated("deflated.bin", deflated_payload)
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut stored_accounting = ZipOperationAccounting::default();
         assert_eq!(
             reader
@@ -9736,14 +9727,19 @@ mod tests {
                 &mut stored_stream_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             stored_stream_accounting.stored_payload_bytes_read(),
             stored_payload.len() as u64
         );
         assert_eq!(stored_stream_accounting.stored_payload_bytes_accepted(), 5);
 
-        let lazy = LazyArchiveReader::new(&bytes).unwrap();
+        let lazy = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         assert_eq!(lazy.cache_size(), 0);
         let mut cold = ZipOperationAccounting::default();
         lazy.read_with_accounting("deflated.bin", &mut cold)
@@ -9761,8 +9757,15 @@ mod tests {
             .unwrap();
         assert!(after_clear.compressed_deflate_payload_bytes_read() > 0);
 
-        let bypass_limits = LazyArchiveCacheLimits::new(1, 1).unwrap();
-        let bypass = LazyArchiveReader::new_with_cache_limits(&bytes, bypass_limits).unwrap();
+        let bypass_limits = LazyArchiveCacheLimits::new(
+            1,
+            1,
+            LazyArchiveCacheLimits::DEFAULT_MAX_ACTIVE_FLIGHTS,
+            LazyArchiveCacheLimits::DEFAULT_MAX_FLIGHT_KEY_BYTES,
+        )
+        .unwrap();
+        let bypass =
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), bypass_limits).unwrap();
         let mut bypass_accounting = ZipOperationAccounting::default();
         bypass
             .read_with_accounting("deflated.bin", &mut bypass_accounting)
@@ -9824,7 +9827,7 @@ mod tests {
                 &mut indexed_deflated_failure_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(indexed_deflated_failure_accounting.compressed_deflate_payload_bytes_read() > 0);
         assert_eq!(
             indexed_deflated_failure_accounting.deflate_bytes_accepted(),
@@ -9886,7 +9889,7 @@ mod tests {
                 &mut indexed_stored_failure_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(indexed_stored_failure_accounting.stored_payload_bytes_read() > 0);
         assert_eq!(
             indexed_stored_failure_accounting.stored_payload_bytes_accepted(),
@@ -9902,7 +9905,7 @@ mod tests {
         );
         assert_eq!(borrowed, ZipOperationAccounting::default());
 
-        let mut writing = StreamingArchiveWriter::new();
+        let mut writing = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         let mut writing_accounting = ZipOperationAccounting::default();
         writing
             .write_stored_with_accounting("stored.bin", stored_payload, &mut writing_accounting)
@@ -9933,16 +9936,16 @@ mod tests {
     #[test]
     fn accounting_preserves_partial_deflate_sink_progress() {
         let payload = vec![b'x'; STREAM_COPY_BUFFER_SIZE + 17];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut sink = FailingWriter::new(19);
         let mut accounting = ZipOperationAccounting::default();
         let error = reader
             .read_to_with_accounting("payload.bin", &mut sink, &mut accounting)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
         assert_eq!(accounting.deflate_bytes_accepted(), sink.bytes.len() as u64);
         assert!(accounting.deflate_bytes_produced() >= accounting.deflate_bytes_accepted());
@@ -9950,7 +9953,7 @@ mod tests {
 
     #[test]
     fn indexed_and_lazy_read_to_stream_without_cache_population() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_deflated("content.xml", b"<content>Hello</content>")
             .unwrap();
@@ -9965,7 +9968,12 @@ mod tests {
         );
         assert_eq!(indexed_output, b"<content>Hello</content>");
 
-        let lazy = LazyArchiveReader::new(&bytes).unwrap();
+        let lazy = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let mut lazy_output = Vec::new();
         assert_eq!(
             lazy.read_to("content.xml", &mut lazy_output).unwrap(),
@@ -9979,27 +9987,27 @@ mod tests {
     fn read_to_retains_typed_integrity_errors_and_sink_failures() {
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut output = Vec::new();
         let error = reader.read_to("bad", &mut output).unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
         assert_eq!(output, vec![b'b' ^ 0x80, b'a', b'd']);
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_deflated("payload.bin", &[b'x'; STREAM_COPY_BUFFER_SIZE + 1])
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut failing = FailingWriter::new(5);
         let error = reader.read_to("payload.bin", &mut failing).unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(failing.bytes.len(), 5);
     }
 
     #[test]
     fn consuming_entry_writer_recovers_bounded_archive_for_both_methods() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         let mut entry = writer
             .start_entry("first.bin", CompressionMethod::Store)
             .unwrap();
@@ -10013,7 +10021,7 @@ mod tests {
         writer = entry.finish().unwrap();
 
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("first.bin").unwrap(), b"first payload");
         assert_eq!(reader.read("second.bin").unwrap(), b"second payload");
     }
@@ -10021,7 +10029,7 @@ mod tests {
     #[test]
     fn consuming_entry_writer_preserves_limits_and_poison_progress() {
         let limits = StreamingArchiveLimits::new(4, 16, 4096).with_byte_limits(3, 8, 4096);
-        let writer = StreamingArchiveWriter::with_limits(limits);
+        let writer = StreamingArchiveWriter::new(limits);
         let mut entry = writer
             .start_entry("bounded.bin", CompressionMethod::Store)
             .unwrap();
@@ -10046,7 +10054,7 @@ mod tests {
 
     #[test]
     fn consuming_entry_writer_rejects_duplicate_before_header_and_handles_short_sink() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         let mut entry = writer
             .start_entry("dir/../same.bin", CompressionMethod::Deflate)
             .unwrap();
@@ -10064,14 +10072,15 @@ mod tests {
         assert!(!duplicate.progress().is_poisoned());
 
         let mut sink = ShortWriter::new(2);
-        let mut writer = StreamingArchiveWriter::with_writer(&mut sink);
+        let mut writer =
+            StreamingArchiveWriter::with_writer(&mut sink, StreamingArchiveLimits::default());
         let mut entry = writer
             .start_entry("short.bin", CompressionMethod::Deflate)
             .unwrap();
         entry.write_all(b"short sink payload").unwrap();
         writer = entry.finish().unwrap();
         writer.finish().unwrap();
-        let reader = ArchiveReader::new(&sink.bytes).unwrap();
+        let reader = ArchiveReader::new(&sink.bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("short.bin").unwrap(), b"short sink payload");
     }
 
@@ -10079,7 +10088,7 @@ mod tests {
     fn consuming_entry_writer_preflights_raw_names_and_drops_incomplete_publication() {
         let limits = StreamingArchiveLimits::new(4, 8, 64);
         let mut sink = ShortWriter::new(3);
-        let failure = match StreamingArchiveWriter::with_writer_and_limits(&mut sink, limits)
+        let failure = match StreamingArchiveWriter::with_writer(&mut sink, limits)
             .start_entry(&"x".repeat(9), CompressionMethod::Store)
         {
             Ok(_) => panic!("oversized raw name unexpectedly started"),
@@ -10098,19 +10107,20 @@ mod tests {
 
         let mut sink = ShortWriter::new(3);
         {
-            let writer = StreamingArchiveWriter::with_writer(&mut sink);
+            let writer =
+                StreamingArchiveWriter::with_writer(&mut sink, StreamingArchiveLimits::default());
             let mut entry = writer
                 .start_entry("unfinished.bin", CompressionMethod::Deflate)
                 .unwrap();
             entry.write_all(b"partial payload").unwrap();
         }
-        assert!(ArchiveReader::new(&sink.bytes).is_err());
+        assert!(ArchiveReader::new(&sink.bytes, ArchiveLimits::default()).is_err());
     }
 
     #[test]
     fn consuming_entry_writer_enforces_store_compressed_and_aggregate_boundaries() {
         let base = StreamingArchiveLimits::new(4, 32, 128).with_byte_limits(16, 16, 4096);
-        let mut writer = StreamingArchiveWriter::with_limits(base.with_compressed_size_limit(3));
+        let mut writer = StreamingArchiveWriter::new(base.with_compressed_size_limit(3));
         let mut entry = writer
             .start_entry("exact.bin", CompressionMethod::Store)
             .unwrap();
@@ -10137,7 +10147,7 @@ mod tests {
         ));
 
         let limits = StreamingArchiveLimits::new(4, 32, 128).with_byte_limits(16, 3, 4096);
-        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        let mut writer = StreamingArchiveWriter::new(limits);
         let mut entry = writer
             .start_entry("first.bin", CompressionMethod::Store)
             .unwrap();
@@ -10165,18 +10175,16 @@ mod tests {
     #[test]
     fn consuming_entry_writer_reports_sink_failure_during_descriptor_finish() {
         let mut sink = FailingWriter::new(52);
-        let mut entry = StreamingArchiveWriter::with_writer(&mut sink)
-            .start_entry("descriptor.bin", CompressionMethod::Store)
-            .unwrap();
+        let mut entry =
+            StreamingArchiveWriter::with_writer(&mut sink, StreamingArchiveLimits::default())
+                .start_entry("descriptor.bin", CompressionMethod::Store)
+                .unwrap();
         entry.write_all(b"payload").unwrap();
         let failure = match entry.finish() {
             Ok(_) => panic!("descriptor sink failure unexpectedly succeeded"),
             Err(failure) => failure,
         };
-        assert!(matches!(
-            failure.error().kind(),
-            ErrorKind::IO(_) | ErrorKind::Io(_)
-        ));
+        assert!(matches!(failure.error().kind(), ErrorKind::IO(_)));
         assert!(failure.progress().is_poisoned());
         assert!(failure.progress().output_bytes() <= 52);
     }
@@ -10188,9 +10196,10 @@ mod tests {
         // capture path—not descriptor finalization—owns the original error.
         let name = "nested.bin";
         let mut sink = NestedFailingWriter::new(30 + name.len());
-        let mut entry = StreamingArchiveWriter::with_writer(&mut sink)
-            .start_entry(name, CompressionMethod::Store)
-            .unwrap();
+        let mut entry =
+            StreamingArchiveWriter::with_writer(&mut sink, StreamingArchiveLimits::default())
+                .start_entry(name, CompressionMethod::Store)
+                .unwrap();
         let immediate = entry.write(b"payload").unwrap_err();
         assert_eq!(immediate.kind(), io::ErrorKind::BrokenPipe);
 
@@ -10199,7 +10208,7 @@ mod tests {
             Err(failure) => failure,
         };
         let error = match failure.error().kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => error,
+            ErrorKind::IO(error) => error,
             other => panic!("expected retained I/O error, got {other:?}"),
         };
         assert!(
@@ -10215,7 +10224,7 @@ mod tests {
 
     #[test]
     fn consuming_entry_writer_enforces_deflate_and_output_exact_boundaries() {
-        let mut probe = StreamingArchiveWriter::new();
+        let mut probe = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         let mut entry = probe.start_entry("x", CompressionMethod::Deflate).unwrap();
         entry.write_all(b"payload").unwrap();
         probe = entry.finish().unwrap();
@@ -10226,14 +10235,14 @@ mod tests {
             64,
             expected_output.len() as u64,
         );
-        let mut exact = StreamingArchiveWriter::with_limits(limits);
+        let mut exact = StreamingArchiveWriter::new(limits);
         let mut entry = exact.start_entry("x", CompressionMethod::Deflate).unwrap();
         entry.write_all(b"payload").unwrap();
         exact = entry.finish().unwrap();
         assert_eq!(exact.finish_to_bytes().unwrap(), expected_output);
 
         let limits = limits.with_byte_limits(64, 64, expected_output.len() as u64 - 1);
-        let over = StreamingArchiveWriter::with_limits(limits);
+        let over = StreamingArchiveWriter::new(limits);
         let mut entry = over.start_entry("x", CompressionMethod::Deflate).unwrap();
         entry.write_all(b"payload").unwrap();
         let over = match entry.finish() {
@@ -10249,7 +10258,7 @@ mod tests {
             Some(StreamingLimitResource::OutputBytes)
         );
 
-        let limited = StreamingArchiveWriter::with_limits(
+        let limited = StreamingArchiveWriter::new(
             StreamingArchiveLimits::new(4, 32, 128)
                 .with_byte_limits(64, 64, 4096)
                 .with_compressed_size_limit(0),
@@ -10267,7 +10276,7 @@ mod tests {
             .actual();
         assert!(compressed_actual > 0);
 
-        let mut exact = StreamingArchiveWriter::with_limits(
+        let mut exact = StreamingArchiveWriter::new(
             StreamingArchiveLimits::new(4, 32, 128)
                 .with_byte_limits(64, 64, 4096)
                 .with_compressed_size_limit(compressed_actual.saturating_add(2)),
@@ -10284,7 +10293,7 @@ mod tests {
         let large = (0..(1024 * 1024))
             .map(|index| (index as u8).wrapping_mul(31))
             .collect::<Vec<_>>();
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored_stream("empty.bin", Cursor::new(Vec::<u8>::new()))
             .unwrap();
@@ -10296,7 +10305,7 @@ mod tests {
         assert_eq!(writer.metadata_bytes(), "empty.binlarge.bin".len() as u64);
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("empty.bin").unwrap(), Vec::<u8>::new());
         assert_eq!(reader.read("large.bin").unwrap(), large);
         assert!(local_member_has_data_descriptor(&bytes, b"empty.bin"));
@@ -10307,7 +10316,7 @@ mod tests {
     fn owned_stream_entries_preserve_order_crc_and_descriptor_metadata() {
         let first = b"first stream payload".to_vec();
         let second = b"second stream payload with deflate".to_vec();
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored_reader("first.bin", Cursor::new(first.clone()))
             .unwrap();
@@ -10328,7 +10337,7 @@ mod tests {
         assert!(second_entry.has_data_descriptor());
         assert!(entries.next_entry().unwrap().is_none());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.file_names().collect::<Vec<_>>(),
             ["first.bin", "second.bin"]
@@ -10341,14 +10350,15 @@ mod tests {
     fn owned_stream_output_accepts_short_non_seek_writes() {
         let mut sink = ShortWriter::new(3);
         {
-            let mut writer = StreamingArchiveWriter::with_writer(&mut sink);
+            let mut writer =
+                StreamingArchiveWriter::with_writer(&mut sink, StreamingArchiveLimits::default());
             writer
                 .write_deflated_stream("short.xml", Cursor::new(b"short sink".to_vec()))
                 .unwrap();
             writer.finish().unwrap();
         }
 
-        let reader = ArchiveReader::new(&sink.bytes).unwrap();
+        let reader = ArchiveReader::new(&sink.bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("short.xml").unwrap(), b"short sink");
     }
 
@@ -10356,20 +10366,21 @@ mod tests {
     fn owned_stream_output_reports_failing_sink_after_partial_output() {
         let mut sink = FailingWriter::new(64);
         let error = {
-            let mut writer = StreamingArchiveWriter::with_writer(&mut sink);
+            let mut writer =
+                StreamingArchiveWriter::with_writer(&mut sink, StreamingArchiveLimits::default());
             writer
                 .write_deflated_stream("failing.xml", Cursor::new(vec![b'x'; 4096]))
                 .unwrap_err()
         };
 
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(sink.bytes.len() <= sink.fail_after);
     }
 
     #[test]
     fn owned_stream_output_is_deterministic_and_rejects_unsupported_methods_early() {
         fn build_archive() -> Vec<u8> {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             writer
                 .write_stored_stream("a", Cursor::new(b"stored".to_vec()))
                 .unwrap();
@@ -10387,7 +10398,7 @@ mod tests {
         let second = build_archive();
         assert_eq!(first, second);
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         let error = writer
             .write_stream(
                 "unsupported",
@@ -10403,12 +10414,15 @@ mod tests {
         writer
             .write_stored_stream("after-error", Cursor::new(b"ok".to_vec()))
             .unwrap();
-        assert!(ArchiveReader::new(&writer.finish_to_bytes().unwrap()).is_ok());
+        assert!(
+            ArchiveReader::new(&writer.finish_to_bytes().unwrap(), ArchiveLimits::default())
+                .is_ok()
+        );
     }
 
     #[test]
     fn owned_stream_output_enforces_finite_metadata_limits() {
-        let mut writer = StreamingArchiveWriter::with_limits(StreamingArchiveLimits::new(1, 8, 16));
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::new(1, 8, 16));
         writer
             .write_stored_stream("first", Cursor::new(b"one".to_vec()))
             .unwrap();
@@ -10419,15 +10433,14 @@ mod tests {
             .unwrap_err();
         assert_limit(error, LimitResource::FileCount, 2, 1);
 
-        let mut name_limited =
-            StreamingArchiveWriter::with_limits(StreamingArchiveLimits::new(4, 3, 16));
+        let mut name_limited = StreamingArchiveWriter::new(StreamingArchiveLimits::new(4, 3, 16));
         let error = name_limited
             .write_stored_stream("four", Cursor::new(b"payload".to_vec()))
             .unwrap_err();
         assert_limit(error, LimitResource::MemberNameBytes, 4, 3);
 
         let mut metadata_limited =
-            StreamingArchiveWriter::with_limits(StreamingArchiveLimits::new(4, 16, 5));
+            StreamingArchiveWriter::new(StreamingArchiveLimits::new(4, 16, 5));
         metadata_limited
             .write_stored_stream("one", Cursor::new(b"one".to_vec()))
             .unwrap();
@@ -10439,13 +10452,13 @@ mod tests {
 
     #[test]
     fn owned_stream_output_enforces_exact_and_one_over_byte_limits() {
-        let mut exact = StreamingArchiveWriter::new();
+        let mut exact = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         exact
             .write_stored_stream("exact", Cursor::new(b"abc".to_vec()))
             .unwrap();
         assert_eq!(exact.total_uncompressed_bytes, 3);
 
-        let mut entry_limited = StreamingArchiveWriter::with_limits(
+        let mut entry_limited = StreamingArchiveWriter::new(
             StreamingArchiveLimits::new(4, 16, 16).with_byte_limits(3, 8, 4096),
         );
         entry_limited
@@ -10456,7 +10469,7 @@ mod tests {
             .unwrap_err();
         assert_limit(error, LimitResource::EntrySize, 4, 3);
 
-        let mut aggregate_limited = StreamingArchiveWriter::with_limits(
+        let mut aggregate_limited = StreamingArchiveWriter::new(
             StreamingArchiveLimits::new(4, 16, 16).with_byte_limits(8, 3, 4096),
         );
         aggregate_limited
@@ -10467,25 +10480,22 @@ mod tests {
             .unwrap_err();
         assert_limit(error, LimitResource::TotalSize, 4, 3);
 
-        let mut output_probe = StreamingArchiveWriter::new();
+        let mut output_probe = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         output_probe.write_stored("one", b"payload").unwrap();
         let output = output_probe.finish_to_bytes().unwrap();
         let expected_output_bytes = output.len() as u64;
 
         let output_limits =
             StreamingArchiveLimits::new(4, 16, 16).with_byte_limits(8, 8, expected_output_bytes);
-        let mut output_exact = StreamingArchiveWriter::with_limits(output_limits);
+        let mut output_exact = StreamingArchiveWriter::new(output_limits);
         output_exact.write_stored("one", b"payload").unwrap();
         assert_eq!(output_exact.finish_to_bytes().unwrap(), output);
 
         let output_limits = output_limits.with_byte_limits(8, 8, expected_output_bytes - 1);
-        let mut output_over = StreamingArchiveWriter::with_limits(output_limits);
+        let mut output_over = StreamingArchiveWriter::new(output_limits);
         output_over.write_stored("one", b"payload").unwrap();
         let failure = output_over.finish_with_progress().unwrap_err();
-        assert!(matches!(
-            failure.error().kind(),
-            ErrorKind::IO(_) | ErrorKind::Io(_)
-        ));
+        assert!(matches!(failure.error().kind(), ErrorKind::IO(_)));
         let limit = failure.limit().expect("typed output limit");
         assert_eq!(limit.resource(), StreamingLimitResource::OutputBytes);
         assert_eq!(limit.maximum(), expected_output_bytes - 1);
@@ -10499,17 +10509,20 @@ mod tests {
             .with_byte_limits(16, 32, 4096)
             .with_compressed_size_limit(3);
 
-        let mut exact = StreamingArchiveWriter::with_limits(limits);
+        let mut exact = StreamingArchiveWriter::new(limits);
         exact
             .write_stored_stream("exact", Cursor::new(b"abc".to_vec()))
             .unwrap();
         let bytes = exact.finish_to_bytes().unwrap();
         assert_eq!(
-            ArchiveReader::new(&bytes).unwrap().read("exact").unwrap(),
+            ArchiveReader::new(&bytes, ArchiveLimits::default())
+                .unwrap()
+                .read("exact")
+                .unwrap(),
             b"abc"
         );
 
-        let mut one_over = StreamingArchiveWriter::with_limits(limits);
+        let mut one_over = StreamingArchiveWriter::new(limits);
         let error = one_over
             .write_stored_stream("over", Cursor::new(b"abcd".to_vec()))
             .unwrap_err();
@@ -10520,7 +10533,7 @@ mod tests {
         assert_eq!(limit.maximum(), 3);
         assert!(one_over.is_poisoned());
 
-        let mut deflated = StreamingArchiveWriter::with_limits(
+        let mut deflated = StreamingArchiveWriter::new(
             StreamingArchiveLimits::new(4, 16, 64)
                 .with_byte_limits(16, 32, 4096)
                 .with_compressed_size_limit(1),
@@ -10542,7 +10555,7 @@ mod tests {
     #[test]
     fn owned_stream_deflate_limit_applies_to_compressed_bytes_not_input_bytes() {
         let payload = vec![b'a'; 4096];
-        let mut probe = StreamingArchiveWriter::new();
+        let mut probe = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         probe.write_deflated("probe", &payload).unwrap();
         let bytes = probe.finish_to_bytes().unwrap();
         let archive = ZipArchive::from_slice(&bytes).unwrap();
@@ -10553,11 +10566,11 @@ mod tests {
         let limits = StreamingArchiveLimits::new(4, 16, 64)
             .with_byte_limits(8192, 8192, 4096)
             .with_compressed_size_limit(compressed);
-        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        let mut writer = StreamingArchiveWriter::new(limits);
         writer.write_deflated("compressed", &payload).unwrap();
         let output = writer.finish_to_bytes().unwrap();
         assert_eq!(
-            ArchiveReader::new(&output)
+            ArchiveReader::new(&output, ArchiveLimits::default())
                 .unwrap()
                 .read("compressed")
                 .unwrap(),
@@ -10567,7 +10580,7 @@ mod tests {
 
     #[test]
     fn owned_stream_output_rejects_duplicate_normalized_names_before_header() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("dir/../same", b"one").unwrap();
         let output_before_duplicate = writer.output_bytes();
         let error = writer
@@ -10580,14 +10593,14 @@ mod tests {
         assert_eq!(writer.entry_count(), 1);
         assert!(!writer.is_poisoned());
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.file_names().collect::<Vec<_>>(), ["same"]);
         assert_eq!(reader.read("same").unwrap(), b"one");
     }
 
     #[test]
     fn owned_stream_output_handles_interrupted_and_source_errors_with_poisoning() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         let reader =
             ScriptedReader::new([ReadStep::Interrupted, ReadStep::Bytes(b"accepted".to_vec())]);
         writer.write_stored_stream("ok", reader).unwrap();
@@ -10595,7 +10608,7 @@ mod tests {
 
         let reader = ScriptedReader::new([ReadStep::Bytes(b"partial".to_vec()), ReadStep::Error]);
         let error = writer.write_stored_stream("bad", reader).unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(writer.is_poisoned());
         let progress = writer.progress();
         assert!(progress.is_poisoned());
@@ -10611,14 +10624,12 @@ mod tests {
 
     #[test]
     fn owned_stream_output_reports_write_zero_and_rejects_post_failure_finish() {
-        let mut writer = StreamingArchiveWriter::with_writer_and_limits(
-            ZeroWriter,
-            StreamingArchiveLimits::default(),
-        );
+        let mut writer =
+            StreamingArchiveWriter::with_writer(ZeroWriter, StreamingArchiveLimits::default());
         let error = writer
             .write_stored_stream("zero", Cursor::new(b"payload".to_vec()))
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(writer.is_poisoned());
         assert_eq!(writer.output_bytes(), 0);
 
@@ -10635,7 +10646,7 @@ mod tests {
             u64::MAX,
             u64::MAX,
         );
-        let mut writer = StreamingArchiveWriter::with_limits(invalid);
+        let mut writer = StreamingArchiveWriter::new(invalid);
         let error = writer
             .write_stored_stream("x", Cursor::new(b"x".to_vec()))
             .unwrap_err();
@@ -10650,7 +10661,7 @@ mod tests {
         let limits = StreamingArchiveLimits::new(u16::MAX as usize, 64, 4096)
             .with_byte_limits(zip32_boundary, zip32_boundary, zip32_boundary)
             .with_compressed_size_limit(zip32_boundary);
-        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        let mut writer = StreamingArchiveWriter::new(limits);
 
         writer
             .write_deflated("borrowed-deflated", b"borrowed payload")
@@ -10667,7 +10678,7 @@ mod tests {
 
         let bytes = writer.finish_to_bytes().unwrap();
         assert!(ZipArchive::from_slice(&bytes).unwrap().is_zip64());
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.read("borrowed-deflated").unwrap(),
             b"borrowed payload"
@@ -10701,7 +10712,7 @@ mod tests {
         let limits = StreamingArchiveLimits::new(4, 64, expected_metadata)
             .with_byte_limits(zip32_boundary, zip32_boundary, zip32_boundary)
             .with_compressed_size_limit(zip32_boundary);
-        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        let mut writer = StreamingArchiveWriter::new(limits);
         writer.write_deflated(borrowed_name, b"payload").unwrap();
         assert_eq!(writer.metadata_bytes(), borrowed_metadata);
 
@@ -10715,7 +10726,7 @@ mod tests {
         let name_only_budget = StreamingArchiveLimits::new(4, 64, borrowed_name.len() as u64)
             .with_byte_limits(zip32_boundary, zip32_boundary, zip32_boundary)
             .with_compressed_size_limit(zip32_boundary);
-        let mut name_only = StreamingArchiveWriter::with_limits(name_only_budget);
+        let mut name_only = StreamingArchiveWriter::new(name_only_budget);
         let error = name_only
             .write_deflated(borrowed_name, b"payload")
             .unwrap_err();
@@ -10784,7 +10795,7 @@ mod tests {
 
     #[test]
     fn test_multiple_files() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored("mimetype", b"application/test")
             .unwrap();
@@ -10792,7 +10803,7 @@ mod tests {
         writer.write_deflated("styles.xml", b"<styles/>").unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.len(), 3);
         assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
         assert_eq!(reader.read("content.xml").unwrap(), b"<content/>");
@@ -10805,7 +10816,7 @@ mod tests {
         let deflated_first = b"deflated first payload with a data descriptor";
         let stored_second = b"stored second payload with a data descriptor";
         let deflated_second = b"deflated second payload with a data descriptor";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored-first", stored_first).unwrap();
         writer
             .write_deflated("deflated-first", deflated_first)
@@ -10821,7 +10832,7 @@ mod tests {
         assert!(local_member_has_data_descriptor(&bytes, b"stored-second"));
         assert!(local_member_has_data_descriptor(&bytes, b"deflated-second"));
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let members = [
             ("stored-first", stored_first.as_slice()),
             ("deflated-first", deflated_first.as_slice()),
@@ -10852,7 +10863,7 @@ mod tests {
     fn archive_read_session_resets_after_crc_and_corrupt_deflate_failures() {
         const VALID: &[u8] = b"valid payload after a failed Deflate read";
 
-        let mut crc_writer = StreamingArchiveWriter::new();
+        let mut crc_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         crc_writer
             .write_deflated_sized("bad-crc", b"payload with a bad CRC")
             .unwrap();
@@ -10865,13 +10876,13 @@ mod tests {
                 .unwrap(),
         );
         crc_bytes[crc_central + 16..crc_central + 20].copy_from_slice(&(crc ^ 1).to_le_bytes());
-        let crc_reader = ArchiveReader::new(&crc_bytes).unwrap();
+        let crc_reader = ArchiveReader::new(&crc_bytes, ArchiveLimits::default()).unwrap();
         let mut crc_session = crc_reader.read_session();
         let error = crc_session.read("bad-crc").unwrap_err();
         assert_materialized_checksum_error(error);
         assert_eq!(crc_session.read("valid").unwrap(), VALID);
 
-        let mut corrupt_writer = StreamingArchiveWriter::new();
+        let mut corrupt_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         corrupt_writer
             .write_deflated_sized("corrupt", b"payload with corrupt Deflate bytes")
             .unwrap();
@@ -10890,12 +10901,12 @@ mod tests {
         ));
         let compressed_start = corrupt_local + 30 + name_len + extra_len;
         corrupt_bytes[compressed_start] ^= 0xff;
-        let corrupt_reader = ArchiveReader::new(&corrupt_bytes).unwrap();
+        let corrupt_reader = ArchiveReader::new(&corrupt_bytes, ArchiveLimits::default()).unwrap();
         let mut corrupt_session = corrupt_reader.read_session();
         assert!(corrupt_session.read("corrupt").is_err());
         assert_eq!(corrupt_session.read("valid").unwrap(), VALID);
 
-        let mut truncated_writer = StreamingArchiveWriter::new();
+        let mut truncated_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         truncated_writer
             .write_deflated_sized("truncated", b"payload with a truncated Deflate stream")
             .unwrap();
@@ -10915,7 +10926,8 @@ mod tests {
             .copy_from_slice(&(compressed_size - 1).to_le_bytes());
         truncated_bytes[truncated_central + 20..truncated_central + 24]
             .copy_from_slice(&(compressed_size - 1).to_le_bytes());
-        let truncated_reader = ArchiveReader::new(&truncated_bytes).unwrap();
+        let truncated_reader =
+            ArchiveReader::new(&truncated_bytes, ArchiveLimits::default()).unwrap();
         let mut truncated_session = truncated_reader.read_session();
         assert!(truncated_session.read("truncated").is_err());
         assert_eq!(truncated_session.read("valid").unwrap(), VALID);
@@ -10925,7 +10937,7 @@ mod tests {
     fn archive_read_session_recovers_after_store_and_unsupported_failures() {
         const VALID: &[u8] = b"valid Deflate payload after a failed member";
 
-        let mut store_writer = StreamingArchiveWriter::new();
+        let mut store_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         store_writer
             .write_stored("bad-store", b"stored payload")
             .unwrap();
@@ -10943,13 +10955,13 @@ mod tests {
                 .unwrap(),
         ));
         store_bytes[store_local + 30 + store_name_len + store_extra_len] ^= 0xff;
-        let store_reader = ArchiveReader::new(&store_bytes).unwrap();
+        let store_reader = ArchiveReader::new(&store_bytes, ArchiveLimits::default()).unwrap();
         let mut store_session = store_reader.read_session();
         let store_error = store_session.read("bad-store").unwrap_err();
         assert_materialized_checksum_error(store_error);
         assert_eq!(store_session.read("valid").unwrap(), VALID);
 
-        let mut unsupported_writer = StreamingArchiveWriter::new();
+        let mut unsupported_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         unsupported_writer
             .write_deflated_sized("unsupported", b"unsupported method payload")
             .unwrap();
@@ -10964,7 +10976,8 @@ mod tests {
             .copy_from_slice(&12_u16.to_le_bytes());
         unsupported_bytes[unsupported_central + 10..unsupported_central + 12]
             .copy_from_slice(&12_u16.to_le_bytes());
-        let unsupported_reader = ArchiveReader::new(&unsupported_bytes).unwrap();
+        let unsupported_reader =
+            ArchiveReader::new(&unsupported_bytes, ArchiveLimits::default()).unwrap();
         let mut unsupported_session = unsupported_reader.read_session();
         let unsupported_error = unsupported_session.read("unsupported").unwrap_err();
         assert!(matches!(
@@ -10980,12 +10993,12 @@ mod tests {
         const VALID: &[u8] = b"valid payload after a size failure";
 
         for declared_size in [3_u32, 128_u32] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             writer.write_deflated_sized("bad-size", ACTUAL).unwrap();
             writer.write_deflated_sized("valid", VALID).unwrap();
             let mut bytes = writer.finish_to_bytes().unwrap();
             rewrite_uncompressed_size(&mut bytes, b"bad-size", declared_size);
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let mut session = reader.read_session();
             let error = session.read("bad-size").unwrap_err();
             assert_materialized_size_error(error);
@@ -10995,7 +11008,7 @@ mod tests {
 
     #[test]
     fn sized_deflated_members_declare_upfront_sizes_without_a_data_descriptor() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored("mimetype", b"application/test")
             .unwrap();
@@ -11005,7 +11018,7 @@ mod tests {
         let bytes = writer.finish_to_bytes().unwrap();
         assert!(!local_member_has_data_descriptor(&bytes, b"content.xml"));
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.len(), 2);
         assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
         assert_eq!(
@@ -11017,7 +11030,7 @@ mod tests {
     #[test]
     fn sized_deflated_limit_breach_leaves_the_writer_usable() {
         let limits = StreamingArchiveLimits::default().with_compressed_size_limit(1024);
-        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        let mut writer = StreamingArchiveWriter::new(limits);
         writer
             .write_stored("mimetype", b"application/test")
             .unwrap();
@@ -11041,13 +11054,13 @@ mod tests {
         // in-budget write still succeeds.
         writer.write_deflated_sized("ok.xml", b"<ok/>").unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read("ok.xml").unwrap(), b"<ok/>");
     }
 
     #[test]
     fn indexed_archive_reads_stored_and_deflated_members_by_stable_id() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored("mimetype", b"application/test")
             .unwrap();
@@ -11082,7 +11095,7 @@ mod tests {
         let deflated_first = b"deflated first payload with a data descriptor";
         let stored_second = b"stored second payload with a data descriptor";
         let deflated_second = b"deflated second payload with a data descriptor";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored-first", stored_first).unwrap();
         writer
             .write_deflated("deflated-first", deflated_first)
@@ -11137,7 +11150,7 @@ mod tests {
         let stored = b"stored payload that bypasses the decoder";
         let deflated = b"deflated payload that resets the decoder";
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", stored).unwrap();
         writer
             .write_deflated_sized("bad-crc.bin", b"payload with a bad CRC")
@@ -11208,7 +11221,7 @@ mod tests {
     fn indexed_read_session_resets_after_crc_and_corrupt_deflate_failures() {
         const VALID: &[u8] = b"valid payload after a failed Deflate read";
 
-        let mut crc_writer = StreamingArchiveWriter::new();
+        let mut crc_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         crc_writer
             .write_deflated_sized("bad-crc", b"payload with a bad CRC")
             .unwrap();
@@ -11229,7 +11242,7 @@ mod tests {
         assert_materialized_checksum_error(error);
         assert_eq!(session.read_entry(valid).unwrap(), VALID);
 
-        let mut corrupt_writer = StreamingArchiveWriter::new();
+        let mut corrupt_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         corrupt_writer
             .write_deflated_sized("corrupt", b"payload with corrupt Deflate bytes")
             .unwrap();
@@ -11255,7 +11268,7 @@ mod tests {
         assert!(session.read_entry(corrupt).is_err());
         assert_eq!(session.read_entry(valid).unwrap(), VALID);
 
-        let mut truncated_writer = StreamingArchiveWriter::new();
+        let mut truncated_writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         truncated_writer
             .write_deflated_sized("truncated", b"payload with a truncated Deflate stream")
             .unwrap();
@@ -11289,7 +11302,7 @@ mod tests {
         const VALID: &[u8] = b"valid payload after a size failure";
 
         for declared_size in [3_u32, 128_u32] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             writer.write_deflated_sized("bad-size", ACTUAL).unwrap();
             writer.write_deflated_sized("valid", VALID).unwrap();
             let mut bytes = writer.finish_to_bytes().unwrap();
@@ -11306,7 +11319,7 @@ mod tests {
 
     #[test]
     fn indexed_read_to_reports_typed_crc_failure_for_data_descriptor() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored_stream("bad.bin", Cursor::new(b"bad".to_vec()))
             .unwrap();
@@ -11328,7 +11341,7 @@ mod tests {
             for (payload, declared_size) in
                 [(b"abc".as_slice(), 4_u32), (b"abcde".as_slice(), 4_u32)]
             {
-                let mut writer = StreamingArchiveWriter::new();
+                let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                 if deflated {
                     writer.write_deflated("member.bin", payload).unwrap();
                 } else {
@@ -11337,7 +11350,7 @@ mod tests {
                 let mut bytes = writer.finish_to_bytes().unwrap();
                 rewrite_uncompressed_size(&mut bytes, b"member.bin", declared_size);
 
-                let reader = ArchiveReader::new(&bytes).unwrap();
+                let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
                 let mut output = Vec::new();
                 let error = reader.read_to("member.bin", &mut output).unwrap_err();
                 assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
@@ -11356,7 +11369,7 @@ mod tests {
             for (payload, declared_size) in
                 [(b"abc".as_slice(), 4_u32), (b"abcde".as_slice(), 4_u32)]
             {
-                let mut writer = StreamingArchiveWriter::new();
+                let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                 if deflated {
                     writer.write_deflated("member.bin", payload).unwrap();
                 } else {
@@ -11366,8 +11379,7 @@ mod tests {
                 rewrite_uncompressed_size(&mut bytes, b"member.bin", declared_size);
 
                 {
-                    let reader =
-                        ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+                    let reader = ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
                     let error = reader.read("member.bin").unwrap_err();
                     assert_materialized_size_error(error);
                 }
@@ -11396,7 +11408,7 @@ mod tests {
         let archive = ZipArchive::from_slice(bytes).unwrap();
         assert!(archive.is_zip64());
 
-        let reader = ArchiveReader::new(bytes).unwrap();
+        let reader = ArchiveReader::new(bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read_stored_borrowed("README").unwrap(), None);
         assert_eq!(
             reader.read("README").unwrap(),
@@ -11418,7 +11430,7 @@ mod tests {
             .unwrap();
         assert!(central_end <= archive.eocd_offset());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.read("README").unwrap(),
             b"This small file is in ZIP64 format.\n"
@@ -11428,7 +11440,7 @@ mod tests {
     #[test]
     fn indexed_read_to_reports_source_and_zero_progress_sink_errors() {
         let payload = vec![b'x'; STREAM_COPY_BUFFER_SIZE + 1];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
@@ -11436,7 +11448,7 @@ mod tests {
         let wayfinder = zip.entries().next().unwrap().unwrap().wayfinder();
         let entry = zip.get_entry(wayfinder).unwrap();
         let (fail_start, fail_end) = entry.compressed_data_range();
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = IndexedArchive::from_reader(
             FailOnRangeReaderAt {
                 bytes: bytes.clone(),
                 fail_start,
@@ -11448,14 +11460,14 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         let error = archive.read_to("payload.bin", &mut output).unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(output.is_empty());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut zero = ZeroWriter;
         let error = reader.read_to("payload.bin", &mut zero).unwrap_err();
         match error.kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => {
+            ErrorKind::IO(error) => {
                 assert_eq!(error.kind(), io::ErrorKind::WriteZero);
             },
             other => panic!("expected zero-progress sink failure, got {other:?}"),
@@ -11513,7 +11525,7 @@ mod tests {
         ] {
             let bytes = fixture(&entries);
             assert!(matches!(
-                ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED),
+                ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED),
                 Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("directory") || msg.contains("file/directory"))
             ));
             assert!(matches!(
@@ -11531,7 +11543,7 @@ mod tests {
         ]);
 
         for result in [
-            ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).map(|_| ()),
+            ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).map(|_| ()),
             indexed_archive_result(bytes.clone(), ArchiveLimits::UNBOUNDED).map(|_| ()),
         ] {
             assert!(matches!(
@@ -11561,7 +11573,7 @@ mod tests {
         ] {
             let bytes = fixture(&entries);
             for result in [
-                ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).map(|_| ()),
+                ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).map(|_| ()),
                 indexed_archive_result(bytes.clone(), ArchiveLimits::UNBOUNDED).map(|_| ()),
             ] {
                 assert!(matches!(
@@ -11577,7 +11589,7 @@ mod tests {
     #[test]
     fn archive_lookups_apply_the_same_normalization_as_ingress() {
         let bytes = fixture(&[FixtureEntry::stored(b"dir/../body.xml", b"body")]);
-        let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
         assert!(reader.contains("/./dir/../body.xml"));
         assert_eq!(reader.read("/./dir/../body.xml").unwrap(), b"body");
 
@@ -11591,7 +11603,7 @@ mod tests {
         let bytes = fixture(&[FixtureEntry::stored(b"dir/../lossy\xff.bin", b"body")]);
         let query = "/./dir/../lossy\u{FFFD}.bin";
 
-        let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
         assert_eq!(reader.file_names().collect::<Vec<_>>(), ["lossy�.bin"]);
         assert!(reader.contains(query));
         assert_eq!(reader.read(query).unwrap(), b"body");
@@ -11601,7 +11613,12 @@ mod tests {
         assert!(indexed.contains(query));
         assert_eq!(indexed.read(query).unwrap(), b"body");
 
-        let lazy = LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let lazy = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::UNBOUNDED,
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         assert!(lazy.contains(query));
         assert_eq!(lazy.read_shared(query).unwrap().as_slice(), b"body");
     }
@@ -11629,7 +11646,7 @@ mod tests {
             ..ArchiveLimits::UNBOUNDED
         };
         assert_limit(
-            IndexedArchive::from_zip_archive_with_limits(located, limits).unwrap_err(),
+            IndexedArchive::from_zip_archive(located, limits).unwrap_err(),
             LimitResource::EntrySize,
             5,
             4,
@@ -11638,12 +11655,12 @@ mod tests {
 
     #[test]
     fn rejects_archives_exceeding_configured_resource_limits() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("first.xml", b"1234").unwrap();
         writer.write_deflated("second.xml", b"5678").unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
 
-        let file_error = ArchiveReader::new_with_limits(
+        let file_error = ArchiveReader::new(
             &bytes,
             ArchiveLimits {
                 max_files: 1,
@@ -11653,7 +11670,7 @@ mod tests {
         .unwrap_err();
         assert_limit(file_error, LimitResource::FileCount, 2, 1);
 
-        let entry_error = ArchiveReader::new_with_limits(
+        let entry_error = ArchiveReader::new(
             &bytes,
             ArchiveLimits {
                 max_entry_size: 3,
@@ -11663,7 +11680,7 @@ mod tests {
         .unwrap_err();
         assert_limit(entry_error, LimitResource::EntrySize, 4, 3);
 
-        let total_error = ArchiveReader::new_with_limits(
+        let total_error = ArchiveReader::new(
             &bytes,
             ArchiveLimits {
                 max_total_size: 7,
@@ -11673,8 +11690,15 @@ mod tests {
         .unwrap_err();
         assert_limit(total_error, LimitResource::TotalSize, 8, 7);
 
-        assert!(ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
-        assert!(LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
+        assert!(ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
+        assert!(
+            LazyArchiveReader::new(
+                &bytes,
+                ArchiveLimits::UNBOUNDED,
+                LazyArchiveCacheLimits::default(),
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -11683,12 +11707,12 @@ mod tests {
 
         let mut exact = ArchiveLimits::UNBOUNDED;
         exact.max_member_name_bytes = 4;
-        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(ArchiveReader::new(&bytes, exact).is_ok());
 
         let mut over = exact;
         over.max_member_name_bytes = 3;
         assert_limit(
-            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            ArchiveReader::new(&bytes, over).unwrap_err(),
             LimitResource::MemberNameBytes,
             4,
             3,
@@ -11708,13 +11732,13 @@ mod tests {
 
         let mut exact = ArchiveLimits::UNBOUNDED;
         exact.max_metadata_bytes = 5 + CENTRAL_FIXED_RECORD_BYTES;
-        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(ArchiveReader::new(&bytes, exact).is_ok());
         assert!(indexed_archive_result(bytes.clone(), exact).is_ok());
 
         let mut over = exact;
         over.max_metadata_bytes -= 1;
         assert_limit(
-            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            ArchiveReader::new(&bytes, over).unwrap_err(),
             LimitResource::MetadataBytes,
             5 + CENTRAL_FIXED_RECORD_BYTES,
             4 + CENTRAL_FIXED_RECORD_BYTES,
@@ -11868,12 +11892,12 @@ mod tests {
 
         let mut exact = ArchiveLimits::UNBOUNDED;
         exact.max_compressed_size = 3;
-        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(ArchiveReader::new(&bytes, exact).is_ok());
 
         let mut over = exact;
         over.max_compressed_size = 2;
         assert_limit(
-            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            ArchiveReader::new(&bytes, over).unwrap_err(),
             LimitResource::CompressedSize,
             3,
             2,
@@ -11886,12 +11910,12 @@ mod tests {
 
         let mut exact = ArchiveLimits::UNBOUNDED;
         exact.max_entry_size = 3;
-        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(ArchiveReader::new(&bytes, exact).is_ok());
 
         let mut over = exact;
         over.max_entry_size = 2;
         assert_limit(
-            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            ArchiveReader::new(&bytes, over).unwrap_err(),
             LimitResource::EntrySize,
             3,
             2,
@@ -11907,12 +11931,12 @@ mod tests {
 
         let mut exact = ArchiveLimits::UNBOUNDED;
         exact.max_total_size = 7;
-        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(ArchiveReader::new(&bytes, exact).is_ok());
 
         let mut over = exact;
         over.max_total_size = 6;
         assert_limit(
-            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            ArchiveReader::new(&bytes, over).unwrap_err(),
             LimitResource::TotalSize,
             7,
             6,
@@ -11928,12 +11952,12 @@ mod tests {
 
         let mut exact = ArchiveLimits::UNBOUNDED;
         exact.max_files = 2;
-        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(ArchiveReader::new(&bytes, exact).is_ok());
 
         let mut over = exact;
         over.max_files = 1;
         assert_limit(
-            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            ArchiveReader::new(&bytes, over).unwrap_err(),
             LimitResource::FileCount,
             2,
             1,
@@ -11960,7 +11984,7 @@ mod tests {
             max_total_size: 0,
         };
 
-        assert!(ArchiveReader::new_with_limits(&bytes, limits).is_ok());
+        assert!(ArchiveReader::new(&bytes, limits).is_ok());
     }
 
     #[test]
@@ -11985,7 +12009,7 @@ mod tests {
             },
         ]);
 
-        let error = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap_err();
+        let error = ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).unwrap_err();
         assert!(
             matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("overflows"))
         );
@@ -12000,7 +12024,7 @@ mod tests {
         bytes[central_directory_offset + 28..central_directory_offset + 30]
             .copy_from_slice(&2u16.to_le_bytes());
 
-        assert!(ArchiveReader::new(&bytes).is_err());
+        assert!(ArchiveReader::new(&bytes, ArchiveLimits::default()).is_err());
     }
 
     #[test]
@@ -12025,7 +12049,7 @@ mod tests {
             },
         ]);
 
-        let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
         let file = reader.metadata("/body.xml").unwrap();
         assert_eq!(file.compressed_size(), 3);
         assert_eq!(file.uncompressed_size(), 5);
@@ -12039,7 +12063,12 @@ mod tests {
             matches!(reader.metadata("missing"), Err(error) if matches!(error.kind(), ErrorKind::FileNotFound(_)))
         );
 
-        let lazy = LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let lazy = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::UNBOUNDED,
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         assert_eq!(lazy.cache_size(), 0);
         assert_eq!(lazy.metadata("body.xml").unwrap(), file);
         assert_eq!(lazy.cache_size(), 0);
@@ -12049,7 +12078,7 @@ mod tests {
     fn eager_bulk_reads_preserve_source_order_and_all_member_errors() {
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let session = test_parallel_session(4);
         let never_cancel = || false;
 
@@ -12090,7 +12119,12 @@ mod tests {
     fn lazy_bulk_reads_propagate_errors_and_cache_only_successes() {
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let requested = ["last", "bad", "missing", "first"];
 
         let results = reader.read_many_parallel_cached(&requested);
@@ -12122,10 +12156,17 @@ mod tests {
     fn lazy_shared_concurrent_cold_reads_share_one_flight() {
         const CALLERS: usize = 8;
         let payload = vec![b'x'; 1024 * 1024];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = Arc::new(LazyArchiveReader::new(&bytes).unwrap());
+        let reader = Arc::new(
+            LazyArchiveReader::new(
+                &bytes,
+                ArchiveLimits::default(),
+                LazyArchiveCacheLimits::default(),
+            )
+            .unwrap(),
+        );
         let ready = Arc::new(std::sync::Barrier::new(CALLERS + 1));
         let values = std::thread::scope(|scope| {
             let handles = (0..CALLERS)
@@ -12161,7 +12202,14 @@ mod tests {
         const CALLERS: usize = 6;
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
-        let reader = Arc::new(LazyArchiveReader::new(&bytes).unwrap());
+        let reader = Arc::new(
+            LazyArchiveReader::new(
+                &bytes,
+                ArchiveLimits::default(),
+                LazyArchiveCacheLimits::default(),
+            )
+            .unwrap(),
+        );
         let ready = Arc::new(std::sync::Barrier::new(CALLERS + 1));
         std::thread::scope(|scope| {
             let handles = (0..CALLERS)
@@ -12216,9 +12264,9 @@ mod tests {
     #[test]
     fn lazy_active_flight_limit_bypasses_and_recovers() {
         let bytes = fixture(&[FixtureEntry::stored(b"one", b"one")]);
-        let cache_limits =
-            LazyArchiveCacheLimits::new_with_active_flight_limits(64, 2, 1, 5).unwrap();
-        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+        let cache_limits = LazyArchiveCacheLimits::new(64, 2, 1, 5).unwrap();
+        let reader =
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap();
         let held = register_lazy_test_flight(&reader, "hold");
         assert_eq!(reader.active_flight_count(), 1);
         assert_eq!(reader.active_flight_key_bytes(), 4);
@@ -12245,9 +12293,9 @@ mod tests {
     #[test]
     fn lazy_flight_key_limit_is_typed_and_does_not_retain_state() {
         let bytes = fixture(&[FixtureEntry::stored(b"one", b"one")]);
-        let cache_limits =
-            LazyArchiveCacheLimits::new_with_active_flight_limits(64, 2, 2, 4).unwrap();
-        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+        let cache_limits = LazyArchiveCacheLimits::new(64, 2, 2, 4).unwrap();
+        let reader =
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap();
 
         let result = reader.read_shared("fives");
         assert!(matches!(
@@ -12262,10 +12310,10 @@ mod tests {
     #[test]
     fn lazy_missing_name_flight_wakes_waiter_and_releases_budget() {
         let bytes = fixture(&[FixtureEntry::stored(b"one", b"one")]);
-        let cache_limits =
-            LazyArchiveCacheLimits::new_with_active_flight_limits(64, 2, 1, 64).unwrap();
-        let reader =
-            Arc::new(LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap());
+        let cache_limits = LazyArchiveCacheLimits::new(64, 2, 1, 64).unwrap();
+        let reader = Arc::new(
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap(),
+        );
         let held = register_lazy_test_flight(&reader, "missing");
 
         let waited = std::thread::scope(|scope| {
@@ -12309,8 +12357,15 @@ mod tests {
             FixtureEntry::stored(b"second", b"two"),
             FixtureEntry::stored(b"third", b"tre"),
         ]);
-        let cache_limits = LazyArchiveCacheLimits::new(6, 2).unwrap();
-        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+        let cache_limits = LazyArchiveCacheLimits::new(
+            6,
+            2,
+            LazyArchiveCacheLimits::DEFAULT_MAX_ACTIVE_FLIGHTS,
+            LazyArchiveCacheLimits::DEFAULT_MAX_FLIGHT_KEY_BYTES,
+        )
+        .unwrap();
+        let reader =
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap();
 
         assert_eq!(reader.cache_limits(), cache_limits);
         assert_eq!(reader.read_shared("first").unwrap().as_slice(), b"one");
@@ -12334,7 +12389,12 @@ mod tests {
     #[test]
     fn lazy_read_returns_fresh_vec_while_shared_reads_preserve_arc() {
         let bytes = fixture(&[FixtureEntry::stored(b"payload", b"body")]);
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
 
         let mut first = reader.read("payload").unwrap();
         first[0] = b'X';
@@ -12350,12 +12410,17 @@ mod tests {
         let stored = b"stored payload";
         let first = b"first Deflate payload";
         let second = b"second Deflate payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored", stored).unwrap();
         writer.write_deflated("first", first).unwrap();
         writer.write_deflated("second", second).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let names = ["second", "stored", "first", "second", "first"];
         let expected = [
             second.as_slice(),
@@ -12389,7 +12454,7 @@ mod tests {
     #[test]
     fn lazy_serial_shared_batch_recovers_after_a_failed_cold_member() {
         const VALID: &[u8] = b"valid payload after a failed serial batch member";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_deflated_sized("bad", b"payload with corrupt Deflate bytes")
             .unwrap();
@@ -12404,7 +12469,12 @@ mod tests {
         ));
         bytes[local + 30 + name_len + extra_len] ^= 0xff;
 
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let names = ["bad", "valid"];
         let first = reader.read_many_serial_shared(&names);
         assert!(first[0].1.is_err());
@@ -12422,14 +12492,14 @@ mod tests {
 
     #[test]
     fn lazy_serial_shared_batch_bypasses_full_flight_budget_and_recovers() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_deflated("payload", b"serial bypass payload")
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let cache_limits =
-            LazyArchiveCacheLimits::new_with_active_flight_limits(1024, 4, 1, 64).unwrap();
-        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+        let cache_limits = LazyArchiveCacheLimits::new(1024, 4, 1, 64).unwrap();
+        let reader =
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap();
         let held = register_lazy_test_flight(&reader, "held");
 
         let bypassed = reader.read_many_serial_shared(&["payload"]);
@@ -12460,19 +12530,50 @@ mod tests {
     #[test]
     fn lazy_cache_limits_reject_zero_capacity() {
         assert!(matches!(
-            LazyArchiveCacheLimits::new(0, 1),
+            LazyArchiveCacheLimits::new(
+                0,
+                1,
+                LazyArchiveCacheLimits::DEFAULT_MAX_ACTIVE_FLIGHTS,
+                LazyArchiveCacheLimits::DEFAULT_MAX_FLIGHT_KEY_BYTES,
+            ),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
         assert!(matches!(
-            LazyArchiveCacheLimits::new(1, 0),
+            LazyArchiveCacheLimits::new(
+                1,
+                0,
+                LazyArchiveCacheLimits::DEFAULT_MAX_ACTIVE_FLIGHTS,
+                LazyArchiveCacheLimits::DEFAULT_MAX_FLIGHT_KEY_BYTES,
+            ),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
         assert!(matches!(
-            LazyArchiveCacheLimits::new_with_active_flight_limits(1, 1, 0, 1),
+            LazyArchiveCacheLimits::new(1, 1, 0, 1),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
         assert!(matches!(
-            LazyArchiveCacheLimits::new_with_active_flight_limits(1, 1, 1, 0),
+            LazyArchiveCacheLimits::new(1, 1, 1, 0),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+    }
+
+    #[test]
+    fn lazy_cache_active_flight_limits_reconfigure_and_validate() {
+        let original = LazyArchiveCacheLimits::new(64, 2, 1, 4).unwrap();
+        let adjusted = original.active_flight_limits(3, 17).unwrap();
+
+        assert_eq!(original.max_active_flights_value(), 1);
+        assert_eq!(original.max_flight_key_bytes_value(), 4);
+        assert_eq!(adjusted.max_bytes_value(), 64);
+        assert_eq!(adjusted.max_entries_value(), 2);
+        assert_eq!(adjusted.max_active_flights_value(), 3);
+        assert_eq!(adjusted.max_flight_key_bytes_value(), 17);
+        assert!(matches!(
+            original.active_flight_limits(0, 17),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+        assert!(matches!(
+            original.active_flight_limits(3, 0),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
     }
@@ -12485,8 +12586,15 @@ mod tests {
             FixtureEntry::stored(b"third", b"tre"),
             FixtureEntry::stored(b"large", b"larger!!"),
         ]);
-        let cache_limits = LazyArchiveCacheLimits::new(6, 2).unwrap();
-        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+        let cache_limits = LazyArchiveCacheLimits::new(
+            6,
+            2,
+            LazyArchiveCacheLimits::DEFAULT_MAX_ACTIVE_FLIGHTS,
+            LazyArchiveCacheLimits::DEFAULT_MAX_FLIGHT_KEY_BYTES,
+        )
+        .unwrap();
+        let reader =
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap();
 
         let first = reader.read_shared("first").unwrap();
         let second = reader.read_shared("second").unwrap();
@@ -12512,8 +12620,14 @@ mod tests {
     #[test]
     fn lazy_cache_uses_canonical_member_names_and_clear_fences_flights() {
         let bytes = fixture(&[FixtureEntry::stored(b"dir/../body.xml", b"body")]);
-        let reader =
-            Arc::new(LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap());
+        let reader = Arc::new(
+            LazyArchiveReader::new(
+                &bytes,
+                ArchiveLimits::UNBOUNDED,
+                LazyArchiveCacheLimits::default(),
+            )
+            .unwrap(),
+        );
         let first = reader.read_shared("/./dir/../body.xml").unwrap();
         let second = reader.read_shared("body.xml").unwrap();
         assert!(Arc::ptr_eq(&first, &second));
@@ -12573,10 +12687,10 @@ mod tests {
     #[test]
     fn lazy_cache_take_fences_old_flights_and_wakes_waiters() {
         let bytes = fixture(&[FixtureEntry::stored(b"body.xml", b"body")]);
-        let cache_limits =
-            LazyArchiveCacheLimits::new_with_active_flight_limits(64, 2, 2, 64).unwrap();
-        let reader =
-            Arc::new(LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap());
+        let cache_limits = LazyArchiveCacheLimits::new(64, 2, 2, 64).unwrap();
+        let reader = Arc::new(
+            LazyArchiveReader::new(&bytes, ArchiveLimits::default(), cache_limits).unwrap(),
+        );
         let old = register_lazy_test_flight(&reader, "body.xml");
 
         let (taken, fresh, waited, active_after_take, flights_empty, cold_loads) =
@@ -12634,7 +12748,7 @@ mod tests {
     fn local_sessions_with_one_two_and_four_workers_preserve_results_and_order() {
         let mut bytes = bulk_fixture();
         corrupt_payload(&mut bytes, b"bad");
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let requested = ["last", "bad", "missing", "first"];
         let never_cancel = || false;
 
@@ -12690,7 +12804,12 @@ mod tests {
     #[test]
     fn pre_cancelled_session_reads_no_member_and_does_not_populate_lazy_cache() {
         let bytes = bulk_fixture();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let session = test_parallel_session(2);
         let cancelled = || true;
 
@@ -12704,7 +12823,12 @@ mod tests {
     #[test]
     fn cancellation_discards_batch_results_and_does_not_publish_lazy_cache_entries() {
         let bytes = bulk_fixture();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let session = test_parallel_session(1);
         let cancellation = CancelAfter::new(4);
 
@@ -12741,7 +12865,12 @@ mod tests {
     #[test]
     fn explicit_width_cannot_exceed_session_worker_policy() {
         let bytes = bulk_fixture();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let session = test_parallel_session(2);
         let never_cancel = || false;
         let results = reader
@@ -12782,7 +12911,9 @@ mod tests {
         ]);
         let indexed = indexed_archive(bytes.clone());
         let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-        let preservation = indexed.preservation_index(&mut scratch).unwrap();
+        let preservation = indexed
+            .preservation_index(&mut scratch, ArchiveLimits::default())
+            .unwrap();
         let names: Vec<_> = preservation
             .entries()
             .iter()
@@ -12807,8 +12938,12 @@ mod tests {
         let archive_end = bytes.len() as u64;
         bytes.extend_from_slice(b"opaque trailing bytes");
         let source_len = bytes.len() as u64;
-        let indexed = IndexedArchive::from_reader(std::io::Cursor::new(bytes), source_len)
-            .expect("ZIP before the opaque suffix remains locatable");
+        let indexed = IndexedArchive::from_reader(
+            std::io::Cursor::new(bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .expect("ZIP before the opaque suffix remains locatable");
 
         assert_eq!(indexed.archive_end_offset(), archive_end);
         assert_ne!(indexed.archive_end_offset(), source_len);
@@ -12821,7 +12956,7 @@ mod tests {
             FixtureEntry::stored(b"folder/", b""),
             FixtureEntry::stored(b"second.bin", b"second"),
         ]);
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.file_names().collect::<Vec<_>>(),
             vec!["first.bin", "second.bin"]
@@ -12837,7 +12972,7 @@ mod tests {
         let third = bytes[central + first_len + second_len..eocd].to_vec();
         bytes[central..eocd].copy_from_slice(&[third, second, first].concat());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.file_names().collect::<Vec<_>>(),
             vec!["first.bin", "second.bin"]
@@ -12848,7 +12983,9 @@ mod tests {
             vec!["first.bin", "second.bin"]
         );
         let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-        let preservation = indexed.preservation_index(&mut scratch).unwrap();
+        let preservation = indexed
+            .preservation_index(&mut scratch, ArchiveLimits::default())
+            .unwrap();
         let names: Vec<_> = preservation
             .entries()
             .iter()
@@ -12923,6 +13060,31 @@ mod tests {
     }
 
     #[test]
+    fn indexed_archive_preservation_entries_include_directories_without_payload_work() {
+        let indexed = indexed_archive(fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"folder/", b""),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]));
+
+        let entries: Vec<_> = indexed.preservation_entries().collect();
+        assert_eq!(entries.len(), indexed.preservation_entry_count());
+        assert_eq!(entries.len(), 3);
+        assert!(!entries[0].is_directory());
+        assert_eq!(entries[0].raw_name_len(), b"first.bin".len() as u64);
+        assert_eq!(entries[0].compressed_size(), 5);
+        assert_eq!(entries[0].uncompressed_size(), 5);
+        assert!(entries[1].is_directory());
+        assert_eq!(entries[1].raw_name_len(), b"folder/".len() as u64);
+        assert_eq!(entries[1].compressed_size(), 0);
+        assert_eq!(entries[1].uncompressed_size(), 0);
+        assert!(!entries[2].is_directory());
+        assert_eq!(entries[2].raw_name_len(), b"second.bin".len() as u64);
+        assert_eq!(entries[2].compressed_size(), 6);
+        assert_eq!(entries[2].uncompressed_size(), 6);
+    }
+
+    #[test]
     fn equal_local_header_offsets_keep_existing_reader_ordering() {
         let mut bytes = fixture(&[
             FixtureEntry::stored(b"first.bin", b"first"),
@@ -12934,7 +13096,7 @@ mod tests {
         let second = central + first_len;
         bytes[second + 42..second + 46].copy_from_slice(&0u32.to_le_bytes());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.file_names().collect::<Vec<_>>(),
             vec!["first.bin", "second.bin"]
@@ -12951,7 +13113,7 @@ mod tests {
         let payload = b"descriptor payload";
         for signature in [false, true] {
             let bytes = stored_descriptor_fixture(payload, signature);
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let borrowed = reader.read_stored_borrowed("stored.bin").unwrap().unwrap();
 
             let archive = ZipArchive::from_slice(bytes.as_slice()).unwrap();
@@ -12971,7 +13133,7 @@ mod tests {
         let payload = b"leading descriptor payload";
         for signature in [false, true] {
             let bytes = stored_descriptor_fixture_with_prefix(payload, signature, 17);
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let borrowed = reader.read_stored_borrowed("stored.bin").unwrap().unwrap();
             let archive = ZipArchive::from_slice(bytes.as_slice()).unwrap();
             let record = archive.entries().next().unwrap().unwrap();
@@ -12988,7 +13150,7 @@ mod tests {
     #[test]
     fn strict_read_to_rejects_target_metadata_before_sink() {
         let payload = b"strict sink payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", payload).unwrap();
         let base = writer.finish_to_bytes().unwrap();
         let local = local_header_offset_for_name(&base, b"stored.bin");
@@ -13008,7 +13170,7 @@ mod tests {
                 8 => bytes[central + 24..central + 28].copy_from_slice(&1u32.to_le_bytes()),
                 _ => unreachable!(),
             }
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let mut sink = vec![0xA5];
             let _error = reader.read_to("stored.bin", &mut sink).unwrap_err();
             assert_eq!(sink, vec![0xA5], "mutation {mutation}");
@@ -13019,7 +13181,7 @@ mod tests {
     fn strict_read_to_rejects_target_encryption_but_ignores_unrelated_encryption() {
         for deflated in [false, true] {
             let payload = b"strict encrypted target";
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             writer.write_stored("neighbor.bin", b"neighbor").unwrap();
             if deflated {
                 writer.write_deflated("target.bin", payload).unwrap();
@@ -13033,7 +13195,7 @@ mod tests {
             unrelated[neighbor_local + 6..neighbor_local + 8].copy_from_slice(&1u16.to_le_bytes());
             unrelated[neighbor_central + 8..neighbor_central + 10]
                 .copy_from_slice(&1u16.to_le_bytes());
-            let reader = ArchiveReader::new(&unrelated).unwrap();
+            let reader = ArchiveReader::new(&unrelated, ArchiveLimits::default()).unwrap();
             let mut output = Vec::new();
             assert_eq!(
                 reader.read_to("target.bin", &mut output).unwrap(),
@@ -13049,7 +13211,7 @@ mod tests {
                     .copy_from_slice(&encrypted_flag.to_le_bytes());
                 encrypted[target_central + 8..target_central + 10]
                     .copy_from_slice(&encrypted_flag.to_le_bytes());
-                let reader = ArchiveReader::new(&encrypted).unwrap();
+                let reader = ArchiveReader::new(&encrypted, ArchiveLimits::default()).unwrap();
                 let mut sink = vec![0xA5];
                 let _error = reader.read_to("target.bin", &mut sink).unwrap_err();
                 assert_eq!(sink, vec![0xA5]);
@@ -13062,7 +13224,7 @@ mod tests {
         let payload = b"strict prefix payload";
         for signature in [false, true] {
             let bytes = stored_descriptor_fixture_with_prefix(payload, signature, 17);
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let mut output = Vec::new();
             assert_eq!(
                 reader.read_to("stored.bin", &mut output).unwrap(),
@@ -13071,7 +13233,7 @@ mod tests {
             assert_eq!(output, payload);
         }
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("first.bin", b"first payload").unwrap();
         writer.write_stored("target.bin", b"target").unwrap();
         let base = writer.finish_to_bytes().unwrap();
@@ -13091,7 +13253,7 @@ mod tests {
         let mut overlap = base.clone();
         overlap[first_local + 18..first_local + 22].copy_from_slice(&declared.to_le_bytes());
         overlap[first_central + 20..first_central + 24].copy_from_slice(&declared.to_le_bytes());
-        let reader = ArchiveReader::new(&overlap).unwrap();
+        let reader = ArchiveReader::new(&overlap, ArchiveLimits::default()).unwrap();
         let mut sink = vec![0xA5];
         let _error = reader.read_to("target.bin", &mut sink).unwrap_err();
         assert_eq!(sink, vec![0xA5]);
@@ -13116,7 +13278,7 @@ mod tests {
         intrusion[target_local + 22..target_local + 26].copy_from_slice(&declared.to_le_bytes());
         intrusion[target_central + 24..target_central + 28]
             .copy_from_slice(&declared.to_le_bytes());
-        let reader = ArchiveReader::new(&intrusion).unwrap();
+        let reader = ArchiveReader::new(&intrusion, ArchiveLimits::default()).unwrap();
         let mut sink = vec![0xA5];
         let _error = reader.read_to("target.bin", &mut sink).unwrap_err();
         assert_eq!(sink, vec![0xA5]);
@@ -13125,7 +13287,7 @@ mod tests {
     #[test]
     fn strict_read_to_rejects_deflate_trailing_bytes_after_sink_prefix() {
         let payload = b"strict deflate payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_deflated_sized("deflated.bin", payload)
             .unwrap();
@@ -13148,7 +13310,7 @@ mod tests {
             .copy_from_slice(&u32::try_from(shifted_central).unwrap().to_le_bytes());
 
         {
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let mut sink = b"prefix".to_vec();
             let error = reader.read_to("deflated.bin", &mut sink).unwrap_err();
             assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
@@ -13179,7 +13341,7 @@ mod tests {
     #[test]
     fn indexed_read_entry_to_with_accounting_uses_strict_preflight() {
         let payload = b"indexed strict payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", payload).unwrap();
         writer.write_deflated("deflated.bin", payload).unwrap();
         let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
@@ -13244,7 +13406,7 @@ mod tests {
         );
         assert_eq!(sink, payload);
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("neighbor.bin", b"neighbor").unwrap();
         writer.write_deflated("target.bin", payload).unwrap();
         let base = writer.finish_to_bytes().unwrap();
@@ -13291,7 +13453,7 @@ mod tests {
             assert_eq!(accounting, ZipOperationAccounting::default());
         }
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("zero-crc.bin", payload).unwrap();
         let mut zero_crc = writer.finish_to_bytes().unwrap();
         let zero_local = local_header_offset_for_name(&zero_crc, b"zero-crc.bin");
@@ -13331,7 +13493,7 @@ mod tests {
         );
         assert_eq!(sink, b"This small file is in ZIP64 format.\n");
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("unresolved.bin", payload).unwrap();
         let mut unresolved = writer.finish_to_bytes().unwrap();
         let unresolved_central = central_header_offset_for_name(&unresolved, b"unresolved.bin");
@@ -13340,7 +13502,7 @@ mod tests {
         let error = indexed_archive_result(unresolved, ArchiveLimits::UNBOUNDED).unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("first.bin", b"first payload").unwrap();
         writer.write_stored("target.bin", b"target").unwrap();
         let base = writer.finish_to_bytes().unwrap();
@@ -13405,7 +13567,7 @@ mod tests {
     fn indexed_strict_preflight_rejects_local_central_mismatches() {
         let payload = b"indexed metadata mismatch payload";
         for deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             if deflated {
                 writer.write_deflated_sized("member.bin", payload).unwrap();
             } else {
@@ -13595,6 +13757,15 @@ mod tests {
         assert_eq!(indexed.len(), 0);
         assert!(indexed.metadata("folder/").unwrap().is_directory());
 
+        let mut one_name_over = one_limits;
+        one_name_over.max_member_name_bytes = 6;
+        assert_limit(
+            indexed_archive_result(one.clone(), one_name_over).unwrap_err(),
+            LimitResource::MemberNameBytes,
+            7,
+            6,
+        );
+
         let mut one_over = one_limits;
         one_over.max_metadata_bytes -= 1;
         assert_limit(
@@ -13681,7 +13852,7 @@ mod tests {
 
     #[test]
     fn indexed_strict_layout_accepts_prefix_and_gaps_and_rejects_store_deflate_spans() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", b"stored").unwrap();
         writer
             .write_deflated_sized("deflated.bin", b"deflated")
@@ -13751,7 +13922,7 @@ mod tests {
 
         for first_deflated in [false, true] {
             for target_deflated in [false, true] {
-                let mut writer = StreamingArchiveWriter::new();
+                let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                 if first_deflated {
                     writer
                         .write_deflated_sized("first.bin", b"first payload")
@@ -13799,7 +13970,7 @@ mod tests {
         }
 
         for target_deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             writer.write_stored("first.bin", b"first payload").unwrap();
             if target_deflated {
                 writer
@@ -13859,7 +14030,7 @@ mod tests {
                 let field_start = descriptor + field_offset;
                 bytes[field_start..field_start + 4].copy_from_slice(&value.to_le_bytes());
 
-                let reader = ArchiveReader::new(&bytes).unwrap();
+                let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
                 let error = reader.read_stored_borrowed("stored.bin").unwrap_err();
                 if checksum {
                     assert!(
@@ -13881,7 +14052,7 @@ mod tests {
     #[test]
     fn borrowed_store_rejects_local_central_metadata_mismatches() {
         let payload = b"fixed stored payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", payload).unwrap();
         let base = writer.finish_to_bytes().unwrap();
         assert!(!local_member_has_data_descriptor(&base, b"stored.bin"));
@@ -13889,7 +14060,7 @@ mod tests {
 
         let mut method = base.clone();
         method[local + 8..local + 10].copy_from_slice(&8u16.to_le_bytes());
-        let error = ArchiveReader::new(&method)
+        let error = ArchiveReader::new(&method, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -13897,7 +14068,7 @@ mod tests {
 
         let mut flags = base.clone();
         flags[local + 6..local + 8].copy_from_slice(&8u16.to_le_bytes());
-        let error = ArchiveReader::new(&flags)
+        let error = ArchiveReader::new(&flags, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -13908,7 +14079,7 @@ mod tests {
             let mut encrypted = base.clone();
             encrypted[local + 6..local + 8].copy_from_slice(&encrypted_flag.to_le_bytes());
             encrypted[central + 8..central + 10].copy_from_slice(&encrypted_flag.to_le_bytes());
-            let error = ArchiveReader::new(&encrypted)
+            let error = ArchiveReader::new(&encrypted, ArchiveLimits::default())
                 .unwrap()
                 .read_stored_borrowed("stored.bin")
                 .unwrap_err();
@@ -13917,7 +14088,7 @@ mod tests {
 
         let mut name = base.clone();
         name[local + 30] ^= 0x20;
-        let error = ArchiveReader::new(&name)
+        let error = ArchiveReader::new(&name, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -13925,7 +14096,7 @@ mod tests {
 
         let mut crc = base.clone();
         crc[local + 14..local + 18].copy_from_slice(&0u32.to_le_bytes());
-        let error = ArchiveReader::new(&crc)
+        let error = ArchiveReader::new(&crc, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -13933,7 +14104,7 @@ mod tests {
 
         let mut compressed_size = base.clone();
         compressed_size[local + 18..local + 22].copy_from_slice(&1u32.to_le_bytes());
-        let error = ArchiveReader::new(&compressed_size)
+        let error = ArchiveReader::new(&compressed_size, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -13941,7 +14112,7 @@ mod tests {
 
         let mut uncompressed_size = base.clone();
         uncompressed_size[local + 22..local + 26].copy_from_slice(&1u32.to_le_bytes());
-        let error = ArchiveReader::new(&uncompressed_size)
+        let error = ArchiveReader::new(&uncompressed_size, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -13950,7 +14121,7 @@ mod tests {
 
     #[test]
     fn unrelated_encrypted_store_does_not_block_an_unencrypted_target() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("target.bin", b"target").unwrap();
         writer.write_stored("encrypted.bin", b"encrypted").unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
@@ -13959,7 +14130,7 @@ mod tests {
         bytes[encrypted_local + 6..encrypted_local + 8].copy_from_slice(&1u16.to_le_bytes());
         bytes[encrypted_central + 8..encrypted_central + 10].copy_from_slice(&1u16.to_le_bytes());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.read_stored_borrowed("target.bin").unwrap(),
             Some(&b"target"[..])
@@ -13985,7 +14156,7 @@ mod tests {
                             .copy_from_slice(&encrypted_flag.to_le_bytes());
                     }
 
-                    let reader = ArchiveReader::new(&bytes).unwrap();
+                    let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
                     assert_eq!(reader.has_encrypted_entries(), !local_only);
                     assert!(reader.validate_unencrypted_entries().is_err());
                     if member == b"target.bin" {
@@ -13999,19 +14170,29 @@ mod tests {
                         assert!(indexed.validate_unencrypted_entry("target.bin").is_err());
                     }
 
-                    let lazy = LazyArchiveReader::new(&bytes).unwrap();
+                    let lazy = LazyArchiveReader::new(
+                        &bytes,
+                        ArchiveLimits::default(),
+                        LazyArchiveCacheLimits::default(),
+                    )
+                    .unwrap();
                     assert_eq!(lazy.has_encrypted_entries(), !local_only);
                     assert!(lazy.validate_unencrypted_entries().is_err());
                 }
             }
         }
 
-        let clean = ArchiveReader::new(&base).unwrap();
+        let clean = ArchiveReader::new(&base, ArchiveLimits::default()).unwrap();
         assert!(!clean.has_encrypted_entries());
         clean.validate_unencrypted_entries().unwrap();
         let indexed = indexed_archive(base.clone());
         indexed.validate_unencrypted_entries().unwrap();
-        let lazy = LazyArchiveReader::new(&base).unwrap();
+        let lazy = LazyArchiveReader::new(
+            &base,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         lazy.validate_unencrypted_entries().unwrap();
     }
 
@@ -14022,7 +14203,7 @@ mod tests {
             FixtureEntry::stored(b"folder/", b""),
         ]);
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = IndexedArchive::from_reader(
             InstrumentedChunkedReaderAt {
                 bytes: bytes.clone(),
                 max_chunk: 8,
@@ -14047,10 +14228,10 @@ mod tests {
     #[test]
     fn deflate_borrowing_returns_none_and_owned_read_remains_available() {
         let payload = b"deflated fallback payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("deflated.bin", payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
 
         assert_eq!(reader.read_stored_borrowed("deflated.bin").unwrap(), None);
         assert_eq!(reader.read("deflated.bin").unwrap(), payload);
@@ -14059,7 +14240,7 @@ mod tests {
     #[test]
     fn encrypted_deflate_borrowing_is_rejected_before_ineligible_fallback() {
         let payload = b"encrypted deflated payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("deflated.bin", payload).unwrap();
         let base = writer.finish_to_bytes().unwrap();
         let local = local_header_offset_for_name(&base, b"deflated.bin");
@@ -14069,7 +14250,7 @@ mod tests {
             let mut encrypted = base.clone();
             encrypted[local + 6..local + 8].copy_from_slice(&encrypted_flag.to_le_bytes());
             encrypted[central + 8..central + 10].copy_from_slice(&encrypted_flag.to_le_bytes());
-            let reader = ArchiveReader::new(&encrypted).unwrap();
+            let reader = ArchiveReader::new(&encrypted, ArchiveLimits::default()).unwrap();
             let error = reader.read_stored_borrowed("deflated.bin").unwrap_err();
             assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
 
@@ -14083,7 +14264,7 @@ mod tests {
 
     #[test]
     fn borrowed_store_refuses_an_overlapping_non_target_span() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored("underclaimed.bin", b"underclaim payload")
             .unwrap();
@@ -14105,7 +14286,7 @@ mod tests {
         bytes[first_local + 18..first_local + 22].copy_from_slice(&declared_size.to_le_bytes());
         bytes[first_central + 20..first_central + 24].copy_from_slice(&declared_size.to_le_bytes());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let error = reader.read_stored_borrowed("target.bin").unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
     }
@@ -14113,7 +14294,7 @@ mod tests {
     #[test]
     fn borrowed_store_returns_none_for_nonempty_zero_crc_even_when_payload_is_corrupt() {
         let payload = b"zero CRC payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", payload).unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
         let local = local_header_offset_for_name(&bytes, b"stored.bin");
@@ -14125,7 +14306,7 @@ mod tests {
         bytes[central + 16..central + 20].copy_from_slice(&0u32.to_le_bytes());
         bytes[payload_offset] ^= 0x80;
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         assert_eq!(reader.read_stored_borrowed("stored.bin").unwrap(), None);
         let mut accounting = ZipOperationAccounting::default();
         assert_eq!(
@@ -14143,7 +14324,7 @@ mod tests {
         let bytes = skipped_crc_fixture(payload);
         let actual_crc = crate::crc32(payload);
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut stored_output = Vec::new();
         let error = reader
             .read_to("stored.bin", &mut stored_output)
@@ -14185,7 +14366,12 @@ mod tests {
         assert_zero_crc_checksum(error, actual_crc);
         assert_eq!(indexed_output, payload);
 
-        let lazy = LazyArchiveReader::new(&bytes).unwrap();
+        let lazy = LazyArchiveReader::new(
+            &bytes,
+            ArchiveLimits::default(),
+            LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let mut lazy_output = Vec::new();
         let mut lazy_accounting = ZipOperationAccounting::default();
         let error = lazy
@@ -14205,7 +14391,7 @@ mod tests {
     #[test]
     fn borrowed_store_rejects_payload_corruption_with_a_nonzero_crc() {
         let payload = b"nonzero CRC payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", payload).unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
         let local = local_header_offset_for_name(&bytes, b"stored.bin");
@@ -14213,14 +14399,14 @@ mod tests {
         let extra_len = usize::from(u16::from_le_bytes([bytes[local + 28], bytes[local + 29]]));
         bytes[local + 30 + name_len + extra_len] ^= 0x80;
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let error = reader.read_stored_borrowed("stored.bin").unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
     }
 
     #[test]
     fn borrowed_store_refuses_overlapping_local_spans() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("first.bin", b"first").unwrap();
         writer.write_stored("second.bin", b"second").unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
@@ -14229,7 +14415,7 @@ mod tests {
         bytes[second_central + 42..second_central + 46]
             .copy_from_slice(&(u32::try_from(first_local).unwrap()).to_le_bytes());
 
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let error = reader.read_stored_borrowed("first.bin").unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
     }
@@ -14293,7 +14479,7 @@ mod tests {
         push_u32(&mut archive, central_directory_offset);
         push_u16(&mut archive, 0);
 
-        let reader = ArchiveReader::new(&archive).unwrap();
+        let reader = ArchiveReader::new(&archive, ArchiveLimits::default()).unwrap();
         assert_eq!(
             reader.read_stored_borrowed("stored.bin").unwrap(),
             Some(&payload[..])
@@ -14319,7 +14505,7 @@ mod tests {
         let local_extra_start = local + 30 + name.len();
         let mut truncated = archive.clone();
         truncated[local + 28..local + 30].copy_from_slice(&12u16.to_le_bytes());
-        let error = ArchiveReader::new(&truncated)
+        let error = ArchiveReader::new(&truncated, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -14328,7 +14514,7 @@ mod tests {
         let mut mismatched = archive.clone();
         mismatched[local_extra_start + 4..local_extra_start + 12]
             .copy_from_slice(&(size + 1).to_le_bytes());
-        let error = ArchiveReader::new(&mismatched)
+        let error = ArchiveReader::new(&mismatched, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -14349,7 +14535,7 @@ mod tests {
         .checked_add(u32::try_from(extra.len()).unwrap())
         .unwrap();
         duplicated[eocd + 16..eocd + 20].copy_from_slice(&central_offset.to_le_bytes());
-        let error = ArchiveReader::new(&duplicated)
+        let error = ArchiveReader::new(&duplicated, ArchiveLimits::default())
             .unwrap()
             .read_stored_borrowed("stored.bin")
             .unwrap_err();
@@ -14471,7 +14657,7 @@ mod tests {
 
     #[test]
     fn indexed_strict_streams_reuse_the_bounded_layout_path() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", b"abc").unwrap();
         writer.write_deflated("deflated.bin", b"xyz").unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
@@ -14541,7 +14727,7 @@ mod tests {
 
     #[test]
     fn indexed_strict_first_read_uses_one_single_flight_builder() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", b"abc").unwrap();
         let indexed = Arc::new(indexed_archive(writer.finish_to_bytes().unwrap()));
         let entry_id = indexed.entry_id("stored.bin").unwrap();
@@ -14807,7 +14993,7 @@ mod tests {
 
     fn scoped_indexed_read(bytes: &[u8], name: &str) -> Result<Vec<u8>, Error> {
         let length = bytes.len() as u64;
-        let indexed = IndexedArchive::from_reader_with_limits(
+        let indexed = IndexedArchive::from_reader(
             std::io::Cursor::new(bytes.to_vec()),
             length,
             ArchiveLimits::UNBOUNDED,
@@ -14821,7 +15007,7 @@ mod tests {
     }
 
     fn scoped_borrowed_read(bytes: &[u8], name: &str) -> Result<Vec<u8>, Error> {
-        let reader = ArchiveReader::new(bytes)?;
+        let reader = ArchiveReader::new(bytes, ArchiveLimits::default())?;
         let mut sink = Vec::new();
         reader.read_to(name, &mut sink)?;
         Ok(sink)
@@ -14875,7 +15061,7 @@ mod tests {
     /// Positional reads the strict-layout proof alone issues for one target.
     fn scoped_strict_layout_reads(bytes: &[u8], name: &str) -> usize {
         let length = bytes.len() as u64;
-        let indexed = IndexedArchive::from_reader_with_limits(
+        let indexed = IndexedArchive::from_reader(
             ScopedCountingReaderAt::new(bytes.to_vec()),
             length,
             ArchiveLimits::UNBOUNDED,
@@ -15108,13 +15294,13 @@ mod tests {
         // And a reader that has already proven `pred.bin`'s own layout, which
         // is the order that populates the memo.
         let length = bytes.len() as u64;
-        let indexed = IndexedArchive::from_reader_with_limits(
+        let indexed = IndexedArchive::from_reader(
             std::io::Cursor::new(bytes.clone()),
             length,
             ArchiveLimits::UNBOUNDED,
         )
         .unwrap();
-        let reader = ArchiveReader::new(&bytes).unwrap();
+        let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         for name in ["pred.bin", "target.bin"] {
             let entry_id = indexed.entry_id(name).unwrap();
             let mut sink = Vec::new();
@@ -15238,13 +15424,13 @@ mod tests {
         for order in orders {
             // One reader, reading the three members in this order.
             let length = bytes.len() as u64;
-            let indexed = IndexedArchive::from_reader_with_limits(
+            let indexed = IndexedArchive::from_reader(
                 std::io::Cursor::new(bytes.clone()),
                 length,
                 ArchiveLimits::UNBOUNDED,
             )
             .unwrap();
-            let reader = ArchiveReader::new(&bytes).unwrap();
+            let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
             let mut seen = Vec::new();
             for name in order {
                 let entry_id = indexed.entry_id(name).unwrap();
@@ -15373,7 +15559,7 @@ mod tests {
             ScopedMember::new(b"third.bin", b"third"),
         ]);
         let length = bytes.len() as u64;
-        let indexed = IndexedArchive::from_reader_with_limits(
+        let indexed = IndexedArchive::from_reader(
             ScopedCountingReaderAt::new(bytes),
             length,
             ArchiveLimits::UNBOUNDED,
@@ -15400,7 +15586,7 @@ mod tests {
             ScopedMember::new(b"tail.bin", b"tail"),
         ];
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .write_stored("stored.bin", b"stored payload")
             .unwrap();
@@ -15441,7 +15627,7 @@ mod tests {
 
         for (label, bytes) in archives {
             let length = bytes.len() as u64;
-            let indexed = IndexedArchive::from_reader_with_limits(
+            let indexed = IndexedArchive::from_reader(
                 std::io::Cursor::new(bytes.clone()),
                 length,
                 ArchiveLimits::UNBOUNDED,
@@ -15498,7 +15684,7 @@ mod tests {
             // members that follow it.
             if archive_wide_ok {
                 let scoped = {
-                    let indexed = IndexedArchive::from_reader_with_limits(
+                    let indexed = IndexedArchive::from_reader(
                         ScopedCountingReaderAt::new(bytes.clone()),
                         length,
                         ArchiveLimits::UNBOUNDED,
@@ -15513,7 +15699,7 @@ mod tests {
                     indexed.archive.get_ref().calls()
                 };
                 let archive_wide = {
-                    let indexed = IndexedArchive::from_reader_with_limits(
+                    let indexed = IndexedArchive::from_reader(
                         ScopedCountingReaderAt::new(bytes.clone()),
                         length,
                         ArchiveLimits::UNBOUNDED,
@@ -15551,7 +15737,7 @@ mod tests {
         // both readers, for Store and Deflate.
         let payload = vec![0x42u8; 4096];
         for deflate in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             writer.write_stored("first.bin", b"first").unwrap();
             if deflate {
                 writer.write_deflated("member.bin", &payload).unwrap();
@@ -15584,7 +15770,7 @@ mod tests {
     fn a_failed_proof_memoises_nothing_and_the_next_read_retries() {
         let bytes = overlap_witness_archive();
         let length = bytes.len() as u64;
-        let indexed = IndexedArchive::from_reader_with_limits(
+        let indexed = IndexedArchive::from_reader(
             std::io::Cursor::new(bytes.clone()),
             length,
             ArchiveLimits::UNBOUNDED,
@@ -15613,7 +15799,7 @@ mod tests {
         bytes[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&1000u16.to_le_bytes());
         bytes[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&1000u16.to_le_bytes());
 
-        let error = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED)
+        let error = ArchiveReader::new(&bytes, ArchiveLimits::UNBOUNDED)
             .expect_err("inflated EOCD count must be rejected");
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
 
@@ -15632,7 +15818,7 @@ mod tests {
         understated[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&1u16.to_le_bytes());
         understated[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&1u16.to_le_bytes());
         assert!(matches!(
-            ArchiveReader::new_with_limits(&understated, ArchiveLimits::UNBOUNDED),
+            ArchiveReader::new(&understated, ArchiveLimits::UNBOUNDED),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
         assert!(matches!(
@@ -15653,7 +15839,7 @@ mod tests {
         overstated[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&2u16.to_le_bytes());
         overstated[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&2u16.to_le_bytes());
         assert!(matches!(
-            ArchiveReader::new_with_limits(&overstated, ArchiveLimits::UNBOUNDED),
+            ArchiveReader::new(&overstated, ArchiveLimits::UNBOUNDED),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
         assert!(matches!(
@@ -15708,7 +15894,7 @@ mod tests {
         limits: ArchiveLimits,
     ) -> Result<IndexedArchive<std::io::Cursor<Vec<u8>>>, Error> {
         let length = bytes.len() as u64;
-        IndexedArchive::from_reader_with_limits(std::io::Cursor::new(bytes), length, limits)
+        IndexedArchive::from_reader(std::io::Cursor::new(bytes), length, limits)
     }
 
     fn assert_limit(error: Error, resource: LimitResource, actual: u64, maximum: u64) {
@@ -15740,7 +15926,7 @@ mod tests {
     fn assert_materialized_size_error(error: Error) {
         match error.kind() {
             ErrorKind::InvalidSize { .. } => {},
-            ErrorKind::IO(io_error) | ErrorKind::Io(io_error) => {
+            ErrorKind::IO(io_error) => {
                 let source = io_error
                     .get_ref()
                     .and_then(|source| source.downcast_ref::<Error>());
@@ -15758,7 +15944,7 @@ mod tests {
     fn assert_materialized_checksum_error(error: Error) {
         match error.kind() {
             ErrorKind::InvalidChecksum { .. } => {},
-            ErrorKind::IO(io_error) | ErrorKind::Io(io_error) => {
+            ErrorKind::IO(io_error) => {
                 let source = io_error
                     .get_ref()
                     .and_then(|source| source.downcast_ref::<Error>());
@@ -16131,7 +16317,7 @@ mod tests {
     }
 
     fn bulk_fixture() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("first", b"first").unwrap();
         writer.write_stored("bad", b"bad").unwrap();
         writer.write_stored("last", b"last").unwrap();
@@ -16165,7 +16351,7 @@ mod tests {
     #[test]
     fn callback_scoped_reader_streams_store_and_deflate_with_fixed_reads() {
         let payload = vec![b'x'; VERIFIED_ENTRY_READER_BUFFER_SIZE * 2 + 37];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", &payload).unwrap();
         writer.write_deflated("deflated.bin", &payload).unwrap();
         let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
@@ -16201,7 +16387,7 @@ mod tests {
     #[test]
     fn verified_reader_bound_matches_private_fixed_layouts_and_dispatches_both_methods() {
         let payload = b"fixed verified-reader bound evidence";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("stored.bin", payload).unwrap();
         writer.write_deflated("deflated.bin", payload).unwrap();
         let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
@@ -16240,7 +16426,7 @@ mod tests {
     #[test]
     fn callback_scoped_reader_drains_after_prefix_and_callback_error() {
         let payload = b"callback prefix and drain payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let indexed = indexed_archive(bytes.clone());
@@ -16278,12 +16464,12 @@ mod tests {
     #[test]
     fn callback_scoped_abortable_reader_stops_short_source_after_callback_error() {
         let payload = vec![b'a'; 256 * 1024 + 11];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("payload.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let length = u64::try_from(bytes.len()).unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let indexed = IndexedArchive::from_reader_with_limits(
+        let indexed = IndexedArchive::from_reader(
             InstrumentedChunkedReaderAt {
                 bytes,
                 max_chunk: 7,
@@ -16350,7 +16536,7 @@ mod tests {
     #[test]
     fn callback_scoped_reader_retains_callback_error_on_archive_failure() {
         let payload = b"callback secondary error payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated_sized("payload.bin", payload).unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
         let local = local_header_offset_for_name(&bytes, b"payload.bin");
@@ -16435,7 +16621,7 @@ mod tests {
     #[test]
     fn callback_scoped_reader_defers_invalid_consume_and_retries_interrupts() {
         let payload = b"deferred consume payload";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("payload.bin", payload).unwrap();
         let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
         let entry_id = indexed.entry_id("payload.bin").unwrap();
@@ -16472,7 +16658,7 @@ mod tests {
     fn precompressed_capture_verifies_store_and_deflate_exact_payloads() {
         let payload = b"verified precompressed payload with repeated repeated bytes";
         for deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             if deflated {
                 writer.write_deflated("payload.bin", payload).unwrap();
             } else {
@@ -16514,7 +16700,7 @@ mod tests {
     #[test]
     fn precompressed_layout_proof_classifies_without_reading_payloads() {
         let payload = b"layout proofs read headers, never payload bytes";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("deflated.bin", payload).unwrap();
         writer.write_deflated_sized("sized.bin", payload).unwrap();
         writer.write_stored("stored.bin", payload).unwrap();
@@ -16582,7 +16768,7 @@ mod tests {
     #[test]
     fn precompressed_capture_compares_expected_bytes_and_retains_callback_errors() {
         let payload = b"expected logical bytes are part of the proof";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let archive = indexed_archive(bytes);
@@ -16623,7 +16809,7 @@ mod tests {
     #[test]
     fn precompressed_capture_rejects_corrupt_compressed_payload() {
         let payload = b"compressed bytes must remain an exact verified source";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", payload).unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
         let (start, end) = {
@@ -16646,7 +16832,7 @@ mod tests {
     #[test]
     fn precompressed_capture_rejects_deflate_without_stream_end() {
         let payload = b"a truncated Deflate stream cannot publish its expected prefix";
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let compressed = raw_payload_for_single_entry(&bytes);
@@ -16669,11 +16855,11 @@ mod tests {
     #[test]
     fn precompressed_capture_handles_short_reader_at_chunks() {
         let payload = vec![b'z'; VERIFIED_ENTRY_READER_BUFFER_SIZE * 128 + 19];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_deflated("payload.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let source_len = bytes.len() as u64;
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = IndexedArchive::from_reader(
             ChunkedReaderAt {
                 bytes,
                 max_chunk: 3,
@@ -16698,12 +16884,12 @@ mod tests {
                 index.wrapping_mul(37).wrapping_add(11)
             })
             .collect::<Vec<_>>();
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("payload.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let source_len = bytes.len() as u64;
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = IndexedArchive::from_reader(
             InstrumentedChunkedReaderAt {
                 bytes,
                 max_chunk: 4096,
@@ -16782,7 +16968,7 @@ mod tests {
                         state.to_le_bytes()[0]
                     })
                     .collect::<Vec<_>>();
-                let mut writer = StreamingArchiveWriter::new();
+                let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                 if deflated {
                     writer.write_deflated("payload.bin", &payload).unwrap();
                 } else {
@@ -16793,7 +16979,7 @@ mod tests {
                 let fused_input = bytes.clone();
                 let compressed = raw_payload_for_single_entry(&bytes);
                 let requests = Arc::new(Mutex::new(Vec::new()));
-                let archive = IndexedArchive::from_reader_with_limits(
+                let archive = IndexedArchive::from_reader(
                     InstrumentedChunkedReaderAt {
                         bytes,
                         max_chunk: 65536,
@@ -16815,7 +17001,7 @@ mod tests {
                 drop(archive);
                 // Each alternative starts with an independently indexed archive;
                 // the control cannot warm the candidate's strict-layout cache.
-                let archive = IndexedArchive::from_reader_with_limits(
+                let archive = IndexedArchive::from_reader(
                     InstrumentedChunkedReaderAt {
                         bytes: fused_input,
                         max_chunk: 65536,
@@ -16875,7 +17061,8 @@ mod tests {
                     fused_reads.len()
                 );
                 drop(archive);
-                let mut destination = StreamingArchiveWriter::new();
+                let mut destination =
+                    StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                 destination
                     .write_stored("untouched.bin", b"original bytes")
                     .unwrap();
@@ -16884,7 +17071,9 @@ mod tests {
                     .unwrap()
                     .into_zip_archive();
                 let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-                let index = PreservationIndex::new(&destination, &mut scratch).unwrap();
+                let index =
+                    PreservationIndex::new(&destination, &mut scratch, ArchiveLimits::default())
+                        .unwrap();
                 let mut plan = crate::PreservationPlan::copy_all(&index);
                 plan.try_append(crate::RegeneratedEntry::new_precompressed_shared(
                     "copied.bin",
@@ -16895,7 +17084,7 @@ mod tests {
                 let output = index
                     .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
                     .unwrap();
-                let reopened = ArchiveReader::new(&output).unwrap();
+                let reopened = ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
                 assert_eq!(reopened.read("copied.bin").unwrap(), payload);
                 assert_eq!(reopened.read("untouched.bin").unwrap(), b"original bytes");
                 assert_eq!(
@@ -16915,7 +17104,7 @@ mod tests {
     fn fused_precompressed_capture_handles_short_reads_and_cancellation() {
         let payload = vec![b'x'; 131091];
         for deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             if deflated {
                 writer.write_deflated("payload.bin", &payload).unwrap();
             } else {
@@ -16924,7 +17113,7 @@ mod tests {
             let bytes = writer.finish_to_bytes().unwrap();
             let len = bytes.len() as u64;
             let requests = Arc::new(Mutex::new(Vec::new()));
-            let archive = IndexedArchive::from_reader_with_limits(
+            let archive = IndexedArchive::from_reader(
                 InstrumentedChunkedReaderAt {
                     bytes,
                     max_chunk: 3,
@@ -16967,7 +17156,7 @@ mod tests {
     fn fused_precompressed_capture_checks_crc_size_and_deflate_end() {
         let payload = vec![b'z'; 131091];
         for deflated in [false, true] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
             if deflated {
                 writer.write_deflated("payload.bin", &payload).unwrap();
             } else {
@@ -16985,7 +17174,7 @@ mod tests {
                 (payload.len() as u64 - 1, crate::crc32(&payload)),
                 (payload.len() as u64 + 1, crate::crc32(&payload)),
             ] {
-                let mut writer = StreamingArchiveWriter::new();
+                let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                 writer
                     .archive
                     .write_precompressed_file("payload.bin", method, crc, declared, &compressed)
@@ -17007,7 +17196,7 @@ mod tests {
                     compressed[..compressed.len() - 1].to_vec(),
                     [compressed.as_slice(), &[0, 1, 2]].concat(),
                 ] {
-                    let mut writer = StreamingArchiveWriter::new();
+                    let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
                     writer
                         .archive
                         .write_precompressed_file(
@@ -17074,7 +17263,7 @@ mod tests {
     #[test]
     fn fused_precompressed_capture_preserves_transport_and_allocation_failures() {
         let payload = vec![b'a'; 256 * 1024];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer.write_stored("payload.bin", &payload).unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let start = {
@@ -17087,7 +17276,7 @@ mod tests {
                 .0
         };
         let length = bytes.len() as u64;
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = IndexedArchive::from_reader(
             FailOnRangeReaderAt {
                 bytes,
                 fail_start: start + 32,
@@ -17108,7 +17297,7 @@ mod tests {
 
         // A ZIP64 declaration larger than Vec's capacity must fail before
         // capture, rather than panic or publish a partially decoded token.
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = StreamingArchiveWriter::new(StreamingArchiveLimits::default());
         writer
             .archive
             .write_precompressed_file(
@@ -17348,7 +17537,9 @@ mod lookup_member_name_tests {
         for path in fixtures {
             let bytes = std::fs::read(&path).unwrap();
             let length = bytes.len() as u64;
-            let Ok(archive) = IndexedArchive::from_reader(Cursor::new(bytes), length) else {
+            let Ok(archive) =
+                IndexedArchive::from_reader(Cursor::new(bytes), length, ArchiveLimits::default())
+            else {
                 // A package that does not index refuses before any lookup runs.
                 continue;
             };

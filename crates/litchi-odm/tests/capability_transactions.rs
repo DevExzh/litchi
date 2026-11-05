@@ -1,12 +1,13 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_core::{HistoryLimits, Position};
+use litchi_odf_common::Error;
 use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, Profile},
 };
 use litchi_odm::{
-    Master,
+    Package,
     style::Origin,
     subdocument::Target,
     transaction::{Conflict, MergeError},
@@ -45,7 +46,7 @@ const STYLES: &str = concat!(
 );
 
 fn package(content: &str, signed: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("meta.xml", META.as_bytes()).unwrap();
@@ -70,8 +71,9 @@ fn package(content: &str, signed: bool) -> Vec<u8> {
 
 #[test]
 fn projects_section_tree_style_catalog_metadata_and_resource_graph() {
-    let master = Master::from_bytes(package(CONTENT, false)).unwrap();
-    let tree = master.section_tree();
+    let master = Package::from_bytes(&package(CONTENT, false)).unwrap();
+    let master_document = master.document();
+    let tree = master_document.section_tree();
     assert_eq!(tree.roots(), &[Position::new(0)]);
     assert_eq!(tree.sections().len(), 2);
     let chapter = tree.get(Position::new(1)).unwrap();
@@ -83,64 +85,82 @@ fn projects_section_tree_style_catalog_metadata_and_resource_graph() {
 
     assert!(
         master
+            .document()
             .styles()
             .iter()
             .any(|style| { style.name() == "AutoSection" && style.origin() == Origin::Content })
     );
-    assert!(master.styles().iter().any(|style| {
+    assert!(master.document().styles().iter().any(|style| {
         style.name() == "Sect1"
             && style.family() == Some("section")
             && style.parent() == Some("Standard")
             && style.origin() == Origin::Styles
     }));
-    assert_eq!(master.metadata().unwrap().author.as_deref(), Some("Editor"));
+    assert_eq!(
+        master.document().metadata().unwrap().author.as_deref(),
+        Some("Editor")
+    );
 
-    let chapter_resource = master
+    let master_document = master.document();
+    let chapter_resource = master_document
         .resources()
         .resources()
         .iter()
         .find(|resource| resource.path() == "Chapters/a.odt")
         .unwrap();
     assert_eq!(chapter_resource.references(), &[Position::new(0)]);
-    assert_eq!(master.resources().missing(), &[]);
+    assert_eq!(master.document().resources().missing(), &[]);
 }
 
 #[test]
 fn unified_title_and_link_commit_is_atomic_compact_and_reversible() {
-    let source = Master::from_bytes(package(CONTENT, false)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT, false)).unwrap();
     let mut edit = source.edit();
     edit.set_title("After & exact")
         .unwrap()
         .set_link("Chapter", "Chapters/revised & exact.odt")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let changed = commit.snapshot();
-    assert_eq!(changed.title(), Some("After & exact"));
+    let changed = commit.package();
+    assert_eq!(changed.document().title(), Some("After & exact"));
     assert_eq!(
-        changed.subdocuments()[0].href(),
+        changed.document().subdocuments()[0].href(),
         "Chapters/revised & exact.odt"
     );
     assert!(matches!(
-        changed.subdocuments()[0].target(),
+        changed.document().subdocuments()[0].target(),
         Target::Package(_)
     ));
-    assert!(changed.content_xml().contains("revised &amp; exact.odt"));
-    compact_xml::validate(changed.content_xml().as_bytes()).unwrap();
+    assert!(
+        changed
+            .document()
+            .content_xml()
+            .contains("revised &amp; exact.odt")
+    );
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert_eq!(commit.patch().changes().links().len(), 1);
     assert!(commit.patch().changes().title().is_some());
     assert_eq!(
-        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
-    let reopened = Master::from_bytes(changed.as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.title(), Some("After & exact"));
-    assert_eq!(reopened.section_tree().sections().len(), 2);
+    let reopened = Package::from_bytes(changed.as_bytes()).unwrap();
+    assert_eq!(reopened.document().title(), Some("After & exact"));
+    assert_eq!(reopened.document().section_tree().sections().len(), 2);
 }
 
 #[test]
 fn durable_patch_merge_and_bounded_history_preserve_lineage() {
-    let source = Master::from_bytes(package(CONTENT, false)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT, false)).unwrap();
 
     let mut title_edit = source.edit();
     title_edit.set_title("Merged title").unwrap();
@@ -151,10 +171,10 @@ fn durable_patch_merge_and_bounded_history_preserve_lineage() {
         .unwrap();
     let link_commit = link_edit.commit().unwrap();
     let merged = title_commit.patch().merge(link_commit.patch()).unwrap();
-    let merged_snapshot = merged.apply(&source).unwrap();
-    assert_eq!(merged_snapshot.title(), Some("Merged title"));
+    let merged_snapshot = source.apply(&merged).unwrap().into_package();
+    assert_eq!(merged_snapshot.document().title(), Some("Merged title"));
     assert_eq!(
-        merged_snapshot.subdocuments()[0].href(),
+        merged_snapshot.document().subdocuments()[0].href(),
         "Chapters/merged.odt"
     );
 
@@ -168,20 +188,27 @@ fn durable_patch_merge_and_bounded_history_preserve_lineage() {
         decoded.inverse().apply(&applied).unwrap().as_bytes(),
         source.as_bytes()
     );
-    assert!(decoded.apply(&applied).is_err());
+    assert!(matches!(
+        decoded.apply(&applied),
+        Err(Error::PatchConflict { .. })
+    ));
 
     let mut history = source.history(HistoryLimits::new(4, u64::MAX));
     history.record(&title_commit).unwrap();
-    assert_eq!(history.current().title(), Some("Merged title"));
+    assert_eq!(history.current().document().title(), Some("Merged title"));
     assert!(history.undo());
-    assert_eq!(history.current().title(), Some("Before"));
+    assert_eq!(history.current().document().title(), Some("Before"));
     assert!(history.redo());
-    assert_eq!(history.current().title(), Some("Merged title"));
+    assert_eq!(history.current().document().title(), Some("Merged title"));
+    assert!(matches!(
+        history.record(&title_commit),
+        Err(Error::PatchConflict { .. })
+    ));
 }
 
 #[test]
 fn merge_reports_divergent_title_conflict() {
-    let source = Master::from_bytes(package(CONTENT, false)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT, false)).unwrap();
     let mut left_edit = source.edit();
     left_edit.set_title("Left").unwrap();
     let left_commit = left_edit.commit().unwrap();
@@ -196,28 +223,36 @@ fn merge_reports_divergent_title_conflict() {
 
 #[test]
 fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
-    let signed = Master::from_bytes(package(CONTENT, true)).unwrap();
+    let signed = Package::from_bytes(&package(CONTENT, true)).unwrap();
     assert_eq!(
-        signed.security().changed_write_disposition(),
+        signed.document().security().changed_write_disposition(),
         litchi_odm::security::ChangedWriteDisposition::RefusedSigned
     );
     assert_eq!(
-        signed.security().write_capabilities().signatures(),
+        signed
+            .document()
+            .security()
+            .write_capabilities()
+            .signatures(),
         litchi_odm::security::CryptographicWriteCapability::ExactPreservationOnly
     );
     assert_eq!(
-        signed.security().write_capabilities().encryption(),
+        signed
+            .document()
+            .security()
+            .write_capabilities()
+            .encryption(),
         litchi_odm::security::CryptographicWriteCapability::Unavailable
     );
     assert_eq!(
-        signed.edit().commit().unwrap().snapshot().as_bytes(),
+        signed.edit().commit().unwrap().package().as_bytes(),
         signed.as_bytes()
     );
     let mut signed_edit = signed.edit();
     signed_edit.set_title("invalidates signature").unwrap();
     assert!(signed_edit.commit().is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption("secret", Profile::compatible())
@@ -226,17 +261,21 @@ fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
     writer.add_file("meta.xml", META.as_bytes()).unwrap();
     writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
     let encrypted_bytes = writer.finish_to_bytes().unwrap();
-    let encrypted = Master::from_bytes_with_password(encrypted_bytes, "secret").unwrap();
+    let encrypted = Package::from_bytes_with_password(&encrypted_bytes, "secret").unwrap();
     assert_eq!(
-        encrypted.security().changed_write_disposition(),
+        encrypted.document().security().changed_write_disposition(),
         litchi_odm::security::ChangedWriteDisposition::RefusedEncrypted
     );
     assert_eq!(
-        encrypted.security().write_capabilities().encryption(),
+        encrypted
+            .document()
+            .security()
+            .write_capabilities()
+            .encryption(),
         litchi_odm::security::CryptographicWriteCapability::ExactPreservationOnly
     );
     assert_eq!(
-        encrypted.edit().commit().unwrap().snapshot().as_bytes(),
+        encrypted.edit().commit().unwrap().package().as_bytes(),
         encrypted.as_bytes()
     );
     let mut encrypted_edit = encrypted.edit();
@@ -249,16 +288,16 @@ fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
 #[test]
 fn malformed_section_and_style_semantics_are_rejected() {
     let invalid_bool = CONTENT.replace("text:protected=\"true\"", "text:protected=\"maybe\"");
-    assert!(Master::from_bytes(package(&invalid_bool, false)).is_err());
+    assert!(Package::from_bytes(&package(&invalid_bool, false)).is_err());
     let invalid_style = STYLES.replace(" style:name=\"Sect1\"", "");
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
     writer.add_file("meta.xml", META.as_bytes()).unwrap();
     writer
         .add_file("styles.xml", invalid_style.as_bytes())
         .unwrap();
-    assert!(Master::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 }
 
 #[test]
@@ -266,20 +305,28 @@ fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
     let original = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm"
     );
-    let master = Master::from_bytes(original.to_vec()).unwrap();
+    let master = Package::from_bytes(original.as_ref()).unwrap();
     assert_eq!(master.as_bytes(), original);
-    assert_eq!(master.section_tree().sections().len(), 2);
+    assert_eq!(master.document().section_tree().sections().len(), 2);
     assert!(
         master
+            .document()
             .section_tree()
             .sections()
             .iter()
             .all(|section| section.protected() == Some(true))
     );
-    assert!(master.styles().iter().any(|style| style.name() == "Sect1"));
-    assert_eq!(master.subdocuments().len(), 2);
     assert!(
         master
+            .document()
+            .styles()
+            .iter()
+            .any(|style| style.name() == "Sect1")
+    );
+    assert_eq!(master.document().subdocuments().len(), 2);
+    assert!(
+        master
+            .document()
             .subdocuments()
             .iter()
             .all(|reference| reference.target().is_external())
@@ -290,13 +337,16 @@ fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
         .set_link(Position::new(0), "../edited-DUMMY2.odt")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().title(), Some("Edited genuine ODM"));
     assert_eq!(
-        commit.snapshot().subdocuments()[0].href(),
+        commit.package().document().title(),
+        Some("Edited genuine ODM")
+    );
+    assert_eq!(
+        commit.package().document().subdocuments()[0].href(),
         "../edited-DUMMY2.odt"
     );
     let mut changed_archive =
-        zip::ZipArchive::new(Cursor::new(commit.snapshot().as_bytes())).unwrap();
+        zip::ZipArchive::new(Cursor::new(commit.package().as_bytes())).unwrap();
     let mut mimetype = String::new();
     {
         let mut first = changed_archive.by_index(0).unwrap();
@@ -305,13 +355,13 @@ fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
         first.read_to_string(&mut mimetype).unwrap();
     }
     assert_eq!(mimetype, MIME);
-    assert!(Master::from_bytes(commit.snapshot().as_bytes().to_vec()).is_ok());
+    assert!(Package::from_bytes(commit.package().as_bytes()).is_ok());
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         original
     );
@@ -319,7 +369,7 @@ fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
 
 #[test]
 fn three_way_planning_detects_parent_remove_against_child_edit() {
-    let source = Master::from_bytes(package(CONTENT, false)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT, false)).unwrap();
     let mut remove_parent_edit = source.edit();
     remove_parent_edit.remove_section(Position::new(0)).unwrap();
     let remove_parent_commit = remove_parent_edit.commit().unwrap();

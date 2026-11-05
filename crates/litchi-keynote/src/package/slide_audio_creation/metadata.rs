@@ -23,7 +23,9 @@ use litchi_iwa_protos::{
 };
 use sha1::{Digest, Sha1};
 
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 use crate::soundtrack::items::MAX_FILENAME_BYTES;
 
 use super::super::{Package, PhysicalSource};
@@ -338,7 +340,9 @@ pub(in crate::package) fn plan_and_rewrite_media(
     let catalog = match &source.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => catalog,
         PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
-            return Err(SlideAudioCreationError::UnsupportedSource);
+            return Err(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedSource,
+            ));
         },
     };
 
@@ -599,7 +603,7 @@ pub(in crate::package) fn plan_and_rewrite_media(
         .get_mut(object_index)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -609,21 +613,27 @@ pub(in crate::package) fn plan_and_rewrite_media(
         )
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let encoded_len = archive
-        .encoded_len_with_limits(ctx.archive_limits)
+        .encoded_len(ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_output(encoded_len)?;
     budget.charge_total(encoded_len)?;
     budget.charge_allocations(encoded_len)?;
     let serialized = archive
-        .to_bytes_with_limits(ctx.archive_limits)
+        .to_bytes(ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-    let compressed_max = SnappyStream::maximum_compressed_len(serialized.len())
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed_max = SnappyStream::maximum_compressed_len(serialized.len(), snappy_limits)
+        .map_err(super::map_snappy_error)?;
     budget.charge_output(compressed_max)?;
     budget.charge_total(compressed_max)?;
     budget.charge_allocations(compressed_max)?;
     let compressed =
-        SnappyStream::compress(&serialized).map_err(|_| SlideAudioCreationError::InvalidSource)?;
+        SnappyStream::compress(&serialized, snappy_limits).map_err(super::map_snappy_error)?;
     budget.charge_entry_bytes(compressed.len())?;
 
     drop(data_additions);
@@ -711,31 +721,41 @@ fn validate_media_input(
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     let extension = asset
         .filename
         .rsplit_once('.')
         .map(|(_, extension)| extension)
         .filter(|extension| !extension.is_empty())
-        .ok_or(SlideAudioCreationError::InvalidFilename)?;
+        .ok_or(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ))?;
     if MediaType::from_extension(extension) != asset.media_type {
         return Err(if asset.media_type == MediaType::Audio {
-            SlideAudioCreationError::InvalidFilename
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::InvalidFilename,
+            )
         } else {
             SlideAudioCreationError::InvalidSource
         });
     }
     if asset.bytes.is_empty() {
         return Err(if asset.media_type == MediaType::Audio {
-            SlideAudioCreationError::UnsupportedAudio
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedAudio,
+            )
         } else {
             SlideAudioCreationError::InvalidSource
         });
     }
     if MediaType::from_bytes(asset.bytes) != asset.media_type {
         return Err(if asset.media_type == MediaType::Audio {
-            SlideAudioCreationError::UnsupportedAudio
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedAudio,
+            )
         } else {
             SlideAudioCreationError::InvalidSource
         });
@@ -770,7 +790,7 @@ fn read_metadata_archive(
         .limits()
         .snappy_limits()
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let decoded_len = stream.as_bytes().len();
     budget.charge_allocations(decoded_len)?;
@@ -778,10 +798,10 @@ fn read_metadata_archive(
     // the Snappy buffer. Reserve the same bounded byte width for that clone
     // before the parser starts growing its object/message vectors.
     budget.charge_allocations(decoded_len)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), ctx.archive_limits)
+    let archive = Archive::parse(stream.as_bytes(), ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let mut selected = None;
     for (object_index, object) in archive.objects.iter().enumerate() {
@@ -858,7 +878,7 @@ fn residual_wire_allowances(
 ) -> Result<(usize, usize, usize), SlideAudioCreationError> {
     let fields = wire.max_fields().min(budget.remaining_wire_fields());
     if fields == 0 {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::WireFields,
             observed: 1,
             maximum: 0,
@@ -866,7 +886,7 @@ fn residual_wire_allowances(
     }
     let work = wire.max_rewrite_work().min(budget.remaining_work());
     if work == 0 {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -874,7 +894,7 @@ fn residual_wire_allowances(
     }
     let output = wire.max_output_bytes().min(budget.remaining_output());
     if output == 0 {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::OutputBytes,
             observed: 1,
             maximum: 0,
@@ -1271,9 +1291,12 @@ fn generated_name(
     planned_names: &[Box<str>],
     budget: &mut CreationBudget,
 ) -> Result<String, SlideAudioCreationError> {
-    let (stem, extension) = source_name
-        .rsplit_once('.')
-        .ok_or(SlideAudioCreationError::InvalidFilename)?;
+    let (stem, extension) =
+        source_name
+            .rsplit_once('.')
+            .ok_or(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::InvalidFilename,
+            ))?;
     let identifier_digits = decimal_len(identifier);
     let normal_length = stem
         .len()
@@ -1410,7 +1433,7 @@ pub(super) fn map_identity_error(error: identity_codec::RewriteError) -> SlideAu
             },
             _ => return SlideAudioCreationError::InvalidSource,
         };
-        return SlideAudioCreationError::LimitExceeded {
+        return SlideAudioCreationError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1453,7 +1476,7 @@ pub(super) fn map_media_error(
             },
             _ => return SlideAudioCreationError::InvalidSource,
         };
-        return SlideAudioCreationError::LimitExceeded {
+        return SlideAudioCreationError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1497,7 +1520,7 @@ fn map_media_rewrite_error(error: media_codec::RewriteError) -> SlideAudioCreati
             ),
             _ => return SlideAudioCreationError::InvalidSource,
         };
-        return SlideAudioCreationError::LimitExceeded {
+        return SlideAudioCreationError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

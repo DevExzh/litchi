@@ -8,9 +8,9 @@ use std::io::Cursor;
 const REVISION_DATE_UTC: &str = "2026-07-17T00:00:00.123456+00:00";
 
 fn authored_source_docx() -> Vec<u8> {
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
         paragraph.add_run_with_text("before ");
         paragraph
@@ -34,6 +34,7 @@ fn authored_source_docx() -> Vec<u8> {
         paragraph.add_run_with_text(" after");
     }
     let mut stream = Cursor::new(Vec::new());
+    let package = builder.build().unwrap();
     package.to_plain_stream(&mut stream).unwrap();
     stream.into_inner()
 }
@@ -66,7 +67,7 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
     assert_eq!(source_text.matches("w16du:dateUtc=").count(), 4);
     assert!(source_text.contains("mc:Ignorable=\"w16du\""));
 
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap()
         .reject_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
@@ -77,7 +78,7 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.patch().operations().len(), 4);
-    let target_xml = commit.snapshot().xml_bytes().to_vec();
+    let target_xml = commit.patch().target().xml_bytes().to_vec();
     let target_text = std::str::from_utf8(&target_xml).unwrap();
     assert!(!target_text.contains("<w:ins"));
     assert!(!target_text.contains("<w:del"));
@@ -87,20 +88,24 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
     assert!(target_text.contains("restored deletion"));
 
     let durable = commit.patch().to_durable(durable_limits()).unwrap();
-    package.publish_document_commit(commit).unwrap();
+    package = commit.into_package();
 
     let changed_file = NamedTempFile::with_suffix(".docx").unwrap();
     package.save(changed_file.path()).unwrap();
-    let mut reopened = Package::open(changed_file.path()).unwrap();
+    let reopened = Package::open(changed_file.path()).unwrap();
     assert_eq!(
         reopened.document_snapshot().unwrap().xml_bytes(),
         target_xml.as_slice()
     );
 
-    let restored = reopened
-        .apply_durable_document_patch(&durable.inverse())
-        .unwrap();
-    assert_eq!(restored.xml_bytes(), source_xml.as_slice());
+    let reopened = reopened
+        .apply_durable_document(&durable.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(
+        reopened.document_snapshot().unwrap().xml_bytes(),
+        source_xml.as_slice()
+    );
 
     let restored_file = NamedTempFile::with_suffix(".docx").unwrap();
     reopened.save(restored_file.path()).unwrap();

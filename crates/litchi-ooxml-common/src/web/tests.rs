@@ -19,16 +19,43 @@ const LOCAL_EXTENSION_LISTS_EXTENSION: &[u8] =
 const LOCAL_EXTENSION_LISTS_TASK_PANES: &[u8] =
     include_bytes!("../../../../test-data/ooxml/web_extensions/extension_lists_taskpanes.xml");
 
+fn put(
+    package: &mut OpcPackage,
+    panes: Panes,
+    conformance: Conformance,
+    limits: &Limits,
+) -> Result<()> {
+    let patch = plan_put(package, panes, conformance, limits)?;
+    let commit = patch.apply(package)?;
+    *package = commit.into_package();
+    Ok(())
+}
+
+fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
+    let patch = plan_remove(package, limits)?;
+    let commit = patch.apply(package)?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
+fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<bool> {
+    let commit = patch.apply(package)?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
 #[test]
 fn loads_local_omex_and_registry_fixtures_inertly() {
     let omex = local_fixture_package(LOCAL_VISIBLE_TASK_PANES, LOCAL_OMEX_EXTENSION);
-    let panes = load(&omex).unwrap().unwrap();
+    let panes = load(&omex, &Limits::standard()).unwrap().unwrap();
     assert_eq!(panes.panes.len(), 1);
     assert_eq!(panes.panes[0].add_in.reference.store, Store::Omex);
     assert!(panes.panes[0].visible);
 
     let registry = local_fixture_package(LOCAL_HIDDEN_TASK_PANES, LOCAL_REGISTRY_EXTENSION);
-    let panes = load(&registry).unwrap().unwrap();
+    let panes = load(&registry, &Limits::standard()).unwrap().unwrap();
     assert_eq!(panes.panes[0].add_in.reference.store, Store::Registry);
     assert!(!panes.panes[0].visible);
 }
@@ -154,13 +181,19 @@ fn package_crud_round_trips_every_inert_extension_list() {
         LOCAL_EXTENSION_LISTS_TASK_PANES,
         LOCAL_EXTENSION_LISTS_EXTENSION,
     );
-    let loaded = load(&package).unwrap().unwrap();
+    let loaded = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(loaded.panes[0].extension_list.is_some());
     assert!(loaded.panes[0].add_in.extension_list.is_some());
 
     let mut stored = OpcPackage::new();
-    put(&mut stored, loaded.clone(), Conformance::Strict).unwrap();
-    assert_eq!(load(&stored).unwrap(), Some(loaded));
+    put(
+        &mut stored,
+        loaded.clone(),
+        Conformance::Strict,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert_eq!(load(&stored, &Limits::standard()).unwrap(), Some(loaded));
 }
 
 #[test]
@@ -458,21 +491,33 @@ fn enforces_input_and_list_caps() {
 #[test]
 fn rejects_external_wrong_content_type_and_dangling_package_graphs() {
     let external = synthetic_package(true, ADD_IN_CONTENT_TYPE, "rId1");
-    assert!(load(&external).is_err());
+    assert!(load(&external, &Limits::standard()).is_err());
 
     let wrong_type = synthetic_package(false, "application/xml", "rId1");
-    assert!(matches!(load(&wrong_type), Err(Error::ContentType { .. })));
+    assert!(matches!(
+        load(&wrong_type, &Limits::standard()),
+        Err(Error::ContentType { .. })
+    ));
 
     let dangling = synthetic_package(false, ADD_IN_CONTENT_TYPE, "missing");
-    assert!(load(&dangling).is_err());
+    assert!(load(&dangling, &Limits::standard()).is_err());
 }
 
 #[test]
 fn package_crud_round_trips_embedded_and_linked_snapshots() {
     let mut package = OpcPackage::new();
     let authored = sample_task_panes();
-    put(&mut package, authored.clone(), Conformance::Transitional).unwrap();
-    assert_eq!(load(&package).unwrap(), Some(authored.clone()));
+    put(
+        &mut package,
+        authored.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert_eq!(
+        load(&package, &Limits::standard()).unwrap(),
+        Some(authored.clone())
+    );
 
     let task_panes_name = package
         .rels()
@@ -497,37 +542,64 @@ fn package_crud_round_trips_embedded_and_linked_snapshots() {
     replacement.panes[0].add_in.snapshot = None;
     replacement.panes[0].snapshot_resources.clear();
     replacement.panes[0].visible = false;
-    put(&mut package, replacement.clone(), Conformance::Strict).unwrap();
-    assert_eq!(load(&package).unwrap(), Some(replacement));
+    put(
+        &mut package,
+        replacement.clone(),
+        Conformance::Strict,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert_eq!(
+        load(&package, &Limits::standard()).unwrap(),
+        Some(replacement)
+    );
     assert!(
         package
             .get_part(&PackURI::new("/media/web-extension-snapshot.png").unwrap())
             .is_err()
     );
 
-    assert!(remove(&mut package).unwrap());
-    assert!(load(&package).unwrap().is_none());
-    assert!(!remove(&mut package).unwrap());
+    assert!(remove(&mut package, &Limits::standard()).unwrap());
+    assert!(load(&package, &Limits::standard()).unwrap().is_none());
+    assert!(!remove(&mut package, &Limits::standard()).unwrap());
     assert_eq!(package.part_count(), 0);
 }
 
 #[test]
 fn byte_identical_put_is_a_signature_preserving_no_op() {
     let mut package = OpcPackage::new();
-    put(&mut package, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.is_signed());
 
-    let loaded = load(&package).unwrap().unwrap();
-    let patch = plan_put(&package, loaded.clone(), Conformance::Transitional).unwrap();
-    assert!(patch.is_empty());
-    assert!(patch.inverse().is_empty());
-    assert!(!patch.apply(&mut package).unwrap());
+    let loaded = load(&package, &Limits::standard()).unwrap().unwrap();
+    let patch = plan_put(
+        &package,
+        loaded.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(patch.is_noop());
+    assert!(patch.inverse().is_noop());
+    assert!(!apply_patch(&mut package, &patch).unwrap());
     assert_eq!(
         format!("{patch:?}"),
         "Patch { empty: true, affected_parts: 0, .. }"
     );
-    put(&mut package, loaded, Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        loaded,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
 
     assert!(package.is_signed());
 }
@@ -547,25 +619,55 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         .set_custom_functions(Some(metadata.clone()))
         .unwrap();
     let mut package = OpcPackage::new();
-    put(&mut package, authored.clone(), Conformance::Transitional).unwrap();
-    let loaded = load(&package).unwrap().unwrap();
+    put(
+        &mut package,
+        authored.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    let loaded = load(&package, &Limits::standard()).unwrap().unwrap();
     assert_eq!(loaded.panes[0].add_in.custom_functions(), Some(&metadata));
 
-    let noop = plan_put(&package, loaded.clone(), Conformance::Transitional).unwrap();
-    assert!(noop.is_empty());
-    assert!(!noop.apply(&mut package).unwrap());
+    let noop = plan_put(
+        &package,
+        loaded.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(noop.is_noop());
+    assert!(!apply_patch(&mut package, &noop).unwrap());
 
     let mut changed = loaded.clone();
     changed.panes[0].add_in.set_custom_functions(None).unwrap();
-    let patch = plan_put(&package, changed.clone(), Conformance::Transitional).unwrap();
-    assert!(!patch.is_empty());
+    let patch = plan_put(
+        &package,
+        changed.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(!patch.is_noop());
     let inverse = patch.inverse();
-    assert!(patch.apply(&mut package).unwrap());
-    assert_eq!(load(&package).unwrap(), Some(changed.clone()));
-    assert!(inverse.apply(&mut package).unwrap());
-    assert_eq!(load(&package).unwrap(), Some(authored.clone()));
+    assert!(apply_patch(&mut package, &patch).unwrap());
+    assert_eq!(
+        load(&package, &Limits::standard()).unwrap(),
+        Some(changed.clone())
+    );
+    assert!(apply_patch(&mut package, &inverse).unwrap());
+    assert_eq!(
+        load(&package, &Limits::standard()).unwrap(),
+        Some(authored.clone())
+    );
 
-    let stale = plan_put(&package, changed, Conformance::Transitional).unwrap();
+    let stale = plan_put(
+        &package,
+        changed,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     package
         .get_part_mut(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
         .unwrap()
@@ -574,7 +676,7 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         .get_part(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
         .unwrap()
         .blob_arc();
-    assert!(stale.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &stale).is_err());
     assert!(Arc::ptr_eq(
         &package
             .get_part(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
@@ -588,7 +690,13 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
 fn put_patch_is_exact_reversible_and_arc_shared() {
     let mut package = OpcPackage::new();
     let original = sample_task_panes();
-    put(&mut package, original.clone(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        original.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
     let original_image = package.get_part(&image_name).unwrap().blob_arc();
     let original_root = package
@@ -600,7 +708,7 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
 
     let replacement_image = Arc::new(vec![1, 2, 3, 4, 5, 6]);
-    let mut replacement = load(&package).unwrap().unwrap();
+    let mut replacement = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(
         replacement
             .edit(0usize, |pane| {
@@ -615,10 +723,16 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
             .unwrap()
     );
 
-    let signed_patch = plan_put(&package, replacement.clone(), Conformance::Transitional).unwrap();
-    assert!(!signed_patch.is_empty());
+    let signed_patch = plan_put(
+        &package,
+        replacement.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(!signed_patch.is_noop());
     let signed_before = package.get_part(&image_name).unwrap().blob_arc();
-    assert!(signed_patch.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &signed_patch).is_err());
     assert!(package.is_signed());
     assert!(Arc::ptr_eq(
         &package.get_part(&image_name).unwrap().blob_arc(),
@@ -629,8 +743,14 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
     // removing signatures changes the guarded source, so the edit is planned
     // again before it is published.
     package.unsign();
-    let patch = plan_put(&package, replacement.clone(), Conformance::Transitional).unwrap();
-    assert!(!patch.is_empty());
+    let patch = plan_put(
+        &package,
+        replacement.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(!patch.is_noop());
     let image_change = patch
         .parts
         .iter()
@@ -653,9 +773,9 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
     assert!(!format!("{patch:?}").contains("rId"));
     assert!(!format!("{patch:?}").contains("/webextensions"));
 
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &patch).unwrap());
     assert!(!package.is_signed());
-    let applied = load(&package).unwrap().unwrap();
+    let applied = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(!applied.get(0usize).unwrap().visible());
     assert_eq!(
         applied.get(0usize).unwrap().image().unwrap().bytes(),
@@ -670,8 +790,8 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
         &replacement_image,
     ));
 
-    assert!(inverse.apply(&mut package).unwrap());
-    let restored = load(&package).unwrap().unwrap();
+    assert!(apply_patch(&mut package, &inverse).unwrap());
+    let restored = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(restored.get(0usize).unwrap().visible());
     assert_eq!(
         restored.get(0usize).unwrap().add_in(),
@@ -697,14 +817,20 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
 fn remove_patch_restores_exact_shared_parts() {
     let mut package = OpcPackage::new();
     let original = sample_task_panes();
-    put(&mut package, original.clone(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        original.clone(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
     let original_image = package.get_part(&image_name).unwrap().blob_arc();
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
 
-    let signed_patch = plan_remove(&package).unwrap();
+    let signed_patch = plan_remove(&package, &Limits::standard()).unwrap();
     let signed_before = package.get_part(&image_name).unwrap().blob_arc();
-    assert!(signed_patch.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &signed_patch).is_err());
     assert!(package.is_signed());
     assert!(Arc::ptr_eq(
         &package.get_part(&image_name).unwrap().blob_arc(),
@@ -712,7 +838,7 @@ fn remove_patch_restores_exact_shared_parts() {
     ));
 
     package.unsign();
-    let patch = plan_remove(&package).unwrap();
+    let patch = plan_remove(&package, &Limits::standard()).unwrap();
     let inverse = patch.inverse();
     let restored_image = inverse
         .parts
@@ -722,13 +848,13 @@ fn remove_patch_restores_exact_shared_parts() {
         .unwrap();
     assert!(Arc::ptr_eq(&restored_image.data, &original_image));
 
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &patch).unwrap());
     assert!(!package.is_signed());
-    assert!(load(&package).unwrap().is_none());
+    assert!(load(&package, &Limits::standard()).unwrap().is_none());
     assert!(package.get_part(&image_name).is_err());
 
-    assert!(inverse.apply(&mut package).unwrap());
-    assert_eq!(load(&package).unwrap(), Some(original));
+    assert!(apply_patch(&mut package, &inverse).unwrap());
+    assert_eq!(load(&package, &Limits::standard()).unwrap(), Some(original));
     assert!(Arc::ptr_eq(
         &package.get_part(&image_name).unwrap().blob_arc(),
         &original_image,
@@ -742,12 +868,19 @@ fn patch_rejects_changed_root_and_part_before_mutation() {
         &mut root_changed,
         sample_task_panes(),
         Conformance::Transitional,
+        &Limits::standard(),
     )
     .unwrap();
     root_changed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-    let mut replacement = load(&root_changed).unwrap().unwrap();
+    let mut replacement = load(&root_changed, &Limits::standard()).unwrap().unwrap();
     replacement.panes[0].visible = false;
-    let patch = plan_put(&root_changed, replacement, Conformance::Transitional).unwrap();
+    let patch = plan_put(
+        &root_changed,
+        replacement,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let root = root_changed
         .rels()
         .iter()
@@ -763,7 +896,7 @@ fn patch_rejects_changed_root_and_part_before_mutation() {
     );
     let task_name = PackURI::new("/webextensions/taskpanes.xml").unwrap();
     let task_before = root_changed.get_part(&task_name).unwrap().blob_arc();
-    assert!(patch.apply(&mut root_changed).is_err());
+    assert!(apply_patch(&mut root_changed, &patch).is_err());
     assert!(root_changed.is_signed());
     assert!(Arc::ptr_eq(
         &root_changed.get_part(&task_name).unwrap().blob_arc(),
@@ -775,19 +908,26 @@ fn patch_rejects_changed_root_and_part_before_mutation() {
         &mut part_changed,
         sample_task_panes(),
         Conformance::Transitional,
+        &Limits::standard(),
     )
     .unwrap();
     part_changed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-    let mut replacement = load(&part_changed).unwrap().unwrap();
+    let mut replacement = load(&part_changed, &Limits::standard()).unwrap().unwrap();
     replacement.panes[0].visible = false;
-    let patch = plan_put(&part_changed, replacement, Conformance::Transitional).unwrap();
+    let patch = plan_put(
+        &part_changed,
+        replacement,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
     part_changed
         .get_part_mut(&image_name)
         .unwrap()
         .set_blob(vec![9, 8, 7]);
     let task_before = part_changed.get_part(&task_name).unwrap().blob_arc();
-    assert!(patch.apply(&mut part_changed).is_err());
+    assert!(apply_patch(&mut part_changed, &patch).is_err());
     assert!(part_changed.is_signed());
     assert!(Arc::ptr_eq(
         &part_changed.get_part(&task_name).unwrap().blob_arc(),
@@ -802,28 +942,39 @@ fn patch_rejects_changed_root_and_part_before_mutation() {
 #[test]
 fn patch_rechecks_shared_graph_protection_before_mutation() {
     let mut stale = OpcPackage::new();
-    put(&mut stale, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut stale,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     stale.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-    let patch = plan_remove(&stale).unwrap();
+    let patch = plan_remove(&stale, &Limits::standard()).unwrap();
     let task_name = add_shared_task_pane_ingress(&mut stale);
     let before_parts = stale.part_count();
 
-    assert!(patch.apply(&mut stale).is_err());
+    assert!(apply_patch(&mut stale, &patch).is_err());
     assert!(stale.is_signed());
     assert_eq!(stale.part_count(), before_parts);
     assert!(stale.get_part(&task_name).is_ok());
-    assert!(load(&stale).unwrap().is_some());
+    assert!(load(&stale, &Limits::standard()).unwrap().is_some());
 
     let mut shared_before_planning = OpcPackage::new();
     put(
         &mut shared_before_planning,
         sample_task_panes(),
         Conformance::Transitional,
+        &Limits::standard(),
     )
     .unwrap();
     let task_name = add_shared_task_pane_ingress(&mut shared_before_planning);
-    assert!(remove(&mut shared_before_planning).unwrap());
-    assert!(load(&shared_before_planning).unwrap().is_none());
+    assert!(remove(&mut shared_before_planning, &Limits::standard()).unwrap());
+    assert!(
+        load(&shared_before_planning, &Limits::standard())
+            .unwrap()
+            .is_none()
+    );
     assert!(shared_before_planning.get_part(&task_name).is_ok());
 }
 
@@ -831,7 +982,13 @@ fn patch_rechecks_shared_graph_protection_before_mutation() {
 fn patch_rejects_new_inbound_relationship_to_absent_destination() {
     let mut package = OpcPackage::new();
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-    let patch = plan_put(&package, sample_task_panes(), Conformance::Transitional).unwrap();
+    let patch = plan_put(
+        &package,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     package.rels_mut().add_relationship(
         "urn:litchi:test:new-shared-target".into(),
         "media/web-extension-snapshot.png".into(),
@@ -839,7 +996,7 @@ fn patch_rejects_new_inbound_relationship_to_absent_destination() {
         false,
     );
 
-    assert!(patch.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &patch).is_err());
     assert!(package.is_signed());
     assert_eq!(package.part_count(), 0);
     assert!(
@@ -860,7 +1017,13 @@ fn patch_rejects_new_inbound_relationship_to_absent_destination() {
 #[test]
 fn changed_shared_task_pane_part_is_rejected_without_mutation() {
     let mut package = OpcPackage::new();
-    put(&mut package, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let task_panes_name = package
         .rels()
         .iter()
@@ -877,19 +1040,33 @@ fn changed_shared_task_pane_part_is_rejected_without_mutation() {
     );
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     let before = package.get_part(&task_panes_name).unwrap().blob().to_vec();
-    let mut changed = load(&package).unwrap().unwrap();
+    let mut changed = load(&package, &Limits::standard()).unwrap().unwrap();
     changed.panes[0].visible = false;
 
-    assert!(put(&mut package, changed, Conformance::Transitional).is_err());
+    assert!(
+        put(
+            &mut package,
+            changed,
+            Conformance::Transitional,
+            &Limits::standard()
+        )
+        .is_err()
+    );
     assert_eq!(package.get_part(&task_panes_name).unwrap().blob(), before);
     assert!(package.is_signed());
-    assert!(load(&package).unwrap().unwrap().panes[0].visible);
+    assert!(load(&package, &Limits::standard()).unwrap().unwrap().panes[0].visible);
 }
 
 #[test]
 fn shared_task_pane_ingress_protects_descendant_add_in() {
     let mut package = OpcPackage::new();
-    put(&mut package, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let task_panes_name = add_shared_task_pane_ingress(&mut package);
     let extension_name = package
         .get_part(&task_panes_name)
@@ -900,7 +1077,7 @@ fn shared_task_pane_ingress_protects_descendant_add_in() {
         .target_partname()
         .unwrap();
     let before = package.get_part(&extension_name).unwrap().blob().to_vec();
-    let mut changed = load(&package).unwrap().unwrap();
+    let mut changed = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(
         changed
             .edit(0usize, |pane| {
@@ -910,10 +1087,18 @@ fn shared_task_pane_ingress_protects_descendant_add_in() {
             .unwrap()
     );
 
-    assert!(put(&mut package, changed, Conformance::Transitional).is_err());
+    assert!(
+        put(
+            &mut package,
+            changed,
+            Conformance::Transitional,
+            &Limits::standard()
+        )
+        .is_err()
+    );
     assert_eq!(package.get_part(&extension_name).unwrap().blob(), before);
     assert!(
-        load(&package)
+        load(&package, &Limits::standard())
             .unwrap()
             .unwrap()
             .get(0usize)
@@ -926,11 +1111,17 @@ fn shared_task_pane_ingress_protects_descendant_add_in() {
 #[test]
 fn shared_task_pane_ingress_protects_descendant_image() {
     let mut package = OpcPackage::new();
-    put(&mut package, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     add_shared_task_pane_ingress(&mut package);
     let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
     let before = package.get_part(&image_name).unwrap().blob().to_vec();
-    let mut changed = load(&package).unwrap().unwrap();
+    let mut changed = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(
         changed
             .edit(0usize, |pane| {
@@ -944,14 +1135,28 @@ fn shared_task_pane_ingress_protects_descendant_image() {
             .unwrap()
     );
 
-    assert!(put(&mut package, changed, Conformance::Transitional).is_err());
+    assert!(
+        put(
+            &mut package,
+            changed,
+            Conformance::Transitional,
+            &Limits::standard()
+        )
+        .is_err()
+    );
     assert_eq!(package.get_part(&image_name).unwrap().blob(), before);
 }
 
 #[test]
 fn internal_web_relationship_targets_reject_queries_and_fragments() {
     let mut root = OpcPackage::new();
-    put(&mut root, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut root,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let root_id = root
         .rels()
         .iter()
@@ -966,10 +1171,19 @@ fn internal_web_relationship_targets_reject_queries_and_fragments() {
         root_id,
         false,
     );
-    assert!(matches!(load(&root), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&root, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     let mut add_in = OpcPackage::new();
-    put(&mut add_in, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut add_in,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let task_name = add_in
         .rels()
         .iter()
@@ -985,10 +1199,19 @@ fn internal_web_relationship_targets_reject_queries_and_fragments() {
         "rId1".into(),
         false,
     );
-    assert!(matches!(load(&add_in), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&add_in, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     let mut image = OpcPackage::new();
-    put(&mut image, sample_task_panes(), Conformance::Transitional).unwrap();
+    put(
+        &mut image,
+        sample_task_panes(),
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     let task_name = image
         .rels()
         .iter()
@@ -1012,7 +1235,10 @@ fn internal_web_relationship_targets_reject_queries_and_fragments() {
         "rIdSnapshot".into(),
         false,
     );
-    assert!(matches!(load(&image), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&image, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 }
 
 #[test]
@@ -1029,7 +1255,15 @@ fn case_equivalent_existing_parts_are_rejected_before_put_mutates() {
         vec![2],
     )));
     let before = package.part_count();
-    assert!(put(&mut package, sample_task_panes(), Conformance::Transitional,).is_err());
+    assert!(
+        put(
+            &mut package,
+            sample_task_panes(),
+            Conformance::Transitional,
+            &Limits::standard(),
+        )
+        .is_err()
+    );
     assert_eq!(package.part_count(), before);
     assert_eq!(package.rels().len(), 0);
 }
@@ -1039,7 +1273,15 @@ fn package_store_rejects_resource_mismatches_without_mutation() {
     let mut package = OpcPackage::new();
     let mut malformed = sample_task_panes();
     malformed.panes[0].snapshot_resources.pop();
-    assert!(put(&mut package, malformed, Conformance::Transitional,).is_err());
+    assert!(
+        put(
+            &mut package,
+            malformed,
+            Conformance::Transitional,
+            &Limits::standard(),
+        )
+        .is_err()
+    );
     assert_eq!(package.part_count(), 0);
     assert_eq!(package.rels().iter().count(), 0);
 
@@ -1048,7 +1290,15 @@ fn package_store_rejects_resource_mismatches_without_mutation() {
         "image/png".into(),
         vec![9, 9, 9],
     )));
-    assert!(put(&mut package, sample_task_panes(), Conformance::Transitional,).is_err());
+    assert!(
+        put(
+            &mut package,
+            sample_task_panes(),
+            Conformance::Transitional,
+            &Limits::standard(),
+        )
+        .is_err()
+    );
     assert_eq!(package.part_count(), 1);
     assert_eq!(
         package
@@ -1132,8 +1382,17 @@ fn panes_push_rekeys_colliding_hidden_relationship_ids() {
     );
     assert!(!panes.panes[1].relationship_id.is_empty());
     let mut package = OpcPackage::new();
-    put(&mut package, panes, Conformance::Transitional).unwrap();
-    assert_eq!(load(&package).unwrap().unwrap().len(), 2);
+    put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert_eq!(
+        load(&package, &Limits::standard()).unwrap().unwrap().len(),
+        2
+    );
 }
 
 #[test]
@@ -1161,7 +1420,13 @@ fn panes_push_canonicalizes_equivalent_resources_within_one_pane() {
     assert_eq!(embedded.name().as_str(), "/media/Preview.png");
     assert!(Arc::ptr_eq(&embedded.shared(), &linked.shared()));
     let mut package = OpcPackage::new();
-    put(&mut package, panes, Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -1346,8 +1611,14 @@ fn internal_linked_image_is_typed_and_round_trips() {
     let mut panes = Panes::new();
     panes.push(pane).unwrap();
     let mut package = OpcPackage::new();
-    put(&mut package, panes, Conformance::Transitional).unwrap();
-    let mut loaded = load(&package).unwrap().unwrap();
+    put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    let mut loaded = load(&package, &Limits::standard()).unwrap().unwrap();
     assert_eq!(
         loaded
             .get(0usize)
@@ -1458,8 +1729,14 @@ fn checked_update_crud_covers_collections_metadata_and_all_ext_sites() {
     let mut panes = Panes::new();
     panes.push(pane).unwrap();
     let mut package = OpcPackage::new();
-    put(&mut package, panes, Conformance::Transitional).unwrap();
-    assert!(load(&package).unwrap().is_some());
+    put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(load(&package, &Limits::standard()).unwrap().is_some());
 }
 
 #[test]
@@ -1470,7 +1747,7 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
         ..Limits::standard()
     };
     assert!(
-        put_with(
+        put(
             &mut authored,
             sample_task_panes(),
             Conformance::Transitional,
@@ -1484,6 +1761,7 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
         &mut authored,
         sample_task_panes(),
         Conformance::Transitional,
+        &Limits::standard(),
     )
     .unwrap();
     let no_parts = Limits {
@@ -1491,23 +1769,29 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
         ..Limits::standard()
     };
     assert!(matches!(
-        load_with(&authored, &no_parts),
-        Err(Error::Limit { .. })
+        load(&authored, &no_parts),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     let no_relationships = Limits {
         package_relationships: 0,
         ..Limits::standard()
     };
     assert!(matches!(
-        load_with(&authored, &no_relationships),
-        Err(Error::Limit { .. })
+        load(&authored, &no_relationships),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     let no_deletions = Limits {
         part_deletions: 0,
         ..Limits::standard()
     };
-    assert!(remove_with(&mut authored, &no_deletions).is_err());
-    assert!(load(&authored).unwrap().is_some());
+    assert!(remove(&mut authored, &no_deletions).is_err());
+    assert!(load(&authored, &Limits::standard()).unwrap().is_some());
 }
 
 #[test]
@@ -1524,8 +1808,8 @@ fn absent_feature_skips_the_bounded_full_graph_index() {
         ..Limits::standard()
     };
 
-    assert!(load_with(&package, &limits).unwrap().is_none());
-    assert!(!remove_with(&mut package, &limits).unwrap());
+    assert!(load(&package, &limits).unwrap().is_none());
+    assert!(!remove(&mut package, &limits).unwrap());
     assert_eq!(package.get_part(&sentinel_name).unwrap().blob(), &[1, 2, 3]);
 }
 
@@ -1554,8 +1838,11 @@ fn part_name_allocation_probes_are_operation_wide() {
     };
 
     assert!(matches!(
-        put_with(&mut package, panes, Conformance::Transitional, &limits,),
-        Err(Error::Limit { .. })
+        put(&mut package, panes, Conformance::Transitional, &limits,),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(package.part_count(), 1);
     assert_eq!(package.get_part(&occupied_name).unwrap().blob(), &[7]);
@@ -1578,13 +1865,16 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
     };
     let mut rejected = OpcPackage::new();
     assert!(matches!(
-        put_with(
+        put(
             &mut rejected,
             panes.clone(),
             Conformance::Transitional,
             &xml_tight,
         ),
-        Err(Error::Limit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(rejected.part_count(), 0);
 
@@ -1593,25 +1883,40 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
         ..Limits::standard()
     };
     assert!(matches!(
-        put_with(
+        put(
             &mut rejected,
             panes.clone(),
             Conformance::Transitional,
             &strings_tight,
         ),
-        Err(Error::Limit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(rejected.part_count(), 0);
 
     let mut stored = OpcPackage::new();
-    put(&mut stored, panes, Conformance::Transitional).unwrap();
+    put(
+        &mut stored,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
     assert!(matches!(
-        load_with(&stored, &xml_tight),
-        Err(Error::Limit { .. })
+        load(&stored, &xml_tight),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert!(matches!(
-        load_with(&stored, &strings_tight),
-        Err(Error::Limit { .. })
+        load(&stored, &strings_tight),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
 }
 
@@ -1640,7 +1945,10 @@ fn inherited_namespace_expansion_is_charged_before_fragment_retention() {
 
     assert!(matches!(
         parse_add_in_with(xml.as_bytes(), &limits),
-        Err(Error::Limit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(parse_add_in(xml.as_bytes()).unwrap().bindings().len(), 32);
 }
@@ -1659,8 +1967,11 @@ fn package_and_authored_relationship_metadata_share_the_string_budget() {
         ..Limits::standard()
     };
     assert!(matches!(
-        load_with(&stored, &tight),
-        Err(Error::Limit { .. })
+        load(&stored, &tight),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
 
     let add_in = AddIn::new(
@@ -1675,8 +1986,11 @@ fn package_and_authored_relationship_metadata_share_the_string_budget() {
     panes.push(pane).unwrap();
     let mut package = OpcPackage::new();
     assert!(matches!(
-        put_with(&mut package, panes, Conformance::Transitional, &tight,),
-        Err(Error::Limit { .. })
+        put(&mut package, panes, Conformance::Transitional, &tight,),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(package.part_count(), 0);
 }
@@ -1694,7 +2008,7 @@ fn explicit_limits_bound_both_put_and_load() {
 
     let mut rejected = OpcPackage::new();
     assert!(
-        put_with(
+        put(
             &mut rejected,
             panes.clone(),
             Conformance::Transitional,
@@ -1706,8 +2020,14 @@ fn explicit_limits_bound_both_put_and_load() {
     assert_eq!(rejected.rels().len(), 0);
 
     let mut stored = OpcPackage::new();
-    put(&mut stored, panes, Conformance::Transitional).unwrap();
-    assert!(load_with(&stored, &tight).is_err());
+    put(
+        &mut stored,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert!(load(&stored, &tight).is_err());
 }
 
 fn synthetic_package(

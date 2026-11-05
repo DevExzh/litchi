@@ -1,6 +1,6 @@
 //! Core-backed composition and non-applying merge plans for RTF edits.
 
-use super::{Edit, Error, Limits, Operation, Snapshot};
+use super::{Edit, EditOptions, Error, Operation, Package, SemanticLimits};
 use litchi_core::patch as core;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -10,7 +10,7 @@ pub use core::CompositionLimits;
 pub use core::MergeChoice as MergeResolution;
 
 #[derive(Clone)]
-struct Lineage(Snapshot);
+struct Lineage(Package);
 
 impl PartialEq for Lineage {
     fn eq(&self, other: &Self) -> bool {
@@ -101,7 +101,7 @@ impl Prepared {
 
 /// A bounded deterministic collection of provably disjoint RTF sub-edits.
 pub struct Composition {
-    source: Snapshot,
+    source: Package,
     inner: core::JoinedSubEdits<Lineage, Vec<Operation>>,
 }
 
@@ -118,7 +118,7 @@ impl fmt::Debug for Composition {
 impl Composition {
     /// Starts an empty composition for one exact snapshot.
     #[must_use]
-    pub fn new(source: &Snapshot, limits: CompositionLimits) -> Self {
+    pub fn new(source: &Package, limits: CompositionLimits) -> Self {
         let lineage = Lineage(source.clone());
         Self {
             source: source.clone(),
@@ -190,11 +190,15 @@ impl Composition {
         let replacement_bytes = operations.iter().fold(0usize, |total, operation| {
             total.saturating_add(operation.replacement_bytes())
         });
+        let limits = SemanticLimits::for_operations(&operations, self.source.source_limits());
         Edit {
+            paragraph_batch_len: None,
+            destination_effects: Edit::destination_effects_of(&operations),
             source: self.source,
-            limits: Limits::new(operations.len()),
+            limits,
             operations,
             replacement_bytes,
+            marks: Vec::new(),
         }
     }
 
@@ -209,7 +213,7 @@ impl Composition {
 
 /// A non-mutating bounded three-way plan for two branches from one exact base.
 pub struct MergePlan {
-    source: Snapshot,
+    source: Package,
     inner: core::ThreeWayMergePlan<Lineage, Vec<Operation>>,
     conflicts: ConflictSet,
 }
@@ -360,10 +364,13 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::InsertParagraph { .. }
         | Operation::RemoveParagraph { .. }
         | Operation::RestoreParagraph { .. }
-        | Operation::MoveParagraph { .. } => PublicationDomain::Lifecycle,
+        | Operation::MoveParagraph { .. }
+        | Operation::SwapParagraph { .. } => PublicationDomain::Lifecycle,
         Operation::Text { .. }
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
+        | Operation::RunFormat { .. }
+        | Operation::RunInsert { .. }
         | Operation::Bold { .. }
         | Operation::Italic { .. }
         | Operation::Underline { .. }
@@ -503,6 +510,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::AllCaps { span, .. }
         | Operation::Outline { span, .. }
         | Operation::InsertParagraph { span, .. } => Some(*span),
+        Operation::RunInsert { span, .. } => Some(*span),
         _ => None,
     }
 }
@@ -552,7 +560,7 @@ type DurableOperation = core::PatchOperation;
 /// RTF patch is derived from that combined commit, so its inverse preconditions
 /// refer to the combined target rather than to an individual branch.
 pub struct DurableComposition {
-    source: Snapshot,
+    source: Package,
     limits: core::PatchLimits,
     operations: Vec<DurableOperation>,
     domain: Option<DurableDomain>,
@@ -571,7 +579,7 @@ impl fmt::Debug for DurableComposition {
 impl DurableComposition {
     /// Starts an empty durable composition for one exact base snapshot.
     #[must_use]
-    pub fn new(source: &Snapshot, limits: core::PatchLimits) -> Self {
+    pub fn new(source: &Package, limits: core::PatchLimits) -> Self {
         Self {
             source: source.clone(),
             limits,
@@ -582,7 +590,7 @@ impl DurableComposition {
 
     /// Exact immutable base snapshot used by this composition.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub const fn source(&self) -> &Package {
         &self.source
     }
 
@@ -708,7 +716,7 @@ impl DurableComposition {
 /// A non-applying durable three-way plan for two independently validated
 /// branches rooted at one exact RTF base.
 pub struct DurableMergePlan {
-    source: Snapshot,
+    source: Package,
     limits: core::PatchLimits,
     automatic: Vec<DurableOperation>,
     left_conflicts: Vec<DurableOperation>,
@@ -1459,7 +1467,7 @@ fn validate_durable_forward_limit(
 }
 
 fn durable_merge_limit_ok(
-    source: &Snapshot,
+    source: &Package,
     limits: core::PatchLimits,
     automatic: &[DurableOperation],
     selected: Option<&[DurableOperation]>,
@@ -1482,7 +1490,7 @@ fn durable_merge_limit_ok(
 }
 
 fn preflight_durable_reversible(
-    source: &Snapshot,
+    source: &Package,
     limits: core::PatchLimits,
     operations: &[DurableOperation],
 ) -> Result<(), CompositionError> {
@@ -1505,7 +1513,7 @@ fn durable_domain_conflict(left: DurableDomain, right: DurableDomain) -> Composi
 }
 
 fn validate_durable_branch(
-    source: &Snapshot,
+    source: &Package,
     limits: core::PatchLimits,
     patch: &DurablePatch,
 ) -> Result<Vec<DurableOperation>, CompositionError> {
@@ -1546,19 +1554,20 @@ fn validate_durable_branch(
         }
         validate_durable_operation_shape(source, operation)?;
     }
-    let target = source
+    let target_commit = source
         .apply_durable(patch)
         .map_err(CompositionError::Edit)?;
+    let target = target_commit.package();
     let inverse = patch.inverse();
     durable_domain(inverse.operations())?;
     validate_durable_inverse_pairs(patch.operations(), inverse.operations())?;
     for operation in inverse.operations() {
-        validate_durable_operation_shape(&target, operation)?;
+        validate_durable_operation_shape(target, operation)?;
     }
-    let restored = target
+    let restored_commit = target
         .apply_durable(&inverse)
         .map_err(CompositionError::Edit)?;
-    verify_durable_inverse_semantics(source, &restored, patch.operations())?;
+    verify_durable_inverse_semantics(source, restored_commit.package(), patch.operations())?;
     let mut operations = Vec::new();
     operations
         .try_reserve(patch.operations().len())
@@ -1734,8 +1743,8 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
 }
 
 fn verify_durable_inverse_semantics(
-    source: &Snapshot,
-    restored: &Snapshot,
+    source: &Package,
+    restored: &Package,
     operations: &[DurableOperation],
 ) -> Result<(), CompositionError> {
     // Character/property rewrites are intentionally semantic: the RTF writer
@@ -2075,8 +2084,8 @@ fn verify_durable_inverse_semantics(
 }
 
 fn verify_durable_character_properties(
-    source: &Snapshot,
-    restored: &Snapshot,
+    source: &Package,
+    restored: &Package,
 ) -> Result<(), CompositionError> {
     let mut body_position = 0usize;
     for paragraph in source.body().paragraphs() {
@@ -2135,7 +2144,7 @@ fn verify_durable_character_properties(
 }
 
 fn durable_destination_text<'a>(
-    source: &'a Snapshot,
+    source: &'a Package,
     operation: &DurableOperation,
 ) -> Result<&'a str, Error> {
     match operation.op.as_str() {
@@ -2171,7 +2180,7 @@ fn durable_destination_text<'a>(
 }
 
 fn validate_durable_operation_shape(
-    source: &Snapshot,
+    source: &Package,
     operation: &DurableOperation,
 ) -> Result<(), CompositionError> {
     let expected_preconditions = match operation.op.as_str() {
@@ -2415,11 +2424,15 @@ const fn conflict_kind(conflict: &CompositionConflict) -> &'static str {
 }
 
 fn commit_durable_operations(
-    source: &Snapshot,
+    source: &Package,
     operations: &[DurableOperation],
 ) -> Result<super::Commit, CompositionError> {
     let operation_limit = operations.len().max(1);
-    let mut edit = source.edit_with_limits(Limits::new(operation_limit));
+    let profile = SemanticLimits::builder()
+        .max_operations(operation_limit)?
+        .max_replacement_bytes(source.source_limits().max_input_bytes())?
+        .build()?;
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(profile));
     for operation in operations {
         match operation.op.as_str() {
             "body-text.replace" => {

@@ -1,0 +1,262 @@
+{
+  "schema": "litchi.odf.raw-codec-qualification.manifest.v4",
+  "lane": "odf-raw-codec",
+  "baseline_commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+  "source": {
+    "consumer_manifest": "tools/odf-raw-codec-consumer/Cargo.toml",
+    "consumer_package": "litchi-odf-raw-codec-consumer",
+    "production_manifest": "crates/litchi-ops/Cargo.toml",
+    "lock_path": "tools/odf-raw-codec-consumer/Cargo.lock",
+    "candidate_mode": "integrated_final_c",
+    "candidate_identity_schema": "litchi.odf.raw-codec-qualification.candidate-identity.v3",
+    "protocol_p_pin_schema": "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1",
+    "consumer_manifest_identities": {
+      "baseline": {
+        "path": "tools/odf-raw-codec-consumer/Cargo.toml",
+        "sha256": "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70",
+        "bytes": 1300,
+        "policy": {
+          "root_patch_resolution": "historical_registry",
+          "patches": {},
+          "production_dependency_projection": "70d root has no [patch.crates-io]; flate2 and zlib-rs remain registry-resolved"
+        }
+      },
+      "candidate": {
+        "path": "tools/odf-raw-codec-consumer/Cargo.toml",
+        "sha256": "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d",
+        "bytes": 2056,
+        "policy": {
+          "root_patch_resolution": "integrated_vendored",
+          "patches": {
+            "flate2": "../../vendor/flate2",
+            "zlib-rs": "../../vendor/zlib-rs"
+          },
+          "production_dependency_projection": "integrated root [patch.crates-io] binds flate2 and zlib-rs to vendor paths"
+        }
+      }
+    },
+    "baseline_lock_identity": {
+      "schema": "litchi.odf.raw-codec.baseline-lock-provenance.v1",
+      "sha256": "5ad5000eef2a0a9038f77e16e3347ba757be932e830fe07855c267fcd695cc2a",
+      "bytes": 43921,
+      "seed": {
+        "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "bytes": 57158,
+        "registry_entries": 204
+      },
+      "source": {
+        "commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+        "tree": "4d716d79263612541988f2e30198f7f8e59e520c",
+        "manifest_sha256": "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70",
+        "manifest_bytes": 1300,
+        "probe_sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002",
+        "probe_bytes": 65903
+      },
+      "policy": {
+        "root_patch_resolution": "historical_registry",
+        "patches": {},
+        "required_registry": {
+          "flate2": {
+            "version": "1.1.10",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+          },
+          "zlib-rs": {
+            "version": "0.6.7",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "34b31d188d9d685a4f9c7b46d6e36631b07058d2cfe190267adce54dc230bf12"
+          }
+        }
+      },
+      "resolution": {
+        "registry_entries": 170,
+        "registry_added": 0,
+        "registry_removed": 34,
+        "registry_changed": 5,
+        "local_packages_added": [
+          "litchi-odb",
+          "litchi-odc",
+          "litchi-odf-formula",
+          "litchi-odf-raw-codec-consumer",
+          "litchi-odg",
+          "litchi-odi",
+          "litchi-odm",
+          "litchi-oth"
+        ]
+      }
+    },
+    "consumer_lock_status": "ready",
+    "candidate_consumer_lock_sha256": "d2575e2194d6d8968a76913fe872aebba1857fe8ae79b99221d79925bd3cb38b",
+    "candidate_consumer_lock_bytes": 43635,
+    "candidate_probe_bytes": 65903,
+    "baseline_overlay": [
+      "tools/odf-raw-codec-consumer/Cargo.toml",
+      "tools/odf-raw-codec-consumer/Cargo.lock",
+      "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
+    ],
+    "candidate_overlay": [],
+    "candidate_integrated_files": [
+      "tools/odf-raw-codec-consumer/Cargo.toml",
+      "tools/odf-raw-codec-consumer/Cargo.lock",
+      "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
+    ],
+    "adapter_provenance_scope": "three consumer files only; production closure is not equated to final C"
+  },
+  "probe": {
+    "path": "tools/perf-baseline/examples/odf_raw_codec_qualification.rs",
+    "features": [
+      "raw-codec-original",
+      "raw-codec-current",
+      "raw-codec-allocator"
+    ],
+    "api_eras": ["original", "current"],
+    "namespace_contracts": {
+      "baseline": "legacy_unknown_namespace_event",
+      "candidate": "document_rejects_undeclared_namespace"
+    },
+    "modes": ["validate", "timed", "allocator"],
+    "max_iterations": 128,
+    "bytes": 65903,
+    "sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
+  },
+  "build": {
+    "package": "litchi-odf-raw-codec-consumer",
+    "profile": "release",
+    "cargo_flag": "--release",
+    "binary_directory": "release",
+    "lto": "fat",
+    "panic": "abort",
+    "allocator_feature": "raw-codec-allocator",
+    "variants": {
+      "normal": {"allocator_feature": null},
+      "allocator": {"allocator_feature": "raw-codec-allocator"}
+    }
+  },
+  "routes": [
+    {
+      "id": "archive_catalog_and_raw_split",
+      "family": "raw",
+      "operations": ["Archive::new", "file_names", "contains", "metadata", "is_stored", "read"],
+      "boundary": "Archive construction and catalog/read operation; package bytes and expected content are prepared outside the clock"
+    },
+    {
+      "id": "manifest_xml_stream_and_parse",
+      "family": "manifest",
+      "operations": ["Archive::read_manifest_xml", "read_manifest", "parse_manifest"],
+      "boundary": "prebuilt Archive manifest materialization/read/parse only; package bytes, Archive and limits are prepared outside the clock"
+    },
+    {
+      "id": "metadata_xml_and_namespace_resolution",
+      "family": "xml",
+      "operations": ["Metadata::from_xml", "ResolvedReader::from_xml baseline/from_xml_document current", "read_resolved_event_into"],
+      "boundary": "bounded metadata/namespace construction and event consumption; XML constants, limits and proof serialization are outside the clock"
+    },
+    {
+      "id": "writer_memory_publication",
+      "family": "writer",
+      "operations": ["PackageWriter::new", "add_authored_xml", "add_file_reader_with_media_type_and_compression", "finish"],
+      "boundary": "in-memory writer construction/publication; deterministic payload values are prepared outside and output proof is outside the clock"
+    },
+    {
+      "id": "writer_stream_publication",
+      "family": "writer",
+      "operations": ["PackageWriter::with_writer", "add_file_reader_with_media_type_and_compression", "finish_to_writer"],
+      "boundary": "stream writer/sink construction and reader-to-sink publication; deterministic payload is prepared outside the clock"
+    },
+    {
+      "id": "writer_bounded_policy",
+      "family": "writer",
+      "operations": ["PackageWriter::new_bounded", "add_file", "finish_to_bounded_bytes"],
+      "boundary": "bounded writer construction/publication and refusal; payload and output/error proof are outside the clock"
+    },
+    {
+      "id": "raw_split_merge_and_opaque_preservation",
+      "family": "merge",
+      "operations": ["OwnedPackage::from_bytes", "replace_content_xml", "raw_identical_members"],
+      "boundary": "source reopen and raw replacement/publication; expected payload, member audit and output proof are outside the clock"
+    },
+    {
+      "id": "raw_xml_splice_merge_publication",
+      "family": "splice",
+      "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
+      "boundary": "prebuilt per-iteration source publication batches and rebuild only; source reopen/index/proof, fragment copies and output audit are outside the clock"
+    },
+    {
+      "id": "unified_facade_raw_parts_and_publication",
+      "family": "facade",
+      "operations": ["open_bytes_with", "File::parts", "File::raw", "File::to_bytes", "File::metadata"],
+      "boundary": "facade open, raw/parts/metadata access and byte-identical no-op publication; input bytes are intentionally cloned inside the measured API boundary"
+    },
+    {
+      "id": "consumer_reopen_matrix",
+      "family": "consumers",
+      "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
+      "boundary": "prebuilt owned per-iteration family inputs; raw split and unified facade reopen/projection only; package generation and ownership copies/output comparison are outside the clock"
+    }
+  ],
+  "families": ["odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm"],
+  "phases": {
+    "setup_outside_clock": [
+      "deterministic package and ODF family packages prepared before timing",
+      "Archive/OwnedPackage/File opening for correctness proofs",
+      "XML, metadata, namespace, reader/sink and expected-hash construction",
+      "route-specific limit and refusal inputs"
+    ],
+    "inside_clock": "the route operation named by the exact descriptor boundary only",
+    "output_proof": [
+      "operation_ok",
+      "changed_ok",
+      "no_op_ok",
+      "reopen_ok",
+      "source_bytes_ok",
+      "facade_bytes_ok",
+      "untouched_members_ok",
+      "manifest_ok",
+      "metadata_ok",
+      "namespace_ok",
+      "bounded_error_ok",
+      "negative_cases_ok"
+    ],
+    "negative_cases": [
+      "duplicate_manifest_path",
+      "manifest_limit",
+      "malformed_xml",
+      "undeclared_namespace",
+      "stale_xml_range",
+      "foreign_xml_source",
+      "bounded_output",
+      "failing_reader_or_sink",
+      "corrupt_stored_payload_without_verification"
+    ]
+  },
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmup_iterations_per_leg": 3,
+    "samples_per_leg": 30,
+    "probe_iterations": 128,
+    "roles": ["baseline", "candidate"],
+    "variants": ["normal", "allocator"],
+    "calibration": {"mode": "validate", "iterations": 1},
+    "allocator": {
+      "scope": "operation_global_system_allocator",
+      "elapsed_claimable": false,
+      "counters": ["allocations", "deallocations", "allocated_bytes", "deallocated_bytes", "reallocations"]
+    },
+    "quiet": {
+      "process_guard": "tools.native_qualification_runner.ProcessGuard",
+      "cpu_affinity_required": true,
+      "resource_monitor": "loadavg+proc-descendants+RSS+target-bytes"
+    }
+  },
+  "guards": {
+    "cargo": {"offline": true, "locked": true, "jobs": 1, "incremental": false},
+    "target_preflight_bytes": 19200000000,
+    "target_hard_limit_bytes": 20000000000,
+    "memory_hard_limit_bytes": 20000000000,
+    "max_probe_output_bytes": 1048576,
+    "fresh_no_follow_outputs": true,
+    "full_source_closure": true,
+    "quiet_host": true
+  },
+  "claim_scope": "correctness and reproducible paired protocol only; no native acceptance claim"
+}

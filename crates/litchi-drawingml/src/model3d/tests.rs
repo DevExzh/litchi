@@ -1,14 +1,14 @@
-use super::codec::{opaque, read, write};
+use super::codec::{Limits, opaque, read, write};
 use super::{
-    Error, Id, Metadata, Raster, RasterChild, Reference, Relationship, Resolver, Target,
-    validate_relationships,
+    Error, Id, MAX_NAMESPACE_TEXT_BYTES, MAX_RELATIONSHIP_ID_BYTES, Metadata, Namespace, Raster,
+    RasterChild, Reference, Relationship, Resolver, Target, ValueError, validate_relationships,
 };
 
 const MODEL_XML: &[u8] = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:f="urn:future" r:embed="rIdModel" r:link="rIdLinked"><m3d:spPr><a:futureShape f:value="keep"/></m3d:spPr><m3d:camera/><m3d:trans/><m3d:attrSrcUrl f:source="keep"/><m3d:raster rName="Office Renderer" rVer="17.0"><m3d:blip r:embed="rIdRaster"><m3d:future/></m3d:blip><m3d:future f:payload="yes"/></m3d:raster><m3d:extLst><a:ext uri="urn:future"><f:payload/></a:ext></m3d:extLst><m3d:objViewport/><m3d:ptLight/></m3d:model3d>"#;
 
 #[test]
 fn reads_typed_relationships_and_keeps_the_scene_inert() {
-    let metadata = read(MODEL_XML).expect("model3d fixture must parse");
+    let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     assert_eq!(
         metadata.reference.embedded.as_ref().unwrap().as_str(),
         "rIdModel"
@@ -32,8 +32,8 @@ fn reads_typed_relationships_and_keeps_the_scene_inert() {
 
 #[test]
 fn preserves_unknown_children_and_namespace_declarations_on_round_trip() {
-    let metadata = read(MODEL_XML).expect("model3d fixture must parse");
-    let encoded = write(&metadata).expect("model3d fixture must serialize");
+    let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
+    let encoded = write(&metadata, Limits::DEFAULT).expect("model3d fixture must serialize");
     assert!(
         encoded
             .windows(b"f:payload".len())
@@ -44,26 +44,124 @@ fn preserves_unknown_children_and_namespace_declarations_on_round_trip() {
             .windows(b"f:value".len())
             .any(|window| window == b"f:value")
     );
-    let reparsed = read(&encoded).expect("serialized model3d must parse");
+    let reparsed = read(&encoded, Limits::DEFAULT).expect("serialized model3d must parse");
     assert_eq!(reparsed, metadata);
+}
+
+#[test]
+fn writer_picks_fresh_prefixes_around_foreign_bindings() {
+    let xml = br#"<model3d xmlns="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:m3d="urn:foreign-model" xmlns:r="urn:foreign-relationship" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" rel:embed="rIdModel"><spPr/><camera/><trans/><objViewport/><m3d:foreign/><r:foreign/></model3d>"#;
+    let metadata = read(xml, Limits::DEFAULT).expect("default-prefix scene must parse");
+    let unknown = metadata
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            super::Child::Opaque(value) if value.namespace().starts_with("urn:") => {
+                Some((value.local_name(), value.namespace()))
+            },
+            super::Child::Raster(_) => None,
+            super::Child::Opaque(_) => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unknown,
+        vec![
+            ("foreign", "urn:foreign-model"),
+            ("foreign", "urn:foreign-relationship"),
+        ]
+    );
+
+    let encoded = write(&metadata, Limits::DEFAULT).expect("fresh-prefix scene must serialize");
+    assert!(encoded.starts_with(b"<m3d1:model3d"));
+    assert!(
+        encoded
+            .windows(b"xmlns:m3d1=".len())
+            .any(|window| window == b"xmlns:m3d1=")
+    );
+    assert_eq!(
+        encoded
+            .windows(b"xmlns:m3d=".len())
+            .filter(|window| *window == b"xmlns:m3d=")
+            .count(),
+        1
+    );
+    assert_eq!(
+        encoded
+            .windows(b"xmlns:r=".len())
+            .filter(|window| *window == b"xmlns:r=")
+            .count(),
+        1
+    );
+    let reparsed = read(&encoded, Limits::DEFAULT).expect("fresh-prefix output must parse");
+    let reparsed_unknown = reparsed
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            super::Child::Opaque(value) if value.namespace().starts_with("urn:") => {
+                Some((value.local_name(), value.namespace()))
+            },
+            super::Child::Raster(_) => None,
+            super::Child::Opaque(_) => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(reparsed_unknown, unknown);
+
+    let mut narrow = Limits::DEFAULT;
+    narrow.max_output_bytes = encoded.len() - 1;
+    assert!(matches!(
+        write(&metadata, narrow),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::OutputBytes,
+            observed,
+            maximum,
+        }) if observed == encoded.len() && maximum + 1 == observed
+    ));
 }
 
 #[test]
 fn rejects_invalid_sequence_and_duplicate_raster_blip() {
     let missing = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/></m3d:model3d>"#;
     assert!(
-        matches!(read(missing), Err(crate::Error::Invalid(message)) if message.contains("trans"))
+        matches!(read(missing, Limits::DEFAULT), Err(crate::Error::Invalid(message)) if message.contains("trans"))
     );
 
     let duplicate = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:raster rName="x" rVer="y"><m3d:blip/><m3d:blip/></m3d:raster><m3d:objViewport/></m3d:model3d>"#;
     assert!(
-        matches!(read(duplicate), Err(crate::Error::Invalid(message)) if message.contains("blip"))
+        matches!(read(duplicate, Limits::DEFAULT), Err(crate::Error::Invalid(message)) if message.contains("blip"))
     );
 }
 
 #[test]
+fn read_counts_root_and_direct_empty_children_once_operation_wide() {
+    let xml = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:objViewport/></m3d:model3d>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_nodes = 4;
+    assert!(matches!(
+        read(xml, limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::XmlNodes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn read_admits_an_opaque_child_before_copying_it() {
+    let xml = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:objViewport/><f:future xmlns:f="urn:future">retained</f:future></m3d:model3d>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_fragment_bytes = 16;
+    assert!(matches!(
+        read(xml, limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::InertFragmentBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn relationship_graph_distinguishes_embedded_linked_and_missing_targets() {
-    let metadata = read(MODEL_XML).expect("model3d fixture must parse");
+    let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     let graph = FixtureGraph;
     validate_relationships(&metadata, &graph).expect("fixture graph is valid");
 
@@ -84,16 +182,25 @@ fn relationship_graph_distinguishes_embedded_linked_and_missing_targets() {
 
 #[test]
 fn opaque_constructor_accepts_one_element_and_rejects_multiple_roots() {
-    let value = opaque(br#"<f:future xmlns:f="urn:future"><f:nested/></f:future>"#)
-        .expect("self-contained inert element");
+    let value = opaque(
+        br#"<f:future xmlns:f="urn:future"><f:nested/></f:future>"#,
+        Limits::DEFAULT,
+    )
+    .expect("self-contained inert element");
     assert_eq!(value.local_name(), "future");
     assert_eq!(value.namespace(), "urn:future");
-    assert!(opaque(b"<f:one xmlns:f=\"urn:f\"/><f:two xmlns:f=\"urn:f\"/>").is_err());
+    assert!(
+        opaque(
+            b"<f:one xmlns:f=\"urn:f\"/><f:two xmlns:f=\"urn:f\"/>",
+            Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn authoring_facade_can_replace_raster_without_losing_scene_children() {
-    let mut metadata = read(MODEL_XML).expect("model3d fixture must parse");
+    let mut metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     let mut raster = Raster::new("Renderer", "1").unwrap();
     raster.children.push(RasterChild::Blip(super::Blip {
         reference: Reference::embedded("rIdRaster").unwrap(),
@@ -101,7 +208,7 @@ fn authoring_facade_can_replace_raster_without_losing_scene_children() {
         namespaces: Vec::new(),
     }));
     metadata.set_raster(raster);
-    let encoded = write(&metadata).expect("edited model3d must serialize");
+    let encoded = write(&metadata, Limits::DEFAULT).expect("edited model3d must serialize");
     assert!(
         encoded
             .windows(b"f:payload".len())
@@ -112,6 +219,29 @@ fn authoring_facade_can_replace_raster_without_losing_scene_children() {
             .windows(b"Renderer".len())
             .any(|window| window == b"Renderer")
     );
+}
+
+#[test]
+fn scalar_constructor_bounds_keep_typed_limit_dimensions() {
+    let relationship_id = "r".repeat(MAX_RELATIONSHIP_ID_BYTES + 1);
+    assert!(matches!(
+        Id::new(&relationship_id),
+        Err(ValueError::Limit {
+            kind: crate::LimitKind::AttributeValueBytes,
+            observed,
+            maximum: MAX_RELATIONSHIP_ID_BYTES,
+        }) if observed == relationship_id.len()
+    ));
+
+    let prefix = "p".repeat(MAX_NAMESPACE_TEXT_BYTES + 1);
+    assert!(matches!(
+        Namespace::new(Some(&prefix), "urn:future"),
+        Err(ValueError::Limit {
+            kind: crate::LimitKind::NamespacePrefixBytes,
+            observed,
+            maximum: MAX_NAMESPACE_TEXT_BYTES,
+        }) if observed == prefix.len()
+    ));
 }
 
 struct FixtureGraph;

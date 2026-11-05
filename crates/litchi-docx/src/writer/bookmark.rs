@@ -1,7 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 /// Bookmark writer support for DOCX documents.
 use crate::error::Result;
 use litchi_core::xml::escape_xml;
@@ -11,14 +7,14 @@ use std::fmt::Write as FmtWrite;
 ///
 /// Bookmarks mark named locations in a document for quick navigation and cross-referencing.
 #[derive(Debug, Clone)]
-pub struct MutableBookmark {
+pub struct Bookmark {
     /// Bookmark ID
     id: u32,
     /// Bookmark name
     name: String,
 }
 
-impl MutableBookmark {
+impl Bookmark {
     /// Create a new bookmark.
     ///
     /// # Arguments
@@ -83,14 +79,14 @@ mod tests {
 
     #[test]
     fn test_bookmark_creation() {
-        let bookmark = MutableBookmark::new(1, "Section1".to_string());
+        let bookmark = Bookmark::new(1, "Section1".to_string());
         assert_eq!(bookmark.id(), 1);
         assert_eq!(bookmark.name(), "Section1");
     }
 
     #[test]
     fn test_bookmark_xml() {
-        let bookmark = MutableBookmark::new(42, "MyBookmark".to_string());
+        let bookmark = Bookmark::new(42, "MyBookmark".to_string());
 
         let start_xml = bookmark.to_xml_start().unwrap();
         assert!(start_xml.contains(r#"w:id="42""#));

@@ -128,7 +128,8 @@ fn tolerates_chartsheet_entries_in_sheet_walk() {
 fn poi_fixture_with_chartsheet_reads_pivot_tables() {
     const POI_CHARTSHEET: &[u8] =
         include_bytes!("../../../../../test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx");
-    let package = OpcPackage::from_bytes(POI_CHARTSHEET).unwrap();
+    let package =
+        OpcPackage::from_bytes(POI_CHARTSHEET, litchi_opc::SourceLimits::default()).unwrap();
     let tables = read_pivot_tables(&package).unwrap();
     assert_eq!(tables.len(), 5);
     assert!(

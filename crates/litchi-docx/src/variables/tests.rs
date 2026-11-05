@@ -1,4 +1,4 @@
-use super::{MAX_DOCUMENT_VARIABLE_VALUE_CHARS, Snapshot, Variables};
+use super::{MAX_DOCUMENT_VARIABLE_VALUE_CHARS, Snapshot, Variables, raw::Limits};
 use std::sync::Arc;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -9,7 +9,7 @@ fn source_checked_edits_are_canonical_and_inverse_is_byte_exact() {
     let source = format!(
         r#"<?xml version="1.0"?><q:settings xmlns:q="{W}" xmlns:x="urn:opaque"><q:compat/><q:docVars><q:docVar q:name='old' q:val='old'/></q:docVars><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#
     );
-    let snapshot = Snapshot::from_xml(source.as_bytes().to_vec()).unwrap();
+    let snapshot = Snapshot::from_xml(source.as_bytes().to_vec(), Limits::default()).unwrap();
 
     let mut no_op = snapshot.edit();
     no_op.set("old", "old").unwrap();
@@ -38,14 +38,18 @@ fn source_checked_edits_are_canonical_and_inverse_is_byte_exact() {
     assert_eq!(restored.xml_bytes(), source.as_bytes());
     assert_eq!(restored.variables(), snapshot.variables());
 
-    let stale = Snapshot::from_xml(source.replace("urn:opaque", "urn:other").into_bytes()).unwrap();
+    let stale = Snapshot::from_xml(
+        source.replace("urn:opaque", "urn:other").into_bytes(),
+        Limits::default(),
+    )
+    .unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 }
 
 #[test]
 fn exact_noop_shares_the_retained_settings_allocation() {
     let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
-    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let snapshot = Snapshot::from_xml(source.into_bytes(), Limits::default()).unwrap();
     let source_xml = snapshot.shared_xml();
     let commit = snapshot.edit().commit().unwrap();
 
@@ -56,7 +60,7 @@ fn exact_noop_shares_the_retained_settings_allocation() {
 #[test]
 fn transaction_failures_are_atomic_and_limits_are_enforced() {
     let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
-    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let snapshot = Snapshot::from_xml(source.into_bytes(), Limits::default()).unwrap();
     let mut edit = snapshot.edit();
     assert!(edit.set("", "invalid").is_err());
     assert!(edit.variables().is_empty());
@@ -88,7 +92,7 @@ fn transaction_failures_are_atomic_and_limits_are_enforced() {
 #[test]
 fn strict_empty_settings_are_inserted_in_canonical_form_and_removed_atomically() {
     let source = format!(r#"<settings xmlns="{STRICT_W}"/>"#);
-    let snapshot = Snapshot::from_xml(source.as_bytes().to_vec()).unwrap();
+    let snapshot = Snapshot::from_xml(source.as_bytes().to_vec(), Limits::default()).unwrap();
     let mut edit = snapshot.edit();
     edit.set("strict", "value").unwrap();
     let commit = edit.commit().unwrap();
@@ -120,7 +124,7 @@ fn complete_collection_replacement_validates_before_publication() {
     let source = format!(
         r#"<w:settings xmlns:w="{W}"><w:docVars><w:docVar w:name="old" w:val="value"/></w:docVars></w:settings>"#
     );
-    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let snapshot = Snapshot::from_xml(source.into_bytes(), Limits::default()).unwrap();
     let mut edit = snapshot.edit();
     let mut replacement = Variables::new();
     replacement.insert("new", "value").unwrap();
@@ -133,7 +137,7 @@ fn complete_collection_replacement_validates_before_publication() {
 #[test]
 fn aggregate_encoded_output_is_rejected_before_publication() {
     let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
-    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let snapshot = Snapshot::from_xml(source.into_bytes(), Limits::default()).unwrap();
     let mut replacement = Variables::new();
     for index in 0..129 {
         replacement
@@ -143,7 +147,7 @@ fn aggregate_encoded_output_is_rejected_before_publication() {
             )
             .unwrap();
     }
-    assert!(replacement.to_xml().is_err());
+    assert!(replacement.to_xml(&Limits::default()).is_err());
     let mut edit = snapshot.edit();
     edit.replace(replacement).unwrap();
     assert!(edit.commit().is_err());

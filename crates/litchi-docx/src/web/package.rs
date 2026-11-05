@@ -10,7 +10,7 @@
 
 use super::codec::{read, write};
 use super::model::{Conformance, Settings};
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Patch, Snapshot};
 use super::{
     CONTENT_TYPE, STRICT_OFFICE_DOCUMENT_RELATIONSHIP, invalid, is_web_settings_relationship,
 };
@@ -30,12 +30,15 @@ struct Owner {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
+pub fn load(
+    package: &OpcPackage,
+    limits: &super::Limits,
+) -> Result<Option<(Settings, Conformance)>> {
     let Some(owner) = locate(package)? else {
         return Ok(None);
     };
     let part = package.get_part(&owner.target)?;
-    let (settings, conformance) = read(part)?;
+    let (settings, conformance) = read(part, limits)?;
     if conformance != owner.conformance {
         return Err(invalid(
             "web-settings relationship and XML use different conformance families",
@@ -52,13 +55,22 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
+pub fn load_snapshot(package: &OpcPackage, limits: &super::Limits) -> Result<Option<Snapshot>> {
     let Some(owner) = locate(package)? else {
         return Ok(None);
     };
     let part = package.get_part(&owner.target)?;
-    let (_, conformance) = read(part)?;
-    Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance).map(Some)
+    let (settings, conformance) = read(part, limits)?;
+    if conformance != owner.conformance {
+        return Err(invalid(
+            "web-settings relationship and XML use different conformance families",
+        ));
+    }
+    Ok(Some(Snapshot::from_parsed_xml(
+        part.blob().to_vec(),
+        settings,
+        conformance,
+    )))
 }
 
 /// Apply a source-checked web-settings patch to its owning OPC part.
@@ -67,54 +79,71 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 /// content-type, conformance, relationship, and semantic validation. A
 /// failure leaves the caller's package and signatures untouched.
 ///
+/// A patch that leaves the part's bytes as they are publishes nothing, so a
+/// signed package keeps its signature byte for byte. Any other patch changes
+/// the package, so a signed package is refused with
+/// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+/// remove the signature explicitly first ([`OpcPackage::unsign`]).
+///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let owner = locate(package)?.ok_or_else(|| Error::PartNotFound("web-settings part".into()))?;
     let part = package.get_part(&owner.target)?;
-    let (_, conformance) = read(part)?;
-    let current = Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance)?;
+    let (_, conformance) = read(part, &super::Limits::DEFAULT)?;
+    let current = Snapshot::from_xml_with_conformance(
+        part.blob().to_vec(),
+        conformance,
+        &super::Limits::DEFAULT,
+    )?;
     let candidate = patch.apply(&current)?;
     if candidate.xml_bytes() == current.xml_bytes() {
         return Ok(current);
     }
 
+    crate::signature_policy::ensure_unsigned(package)?;
     let mut staged = package.clone();
     staged
         .get_part_mut(&owner.target)?
         .set_blob(candidate.xml_bytes().to_vec());
     validate_internal_targets(&staged)?;
-    let published = load_snapshot(&staged)?
+    let published = load_snapshot(&staged, &super::Limits::DEFAULT)?
         .ok_or_else(|| invalid("staged web-settings ownership disappeared"))?;
-    staged.unsign();
     *package = staged;
     Ok(published)
-}
-
-/// Apply a committed web-settings edit to its owning OPC part.
-///
-/// # Errors
-///
-/// Returns an error if the operation cannot be completed.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
-    apply_patch(package, &commit.into_patch())
 }
 
 /// Move a complete model into package ownership.
 ///
 /// Serialization, graph validation, and a semantic round trip complete before
-/// signatures or package members are changed. Semantic/conformance equality is
-/// a no-op that retains the producer's exact original bytes and signatures.
-/// A different requested conformance is rejected before mutation. A real
-/// semantic edit writes canonical modeled XML; ignored or unknown extension
-/// markup is not retained source-surgically.
+/// package members are changed. Semantic/conformance equality is a no-op that
+/// retains the producer's exact original bytes and signatures. A different
+/// requested conformance is rejected before mutation. A real semantic edit
+/// writes canonical modeled XML; ignored or unknown extension markup is not
+/// retained source-surgically. A real edit of a signed package is refused with
+/// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+/// remove the signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) -> Result<bool> {
+pub(crate) fn put(
+    package: &mut OpcPackage,
+    value: Settings,
+    conformance: Conformance,
+) -> Result<bool> {
     let xml = write(&value, conformance)?;
+    put_encoded(package, value, conformance, xml, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn put_encoded(
+    package: &mut OpcPackage,
+    value: Settings,
+    conformance: Conformance,
+    xml: Vec<u8>,
+    limits: &super::Limits,
+) -> Result<bool> {
     let package_conformance = package_conformance(package)?;
     if package_conformance != conformance {
         return Err(invalid(
@@ -125,7 +154,7 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
     let existing = locate(package)?;
     if let Some(owner) = &existing {
         let part = package.get_part(&owner.target)?;
-        let (current, parsed_conformance) = read(part)?;
+        let (current, parsed_conformance) = read(part, limits)?;
         if parsed_conformance != owner.conformance {
             return Err(invalid(
                 "web-settings relationship and XML use different conformance families",
@@ -143,21 +172,21 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
 
         let mut staged = BlobPart::new(owner.target.clone(), CONTENT_TYPE.to_owned(), xml);
         copy_relationships(part, &mut staged);
-        let (round_trip, staged_conformance) = read(&staged)?;
+        let (round_trip, staged_conformance) = read(&staged, limits)?;
         if round_trip != value || staged_conformance != conformance {
             return Err(invalid("staged web-settings XML did not round-trip"));
         }
         validate_internal_targets(package)?;
 
+        crate::signature_policy::ensure_unsigned(package)?;
         package.add_part(Box::new(staged));
-        package.unsign();
         return Ok(true);
     }
 
     let main = package.main_document_part()?.partname().clone();
     let target = next_part_name(package)?;
     let staged = BlobPart::new(target.clone(), CONTENT_TYPE.to_owned(), xml);
-    let (round_trip, staged_conformance) = read(&staged)?;
+    let (round_trip, staged_conformance) = read(&staged, limits)?;
     if round_trip != value || staged_conformance != conformance {
         return Err(invalid("staged web-settings XML did not round-trip"));
     }
@@ -165,12 +194,12 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
     let target_ref = target.relative_ref(main.base_uri());
     let relationship_type = conformance.relationship();
 
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(&main)?
         .rels_mut()
         .get_or_add(relationship_type, &target_ref);
     package.add_part(Box::new(staged));
-    package.unsign();
     Ok(true)
 }
 
@@ -178,16 +207,23 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
 ///
 /// A part shared by another relationship is rejected rather than silently
 /// detached or deleted. Absence is an exact, signature-preserving no-op.
+/// Removing a part from a signed package is refused with
+/// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] (ADR 0006):
+/// remove the signature explicitly first ([`OpcPackage::unsign`]).
 ///
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
+    remove_with_limits(package, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn remove_with_limits(package: &mut OpcPackage, limits: &super::Limits) -> Result<bool> {
     let Some(owner) = locate(package)? else {
         return Ok(false);
     };
     let part = package.get_part(&owner.target)?;
-    let (_, conformance) = read(part)?;
+    let (_, conformance) = read(part, limits)?;
     if conformance != owner.conformance {
         return Err(invalid(
             "web-settings relationship and XML use different conformance families",
@@ -201,12 +237,12 @@ pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     }
     validate_internal_targets(package)?;
 
+    crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(&owner.main)?
         .rels_mut()
         .remove(&owner.relationship_id);
     package.remove_part(&owner.target);
-    package.unsign();
     Ok(true)
 }
 

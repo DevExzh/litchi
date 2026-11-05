@@ -25,8 +25,11 @@ fn serialize_parse_round_trip() {
         .with_tooltip("Go".to_string())
         .with_display("Display".to_string());
 
-    let encoded = link.try_serialize().expect("valid hyperlink strings");
-    let parsed = Hyperlink::parse(&encoded).expect("valid hyperlink payload");
+    let encoded = link
+        .serialize(crate::raw::Limits::DEFAULT)
+        .expect("valid hyperlink strings");
+    let parsed =
+        Hyperlink::parse(&encoded, crate::raw::Limits::DEFAULT).expect("valid hyperlink payload");
     assert_eq!(
         parsed,
         Hyperlink {
@@ -45,7 +48,8 @@ fn missing_optional_strings_are_accepted_for_compatibility() {
     encoded.extend_from_slice(&3_u32.to_le_bytes());
     encoded.extend_from_slice(&0_u32.to_le_bytes());
 
-    let parsed = Hyperlink::parse(&encoded).expect("relationship ID is required");
+    let parsed = Hyperlink::parse(&encoded, crate::raw::Limits::DEFAULT)
+        .expect("relationship ID is required");
     assert_eq!(parsed.r_id, "");
     assert!(parsed.location.is_none());
 }
@@ -53,12 +57,38 @@ fn missing_optional_strings_are_accepted_for_compatibility() {
 #[test]
 fn rejects_truncated_prefix_and_string() {
     assert!(matches!(
-        Hyperlink::parse(&[0; PREFIX_LEN - 1]),
+        Hyperlink::parse(&[0; PREFIX_LEN - 1], crate::raw::Limits::DEFAULT),
         Err(Error::InvalidLength { .. })
     ));
 
     let mut encoded = vec![0; PREFIX_LEN];
     encoded.extend_from_slice(&2_u32.to_le_bytes());
     encoded.extend_from_slice(&[0, 0]);
-    assert!(matches!(Hyperlink::parse(&encoded), Err(Error::Wire(_))));
+    assert!(matches!(
+        Hyperlink::parse(&encoded, crate::raw::Limits::DEFAULT),
+        Err(Error::Wire(_))
+    ));
+}
+
+#[test]
+fn raw_limits_bound_hyperlink_input_and_output() {
+    let link =
+        Hyperlink::new(0, 4, 1, 3, "rId7".to_string()).with_location("Sheet2!A1".to_string());
+    let encoded = link.serialize(crate::raw::Limits::DEFAULT).unwrap();
+    assert!(matches!(
+        Hyperlink::parse(
+            &encoded,
+            crate::raw::Limits::new(
+                encoded.len() - 1,
+                crate::raw::Limits::DEFAULT.string_units()
+            )
+        ),
+        Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+    ));
+
+    let tight_strings = crate::raw::Limits::new(crate::raw::Limits::DEFAULT.payload(), 0);
+    assert!(matches!(
+        link.serialize(tight_strings),
+        Err(Error::Wire(crate::raw::Error::StringLimit { .. }))
+    ));
 }

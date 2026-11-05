@@ -4,7 +4,7 @@ use crate::engine::{EvalCtx, evaluate_expression, to_number};
 use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 
-pub(crate) async fn eval_rand(
+pub(crate) fn eval_rand(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     args: &[Expr],
@@ -16,7 +16,7 @@ pub(crate) async fn eval_rand(
     Ok(CellValue::Float(rng.random::<f64>()))
 }
 
-pub(crate) async fn eval_randbetween(
+pub(crate) fn eval_randbetween(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -26,8 +26,8 @@ pub(crate) async fn eval_randbetween(
             "RANDBETWEEN expects 2 arguments (bottom, top)".to_string(),
         ));
     }
-    let bottom_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let top_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let bottom_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let top_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let bottom = match to_number(&bottom_val) {
         Some(n) => n.trunc() as i64,
         None => {
@@ -72,12 +72,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rand() {
+    #[test]
+    fn test_eval_rand() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_rand(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rand(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // RAND should return a value between 0 and 1
@@ -87,24 +87,24 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rand_with_args() {
+    #[test]
+    fn test_eval_rand_with_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1.0)];
-        let result = eval_rand(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rand(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 0 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween() {
+    #[test]
+    fn test_eval_randbetween() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1.0), num_expr(10.0)];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => {
                 // RANDBETWEEN should return an integer in the range [1, 10]
@@ -114,12 +114,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween_same_value() {
+    #[test]
+    fn test_eval_randbetween_same_value() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(5.0), num_expr(5.0)];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             // When bottom == top, should always return that value
             CellValue::Int(v) => assert_eq!(v, 5),
@@ -127,12 +127,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween_negative() {
+    #[test]
+    fn test_eval_randbetween_negative() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-10.0), num_expr(-1.0)];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => {
                 assert!((-10..=-1).contains(&v));
@@ -141,12 +141,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween_mixed_range() {
+    #[test]
+    fn test_eval_randbetween_mixed_range() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-5.0), num_expr(5.0)];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => {
                 assert!((-5..=5).contains(&v));
@@ -155,39 +155,39 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween_wrong_args() {
+    #[test]
+    fn test_eval_randbetween_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1.0)];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween_bottom_greater_than_top() {
+    #[test]
+    fn test_eval_randbetween_bottom_greater_than_top() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0), num_expr(1.0)];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("bottom must be less than or equal to top")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randbetween_non_numeric() {
+    #[test]
+    fn test_eval_randbetween_non_numeric() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
             Expr::Literal(CellValue::String("abc".to_string())),
             num_expr(10.0),
         ];
-        let result = eval_randbetween(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randbetween(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("bottom must be numeric")),
             _ => panic!("Expected Error"),

@@ -18,8 +18,16 @@ fn model() -> Theme {
 }
 
 fn encoded(value: &Theme) -> String {
-    String::from_utf8(codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode"))
-        .expect("UTF-8")
+    String::from_utf8(
+        codec::encode_part(
+            &value.name,
+            &value.colors,
+            &value.fonts,
+            codec::Limits::DEFAULT,
+        )
+        .expect("encode"),
+    )
+    .expect("UTF-8")
 }
 
 fn retain_schema_fixture(name: &str, bytes: &[u8]) {
@@ -38,7 +46,10 @@ fn name_splice_preserves_quote_style_and_attribute_whitespace_values() {
     after.name = "A 'quoted' &\r\n\t theme".to_owned();
     let output =
         rewrite_source(source.as_bytes(), &before, &after, Limits::DEFAULT).expect("splice");
-    assert_eq!(codec::read(&output).expect("read back"), after);
+    assert_eq!(
+        codec::read(&output, codec::Limits::DEFAULT).expect("read back"),
+        after
+    );
     retain_schema_fixture("renamed-theme.xml", &output);
     assert!(
         String::from_utf8(output)
@@ -56,7 +67,10 @@ fn missing_optional_root_name_can_be_inserted() {
     after.name = "Named".to_owned();
     let output =
         rewrite_source(source.as_bytes(), &before, &after, Limits::DEFAULT).expect("insert");
-    assert_eq!(codec::read(&output).expect("read back"), after);
+    assert_eq!(
+        codec::read(&output, codec::Limits::DEFAULT).expect("read back"),
+        after
+    );
     retain_schema_fixture("inserted-name-theme.xml", &output);
 }
 
@@ -110,7 +124,10 @@ fn strict_arbitrary_prefix_preserves_namespace_uri_in_user_values() {
     );
     let output =
         rewrite_source(source.as_bytes(), &before, &after, Limits::DEFAULT).expect("Strict splice");
-    assert_eq!(codec::read(&output).expect("read back"), after);
+    assert_eq!(
+        codec::read(&output, codec::Limits::DEFAULT).expect("read back"),
+        after
+    );
     retain_schema_fixture("strict-edited-theme.xml", &output);
     let text = String::from_utf8(output).expect("UTF-8");
     assert!(text.contains(&format!("xmlns:a=\"{}\"", codec::STRICT_NAMESPACE)));
@@ -133,7 +150,10 @@ fn multiple_replacements_have_one_checked_output_size() {
     );
     let output =
         rewrite_source(source.as_bytes(), &before, &after, Limits::DEFAULT).expect("splice");
-    assert_eq!(codec::read(&output).expect("read back"), after);
+    assert_eq!(
+        codec::read(&output, codec::Limits::DEFAULT).expect("read back"),
+        after
+    );
     retain_schema_fixture("multiple-edits-theme.xml", &output);
     let exact = Limits::new(output.len(), 100_000, 128);
     assert_eq!(
@@ -142,7 +162,7 @@ fn multiple_replacements_have_one_checked_output_size() {
     );
     assert!(matches!(
         rewrite_source(source.as_bytes(), &before, &after, Limits::new(output.len() - 1, 100_000, 128)),
-        Err(Error::LimitExceeded { actual, maximum, .. }) if actual == output.len() && maximum == output.len() - 1
+        Err(Error::Limit { observed: actual, maximum, .. }) if actual == output.len() && maximum == output.len() - 1
     ));
 }
 
@@ -150,8 +170,8 @@ fn multiple_replacements_have_one_checked_output_size() {
 fn empty_elements_count_toward_the_caller_depth_limit() {
     assert!(matches!(
         bounded_xml_preflight(b"<root><child/></root>", Limits::new(128, 10, 1)),
-        Err(Error::LimitExceeded {
-            actual: 2,
+        Err(Error::Limit {
+            observed: 2,
             maximum: 1,
             ..
         })

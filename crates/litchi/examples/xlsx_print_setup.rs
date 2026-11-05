@@ -4,7 +4,7 @@
 //! standalone worksheet transaction yet. The page settings below remain typed
 //! and validated, while the supported worksheet data is committed atomically.
 
-use litchi_xlsx::{Fit, Orientation, Paper, Setup, Workbook};
+use litchi_xlsx::{Fit, Orientation, Package, Paper, Setup};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let repeating_rows = "$1:$1";
     let repeating_columns = "$A:$A";
 
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output_path)?;
     println!("Saved {output_path}");
     println!("Typed page setup: {page_setup:?}; print area: {print_area}");

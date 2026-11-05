@@ -216,16 +216,25 @@ fn undeclared_element_and_attribute_prefixes_are_rejected() {
 
 #[test]
 fn package_transaction_reads_back_and_reverses_page_breaks() {
-    let mut package = crate::Package::create().unwrap();
-    let mut transaction = package.edit_page_breaks("Sheet1").unwrap();
+    let source = crate::Package::new().unwrap();
+    let mut edit = source.edit_page_breaks("Sheet1").unwrap();
     let collection = Collection::horizontal([Break::new(7, 0, 0).unwrap()]).unwrap();
-    assert!(transaction.set_horizontal(collection.clone()).unwrap());
-    let commit = transaction.commit().unwrap();
+    assert!(edit.set_horizontal(collection.clone()).unwrap());
+    let commit = edit.commit().unwrap();
 
     assert_eq!(
-        commit.snapshot().page_breaks().horizontal(),
+        commit.patch().after().page_breaks().horizontal(),
         Some(&collection)
     );
+    assert!(
+        source
+            .page_breaks("Sheet1")
+            .unwrap()
+            .page_breaks()
+            .horizontal()
+            .is_none()
+    );
+    let package = commit.package().clone();
     assert_eq!(
         package
             .page_breaks("Sheet1")
@@ -235,11 +244,55 @@ fn package_transaction_reads_back_and_reverses_page_breaks() {
         Some(&collection)
     );
 
-    package
-        .apply_page_breaks_patch(&commit.patch().inverse())
-        .unwrap();
+    let restored = package
+        .apply_page_breaks(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
-        package.page_breaks("Sheet1").unwrap().page_breaks(),
+        restored.page_breaks("Sheet1").unwrap().page_breaks(),
         &PageBreaks::new()
+    );
+}
+
+#[test]
+fn retained_patch_budget_rejects_one_below_and_accepts_exact() {
+    let source = crate::Package::new().unwrap();
+    let collection = Collection::horizontal([Break::new(7, 0, 0).unwrap()]).unwrap();
+
+    let mut probe = source.edit_page_breaks("Sheet1").unwrap();
+    probe.set_horizontal(collection.clone()).unwrap();
+    let (after, patch) = probe.commit().unwrap().into_parts();
+    let required = source
+        .retained_bytes()
+        .saturating_add(after.retained_bytes())
+        .saturating_add(patch.retained_bytes());
+    assert!(required > 0);
+
+    let mut rejected = source
+        .edit_page_breaks_with_options(
+            "Sheet1",
+            crate::EditOptions::default().with_max_retained_bytes(required - 1),
+        )
+        .unwrap();
+    rejected.set_horizontal(collection.clone()).unwrap();
+    assert!(matches!(
+        rejected.commit(),
+        Err(crate::Error::ResourceLimit(limit)) if limit.limit == (required - 1) as u64
+    ));
+
+    let mut exact = source
+        .edit_page_breaks_with_options(
+            "Sheet1",
+            crate::EditOptions::default().with_max_retained_bytes(required),
+        )
+        .unwrap();
+    exact.set_horizontal(collection).unwrap();
+    let commit = exact.commit().unwrap();
+    assert_eq!(
+        source
+            .retained_bytes()
+            .saturating_add(commit.package().retained_bytes())
+            .saturating_add(commit.patch().retained_bytes()),
+        required
     );
 }

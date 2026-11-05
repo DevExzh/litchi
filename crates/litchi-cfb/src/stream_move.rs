@@ -295,12 +295,13 @@ impl SharedOleFile {
 
         let composed = forward.composed_source()?;
         let inverse_source: Arc<dyn ReadAt> = Arc::new(composed);
-        let inverse_view = SharedOleFile::open(Arc::clone(&inverse_source))?;
+        let inverse_view = SharedOleFile::open(Arc::clone(&inverse_source), self.limits)?;
         let inverse_snapshot = SourceSnapshot {
             source: inverse_source,
             version: inverse_view.expected_version,
             length: inverse_view.index.file_size,
             source_is_owned_immutable: false,
+            limits: inverse_view.limits,
         };
         let inverse_spans = directory_spans(
             &inverse_snapshot,

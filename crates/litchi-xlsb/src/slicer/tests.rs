@@ -27,13 +27,16 @@ fn native_cache() -> Cache {
 #[test]
 fn native_cache_round_trips_bounded_biff12() {
     let original = native_cache();
-    let bytes = write_cache(&original).unwrap();
-    let records: Vec<_> = Records::new(&bytes)
+    let bytes = write_cache(&original, crate::raw::Limits::DEFAULT).unwrap();
+    let records: Vec<_> = Records::new(&bytes, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap().kind())
         .collect();
     assert_eq!(records[0], kind::BEGIN_SLICER_CACHE);
     assert_eq!(records.last().copied(), Some(kind::END_SLICER_CACHE));
-    assert_eq!(parse_cache(&bytes).unwrap(), original);
+    assert_eq!(
+        parse_cache(&bytes, crate::raw::Limits::DEFAULT).unwrap(),
+        original
+    );
 }
 
 #[test]
@@ -47,7 +50,14 @@ fn slicer_view_round_trips_optional_fields_and_flags() {
     view.style = Some("SlicerStyleLight1".to_string());
     view.locked_position = true;
     let views = Views { items: vec![view] };
-    assert_eq!(parse_views(&write_views(&views).unwrap()).unwrap(), views);
+    assert_eq!(
+        parse_views(
+            &write_views(&views, crate::raw::Limits::DEFAULT).unwrap(),
+            crate::raw::Limits::DEFAULT
+        )
+        .unwrap(),
+        views
+    );
 }
 
 #[test]
@@ -60,28 +70,29 @@ fn validation_rejects_unsafe_selection_and_reserved_bits() {
             .for_each(|item| item.selected = false);
     }
     assert!(matches!(
-        write_cache(&cache),
+        write_cache(&cache, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
 
-    let mut bytes = write_cache(&native_cache()).unwrap();
-    let mut records: Vec<(crate::raw::Kind, Vec<u8>)> = Records::new(&bytes)
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut bytes = write_cache(&native_cache(), crate::raw::Limits::DEFAULT).unwrap();
+    let mut records: Vec<(crate::raw::Kind, Vec<u8>)> =
+        Records::new(&bytes, crate::raw::Limits::DEFAULT)
+            .map(|record| {
+                let record = record.unwrap();
+                (record.kind(), record.payload().to_vec())
+            })
+            .collect();
     let native = records
         .iter_mut()
         .find(|(kind, _)| *kind == kind::BEGIN_SLICER_CACHE_NATIVE)
         .unwrap();
     native.1[8] |= 0x80;
     bytes.clear();
-    let mut writer = crate::raw::Writer::new(&mut bytes);
+    let mut writer = crate::raw::Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     for (kind, payload) in records {
         writer.write_record(kind, &payload).unwrap();
     }
-    assert!(parse_cache(&bytes).is_err());
+    assert!(parse_cache(&bytes, crate::raw::Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -90,5 +101,25 @@ fn validation_rejects_zero_view_columns() {
         items: vec![View::new("StateView", "Slicer_State")],
     };
     views.items[0].column_count = 0;
-    assert!(write_views(&views).is_err());
+    assert!(write_views(&views, crate::raw::Limits::DEFAULT).is_err());
+}
+
+#[test]
+fn raw_limits_bound_slicer_cache_strings_and_output() {
+    let original = native_cache();
+    let bytes = write_cache(&original, crate::raw::Limits::DEFAULT).unwrap();
+    // "Slicer_State" (12 units) is the longest cache string.
+    let payload = crate::raw::Limits::DEFAULT.payload();
+    assert_eq!(
+        parse_cache(&bytes, crate::raw::Limits::new(payload, 12)).unwrap(),
+        original
+    );
+    assert!(matches!(
+        parse_cache(&bytes, crate::raw::Limits::new(payload, 11)),
+        Err(Error::Wire(crate::raw::Error::StringLimit { .. }))
+    ));
+    assert!(matches!(
+        write_cache(&original, crate::raw::Limits::new(payload, 11)),
+        Err(Error::Wire(crate::raw::Error::StringLimit { .. }))
+    ));
 }

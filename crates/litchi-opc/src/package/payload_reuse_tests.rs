@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::part::{BlobPart, Part};
-use crate::{PackageWriter, ReadResource, TargetMode};
+use crate::{PackageWriter, SourceLimitKind, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -22,7 +22,8 @@ fn pack(uri: &str) -> PackURI {
 }
 
 fn payload_archive(comment: &[u8], binary_payload: &[u8]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(
             "[Content_Types].xml",
@@ -125,7 +126,7 @@ fn assert_payload_internals(
 fn matching_binary_and_xml_payloads_share_all_owned_views_and_target_output() {
     let donor_bytes = payload_archive(b"donor archive", BINARY_PAYLOAD);
     let target_bytes = payload_archive(b"target archive", BINARY_PAYLOAD);
-    let mut donor = OpcPackage::from_vec(donor_bytes).expect("open donor");
+    let mut donor = OpcPackage::from_vec(donor_bytes, SourceLimits::default()).expect("open donor");
 
     // Donor graph state is deliberately different. Reuse may borrow payloads,
     // but it must parse all target metadata independently.
@@ -153,10 +154,14 @@ fn matching_binary_and_xml_payloads_share_all_owned_views_and_target_output() {
         fonts: FontEmbedding::Full,
     });
 
-    let ordinary = OpcPackage::from_vec(target_bytes.clone()).expect("ordinary target parse");
-    let reused =
-        OpcPackage::from_vec_reusing_payloads(target_bytes.clone(), ReadLimits::default(), &donor)
-            .expect("matching payloads should be reusable");
+    let ordinary = OpcPackage::from_vec(target_bytes.clone(), SourceLimits::default())
+        .expect("ordinary target parse");
+    let reused = OpcPackage::from_vec_reusing_payloads(
+        target_bytes.clone(),
+        SourceLimits::default(),
+        &donor,
+    )
+    .expect("matching payloads should be reusable");
 
     assert_payload_internals(&donor, &reused, &ordinary, &pack(XML_URI), true);
     assert_payload_internals(&donor, &reused, &ordinary, &pack(BINARY_URI), false);
@@ -184,7 +189,8 @@ fn mismatched_bytes_and_larger_donor_capacity_keep_decoded_payload() {
     let donor_bytes = payload_archive(b"donor", BINARY_PAYLOAD);
     let target_bytes = payload_archive(b"target", BINARY_PAYLOAD);
     let binary = pack(BINARY_URI);
-    let target = OpcPackage::from_vec(target_bytes.clone()).expect("ordinary target parse");
+    let target = OpcPackage::from_vec(target_bytes.clone(), SourceLimits::default())
+        .expect("ordinary target parse");
     let decoded = target.get_part(&binary).expect("target binary part");
     let decoded_payload = decoded.blob().to_vec();
     let decoded_capacity = decoded.blob_arc().capacity();
@@ -192,7 +198,8 @@ fn mismatched_bytes_and_larger_donor_capacity_keep_decoded_payload() {
     let mut mismatched = decoded_payload.clone();
     mismatched[0] ^= 0xff;
     let mismatched_blob = Arc::new(mismatched);
-    let mut byte_mismatch_donor = OpcPackage::from_vec(donor_bytes.clone()).expect("open donor");
+    let mut byte_mismatch_donor =
+        OpcPackage::from_vec(donor_bytes.clone(), SourceLimits::default()).expect("open donor");
     byte_mismatch_donor.add_part(Box::new(BlobPart::new_shared(
         binary.clone(),
         "application/octet-stream".to_owned(),
@@ -200,7 +207,7 @@ fn mismatched_bytes_and_larger_donor_capacity_keep_decoded_payload() {
     )));
     let byte_mismatch = OpcPackage::from_vec_reusing_payloads(
         target_bytes.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         &byte_mismatch_donor,
     )
     .expect("mismatched donor bytes must be ignored");
@@ -218,15 +225,19 @@ fn mismatched_bytes_and_larger_donor_capacity_keep_decoded_payload() {
     oversized.extend_from_slice(&decoded_payload);
     assert!(oversized.capacity() > decoded_capacity);
     let oversized_blob = Arc::new(oversized);
-    let mut capacity_donor = OpcPackage::from_vec(donor_bytes).expect("open donor");
+    let mut capacity_donor =
+        OpcPackage::from_vec(donor_bytes, SourceLimits::default()).expect("open donor");
     capacity_donor.add_part(Box::new(BlobPart::new_shared(
         binary.clone(),
         "application/octet-stream".to_owned(),
         Arc::clone(&oversized_blob),
     )));
-    let capacity_mismatch =
-        OpcPackage::from_vec_reusing_payloads(target_bytes, ReadLimits::default(), &capacity_donor)
-            .expect("an oversized donor allocation must be ignored");
+    let capacity_mismatch = OpcPackage::from_vec_reusing_payloads(
+        target_bytes,
+        SourceLimits::default(),
+        &capacity_donor,
+    )
+    .expect("an oversized donor allocation must be ignored");
     let capacity_part = capacity_mismatch.get_part(&binary).unwrap();
     assert_eq!(capacity_part.blob(), decoded_payload.as_slice());
     assert!(!Arc::ptr_eq(&capacity_part.blob_arc(), &oversized_blob));
@@ -237,7 +248,7 @@ fn custom_donor_blob_arc_cannot_inject_payload_bytes() {
     let donor_bytes = payload_archive(b"donor", BINARY_PAYLOAD);
     let target_bytes = payload_archive(b"target", BINARY_PAYLOAD);
     let binary = pack(BINARY_URI);
-    let mut donor = OpcPackage::from_vec(donor_bytes).expect("open donor");
+    let mut donor = OpcPackage::from_vec(donor_bytes, SourceLimits::default()).expect("open donor");
     let visible = BINARY_PAYLOAD.to_vec();
     let injected = Arc::new(b"custom donor payload must not escape".to_vec());
     donor.add_part(Box::new(MismatchedBlobArcPart::new(
@@ -247,8 +258,9 @@ fn custom_donor_blob_arc_cannot_inject_payload_bytes() {
         Arc::clone(&injected),
     )));
 
-    let reused = OpcPackage::from_vec_reusing_payloads(target_bytes, ReadLimits::default(), &donor)
-        .expect("custom donor metadata must not block target parsing");
+    let reused =
+        OpcPackage::from_vec_reusing_payloads(target_bytes, SourceLimits::default(), &donor)
+            .expect("custom donor metadata must not block target parsing");
     let part = reused.get_part(&binary).expect("target binary part");
     assert_eq!(part.blob(), BINARY_PAYLOAD);
     assert!(!Arc::ptr_eq(&part.blob_arc(), &injected));
@@ -266,10 +278,13 @@ fn reused_payloads_isolate_donor_output_and_clone_mutations() {
     let donor_bytes = payload_archive(b"donor", BINARY_PAYLOAD);
     let target_bytes = payload_archive(b"target", BINARY_PAYLOAD);
     let binary = pack(BINARY_URI);
-    let donor = OpcPackage::from_vec(donor_bytes).expect("open donor");
-    let reused =
-        OpcPackage::from_vec_reusing_payloads(target_bytes.clone(), ReadLimits::default(), &donor)
-            .expect("reuse target payloads");
+    let donor = OpcPackage::from_vec(donor_bytes, SourceLimits::default()).expect("open donor");
+    let reused = OpcPackage::from_vec_reusing_payloads(
+        target_bytes.clone(),
+        SourceLimits::default(),
+        &donor,
+    )
+    .expect("reuse target payloads");
     assert!(donor.is_unmodified_owned_source());
     assert!(reused.is_unmodified_owned_source());
 
@@ -310,13 +325,13 @@ fn custom_donor_cannot_claim_an_arc_inconsistent_with_its_visible_payload() {
     )));
     let bytes = payload_archive(b"target", BINARY_PAYLOAD);
     let reused =
-        OpcPackage::from_vec_reusing_payloads(bytes.clone(), ReadLimits::default(), &donor)
+        OpcPackage::from_vec_reusing_payloads(bytes.clone(), SourceLimits::default(), &donor)
             .expect("inconsistent donation must fall back to independently decoded storage");
     let payload = reused.get_part(&binary).expect("target binary").blob_arc();
     assert_eq!(payload.as_slice(), BINARY_PAYLOAD);
     assert!(!Arc::ptr_eq(&payload, &offered));
     let mut output = Vec::new();
-    reused.to_stream(&mut output).expect("exact publication");
+    reused.write_to(&mut output).expect("exact publication");
     assert_eq!(output, bytes);
 }
 
@@ -325,17 +340,17 @@ fn input_limit_is_refused_before_donor_payload_callbacks() {
     let donor_bytes = payload_archive(b"donor", BINARY_PAYLOAD);
     let target_bytes = payload_archive(b"target", BINARY_PAYLOAD);
     let calls = Arc::new(AtomicUsize::new(0));
-    let mut donor = OpcPackage::from_vec(donor_bytes).expect("open donor");
+    let mut donor = OpcPackage::from_vec(donor_bytes, SourceLimits::default()).expect("open donor");
     donor.add_part(Box::new(CallbackPart::new(
         pack(BINARY_URI),
         Arc::clone(&calls),
     )));
-    OpcPackage::from_vec_reusing_payloads(target_bytes.clone(), ReadLimits::default(), &donor)
+    OpcPackage::from_vec_reusing_payloads(target_bytes.clone(), SourceLimits::default(), &donor)
         .expect("valid input must reach the matching donor callback");
     assert!(calls.load(Ordering::SeqCst) > 0);
     calls.store(0, Ordering::SeqCst);
     let maximum = u64::try_from(target_bytes.len() - 1).expect("fixture length fits u64");
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(maximum)
         .expect("input limit")
         .build()
@@ -345,8 +360,8 @@ fn input_limit_is_refused_before_donor_payload_callbacks() {
         .expect_err("input limit must reject the target archive");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
             ..
         }
     ));
@@ -355,11 +370,14 @@ fn input_limit_is_refused_before_donor_payload_callbacks() {
 
 #[test]
 fn malformed_reuse_input_keeps_the_typed_zip_error() {
-    let donor =
-        OpcPackage::from_vec(payload_archive(b"donor", BINARY_PAYLOAD)).expect("open donor");
+    let donor = OpcPackage::from_vec(
+        payload_archive(b"donor", BINARY_PAYLOAD),
+        SourceLimits::default(),
+    )
+    .expect("open donor");
     let error = OpcPackage::from_vec_reusing_payloads(
         b"not an OPC ZIP".to_vec(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         &donor,
     )
     .expect_err("malformed input must be rejected");

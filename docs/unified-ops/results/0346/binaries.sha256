@@ -1,0 +1,3 @@
+# examples/pptx_p0_final_bench, built at 0dc2c5eb90 with: cargo build --release -p litchi-ops --example pptx_p0_final_bench --features pptx
+# run: taskset -c 7 target/release/examples/pptx_p0_final_bench (loadavg at start: run1 2.34 2.98 3.64, run2 2.88 3.20 3.56)
+5575617cf0330793a1a4e496e95d710a317cc8c169b2b23b27a76e8fd23cfcc9  pptx_p0_final_bench

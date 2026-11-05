@@ -6,8 +6,7 @@ use litchi_iwa_archive::{ComponentCatalog, Limits};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
-    MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
-    Package, ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticPath,
+    OpenOptions, Package, ReadError, SemanticLimitKind, SemanticLimits, SemanticPath,
     TextStorageFailure,
 };
 use prost::Message as _;
@@ -56,6 +55,7 @@ fn object(identifier: u64, type_: u32, value: &impl prost::Message) -> TestResul
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -183,6 +183,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 data: false_text.clone(),
             },
         ],
+        Default::default(),
     )?;
     let mut title_messages = vec![RawMessage {
         type_: 7,
@@ -198,7 +199,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
             .encode_to_vec(),
         });
     }
-    let title_object = ArchiveObject::new(5, title_messages)?;
+    let title_object = ArchiveObject::new(5, title_messages, Default::default())?;
 
     let body_payload = tswp::StorageArchive {
         text: BODY.iter().map(|fragment| (*fragment).to_owned()).collect(),
@@ -229,7 +230,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
             data: vec![0x18, 0x01],
         });
     }
-    let body_storage = ArchiveObject::new(11, body_messages)?;
+    let body_storage = ArchiveObject::new(11, body_messages, Default::default())?;
 
     let node_payload = if matches!(malformed, Malformation::MissingSlideNodeFlag) {
         litchi_iwa_common::wire::patch_varint_field(&node.encode_to_vec(), 6, true, None)?
@@ -289,6 +290,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 1,
                 data: document_payload,
             }],
+            Default::default(),
         )?,
         show_object,
         ArchiveObject::new(
@@ -297,6 +299,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 4,
                 data: node_payload,
             }],
+            Default::default(),
         )?,
         ArchiveObject::new(
             4,
@@ -304,6 +307,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 5,
                 data: slide_payload,
             }],
+            Default::default(),
         )?,
         title_object,
         ArchiveObject::new(
@@ -312,6 +316,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 7,
                 data: body_owner_payload,
             }],
+            Default::default(),
         )?,
         ArchiveObject::new(
             7,
@@ -319,6 +324,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 2_011,
                 data: shape_payload,
             }],
+            Default::default(),
         )?,
         ArchiveObject::new(
             8,
@@ -326,6 +332,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 15,
                 data: speaker_note_payload,
             }],
+            Default::default(),
         )?,
         storage(10, TITLE)?,
         body_storage,
@@ -337,6 +344,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 999,
                 data: false_text,
             }],
+            Default::default(),
         )?,
     ];
     if matches!(
@@ -355,10 +363,12 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 8,
                 data: payload,
             }],
+            Default::default(),
         )?);
     }
     let archive = Archive { objects };
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     if matches!(malformed, Malformation::DuplicateObjectIdentity) {
         let duplicate = Archive {
             objects: vec![ArchiveObject::new(
@@ -367,9 +377,11 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )?],
         };
-        let duplicate_compressed = SnappyStream::compress(&duplicate.to_bytes()?)?;
+        let duplicate_compressed =
+            SnappyStream::compress(&duplicate.to_bytes(Default::default())?, Default::default())?;
         return Ok(litchi_iwa_archive::package::to_bytes(
             [
                 ("Index/Document.iwa", compressed.as_slice()),
@@ -430,30 +442,23 @@ fn semantic_limits_are_inclusive_typed_and_semantically_located() -> TestResult<
     let text_bytes = semantic_text_bytes();
     let references = semantic_reference_count();
     let fragments = semantic_fragment_count();
-    let exact = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        references,
-        4,
-        fragments,
-        text_bytes,
-    )?;
+    let exact = SemanticLimits::builder()
+        .max_references(references)?
+        .max_text_storages(4)?
+        .max_text_fragments(fragments)?
+        .max_text_bytes(text_bytes)?
+        .build()?;
     let exact_package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), exact))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(exact))?;
     assert_eq!(exact_package.semantic_limits(), exact);
     assert_eq!(exact_package.show()?.slides().len(), 1);
 
-    let reference_limited = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        references - 1,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )?;
+    let reference_limited = SemanticLimits::builder()
+        .max_references(references - 1)?
+        .build()?;
     let reference_package = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), reference_limited),
+        OpenOptions::new().semantic_limits(reference_limited),
     )?;
     assert!(matches!(
         reference_package.show(),
@@ -465,17 +470,10 @@ fn semantic_limits_are_inclusive_typed_and_semantically_located() -> TestResult<
         }) if observed == references && maximum == references - 1
     ));
 
-    let storage_limited = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        3,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )?;
+    let storage_limited = SemanticLimits::builder().max_text_storages(3)?.build()?;
     let storage_package = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), storage_limited),
+        OpenOptions::new().semantic_limits(storage_limited),
     )?;
     let storage_error = storage_package.show().err();
     assert!(
@@ -491,17 +489,12 @@ fn semantic_limits_are_inclusive_typed_and_semantically_located() -> TestResult<
         "unexpected storage-limit result: {storage_error:?}"
     );
 
-    let fragment_limited = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        fragments - 1,
-        MAX_TEXT_BYTES,
-    )?;
+    let fragment_limited = SemanticLimits::builder()
+        .max_text_fragments(fragments - 1)?
+        .build()?;
     let fragment_package = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), fragment_limited),
+        OpenOptions::new().semantic_limits(fragment_limited),
     )?;
     assert!(matches!(
         fragment_package.show(),
@@ -513,18 +506,11 @@ fn semantic_limits_are_inclusive_typed_and_semantically_located() -> TestResult<
         }) if observed == fragments && maximum == fragments - 1
     ));
 
-    let text_limited = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        text_bytes - 1,
-    )?;
-    let text_package = Package::from_bytes_with_options(
-        &bytes,
-        ReadOptions::new(Limits::default(), text_limited),
-    )?;
+    let text_limited = SemanticLimits::builder()
+        .max_text_bytes(text_bytes - 1)?
+        .build()?;
+    let text_package =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(text_limited))?;
     assert!(matches!(
         text_package.show(),
         Err(ReadError::SemanticLimit {
@@ -540,16 +526,9 @@ fn semantic_limits_are_inclusive_typed_and_semantically_located() -> TestResult<
 #[test]
 fn package_wide_object_limit_is_checked_before_index_allocation() -> TestResult<()> {
     let bytes = synthetic_package(Malformation::default())?;
-    let limits = SemanticLimits::new(
-        12,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )?;
+    let limits = SemanticLimits::builder().max_objects(12)?.build()?;
     let error =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), limits))
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(limits))
             .err()
             .ok_or_else(|| io::Error::other("object limit should reject the package"))?;
     assert!(matches!(
@@ -567,16 +546,9 @@ fn package_wide_object_limit_is_checked_before_index_allocation() -> TestResult<
 #[test]
 fn slide_limit_is_checked_before_record_allocation() -> TestResult<()> {
     let bytes = synthetic_package(Malformation::DuplicateSlideReference)?;
-    let limits = SemanticLimits::new(
-        MAX_OBJECTS,
-        1,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        MAX_TEXT_BYTES,
-    )?;
+    let limits = SemanticLimits::builder().max_slides(1)?.build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(limits))?;
     assert!(matches!(
         package.show(),
         Err(ReadError::SemanticLimit {
@@ -682,16 +654,11 @@ fn unproven_legacy_type_2022_sibling_is_not_misclassified_as_storage() -> TestRe
 #[test]
 fn build_identifier_budget_is_checked_before_prost_materialization() -> TestResult<()> {
     let bytes = synthetic_package(Malformation::OversizedBuildIdentifier)?;
-    let limits = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        "future-effect".len() - 1,
-    )?;
+    let limits = SemanticLimits::builder()
+        .max_text_bytes("future-effect".len() - 1)?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(limits))?;
     assert!(matches!(
         package.show(),
         Err(ReadError::SemanticLimit {
@@ -707,16 +674,11 @@ fn build_identifier_budget_is_checked_before_prost_materialization() -> TestResu
 #[test]
 fn transition_identifier_budget_is_checked_before_slide_materialization() -> TestResult<()> {
     let bytes = synthetic_package(Malformation::OversizedTransitionIdentifier)?;
-    let limits = SemanticLimits::new(
-        MAX_OBJECTS,
-        MAX_SLIDES,
-        MAX_REFERENCES,
-        MAX_TEXT_STORAGES,
-        MAX_TEXT_FRAGMENTS,
-        "future-transition".len() - 1,
-    )?;
+    let limits = SemanticLimits::builder()
+        .max_text_bytes("future-transition".len() - 1)?
+        .build()?;
     let package =
-        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), limits))?;
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(limits))?;
     assert!(matches!(
         package.show(),
         Err(ReadError::SemanticLimit {
@@ -759,7 +721,7 @@ fn native_storage_messages_match_the_prost_oracle() -> TestResult<()> {
     let path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key");
     let bytes = std::fs::read(path)?;
-    let catalog = ComponentCatalog::from_bytes(&bytes)?;
+    let catalog = ComponentCatalog::from_bytes(&bytes, Default::default())?;
     let mut checked = 0usize;
     for component in catalog.iter() {
         for object in &component.archive().objects {
@@ -771,7 +733,10 @@ fn native_storage_messages_match_the_prost_oracle() -> TestResult<()> {
                     continue;
                 }
                 let oracle = tswp::StorageArchive::decode(message.data.as_slice())?;
-                let projected = litchi_iwa_text_wire::from_bytes(&message.data)?;
+                let projected = litchi_iwa_text_wire::from_bytes(
+                    &message.data,
+                    litchi_iwa_text_wire::Limits::default(),
+                )?;
                 assert_eq!(projected.text(), oracle.text.concat());
                 assert_eq!(projected.runs().len(), oracle.text.len());
                 checked = checked

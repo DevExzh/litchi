@@ -33,23 +33,24 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_doc::writer::{EncryptionProfile, FootnoteEntry, Writer};
-use litchi_doc::{Error, OpenOptions, Package};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::{EncryptionProfile, FootnoteEntry};
+use litchi_doc::{Error, OpenOptions, raw::Reader};
 use std::io::Cursor;
 
 fn encrypted_document(profile: EncryptionProfile, password: &str) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Main 文本").unwrap();
     writer.set_odd_header("Header");
     writer.add_footnote(FootnoteEntry::new(2, "Footnote text", 1));
     writer.set_password(password, profile).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let mut ole = OleFile::open(Cursor::new(file)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(file), litchi_cfb::OleFileLimits::default()).unwrap();
     (
         ole.open_stream(&["WordDocument"]).unwrap(),
         ole.open_stream(&["1Table"]).unwrap(),
@@ -59,15 +60,14 @@ fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
 
 fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let bytes = encrypted_document(profile, password);
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(package.document(), Err(Error::PasswordRequired)));
     assert!(matches!(
-        package
-            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
+        package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
     let document = package
-        .document_with_options(OpenOptions::default().with_password(password.to_owned().into()))
+        .document_with_options(OpenOptions::default().password(password.to_owned().into()))
         .unwrap();
     assert!(document.text().unwrap().contains("Main 文本"));
     assert_eq!(
@@ -124,7 +124,7 @@ fn salts_are_nondeterministic_and_setter_validation_is_atomic() {
     let (_, second_table, _) = streams(&second);
     assert_ne!(&first_table[4..20], &second_table[4..20]);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .set_password("kept", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();

@@ -1,5 +1,6 @@
 //! Inert `PowerPoint` 9 Web-publishing metadata from MS-PPT 2.4.18.
 
+use crate::SourceLimits;
 use crate::consts::RecordType;
 
 use super::package::{Error, Result};
@@ -170,8 +171,8 @@ impl HtmlDocumentSettings {
     }
 
     /// Discover the single Web-document atom in the PPT9 document tag.
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(9)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(9, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type_raw == HTML_DOC_INFO_RECORD_TYPE);
@@ -356,8 +357,8 @@ impl HtmlPublishSettings {
     }
 
     /// Discover and cross-validate the single PPT9 publication container.
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(9)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(9, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type_raw == HTML_PUBLISH_CONTAINER_RECORD_TYPE);

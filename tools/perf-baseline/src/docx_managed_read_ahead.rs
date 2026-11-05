@@ -30,7 +30,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_docx::{ReadLimits, source_backed};
+use litchi_docx::{SourceLimits, source_backed};
 use litchi_opc::SourceCacheLimits;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -274,12 +274,12 @@ struct LimitRecord {
 #[derive(Clone, Copy, Debug, Serialize)]
 struct ReadLimitsRecord {
     max_input_bytes: u64,
-    max_archive_members: usize,
+    max_members: usize,
     max_archive_member_name_bytes: u64,
     max_archive_metadata_bytes: u64,
     max_archive_compressed_bytes: u64,
-    max_archive_entry_bytes: u64,
-    max_archive_total_bytes: u64,
+    max_entry_bytes: u64,
+    max_aggregate_bytes: u64,
     max_parts: usize,
     max_part_bytes: u64,
     max_total_part_bytes: u64,
@@ -291,23 +291,23 @@ struct ReadLimitsRecord {
     max_relationships_per_part: usize,
     max_total_relationships: usize,
     max_relationship_graph_nodes: usize,
-    max_xml_events: usize,
+    max_events: usize,
     max_total_relationship_xml_events: usize,
-    max_xml_depth: usize,
+    max_depth: usize,
     max_xml_attribute_bytes: usize,
     max_relationship_target_bytes: usize,
 }
 
 impl ReadLimitsRecord {
-    fn from_limits(limits: ReadLimits) -> Self {
+    fn from_limits(limits: SourceLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
-            max_archive_members: limits.max_archive_members(),
+            max_members: limits.max_members(),
             max_archive_member_name_bytes: limits.max_archive_member_name_bytes(),
             max_archive_metadata_bytes: limits.max_archive_metadata_bytes(),
             max_archive_compressed_bytes: limits.max_archive_compressed_bytes(),
-            max_archive_entry_bytes: limits.max_archive_entry_bytes(),
-            max_archive_total_bytes: limits.max_archive_total_bytes(),
+            max_entry_bytes: limits.max_entry_bytes(),
+            max_aggregate_bytes: limits.max_aggregate_bytes(),
             max_parts: limits.max_parts(),
             max_part_bytes: limits.max_part_bytes(),
             max_total_part_bytes: limits.max_total_part_bytes(),
@@ -319,9 +319,9 @@ impl ReadLimitsRecord {
             max_relationships_per_part: limits.max_relationships_per_part(),
             max_total_relationships: limits.max_total_relationships(),
             max_relationship_graph_nodes: limits.max_relationship_graph_nodes(),
-            max_xml_events: limits.max_xml_events(),
+            max_events: limits.max_events(),
             max_total_relationship_xml_events: limits.max_total_relationship_xml_events(),
-            max_xml_depth: limits.max_xml_depth(),
+            max_depth: limits.max_depth(),
             max_xml_attribute_bytes: limits.max_xml_attribute_bytes(),
             max_relationship_target_bytes: limits.max_relationship_target_bytes(),
         }
@@ -569,7 +569,7 @@ fn run_sample(
     config: &Config,
     corpus: &Corpus,
     sample_index: usize,
-    limits: ReadLimits,
+    limits: SourceLimits,
     cache_limits: SourceCacheLimits,
 ) -> Result<SampleRecord, Box<dyn Error>> {
     let provider = provider(config, corpus)?;
@@ -581,12 +581,13 @@ fn run_sample(
     let allocation_region = allocation_metrics::begin();
     let started = Instant::now();
     let (actual_text, source_read, cache, memory_live, objects_live) = {
-        let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+        let package = source_backed::Package::from_read_at_with_options(
             Arc::clone(&provider.source),
-            limits,
-            cache_limits,
-            source_policy(config.policy)?,
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(limits)
+                .cache_limits(cache_limits)
+                .source_read_policy(source_policy(config.policy)?)
+                .execution_context(context),
         )?;
         let open_cache = package.cache_diagnostics();
         let document = package.document()?;
@@ -1028,7 +1029,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     })
 }
 
-fn limits_record(limits: ReadLimits, cache: SourceCacheLimits) -> LimitRecord {
+fn limits_record(limits: SourceLimits, cache: SourceCacheLimits) -> LimitRecord {
     let execution_max_in_flight_bytes = MAX_IN_FLIGHT_BYTES;
     LimitRecord {
         read_limits: ReadLimitsRecord::from_limits(limits),
@@ -1070,7 +1071,7 @@ pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box
     }
     let config = parse_config(&args)?;
     let corpus = build_corpus()?;
-    let limits = ReadLimits::default();
+    let limits = SourceLimits::default();
     let cache_limits = SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?;
     let mut rows = Vec::with_capacity(config.samples);
     for iteration in 0..config.warmup.saturating_add(config.samples) {
@@ -1205,12 +1206,13 @@ mod tests {
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
-        let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+        let package = source_backed::Package::from_read_at_with_options(
             source,
-            ReadLimits::default(),
-            SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).unwrap(),
-            source_policy(policy).unwrap(),
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).unwrap())
+                .source_read_policy(source_policy(policy).unwrap())
+                .execution_context(context),
         )
         .unwrap();
         (budget, package)

@@ -3,19 +3,19 @@
 use super::codec::inventory;
 use super::model::{Chart, Limits, Part, Selector};
 use super::package;
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 use std::borrow::Cow;
 
 /// Immutable chart inventory bound to one ODS package snapshot.
 pub struct Inventory<'source> {
-    pub(crate) source: &'source Package,
+    pub(crate) source: &'source Archive,
     pub(crate) limits: Limits,
     pub(crate) charts: Vec<Chart>,
 }
 
 impl<'source> Inventory<'source> {
-    pub(crate) fn load(source: &'source Package, limits: Limits) -> Result<Self> {
+    pub(crate) fn load(source: &'source Archive, limits: Limits) -> Result<Self> {
         Ok(Self {
             source,
             limits,
@@ -77,7 +77,7 @@ impl<'source> Inventory<'source> {
 
     /// Start an isolated clone-staged transaction.
     #[must_use]
-    pub fn transaction(&self) -> Transaction<'source> {
+    pub(crate) fn transaction(&self) -> Transaction<'source> {
         Transaction {
             source: self.source,
             limits: self.limits,
@@ -88,8 +88,8 @@ impl<'source> Inventory<'source> {
 }
 
 /// An isolated mutable draft of an immutable chart inventory.
-pub struct Transaction<'source> {
-    pub(crate) source: &'source Package,
+pub(crate) struct Transaction<'source> {
+    pub(crate) source: &'source Archive,
     pub(crate) limits: Limits,
     pub(crate) original: Vec<Chart>,
     pub(crate) draft: Vec<Chart>,
@@ -98,24 +98,13 @@ pub struct Transaction<'source> {
 impl<'source> Transaction<'source> {
     /// Borrow the current staged chart values.
     #[must_use]
-    pub fn charts(&self) -> &[Chart] {
+    pub(crate) fn charts(&self) -> &[Chart] {
         &self.draft
     }
 
     /// Open a short-lived contextual editor over this transaction.
-    pub fn editor(&mut self) -> Editor<'_, 'source> {
+    pub(crate) fn editor(&mut self) -> Editor<'_, 'source> {
         Editor { transaction: self }
-    }
-
-    /// Replace one chart part and stage the operation atomically.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
-    where
-        S: Into<Selector<'a>>,
-    {
-        self.editor().replace(selector, part)
     }
 
     /// Publish the staged replacement as one package commit.
@@ -125,7 +114,7 @@ impl<'source> Transaction<'source> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit<'source>> {
+    pub(crate) fn commit(self) -> Result<Commit<'source>> {
         let changed = self
             .original
             .iter()
@@ -136,11 +125,7 @@ impl<'source> Transaction<'source> {
         } else {
             Cow::Borrowed(self.source.package().as_bytes())
         };
-        Ok(Commit {
-            bytes,
-            charts: self.draft,
-            changed,
-        })
+        Ok(Commit { bytes, changed })
     }
 }
 
@@ -183,42 +168,23 @@ impl Editor<'_, '_> {
 }
 
 /// The result of publishing a chart transaction.
-pub struct Commit<'source> {
+pub(crate) struct Commit<'source> {
     bytes: Cow<'source, [u8]>,
-    charts: Vec<Chart>,
     changed: bool,
 }
 
 impl Commit<'_> {
-    /// Borrow the resulting package bytes.
-    #[must_use]
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-
-    /// Borrow the staged chart inventory represented by the commit.
-    #[must_use]
-    pub fn charts(&self) -> &[Chart] {
-        &self.charts
-    }
-
     /// Return whether package bytes had to be rebuilt.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 }
 
 impl<'source> Commit<'source> {
-    /// Consume the commit while retaining a borrow for an unchanged result.
-    #[must_use]
-    pub fn into_bytes(self) -> Cow<'source, [u8]> {
-        self.bytes
-    }
-
     /// Consume the commit into owned package bytes.
     #[must_use]
-    pub fn into_owned_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_owned_bytes(self) -> Vec<u8> {
         self.bytes.into_owned()
     }
 }

@@ -246,7 +246,7 @@ fn edit_chart_title(
         ));
     }
 
-    save_new(&output, commit.package())
+    save_new(output, commit.package())
         .map_err(|error| io::Error::other(format!("writing chart-title output failed: {error}")))?;
     let reopened = Package::open(output).map_err(|error| {
         io::Error::other(format!("reopening chart-title output failed: {error}"))
@@ -416,7 +416,7 @@ fn edit_axis_title(
         )));
     }
 
-    save_new(&output, commit.package()).map_err(|error| {
+    save_new(output, commit.package()).map_err(|error| {
         io::Error::other(format!(
             "writing {} output failed: {error}",
             axis_name(axis)

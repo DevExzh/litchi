@@ -191,7 +191,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let Ok(bytes) = std::fs::read(path) else {
             continue;
         };
-        let Ok(archive) = ArchiveReader::new(&bytes) else {
+        let Ok(archive) =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
+        else {
             continue;
         };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
@@ -281,7 +283,9 @@ fn collect_tags(roots: &[PathBuf]) -> Result<Vec<(String, usize)>, Box<dyn Error
         let Ok(bytes) = std::fs::read(path) else {
             continue;
         };
-        let Ok(archive) = ArchiveReader::new(&bytes) else {
+        let Ok(archive) =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
+        else {
             continue;
         };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
@@ -383,7 +387,7 @@ fn collect_packages(root: &Path, packages: &mut Vec<PathBuf>) -> Result<(), Box<
             return Ok(());
         };
         if bytes.starts_with(b"PK\x03\x04")
-            && ArchiveReader::new(&bytes)
+            && ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
                 .is_ok_and(|archive| archive.contains("[Content_Types].xml"))
         {
             packages.push(root.to_owned());

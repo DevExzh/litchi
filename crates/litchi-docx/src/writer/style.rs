@@ -1,8 +1,4 @@
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::struct_excessive_bools,
     reason = "the public model preserves independent OOXML flags"
 )]
@@ -24,17 +20,17 @@ use std::fmt::Write as FmtWrite;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi_docx::writer::MutableStyle;
+/// use litchi_docx::writer::Style;
 /// use litchi_docx::styles::Type;
 ///
 /// // Create a custom paragraph style
-/// let mut style = MutableStyle::new("MyStyle", "My Custom Style", Type::Paragraph);
+/// let mut style = Style::new("MyStyle", "My Custom Style", Type::Paragraph);
 /// style.set_based_on(Some("Normal".to_string()));
 /// style.set_font_size(Some(24)); // 12pt (half-points)
 /// style.set_bold(true);
 /// ```
 #[derive(Debug, Clone)]
-pub struct MutableStyle {
+pub struct Style {
     /// Style identifier (required, e.g., "Heading1")
     style_id: String,
     /// UI-visible name (e.g., "Heading 1")
@@ -85,7 +81,7 @@ pub struct MutableStyle {
     outline: Option<Outline>,
 }
 
-impl MutableStyle {
+impl Style {
     /// Create a new style with the given ID, name, and type.
     ///
     /// # Arguments
@@ -97,7 +93,7 @@ impl MutableStyle {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// let style = MutableStyle::new(
+    /// let style = Style::new(
     ///     "MyHeading",
     ///     "My Custom Heading",
     ///     Type::Paragraph
@@ -766,7 +762,7 @@ impl MutableStyle {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn generate_styles_xml(styles: &[MutableStyle]) -> Result<String> {
+pub fn generate_styles_xml(styles: &[Style]) -> Result<String> {
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -804,7 +800,7 @@ mod tests {
 
     #[test]
     fn test_create_basic_style() {
-        let style = MutableStyle::new("MyStyle", "My Custom Style", Type::Paragraph);
+        let style = Style::new("MyStyle", "My Custom Style", Type::Paragraph);
         assert_eq!(style.style_id(), "MyStyle");
         assert_eq!(style.name(), "My Custom Style");
         assert_eq!(style.style_type(), Type::Paragraph);
@@ -813,7 +809,7 @@ mod tests {
 
     #[test]
     fn test_style_formatting() {
-        let mut style = MutableStyle::new("Formatted", "Formatted Style", Type::Character);
+        let mut style = Style::new("Formatted", "Formatted Style", Type::Character);
         style.set_bold(true);
         style.set_italic(true);
         style.set_underline(true);
@@ -830,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_paragraph_properties() {
-        let mut style = MutableStyle::new("ParaStyle", "Paragraph Style", Type::Paragraph);
+        let mut style = Style::new("ParaStyle", "Paragraph Style", Type::Paragraph);
         style.set_alignment(Some("center".to_string()));
         style.set_space_before(Some(240));
         style.set_space_after(Some(120));
@@ -845,26 +841,26 @@ mod tests {
 
     #[test]
     fn test_heading_styles() {
-        let h1 = MutableStyle::heading_1();
+        let h1 = Style::heading_1();
         assert_eq!(h1.style_id(), "Heading1");
         assert_eq!(h1.based_on(), Some("Normal"));
         assert_eq!(h1.outline(), Some(Outline::H1));
 
-        let h2 = MutableStyle::heading_2();
+        let h2 = Style::heading_2();
         assert_eq!(h2.style_id(), "Heading2");
         assert_eq!(h2.outline(), Some(Outline::H2));
 
-        let h3 = MutableStyle::heading_3();
+        let h3 = Style::heading_3();
         assert_eq!(h3.style_id(), "Heading3");
         assert_eq!(h3.outline(), Some(Outline::H3));
 
         for (level, style) in [
-            MutableStyle::heading_4(),
-            MutableStyle::heading_5(),
-            MutableStyle::heading_6(),
-            MutableStyle::heading_7(),
-            MutableStyle::heading_8(),
-            MutableStyle::heading_9(),
+            Style::heading_4(),
+            Style::heading_5(),
+            Style::heading_6(),
+            Style::heading_7(),
+            Style::heading_8(),
+            Style::heading_9(),
         ]
         .into_iter()
         .enumerate()
@@ -876,7 +872,7 @@ mod tests {
 
     #[test]
     fn test_normal_style() {
-        let normal = MutableStyle::normal();
+        let normal = Style::normal();
         assert_eq!(normal.style_id(), "Normal");
         assert!(normal.is_default());
         assert!(!normal.is_custom());
@@ -884,11 +880,7 @@ mod tests {
 
     #[test]
     fn test_generate_styles_xml() {
-        let styles = vec![
-            MutableStyle::normal(),
-            MutableStyle::heading_1(),
-            MutableStyle::heading_2(),
-        ];
+        let styles = vec![Style::normal(), Style::heading_1(), Style::heading_2()];
 
         let xml = generate_styles_xml(&styles).unwrap();
         // Debug output
@@ -904,7 +896,7 @@ mod tests {
 
     #[test]
     fn test_xml_escaping() {
-        let mut style = MutableStyle::new("Test<>&\"'", "Name<>&\"'", Type::Paragraph);
+        let mut style = Style::new("Test<>&\"'", "Name<>&\"'", Type::Paragraph);
         style.set_based_on(Some("Base<>&\"'".to_string()));
 
         let xml = style.to_xml().unwrap();

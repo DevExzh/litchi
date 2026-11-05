@@ -7,7 +7,6 @@
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
-use litchi_pptx::Package;
 use litchi_pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use litchi_pptx::transition::{Kind, Ms, Ripple, Transition, read};
 
@@ -26,16 +25,37 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
             .unwrap(),
     )
     .unwrap();
-    assert_ripple(&read(master.part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(
+            master.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
 
     let layouts = master.layouts(&package).unwrap();
     let layout = layouts
         .iter()
         .find(|layout| layout.part().partname().as_str() == "/ppt/slideLayouts/slideLayout1.xml")
         .unwrap();
-    assert_ripple(&read(layout.part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(
+            layout.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
     let inherited_master = layout.master(&package).unwrap();
-    assert_ripple(&read(inherited_master.part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(
+            inherited_master.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
 
     let reference = presentation.slide_references().unwrap().remove(0);
     let slide = SlidePart::from_part(
@@ -46,11 +66,21 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
     .unwrap();
     assert_eq!(reference.relationship_id(), "rId4");
     let layout = slide.layout(&package).unwrap().unwrap();
-    assert_ripple(&read(layout.part().blob()).unwrap().unwrap());
     assert_ripple(
-        &read(layout.master(&package).unwrap().part().blob())
-            .unwrap()
-            .unwrap(),
+        &read(
+            layout.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
+    assert_ripple(
+        &read(
+            layout.master(&package).unwrap().part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
     );
 }
 
@@ -175,9 +205,14 @@ fn package_with_inherited_transition_fragment(fragment: &str) -> OpcPackage {
 }
 
 fn package_with_slides(count: usize) -> OpcPackage {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     for _ in 0..count {
-        package.presentation_mut().unwrap().add_slide().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
     }
-    OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap()
+    let package = builder.build().unwrap();
+    OpcPackage::from_vec(
+        package.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
 }

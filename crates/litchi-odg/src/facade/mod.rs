@@ -1,77 +1,52 @@
 //! Concise family entry points.
 
-use litchi_core::{CompositionLimits, Metadata, Result};
-use std::path::Path;
+use crate::package::{
+    ActiveContentStatus, Package, SecurityCapabilities, SecurityStatus, ShapeTransfer,
+};
+use litchi_core::Metadata;
 
 pub use crate::authoring::Builder;
-pub use crate::package::{
-    ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
-    DurablePatch, GeometryChange, History, HistoryLimits, JoinedEdits, LayerChange, Lineage,
-    MergePlan, NameChange, PageNameChange, PageStyleChange, PageTransitionChange, Patch,
-    PathChange, PreparedEdit, ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition,
-    SecurityLifecycleOperation, SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy,
-    ShapeTransfer, Snapshot, StructureChange, StyleChange, TextChange, Transaction,
-    TransferControl, TransferResource, TransferStyle, TransferStyleResource,
-};
 
-/// Immutable source-owning drawing facade.
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
+
+/// Source-checked ODG package transactions, patches and history.
+///
+/// The owner is [`crate::Package`]; [`edit::Edit`](crate::edit::Edit) is started with
+/// [`crate::Package::edit`] and published with [`crate::edit::Edit::commit`].
+pub mod edit {
+    pub use crate::package::{
+        ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
+        Diagnostics, DurablePatch, Edit, GeometryChange, History, HistoryLimits, JoinError,
+        JoinedEdits, LayerChange, Lineage, MergePlan, NameChange, PageNameChange, PageStyleChange,
+        PageTransitionChange, Patch, PathChange, ResourceChange, SecurityCapabilities,
+        SecurityLifecycleDisposition, SecurityLifecycleOperation, SecurityLifecycleRefusal,
+        SecurityStatus, SecurityWritePolicy, ShapeTransfer, StructureChange, StyleChange, SubEdit,
+        TextChange, TransferControl, TransferResource, TransferStyle, TransferStyleResource,
+    };
+    pub use litchi_odf_common::{Error, LimitKind};
+}
+
+/// The read-only drawing projection of one [`Package`].
+///
+/// A cheap clone (one reference-count increment). It owns no state verbs:
+/// ingress, editing, patch application and output live on [`Package`].
+#[derive(Clone)]
 pub struct Drawing {
-    package: Snapshot,
+    package: Package,
+}
+
+impl std::fmt::Debug for Drawing {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Drawing")
+            .field("pages", &self.package.pages().len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Drawing {
-    /// Opens a drawing package from a file path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package cannot be read or is not a structurally valid ODG.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Snapshot::open(path).map(|package| Self { package })
-    }
-
-    /// Opens an OTG drawing template from a file path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is unreadable or is not a structurally valid OTG.
-    pub fn open_template(path: impl AsRef<Path>) -> Result<Self> {
-        Snapshot::open_template(path).map(|package| Self { package })
-    }
-
-    /// Opens a drawing package from in-memory bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is not a structurally valid ODG.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Snapshot::from_bytes(bytes).map(|package| Self { package })
-    }
-
-    /// Opens password-protected ODG bytes for inert inspection.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for invalid encryption metadata, a bad password, or invalid ODG content.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Snapshot::from_bytes_with_password(bytes, password).map(|package| Self { package })
-    }
-
-    /// Opens a password-protected ODG file for inert inspection.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for filesystem, password, encryption, or ODG validation failures.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Snapshot::open_with_password(path, password).map(|package| Self { package })
-    }
-
-    /// Opens an OTG drawing template from in-memory bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is not a structurally valid OTG.
-    pub fn from_template_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Snapshot::from_template_bytes(bytes).map(|package| Self { package })
+    pub(crate) fn from_package(package: Package) -> Self {
+        Self { package }
     }
 
     /// Returns the exact `content.xml` document.
@@ -106,8 +81,10 @@ impl Drawing {
     pub fn page<'selector>(
         &self,
         selector: impl Into<crate::page::Selector<'selector>>,
-    ) -> Result<Option<&crate::page::Page>> {
-        self.package.page(selector)
+    ) -> FamilyResult<Option<&crate::page::Page>> {
+        self.package
+            .page(selector)
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Returns global `styles.xml` drawing layers in source order.
@@ -145,8 +122,12 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error when signature XML cannot be decoded safely.
-    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
-        self.package.digital_signatures()
+    pub fn digital_signatures(
+        &self,
+    ) -> FamilyResult<litchi_odf_common::signature::DigitalSignatures> {
+        self.package
+            .digital_signatures()
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Verifies signature math without making a certificate trust decision.
@@ -156,8 +137,10 @@ impl Drawing {
     /// Returns an error when signature metadata or referenced bytes cannot be verified.
     pub fn verify_document_signatures(
         &self,
-    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
-        self.package.verify_document_signatures()
+    ) -> FamilyResult<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.package
+            .verify_document_signatures()
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Returns inert script, event, action, link, and embedded-object inventory.
@@ -171,8 +154,8 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error when package member validation fails.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        self.package.files().map_err(litchi_odf_common::Error::from)
     }
 
     /// Returns package-local image resources referenced by drawing XML.
@@ -204,8 +187,10 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error for an invalid or non-group selector.
-    pub fn group(&self, page: usize, shape: usize) -> Result<crate::group::Group> {
-        self.package.group(page, shape)
+    pub fn group(&self, page: usize, shape: usize) -> FamilyResult<crate::group::Group> {
+        self.package
+            .group(page, shape)
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Reads one package-local resource without activating it.
@@ -213,37 +198,10 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or unreadable member.
-    pub fn resource_bytes(&self, resource: usize) -> Result<Option<Vec<u8>>> {
-        self.package.resource_bytes(resource)
-    }
-
-    /// Starts a source-bound package semantic transaction.
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        self.package.edit()
-    }
-
-    /// Starts a transaction with explicit signed-package write policy.
-    #[must_use]
-    pub fn edit_with_security_policy(&self, policy: SecurityWritePolicy) -> Transaction {
-        self.package.edit_with_security_policy(policy)
-    }
-
-    /// Starts a transaction with an explicit inert active-content disposition.
-    #[must_use]
-    pub fn edit_with_active_content_policy(&self, policy: ActiveContentWritePolicy) -> Transaction {
-        self.package.edit_with_active_content_policy(policy)
-    }
-
-    /// Starts a transaction with explicit security and inert active-content dispositions.
-    #[must_use]
-    pub fn edit_with_policies(
-        &self,
-        security_policy: SecurityWritePolicy,
-        active_content_policy: ActiveContentWritePolicy,
-    ) -> Transaction {
+    pub fn resource_bytes(&self, resource: usize) -> FamilyResult<Option<Vec<u8>>> {
         self.package
-            .edit_with_policies(security_policy, active_content_policy)
+            .resource_bytes(resource)
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Prepares a provenance-bound shape or complete group subtree for cross-drawing transfer.
@@ -251,58 +209,9 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error for invalid selectors, noncompact source, or unreadable dependencies.
-    pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
-        self.package.prepare_shape_transfer(page, shape)
-    }
-
-    /// Starts deterministic exact-lineage sub-edit composition.
-    #[must_use]
-    pub fn joined_edits(&self, limits: CompositionLimits) -> JoinedEdits {
-        self.package.joined_edits(limits)
-    }
-
-    /// Applies joined disjoint work atomically and returns a new drawing facade.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, conflicts, policy refusal, or failed full reopen.
-    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Self> {
+    pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> FamilyResult<ShapeTransfer> {
         self.package
-            .apply_joined(joined)
-            .map(|package| Self { package })
-    }
-
-    /// Applies joined work under explicit security and inert active-content dispositions.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, conflicts, either policy refusal, or failed readback.
-    pub fn apply_joined_with_policies(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-        active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Self> {
-        self.package
-            .apply_joined_with_policies(joined, security_policy, active_content_policy)
-            .map(|package| Self { package })
-    }
-
-    /// Starts explicit bounded undo/redo history at this drawing snapshot.
-    #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> History {
-        self.package.history(limits)
-    }
-
-    /// Returns the source-owning package snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.package
-    }
-
-    /// Consumes the facade and returns source bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
+            .prepare_shape_transfer(page, shape)
+            .map_err(litchi_odf_common::Error::from)
     }
 }

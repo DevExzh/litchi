@@ -8,10 +8,11 @@ use super::{
     xml_error,
 };
 use crate::{
-    FlatDocument, Package,
+    FlatDocument, GenericPackage as Package,
     core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication},
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::{events::Event, reader::NsReader};
 use std::ops::Range;
 
@@ -51,16 +52,26 @@ struct Location {
     insertion: usize,
 }
 
-fn parse_font_face_declarations_in_part(xml: &str, part: Part) -> Result<Option<Declarations>> {
-    Ok(locate_font_face_declarations(xml, part)?.0)
+fn parse_font_face_declarations_in_part(
+    xml: &str,
+    part: Part,
+    limits: &XmlStreamLimits,
+) -> Result<Option<Declarations>> {
+    Ok(locate_font_face_declarations(xml, part, limits)?.0)
 }
 
-pub(crate) fn parse_content_font_face_declarations(xml: &str) -> Result<Option<Declarations>> {
-    parse_font_face_declarations_in_part(xml, Part::Content)
+pub(crate) fn parse_content_font_face_declarations(
+    xml: &str,
+    limits: &XmlStreamLimits,
+) -> Result<Option<Declarations>> {
+    parse_font_face_declarations_in_part(xml, Part::Content, limits)
 }
 
-pub(crate) fn parse_styles_font_face_declarations(xml: &str) -> Result<Option<Declarations>> {
-    parse_font_face_declarations_in_part(xml, Part::Styles)
+pub(crate) fn parse_styles_font_face_declarations(
+    xml: &str,
+    limits: &XmlStreamLimits,
+) -> Result<Option<Declarations>> {
+    parse_font_face_declarations_in_part(xml, Part::Styles, limits)
 }
 
 /// Insert or replace content-part font-face declarations without rewriting
@@ -68,8 +79,9 @@ pub(crate) fn parse_styles_font_face_declarations(xml: &str) -> Result<Option<De
 pub(crate) fn set_content_font_face_declarations_xml(
     xml: &str,
     declarations: &Declarations,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, Option<Declarations>)> {
-    set_font_face_declarations_xml(xml, declarations, Part::Content)
+    set_font_face_declarations_xml(xml, declarations, Part::Content, limits)
 }
 
 /// Insert or replace styles-part font-face declarations without rewriting
@@ -77,38 +89,43 @@ pub(crate) fn set_content_font_face_declarations_xml(
 pub(crate) fn set_styles_font_face_declarations_xml(
     xml: &str,
     declarations: &Declarations,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, Option<Declarations>)> {
-    set_font_face_declarations_xml(xml, declarations, Part::Styles)
+    set_font_face_declarations_xml(xml, declarations, Part::Styles, limits)
 }
 
 /// Remove content-part font-face declarations without rewriting unrelated
 /// content XML.
 pub(crate) fn remove_content_font_face_declarations_xml(
     xml: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, Option<Declarations>)> {
-    remove_font_face_declarations_xml(xml, Part::Content)
+    remove_font_face_declarations_xml(xml, Part::Content, limits)
 }
 
 /// Remove styles-part font-face declarations without rewriting unrelated
 /// styles XML.
 pub(crate) fn remove_styles_font_face_declarations_xml(
     xml: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, Option<Declarations>)> {
-    remove_font_face_declarations_xml(xml, Part::Styles)
+    remove_font_face_declarations_xml(xml, Part::Styles, limits)
 }
 
 pub(crate) fn content_font_face_splice_publication(
     source: &OwnedPackage,
     candidate: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<Option<XmlSplicePublication>> {
-    font_face_splice_publication(source, "content.xml", candidate, Part::Content)
+    font_face_splice_publication(source, "content.xml", candidate, Part::Content, limits)
 }
 
 pub(crate) fn styles_font_face_splice_publication(
     source: &OwnedPackage,
     candidate: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<Option<XmlSplicePublication>> {
-    font_face_splice_publication(source, "styles.xml", candidate, Part::Styles)
+    font_face_splice_publication(source, "styles.xml", candidate, Part::Styles, limits)
 }
 
 fn font_face_splice_publication(
@@ -116,6 +133,7 @@ fn font_face_splice_publication(
     path: &str,
     candidate: &str,
     part: Part,
+    limits: &XmlStreamLimits,
 ) -> Result<Option<XmlSplicePublication>> {
     let source = XmlSourcePart::load(package, path)?;
     if source.bytes() == candidate.as_bytes() {
@@ -124,8 +142,8 @@ fn font_face_splice_publication(
     let source_xml = std::str::from_utf8(source.bytes()).map_err(|error| {
         Error::InvalidFormat(format!("invalid UTF-8 in source {path}: {error}"))
     })?;
-    let (_, source_location) = locate_font_face_declarations(source_xml, part)?;
-    let (_, candidate_location) = locate_font_face_declarations(candidate, part)?;
+    let (_, source_location) = locate_font_face_declarations(source_xml, part, limits)?;
+    let (_, candidate_location) = locate_font_face_declarations(candidate, part, limits)?;
     let source_range = declaration_or_insertion_range(&source_location);
     let candidate_range = declaration_or_insertion_range(&candidate_location);
     let replacement = candidate
@@ -217,37 +235,40 @@ fn set_font_face_declarations_xml(
     xml: &str,
     declarations: &Declarations,
     part: Part,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, Option<Declarations>)> {
     declarations.validate()?;
-    let (old, location) = locate_font_face_declarations(xml, part)?;
-    let fragment = declarations.to_xml()?;
+    let (old, location) = locate_font_face_declarations(xml, part, limits)?;
+    let fragment = declarations.to_xml(limits)?;
     let updated = if let Some(target) = location.target {
-        replace_span(xml, &target, &fragment)
+        replace_span(xml, &target, &fragment, limits)?
     } else {
-        insert_at(xml, location.insertion, &fragment)
+        insert_at(xml, location.insertion, &fragment, limits)?
     };
-    parse_font_face_declarations_in_part(&updated, part)?;
+    parse_font_face_declarations_in_part(&updated, part, limits)?;
     Ok((updated, old))
 }
 
 fn remove_font_face_declarations_xml(
     xml: &str,
     part: Part,
+    limits: &XmlStreamLimits,
 ) -> Result<(String, Option<Declarations>)> {
-    let (old, location) = locate_font_face_declarations(xml, part)?;
+    let (old, location) = locate_font_face_declarations(xml, part, limits)?;
     let Some(target) = location.target else {
         return Ok((xml.to_owned(), old));
     };
-    let updated = replace_span(xml, &target, "");
-    parse_font_face_declarations_in_part(&updated, part)?;
+    let updated = replace_span(xml, &target, "", limits)?;
+    parse_font_face_declarations_in_part(&updated, part, limits)?;
     Ok((updated, old))
 }
 
 fn locate_font_face_declarations(
     xml: &str,
     part: Part,
+    limits: &XmlStreamLimits,
 ) -> Result<(Option<Declarations>, Location)> {
-    let declarations = parse(xml)?;
+    let declarations = parse(xml, limits)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -374,20 +395,52 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat("invalid ODF font-face XML event boundary".to_string()))
 }
 
-fn replace_span(xml: &str, span: &XmlSpan, replacement: &str) -> String {
-    let mut output = String::with_capacity(xml.len() - (span.end - span.start) + replacement.len());
+fn replace_span(
+    xml: &str,
+    span: &XmlSpan,
+    replacement: &str,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
+    let removed = span
+        .end
+        .checked_sub(span.start)
+        .ok_or_else(|| Error::InvalidFormat("invalid font-face replacement span".to_string()))?;
+    let final_len = xml
+        .len()
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or_else(|| Error::InvalidFormat("font-face output size overflow".to_string()))?;
+    ensure_output_size(final_len, limits)?;
+    let mut output = String::with_capacity(final_len);
     output.push_str(&xml[..span.start]);
     output.push_str(replacement);
     output.push_str(&xml[span.end..]);
-    output
+    Ok(output)
 }
 
-fn insert_at(xml: &str, insertion: usize, fragment: &str) -> String {
-    let mut output = String::with_capacity(xml.len() + fragment.len());
+fn insert_at(
+    xml: &str,
+    insertion: usize,
+    fragment: &str,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
+    let final_len = xml
+        .len()
+        .checked_add(fragment.len())
+        .ok_or_else(|| Error::InvalidFormat("font-face output size overflow".to_string()))?;
+    ensure_output_size(final_len, limits)?;
+    let mut output = String::with_capacity(final_len);
     output.push_str(&xml[..insertion]);
     output.push_str(fragment);
     output.push_str(&xml[insertion..]);
-    output
+    Ok(output)
+}
+
+fn ensure_output_size(size: usize, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(size).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("font-face XML output exceeds the configured size limit");
+    }
+    Ok(())
 }
 
 impl Package {
@@ -397,7 +450,7 @@ impl Package {
     /// does not fetch a URI, load a font, or inspect embedded font data.
     pub fn content_font_face_declarations(&self) -> Result<Option<Declarations>> {
         let xml = self.content_xml()?;
-        parse_content_font_face_declarations(&xml)
+        parse_content_font_face_declarations(&xml, &self.xml_limits_value())
     }
 
     /// Return styles-part font-face declarations.
@@ -405,8 +458,10 @@ impl Package {
     /// Font resource links are retained as inert metadata only. This method
     /// does not fetch a URI, load a font, or inspect embedded font data.
     pub fn styles_font_face_declarations(&self) -> Result<Option<Declarations>> {
-        self.styles_xml()?
-            .map_or_else(|| Ok(None), |xml| parse_styles_font_face_declarations(&xml))
+        self.styles_xml()?.map_or_else(
+            || Ok(None),
+            |xml| parse_styles_font_face_declarations(&xml, &self.xml_limits_value()),
+        )
     }
 }
 
@@ -416,6 +471,6 @@ impl FlatDocument {
     /// Font resource links are retained as inert metadata only. This method
     /// does not fetch a URI, load a font, or inspect embedded font data.
     pub fn font_face_declarations(&self) -> Result<Option<Declarations>> {
-        parse_font_face_declarations_in_part(self.xml(), Part::Flat)
+        parse_font_face_declarations_in_part(self.xml(), Part::Flat, &self.xml_limits_value())
     }
 }

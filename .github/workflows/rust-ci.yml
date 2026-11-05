@@ -22,6 +22,7 @@ on:
       - 'crates/**/docs/**'
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
+      - 'docs/API_GLOSSARY.md'
       - 'docs/adr/**'
       - 'test-data/libreoffice-core/**'
       - 'test-data/odf/**'
@@ -41,6 +42,7 @@ on:
       - 'tools/test_non_iwork_gate.py'
       - 'tools/native_odf_resave.py'
       - 'tools/test_native_odf_resave.py'
+      - 'tools/test_no_3rdparty_references.py'
       - 'docs/performance/BASELINE.md'
     branches:
       - main
@@ -65,6 +67,7 @@ on:
       - 'crates/**/docs/**'
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
+      - 'docs/API_GLOSSARY.md'
       - 'docs/adr/**'
       - 'test-data/libreoffice-core/**'
       - 'test-data/odf/**'
@@ -84,6 +87,7 @@ on:
       - 'tools/test_non_iwork_gate.py'
       - 'tools/native_odf_resave.py'
       - 'tools/test_native_odf_resave.py'
+      - 'tools/test_no_3rdparty_references.py'
       - 'docs/performance/BASELINE.md'
     branches:
       - main
@@ -127,6 +131,9 @@ jobs:
 
       - name: Verify checked native-resave evidence
         run: python3 -m unittest tools.test_native_odf_resave
+
+      - name: Check that code never references the untracked upstream checkout
+        run: python3 -m unittest tools.test_no_3rdparty_references
 
   non-iwork-release-gate:
     name: non-iWork release gate
@@ -241,6 +248,7 @@ jobs:
           -p litchi-ppt
           -p litchi-pptx
           -p litchi-sheet
+          -p litchi-sheet-text
           -p litchi-sign
           -p litchi-slide
           -p litchi-vba
@@ -275,6 +283,20 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-sort
+
+      - name: Test API glossary, debt inventory, and disposition gates
+        run: python3 -m unittest tools.test_check_api_glossary tools.test_api_debt_inventory tools.test_validate_api_disposition
+      - name: Check capability delta inputs and generator
+        run: python3 -m unittest tools.test_officecli_capability_delta
+      - name: Check the capability delta table is current
+        run: python3 tools/officecli_capability_delta.py --check
+      - name: Check the OfficeCLI corpus classifier and its table (record 0265)
+        run: |
+          python3 -m unittest tools.test_officecli_corpus
+          python3 tools/officecli_corpus.py --check
+
+      - name: Check registered API glossary waves
+        run: python3 tools/check_api_glossary.py --target-dir target/api-glossary
 
       - name: Check formatting
         run: cargo fmt --all -- --check

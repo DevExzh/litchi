@@ -704,7 +704,11 @@ fn push_break(collection: &mut OpenCollection, value: Break) -> Result<()> {
         Axis::Vertical => super::MAX_VERTICAL_BREAKS,
     };
     if collection.breaks.len() >= maximum {
-        return Err(invalid("page-break collection exceeds the Office limit"));
+        return Err(Error::limit(
+            super::LimitKind::of(collection.axis),
+            collection.breaks.len().saturating_add(1),
+            maximum,
+        ));
     }
     collection
         .breaks

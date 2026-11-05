@@ -1,4 +1,4 @@
-use litchi_xls::{BorderStyle, FillPattern, OpenOptions, Workbook};
+use litchi_xls::{BorderStyle, FillPattern, OpenOptions, raw::Reader};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -17,7 +17,7 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
 #[test]
 fn reads_poi_border_style_fixture() {
     let workbook =
-        Workbook::new(File::open(poi_fixture("55341_CellStyleBorder.xls")).unwrap()).unwrap();
+        Reader::new(File::open(poi_fixture("55341_CellStyleBorder.xls")).unwrap()).unwrap();
     let sheet = workbook.xls_worksheet(0).unwrap();
     let expected = [
         BorderStyle::Hair,
@@ -44,7 +44,7 @@ fn reads_poi_border_style_fixture() {
 #[test]
 fn reads_libreoffice_border_fixture() {
     let workbook =
-        Workbook::new(File::open(libreoffice_fixture("cell-borders.xls")).unwrap()).unwrap();
+        Reader::new(File::open(libreoffice_fixture("cell-borders.xls")).unwrap()).unwrap();
     assert!(workbook.extended_formats().iter().any(|xf| {
         let borders = xf.borders();
         borders.left().style() != BorderStyle::None
@@ -57,8 +57,7 @@ fn reads_libreoffice_border_fixture() {
 
 #[test]
 fn reads_poi_fill_fixture() {
-    let workbook =
-        Workbook::new(File::open(poi_fixture("SimpleWithColours.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("SimpleWithColours.xls")).unwrap()).unwrap();
     let palette = workbook.palette();
     let fill = workbook
         .extended_formats()
@@ -71,9 +70,9 @@ fn reads_poi_fill_fixture() {
 
 #[test]
 fn reads_poi_xor_encrypted_style_xf_reserved_bit() {
-    let workbook = Workbook::new_with_options(
+    let workbook = Reader::new_with_options(
         File::open(poi_fixture("xor-encryption-abc.xls")).unwrap(),
-        OpenOptions::new().with_password("abc"),
+        OpenOptions::new().password("abc"),
     )
     .unwrap();
     assert!(!workbook.extended_formats().is_empty());

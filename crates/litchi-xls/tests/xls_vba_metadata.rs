@@ -2,7 +2,7 @@ use litchi_vba::{
     Limits,
     build::{Module, Project},
 };
-use litchi_xls::{Workbook, Writer};
+use litchi_xls::{Builder, raw::Reader};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_macro_fixture_without_opening_project_streams() {
-    let workbook = Workbook::new(File::open(poi_fixture("SimpleMacro.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("SimpleMacro.xls")).unwrap()).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_project_storage());
@@ -30,7 +30,7 @@ fn reads_macro_fixture_without_opening_project_streams() {
 
 #[test]
 fn empty_project_metadata_round_trips_as_non_executable() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     let project = Project::new("VBAProject")
         .finish(&Limits::default())
@@ -40,8 +40,8 @@ fn empty_project_metadata_round_trips_as_non_executable() {
         .set_worksheet_vba_code_name(sheet, Some("DataSheet"))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_no_macros_marker());
@@ -55,14 +55,14 @@ fn empty_project_metadata_round_trips_as_non_executable() {
     let storage = workbook.vba_project_storage().unwrap();
     assert!(storage.is_structurally_complete());
     assert!(storage.candidate_module_stream_names().is_empty());
-    let project = workbook.vba().unwrap().unwrap();
+    let project = workbook.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "VBAProject");
     assert!(project.modules().is_empty());
 }
 
 #[test]
 fn complete_project_with_modules_round_trips_as_inert_source() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     let project = Project::new("Analytics")
         .module(Module::standard(
@@ -80,8 +80,8 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(!metadata.has_no_macros_marker());
@@ -95,7 +95,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
         storage.candidate_module_stream_names(),
         ["Module1", "ThisWorkbook"]
     );
-    let project = workbook.vba().unwrap().unwrap();
+    let project = workbook.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "Analytics");
     assert_eq!(project.modules().len(), 2);
     assert_eq!(project.modules()[0].name(), "Module1");
@@ -116,7 +116,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
 
 #[test]
 fn configured_project_and_sheet_code_names_can_be_cleared() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer
         .set_vba("ThisWorkbook", Project::new("VBAProject"))
@@ -130,15 +130,15 @@ fn configured_project_and_sheet_code_names_can_be_cleared() {
     assert!(!writer.has_vba());
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(!workbook.vba_metadata().has_project_storage());
     assert_eq!(workbook.xls_worksheet(0).unwrap().vba_code_name(), None);
 }
 
 #[test]
 fn failed_project_build_does_not_replace_existing_configuration() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Data").unwrap();
     writer
         .set_vba("ExistingBook", Project::new("VBAProject"))
@@ -156,8 +156,8 @@ fn failed_project_build_does_not_replace_existing_configuration() {
     );
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert_eq!(
         workbook.vba_metadata().workbook_code_name(),
         Some("ExistingBook")
@@ -167,7 +167,7 @@ fn failed_project_build_does_not_replace_existing_configuration() {
 
 #[test]
 fn writer_rejects_invalid_code_names_and_unscoped_sheet_names() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     assert!(
         writer

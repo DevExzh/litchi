@@ -25,7 +25,8 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const TARGET_URI: &str = "/word/document.xml";
 const SOURCE_FIXTURE: &[u8] = include_bytes!(
@@ -279,21 +280,26 @@ fn forced_zip64_metadata_limit_rejects_source_before_catalog_publication() {
     let source = fixture();
     let metadata_bytes = central_metadata_bytes(source);
     assert!(metadata_bytes > 0);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_archive_metadata_bytes(metadata_bytes - 1)
         .unwrap()
         .build()
         .unwrap();
 
-    let error = match SourceBackedPackage::from_vec_with_limits(source.to_vec(), limits) {
+    let error = match SourceBackedPackage::from_vec(
+        source.to_vec(),
+        limits,
+        SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("the one-under metadata limit must reject the fixture"),
         Err(error) => error,
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::ArchiveMetadataBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::ArchiveMetadataBytes,
+            observed: actual,
             maximum,
         } if actual == metadata_bytes && maximum == metadata_bytes - 1
     ));
@@ -302,14 +308,16 @@ fn forced_zip64_metadata_limit_rejects_source_before_catalog_publication() {
 #[test]
 fn forced_zip64_overlay_part_limit_rejects_before_sink_output() {
     let source = fixture();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         // The source's largest ordinary Part is 61 bytes; the replacement is
         // deliberately larger so ingress succeeds and overlay preflight fails.
         .max_part_bytes(61)
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(source.to_vec(), limits).unwrap();
+    let package =
+        SourceBackedPackage::from_vec(source.to_vec(), limits, SourceCacheLimits::default(), None)
+            .unwrap();
     let mut output = Vec::new();
     let error = package
         .write_part_overlay_to_stream(&mut output, &pack(TARGET_URI), REPLACEMENT.to_vec())
@@ -317,9 +325,9 @@ fn forced_zip64_overlay_part_limit_rejects_before_sink_output() {
 
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::PartBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: actual,
             maximum: 61,
         } if actual == REPLACEMENT.len() as u64
     ));
@@ -331,10 +339,12 @@ fn forced_zip64_managed_output_limit_rejects_before_first_sink_write() {
     let source = fixture();
     let (budget, _cancellation_source, context) = managed_context(0);
     let source_owner = Arc::new(VersionedSource::new(source));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_owner.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let mut output = Vec::new();
@@ -358,10 +368,12 @@ fn forced_zip64_managed_cancellation_rejects_before_first_sink_write() {
     let source = fixture();
     let (budget, cancellation_source, context) = managed_context(u64::MAX);
     let source_owner = Arc::new(VersionedSource::new(source));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_owner.clone(),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     cancellation_source.cancel();
@@ -382,7 +394,14 @@ fn forced_zip64_managed_cancellation_rejects_before_first_sink_write() {
 fn forced_zip64_overlay_reports_partial_sequential_sink_failure() {
     let source = fixture();
     let source_owner = Arc::new(VersionedSource::new(source));
-    let package = SourceBackedPackage::from_read_at(source_owner.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source_owner.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let mut sink = PartialSink::new(137);
     let error = package
         .write_part_overlay_to_stream(&mut sink, &pack(TARGET_URI), REPLACEMENT.to_vec())
@@ -407,7 +426,14 @@ fn forced_zip64_overlay_reports_partial_sequential_sink_failure() {
 #[test]
 fn forced_zip64_overlay_reports_source_version_change_before_output_and_midstream() {
     let source = Arc::new(VersionedSource::new(fixture()));
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     source.bump();
     let mut output = Vec::new();
     let error = package
@@ -419,7 +445,14 @@ fn forced_zip64_overlay_reports_source_version_change_before_output_and_midstrea
     assert_eq!(source.revision(), 1);
 
     let source = Arc::new(VersionedSource::new(fixture()));
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let mut sink = VersionBumpingSink {
         source: Arc::clone(&source),
         bytes: Vec::new(),

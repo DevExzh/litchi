@@ -738,6 +738,16 @@ mod tests {
         ),
         ("chart_metadata", include_str!("chart_metadata_codec.rs")),
         ("chart_data", include_str!("chart_data_codec.rs")),
+        ("chart_style", include_str!("chart_style_codec.rs")),
+        (
+            "chart_style_merge",
+            include_str!("chart_style_codec/merge.rs"),
+        ),
+        ("shape_style", include_str!("shape_style_codec.rs")),
+        (
+            "shape_style_native",
+            include_str!("shape_style_codec/native.rs"),
+        ),
         (
             "chart_data_rewrite",
             include_str!("chart_data_codec/rewrite.rs"),
@@ -769,6 +779,10 @@ mod tests {
         (
             "keynote_slide_number",
             include_str!("keynote_slide_number_codec.rs"),
+        ),
+        (
+            "number_attachment",
+            include_str!("number_attachment_codec.rs"),
         ),
         (
             "keynote_soundtrack_settings",
@@ -1252,6 +1266,8 @@ mod oracle {
         for (name, _) in FOCUSED_CODECS {
             let source_path = match *name {
                 "chart_data_rewrite" => "chart_data_codec/rewrite.rs".to_owned(),
+                "shape_style_native" => "shape_style_codec/native.rs".to_owned(),
+                "chart_style_merge" => "chart_style_codec/merge.rs".to_owned(),
                 "chart_grid_creation" => "chart_grid_creation_codec.rs".to_owned(),
                 "comment_storage_lifecycle" => "comment_storage_codec/lifecycle.rs".to_owned(),
                 "keynote_media_lifecycle_node_cache" => {
@@ -1306,12 +1322,12 @@ mod oracle {
         let build_script = include_str!("../build.rs");
         for marker in [
             "fn enforce_pages_native_message_provenance(",
-            "const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 21]",
-            "const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 40]",
+            "const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 9]",
+            "const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 17]",
             "let root = root_references_with_limits(components, package.state.source.limits())",
             r"let payload = unique_message_payload(\n            &reference.messages,\n            FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
             r"let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
-            r"let body =\n        find_object(components, body_identifier.get())",
+            "let body = find_object(components, body_identifier.get())",
             ".object_mut(native_footnote.reference_identifier.get())",
             ".object_mut(native_footnote.storage_identifier.get())",
             "let marker_identifier = footnote_marker_identifier(",

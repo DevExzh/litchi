@@ -1,0 +1,77 @@
+[
+  {
+    "median_us": 3508.8354,
+    "min_us": 3501.1992,
+    "output_sha256": "d318ad95cfb1463e09a5ee39b5bfbe6adb8b4d0cd9060a34c9d627e6c89e3663",
+    "samples": 31,
+    "scenario": "doc/source_set"
+  },
+  {
+    "median_us": 6649573.495,
+    "min_us": 6534001.204,
+    "samples": 7,
+    "scenario": "doc/batch1k_ops"
+  },
+  {
+    "median_us": 1094692.016,
+    "min_us": 1092613.983,
+    "samples": 7,
+    "scenario": "doc/batch1k_leaf"
+  },
+  {
+    "median_us": 239.02939999999998,
+    "min_us": 237.58540000000002,
+    "output_sha256": "595ab31fa6ced92034e6eff1663f2d880b886832a3be9095fde07f1e6f22f992",
+    "samples": 31,
+    "scenario": "xls/source_cells1"
+  },
+  {
+    "median_us": 198.16320000000002,
+    "min_us": 197.45520000000002,
+    "output_sha256": "595ab31fa6ced92034e6eff1663f2d880b886832a3be9095fde07f1e6f22f992",
+    "samples": 31,
+    "scenario": "xls/source_cells1_plan"
+  },
+  {
+    "median_us": 600.3475999999999,
+    "min_us": 597.8113999999999,
+    "output_sha256": "7b810037f305d037644a0aeee4dd196e883d8426a1b48c9b20a4ee420be08080",
+    "samples": 31,
+    "scenario": "xls/source_cells100"
+  },
+  {
+    "median_us": 254.32760000000002,
+    "min_us": 252.7676,
+    "output_sha256": "7b810037f305d037644a0aeee4dd196e883d8426a1b48c9b20a4ee420be08080",
+    "samples": 31,
+    "scenario": "xls/source_cells100_plan"
+  },
+  {
+    "median_us": 1506.9209999999998,
+    "min_us": 1501.393,
+    "output_sha256": "dd1faf8e5fb072ecd59e50fd9c7f549d39fdff4ddc2b874f1d1e8ac7bfe3a5bd",
+    "samples": 31,
+    "scenario": "xls/source_comments1"
+  },
+  {
+    "median_us": 2009.2378,
+    "min_us": 2002.5498,
+    "output_sha256": "6dc30ba00e98c80924488cba6e0af4a2add43770886636190d0e61bbcfeb2f16",
+    "samples": 31,
+    "scenario": "xls/source_comments256"
+  },
+  {
+    "median_us": 76.4804,
+    "min_us": 74.8846,
+    "output_sha256": "460f614162e09972b08518490580f235ac7ca6305f497e8571edc5d673b7bcdb",
+    "samples": 31,
+    "scenario": "xls/source_hide7"
+  },
+  {
+    "median_us": 298.5138,
+    "min_us": 296.9756,
+    "output_sha256": "9c1cc5368f99a988f1280446fcf43ec9485a1a88ff6e7245b26038676718731a",
+    "samples": 31,
+    "scenario": "rtf/source_append"
+  }
+]

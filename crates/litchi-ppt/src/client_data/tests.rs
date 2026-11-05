@@ -62,7 +62,7 @@ fn parses_accesses_and_round_trips_the_complete_ordered_grammar() {
     ));
     let bytes = container(&payload);
 
-    let parsed = ClientData::parse(&bytes).unwrap();
+    let parsed = ClientData::parse(&bytes, &ClientDataLimits::default()).unwrap();
     assert!(parsed.shape_flags().is_some());
     assert_eq!(
         parsed
@@ -105,7 +105,7 @@ fn canonical_constructor_writes_valid_records() {
     ];
     let value = ClientData::new(records).unwrap();
     assert_eq!(
-        ClientData::parse(&value.to_bytes().unwrap()).unwrap(),
+        ClientData::parse(&value.to_bytes().unwrap(), &ClientDataLimits::default()).unwrap(),
         value
     );
 }
@@ -116,15 +116,15 @@ fn rejects_outer_header_length_truncation_and_trailing_data() {
     for index in [0usize, 1, 2] {
         let mut bad = valid.clone();
         bad[index] ^= 1;
-        assert!(ClientData::parse(&bad).is_err());
+        assert!(ClientData::parse(&bad, &ClientDataLimits::default()).is_err());
     }
     let mut bad_length = valid.clone();
     bad_length[4..8].copy_from_slice(&1u32.to_le_bytes());
-    assert!(ClientData::parse(&bad_length).is_err());
+    assert!(ClientData::parse(&bad_length, &ClientDataLimits::default()).is_err());
     let mut trailing = valid.clone();
     trailing.push(0);
-    assert!(ClientData::parse(&trailing).is_err());
-    assert!(ClientData::parse(&valid[..7]).is_err());
+    assert!(ClientData::parse(&trailing, &ClientDataLimits::default()).is_err());
+    assert!(ClientData::parse(&valid[..7], &ClientDataLimits::default()).is_err());
 }
 
 #[test]
@@ -136,12 +136,24 @@ fn preserves_unknown_children_and_rejects_duplicate_and_out_of_order_known_child
         ClientDataChildKind::Placeholder,
         &[0, 0, 0, 0, 13, 0, 0, 0],
     );
-    assert!(ClientData::parse(&container(&[flags.clone(), flags.clone()].concat())).is_err());
-    assert!(ClientData::parse(&container(&[placeholder, flags].concat())).is_err());
+    assert!(
+        ClientData::parse(
+            &container(&[flags.clone(), flags.clone()].concat()),
+            &ClientDataLimits::default()
+        )
+        .is_err()
+    );
+    assert!(
+        ClientData::parse(
+            &container(&[placeholder, flags].concat()),
+            &ClientDataLimits::default()
+        )
+        .is_err()
+    );
 
     let unknown = opaque(7, 0x123, 0x2222, &[0xCA, 0xFE]);
     let unknown_container = container(&unknown);
-    let parsed = ClientData::parse(&unknown_container).unwrap();
+    let parsed = ClientData::parse(&unknown_container, &ClientDataLimits::default()).unwrap();
     assert_eq!(parsed.children().len(), 1);
     assert_eq!(parsed.children()[0].kind(), ClientDataChildKind::Unknown);
     assert_eq!(parsed.children()[0].record_type(), 0x2222);
@@ -151,69 +163,78 @@ fn preserves_unknown_children_and_rejects_duplicate_and_out_of_order_known_child
     assert_eq!(parsed.to_bytes().unwrap(), unknown_container);
 
     let shape_id = child(0, 0, ClientDataChildKind::RoundTripShapeId12, &[0; 4]);
-    assert!(ClientData::parse(&container(&[shape_id.clone(), shape_id].concat())).is_err());
+    assert!(
+        ClientData::parse(
+            &container(&[shape_id.clone(), shape_id].concat()),
+            &ClientDataLimits::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn rejects_bad_child_headers_reserved_values_and_boundaries() {
     assert!(
-        ClientData::parse(&container(&child(
-            1,
-            0,
-            ClientDataChildKind::ShapeFlags,
-            &[0]
-        )))
+        ClientData::parse(
+            &container(&child(1, 0, ClientDataChildKind::ShapeFlags, &[0])),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            1,
-            ClientDataChildKind::ShapeFlags,
-            &[0]
-        )))
+        ClientData::parse(
+            &container(&child(0, 1, ClientDataChildKind::ShapeFlags, &[0])),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            0,
-            ClientDataChildKind::ShapeFlags,
-            &[2]
-        )))
+        ClientData::parse(
+            &container(&child(0, 0, ClientDataChildKind::ShapeFlags, &[2])),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            0,
-            ClientDataChildKind::Placeholder,
-            &[0, 0, 0, 0, 0, 0, 0, 0]
-        )))
+        ClientData::parse(
+            &container(&child(
+                0,
+                0,
+                ClientDataChildKind::Placeholder,
+                &[0, 0, 0, 0, 0, 0, 0, 0]
+            )),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            0,
-            ClientDataChildKind::RoundTripNewPlaceholderId12,
-            &[24]
-        )))
+        ClientData::parse(
+            &container(&child(
+                0,
+                0,
+                ClientDataChildKind::RoundTripNewPlaceholderId12,
+                &[24]
+            )),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            2,
-            ClientDataChildKind::MouseClickInteractiveInfo,
-            &[]
-        )))
+        ClientData::parse(
+            &container(&child(
+                0,
+                2,
+                ClientDataChildKind::MouseClickInteractiveInfo,
+                &[]
+            )),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
 
     let mut truncated = child(0, 0, ClientDataChildKind::ExternalObjectReference, &[0; 4]);
     truncated.pop();
-    assert!(ClientData::parse(&container(&truncated)).is_err());
+    assert!(ClientData::parse(&container(&truncated), &ClientDataLimits::default()).is_err());
 }
 
 #[test]
@@ -268,10 +289,8 @@ fn snapshot_noop_is_source_exact_and_unknown_order_is_retained() {
         &[3, 0, 0, 0, 13, 1, 0, 0],
     ));
     let source_bytes = container(&payload);
-    let source = super::Snapshot::parse(&source_bytes).unwrap();
+    let source = super::Snapshot::parse(&source_bytes, &ClientDataLimits::default()).unwrap();
 
-    let snapshot = source.edit().snapshot().unwrap();
-    assert_eq!(snapshot.bytes(), source_bytes.as_slice());
     let commit = source.edit().commit().unwrap();
     assert!(commit.patch().is_empty());
     assert_eq!(commit.snapshot().bytes(), source_bytes.as_slice());
@@ -295,7 +314,7 @@ fn transaction_edits_are_checked_ordered_and_reversible() {
         ClientDataChildKind::RoundTripShapeId12,
         &0x1020u32.to_le_bytes(),
     ));
-    let source = super::Snapshot::parse(container(&payload)).unwrap();
+    let source = super::Snapshot::parse(container(&payload), &ClientDataLimits::default()).unwrap();
     let mut edit = source.edit();
 
     let before = edit
@@ -333,18 +352,21 @@ fn transaction_edits_are_checked_ordered_and_reversible() {
 
 #[test]
 fn failed_child_edits_leave_the_candidate_unchanged() {
-    let source = super::Snapshot::parse(container(
-        &[
-            child(0, 0, ClientDataChildKind::ShapeFlags, &[1]),
-            child(
-                0,
-                0,
-                ClientDataChildKind::Placeholder,
-                &[3, 0, 0, 0, 13, 1, 0, 0],
-            ),
-        ]
-        .concat(),
-    ))
+    let source = super::Snapshot::parse(
+        container(
+            &[
+                child(0, 0, ClientDataChildKind::ShapeFlags, &[1]),
+                child(
+                    0,
+                    0,
+                    ClientDataChildKind::Placeholder,
+                    &[3, 0, 0, 0, 13, 1, 0, 0],
+                ),
+            ]
+            .concat(),
+        ),
+        &ClientDataLimits::default(),
+    )
     .unwrap();
     let mut edit = source.edit();
     let original = edit.children().to_vec();
@@ -384,4 +406,180 @@ fn failed_child_edits_leave_the_candidate_unchanged() {
             .is_err()
     );
     assert_eq!(limited_edit.children(), limited_original.as_slice());
+}
+
+/// A built one-slide package with two textboxes; the first gains an
+/// `OfficeArtClientData` holding one `ShapeFlags10Atom`.
+fn package_with_client_data() -> (crate::Package, Vec<u8>) {
+    use litchi_core::Position;
+
+    use crate::record_wire as wire;
+    use crate::slide_order::records::{Owner, Rewrite, publish};
+
+    let mut builder = crate::Builder::new();
+    let slide = builder.add_slide().unwrap();
+    builder.add_textbox(slide, 10, 10, 200, 40, "One").unwrap();
+    builder.add_textbox(slide, 10, 80, 200, 40, "Two").unwrap();
+    let package = builder.build().unwrap();
+    let shape_id = {
+        let presentation = package.presentation().unwrap();
+        let slides = presentation.slides().unwrap();
+        let shapes = slides[0].shapes().unwrap();
+        crate::text_edit::native_shape_id(&shapes[0])
+    };
+    let base = crate::scoped::Base::capture(&package).unwrap();
+    let native = base.native().unwrap();
+    let owner = Owner::Slide(Position::new(0));
+    let before = base.owner_record(&native, owner).unwrap();
+    let record = container(&child(0, 0, ClientDataChildKind::ShapeFlags10, &[0]));
+    let after =
+        crate::hyperlink::edit::rewrite_slide_shape(&before, shape_id, &mut |shape| {
+            let children = wire::child_list(shape)?;
+            assert!(children.iter().all(
+                |child| wire::record_type(child).unwrap() != OFFICE_ART_CLIENT_DATA_RECORD_TYPE
+            ));
+            let mut data = Vec::new();
+            let mut inserted = false;
+            for child in &children {
+                if !inserted && wire::record_type(child)? == 0xF00D {
+                    data.extend_from_slice(&record);
+                    inserted = true;
+                }
+                data.extend_from_slice(child);
+            }
+            if !inserted {
+                data.extend_from_slice(&record);
+            }
+            Ok(wire::rebuild(shape, &data)?)
+        })
+        .unwrap();
+    let published = publish(
+        &native,
+        &[Rewrite {
+            owner,
+            before: before.into(),
+            after: after.into(),
+        }],
+    )
+    .unwrap();
+    let bytes = published.bytes().to_vec();
+    (crate::Package::from_bytes(&bytes).unwrap(), bytes)
+}
+
+#[test]
+fn package_client_data_edits_publish_replay_and_invert_exactly() {
+    use litchi_core::Position;
+    use litchi_core::edit::RefusalKind;
+
+    use crate::text_edit::Target;
+
+    let (source, source_bytes) = package_with_client_data();
+    let target = Target::new(Position::new(0), Position::new(0));
+    let kinds = |package: &crate::Package| {
+        package
+            .edit_client_data(target)
+            .unwrap()
+            .children()
+            .unwrap()
+            .iter()
+            .map(ClientDataChild::kind)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(kinds(&source), vec![ClientDataChildKind::ShapeFlags10]);
+
+    let no_op = source.edit_client_data(target).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let flags = ClientDataChild::new(ClientDataChildKind::ShapeFlags, vec![1]).unwrap();
+    let mut edit = source.edit_client_data(target).unwrap();
+    edit.insert(0, flags.clone()).unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_client_data(target).unwrap();
+    let Err(super::Error::Refused(refusal)) = edit.remove(9) else {
+        panic!("a missing child must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    let Err(super::Error::Refused(refusal)) = edit.replace(9, flags.clone()) else {
+        panic!("a missing child must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    assert!(edit.changes().unwrap().is_empty());
+    edit.insert(0, flags).unwrap();
+    assert_eq!(edit.changes().unwrap().len(), 1);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
+    assert_eq!(
+        kinds(commit.package()),
+        vec![
+            ClientDataChildKind::ShapeFlags,
+            ClientDataChildKind::ShapeFlags10
+        ]
+    );
+
+    let replayed = source.apply_client_data(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_client_data(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_client_data(commit.patch()),
+        Err(super::Error::PatchConflict)
+    ));
+
+    let refusal_kind = |target| match source
+        .edit_client_data(target)
+        .and_then(|edit| edit.children().map(|_| ()))
+    {
+        Err(super::Error::Refused(refusal)) => refusal.kind(),
+        other => panic!("expected a refusal, got {other:?}"),
+    };
+    assert_eq!(
+        refusal_kind(Target::new(Position::new(0), Position::new(1))),
+        RefusalKind::UnsupportedTarget
+    );
+    assert_eq!(
+        refusal_kind(Target::new(Position::new(0), Position::new(9))),
+        RefusalKind::NotFound
+    );
+    assert_eq!(
+        refusal_kind(Target::new(Position::new(3), Position::new(0))),
+        RefusalKind::NotFound
+    );
+}
+
+#[test]
+fn package_client_data_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    use crate::text_edit::Target;
+
+    let (source, _) = package_with_client_data();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+    let target = Target::new(Position::new(0), Position::new(0));
+
+    let no_op = signed.edit_client_data(target).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let flags = ClientDataChild::new(ClientDataChildKind::ShapeFlags, vec![1]).unwrap();
+    let mut edit = signed.edit_client_data(target).unwrap();
+    edit.insert(0, flags).unwrap();
+    assert!(matches!(edit.commit(), Err(super::Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
 }

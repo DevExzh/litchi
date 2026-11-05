@@ -1,0 +1,16 @@
+callgrind: keynote_bench --only open_get --rounds 1 --iterations 5 (release, 10 tree builds)
+binary sha256 94b686213c972e50aa7a47d5cd7c98864b7ac9d5d431f16c1b010f5d605f3e61 (the bench
+before the add-path change; the open_get path is unchanged)
+
+Inclusive instructions, program total 557,173,664:
+  Package::from_bytes (leaf leg opens)          263,094,281  47.2%
+  litchi_ops::open::open_bytes (unified opens)  234,599,683  42.1%
+  keynote::build_with (10 object-tree builds)    25,526,137   4.6%  (2.55 M per build)
+    slide_text::text_snapshot_at  (100x)          5,329,971   title/body texts (as in 0296)
+    slide_creation::Catalog::read (10x)           5,092,754   slide layouts (new in 0298)
+    OnceCell initialize (10x)                     4,534,423   show/slide projection (as in 0296)
+    slide_drawable::read_inventory (50x)          3,949,817   drawable frames (new in 0298)
+    slide_text::resolve_position (100x)           2,941,257
+    slide_drawable::select_slide (50x)            1,468,019   (new in 0298)
+Layouts and drawable inventories (about 41% of a build) are what 0298 added
+to the first read; the unified open_get is +8.5-8.9% (~150 us) over the leaf.

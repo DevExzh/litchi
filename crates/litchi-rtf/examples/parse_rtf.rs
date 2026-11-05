@@ -12,7 +12,7 @@
 //! cargo run -p litchi-rtf --example parse_rtf -- test-data/rtf/hyperlink.rtf
 //! ```
 
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,9 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Parsing RTF file: {}", path.display());
     println!("{}", "=".repeat(60));
 
-    let doc = Document::open(&path)?;
+    let doc = Package::open(&path)?;
 
-    // Document statistics
+    // Package statistics
     let text = doc.text();
     println!("Text length        : {} characters", text.len());
     println!("Paragraph count    : {}", doc.paragraph_count());
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Endnotes           : {}", doc.endnotes().count());
     println!("Revisions          : {}", doc.revisions().len());
 
-    // Document info / metadata
+    // Package info / metadata
     let info = doc.info();
     println!("\nDocument metadata");
     println!("{}", "-".repeat(60));

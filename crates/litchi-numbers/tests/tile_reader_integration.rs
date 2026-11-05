@@ -4,7 +4,7 @@ use litchi_iwa_archive::Limits as ArchiveLimits;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsp, tst};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{Document, Package};
+use litchi_numbers::{Package, Workbook};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -31,6 +31,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -54,13 +55,13 @@ fn row(
 fn modern_number(value: f64) -> TestResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_number(value)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn modern_boolean(value: bool) -> Vec<u8> {
     let mut cell = BncCell::minimal();
     cell.set_boolean(value);
-    cell.encode()
+    cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap()
 }
 
 fn tile_payload(malformed_later_row: bool) -> TestResult<Vec<u8>> {
@@ -112,6 +113,7 @@ fn synthetic_tile_package(malformed_later_row: bool) -> TestResult<Vec<u8>> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?;
 
     let model = tst::TableModelArchive {
@@ -180,14 +182,17 @@ fn synthetic_tile_package(malformed_later_row: bool) -> TestResult<Vec<u8>> {
         sidecars,
         object(6, TILE_MESSAGE_TYPE, tile_payload(malformed_later_row)?)?,
     ];
-    let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let iwa = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
         ArchiveLimits::default(),
     )?)
 }
 
-fn assert_semantics(document: &Document) -> TestResult {
+fn assert_semantics(document: &Workbook) -> TestResult {
     document.validate()?;
     let sheet = document
         .sheet(0)?
@@ -216,8 +221,8 @@ fn assert_semantics(document: &Document) -> TestResult {
 fn synthetic_tile_reader_reopens_source_ordered_modern_and_wide_rows() -> TestResult {
     let bytes = synthetic_tile_package(false)?;
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
-    assert_semantics(&Document::from_bytes(&bytes)?)?;
+    assert_semantics(package.workbook_ref())?;
+    assert_semantics(&Workbook::from_bytes(&bytes)?)?;
     Ok(())
 }
 
@@ -225,6 +230,6 @@ fn synthetic_tile_reader_reopens_source_ordered_modern_and_wide_rows() -> TestRe
 fn synthetic_tile_reader_refuses_a_malformed_later_row_atomically() -> TestResult {
     let bytes = synthetic_tile_package(true)?;
     assert!(Package::from_bytes(&bytes).is_err());
-    assert!(Document::from_bytes(&bytes).is_err());
+    assert!(Workbook::from_bytes(&bytes).is_err());
     Ok(())
 }

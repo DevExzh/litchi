@@ -5,10 +5,9 @@
 //! syntax that the parser has already proved to be present. Unknown retained
 //! syntax is surfaced as `Unknown`; it is never treated as safe.
 
-use crate::codec::error::RtfResult;
-use crate::codec::limits::ParseLimits;
+use crate::codec::limits::{OpenOptions, SourceLimits};
 use crate::content::field::{FieldType, ParsedFieldCode};
-use crate::model::document::RtfDocument;
+use crate::model::document::Tree;
 
 /// Provenance emitted by the bounded lexer/parser after it has checked the
 /// complete transport token stream.  Keeping this beside the retained model
@@ -310,12 +309,12 @@ impl ValidationCounts {
 /// Hard parser bounds relevant to the report.
 ///
 /// The transport byte and token values come from the caller-selected
-/// [`ParseLimits`]. Group, object-count, picture-count, object-payload, and
+/// [`SourceLimits`]. Group, object-count, picture-count, object-payload, and
 /// picture-payload ceilings are parser hard limits and cannot be widened by
 /// this report API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValidationLimits {
-    parse: ParseLimits,
+    parse: SourceLimits,
 }
 
 impl ValidationLimits {
@@ -331,19 +330,19 @@ impl ValidationLimits {
     /// Hard maximum decoded picture payload accepted by the parser.
     pub const MAX_PICTURE_PAYLOAD_BYTES: usize = crate::codec::parser::MAX_PICTURE_DATA_BYTES;
 
-    const fn new(parse: ParseLimits) -> Self {
+    const fn new(parse: SourceLimits) -> Self {
         Self { parse }
     }
 
-    /// Return the byte/token/opaque limits used by the parser.
-    pub const fn parse(self) -> ParseLimits {
+    /// Return the byte/event/opaque limits used by the parser.
+    pub const fn parse(self) -> SourceLimits {
         self.parse
     }
 
     /// Maximum encoded source bytes.
     #[must_use]
-    pub const fn max_source_bytes(self) -> usize {
-        self.parse.max_source_bytes()
+    pub const fn max_input_bytes(self) -> usize {
+        self.parse.max_input_bytes()
     }
 
     /// Maximum decompressed compressed-RTF bytes.
@@ -354,14 +353,14 @@ impl ValidationLimits {
 
     /// Maximum lexer tokens.
     #[must_use]
-    pub const fn max_tokens(self) -> usize {
-        self.parse.max_tokens()
+    pub const fn max_events(self) -> usize {
+        self.parse.max_events()
     }
 
     /// Maximum aggregate `binN` bytes.
     #[must_use]
-    pub const fn max_total_binary_bytes(self) -> usize {
-        self.parse.max_total_binary_bytes()
+    pub const fn max_aggregate_binary_bytes(self) -> usize {
+        self.parse.max_aggregate_binary_bytes()
     }
 
     /// Maximum bytes accepted in one `binN` payload.
@@ -384,8 +383,8 @@ impl ValidationLimits {
 
     /// Maximum aggregate retained opaque bytes.
     #[must_use]
-    pub const fn max_total_opaque_bytes(self) -> usize {
-        self.parse.max_total_opaque_bytes()
+    pub const fn max_aggregate_opaque_bytes(self) -> usize {
+        self.parse.max_aggregate_opaque_bytes()
     }
 
     /// Hard maximum recursive RTF group depth.
@@ -447,43 +446,33 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
-    /// Parse UTF-8 RTF once and produce its bounded report.
+    /// Parse UTF-8 RTF once with the caller's explicit opening profile.
     #[allow(
         clippy::should_implement_trait,
-        reason = "the inherent constructor keeps the validation API parallel with Document::parse"
+        reason = "the inherent constructor keeps the validation API parallel with Package::parse"
     )]
-    pub fn from_str(input: &str) -> RtfResult<Self> {
-        Self::from_str_with_limits(input, ParseLimits::default())
-    }
-
-    /// Parse UTF-8 RTF once with an explicit finite profile.
-    pub fn from_str_with_limits(input: &str, limits: ParseLimits) -> RtfResult<Self> {
-        let document = crate::Document::parse_with_limits(input, limits)?;
+    pub fn from_str(input: &str, options: OpenOptions) -> crate::Result<Self> {
+        let document = crate::Package::parse_with_options(input, options)?;
         Ok(document.validation_report())
     }
 
     /// Parse original RTF bytes once, including bounded compressed-RTF
     /// decompression when the transport header is present.
-    pub fn from_bytes(input: &[u8]) -> RtfResult<Self> {
-        Self::from_bytes_with_limits(input, ParseLimits::default())
-    }
-
-    /// Parse original RTF bytes once with an explicit finite profile.
-    pub fn from_bytes_with_limits(input: &[u8], limits: ParseLimits) -> RtfResult<Self> {
-        let document = crate::Document::from_bytes_with_limits(input, limits)?;
+    pub fn from_bytes(input: &[u8], options: OpenOptions) -> crate::Result<Self> {
+        let document = crate::Package::from_bytes_with_options(input, options)?;
         Ok(document.validation_report())
     }
 
     /// Build a report from an already parsed immutable facade without parsing
     /// or traversing the same document once per check.
     #[must_use]
-    pub fn from_document(document: &crate::Document) -> Self {
+    pub fn from_package(document: &crate::Package) -> Self {
         build_report(document.model(), document.limits())
     }
 
     /// Build a report from the advanced retained model without mutating it.
     #[must_use]
-    pub fn from_raw(document: &crate::raw::Document<'_>) -> Self {
+    pub fn from_raw(document: &Tree<'_>) -> Self {
         build_report(document, document.parse_limits())
     }
 
@@ -590,27 +579,17 @@ impl ValidationReport {
     }
 }
 
-/// Validate original RTF bytes with the default finite profile.
-pub fn validate(input: &[u8]) -> RtfResult<ValidationReport> {
-    ValidationReport::from_bytes(input)
+/// Validate original RTF bytes with the caller's explicit opening profile.
+pub fn validate(input: &[u8], options: OpenOptions) -> crate::Result<ValidationReport> {
+    ValidationReport::from_bytes(input, options)
 }
 
-/// Validate original RTF bytes with an explicit finite profile.
-pub fn validate_with_limits(input: &[u8], limits: ParseLimits) -> RtfResult<ValidationReport> {
-    ValidationReport::from_bytes_with_limits(input, limits)
+/// Validate UTF-8 RTF with the caller's explicit opening profile.
+pub fn validate_str(input: &str, options: OpenOptions) -> crate::Result<ValidationReport> {
+    ValidationReport::from_str(input, options)
 }
 
-/// Validate UTF-8 RTF with the default finite profile.
-pub fn validate_str(input: &str) -> RtfResult<ValidationReport> {
-    ValidationReport::from_str(input)
-}
-
-/// Validate UTF-8 RTF with an explicit finite profile.
-pub fn validate_str_with_limits(input: &str, limits: ParseLimits) -> RtfResult<ValidationReport> {
-    ValidationReport::from_str_with_limits(input, limits)
-}
-
-fn build_report(document: &RtfDocument<'_>, parse_limits: ParseLimits) -> ValidationReport {
+fn build_report(document: &Tree<'_>, parse_limits: SourceLimits) -> ValidationReport {
     let counts = ValidationCounts {
         source_bytes: document.preserved_source().map_or(0, <[u8]>::len),
         fields: document.fields().len(),

@@ -50,10 +50,10 @@ cargo run -p litchi-odg --example native_metadata_receipt -- \
 The semantic core of that example is:
 
 ```rust
-use litchi_odg::{Drawing, Transition};
+use litchi_odg::{Package, Transition};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let source = Drawing::from_bytes(std::fs::read("compact-source.odg")?)?;
+    let source = Package::open("compact-source.odg")?;
     let mut transition = Transition::new();
     transition.set_transition_type(Some("automatic"))?;
     transition.set_style(Some("dissolve"))?;
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition))?;
     let commit = edit.commit()?;
-    std::fs::write("litchi-changed.odg", commit.snapshot().as_bytes())?;
+    commit.package().save("litchi-changed.odg")?;
     Ok(())
 }
 ```
@@ -83,7 +83,7 @@ python3 tools/native_odf_resave.py \
 
 The Litchi candidate was 6,952 bytes with SHA-256
 `96e95c8a9b85d9f7f9b75339376098466ec4ab9aee57dd09be26599311ceaa69`.
-Reopening it with `litchi_odg::Drawing` returned:
+Reopening it with `litchi_odg::Package` returned:
 
 ```text
 transition_type=automatic
@@ -103,7 +103,7 @@ LibreOffice produced the native output with SHA-256
 The native ZIP contains LibreOffice-generated timestamps, so its whole-file
 hash can vary between otherwise equivalent resaves; this is the hash from the
 frozen-source run recorded here.
-Reopening that output with `litchi_odg::Drawing` reported one page,
+Reopening that output with `litchi_odg::Package` reported one page,
 `transition=None`, and the same inert active-content inventory:
 
 ```text

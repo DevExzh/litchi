@@ -18,12 +18,19 @@
 //! output's member, or that member behind one mark, and a mark appears only on
 //! a member whose input had one.
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use litchi_core::OwnedSource;
-use litchi_xlsx::cell_values::{CellValueEdit, SourceBackedEditor};
-use litchi_xlsx::{Address, Hyperlink, HyperlinkReference, Number, Workbook};
+use litchi_xlsx::cell_values::Change;
+use litchi_xlsx::{Address, Hyperlink, HyperlinkReference, Number};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const BOM: &[u8] = b"\xEF\xBB\xBF";
@@ -37,7 +44,8 @@ fn is_xml_member(name: &str) -> bool {
 }
 
 fn members(archive: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let reader = ArchiveReader::new(archive).unwrap();
+    let reader =
+        ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     names
         .into_iter()
@@ -75,7 +83,8 @@ fn rebuild(
     mark: &dyn Fn(&str) -> bool,
     indented: bool,
 ) -> (Vec<u8>, BTreeSet<String>) {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut marked = BTreeSet::new();
     for (name, bytes) in members(archive) {
         let body = bytes.strip_prefix(BOM).unwrap_or(&bytes);
@@ -143,24 +152,26 @@ fn assert_equal_but_marks(
 fn differential(
     archive: &[u8],
     mark: &dyn Fn(&str) -> bool,
-    scenario: &dyn Fn(Workbook) -> (String, Vec<u8>),
+    scenario: &dyn Fn(litchi_xlsx::Package) -> (String, Vec<u8>),
 ) -> BTreeSet<String> {
     let mut kept = BTreeSet::new();
     for indented in [true, false] {
         let (plain, _) = rebuild(archive, &|_| false, indented);
         let (marked, marked_input) = rebuild(archive, mark, indented);
         assert!(!marked_input.is_empty(), "the scenario must mark a member");
-        let (plain_observed, plain_out) = scenario(Workbook::from_bytes(plain).unwrap());
-        let (marked_observed, marked_out) = scenario(Workbook::from_bytes(marked).unwrap());
+        let (plain_observed, plain_out) =
+            scenario(litchi_xlsx::Package::from_bytes(&plain).unwrap());
+        let (marked_observed, marked_out) =
+            scenario(litchi_xlsx::Package::from_bytes(&marked).unwrap());
         assert_eq!(marked_observed, plain_observed, "indented: {indented}");
         kept = assert_equal_but_marks(&marked_out, &plain_out, &marked_input);
     }
     kept
 }
 
-fn observe(workbook: &Workbook) -> String {
+fn observe(workbook: &litchi_xlsx::Package) -> String {
     let mut observed = String::new();
-    for sheet in workbook.sheets() {
+    for sheet in workbook.workbook_ref().sheets() {
         observed.push_str(&format!("[{}]", sheet.name()));
         for (address, cell) in sheet.cells("A1:XFD1048576").unwrap() {
             observed.push_str(&format!("{address:?}={cell:?};"));
@@ -177,7 +188,7 @@ fn generated_workbook() -> Vec<u8> {
 }
 
 fn generated_workbook_with(second_sheet: bool) -> Vec<u8> {
-    let workbook = Workbook::create().unwrap();
+    let workbook = litchi_xlsx::Package::new().unwrap();
     let mut edit = workbook.edit().unwrap();
     if second_sheet {
         edit.add("Second")
@@ -201,13 +212,13 @@ fn generated_workbook_with(second_sheet: bool) -> Vec<u8> {
         sheet.merge("A20:B21").unwrap();
     }
     let commit = edit.commit().unwrap();
-    commit.workbook().to_bytes().unwrap()
+    commit.package().to_bytes().unwrap()
 }
 
 fn committed(edit: litchi_xlsx::Edit) -> (String, Vec<u8>) {
     let commit = edit.commit().unwrap();
-    let observed = observe(commit.workbook());
-    (observed, commit.workbook().to_bytes().unwrap())
+    let observed = observe(commit.package());
+    (observed, commit.package().to_bytes().unwrap())
 }
 
 #[test]
@@ -279,9 +290,9 @@ fn source_backed_cell_edits_of_marked_parts_match_unmarked_edits() {
                 SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
             let mut edit = editor.edit("Sheet1").unwrap();
             edit.apply_batch([
-                CellValueEdit::set(Address::at(0, 1).unwrap(), Number::new("10.50").unwrap()),
-                CellValueEdit::set(Address::at(2, 2).unwrap(), false),
-                CellValueEdit::insert(Address::at(30, 3).unwrap(), Number::new("7").unwrap()),
+                Change::set(Address::at(0, 1).unwrap(), Number::new("10.50").unwrap()),
+                Change::set(Address::at(2, 2).unwrap(), false),
+                Change::insert(Address::at(30, 3).unwrap(), Number::new("7").unwrap()),
             ])
             .unwrap();
             let commit = edit.commit().unwrap();
@@ -289,7 +300,7 @@ fn source_backed_cell_edits_of_marked_parts_match_unmarked_edits() {
             editor
                 .publish_commit_to_stream(&mut output, &commit)
                 .unwrap();
-            let published = Workbook::from_bytes(output.clone()).unwrap();
+            let published = litchi_xlsx::Package::from_bytes(&output).unwrap();
             (observe(&published), output)
         },
     );

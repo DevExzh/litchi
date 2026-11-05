@@ -27,7 +27,7 @@ use litchi_opc::{
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use crate::package::error::{Error, Result};
+use crate::package::error::Result;
 
 /// Transitional DrawingML Theme relationship type.
 pub const RELATIONSHIP_TYPE: &str = relationship_type::THEME;
@@ -81,19 +81,13 @@ impl Limits {
     /// Validate a caller policy before reading any Theme payload.
     pub(crate) fn validate(self) -> Result<Self> {
         if self.max_xml_bytes == 0 || self.max_xml_bytes > MAX_XML_BYTES {
-            return Err(invalid(format!(
-                "Theme XML byte limit must be between 1 and {MAX_XML_BYTES}"
-            )));
+            return Err(invalid("Theme XML byte limit must be between 1"));
         }
         if self.max_nodes == 0 || self.max_nodes > HARD_MAX_NODES {
-            return Err(invalid(format!(
-                "Theme node limit must be between 1 and {HARD_MAX_NODES}"
-            )));
+            return Err(invalid("Theme node limit must be between 1"));
         }
         if self.max_depth == 0 || self.max_depth > HARD_MAX_DEPTH {
-            return Err(invalid(format!(
-                "Theme depth limit must be between 1 and {HARD_MAX_DEPTH}"
-            )));
+            return Err(invalid("Theme depth limit must be between 1"));
         }
         Ok(self)
     }
@@ -144,19 +138,8 @@ impl Snapshot {
     /// Return the absolute Theme part name for diagnostics and package-owned
     /// integrations.  Ordinary edits do not require this identifier.
     #[must_use]
-    #[allow(dead_code, reason = "used by Workbook publication integration")]
-    pub(crate) fn part_name(&self) -> &str {
+    pub fn part_name(&self) -> &str {
         &self.graph.theme_name
-    }
-
-    /// Start a detached source-checked edit.
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
-            before: self.clone(),
-            staged: self.theme.as_ref().clone(),
-            staged_family: self.family.clone(),
-        }
     }
 
     fn same_source(&self, other: &Self) -> bool {
@@ -173,8 +156,8 @@ impl Snapshot {
 ///
 /// The view owns the parsed typed model and the source payload handle.  It
 /// does not detach a managed allocation into an unreserved `Arc`; callers who
-/// need an edit use [`Self::edit`], which intentionally creates a detached
-/// snapshot.
+/// need an edit open an owned [`crate::Package`] and use
+/// [`crate::Package::edit_theme`].
 #[derive(Clone, Debug)]
 pub struct View {
     theme: Arc<Theme>,
@@ -222,273 +205,6 @@ impl View {
     pub const fn limits(&self) -> Limits {
         self.limits
     }
-
-    /// Start a detached edit over the captured source.
-    ///
-    /// The detached transaction copies only this bounded Theme XML part;
-    /// the source-backed view itself continues to retain its managed payload
-    /// reservation.
-    pub fn edit(&self) -> Result<Transaction> {
-        let source_xml = copy_bytes(self.source.as_bytes(), "Theme transaction source")?;
-        Ok(Transaction {
-            before: Snapshot {
-                theme: Arc::clone(&self.theme),
-                family: self.family.clone(),
-                source_xml: Arc::new(source_xml),
-                graph: self.graph.clone(),
-                limits: self.limits,
-            },
-            staged: self.theme.as_ref().clone(),
-            staged_family: self.family.clone(),
-        })
-    }
-}
-
-/// A detached, source-checked Theme draft.
-#[derive(Clone, Debug)]
-pub struct Transaction {
-    before: Snapshot,
-    staged: Theme,
-    staged_family: Option<Family>,
-}
-
-impl Transaction {
-    /// Snapshot used for stale-source checks.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Borrow the currently staged typed color/font metadata.
-    #[must_use]
-    pub fn theme(&self) -> &Theme {
-        &self.staged
-    }
-
-    /// Borrow the currently staged applied-theme family metadata.
-    #[must_use]
-    pub fn family(&self) -> Option<&Family> {
-        self.staged_family.as_ref()
-    }
-
-    /// Replace the typed color/font metadata after bounded validation.
-    pub fn replace(&mut self, theme: Theme) -> Result<bool> {
-        if self.staged == theme {
-            return Ok(false);
-        }
-        validate_model(&theme, self.before.limits)?;
-        self.staged = theme;
-        Ok(true)
-    }
-
-    /// Change the Theme display name.
-    pub fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
-        let mut candidate = self.staged.clone();
-        candidate.name = name.into();
-        self.replace(candidate)
-    }
-
-    /// Replace the complete twelve-slot color palette.
-    pub fn set_palette(&mut self, colors: Palette) -> Result<bool> {
-        let mut candidate = self.staged.clone();
-        candidate.colors = colors;
-        self.replace(candidate)
-    }
-
-    /// Replace the complete major/minor font set.
-    pub fn set_fonts(&mut self, fonts: FontSet) -> Result<bool> {
-        let mut candidate = self.staged.clone();
-        candidate.fonts = fonts;
-        self.replace(candidate)
-    }
-
-    /// Set or replace the applied-theme family metadata.
-    pub fn set_family(&mut self, family: Family) -> Result<bool> {
-        let family = preserve_family_source(self.before.family.as_ref(), family)?;
-        if self.staged_family.as_ref() == Some(&family) {
-            return Ok(false);
-        }
-        self.staged_family = Some(family);
-        Ok(true)
-    }
-
-    /// Remove the applied-theme family metadata while retaining the Theme.
-    pub fn remove_family(&mut self) -> Result<bool> {
-        if self.staged_family.is_none() {
-            return Ok(false);
-        }
-        self.staged_family = None;
-        Ok(true)
-    }
-
-    /// Commit the detached draft into an exact, reversible XML patch.
-    pub fn commit(self) -> Result<Commit> {
-        if self.staged == *self.before.theme && self.staged_family == self.before.family {
-            let before = self.before;
-            return Ok(Commit::new(Patch::new(before.clone(), before), false));
-        }
-        validate_model(&self.staged, self.before.limits)?;
-        let source = rewrite_source_with_family(
-            self.before.source_xml(),
-            self.before.theme(),
-            &self.staged,
-            self.before.family.as_ref(),
-            self.staged_family.as_ref(),
-            self.before.limits,
-        )?;
-        let (parsed, parsed_family) = parse_theme_content(&source, self.before.limits)?;
-        if parsed != self.staged {
-            return Err(invalid(
-                "Theme transaction read-back did not match the staged typed model",
-            ));
-        }
-        if parsed_family.as_ref() != self.staged_family.as_ref() {
-            return Err(invalid(
-                "Theme transaction read-back did not match the staged family metadata",
-            ));
-        }
-        let after = Snapshot {
-            theme: Arc::new(parsed),
-            family: parsed_family,
-            source_xml: Arc::new(source),
-            graph: self.before.graph.clone(),
-            limits: self.before.limits,
-        };
-        Ok(Commit::new(Patch::new(self.before, after), true))
-    }
-}
-
-/// A detached Theme transaction result.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the Theme XML bytes change.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its planned snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
-
-/// A source-checked, reversible Theme-part replacement.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
-    changed: bool,
-}
-
-impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        let changed = !before.same_source(&after);
-        Self {
-            before,
-            after,
-            changed,
-        }
-    }
-
-    /// Source state required before publication.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Exact state produced by publication.
-    #[must_use]
-    pub fn after(&self) -> &Snapshot {
-        &self.after
-    }
-
-    /// Whether applying this patch changes no Theme bytes or graph metadata.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.changed
-    }
-
-    /// Return an exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-            changed: self.changed,
-        }
-    }
-
-    /// Apply atomically after checking the complete Theme source closure.
-    #[allow(dead_code, reason = "called by Workbook publication integration")]
-    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        let current = read(package, self.before.limits)?;
-        let Some(current) = current else {
-            return Err(invalid("Theme patch source is missing its Theme part"));
-        };
-        if !current.same_source(&self.before) {
-            return Err(invalid("Theme patch source is stale"));
-        }
-        if self.is_empty() {
-            return Ok(current);
-        }
-        if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
-        }
-        let mut candidate = package.clone();
-        let part_name = PackURI::new(self.after.part_name().to_owned())
-            .map_err(|error| Error::InvalidUri(error.to_string()))?;
-        {
-            let part = candidate.get_part(&part_name)?;
-            if part.content_type() != CONTENT_TYPE {
-                return Err(Error::InvalidContentType {
-                    expected: CONTENT_TYPE.to_owned(),
-                    got: part.content_type().to_owned(),
-                });
-            }
-        }
-        candidate.unsign();
-        replace_source_xml_part(
-            &mut candidate,
-            &part_name,
-            self.before.source_xml(),
-            self.after.source_xml(),
-        )?;
-        let resulting = read(&candidate, self.before.limits)?
-            .ok_or_else(|| invalid("Theme patch read-back lost the Theme part"))?;
-        if !resulting.same_state(&self.after) {
-            return Err(invalid(
-                "Theme patch read-back changed the planned Theme state",
-            ));
-        }
-        *package = candidate;
-        Ok(resulting)
-    }
 }
 
 /// Read the optional Theme owner from an eager OPC package.
@@ -529,11 +245,11 @@ pub(crate) fn read_source(package: &SourceBackedPackage, limits: Limits) -> Resu
             resource: "Theme XML limit",
         })?;
     if declared > maximum {
-        return Err(Error::LimitExceeded {
-            resource: "Theme XML bytes",
-            actual: usize::try_from(declared).unwrap_or(usize::MAX),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            usize::try_from(declared).unwrap_or(usize::MAX),
+            limits.max_xml_bytes,
+        ));
     }
     let source = part.data()?;
     let (theme, family) = parse_theme_content(source.as_bytes(), limits)?;
@@ -572,8 +288,7 @@ fn locate_eager(package: &OpcPackage) -> Result<Option<(GraphState, &dyn Part)>>
     let workbook = package.main_document_part()?;
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(Error::InvalidContentType {
-            expected: content_type::XLSB_BIN.to_owned(),
-            got: workbook.content_type().to_owned(),
+            expected: content_type::XLSB_BIN,
         });
     }
     let mut theme_parts = package
@@ -582,33 +297,32 @@ fn locate_eager(package: &OpcPackage) -> Result<Option<(GraphState, &dyn Part)>>
     let theme_part = theme_parts.next();
     if theme_parts.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "XLSB package contains multiple Theme parts".to_string(),
+            "XLSB package contains multiple Theme parts",
         ));
     }
     let Some(relationship) = find_theme_relationship(workbook.rels())? else {
         if theme_part.is_some() {
             return Err(Error::InvalidRelationship(
-                "Theme part is orphaned from the workbook".to_string(),
+                "Theme part is orphaned from the workbook",
             ));
         }
         return Ok(None);
     };
     if relationship.is_external() {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship must be internal".to_string(),
+            "workbook Theme relationship must be internal",
         ));
     }
     let theme_name = relationship.target_partname()?;
     let part = package.get_part(&theme_name)?;
     if theme_part.is_none_or(|candidate| !candidate.partname().is_equivalent_to(&theme_name)) {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship does not identify the unique Theme part".to_string(),
+            "workbook Theme relationship does not identify the unique Theme part",
         ));
     }
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_owned(),
-            got: part.content_type().to_owned(),
+            expected: CONTENT_TYPE,
         });
     }
     let theme_relationships = validate_theme_relationships(
@@ -635,8 +349,7 @@ fn locate_source<'a>(
 ) -> Result<Option<(GraphState, PartView<'a>)>> {
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(Error::InvalidContentType {
-            expected: content_type::XLSB_BIN.to_owned(),
-            got: workbook.content_type().to_owned(),
+            expected: content_type::XLSB_BIN,
         });
     }
     let mut theme_parts = package
@@ -645,33 +358,32 @@ fn locate_source<'a>(
     let theme_part = theme_parts.next();
     if theme_parts.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "XLSB package contains multiple Theme parts".to_string(),
+            "XLSB package contains multiple Theme parts",
         ));
     }
     let Some(relationship) = find_theme_relationship(workbook.rels())? else {
         if theme_part.is_some() {
             return Err(Error::InvalidRelationship(
-                "Theme part is orphaned from the workbook".to_string(),
+                "Theme part is orphaned from the workbook",
             ));
         }
         return Ok(None);
     };
     if relationship.is_external() {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship must be internal".to_string(),
+            "workbook Theme relationship must be internal",
         ));
     }
     let theme_name = relationship.target_partname()?;
     let part = package.part(&theme_name)?;
     if theme_part.is_none_or(|candidate| !candidate.partname().is_equivalent_to(&theme_name)) {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship does not identify the unique Theme part".to_string(),
+            "workbook Theme relationship does not identify the unique Theme part",
         ));
     }
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_owned(),
-            got: part.content_type().to_owned(),
+            expected: CONTENT_TYPE,
         });
     }
     let theme_relationships = validate_theme_relationships(
@@ -703,7 +415,7 @@ fn find_theme_relationship(
     };
     if matching.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "workbook has multiple Theme relationships".to_string(),
+            "workbook has multiple Theme relationships",
         ));
     }
     Ok(Some(first))
@@ -756,10 +468,9 @@ fn validate_theme_relationships(
             relationship_type::IMAGE
         };
         if relationship.reltype() != expected {
-            return Err(Error::InvalidRelationship(format!(
-                "Theme part relationship {:?} is not a {expected} Image relationship",
-                relationship.r_id(),
-            )));
+            return Err(Error::InvalidRelationship(
+                "Theme part relationship is not a Image relationship",
+            ));
         }
         if !relationship.is_external() {
             let target = relationship.target_partname()?;
@@ -773,13 +484,12 @@ fn validate_theme_relationships(
 fn validate_image_target(content_type_value: &str, is_leaf: bool) -> Result<()> {
     if !content_type_value.starts_with("image/") {
         return Err(Error::InvalidContentType {
-            expected: "an image/* Theme relationship target".to_string(),
-            got: content_type_value.to_string(),
+            expected: "an image/* Theme relationship target",
         });
     }
     if !is_leaf {
         return Err(Error::InvalidRelationship(
-            "Theme Image relationship target must be a leaf part".to_string(),
+            "Theme Image relationship target must be a leaf part",
         ));
     }
     Ok(())
@@ -796,7 +506,7 @@ fn validate_single_theme_inbound(
             && relationship.target_partname()?.is_equivalent_to(theme_name)
         {
             return Err(Error::InvalidRelationship(
-                "Theme part has an inbound package-root relationship".to_string(),
+                "Theme part has an inbound package-root relationship",
             ));
         }
     }
@@ -814,17 +524,16 @@ fn validate_single_theme_inbound(
                     || !is_theme_relationship(relationship.reltype())
                 {
                     return Err(Error::InvalidRelationship(
-                        "Theme part has an inbound relationship other than the workbook Theme edge"
-                            .to_string(),
+                        "Theme part has an inbound relationship other than the workbook Theme edge",
                     ));
                 }
             }
         }
     }
     if inbound != 1 {
-        return Err(Error::InvalidRelationship(format!(
-            "Theme part must have exactly one workbook inbound relationship, found {inbound}"
-        )));
+        return Err(Error::InvalidRelationship(
+            "Theme part must have exactly one workbook inbound relationship",
+        ));
     }
     Ok(())
 }
@@ -840,7 +549,7 @@ fn validate_single_theme_inbound_source(
             && relationship.target_partname()?.is_equivalent_to(theme_name)
         {
             return Err(Error::InvalidRelationship(
-                "Theme part has an inbound package-root relationship".to_string(),
+                "Theme part has an inbound package-root relationship",
             ));
         }
     }
@@ -858,17 +567,16 @@ fn validate_single_theme_inbound_source(
                     || !is_theme_relationship(relationship.reltype())
                 {
                     return Err(Error::InvalidRelationship(
-                        "Theme part has an inbound relationship other than the workbook Theme edge"
-                            .to_string(),
+                        "Theme part has an inbound relationship other than the workbook Theme edge",
                     ));
                 }
             }
         }
     }
     if inbound != 1 {
-        return Err(Error::InvalidRelationship(format!(
-            "Theme part must have exactly one workbook inbound relationship, found {inbound}"
-        )));
+        return Err(Error::InvalidRelationship(
+            "Theme part must have exactly one workbook inbound relationship",
+        ));
     }
     Ok(())
 }
@@ -882,16 +590,16 @@ fn validate_conformance(xml: &[u8], relationship_type_value: &str) -> Result<()>
         codec::NAMESPACE
     };
     if namespace != expected {
-        return Err(Error::InvalidRelationship(format!(
-            "Theme relationship conformance does not match Theme XML namespace: expected {expected}"
-        )));
+        return Err(Error::InvalidRelationship(
+            "Theme relationship conformance does not match Theme XML namespace",
+        ));
     }
     let mut reader = quick_xml::reader::NsReader::from_reader(xml);
     reader.resolver_mut().set_max_declarations_per_element(256);
     loop {
         let (resolved, event) = reader
             .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         if matches!(event, Event::Start(_) | Event::Empty(_))
             && let quick_xml::name::ResolveResult::Bound(value) = resolved
             && (value.as_ref() == codec::NAMESPACE.as_bytes()
@@ -919,12 +627,12 @@ fn is_image_relationship(value: &str) -> bool {
 
 fn parse_theme(xml: &[u8], limits: Limits) -> Result<Theme> {
     bounded_xml_preflight(xml, limits)?;
-    Ok(codec::read(xml)?)
+    Ok(codec::read(xml, codec::Limits::new(limits.max_xml_bytes))?)
 }
 
 pub(crate) fn parse_theme_content(xml: &[u8], limits: Limits) -> Result<(Theme, Option<Family>)> {
     let theme = parse_theme(xml, limits)?;
-    let family = family::part::read_family(xml)?;
+    let family = family::part::read_family(xml, family::part::Limits::new(limits.max_xml_bytes))?;
     Ok((theme, family))
 }
 
@@ -938,24 +646,29 @@ fn validate_model(theme: &Theme, limits: Limits) -> Result<()> {
     } else {
         theme.name.as_str()
     };
-    let xml = codec::encode_part(name, &theme.colors, &theme.fonts)?;
+    let xml = codec::encode_part(
+        name,
+        &theme.colors,
+        &theme.fonts,
+        codec::Limits::new(limits.max_xml_bytes),
+    )?;
     if xml.len() > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "generated Theme XML bytes",
-            actual: xml.len(),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
     Ok(())
 }
 
 fn bounded_xml_preflight(xml: &[u8], limits: Limits) -> Result<()> {
     if xml.len() > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "Theme XML bytes",
-            actual: xml.len(),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let mut reader = Reader::from_reader(xml);
     let mut stack = Vec::<Vec<u8>>::new();
@@ -963,45 +676,37 @@ fn bounded_xml_preflight(xml: &[u8], limits: Limits) -> Result<()> {
     loop {
         let event = reader
             .read_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "Theme XML node count",
                 })?;
                 if nodes > limits.max_nodes {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML nodes",
-                        actual: nodes,
-                        maximum: limits.max_nodes,
-                    });
+                    return Err(Error::limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
                 if stack.len() >= limits.max_depth {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML depth",
-                        actual: stack.len() + 1,
-                        maximum: limits.max_depth,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
                 stack.push(element.local_name().as_ref().to_vec());
             },
             Event::Empty(_) => {
                 if stack.len() >= limits.max_depth {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML depth",
-                        actual: stack.len() + 1,
-                        maximum: limits.max_depth,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
                 nodes = nodes.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "Theme XML node count",
                 })?;
                 if nodes > limits.max_nodes {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML nodes",
-                        actual: nodes,
-                        maximum: limits.max_nodes,
-                    });
+                    return Err(Error::limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
             },
             Event::End(element) => {
@@ -1061,16 +766,33 @@ fn rewrite_base_source(
         replacements.push(root_name_replacement(source, &after.name)?);
     }
     if before.colors != after.colors {
-        let range = codec::scheme_replacement_range(source, b"clrScheme")?;
-        let fragment = strict_fragment(codec::encode_palette_fragment(&after.colors)?, strict)?;
+        let range = codec::scheme_replacement_range(
+            source,
+            b"clrScheme",
+            codec::Limits::new(limits.max_xml_bytes),
+        )?;
+        let fragment = strict_fragment(
+            codec::encode_palette_fragment(
+                &after.colors,
+                codec::Limits::new(limits.max_xml_bytes),
+            )?,
+            strict,
+        )?;
         replacements.push(Replacement {
             range,
             bytes: fragment,
         });
     }
     if before.fonts != after.fonts {
-        let range = codec::scheme_replacement_range(source, b"fontScheme")?;
-        let fragment = strict_fragment(codec::encode_fonts_fragment(&after.fonts)?, strict)?;
+        let range = codec::scheme_replacement_range(
+            source,
+            b"fontScheme",
+            codec::Limits::new(limits.max_xml_bytes),
+        )?;
+        let fragment = strict_fragment(
+            codec::encode_fonts_fragment(&after.fonts, codec::Limits::new(limits.max_xml_bytes))?,
+            strict,
+        )?;
         replacements.push(Replacement {
             range,
             bytes: fragment,
@@ -1097,11 +819,11 @@ fn rewrite_base_source(
         previous_end = replacement.range.end;
     }
     if output_len > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "patched Theme XML bytes",
-            actual: output_len,
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            output_len,
+            limits.max_xml_bytes,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -1127,15 +849,19 @@ fn rewrite_family_source(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let output = match (before, after) {
-        (Some(_), Some(family)) => {
-            family::part::replace_family_with_limit(source, family, limits.max_xml_bytes)
+        (Some(_), Some(family)) => family::part::replace_family(
+            source,
+            family,
+            family::part::Limits::new(limits.max_xml_bytes),
+        ),
+        (Some(_), None) => {
+            family::part::remove_family(source, family::part::Limits::new(limits.max_xml_bytes))
         },
-        (Some(_), None) => family::part::remove_family_with_limit(source, limits.max_xml_bytes),
-        (None, Some(family)) => family::part::add_family_with_uri_limit(
+        (None, Some(family)) => family::part::add_family_with_uri(
             source,
             family,
             family::part::NATIVE_EXTENSION_URI,
-            limits.max_xml_bytes,
+            family::part::Limits::new(limits.max_xml_bytes),
         ),
         (None, None) => Ok(source.to_vec()),
     }?;
@@ -1164,18 +890,14 @@ fn strict_fragment(mut fragment: Vec<u8>, strict: bool) -> Result<Vec<u8>> {
 
 fn source_namespace(xml: &[u8]) -> Result<Option<&'static str>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(Error::LimitExceeded {
-            resource: "Theme XML bytes",
-            actual: xml.len(),
-            maximum: MAX_XML_BYTES,
-        });
+        return Err(Error::limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let mut reader = quick_xml::reader::NsReader::from_reader(xml);
     reader.resolver_mut().set_max_declarations_per_element(256);
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if element.local_name().as_ref() != b"theme" {
@@ -1225,7 +947,7 @@ fn root_name_replacement(xml: &[u8], name: &str) -> Result<Replacement> {
             })?;
         let event = reader
             .read_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         let end = origin
             .offset(reader.buffer_position())
             .ok_or(Error::CapacityOverflow {
@@ -1316,15 +1038,6 @@ fn optional_attribute_value_range(raw: &[u8], wanted: &[u8]) -> Result<Option<Ra
     Ok(None)
 }
 
-fn copy_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(bytes.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
-    output.extend_from_slice(bytes);
-    Ok(output)
-}
-
 /// Replace one Theme payload while retaining OPC source provenance for the
 /// resulting XML. Native Theme parts commonly carry an XML declaration and
 /// line endings, which are valid source bytes but fail the compact authored
@@ -1339,7 +1052,9 @@ pub(crate) fn replace_source_xml_part(
 ) -> Result<()> {
     let source = package.source_xml_part(part_name)?;
     if source.bytes() != expected {
-        return Err(invalid("Theme XML source provenance is stale"));
+        return Err(Error::PatchConflict {
+            part: "theme XML part",
+        });
     }
     let (old_open, _) = root_element_ranges(source.bytes())?;
     let (_, new_full) = root_element_ranges(replacement)?;
@@ -1369,7 +1084,7 @@ fn root_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
             })?;
         let event = reader
             .read_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         let end = origin
             .offset(reader.buffer_position())
             .ok_or(Error::CapacityOverflow {
@@ -1420,8 +1135,8 @@ fn root_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 /// Retain the source-backed family fragment when a caller supplies a detached
@@ -1439,10 +1154,10 @@ fn preserve_family_source(existing: Option<&Family>, incoming: Family) -> Result
     Ok(value)
 }
 
+mod edit;
 mod lifecycle;
 
-pub(crate) use lifecycle::read_owner;
-pub use lifecycle::{OwnerCommit, OwnerPatch, OwnerSnapshot, OwnerTransaction};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 
 #[cfg(test)]
 mod splice_tests;
@@ -1475,74 +1190,53 @@ mod tests {
     #[test]
     fn generated_theme_reads_and_noop_is_exact() {
         let value = theme();
-        let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
+        let xml = codec::encode_part(
+            &value.name,
+            &value.colors,
+            &value.fonts,
+            codec::Limits::DEFAULT,
+        )
+        .expect("encode");
         let parsed = parse_theme(&xml, Limits::DEFAULT).expect("read");
         assert_eq!(parsed, value);
-        let snapshot = Snapshot {
-            theme: Arc::new(parsed.clone()),
-            family: None,
-            source_xml: Arc::new(xml.clone()),
-            graph: GraphState {
-                workbook_name: "/xl/workbook.bin".to_string(),
-                theme_name: "/xl/theme/theme1.xml".to_string(),
-                workbook_relationship: RelationshipState {
-                    id: "rId1".to_string(),
-                    reltype: RELATIONSHIP_TYPE.to_string(),
-                    target_ref: "theme/theme1.xml".to_string(),
-                    target_mode: TargetMode::Internal,
-                    target_name: Some("/xl/theme/theme1.xml".to_string()),
-                },
-                theme_relationships: Vec::new(),
-            },
-            limits: Limits::DEFAULT,
-        };
-        let commit = snapshot.edit().commit().expect("commit");
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().source_xml(), xml.as_slice());
+        let rewritten =
+            rewrite_source_with_family(&xml, &parsed, &parsed, None, None, Limits::DEFAULT)
+                .expect("no-op rewrite");
+        assert_eq!(rewritten, xml);
     }
 
     #[test]
     fn palette_edit_preserves_root_and_font_source() {
         let value = theme();
-        let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
-        let snapshot = Snapshot {
-            theme: Arc::new(value.clone()),
-            family: None,
-            source_xml: Arc::new(xml.clone()),
-            graph: GraphState {
-                workbook_name: "/xl/workbook.bin".to_string(),
-                theme_name: "/xl/theme/theme1.xml".to_string(),
-                workbook_relationship: RelationshipState {
-                    id: "rId1".to_string(),
-                    reltype: RELATIONSHIP_TYPE.to_string(),
-                    target_ref: "theme/theme1.xml".to_string(),
-                    target_mode: TargetMode::Internal,
-                    target_name: Some("/xl/theme/theme1.xml".to_string()),
-                },
-                theme_relationships: Vec::new(),
-            },
-            limits: Limits::DEFAULT,
-        };
-        let mut replacement = palette();
-        replacement = replacement.with(Slot::Accent1, Color::rgb("FF0000").expect("color"));
-        let mut edit = snapshot.edit();
-        assert!(edit.set_palette(replacement).expect("set palette"));
-        let commit = edit.commit().expect("commit");
-        assert!(commit.changed());
+        let xml = codec::encode_part(
+            &value.name,
+            &value.colors,
+            &value.fonts,
+            codec::Limits::DEFAULT,
+        )
+        .expect("encode");
+        let mut replacement = value.clone();
+        replacement.colors = palette().with(Slot::Accent1, Color::rgb("FF0000").expect("color"));
+        let edited =
+            rewrite_source_with_family(&xml, &value, &replacement, None, None, Limits::DEFAULT)
+                .expect("palette rewrite");
         assert!(
-            commit
-                .snapshot()
-                .source_xml()
+            edited
                 .windows(b"Aptos".len())
                 .any(|window| window == b"Aptos")
         );
+        let (parsed, family) = parse_theme_content(&edited, Limits::DEFAULT).expect("read back");
+        assert!(family.is_none());
         assert_eq!(
-            commit.snapshot().theme().colors.color(Slot::Accent1),
+            parsed.colors.color(Slot::Accent1),
             Some(&Color::Rgb("FF0000".to_string()))
         );
+        let restored =
+            rewrite_source_with_family(&edited, &parsed, &value, None, None, Limits::DEFAULT)
+                .expect("inverse rewrite");
         assert_eq!(
-            commit.patch().inverse().after().source_xml(),
-            xml.as_slice()
+            parse_theme(&restored, Limits::DEFAULT).expect("restored theme"),
+            value
         );
     }
 }

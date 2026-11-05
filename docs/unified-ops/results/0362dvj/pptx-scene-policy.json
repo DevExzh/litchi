@@ -1,0 +1,26 @@
+{
+  "source_index": "37dceb650c5c699a81229ac1dee6fbd98478b597",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "litchi-pptx",
+    "--lib",
+    "--all-features",
+    "--offline",
+    "--locked",
+    "subordinate_readers_use_the_scene_input_budget"
+  ],
+  "exit_code": 0,
+  "seconds": 95.68530294200173,
+  "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-composed/focused/pptx-scene-policy.log",
+  "log_bytes": 1971,
+  "log_sha256": "f9a46dba9f3efcf30a824b7e6adea0e720bd30e11ce31b942e2845f20a49496e",
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
+  "target_bytes": 5997810347,
+  "lock_unchanged": true,
+  "index_unchanged": true,
+  "memory_cap": "20G",
+  "jobs": 1
+}

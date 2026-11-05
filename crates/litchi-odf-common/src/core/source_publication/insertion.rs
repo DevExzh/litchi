@@ -191,6 +191,7 @@ pub struct SourceContentInsertionPlan {
     source_version: SourceVersion,
     source_length: u64,
     decoded_offset: u64,
+    source_remove_length: u64,
     fragment: AuthoredXmlFragment,
     _retained_memory: Option<Reservation>,
     source_content_sha256: [u8; 32],
@@ -229,6 +230,35 @@ impl SourceContentInsertionPlan {
         input_fragment: AuthoredXmlFragment,
         limits: XmlStreamLimits,
         options: &SourceContentPublicationOptions,
+        validator: F,
+    ) -> std::result::Result<Self, SourceContentPublicationError>
+    where
+        F: for<'event> FnMut(&'event XmlStreamEvent<'event>, &BindingTracker) -> Result<()>,
+    {
+        Self::prepare_replacement_with_validator(
+            source,
+            decoded_offset,
+            0,
+            input_fragment,
+            limits,
+            options,
+            validator,
+        )
+    }
+
+    /// Prepare a bounded replacement of a source range with an audited
+    /// fragment.  A non-empty `source_remove_length` enables inverse replay
+    /// without materializing the complete source or candidate XML member.
+    /// The source range and replacement are streamed together, while the
+    /// source and candidate SHA-256 proofs are retained for publication.
+    #[doc(hidden)]
+    pub fn prepare_replacement_with_validator<F>(
+        source: Arc<SourceBackedPackage>,
+        decoded_offset: u64,
+        source_remove_length: u64,
+        input_fragment: AuthoredXmlFragment,
+        limits: XmlStreamLimits,
+        options: &SourceContentPublicationOptions,
         mut validator: F,
     ) -> std::result::Result<Self, SourceContentPublicationError>
     where
@@ -261,17 +291,24 @@ impl SourceContentInsertionPlan {
             .map_err(|error| {
                 super::map_core_error(error, SourceContentPublicationProgress::Untouched)
             })?;
-        if decoded_offset > source_content_length {
+        let source_end = decoded_offset
+            .checked_add(source_remove_length)
+            .ok_or_else(|| {
+                SourceContentPublicationError::Core(Error::InvalidFormat(
+                    "content.xml replacement range overflows decoded source length".to_string(),
+                ))
+            })?;
+        if source_end > source_content_length {
             return Err(SourceContentPublicationError::Core(Error::InvalidFormat(
-                "content.xml insertion offset exceeds decoded source length".to_string(),
+                "content.xml replacement range exceeds decoded source length".to_string(),
             )));
         }
-        let target_content_length =
-            source_content_length
-                .checked_add(fragment_len)
-                .ok_or_else(|| SourceContentPublicationError::Unsupported {
-                    reason: "content.xml insertion target length overflows u64".to_string(),
-                })?;
+        let target_content_length = source_content_length
+            .checked_sub(source_remove_length)
+            .and_then(|length| length.checked_add(fragment_len))
+            .ok_or_else(|| SourceContentPublicationError::Unsupported {
+                reason: "content.xml replacement target length overflows u64".to_string(),
+            })?;
         validate_replacement_limit(target_content_length, options)?;
 
         let entry_count = u64::try_from(source.publication_entry_count()).unwrap_or(u64::MAX);
@@ -321,6 +358,7 @@ impl SourceContentInsertionPlan {
                     reader,
                     source_content_length,
                     decoded_offset,
+                    source_remove_length,
                     fragment_bytes,
                 );
                 let _report = scan_content_reader(
@@ -383,6 +421,7 @@ impl SourceContentInsertionPlan {
             source_length: source.len(),
             source,
             decoded_offset,
+            source_remove_length,
             fragment,
             _retained_memory: retained_memory,
             source_content_sha256: streamed.source_sha256,
@@ -410,6 +449,13 @@ impl SourceContentInsertionPlan {
         self.decoded_offset
     }
 
+    /// Return the number of source bytes removed before the fragment is
+    /// inserted.  Zero denotes the ordinary append/insertion shape.
+    #[must_use]
+    pub const fn source_remove_length(&self) -> u64 {
+        self.source_remove_length
+    }
+
     /// Return the source `content.xml` decoded length.
     #[must_use]
     pub const fn source_content_length(&self) -> u64 {
@@ -432,6 +478,12 @@ impl SourceContentInsertionPlan {
     #[must_use]
     pub const fn target_content_sha256(&self) -> [u8; 32] {
         self.target_content_sha256
+    }
+
+    /// Return the bounded authored fragment retained by this plan.
+    #[doc(hidden)]
+    pub fn authored_fragment_bytes(&self) -> &[u8] {
+        self.fragment.bytes()
     }
 
     /// Publish the prepared insertion to a caller-owned sequential sink.
@@ -693,6 +745,7 @@ impl SourceContentInsertionPlan {
                         reader,
                         self.source_content_length,
                         self.decoded_offset,
+                        self.source_remove_length,
                         fragment,
                     );
                     let mut buffer = [0_u8; COPY_CHUNK_SIZE];
@@ -760,7 +813,9 @@ struct StreamProof {
 struct SplicedReader<'source, 'fragment> {
     source: &'source mut dyn BufRead,
     expected_source_length: u64,
+    source_remove_length: u64,
     prefix_remaining: u64,
+    source_remove_remaining: u64,
     fragment: &'fragment [u8],
     fragment_position: usize,
     source_sha256: Sha256,
@@ -778,12 +833,15 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
         source: &'source mut dyn BufRead,
         expected_source_length: u64,
         offset: u64,
+        source_remove_length: u64,
         fragment: &'fragment [u8],
     ) -> Self {
         Self {
             source,
             expected_source_length,
+            source_remove_length,
             prefix_remaining: offset,
+            source_remove_remaining: source_remove_length,
             fragment,
             fragment_position: 0,
             source_sha256: Sha256::new(),
@@ -827,6 +885,27 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
         Ok(())
     }
 
+    fn append_removed_source(&mut self, length: usize) -> io::Result<()> {
+        let bytes = &self.pending[..length];
+        let source_length = self
+            .source_content_length
+            .checked_add(u64::try_from(bytes.len()).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "source-content length overflow")
+            })?)
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidData, "source-content length overflow")
+            })?;
+        if source_length > self.expected_source_length {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "verified source content exceeded declared length",
+            ));
+        }
+        self.source_sha256.update(bytes);
+        self.source_content_length = source_length;
+        Ok(())
+    }
+
     fn append_fragment_pending(&mut self, length: usize) -> io::Result<()> {
         let bytes = &self.pending[..length];
         self.target_sha256.update(bytes);
@@ -862,6 +941,25 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
             self.pending_end = read;
             return Ok(());
         }
+        while self.source_remove_remaining != 0 {
+            let request = usize::try_from(self.source_remove_remaining)
+                .unwrap_or(COPY_CHUNK_SIZE)
+                .min(COPY_CHUNK_SIZE);
+            let read = self.source.read(&mut self.pending[..request])?;
+            if read == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "source content ended inside replacement range",
+                ));
+            }
+            self.source_remove_remaining -= u64::try_from(read).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "source-content removal overflow",
+                )
+            })?;
+            self.append_removed_source(read)?;
+        }
         if self.fragment_position < self.fragment.len() {
             let remaining = self.fragment.len() - self.fragment_position;
             let count = remaining.min(COPY_CHUNK_SIZE);
@@ -894,12 +992,18 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
     }
 
     fn finish(self) -> std::result::Result<StreamProof, &'static str> {
-        if self.prefix_remaining != 0 || self.source_content_length != self.expected_source_length {
+        if self.prefix_remaining != 0
+            || self.source_remove_remaining != 0
+            || self.source_content_length != self.expected_source_length
+        {
             return Err("source content length");
         }
         let expected_target = self
             .expected_source_length
-            .checked_add(u64::try_from(self.fragment.len()).unwrap_or(u64::MAX))
+            .checked_sub(self.source_remove_length)
+            .and_then(|length| {
+                length.checked_add(u64::try_from(self.fragment.len()).unwrap_or(u64::MAX))
+            })
             .ok_or("candidate content length")?;
         if self.target_content_length != expected_target {
             return Err("candidate content length");
@@ -1018,9 +1122,7 @@ fn map_replay_archive_marker(
     progress: SourceContentPublicationProgress,
 ) -> Option<SourceContentPublicationError> {
     match error.kind() {
-        soapberry_zip::ErrorKind::IO(source) | soapberry_zip::ErrorKind::Io(source) => {
-            map_replay_io_marker(source, progress)
-        },
+        soapberry_zip::ErrorKind::IO(source) => map_replay_io_marker(source, progress),
         soapberry_zip::ErrorKind::Cancelled => {
             Some(SourceContentPublicationError::Cancelled { progress })
         },

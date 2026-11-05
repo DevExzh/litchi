@@ -22,15 +22,23 @@ litchi-odf = "0.0.1"
 ```rust
 use litchi_odf::{odp, ods, odt};
 
-let doc = odt::Document::open("document.odt")?;
-let text = doc.text()?;
+// Each family's immutable `Package` owns every state verb; the
+// `Document`, `Workbook` and `Presentation` projections are read-only.
+let package = odt::Package::open("document.odt")?;
+let text = package.document()?.text()?;
 
-let sheet = ods::Spreadsheet::open("data.ods")?;
-let csv = sheet.to_csv()?;
+let sheet = ods::Package::open("data.ods")?.workbook()?;
+let names = sheet.sheet_names();
 
-let pres = odp::Presentation::open("slides.odp")?;
+let pres = odp::Package::open("slides.odp")?.presentation()?;
 let slide_values: Vec<odp::slide::Slide> = pres.slides()?;
 let slide_count = pres.slide_count()?;
+
+// Edits stage on a transaction and publish a new package; `save` is an
+// atomic sibling-temporary replacement.
+let mut edit = package.edit();
+edit.replace_paragraph(odt::transaction::Position::new(0), "Updated")?;
+edit.commit()?.package().save("updated.odt")?;
 # Ok::<(), litchi_core::Error>(())
 ```
 

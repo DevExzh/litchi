@@ -11,15 +11,15 @@ use super::*;
 
 /// The commit route before change 0754: the source gate first, then the
 /// route it chose.
-fn historical_route(base: &Snapshot, projected: &Snapshot) -> TransactionResult<Snapshot> {
+fn historical_route(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
     if publication_accepts_preserved_xml(base.xml_bytes()) {
-        compact_changed_paragraphs(base, projected)
+        compact_changed_paragraphs(base, projected, None)
     } else {
-        compact_whole_document(projected)
+        compact_whole_document(base, projected, None)
     }
 }
 
-fn outcome(result: &TransactionResult<Snapshot>) -> String {
+fn outcome(result: &Result<Snapshot>) -> String {
     match result {
         Ok(snapshot) => format!("ok {:?}", snapshot.xml_bytes()),
         Err(error) => format!("err {error} | {error:?}"),
@@ -29,7 +29,7 @@ fn outcome(result: &TransactionResult<Snapshot>) -> String {
 /// Compare the route with the historical one for one projection, and check
 /// the proof invariant.
 fn assert_route(base: &Snapshot, projected: &Snapshot) -> Option<bool> {
-    let committed = commit_preserving_unmodified(base, projected);
+    let committed = commit_preserving_unmodified(base, projected, None);
     let historical = historical_route(base, projected);
     assert_eq!(
         outcome(&committed),
@@ -91,7 +91,11 @@ fn fixture_documents() -> Vec<Vec<u8>> {
         .into_iter()
         .filter_map(|path| {
             let bytes = std::fs::read(&path).ok()?;
-            let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+            let reader = soapberry_zip::office::ArchiveReader::new(
+                &bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .ok()?;
             reader.read("word/document.xml").ok()
         })
         .collect()
@@ -150,7 +154,9 @@ fn the_route_and_proof_follow_the_historical_gate_on_mutated_sources() {
         "<!--a--b-->",
     ];
     let mut fallbacks = 0usize;
-    for xml in fixture_documents().into_iter().take(20) {
+    // The first 40 fixtures in path order: enough mutated paragraphs that
+    // adding fixtures (record 0279 added three) keeps the bound meaningful.
+    for xml in fixture_documents().into_iter().take(40) {
         let Some(body) = xml.windows(8).position(|window| window == b"<w:body>") else {
             continue;
         };
@@ -192,33 +198,35 @@ fn a_candidate_the_writer_would_refuse_carries_no_proof() {
 }
 
 fn generated_package(paragraphs: usize) -> crate::Package {
-    let mut package = crate::Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         for index in 0..paragraphs {
             document.add_paragraph_with_text(&format!("paragraph {index:05}"));
         }
     }
     let mut output = std::io::Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    let package = builder.build().unwrap();
+    package.write_to(&mut output).unwrap();
     crate::Package::from_reader(std::io::Cursor::new(output.into_inner())).unwrap()
 }
 
 fn saved(package: &mut crate::Package) -> Vec<u8> {
     let mut output = std::io::Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     let mut proven_package = generated_package(64);
-    let mut edit = proven_package.edit_document().unwrap();
+    let mut edit = proven_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(7), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().publication_proof().is_some());
-    let published = proven_package.publish_document_commit(commit).unwrap();
+    assert!(commit.patch().target().publication_proof().is_some());
+    let published = commit;
+    proven_package = published.package().clone();
     // The main part now shares the committed snapshot's allocation.
     assert!(std::ptr::eq(
         proven_package
@@ -226,55 +234,60 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
             .main_document_part()
             .unwrap()
             .blob(),
-        published.snapshot().xml_bytes()
+        published.patch().target().xml_bytes()
     ));
 
     let mut unproven_package = generated_package(64);
-    let mut edit = unproven_package.edit_document().unwrap();
+    let mut edit = unproven_package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(7), "edited")
         .unwrap();
     let mut commit = edit.commit().unwrap();
     commit.snapshot.publication = None;
     commit.patch.after.publication = None;
-    assert!(commit.snapshot().publication_proof().is_none());
-    let _published = unproven_package.publish_document_commit(commit).unwrap();
+    assert!(commit.patch().target().publication_proof().is_none());
+    unproven_package = unproven_package
+        .apply(commit.patch())
+        .unwrap()
+        .into_package();
 
     assert_eq!(saved(&mut proven_package), saved(&mut unproven_package));
 
     // A second edit on the published package, and the inverse of the first,
     // publish the same bytes on both.
     for package in [&mut proven_package, &mut unproven_package] {
-        let mut edit = package.edit_document().unwrap();
-        assert!(edit.projected().publication_proof().is_none());
+        let mut edit = package.edit().unwrap();
+        assert!(edit.projected().unwrap().publication_proof().is_none());
         edit.replace_paragraph_text(Position::new(9), "second")
             .unwrap();
-        package.publish_document_edit(edit).unwrap();
+        *package = edit.commit().unwrap().into_package();
     }
     assert_eq!(saved(&mut proven_package), saved(&mut unproven_package));
 }
 
 #[test]
-fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
-    // The source-backed writer audits its own pair and never reads a proof,
-    // so a snapshot bound to a source identity must not pay for one.
+fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
+    // Record 0311: the source-backed writer hands the proof to the OPC
+    // overlay, so a snapshot bound to a source identity is proven too, with
+    // the historical route's bytes.
     let package = generated_package(16);
     let plain = package.document_snapshot().unwrap();
     let mut archive = std::io::Cursor::new(Vec::new());
-    let mut writable = generated_package(16);
-    writable.to_stream(&mut archive).unwrap();
+    let writable = generated_package(16);
+    writable.write_to(&mut archive).unwrap();
     let source_backed = crate::source_backed::Package::from_read_at(Arc::new(
         litchi_core::OwnedSource::new(archive.into_inner()),
     ))
     .unwrap();
-    let base = source_backed.edit_document().unwrap().source().clone();
+    let source_edit = source_backed.edit().unwrap();
+    let base = source_edit.source().unwrap().clone();
     assert!(base.xml.identity().is_some());
     assert_eq!(base.xml_bytes(), plain.xml_bytes());
     let mut edit = base.edit();
     edit.replace_paragraph_text(Position::new(3), "edited")
         .unwrap();
     let projected = edit.projected().clone();
-    let committed = commit_preserving_unmodified(&base, &projected).unwrap();
-    assert!(committed.publication_proof().is_none());
+    let committed = commit_preserving_unmodified(&base, &projected, None).unwrap();
+    assert!(committed.publication_proof().is_some());
     assert_eq!(
         committed.xml_bytes(),
         historical_route(&base, &projected).unwrap().xml_bytes()
@@ -283,7 +296,7 @@ fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
     let mut edit = plain.edit();
     edit.replace_paragraph_text(Position::new(3), "edited")
         .unwrap();
-    let proven = commit_preserving_unmodified(&plain, edit.projected()).unwrap();
+    let proven = commit_preserving_unmodified(&plain, edit.projected(), None).unwrap();
     assert!(proven.publication_proof().is_some());
     assert_eq!(proven.xml_bytes(), committed.xml_bytes());
 }
@@ -291,11 +304,11 @@ fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
 #[test]
 fn a_derived_snapshot_never_inherits_a_proof() {
     let package = generated_package(8);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let proven = commit.snapshot();
+    let proven = commit.patch().target();
     assert!(proven.publication_proof().is_some());
     // A clone is the same allocation and keeps it.
     assert!(proven.clone().publication_proof().is_some());

@@ -452,3 +452,10 @@ mod tests {
         assert_eq!(region.text_bytes(), 0);
     }
 }
+
+/// Exact-source transactions for header and footer text.
+pub mod text {
+    pub use crate::package::header_footer_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}

@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn comments_round_trip_with_other_subdocuments() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Main 😀").unwrap();
     writer.add_footnote(FootnoteEntry::new(0, "Footnote", 1));
     writer.add_comment(
@@ -36,8 +36,8 @@ fn comments_round_trip_with_other_subdocuments() {
     writer.set_odd_header("Header");
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     assert_eq!(document.footnotes().unwrap().len(), 1);
@@ -86,8 +86,8 @@ fn comments_round_trip_with_other_subdocuments() {
             .unwrap()
             .as_nanos()
     ));
-    writer.save(&path).unwrap();
-    let mut package = crate::Package::open(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
+    let mut package = crate::raw::Reader::open(&path).unwrap();
     let comments = package.document().unwrap().comments().unwrap();
     assert_eq!(comments.len(), 2);
     assert_eq!(
@@ -100,18 +100,18 @@ fn comments_round_trip_with_other_subdocuments() {
 
 #[test]
 fn rejects_comment_metadata_outside_binary_limits() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Main").unwrap();
     writer.add_comment(CommentEntry::new(0, "Body", "Author", "0123456789"));
 
-    let error = writer.write_to(&mut Cursor::new(Vec::new())).unwrap_err();
+    let error = writer.build().unwrap_err();
     assert!(error.to_string().contains("at most nine"));
 }
 
 #[test]
 fn rejects_annotation_bookmarks_above_spec_count_before_story_allocations() {
     let count = crate::parts::annotation_bookmarks::MAX_ENTRIES + 1;
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(&"x".repeat(count + 1))
         .expect("main paragraph is accepted");
@@ -120,7 +120,7 @@ fn rejects_annotation_bookmarks_above_spec_count_before_story_allocations() {
     }
 
     let error = writer
-        .write_to(&mut Cursor::new(Vec::new()))
+        .build()
         .expect_err("annotation bookmark count must be bounded");
     assert!(error.to_string().contains("0x3FFB"));
 }
@@ -128,7 +128,7 @@ fn rejects_annotation_bookmarks_above_spec_count_before_story_allocations() {
 #[test]
 fn writes_maximum_annotation_bookmark_count() {
     let count = crate::parts::annotation_bookmarks::MAX_ENTRIES;
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(&"x".repeat(count + 1))
         .expect("main paragraph is accepted");
@@ -138,9 +138,11 @@ fn writes_maximum_annotation_bookmark_count() {
 
     let mut output = Cursor::new(Vec::new());
     writer
+        .build()
+        .unwrap()
         .write_to(&mut output)
         .expect("maximum annotation bookmark count is writable");
-    let mut package = crate::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(
         document.annotation_bookmarks().unwrap().unwrap().len(),
@@ -151,13 +153,10 @@ fn writes_maximum_annotation_bookmark_count() {
 #[test]
 fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
     let write_error = |entry: CommentEntry| {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Main").unwrap();
         writer.add_comment(entry);
-        writer
-            .write_to(&mut Cursor::new(Vec::new()))
-            .unwrap_err()
-            .to_string()
+        writer.build().unwrap_err().to_string()
     };
 
     let error = write_error(CommentEntry::new(0, "Body", "Author", "A").with_range(4, 2));

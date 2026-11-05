@@ -1,0 +1,123 @@
+{
+  "record": "0359qd",
+  "date": "2026-10-22",
+  "scenario": "doc/leaf_write",
+  "status": "matched_ir_output_heap_native_pending",
+  "implementation_commit": "ae094d7d055c59aa9980d52339000b959689d376",
+  "probe": {
+    "source_sha256": "9e1cd649268ad5eefe4314b76493f61cd047bf6ec4114c7e7872b2182b1af689",
+    "environment": {
+      "LITCHI_PROBE_ONLY": "doc/leaf_write",
+      "LITCHI_PROBE_BATCH_ROUNDS": "1",
+      "argv": ["legacy_w5_source_probe", "1"],
+      "runner": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/runner/legacy_w5_source_probe"
+    }
+  },
+  "source_assemblies": {
+    "original": {
+      "implementation_commit": "81323113be7e166d1b37ea185e9fd712d8748a62",
+      "binary": {
+        "path": "before-qualified-legacy_w5_source_probe",
+        "bytes": 13346048,
+        "sha256": "0c4392e6cbf5a65b5e3901fdc860cec80ce29518b11e47b70620641df405c92a"
+      }
+    },
+    "previous_after": {
+      "implementation_commit": "160a00559bb7edb905b1315753e33aedc74c3733",
+      "binary": {
+        "path": "after-qualified-legacy_w5_source_probe",
+        "bytes": 13346080,
+        "sha256": "cfdf1e3040b9b742551d80cd583fc28de4f366f9f9bc9fb7198e91aa3352384f"
+      },
+      "massif_peak_total_bytes": 7620152,
+      "callgrind_route_ir": 258771387
+    },
+    "candidate": {
+      "implementation_commit": "ae094d7d055c59aa9980d52339000b959689d376",
+      "implementation_files": {
+        "crates/litchi-doc/src/body_text.rs": "e12d3f8f35c2183c0cc69ec411d08cc6b76d107a1747ca5ec7baa2c0d33dea77",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "0fd67fae678e870f6e7216f0ec5d64ea62a0da7db6df7f87297a965fd9a2da86"
+      },
+      "binary": {
+        "path": "after-inplace-legacy_w5_source_probe",
+        "bytes": 13345056,
+        "sha256": "399d08d26629caf982d54bf8bdd7209d79b834e8b0162a950e2d1227dc9a6b93"
+      }
+    }
+  },
+  "build": {
+    "toolchain": "rustc 1.95.0 (59807616 2026-04-14); cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "command": "RUSTUP_TOOLCHAIN=1.95.0 LITCHI_MEM_MAX=20G CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/repair-inplace cargo build --offline --locked --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe",
+    "duration": "1m57s",
+    "memory_cap": "20G; MemorySwapMax=0",
+    "target": "/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target"
+  },
+  "output": {
+    "sha256": "6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11",
+    "json": {
+      "path": "after-inplace-ordinary.json",
+      "bytes": 223,
+      "sha256": "5f57d5df67b226e904d859cab7b33ca790b00008ae38f22dc3dc1d26042b0dab"
+    },
+    "log": {
+      "path": "after-inplace-ordinary.log",
+      "bytes": 42,
+      "sha256": "e974874525e65e2c15cae0a560787a02cbe6e9a18dbea25d81dc1fb356feffb3"
+    }
+  },
+  "callgrind": {
+    "command": "systemd-run --user --scope --collect -p MemoryMax=20G -p MemorySwapMax=0 valgrind --tool=callgrind --callgrind-out-file=<leg>.callgrind <runner> 1",
+    "candidate": {
+      "path": "after-inplace-ordinary.callgrind",
+      "bytes": 311611,
+      "sha256": "b9b55ca89f34eea8ddc021382de21299e5ef4dba270fbabc036fff21e5d9bd4b"
+    },
+    "calls": 4,
+    "rows": [
+      {"operation": "routes::doc_leaf_write", "candidate_ir": 257805703, "original_ir": 256566637, "previous_after_ir": 258771387, "candidate_over_original": 1.004829412, "candidate_over_previous_after": 0.996268196},
+      {"operation": "Package::edit", "candidate_ir": 92189187, "original_ir": 87950819, "previous_after_ir": 92226703, "candidate_over_original": 1.048190205, "candidate_over_previous_after": 0.999593219},
+      {"operation": "Edit::commit", "candidate_ir": 79832201, "original_ir": 73309585, "previous_after_ir": 80778169, "candidate_over_original": 1.088973577, "candidate_over_previous_after": 0.988289311},
+      {"operation": "Package::from_bytes_with_options", "candidate_ir": 60653358, "original_ir": 60176893, "previous_after_ir": 59526823, "candidate_over_original": 1.007915456, "candidate_over_previous_after": 1.019865934},
+      {"operation": "set_character_property_override", "candidate_ir": 22455186, "original_ir": 32187392, "previous_after_ir": 22491847, "candidate_over_original": 0.697639187, "candidate_over_previous_after": 0.998370031},
+      {"operation": "Package::write_to", "candidate_ir": 2019194, "original_ir": 2284447, "previous_after_ir": 2413559, "candidate_over_original": 0.883887435, "candidate_over_previous_after": 0.836604367}
+    ],
+    "commit_callees_vs_original": [
+      {"operation": "Document::from_ole_with_options", "candidate_ir": 59887476, "original_ir": 60195583},
+      {"operation": "RevisionEditor::open_from_package", "candidate_ir": 7340384, "original_ir": 7287067},
+      {"operation": "Edit::put_streams_shared", "candidate_ir": 4803020, "original_setter_commit_candidate_ir": 4789219},
+      {"operation": "memcpy", "candidate_ir": 1999420, "original_ir": 1358348, "delta_ir": 641072},
+      {"operation": "RevisionEditor::rewrite_chpx", "candidate_ir": 653486, "original_setter_ir": 655124},
+      {"operation": "Arc::from_box_in", "candidate_ir": 678625, "original_ir": 678715}
+    ],
+    "annotate": {
+      "path": "after-inplace.annotate",
+      "bytes": 235491,
+      "sha256": "2e2753d4c6158d72d6e9957bf7ffe8481488a5ac5205625753af7581e69d4918"
+    }
+  },
+  "massif": {
+    "command": "systemd-run --user --scope --collect -p MemoryMax=20G -p MemorySwapMax=0 valgrind --tool=massif --pages-as-heap=no --massif-out-file=<leg>.massif <runner> 1",
+    "candidate": {
+      "path": "after-inplace-ordinary.massif",
+      "bytes": 184273,
+      "sha256": "1345560d1a059f189dc1253a0064c189a96136b2ec92404a1362056cf47c55fb",
+      "peak_heap_bytes": 7863939,
+      "peak_extra_bytes": 46501,
+      "peak_total_bytes": 7910440,
+      "peak_tree_scope": "routes::doc_leaf_write; no doc_batch1k_leaf_write frame"
+    },
+    "ms_print": {
+      "path": "after-inplace.ms_print",
+      "bytes": 203145,
+      "sha256": "adfc5a0d7e59607b6fe85a6f06f17097d25ef06128ce9591ba2e4880f9ec56f7"
+    },
+    "ratios": {
+      "candidate_over_original_total": 0.961329249,
+      "candidate_over_previous_after_total": 1.038094778
+    }
+  },
+  "native": {
+    "status": "not_run_host_overload",
+    "reason": "Unrelated Cargo and rustc work was active; no native timing claim is made."
+  }
+}

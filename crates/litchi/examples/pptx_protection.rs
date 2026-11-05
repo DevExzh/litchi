@@ -1,7 +1,7 @@
 //! Presentation protection example - demonstrates security settings.
 
 use litchi::pptx::presentation_properties::metadata::protection::{
-    Algorithm, Settings, Slide, Type,
+    Algorithm, Limits, Settings, Slide, Type,
 };
 use litchi::pptx::{Package, encryption::Mode};
 
@@ -45,7 +45,7 @@ fn main() {
 
     // Test password protection
     let mut password_protected = Settings::new();
-    if let Err(e) = password_protected.set_modify_password(&password) {
+    if let Err(e) = password_protected.set_modify_password(&password, Limits::DEFAULT) {
         println!("\nError setting modify password: {e}");
         return;
     }
@@ -123,12 +123,18 @@ fn main() {
 
     // Generate XML
     let mut with_password = Settings::new();
-    if let Err(error) = with_password.set_modify_password(&password) {
+    if let Err(error) = with_password.set_modify_password(&password, Limits::DEFAULT) {
         println!("\nError setting XML example password: {error}");
         return;
     }
 
-    let xml = with_password.to_xml();
+    let xml = match with_password.to_xml(Limits::DEFAULT) {
+        Ok(xml) => xml,
+        Err(error) => {
+            println!("\nError serializing XML example: {error}");
+            return;
+        },
+    };
     println!("\nGenerated protection XML:");
     println!("  Length: {} bytes", xml.len());
     assert!(xml.contains("modifyVerifier"));
@@ -144,9 +150,9 @@ fn main() {
 }
 
 fn generate_protection_pptx(password: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
         let slide = pres.add_slide()?;
         slide.set_title("Protection and Encryption Demo");
         slide.add_text_box(
@@ -161,6 +167,7 @@ fn generate_protection_pptx(password: &str) -> Result<(), Box<dyn std::error::Er
             914400,
         );
     }
+    let pkg = builder.build()?;
     pkg.save_plain("pptx_protection_clear.pptx")?;
     pkg.save_encrypted("pptx_protection_open_password.pptx", password, Mode::Agile)?;
 

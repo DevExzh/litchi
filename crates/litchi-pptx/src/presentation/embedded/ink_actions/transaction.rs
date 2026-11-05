@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use litchi_drawingml::ink::actions::{self, Edit as ProfileEdit, Profile};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::PackURI;
 
 use super::model::{AnchorFingerprint, AnchorSelector, Snapshot};
 use crate::{Error, Result};
@@ -14,12 +14,12 @@ pub type Revision = u64;
 
 /// A source-backed editor over already classified action targets.
 #[derive(Clone, Debug)]
-pub struct Edit {
+pub(crate) struct Draft {
     source: Snapshot,
     replacements: HashMap<usize, Profile>,
 }
 
-impl Edit {
+impl Draft {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             source,
@@ -27,15 +27,8 @@ impl Edit {
         }
     }
 
-    /// Immutable snapshot against which selectors and source contexts resolve.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
-    /// Whether one or more target profiles differ from the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         self.replacements.iter().any(|(index, profile)| {
             self.source
                 .anchors()
@@ -44,46 +37,40 @@ impl Edit {
         })
     }
 
-    /// Obtain a detached shared profile edit for one selected target.
-    ///
-    /// The returned edit remains independent until it is passed back through
-    /// [`Self::replace_profile`] or [`Self::edit_profile`].
-    pub fn profile_edit(&self, selector: AnchorSelector) -> Result<ProfileEdit> {
-        let index = self.source.find(selector)?;
-        actions::Edit::with_limits(
-            self.source.anchors()[index].profile().clone(),
-            profile_limits(self.source.limits()),
-        )
-        .map_err(Into::into)
-    }
-
-    /// Alias emphasizing that the returned edit is the shared DrawingML edit.
-    pub fn shared_edit(&self, selector: AnchorSelector) -> Result<ProfileEdit> {
-        self.profile_edit(selector)
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Run shared action-profile mutations and stage the resulting profile.
-    pub fn edit_profile<F>(&mut self, selector: AnchorSelector, edit: F) -> Result<bool>
+    pub(crate) fn edit_profile<F>(&mut self, selector: AnchorSelector, edit: F) -> Result<bool>
     where
         F: FnOnce(&mut ProfileEdit) -> Result<()>,
     {
         let index = self.source.find(selector)?;
-        let mut profile_edit = actions::Edit::with_limits(
+        let mut profile_edit = actions::Edit::new(
             self.source.anchors()[index].profile().clone(),
             profile_limits(self.source.limits()),
         )?;
         edit(&mut profile_edit)?;
-        let committed = profile_edit.finish()?;
-        self.replace_profile(selector, committed.profile().clone())
+        let committed = profile_edit.commit()?;
+        self.replace_profile(selector, committed.package().profile().clone())
     }
 
     /// Replace one existing target with an already validated shared profile.
-    pub fn replace_profile(&mut self, selector: AnchorSelector, profile: Profile) -> Result<bool> {
+    pub(crate) fn replace_profile(
+        &mut self,
+        selector: AnchorSelector,
+        profile: Profile,
+    ) -> Result<bool> {
         let index = self.source.find(selector)?;
         if profile.source().len() > self.source.limits().target_bytes {
             return Err(Error::Limit {
-                resource: "ink-action target bytes",
-                limit: self.source.limits().target_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: profile.source().len(),
+                maximum: self.source.limits().target_bytes,
             });
         }
         if self.source.anchors()[index].profile() == &profile {
@@ -101,27 +88,28 @@ impl Edit {
     }
 
     /// Parse and replace one existing target from bounded XML bytes.
-    pub fn replace_profile_bytes(
+    pub(crate) fn replace_profile_bytes(
         &mut self,
         selector: AnchorSelector,
         bytes: impl AsRef<[u8]>,
     ) -> Result<bool> {
         if bytes.as_ref().len() > self.source.limits().target_bytes {
             return Err(Error::Limit {
-                resource: "ink-action target bytes",
-                limit: self.source.limits().target_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: bytes.as_ref().len(),
+                maximum: self.source.limits().target_bytes,
             });
         }
-        let profile = actions::read_profile(bytes.as_ref())?;
+        let profile = actions::read_profile(bytes.as_ref(), actions::Limits::DEFAULT)?;
         self.replace_profile(selector, profile)
     }
 
-    /// Commit all staged target replacements into an immutable snapshot and
+    /// Prepared all staged target replacements into an immutable snapshot and
     /// reversible source-checked patch.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if self.replacements.is_empty() {
-            return Ok(Commit {
-                patch: Patch {
+            return Ok(Prepared {
+                patch: Change {
                     before: self.source.clone(),
                     after: self.source.clone(),
                 },
@@ -172,8 +160,8 @@ impl Edit {
             }
         }
         if !changed {
-            return Ok(Commit {
-                patch: Patch {
+            return Ok(Prepared {
+                patch: Change {
                     before: self.source.clone(),
                     after: self.source.clone(),
                 },
@@ -202,18 +190,13 @@ impl Edit {
             self.source.read_limits,
             self.source.limits(),
         );
-        Ok(Commit {
-            patch: Patch {
+        Ok(Prepared {
+            patch: Change {
                 before: self.source,
                 after: after.clone(),
             },
             snapshot: after,
         })
-    }
-
-    /// Alias for [`Self::commit`].
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
     }
 
     fn validate_replacements(&self) -> Result<HashMap<PackURI, (Arc<[u8]>, Arc<Profile>)>> {
@@ -249,8 +232,11 @@ impl Edit {
             let size = profile.source().len();
             if size > limits.target_bytes {
                 return Err(Error::Limit {
-                    resource: "ink-action target bytes",
-                    limit: limits.target_bytes,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::PayloadBytes,
+                    ),
+                    observed: size,
+                    maximum: limits.target_bytes,
                 });
             }
             if let Some(existing_index) =
@@ -272,13 +258,17 @@ impl Edit {
         let mut aggregate = 0usize;
         for size in final_sizes.values() {
             aggregate = aggregate.checked_add(*size).ok_or(Error::Limit {
-                resource: "ink-action aggregate target bytes",
-                limit: limits.total_target_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: usize::MAX,
+                maximum: limits.total_target_bytes,
             })?;
             if aggregate > limits.total_target_bytes {
                 return Err(Error::Limit {
-                    resource: "ink-action aggregate target bytes",
-                    limit: limits.total_target_bytes,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::PayloadBytes,
+                    ),
+                    observed: aggregate,
+                    maximum: limits.total_target_bytes,
                 });
             }
         }
@@ -313,92 +303,87 @@ fn clone_slice<T: Clone>(values: &[T], resource: &'static str) -> Result<Vec<T>>
 
 /// A committed immutable action graph and its source-checked patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
+pub(crate) struct Prepared {
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
 }
 
-impl Commit {
+impl Prepared {
     /// Snapshot expected after publication.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible package patch represented by this commit.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Change {
         &self.patch
     }
 
-    /// Whether publication changes any owner or target bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.patch.is_empty()
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
     }
 
-    /// Consume the commit and return its patch.
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
 /// A reversible source-checked patch for an existing action target graph.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     /// Source snapshot required by this patch.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Resulting snapshot produced by this patch.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether the patch is an exact semantic/source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias used by package owners for no-op checks.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Reverse this patch while retaining exact source checks.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
-
-    /// Apply this patch to an OPC package atomically.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        super::package::apply_patch(package, self)
-    }
 }
 
 /// Shared action profile limits selected by the owner transaction.
 #[must_use]
-pub fn default_profile_limits() -> actions::Limits {
-    actions::Limits::default()
+pub fn default_profile_limits() -> actions::builder::EditOptions {
+    actions::builder::EditOptions::default()
 }
 
-fn profile_limits(limits: super::model::Limits) -> actions::Limits {
-    let mut profile_limits = actions::Limits::default();
+fn profile_limits(limits: super::model::Limits) -> actions::builder::EditOptions {
+    let mut profile_limits = actions::builder::EditOptions::default();
     profile_limits.max_output_bytes = profile_limits.max_output_bytes.min(limits.target_bytes);
     profile_limits.max_payload_bytes = profile_limits.max_payload_bytes.min(limits.target_bytes);
     profile_limits

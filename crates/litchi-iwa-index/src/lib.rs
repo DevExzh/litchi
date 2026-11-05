@@ -15,10 +15,10 @@
 //! The [`semantic`] module is an intentional second view over that snapshot.
 //! It publishes only adapter-local handles and neutral location metadata; it
 //! does not widen the archive-free leaf with package, payload, or native
-//! identifier types. The low-level graph re-exports and
-//! [`ObjectIndex::reference_graph`] are retained as explicitly deprecated
-//! compatibility bridges for existing index adapters. New semantic callers
-//! should use [`SemanticIndex`] and its opaque handles instead.
+//! identifier types. [`ObjectIndex::reference_snapshot`] is the canonical
+//! immutable typed graph projection for callers that need the complete graph
+//! view. New semantic callers should use [`SemanticIndex`] and its opaque
+//! handles instead.
 
 pub mod error;
 pub mod fragment;

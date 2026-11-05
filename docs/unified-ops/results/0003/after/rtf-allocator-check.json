@@ -1,0 +1,1261 @@
+{
+ "schema": "litchi.unified-ops.0003.s10-rtf-allocator-check.v1",
+ "script": "rtf_allocator_check.py (children), rtf_allocator_summary.py (rows)",
+ "tunables": "GLIBC_TUNABLES=glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+ "summary": {
+  "children": 24,
+  "failed": 0,
+  "rows": [
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 1949.57625,
+    "child_p50_us": [
+     1860.3,
+     2042.1,
+     1881.3,
+     2017.8
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 1780.38725,
+    "child_p50_us": [
+     2080.3,
+     1772.6,
+     1778.6,
+     1782.2
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 3197.82625,
+    "child_p50_us": [
+     3213.6,
+     3219.8,
+     3182.0,
+     3135.3
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 52.02025,
+    "child_p50_us": [
+     51.1,
+     52.7,
+     51.4,
+     52.7
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 50.1855,
+    "child_p50_us": [
+     50.5,
+     50.0,
+     49.7,
+     50.4
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 51.8875,
+    "child_p50_us": [
+     52.6,
+     51.8,
+     51.9,
+     51.3
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 7.405,
+    "child_p50_us": [
+     7.4,
+     7.5,
+     7.4,
+     7.4
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 7.19025,
+    "child_p50_us": [
+     7.3,
+     7.2,
+     7.1,
+     7.2
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 7.5025,
+    "child_p50_us": [
+     7.5,
+     7.5,
+     7.5,
+     7.4
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 1940.9935,
+    "child_p50_us": [
+     1892.3,
+     1975.5,
+     1906.5,
+     2045.3
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 3192.6835,
+    "child_p50_us": [
+     3201.4,
+     3181.6,
+     3184.0,
+     3225.6
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 1927.20575,
+    "child_p50_us": [
+     1979.2,
+     1934.7,
+     1919.7,
+     1912.2
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 53.2425,
+    "child_p50_us": [
+     52.5,
+     54.0,
+     52.4,
+     54.8
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 48.68775,
+    "child_p50_us": [
+     48.7,
+     48.2,
+     48.6,
+     49.0
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 41.77025,
+    "child_p50_us": [
+     42.3,
+     41.9,
+     41.7,
+     41.3
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 7.73775,
+    "child_p50_us": [
+     7.7,
+     7.9,
+     7.7,
+     7.8
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 7.385,
+    "child_p50_us": [
+     7.4,
+     7.4,
+     7.4,
+     7.3
+    ]
+   },
+   {
+    "mode": "default",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 7.425,
+    "child_p50_us": [
+     7.5,
+     7.4,
+     7.5,
+     7.3
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 1932.33125,
+    "child_p50_us": [
+     1901.6,
+     1952.5,
+     1912.2,
+     1959.8
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 1710.17475,
+    "child_p50_us": [
+     1719.3,
+     1695.4,
+     1727.2,
+     1701.1
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 1899.246,
+    "child_p50_us": [
+     1882.5,
+     1929.3,
+     1904.4,
+     1894.1
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 39.5755,
+    "child_p50_us": [
+     39.6,
+     39.6,
+     39.6,
+     39.2
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 38.04775,
+    "child_p50_us": [
+     38.0,
+     38.0,
+     39.0,
+     38.1
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 39.575,
+    "child_p50_us": [
+     40.2,
+     39.9,
+     39.2,
+     39.2
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 7.3375,
+    "child_p50_us": [
+     7.3,
+     7.4,
+     7.3,
+     7.4
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 7.105,
+    "child_p50_us": [
+     7.1,
+     7.1,
+     7.1,
+     7.1
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 7.495,
+    "child_p50_us": [
+     7.6,
+     7.5,
+     7.5,
+     7.5
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 1904.31325,
+    "child_p50_us": [
+     1907.9,
+     1834.3,
+     1903.1,
+     1905.5
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 1776.9455,
+    "child_p50_us": [
+     1764.8,
+     1776.0,
+     1777.9,
+     1778.3
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-large",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 1889.7335,
+    "child_p50_us": [
+     1883.7,
+     1895.7,
+     1857.5,
+     1932.2
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 40.30775,
+    "child_p50_us": [
+     40.3,
+     40.6,
+     40.0,
+     40.4
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 38.435,
+    "child_p50_us": [
+     37.8,
+     38.4,
+     38.5,
+     38.7
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-medium",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 40.25275,
+    "child_p50_us": [
+     40.9,
+     40.5,
+     39.8,
+     40.0
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "A",
+    "children": 4,
+    "median_child_p50_us": 7.705,
+    "child_p50_us": [
+     7.7,
+     7.7,
+     7.7,
+     7.6
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "L",
+    "children": 4,
+    "median_child_p50_us": 7.32,
+    "child_p50_us": [
+     7.2,
+     7.3,
+     7.4,
+     7.3
+    ]
+   },
+   {
+    "mode": "tunables",
+    "route": "rtf_file_open_lifecycle",
+    "corpus": "rtf-semantic-plain-tiny",
+    "leg": "U",
+    "children": 4,
+    "median_child_p50_us": 7.38775,
+    "child_p50_us": [
+     7.5,
+     7.4,
+     7.4,
+     7.4
+    ]
+   }
+  ]
+ },
+ "children": [
+  {
+   "block": 1,
+   "mode": "default",
+   "position": 1,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-default-1A-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:58:52.629599+00:00",
+   "loadavg_before": [
+    "3.61",
+    "3.98",
+    "4.48"
+   ],
+   "seconds": 1.364,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "default",
+   "position": 2,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-default-2U-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:58:53.993345+00:00",
+   "loadavg_before": [
+    "3.61",
+    "3.98",
+    "4.48"
+   ],
+   "seconds": 2.442,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "default",
+   "position": 3,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-default-3L-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:58:56.435568+00:00",
+   "loadavg_before": [
+    "3.61",
+    "3.98",
+    "4.48"
+   ],
+   "seconds": 2.0,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "default",
+   "position": 4,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-default-4L-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:58:58.436260+00:00",
+   "loadavg_before": [
+    "3.72",
+    "4.00",
+    "4.49"
+   ],
+   "seconds": 1.71,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "default",
+   "position": 5,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-default-5U-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:00.146250+00:00",
+   "loadavg_before": [
+    "3.72",
+    "4.00",
+    "4.49"
+   ],
+   "seconds": 2.457,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "default",
+   "position": 6,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-default-6A-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:02.603799+00:00",
+   "loadavg_before": [
+    "6.15",
+    "4.50",
+    "4.64"
+   ],
+   "seconds": 1.451,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "tunables",
+   "position": 1,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-tunables-1A-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:04.055222+00:00",
+   "loadavg_before": [
+    "6.15",
+    "4.50",
+    "4.64"
+   ],
+   "seconds": 1.406,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "tunables",
+   "position": 2,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-tunables-2U-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:05.461293+00:00",
+   "loadavg_before": [
+    "6.15",
+    "4.50",
+    "4.64"
+   ],
+   "seconds": 1.576,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "tunables",
+   "position": 3,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-tunables-3L-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:07.037655+00:00",
+   "loadavg_before": [
+    "6.15",
+    "4.50",
+    "4.64"
+   ],
+   "seconds": 1.223,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "tunables",
+   "position": 4,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-tunables-4L-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:08.260978+00:00",
+   "loadavg_before": [
+    "5.90",
+    "4.47",
+    "4.64"
+   ],
+   "seconds": 1.214,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "tunables",
+   "position": 5,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-tunables-5U-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:09.475065+00:00",
+   "loadavg_before": [
+    "5.90",
+    "4.47",
+    "4.64"
+   ],
+   "seconds": 1.588,
+   "exit_code": 0
+  },
+  {
+   "block": 1,
+   "mode": "tunables",
+   "position": 6,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B1-tunables-6A-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:11.063117+00:00",
+   "loadavg_before": [
+    "5.90",
+    "4.47",
+    "4.64"
+   ],
+   "seconds": 1.354,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "default",
+   "position": 1,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-default-1A-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:12.417168+00:00",
+   "loadavg_before": [
+    "5.90",
+    "4.47",
+    "4.64"
+   ],
+   "seconds": 1.361,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "default",
+   "position": 2,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-default-2U-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:13.778599+00:00",
+   "loadavg_before": [
+    "5.66",
+    "4.45",
+    "4.63"
+   ],
+   "seconds": 2.37,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "default",
+   "position": 3,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-default-3L-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:16.148412+00:00",
+   "loadavg_before": [
+    "5.66",
+    "4.45",
+    "4.63"
+   ],
+   "seconds": 1.695,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "default",
+   "position": 4,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-default-4L-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:17.843832+00:00",
+   "loadavg_before": [
+    "5.53",
+    "4.44",
+    "4.62"
+   ],
+   "seconds": 1.715,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "default",
+   "position": 5,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-default-5U-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:19.559295+00:00",
+   "loadavg_before": [
+    "5.53",
+    "4.44",
+    "4.62"
+   ],
+   "seconds": 2.371,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "default",
+   "position": 6,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-default-6A-rtf.json"
+   ],
+   "glibc_tunables": null,
+   "started_utc": "2026-10-05T22:59:21.930746+00:00",
+   "loadavg_before": [
+    "5.53",
+    "4.44",
+    "4.62"
+   ],
+   "seconds": 1.449,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "tunables",
+   "position": 1,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-tunables-1A-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:23.380010+00:00",
+   "loadavg_before": [
+    "5.33",
+    "4.42",
+    "4.61"
+   ],
+   "seconds": 1.425,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "tunables",
+   "position": 2,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-tunables-2U-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:24.805176+00:00",
+   "loadavg_before": [
+    "5.33",
+    "4.42",
+    "4.61"
+   ],
+   "seconds": 1.555,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "tunables",
+   "position": 3,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-tunables-3L-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:26.360732+00:00",
+   "loadavg_before": [
+    "5.33",
+    "4.42",
+    "4.61"
+   ],
+   "seconds": 1.226,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "tunables",
+   "position": 4,
+   "leg": "L",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_leaf_open,rtf_file_leaf_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-tunables-4L-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:27.586657+00:00",
+   "loadavg_before": [
+    "5.14",
+    "4.39",
+    "4.61"
+   ],
+   "seconds": 1.229,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "tunables",
+   "position": 5,
+   "leg": "U",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-s10-measure/target/release/litchi-perf-baseline",
+    "--case",
+    "rtf_file_unified_open,rtf_file_unified_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-tunables-5U-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:28.815764+00:00",
+   "loadavg_before": [
+    "5.14",
+    "4.39",
+    "4.61"
+   ],
+   "seconds": 1.628,
+   "exit_code": 0
+  },
+  {
+   "block": 2,
+   "mode": "tunables",
+   "position": 6,
+   "leg": "A",
+   "argv": [
+    "taskset",
+    "-c",
+    "20",
+    "/home/zhuhe/code/litchi-worktrees/uo-m0a-baseline-bin/litchi-perf-baseline-da4c207478",
+    "--case",
+    "rtf_file_open,rtf_file_open_lifecycle",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--workers",
+    "1",
+    "--json",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/b8eb3d11-f223-4205-92d4-66b12eacbd85/scratchpad/s10/rtf-check/raw/B2-tunables-6A-rtf.json"
+   ],
+   "glibc_tunables": "glibc.malloc.trim_threshold=4294967295:glibc.malloc.mmap_threshold=33554432",
+   "started_utc": "2026-10-05T22:59:30.443752+00:00",
+   "loadavg_before": [
+    "5.14",
+    "4.39",
+    "4.61"
+   ],
+   "seconds": 1.412,
+   "exit_code": 0
+  }
+ ]
+}

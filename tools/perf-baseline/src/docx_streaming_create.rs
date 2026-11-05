@@ -188,7 +188,8 @@ fn inspect_materialized_archive(
     archive: &[u8],
     spec: &DocxStreamingSpec,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let physical = OwnedPhysPkgReader::from_bytes(archive.to_vec())?;
+    let physical =
+        OwnedPhysPkgReader::from_bytes(archive.to_vec(), litchi_opc::SourceLimits::default())?;
     let member_names = physical.member_names()?;
     if member_names != DOCX_STREAMING_MEMBER_NAMES {
         return Err(format!(
@@ -416,7 +417,9 @@ mod tests {
         archive: &[u8],
         mutate: impl FnOnce(&mut Vec<(String, Vec<u8>)>),
     ) -> Vec<u8> {
-        let source = OwnedPhysPkgReader::from_bytes(archive.to_vec()).expect("source package");
+        let source =
+            OwnedPhysPkgReader::from_bytes(archive.to_vec(), litchi_opc::SourceLimits::default())
+                .expect("source package");
         let mut members = source
             .member_names()
             .expect("source member names")
@@ -427,7 +430,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
         mutate(&mut members);
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, payload) in members {
             writer
                 .write_deflated(&name, &payload)

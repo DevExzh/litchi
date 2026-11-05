@@ -18,7 +18,10 @@ fuzz_target!(|data: &[u8]| {
     // Cheap sniff helper; exercises the public is_ole_file path.
     let _ = litchi_cfb::is_ole_file(data);
 
-    if let Ok(mut ole) = litchi_cfb::OleFile::open(std::io::Cursor::new(data)) {
+    if let Ok(mut ole) = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(data),
+        litchi_cfb::OleFileLimits::default(),
+    ) {
         // Walk the directory tree to give the fuzzer extra reach.
         let streams = ole.list_streams();
         let _ = ole.list_directory_entries(&[]);

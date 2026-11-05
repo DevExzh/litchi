@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{FormFieldType, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{FormFieldType, write::Writer};
 
 const SYNTHETIC: &str = concat!(
     r#"{\rtf1\ansi Start"#,
@@ -21,7 +22,7 @@ const SYNTHETIC: &str = concat!(
 
 #[test]
 fn parses_typed_properties_and_round_trips_inertly() {
-    let document = RtfDocument::parse(SYNTHETIC).unwrap();
+    let document = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "StartvaluexEnd");
     assert_eq!(document.form_fields().len(), 2);
 
@@ -39,15 +40,11 @@ fn parses_typed_properties_and_round_trips_inertly() {
     assert!(checkbox.size_automatically);
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
-        .write_document(&document)
-        .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.form_fields(), document.form_fields());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -79,13 +76,13 @@ fn rejects_wrong_order_kind_bounds_duplicates_and_active_content() {
     for properties in malformed {
         let source = wrap_formfield(properties);
         assert!(
-            RtfDocument::parse(&source).is_err(),
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed properties: {properties}"
         );
     }
 
     let unstarred = r"{\rtf1{\field{\*\fldinst FORMTEXT{\formfield{\fftype0}}}{\fldrslt x}}}";
-    assert!(RtfDocument::parse(unstarred).is_err());
+    assert!(Tree::parse(unstarred, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 #[test]
@@ -128,7 +125,7 @@ fn parses_bundled_libreoffice_extended_formfield() {
     };
     let group = std::str::from_utf8(&fixture[start..end]).unwrap();
     let source = format!(r"{{\rtf1\ansi{{\field{{\*\fldinst FORMTEXT{group}}}{{\fldrslt x}}}}}}");
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let field = &document.form_fields()[0];
     assert_eq!(field.field_type, FormFieldType::Text);
     assert_eq!(field.max_length, Some(50));

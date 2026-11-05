@@ -10,13 +10,10 @@
 
 use crate::error::{Error, Result};
 use litchi_core::xml::escape::escape_xml;
-use litchi_ooxml_common::vba::{
-    Host, read_project_part, remove_project_graph, store_project_graph,
-};
+use litchi_ooxml_common::vba::{Edit as VbaEdit, EditOptions, Host, read_project_part};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use litchi_vba::{Limits, project::Project};
-use std::sync::Arc;
 
 const WORD_VBA_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2006/wordml";
 const MAX_MACRO_NAME_CHARACTERS: usize = 255;
@@ -294,15 +291,6 @@ impl VbaProject {
         &self.supplemental_data_part_name
     }
 
-    /// Parse the `vbaProject.bin` payload with default resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
-        self.project_with(package, &Limits::default())
-    }
-
     /// Parse the `vbaProject.bin` payload with explicit resource limits.
     ///
     /// The relationship graph remains independently inspectable through this
@@ -312,7 +300,7 @@ impl VbaProject {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+    pub fn project(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
         Ok(read_project_part(package, &self.project_part_name, limits)?)
     }
 }
@@ -441,10 +429,12 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Arc<Vec<u8>>,
+    payload: Vec<u8>,
     supplemental_xml: Vec<u8>,
 ) -> Result<VbaProject> {
-    store_project_graph(package, source, Host::Word, payload, Some(supplemental_xml))?;
+    let mut edit = VbaEdit::new(package, Host::Word, EditOptions::new())?;
+    edit.store(payload, Some(supplemental_xml))?;
+    *package = edit.commit()?.into_package();
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
         Error::InvalidFormat("stored Word VBA project was not discoverable".to_string())
@@ -472,8 +462,11 @@ pub(crate) fn matching_vba_project(
     Ok(Some(project))
 }
 
-pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
-    Ok(remove_project_graph(package, source, Host::Word)?)
+pub(crate) fn remove_vba_project(package: &mut OpcPackage, _source: &PackURI) -> Result<bool> {
+    let mut edit = VbaEdit::new(package, Host::Word, EditOptions::new())?;
+    let changed = edit.remove()?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
 }
 
 fn validate_supplemental_string(value: &str, field: &str) -> Result<()> {
@@ -619,7 +612,7 @@ mod tests {
 
     #[test]
     fn stores_preserves_and_removes_word_project_graph() {
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         let project = authored_project();
         let mut supplemental = VbaSupplementalData::new();
         supplemental.add_document_event(VbaDocumentEvent::Open);
@@ -627,20 +620,24 @@ mod tests {
             .add_macro(VbaMacroDescriptor::new("WordProject.Module1.Hello").unwrap())
             .unwrap();
 
-        package
+        builder
+            .package_mut()
             .set_vba_with(project, &supplemental, &Limits::default())
             .unwrap();
-        package
-            .document_mut()
+        builder
+            .document()
             .unwrap()
             .add_paragraph_with_text("materialize");
         let mut bytes = Cursor::new(Vec::new());
-        package.to_stream(&mut bytes).unwrap();
+        let package = builder.build().unwrap();
+        package.write_to(&mut bytes).unwrap();
 
         bytes.set_position(0);
         let mut reopened = Package::from_reader(bytes).unwrap();
         let metadata = reopened.vba().unwrap().unwrap();
-        let parsed = metadata.project(reopened.opc_package()).unwrap();
+        let parsed = metadata
+            .project(reopened.opc_package(), &Limits::default())
+            .unwrap();
         assert_eq!(parsed.name(), "WordProject");
         assert_eq!(
             reopened
@@ -706,7 +703,7 @@ mod tests {
             .partname()
             .clone();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.get_part_mut(&source)?
                     .set_content_type(content_type::WML_TEMPLATE_MAIN.to_string())?;
                 Ok(())

@@ -19,7 +19,7 @@ use std::sync::Arc;
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_protos::keynote_movie_geometry_codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::slide_movie_geometry::{
     GeometryBudget, GeometrySelection, codec_options, map_geometry_codec_error, physical_catalog,
@@ -32,7 +32,7 @@ use crate::{MovieSelector, SlideSelector};
 /// Resource categories reported by an audio-position transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideAudioPositionLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -67,7 +67,7 @@ pub enum SlideAudioPositionLimitKind {
     Components,
 }
 
-impl fmt::Display for SlideAudioPositionLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -91,9 +91,42 @@ impl fmt::Display for SlideAudioPositionLimitKind {
 }
 
 /// Content-redacted failure raised by an audio-position transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideAudioPositionError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected media graph or payload was malformed.
+    #[error("the Keynote audio-position source is invalid")]
+    InvalidSource,
+    /// A finite operation resource ceiling was exceeded.
+    #[error("Keynote audio position {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote audio-position transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the staged position and locality.
+    #[error("the edited Keynote audio position failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote audio-position patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical audio-position edits")]
     UnsupportedSource,
@@ -115,97 +148,92 @@ pub enum SlideAudioPositionError {
     /// No audio control existed at a checked source-order position.
     #[error("the selected Keynote slide has no audio at position {position:?}")]
     MoviePositionNotFound { position: Position },
-    /// The selected media graph or payload was malformed.
-    #[error("the Keynote audio-position source is invalid")]
-    InvalidSource,
     /// A supplied or decoded coordinate was not finite.
     #[error("Keynote audio position must contain finite coordinates")]
     InvalidPosition,
-    /// A finite operation resource ceiling was exceeded.
-    #[error("Keynote audio position {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: SlideAudioPositionLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote audio-position transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the staged position and locality.
-    #[error("the edited Keynote audio position failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote audio-position patch does not match the exact source package")]
-    PatchConflict,
 }
 
-impl From<super::slide_movie_geometry::SlideMovieGeometryError> for SlideAudioPositionError {
-    fn from(error: super::slide_movie_geometry::SlideMovieGeometryError) -> Self {
-        use super::slide_movie_geometry::{SlideMovieGeometryError, SlideMovieGeometryLimitKind};
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::InvalidPosition { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
+impl From<super::slide_movie_geometry::Error> for Error {
+    fn from(error: super::slide_movie_geometry::Error) -> Self {
+        use super::slide_movie_geometry::{
+            Error as SlideMovieGeometryError, LimitKind as SlideMovieGeometryLimitKind,
+        };
         match error {
-            SlideMovieGeometryError::UnsupportedSource => Self::UnsupportedSource,
-            SlideMovieGeometryError::UnsupportedDependency => Self::UnsupportedDependency,
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedSource,
+            ) => Self::Refused(Refusal::UnsupportedSource),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedDependency,
+            ) => Self::Refused(Refusal::UnsupportedDependency),
             // Position-only audio edits preserve the native lock bit.  The
             // shared geometry selector can still report this for the
             // file-movie contract, but it is not an audio-position outcome.
-            SlideMovieGeometryError::Locked => Self::UnsupportedDependency,
-            SlideMovieGeometryError::AmbiguousSelector => Self::AmbiguousSelector,
-            SlideMovieGeometryError::EmptySlideName => Self::EmptySlideName,
-            SlideMovieGeometryError::SlideNameNotFound => Self::SlideNameNotFound,
-            SlideMovieGeometryError::SlidePositionNotFound { position } => {
-                Self::SlidePositionNotFound { position }
+            SlideMovieGeometryError::Refused(crate::slide::movie::geometry::Refusal::Locked) => {
+                Self::Refused(Refusal::UnsupportedDependency)
             },
-            SlideMovieGeometryError::MoviePositionNotFound { position } => {
-                Self::MoviePositionNotFound { position }
-            },
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::AmbiguousSelector,
+            ) => Self::Refused(Refusal::AmbiguousSelector),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::EmptySlideName,
+            ) => Self::Refused(Refusal::EmptySlideName),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlideNameNotFound,
+            ) => Self::Refused(Refusal::SlideNameNotFound),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlidePositionNotFound { position },
+            ) => Self::Refused(Refusal::SlidePositionNotFound { position }),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::MoviePositionNotFound { position },
+            ) => Self::Refused(Refusal::MoviePositionNotFound { position }),
             SlideMovieGeometryError::InvalidSource => Self::InvalidSource,
-            SlideMovieGeometryError::LimitExceeded {
+            SlideMovieGeometryError::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Self::LimitExceeded {
+            } => Self::Limit {
                 kind: match kind {
-                    SlideMovieGeometryLimitKind::InputBytes => {
-                        SlideAudioPositionLimitKind::InputBytes
-                    },
-                    SlideMovieGeometryLimitKind::OutputBytes => {
-                        SlideAudioPositionLimitKind::OutputBytes
-                    },
-                    SlideMovieGeometryLimitKind::WireBytes => {
-                        SlideAudioPositionLimitKind::WireBytes
-                    },
-                    SlideMovieGeometryLimitKind::Entries => SlideAudioPositionLimitKind::Entries,
-                    SlideMovieGeometryLimitKind::EntryBytes => {
-                        SlideAudioPositionLimitKind::EntryBytes
-                    },
-                    SlideMovieGeometryLimitKind::TotalBytes => {
-                        SlideAudioPositionLimitKind::TotalBytes
-                    },
-                    SlideMovieGeometryLimitKind::Slides => SlideAudioPositionLimitKind::Slides,
-                    SlideMovieGeometryLimitKind::References => {
-                        SlideAudioPositionLimitKind::References
-                    },
-                    SlideMovieGeometryLimitKind::WireFields => {
-                        SlideAudioPositionLimitKind::WireFields
-                    },
-                    SlideMovieGeometryLimitKind::WireNesting => {
-                        SlideAudioPositionLimitKind::WireNesting
-                    },
-                    SlideMovieGeometryLimitKind::WireWork => SlideAudioPositionLimitKind::WireWork,
-                    SlideMovieGeometryLimitKind::GeometryBytes => {
-                        SlideAudioPositionLimitKind::PositionBytes
-                    },
-                    SlideMovieGeometryLimitKind::Allocations => {
-                        SlideAudioPositionLimitKind::Allocations
-                    },
-                    SlideMovieGeometryLimitKind::Retained => SlideAudioPositionLimitKind::Retained,
-                    SlideMovieGeometryLimitKind::Scratch => SlideAudioPositionLimitKind::Scratch,
-                    SlideMovieGeometryLimitKind::Components => {
-                        SlideAudioPositionLimitKind::Components
-                    },
+                    SlideMovieGeometryLimitKind::InputBytes => LimitKind::InputBytes,
+                    SlideMovieGeometryLimitKind::OutputBytes => LimitKind::OutputBytes,
+                    SlideMovieGeometryLimitKind::WireBytes => LimitKind::WireBytes,
+                    SlideMovieGeometryLimitKind::Entries => LimitKind::Entries,
+                    SlideMovieGeometryLimitKind::EntryBytes => LimitKind::EntryBytes,
+                    SlideMovieGeometryLimitKind::TotalBytes => LimitKind::TotalBytes,
+                    SlideMovieGeometryLimitKind::Slides => LimitKind::Slides,
+                    SlideMovieGeometryLimitKind::References => LimitKind::References,
+                    SlideMovieGeometryLimitKind::WireFields => LimitKind::WireFields,
+                    SlideMovieGeometryLimitKind::WireNesting => LimitKind::WireNesting,
+                    SlideMovieGeometryLimitKind::WireWork => LimitKind::WireWork,
+                    SlideMovieGeometryLimitKind::GeometryBytes => LimitKind::PositionBytes,
+                    SlideMovieGeometryLimitKind::Allocations => LimitKind::Allocations,
+                    SlideMovieGeometryLimitKind::Retained => LimitKind::Retained,
+                    SlideMovieGeometryLimitKind::Scratch => LimitKind::Scratch,
+                    SlideMovieGeometryLimitKind::Components => LimitKind::Components,
                 },
                 observed,
                 maximum,
@@ -218,7 +246,7 @@ impl From<super::slide_movie_geometry::SlideMovieGeometryError> for SlideAudioPo
 }
 
 /// One mutable audio position staged against an immutable package snapshot.
-pub struct SlideAudioPositionEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     budget: GeometryBudget,
     selection: GeometrySelection,
@@ -226,10 +254,10 @@ pub struct SlideAudioPositionEdit<'a> {
     after: Point,
 }
 
-impl fmt::Debug for SlideAudioPositionEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideAudioPositionEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.selection.slide_position)
             .field("audio_position", &self.selection.movie_position)
             .field("before", &self.before)
@@ -238,19 +266,17 @@ impl fmt::Debug for SlideAudioPositionEdit<'_> {
     }
 }
 
-impl<'a> SlideAudioPositionEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide>(
         source: &'a Package,
         slide: impl Into<SlideSelector<'slide>>,
         audio: impl Into<MovieSelector>,
-    ) -> Result<Self, SlideAudioPositionError> {
+    ) -> Result<Self, Error> {
         let mut budget = GeometryBudget::new(source)?;
         let source_bytes = physical_catalog(source)?.source_bytes().len();
         budget.source(source_bytes)?;
         let selection = select_audio_with_budget(source, slide.into(), audio.into(), &mut budget)?;
-        let before = selection
-            .before_position
-            .ok_or(SlideAudioPositionError::InvalidSource)?;
+        let before = selection.before_position.ok_or(Error::InvalidSource)?;
         Ok(Self {
             source,
             budget,
@@ -285,14 +311,14 @@ impl<'a> SlideAudioPositionEdit<'a> {
     }
 
     /// Stage a finite audio position.
-    pub fn set(mut self, position: Point) -> Result<Self, SlideAudioPositionError> {
+    pub fn set(mut self, position: Point) -> Result<Self, Error> {
         validate_position(position)?;
         self.after = position;
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(
             self.source,
             &self.selection,
@@ -305,7 +331,7 @@ impl<'a> SlideAudioPositionEdit<'a> {
 
 /// An exact-source checked reversible audio-position patch.
 #[derive(Clone, PartialEq)]
-pub struct SlideAudioPositionPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     selection: GeometrySelection,
     before: Point,
@@ -316,10 +342,10 @@ pub struct SlideAudioPositionPatch {
     target_previews_absent: bool,
 }
 
-impl fmt::Debug for SlideAudioPositionPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideAudioPositionPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.selection.slide_position)
             .field("audio_position", &self.selection.movie_position)
             .field("before", &self.before)
@@ -328,7 +354,7 @@ impl fmt::Debug for SlideAudioPositionPatch {
     }
 }
 
-impl SlideAudioPositionPatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -389,14 +415,14 @@ impl SlideAudioPositionPatch {
 
 /// Compact evidence describing one audio-position publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideAudioPositionDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl SlideAudioPositionDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -443,13 +469,13 @@ impl SlideAudioPositionDiagnostics {
 /// Fully verified result of one audio-position transaction.
 #[must_use = "an audio-position commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SlideAudioPositionCommit {
+pub struct Commit {
     package: Package,
-    patch: SlideAudioPositionPatch,
-    diagnostics: SlideAudioPositionDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SlideAudioPositionCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -462,15 +488,21 @@ impl SlideAudioPositionCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SlideAudioPositionPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideAudioPositionDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -486,13 +518,13 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         audio: impl Into<MovieSelector>,
-    ) -> Result<Point, SlideAudioPositionError> {
+    ) -> Result<Point, Error> {
         let mut budget = GeometryBudget::new(self)?;
         let source_bytes = physical_catalog(self)?.source_bytes().len();
         budget.source(source_bytes)?;
         select_audio_with_budget(self, slide.into(), audio.into(), &mut budget)?
             .before_position
-            .ok_or(SlideAudioPositionError::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Begin an exact immutable edit of one selected audio position.
@@ -504,15 +536,12 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         audio: impl Into<MovieSelector>,
-    ) -> Result<SlideAudioPositionEdit<'_>, SlideAudioPositionError> {
-        SlideAudioPositionEdit::new(self, slide, audio)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide, audio)
     }
 
     /// Apply an exact-source checked audio-position patch.
-    pub fn apply_slide_audio_position(
-        &self,
-        patch: &SlideAudioPositionPatch,
-    ) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> {
+    pub fn apply_slide_audio_position(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = GeometryBudget::new(self)?;
         let catalog = physical_catalog(self)?;
         let source_len = catalog.source_bytes().len();
@@ -520,10 +549,10 @@ impl Package {
         budget.work(source_len)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(SlideAudioPositionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if previews_absent(self)? != patch.source_previews_absent {
-            return Err(SlideAudioPositionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let current = select_audio_with_budget(
             self,
@@ -534,28 +563,28 @@ impl Package {
         if !same_selection(&current, &patch.selection)
             || current.before_position != Some(patch.before)
         {
-            return Err(SlideAudioPositionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             budget.validate_package(self)?;
-            return Ok(SlideAudioPositionCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SlideAudioPositionDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SlideAudioPositionError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         reopen_target_patch(self, patch, &mut budget)
     }
 }
 
-fn validate_position(position: Point) -> Result<(), SlideAudioPositionError> {
+fn validate_position(position: Point) -> Result<(), Error> {
     if position.x.is_finite() && position.y.is_finite() {
         Ok(())
     } else {
-        Err(SlideAudioPositionError::InvalidPosition)
+        Err(Error::Refused(Refusal::InvalidPosition))
     }
 }
 
@@ -576,7 +605,7 @@ fn commit_edit(
     before: Point,
     after: Point,
     mut budget: GeometryBudget,
-) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> {
+) -> Result<Commit, Error> {
     validate_position(after)?;
     if before == after {
         let catalog = physical_catalog(source)?;
@@ -584,9 +613,9 @@ fn commit_edit(
         budget.work(source.source_bytes().len())?;
         let bytes = catalog.shared_source();
         let previews_absent = previews_absent(source)?;
-        return Ok(SlideAudioPositionCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SlideAudioPositionPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
                 before,
@@ -596,12 +625,12 @@ fn commit_edit(
                 source_previews_absent: previews_absent,
                 target_previews_absent: previews_absent,
             },
-            diagnostics: SlideAudioPositionDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     let catalog = physical_catalog(source)?;
     if !catalog.source_is_exact() {
-        return Err(SlideAudioPositionError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let current = select_audio_with_budget(
         source,
@@ -610,7 +639,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&current, selection) || current.before_position != Some(before) {
-        return Err(SlideAudioPositionError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     let (candidate, deleted_previews) = rewrite_geometry_message(
         source,
@@ -637,7 +666,7 @@ fn commit_edit(
     )?;
     budget.validate_package(&candidate)?;
     if !previews_absent(&candidate)? {
-        return Err(SlideAudioPositionError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_audio_with_budget(
         &candidate,
@@ -646,7 +675,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before_position != Some(after) {
-        return Err(SlideAudioPositionError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(
         source,
@@ -659,9 +688,9 @@ fn commit_edit(
     )?;
     let source_bytes = catalog.shared_source();
     let target = physical_catalog(&candidate)?.shared_source();
-    Ok(SlideAudioPositionCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SlideAudioPositionPatch {
+        patch: Patch {
             artifacts: ExactArtifacts::new(source_bytes, target),
             selection: selection.clone(),
             before,
@@ -671,15 +700,15 @@ fn commit_edit(
             source_previews_absent: previews_absent(source)?,
             target_previews_absent: true,
         },
-        diagnostics: SlideAudioPositionDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
 fn reopen_target_patch(
     source: &Package,
-    patch: &SlideAudioPositionPatch,
+    patch: &Patch,
     budget: &mut GeometryBudget,
-) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> {
+) -> Result<Commit, Error> {
     budget.candidate_reopen(patch.artifacts.target().len())?;
     budget.allocations(1)?;
     budget.retained(patch.artifacts.target().len())?;
@@ -689,7 +718,7 @@ fn reopen_target_patch(
             .map_err(map_read_error)?;
     budget.validate_package(&candidate)?;
     if previews_absent(&candidate)? != patch.target_previews_absent {
-        return Err(SlideAudioPositionError::Verification);
+        return Err(Error::Verification);
     }
     let selected = select_audio_with_budget(
         &candidate,
@@ -699,7 +728,7 @@ fn reopen_target_patch(
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before_position != Some(patch.after)
     {
-        return Err(SlideAudioPositionError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(
         source,
@@ -710,25 +739,25 @@ fn reopen_target_patch(
         patch.target_previews_absent,
         budget,
     )?;
-    Ok(SlideAudioPositionCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SlideAudioPositionDiagnostics::published(patch.deleted_previews),
+        diagnostics: Diagnostics::published(patch.deleted_previews),
     })
 }
 
-fn map_read_error(error: ReadError) -> SlideAudioPositionError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideAudioPositionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Slides => SlideAudioPositionLimitKind::Slides,
-                SemanticLimitKind::References => SlideAudioPositionLimitKind::References,
-                _ => SlideAudioPositionLimitKind::WireWork,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -738,17 +767,17 @@ fn map_read_error(error: ReadError) -> SlideAudioPositionError {
             observed,
             maximum,
             ..
-        } => SlideAudioPositionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => SlideAudioPositionLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => SlideAudioPositionLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => SlideAudioPositionLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => SlideAudioPositionLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideAudioPositionError::Allocation { amount },
-        _ => SlideAudioPositionError::InvalidSource,
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }

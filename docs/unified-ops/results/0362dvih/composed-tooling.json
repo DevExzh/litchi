@@ -1,0 +1,20 @@
+{
+  "source": "a3ec9799939071d535925133c483bc998aa9667c",
+  "owner_source": "9d85708aed",
+  "raw_source": "0e6758b3ed69216fba6a62d556e907c6e2c4c2f1",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_drawingml_raw_qualification",
+    "tools.test_drawingml_compile_driver",
+    "tools.test_native_qualification_runner"
+  ],
+  "exit_code": 0,
+  "tests": 41,
+  "elapsed_seconds": 7.98,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-raw-owner-composed/tooling.log",
+  "log_bytes": 374,
+  "log_sha256": "ce600d9722c9be704b394003766b0ba9cdc393e6615dfd710e6daee44e59687c",
+  "resolution": "Only adapter-pin table conflicted; all entries rehashed from composed files, preserving1adCargo/lib andowner/rawchanges."
+}

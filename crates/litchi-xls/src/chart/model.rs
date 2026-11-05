@@ -1,3 +1,4 @@
+use litchi_core::edit::RefusalKind;
 use std::collections::HashSet;
 
 use litchi_biff::MAX_RECORD_BYTES;
@@ -522,8 +523,10 @@ impl Series {
         for (index, link) in self.links.iter().enumerate() {
             if link.role == role {
                 if link_index.is_some() {
-                    return Err(Error::UnsafeEdit(
-                        "series formula link is duplicated".into(),
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit chart",
+                        "series formula link is duplicated",
                     ));
                 }
                 link_index = Some(index);
@@ -546,15 +549,22 @@ impl Series {
                 );
             }
         }
-        let link_index =
-            link_index.ok_or_else(|| Error::UnsafeEdit("series formula link is missing".into()))?;
+        let link_index = link_index.ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit chart",
+                "series formula link is missing",
+            )
+        })?;
         let link = self
             .links
             .get(link_index)
             .ok_or_else(|| Error::InvalidData("series formula link disappeared".into()))?;
         if link.source != Source::Cells {
-            return Err(Error::UnsafeEdit(
-                "only worksheet-cell chart links can be retargeted".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit chart",
+                "only worksheet-cell chart links can be retargeted",
             ));
         }
         if link.references.len() != formula.references().len()
@@ -569,8 +579,10 @@ impl Series {
                             != new.last_column.checked_sub(new.first_column)
                 })
         {
-            return Err(Error::UnsafeEdit(
-                "retargeted chart formula changes the reference shape".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit chart",
+                "retargeted chart formula changes the reference shape",
             ));
         }
         let link = self
@@ -930,7 +942,7 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn edit_chart_area(&self) -> Result<super::chart_area::Transaction> {
+    pub fn edit_chart_area(&self) -> Result<super::chart_area::Edit> {
         self.chart_area().edit()
     }
 
@@ -993,12 +1005,19 @@ impl Chart {
         let mut matches = self.cached_values.iter().enumerate().filter(|(_, cache)| {
             cache.kind == kind && cache.series == series && cache.point == point
         });
-        let index = matches
-            .next()
-            .map(|(index, _)| index)
-            .ok_or_else(|| Error::UnsafeEdit("chart cache cell is missing".into()))?;
+        let index = matches.next().map(|(index, _)| index).ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit chart",
+                "chart cache cell is missing",
+            )
+        })?;
         if matches.next().is_some() {
-            return Err(Error::UnsafeEdit("chart cache cell is duplicated".into()));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit chart",
+                "chart cache cell is duplicated",
+            ));
         }
         validate_cache_value(&value)?;
         let previous = self.cached_values[index].clone();

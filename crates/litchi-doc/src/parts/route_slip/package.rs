@@ -1,20 +1,27 @@
 //! DOC/OLE package ownership for route-slip metadata.
 
+#![allow(
+    dead_code,
+    reason = "the byte-level editor keeps its record-level API for its unit tests; the package family drives a subset"
+)]
+
 use super::codec;
 use super::model::Metadata;
 use super::transaction::{
-    Error as TransactionError, Patch, RecipientSelector, Snapshot as TransactionSnapshot,
-    Transaction,
+    Edit as RecordEdit, Error as TransactionError, Patch, RecipientSelector,
+    Snapshot as TransactionSnapshot,
 };
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 /// An immutable DOC snapshot carrying the route-slip semantic state and bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Vec<u8>,
     route_slip: TransactionSnapshot,
 }
@@ -26,31 +33,31 @@ impl Snapshot {
 
     /// Returns route-slip metadata, when the package has an active range.
     #[must_use]
-    pub fn metadata(&self) -> Option<&Metadata> {
+    pub(crate) fn metadata(&self) -> Option<&Metadata> {
         self.route_slip.metadata()
     }
 
     /// Returns the immutable semantic route-slip snapshot.
     #[must_use]
-    pub fn route_slip(&self) -> &TransactionSnapshot {
+    pub(crate) fn route_slip(&self) -> &TransactionSnapshot {
         &self.route_slip
     }
 
     /// Returns the rendered package bytes.
-    pub fn finish(&self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(&self) -> Result<Vec<u8>> {
         Ok(self.bytes.clone())
     }
 
     /// Starts a semantic route-slip transaction from this package snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.route_slip.edit()
     }
 }
 
 /// A package commit containing a semantic patch and the common OLE byte patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     package_patch: PackagePatch,
@@ -59,34 +66,35 @@ pub struct Commit {
 impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible route-slip semantic patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// The reversible whole-CFB patch produced by the common OLE editor.
     #[must_use]
-    pub fn package_patch(&self) -> &PackagePatch {
+    pub(crate) fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Splits the package commit into its snapshot, semantic patch, and byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, PackagePatch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
 
 /// Transactional DOC editor for the `WordDocument` and selected table stream.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
+    source_limits: SourceLimits,
     original_route_slip: TransactionSnapshot,
     route_slip: TransactionSnapshot,
     protection: EditProtection,
@@ -99,28 +107,51 @@ impl Editor {
     ///
     /// Only Word 97 and later, unencrypted packages with a complete FIB table
     /// pointer array are accepted for editing.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::open_with_limits(bytes, Limits::default())
+    pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
+        Self::open_bounded(
+            bytes,
+            SourceLimits::default(),
+            Limits::default(),
+            ProtectionPolicy::default(),
+        )
     }
 
     /// Open a package with an explicit policy for changed protected content.
-    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+    pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+        Self::open_bounded(bytes, SourceLimits::default(), Limits::default(), policy)
     }
 
-    /// Open a DOC package with an explicit bounded OLE resource profile.
-    pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    /// Opens a package under one edit profile: its revision limits bound the
+    /// compound-file parse and its protection policy governs changed
+    /// protected content.
+    pub(crate) fn open_with_options(
+        bytes: Vec<u8>,
+        source_limits: SourceLimits,
+        options: &crate::EditOptions,
+    ) -> Result<Self> {
+        Self::open_bounded(
+            bytes,
+            source_limits,
+            options.revision_limits_value(),
+            options.protection_policy_value(),
+        )
     }
 
     /// Open a package with both bounded resources and an explicit protection policy.
-    pub fn open_with_limits_and_policy(
+    fn open_bounded(
         bytes: Vec<u8>,
+        source_limits: SourceLimits,
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let targets = Targets::new([]).map_err(PackageError::from)?;
-        let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new().targets(targets).limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_owned()];
         let word = package
             .stream(&word_path)
@@ -137,10 +168,12 @@ impl Editor {
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
         let protection = classify(&fib, table)?;
-        let route_slip = TransactionSnapshot::from_option(codec::parse(&fib, table)?)?;
+        let route_slip =
+            TransactionSnapshot::from_option(codec::parse(&fib, table, &source_limits)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
+            source_limits,
             original_route_slip: route_slip.clone(),
             route_slip,
             protection,
@@ -151,36 +184,36 @@ impl Editor {
 
     /// Returns the current route-slip metadata, when present.
     #[must_use]
-    pub fn metadata(&self) -> Option<&Metadata> {
+    pub(crate) fn metadata(&self) -> Option<&Metadata> {
         self.route_slip.metadata()
     }
 
     /// Returns the current immutable route-slip semantic snapshot.
     #[must_use]
-    pub fn route_slip(&self) -> &TransactionSnapshot {
+    pub(crate) fn route_slip(&self) -> &TransactionSnapshot {
         &self.route_slip
     }
 
     /// Starts an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.route_slip.edit()
     }
 
     /// Whether a package edit has changed any stream bytes.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Sets or replaces the complete route-slip metadata.
-    pub fn set(&mut self, metadata: Metadata) -> Result<Commit> {
+    pub(crate) fn set(&mut self, metadata: Metadata) -> Result<Commit> {
         let snapshot = TransactionSnapshot::new(metadata)?;
         self.install(snapshot)
     }
 
     /// Replaces existing route-slip metadata, rejecting an absent range.
-    pub fn replace(&mut self, metadata: Metadata) -> Result<Commit> {
+    pub(crate) fn replace(&mut self, metadata: Metadata) -> Result<Commit> {
         if !self.route_slip.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing route-slip metadata".into(),
@@ -190,32 +223,32 @@ impl Editor {
     }
 
     /// Applies and publishes a semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
+    pub(crate) fn apply(&mut self, transaction: RecordEdit) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.patch().before() != &self.route_slip {
             return Err(PackageError::InvalidFormat(
                 "route-slip transaction snapshot conflict".into(),
             ));
         }
-        self.install(commit.snapshot().clone())
+        self.install(commit.package().clone())
     }
 
     /// Sets the current recipient stage and publishes the edit atomically.
-    pub fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<Commit> {
+    pub(crate) fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.set_stage(selector).map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Advances to the next recipient and publishes the lifecycle edit.
-    pub fn advance_stage(&mut self) -> Result<Commit> {
+    pub(crate) fn advance_stage(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.advance_stage().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Adds a recipient and publishes the edit atomically.
-    pub fn add_recipient(&mut self, recipient: super::model::Recipient) -> Result<Commit> {
+    pub(crate) fn add_recipient(&mut self, recipient: super::model::Recipient) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .add_recipient(recipient)
@@ -224,7 +257,7 @@ impl Editor {
     }
 
     /// Replaces a selected recipient and publishes the edit atomically.
-    pub fn replace_recipient(
+    pub(crate) fn replace_recipient(
         &mut self,
         selector: RecipientSelector<'_>,
         recipient: super::model::Recipient,
@@ -237,7 +270,7 @@ impl Editor {
     }
 
     /// Removes a selected recipient and publishes the edit atomically.
-    pub fn remove_recipient(&mut self, selector: RecipientSelector<'_>) -> Result<Commit> {
+    pub(crate) fn remove_recipient(&mut self, selector: RecipientSelector<'_>) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .remove_recipient(selector)
@@ -246,35 +279,35 @@ impl Editor {
     }
 
     /// Clears the route-slip range and its semantic metadata.
-    pub fn clear(&mut self) -> Result<Commit> {
+    pub(crate) fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Completes routing by clearing the route-slip FIB range.
-    pub fn complete(&mut self) -> Result<Commit> {
+    pub(crate) fn complete(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.complete().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
+        let bytes = crate::package::object_edit_bytes(&self.package)?;
         Ok(Snapshot::new(bytes, self.route_slip.clone()))
     }
 
     /// Finishes the edit and returns the rendered DOC bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -285,7 +318,7 @@ impl Editor {
         Ok(Commit {
             snapshot,
             patch: semantic_patch,
-            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
+            package_patch: PackagePatch::new(object_commit.into_parts().1, self.protection),
         })
     }
 
@@ -297,7 +330,8 @@ impl Editor {
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             let package_snapshot = self.snapshot()?;
             return Ok(Commit {
@@ -321,7 +355,7 @@ impl Editor {
             .map_err(PackageError::from)?;
         let bytes = package_commit.patch().after().to_vec();
         let package_snapshot = Snapshot::new(bytes, candidate.route_slip.clone());
-        let package_patch = PackagePatch::new(package_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(package_commit.into_parts().1, candidate.protection);
         *self = candidate;
         Ok(Commit {
             snapshot: package_snapshot,
@@ -346,7 +380,7 @@ impl Editor {
         let fib = FileInformationBlock::parse(&word)?;
         let pointer = validation::route_pointer_location(&fib)?;
         if let Some(metadata) = snapshot.metadata() {
-            let payload = codec::to_bytes(metadata)?;
+            let payload = codec::to_bytes(metadata, &self.source_limits)?;
             let offset = u32::try_from(table.len())
                 .map_err(|_| PackageError::Corrupted("table stream exceeds u32::MAX".into()))?;
             let length = u32::try_from(payload.len()).map_err(|_| {
@@ -360,7 +394,7 @@ impl Editor {
         }
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
-        let reparsed = codec::parse(&reparsed_fib, &table)?;
+        let reparsed = codec::parse(&reparsed_fib, &table, &self.source_limits)?;
         if reparsed.as_ref() != snapshot.metadata() {
             return Err(PackageError::Corrupted(
                 "route-slip snapshot failed FIB/table-stream round-trip validation".into(),

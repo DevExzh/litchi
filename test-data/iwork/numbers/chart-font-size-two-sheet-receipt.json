@@ -1,0 +1,21 @@
+{
+  "application": "Numbers",
+  "file": "chart-font-size-two-sheet.numbers",
+  "size": 9594,
+  "sha256": "578eb93d8df7ae35f6932599a8702b90a710dff9b22d55265fd7b39a701e5070",
+  "source": "Synthetic host-package fixture generated with the tracked public litchi-iwa Numbers editor recipe",
+  "generator_source_commit": "3854785d7a4c3d02b96b464ad179786c7b046a5b",
+  "generator_manifest": "crates/litchi-iwa/Cargo.toml",
+  "generator_source": "crates/litchi-iwa/examples/create_numbers_two_sheet_chart_font_size.rs",
+  "generator_command": "CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 cargo run --manifest-path crates/litchi-iwa/Cargo.toml --example create_numbers_two_sheet_chart_font_size --offline --quiet -- /tmp/two-sheet-chart-font-size.numbers",
+  "generator_operations": [
+    "Builder::build created the first sheet and table",
+    "Draft::add_empty_sheet added Secondary chart",
+    "Draft::add_sheet_chart added one standalone Column2d chart to each sheet",
+    "litchi-numbers::Package::edit_sheet_chart_font seeded sheet 1 to 13pt",
+    "litchi-numbers::Package::edit_sheet_chart_font seeded sheet 2 to 27pt"
+  ],
+  "inputs": "No external fixture inputs; the tracked generator constructs the package from typed data.",
+  "regeneration_note": "The recipe is host-owned and is available through generator_source_commit. W3 deletion of litchi-iwa intentionally removes the recipe; the tracked fixture remains a migration-test input. Fresh generated package identities may change archive bytes, while the two-sheet chart/font semantics remain the asserted contract.",
+  "scope": "Synthetic two-container identity/path control only; no native application acceptance or native evidence is claimed."
+}

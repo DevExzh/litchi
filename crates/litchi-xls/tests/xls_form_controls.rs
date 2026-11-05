@@ -1,9 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_xls::ole_object::Limits;
 use litchi_xls::{
-    CheckState, DropDownStyle, EditBoxValidation, Editor, FormControl, FtCf, FtCmo, FtPictFmla,
-    FtPioGrbit, LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord, ObjectType,
-    OleObjectRecord,
+    CheckState, DropDownStyle, EditBoxValidation, FormControl, FtCf, FtCmo, FtPictFmla, FtPioGrbit,
+    LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord, ObjectType, OleObjectRecord,
 };
 use std::io::Cursor;
 
@@ -498,35 +496,33 @@ fn nested_cfb(marker: &[u8]) -> Vec<u8> {
     output.into_inner()
 }
 
-fn workbook_stream(sheet_records: &[Vec<u8>]) -> Vec<u8> {
-    let bof = subrecord(0x0809, &[0; 16]);
-    let eof = subrecord(0x000A, &[]);
-    let mut bound_body = vec![0; 8];
-    bound_body[6] = 1;
-    bound_body[7] = b'S';
-    let bound = subrecord(0x0085, &bound_body);
-    let globals_len = bof.len() + bound.len() + eof.len();
-    let mut output = bof;
-    let mut bound = bound;
-    bound[4..8].copy_from_slice(&(globals_len as u32).to_le_bytes());
-    output.extend_from_slice(&bound);
-    output.extend_from_slice(&eof);
-    output.extend_from_slice(&subrecord(0x0809, &[0; 16]));
-    for record in sheet_records {
-        output.extend_from_slice(record);
-    }
-    output.extend_from_slice(&eof);
-    output
+/// A complete authored workbook stream (one worksheet `S`) with `records`
+/// appended to the worksheet substream before its EOF, so the package-level
+/// OLE-object family opens it.
+fn authored_workbook_stream(records: &[u8]) -> Vec<u8> {
+    let mut builder = litchi_xls::Builder::new();
+    builder.add_worksheet("S").unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+    let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let eof = workbook.len() - 4;
+    assert_eq!(&workbook[eof..], &[0x0A, 0x00, 0x00, 0x00]);
+    workbook.splice(eof..eof, records.iter().copied());
+    workbook
 }
 
 fn xls(sheet_records: &[Vec<u8>], storages: &[u32]) -> Vec<u8> {
-    let workbook = workbook_stream(sheet_records);
+    let workbook = authored_workbook_stream(&sheet_records.concat());
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
     for id in storages {
         let name = format!("MBD{id:08X}");
         writer.create_storage(&[&name]).unwrap();
-        let mut nested = OleFile::open(Cursor::new(nested_cfb(&id.to_le_bytes()))).unwrap();
+        let mut nested = OleFile::open(
+            Cursor::new(nested_cfb(&id.to_le_bytes())),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let contents = nested.open_stream(&["CONTENTS"]).unwrap();
         writer
             .create_stream(&[&name, "CONTENTS"], &contents)
@@ -550,7 +546,10 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
     let ole = ole_object(1, 42).to_record_bytes().unwrap();
     let bytes = xls(&[ole, checkbox.clone(), radio], &[42]);
 
-    let editor = Editor::new(bytes.clone(), Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
+        .unwrap()
+        .edit_ole_objects()
+        .unwrap();
     assert_eq!(editor.objects(0).unwrap().len(), 1);
     let controls = editor.form_controls(0).unwrap();
     assert_eq!(controls.len(), 2);
@@ -565,10 +564,17 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
 
     // Rewriting the workbook for an unrelated OLE edit keeps the form
     // control Obj records byte-identical.
-    let mut editor = Editor::new(bytes, Limits::default()).unwrap();
-    editor.remove(0, 1).unwrap();
-    let bytes = editor.finish().unwrap();
-    let mut ole_file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
+        .unwrap()
+        .edit_ole_objects()
+        .unwrap();
+    editor.remove_object(0, 1).unwrap();
+    let bytes = editor.commit().unwrap().patch().after().to_vec();
+    let mut ole_file = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let workbook = ole_file.open_stream(&["Workbook"]).unwrap();
     assert!(
         workbook
@@ -576,7 +582,10 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
             .any(|window| window == checkbox)
     );
 
-    let editor = Editor::new(bytes, Limits::default()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
+        .unwrap()
+        .edit_ole_objects()
+        .unwrap();
     let controls = editor.form_controls(0).unwrap();
     assert_eq!(controls.len(), 2);
     assert_eq!(

@@ -299,7 +299,11 @@ impl<'arena> MtefExtractor<'arena> {
         // caller-provided arena so the input and returned nodes share the same real
         // lifetime; the source Vec can then be dropped normally.
         let arena_data = self.arena.alloc_slice_copy(&mtef_data);
-        let mut parser = MtefParser::new(self.arena, arena_data);
+        let mut parser = MtefParser::new(
+            self.arena,
+            arena_data,
+            litchi_formula::mtef::Limits::DEFAULT,
+        );
         parser
             .parse()
             .map_err(|e| MtefExtractionError::ParseError(e.to_string()))

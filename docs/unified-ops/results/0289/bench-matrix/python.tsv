@@ -1,0 +1,19 @@
+format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
+python	batch	DOCX batch of 1k run-bold sets		python/rust		22315.7	23197.9	µs	1.040		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	batch	Python xlsx batch 1k cell sets		after/before (wall, A-B-B-A processes)		3127.2	3386.5	µs	1.083		none	no-budget	0377	parsed:0377/python.json	
+python	batch	XLSX batch of 1k cell sets (JSON text vs dict Rust leg)		python/rust		2070.2	2341.6	µs	1.131		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	batch	XLSX batch of 1k cell sets (dicts)		python/rust		2070.2	2419.3	µs	1.169		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	batch	XLSX edit(fn) with 1k tx.set		python/rust		2011.8	2279.3	µs	1.133		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	get	DOCX get(/body/p[10], depth 0)		python/rust		60.71	62.66	µs	1.032		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	get	DOCX get(/body/p[10], depth 1)		python/rust		154.84	158.50	µs	1.024		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	get	Python xlsx get one cell		after/before (wall, A-B-B-A processes)		1.702	1.704	µs	1.001		none	no-budget	0377	parsed:0377/python.json	
+python	get	XLSX get(/ExcelTable/C2, 0)		python/rust		6.008	6.624	µs	1.102		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	open_bytes	Python docx open_bytes		after/before (wall, A-B-B-A processes)		39.36	39.74	µs	1.010		none	no-budget	0377	parsed:0377/python.json	
+python	open_bytes	Python xlsx open_bytes		after/before (wall, A-B-B-A processes)		25.52	26.50	µs	1.038		none	no-budget	0377	parsed:0377/python.json	
+python	query	DOCX query(paragraph), 227 matches		python/rust		7116.5	7406.1	µs	1.041		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	query	XLSX query(cell, 100), 75k-cell sheet		python/rust		476.08	482.66	µs	1.014		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	set	DOCX set run bold		python/rust		106.52	109.31	µs	1.026		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	set	Python docx set paragraph text		after/before (wall, A-B-B-A processes)		59.26	60.00	µs	1.012		none	no-budget	0377	parsed:0377/python.json	
+python	set	Python xlsx set one cell		after/before (wall, A-B-B-A processes)		3200.5	3026.2	µs	0.946		none	no-budget	0377	parsed:0377/python.json	
+python	set	XLSX set one cell		python/rust		21.70	22.14	µs	1.020		none (record 0255 §5: no Python budget in the goal)	no-budget	0255	parsed:0255-python-overhead.json	
+python	to_bytes	Python docx to_bytes		after/before (wall, A-B-B-A processes)		0.709	0.775	µs	1.093		none	no-budget	0377	parsed:0377/python.json	

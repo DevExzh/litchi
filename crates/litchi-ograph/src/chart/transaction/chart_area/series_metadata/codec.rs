@@ -1,6 +1,6 @@
 //! Lossless fixed-width `Series` record scanning and patching.
 
-use super::super::super::super::{Chart, Count, DataKind};
+use super::super::super::super::{Count, DataKind, Model};
 use super::model::{Change, Entry, Metadata};
 use super::validation;
 use crate::chart::model::Origin;
@@ -22,18 +22,19 @@ struct Physical {
     payload: [u8; PAYLOAD_BYTES],
 }
 
-pub(super) fn scan(chart: &Chart) -> Result<Scan> {
+pub(super) fn scan(chart: &Model) -> Result<Scan> {
     let source = match &chart.origin {
         Origin::Parsed(stream) => stream.as_bytes(),
         Origin::Fresh => {
-            return Err(Error::UnsupportedMutation {
-                operation: "series-metadata-patch",
-                reason: "the source chart is not a parsed replayable stream",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "series-metadata-patch",
+                "the source chart is not a parsed replayable stream",
+            )));
         },
     };
     let mut entries = Vec::new();
-    for item in Records::new(source) {
+    for item in Records::new(source, chart.limits.biff)? {
         let record = item?;
         if record.kind() != SERIES {
             continue;
@@ -55,7 +56,7 @@ pub(super) fn scan(chart: &Chart) -> Result<Scan> {
             .zip(chart.series.iter())
             .any(|(entry, series)| entry.metadata != Metadata::from_series(series))
     {
-        return Err(Error::UnsupportedMutation {
+        return Err(Error::PatchConflict {
             operation: "series-metadata-patch",
             reason: "source Series inventory does not match the semantic snapshot",
         });
@@ -66,13 +67,13 @@ pub(super) fn scan(chart: &Chart) -> Result<Scan> {
     })
 }
 
-pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change]) -> Result<u64> {
+pub(super) fn patch(chart: &mut Model, expected_source: u64, changes: &[Change]) -> Result<u64> {
     if changes.is_empty() {
         return Ok(expected_source);
     }
     let current = scan(chart)?;
     if current.source != expected_source {
-        return Err(Error::UnsupportedMutation {
+        return Err(Error::PatchConflict {
             operation: "series-metadata-patch",
             reason: "patch source fingerprint does not match the chart stream",
         });
@@ -93,10 +94,11 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
         })?;
     for change in changes {
         if seen.contains(&change.index()) {
-            return Err(Error::UnsupportedMutation {
-                operation: "series-metadata-patch",
-                reason: "patch contains duplicate Series indexes",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "series-metadata-patch",
+                "patch contains duplicate Series indexes",
+            )));
         }
         seen.push(change.index());
         let entry = current
@@ -107,13 +109,13 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
                 reason: "patch Series index is outside the source inventory",
             })?;
         if entry.index != change.index() || entry.offset != change.offset() {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "series-metadata-patch",
                 reason: "patch Series record identity does not match the source",
             });
         }
         if entry.metadata != change.before() {
-            return Err(Error::UnsupportedMutation {
+            return Err(Error::PatchConflict {
                 operation: "series-metadata-patch",
                 reason: "patch Series metadata does not match the source",
             });
@@ -140,17 +142,18 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
     let source_len = match &chart.origin {
         Origin::Parsed(stream) => stream.as_bytes().len(),
         Origin::Fresh => {
-            return Err(Error::UnsupportedMutation {
-                operation: "series-metadata-patch",
-                reason: "the source chart is not a parsed replayable stream",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "series-metadata-patch",
+                "the source chart is not a parsed replayable stream",
+            )));
         },
     };
     if edits
         .iter()
         .any(|edit| edit.payload_end > source_len || edit.payload_start > edit.payload_end)
     {
-        return Err(Error::UnsupportedMutation {
+        return Err(Error::PatchConflict {
             operation: "series-metadata-patch",
             reason: "Series payload falls outside the source stream",
         });
@@ -168,10 +171,11 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
     let bytes = match &mut chart.origin {
         Origin::Parsed(stream) => stream.as_bytes_mut(),
         Origin::Fresh => {
-            return Err(Error::UnsupportedMutation {
-                operation: "series-metadata-patch",
-                reason: "the source chart is not a parsed replayable stream",
-            });
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "series-metadata-patch",
+                "the source chart is not a parsed replayable stream",
+            )));
         },
     };
     for edit in &edits {
@@ -180,7 +184,7 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
     }
     for change in changes {
         // The complete preflight above proves every index exists.  This direct
-        // semantic update cannot fail and keeps Chart::encode pristine.
+        // semantic update cannot fail and keeps Model::encode pristine.
         change.after().apply(&mut chart.series[change.index()]);
     }
     Ok(fingerprint(bytes))

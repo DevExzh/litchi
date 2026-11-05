@@ -3,8 +3,9 @@
 use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
 
+use crate::Result as SheetResult;
+use crate::error::{fmt_error, invalid, malformed};
 use chrono::{DateTime, NaiveDateTime};
-use litchi_core::sheet::Result as SheetResult;
 use litchi_core::xml::escape_xml;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -31,7 +32,9 @@ pub fn validate_timestamp(value: Option<&str>) -> SheetResult<()> {
     {
         Ok(())
     } else {
-        Err(format!("invalid threaded-comment timestamp '{value}'").into())
+        Err(invalid(format!(
+            "invalid threaded-comment timestamp '{value}'"
+        )))
     }
 }
 
@@ -40,36 +43,43 @@ fn validate_cell_ref(reference: &str) -> SheetResult<()> {
     let column_end = bytes
         .iter()
         .position(u8::is_ascii_digit)
-        .ok_or_else(|| format!("Invalid cell reference: {reference}"))?;
+        .ok_or_else(|| invalid(format!("Invalid cell reference: {reference}")))?;
     if column_end == 0 || column_end == bytes.len() {
-        return Err(format!("Invalid cell reference: {reference}").into());
+        return Err(invalid(format!("Invalid cell reference: {reference}")));
     }
 
     let mut column = 0u32;
     for byte in &bytes[..column_end] {
         if !byte.is_ascii_alphabetic() {
-            return Err(format!("Invalid column in cell reference: {reference}").into());
+            return Err(invalid(format!(
+                "Invalid column in cell reference: {reference}"
+            )));
         }
         let digit = u32::from(byte.to_ascii_uppercase() - b'A' + 1);
         column = column
             .checked_mul(26)
             .and_then(|value| value.checked_add(digit))
-            .ok_or_else(|| format!("Column overflows in cell reference: {reference}"))?;
+            .ok_or_else(|| invalid(format!("Column overflows in cell reference: {reference}")))?;
     }
     if column > 16_384 {
-        return Err(format!("Column exceeds Excel limits in cell reference: {reference}").into());
+        return Err(invalid(format!(
+            "Column exceeds Excel limits in cell reference: {reference}"
+        )));
     }
 
     let row = bytes[column_end..]
         .iter()
         .all(u8::is_ascii_digit)
         .then(|| std::str::from_utf8(&bytes[column_end..]))
-        .transpose()?
-        .ok_or_else(|| format!("Invalid row in cell reference: {reference}"))?
+        .transpose()
+        .map_err(malformed)?
+        .ok_or_else(|| invalid(format!("Invalid row in cell reference: {reference}")))?
         .parse::<u32>()
-        .map_err(|_source| format!("Invalid row number in cell reference: {reference}"))?;
+        .map_err(|_source| invalid(format!("Invalid row number in cell reference: {reference}")))?;
     if row == 0 || row > 1_048_576 {
-        return Err(format!("Row exceeds Excel limits in cell reference: {reference}").into());
+        return Err(invalid(format!(
+            "Row exceeds Excel limits in cell reference: {reference}"
+        )));
     }
     Ok(())
 }
@@ -83,7 +93,9 @@ enum PersonContext {
 
 pub fn parse_persons(xml: &str) -> SheetResult<People> {
     if xml.len() > MAX_PART_BYTES {
-        return Err("persons part exceeds the configured resource bound".into());
+        return Err(invalid(
+            "persons part exceeds the configured resource bound",
+        ));
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut stack = Vec::new();
@@ -93,7 +105,7 @@ pub fn parse_persons(xml: &str) -> SheetResult<People> {
 
     loop {
         let decoder = reader.decoder();
-        let event = reader.read_event()?.into_owned();
+        let event = reader.read_event().map_err(malformed)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -118,7 +130,9 @@ pub fn parse_persons(xml: &str) -> SheetResult<People> {
                 closed_root = true;
             },
             Event::Start(element) => {
-                let parent = *stack.last().ok_or("people part is missing its root")?;
+                let parent = *stack
+                    .last()
+                    .ok_or_else(|| invalid("people part is missing its root"))?;
                 stack.push(start_person_element(
                     parent,
                     &namespace,
@@ -129,7 +143,9 @@ pub fn parse_persons(xml: &str) -> SheetResult<People> {
                 )?);
             },
             Event::Empty(element) => {
-                let parent = *stack.last().ok_or("people part is missing its root")?;
+                let parent = *stack
+                    .last()
+                    .ok_or_else(|| invalid("people part is missing its root"))?;
                 start_person_element(
                     parent,
                     &namespace,
@@ -142,16 +158,16 @@ pub fn parse_persons(xml: &str) -> SheetResult<People> {
             Event::End(element) => {
                 let context = stack
                     .pop()
-                    .ok_or("people part has a closing element outside its root")?;
+                    .ok_or_else(|| invalid("people part has a closing element outside its root"))?;
                 if context == PersonContext::PersonList {
                     if !is_threaded_name(&namespace, element.name(), b"personList") {
-                        return Err("people part has an invalid root closing element".into());
+                        return Err(invalid("people part has an invalid root closing element"));
                     }
                     closed_root = true;
                 }
             },
             Event::Eof if !closed_root || !stack.is_empty() => {
-                return Err("people part has a missing or unterminated root".into());
+                return Err(invalid("people part has a missing or unterminated root"));
             },
             Event::Eof => break,
             Event::Text(_)
@@ -165,7 +181,7 @@ pub fn parse_persons(xml: &str) -> SheetResult<People> {
     }
 
     if persons.len() > MAX_PERSONS {
-        return Err("persons part contains too many people".into());
+        return Err(invalid("persons part contains too many people"));
     }
     Ok(People { persons })
 }
@@ -185,7 +201,7 @@ fn start_person_element(
     }
     let person = parse_person(element, decoder)?;
     if !ids.insert(person.id.clone()) {
-        return Err(format!("duplicate person ID '{}'", person.id).into());
+        return Err(invalid(format!("duplicate person ID '{}'", person.id)));
     }
     persons.push(person);
     Ok(PersonContext::Person)
@@ -218,7 +234,9 @@ struct PendingComment {
 
 pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
     if xml.len() > MAX_PART_BYTES {
-        return Err("threaded-comments part exceeds the configured resource bound".into());
+        return Err(invalid(
+            "threaded-comments part exceeds the configured resource bound",
+        ));
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut stack = Vec::new();
@@ -230,7 +248,7 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
 
     loop {
         let decoder = reader.decoder();
-        let event = reader.read_event()?.into_owned();
+        let event = reader.read_event().map_err(malformed)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -257,7 +275,7 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
             Event::Start(element) => {
                 let parent = *stack
                     .last()
-                    .ok_or("threaded-comments part is missing its root")?;
+                    .ok_or_else(|| invalid("threaded-comments part is missing its root"))?;
                 let context = start_comment_element(
                     parent,
                     &namespace,
@@ -272,7 +290,7 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
             Event::Empty(element) => {
                 let parent = *stack
                     .last()
-                    .ok_or("threaded-comments part is missing its root")?;
+                    .ok_or_else(|| invalid("threaded-comments part is missing its root"))?;
                 let context = start_comment_element(
                     parent,
                     &namespace,
@@ -287,46 +305,48 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
             Event::Text(text) if stack.last() == Some(&CommentContext::Text) => {
                 pending
                     .as_mut()
-                    .ok_or("threaded-comment text outside a comment")?
+                    .ok_or_else(|| invalid("threaded-comment text outside a comment"))?
                     .comment
                     .text
                     .get_or_insert_with(String::new)
-                    .push_str(&text.decode()?);
+                    .push_str(&text.decode().map_err(malformed)?);
             },
             Event::CData(text) if stack.last() == Some(&CommentContext::Text) => {
                 pending
                     .as_mut()
-                    .ok_or("threaded-comment text outside a comment")?
+                    .ok_or_else(|| invalid("threaded-comment text outside a comment"))?
                     .comment
                     .text
                     .get_or_insert_with(String::new)
-                    .push_str(&text.decode()?);
+                    .push_str(&text.decode().map_err(malformed)?);
             },
             Event::GeneralRef(reference) if stack.last() == Some(&CommentContext::Text) => {
                 pending
                     .as_mut()
-                    .ok_or("threaded-comment text outside a comment")?
+                    .ok_or_else(|| invalid("threaded-comment text outside a comment"))?
                     .comment
                     .text
                     .get_or_insert_with(String::new)
                     .push_str(&decode_xml_reference(&reference)?);
             },
             Event::End(element) => {
-                let context = stack
-                    .pop()
-                    .ok_or("threaded-comments part has a closing element outside its root")?;
+                let context = stack.pop().ok_or_else(|| {
+                    invalid("threaded-comments part has a closing element outside its root")
+                })?;
                 finish_comment_element(context, &mut pending, &mut comments)?;
                 if context == CommentContext::ThreadedComments {
                     if !is_threaded_name(&namespace, element.name(), b"ThreadedComments") {
-                        return Err(
-                            "threaded-comments part has an invalid root closing element".into()
-                        );
+                        return Err(invalid(
+                            "threaded-comments part has an invalid root closing element",
+                        ));
                     }
                     closed_root = true;
                 }
             },
             Event::Eof if !closed_root || !stack.is_empty() => {
-                return Err("threaded-comments part has a missing or unterminated root".into());
+                return Err(invalid(
+                    "threaded-comments part has a missing or unterminated root",
+                ));
             },
             Event::Eof => break,
             Event::Text(_)
@@ -343,22 +363,21 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
         if let Some(parent_id) = comment.parent_id.as_deref()
             && (!comment_ids.contains(parent_id) || parent_id == comment.id)
         {
-            return Err(format!(
+            return Err(invalid(format!(
                 "threaded comment '{}' has invalid parent ID '{parent_id}'",
                 comment.id
-            )
-            .into());
+            )));
         }
     }
     if comments.len() > MAX_COMMENTS {
-        return Err("threaded-comment part contains too many comments".into());
+        return Err(invalid("threaded-comment part contains too many comments"));
     }
     let mentions = comments
         .iter()
         .map(|comment| comment.mentions.len())
         .sum::<usize>();
     if mentions > MAX_MENTIONS {
-        return Err("threaded-comments part contains too many mentions".into());
+        return Err(invalid("threaded-comments part contains too many mentions"));
     }
     if comments.iter().any(|comment| {
         comment
@@ -366,7 +385,9 @@ pub fn parse_comments(xml: &str) -> SheetResult<Comments> {
             .as_deref()
             .is_some_and(|text| text.encode_utf16().count() > MAX_TEXT_UTF16)
     }) {
-        return Err("threaded-comment text exceeds the configured resource bound".into());
+        return Err(invalid(
+            "threaded-comment text exceeds the configured resource bound",
+        ));
     }
     Ok(Comments { comments })
 }
@@ -384,11 +405,14 @@ fn start_comment_element(
         && is_threaded_name(namespace, element.name(), b"threadedComment")
     {
         if pending.is_some() {
-            return Err("nested threaded comment".into());
+            return Err(invalid("nested threaded comment"));
         }
         let comment = parse_threaded_comment(element, decoder)?;
         if !comment_ids.insert(comment.id.clone()) {
-            return Err(format!("duplicate threaded-comment ID '{}'", comment.id).into());
+            return Err(invalid(format!(
+                "duplicate threaded-comment ID '{}'",
+                comment.id
+            )));
         }
         *pending = Some(PendingComment {
             comment,
@@ -400,9 +424,9 @@ fn start_comment_element(
     if parent == CommentContext::Comment && is_threaded_name(namespace, element.name(), b"text") {
         let pending = pending
             .as_mut()
-            .ok_or("threaded-comment text outside a comment")?;
+            .ok_or_else(|| invalid("threaded-comment text outside a comment"))?;
         if pending.saw_text || pending.saw_mentions {
-            return Err("duplicate or out-of-order threaded-comment text".into());
+            return Err(invalid("duplicate or out-of-order threaded-comment text"));
         }
         pending.saw_text = true;
         pending.comment.text = Some(String::new());
@@ -412,9 +436,9 @@ fn start_comment_element(
     {
         let pending = pending
             .as_mut()
-            .ok_or("threaded-comment mentions outside a comment")?;
+            .ok_or_else(|| invalid("threaded-comment mentions outside a comment"))?;
         if pending.saw_mentions {
-            return Err("duplicate threaded-comment mentions element".into());
+            return Err(invalid("duplicate threaded-comment mentions element"));
         }
         pending.saw_mentions = true;
         return Ok(CommentContext::Mentions);
@@ -423,11 +447,14 @@ fn start_comment_element(
     {
         let mention = parse_mention(element, decoder)?;
         if !mention_ids.insert(mention.mention_id.clone()) {
-            return Err(format!("duplicate mention ID '{}'", mention.mention_id).into());
+            return Err(invalid(format!(
+                "duplicate mention ID '{}'",
+                mention.mention_id
+            )));
         }
         pending
             .as_mut()
-            .ok_or("mention outside a threaded comment")?
+            .ok_or_else(|| invalid("mention outside a threaded comment"))?
             .comment
             .mentions
             .push(mention);
@@ -444,21 +471,22 @@ fn finish_comment_element(
     if context != CommentContext::Comment {
         return Ok(());
     }
-    let pending = pending.take().ok_or("missing pending threaded comment")?;
+    let pending = pending
+        .take()
+        .ok_or_else(|| invalid("missing pending threaded comment"))?;
     if let Some(text) = pending.comment.text.as_deref() {
         let text_len = u32::try_from(text.encode_utf16().count())
-            .map_err(|_source| "threaded-comment text is too long")?;
+            .map_err(|_source| invalid("threaded-comment text is too long"))?;
         for mention in &pending.comment.mentions {
             let end = mention
                 .start_index
                 .checked_add(mention.length)
-                .ok_or("mention range overflows")?;
+                .ok_or_else(|| invalid("mention range overflows"))?;
             if end > text_len {
-                return Err(format!(
+                return Err(invalid(format!(
                     "mention '{}' range exceeds threaded-comment text",
                     mention.mention_id
-                )
-                .into());
+                )));
             }
         }
     }
@@ -507,11 +535,10 @@ fn validate_root(
     description: &str,
 ) -> SheetResult<()> {
     if closed_root || !is_threaded_name(namespace, name, local_name) {
-        return Err(format!(
+        return Err(invalid(format!(
             "{description} part must have one namespaced '{}' root",
             String::from_utf8_lossy(local_name)
-        )
-        .into());
+        )));
     }
     Ok(())
 }
@@ -531,9 +558,9 @@ fn required_string(
     description: &str,
 ) -> SheetResult<String> {
     let value = unqualified_attribute_value(element, name, decoder)?
-        .ok_or_else(|| format!("missing {description} attribute"))?;
+        .ok_or_else(|| invalid(format!("missing {description} attribute")))?;
     if value.is_empty() {
-        return Err(format!("{description} cannot be empty").into());
+        return Err(invalid(format!("{description} cannot be empty")));
     }
     Ok(value)
 }
@@ -547,7 +574,7 @@ fn required_u32(
     let value = required_string(element, name, decoder, description)?;
     value
         .parse::<u32>()
-        .map_err(|_source| format!("invalid {description} '{value}'").into())
+        .map_err(|_source| invalid(format!("invalid {description} '{value}'")))
 }
 
 fn required_guid(
@@ -576,7 +603,7 @@ fn optional_guid(
 
 pub fn validate_guid(value: &str, description: &str) -> SheetResult<()> {
     if !valid_guid(value) {
-        return Err(format!("invalid {description} GUID '{value}'").into());
+        return Err(invalid(format!("invalid {description} GUID '{value}'")));
     }
     Ok(())
 }
@@ -593,7 +620,7 @@ fn optional_bool(
     match value.as_str() {
         "1" | "true" => Ok(Some(true)),
         "0" | "false" => Ok(Some(false)),
-        _ => Err(format!("invalid {description} '{value}'").into()),
+        _ => Err(invalid(format!("invalid {description} '{value}'"))),
     }
 }
 
@@ -613,7 +640,7 @@ pub fn write_persons(person_list: &People) -> SheetResult<String> {
     write!(
         &mut xml,
         r#"<personList xmlns="{THREADED_COMMENTS_NS}" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#
-    )?;
+    ).map_err(fmt_error)?;
 
     for person in &person_list.persons {
         write_person(&mut xml, person)?;
@@ -630,13 +657,14 @@ fn write_person(xml: &mut String, person: &Person) -> SheetResult<()> {
         r#"<person displayName="{}" id="{}""#,
         escape_xml(&person.display_name),
         escape_xml(&person.id)
-    )?;
+    )
+    .map_err(fmt_error)?;
 
     if let Some(user_id) = &person.user_id {
-        write!(xml, r#" userId="{}""#, escape_xml(user_id))?;
+        write!(xml, r#" userId="{}""#, escape_xml(user_id)).map_err(fmt_error)?;
     }
     if let Some(provider_id) = &person.provider_id {
-        write!(xml, r#" providerId="{}""#, escape_xml(provider_id))?;
+        write!(xml, r#" providerId="{}""#, escape_xml(provider_id)).map_err(fmt_error)?;
     }
 
     xml.push_str("/>");
@@ -655,7 +683,8 @@ pub fn write_comments(comments: &Comments) -> SheetResult<String> {
     write!(
         &mut xml,
         r#"<ThreadedComments xmlns="{THREADED_COMMENTS_NS}">"#
-    )?;
+    )
+    .map_err(fmt_error)?;
 
     for comment in &comments.comments {
         write_threaded_comment(&mut xml, comment)?;
@@ -670,7 +699,7 @@ fn write_threaded_comment(xml: &mut String, comment: &Comment) -> SheetResult<()
     xml.push_str("<threadedComment");
 
     if let Some(cell_ref) = &comment.cell_ref {
-        write!(xml, r#" ref="{}""#, escape_xml(cell_ref))?;
+        write!(xml, r#" ref="{}""#, escape_xml(cell_ref)).map_err(fmt_error)?;
     }
 
     write!(
@@ -678,18 +707,19 @@ fn write_threaded_comment(xml: &mut String, comment: &Comment) -> SheetResult<()
         r#" id="{}" personId="{}""#,
         escape_xml(&comment.id),
         escape_xml(&comment.person_id)
-    )?;
+    )
+    .map_err(fmt_error)?;
 
     if let Some(parent_id) = &comment.parent_id {
-        write!(xml, r#" parentId="{}""#, escape_xml(parent_id))?;
+        write!(xml, r#" parentId="{}""#, escape_xml(parent_id)).map_err(fmt_error)?;
     }
 
     if let Some(date_time) = &comment.date_time {
-        write!(xml, r#" dT="{}""#, escape_xml(date_time))?;
+        write!(xml, r#" dT="{}""#, escape_xml(date_time)).map_err(fmt_error)?;
     }
 
     if let Some(done) = comment.done {
-        write!(xml, r#" done="{}""#, if done { "1" } else { "0" })?;
+        write!(xml, r#" done="{}""#, if done { "1" } else { "0" }).map_err(fmt_error)?;
     }
 
     if comment.text.is_none() && comment.mentions.is_empty() {
@@ -700,7 +730,7 @@ fn write_threaded_comment(xml: &mut String, comment: &Comment) -> SheetResult<()
     xml.push('>');
 
     if let Some(text) = &comment.text {
-        write!(xml, "<text>{}</text>", escape_xml(text))?;
+        write!(xml, "<text>{}</text>", escape_xml(text)).map_err(fmt_error)?;
     }
 
     if !comment.mentions.is_empty() {
@@ -723,7 +753,8 @@ fn write_mentions(xml: &mut String, mentions: &[Mention]) -> SheetResult<()> {
             escape_xml(&mention.mention_id),
             mention.start_index,
             mention.length
-        )?;
+        )
+        .map_err(fmt_error)?;
     }
 
     xml.push_str("</mentions>");
@@ -732,7 +763,7 @@ fn write_mentions(xml: &mut String, mentions: &[Mention]) -> SheetResult<()> {
 
 pub fn validate_people(person_list: &People) -> SheetResult<()> {
     if person_list.persons.len() > MAX_PERSONS {
-        return Err("persons list contains too many people".into());
+        return Err(invalid("persons list contains too many people"));
     }
     let mut ids = HashSet::with_capacity(person_list.persons.len());
     for person in &person_list.persons {
@@ -747,10 +778,13 @@ pub fn validate_people(person_list: &People) -> SheetResult<()> {
                 .as_ref()
                 .is_some_and(|value| value.len() > MAX_IDENTITY_BYTES)
         {
-            return Err(format!("person '{}' has oversized identity metadata", person.id).into());
+            return Err(invalid(format!(
+                "person '{}' has oversized identity metadata",
+                person.id
+            )));
         }
         if !ids.insert(person.id.as_str()) {
-            return Err(format!("duplicate person ID '{}'", person.id).into());
+            return Err(invalid(format!("duplicate person ID '{}'", person.id)));
         }
     }
     Ok(())
@@ -758,7 +792,7 @@ pub fn validate_people(person_list: &People) -> SheetResult<()> {
 
 pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
     if comments.comments.len() > MAX_COMMENTS {
-        return Err("threaded-comments list contains too many comments".into());
+        return Err(invalid("threaded-comments list contains too many comments"));
     }
     let mut comment_ids = HashSet::with_capacity(comments.comments.len());
     let mention_count = comments
@@ -767,7 +801,7 @@ pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
         .map(|comment| comment.mentions.len())
         .sum();
     if mention_count > MAX_MENTIONS {
-        return Err("threaded-comments list contains too many mentions".into());
+        return Err(invalid("threaded-comments list contains too many mentions"));
     }
     let mut mention_ids = HashSet::with_capacity(mention_count);
 
@@ -782,7 +816,10 @@ pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
         }
         validate_timestamp(comment.date_time.as_deref())?;
         if !comment_ids.insert(comment.id.as_str()) {
-            return Err(format!("duplicate threaded-comment ID '{}'", comment.id).into());
+            return Err(invalid(format!(
+                "duplicate threaded-comment ID '{}'",
+                comment.id
+            )));
         }
 
         let text_len = comment
@@ -790,29 +827,34 @@ pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
             .as_deref()
             .map(|text| {
                 u32::try_from(text.encode_utf16().count())
-                    .map_err(|_source| "threaded-comment text is too long")
+                    .map_err(|_source| invalid("threaded-comment text is too long"))
             })
             .transpose()?;
         if text_len.is_some_and(|length| length as usize > MAX_TEXT_UTF16) {
-            return Err(format!("threaded-comment text '{}' is too long", comment.id).into());
+            return Err(invalid(format!(
+                "threaded-comment text '{}' is too long",
+                comment.id
+            )));
         }
         for mention in &comment.mentions {
             validate_guid(&mention.mention_person_id, "mention person ID")?;
             validate_guid(&mention.mention_id, "mention ID")?;
             if !mention_ids.insert(mention.mention_id.as_str()) {
-                return Err(format!("duplicate mention ID '{}'", mention.mention_id).into());
+                return Err(invalid(format!(
+                    "duplicate mention ID '{}'",
+                    mention.mention_id
+                )));
             }
             if let Some(text_len) = text_len {
                 let end = mention
                     .start_index
                     .checked_add(mention.length)
-                    .ok_or("mention range overflows")?;
+                    .ok_or_else(|| invalid("mention range overflows"))?;
                 if end > text_len {
-                    return Err(format!(
+                    return Err(invalid(format!(
                         "mention '{}' range exceeds threaded-comment text",
                         mention.mention_id
-                    )
-                    .into());
+                    )));
                 }
             }
         }
@@ -822,11 +864,10 @@ pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
         if let Some(parent_id) = comment.parent_id.as_deref()
             && (!comment_ids.contains(parent_id) || parent_id == comment.id)
         {
-            return Err(format!(
+            return Err(invalid(format!(
                 "threaded comment '{}' has invalid parent ID '{parent_id}'",
                 comment.id
-            )
-            .into());
+            )));
         }
     }
     Ok(())
@@ -851,49 +892,48 @@ pub fn validate_graph(graph: &Graph) -> SheetResult<()> {
         let mut root_cells = HashSet::new();
         for comment in &sheet.comments.comments {
             if !comment_ids.insert(comment.id.as_str()) {
-                return Err(
-                    format!("duplicate workbook threaded-comment ID '{}'", comment.id).into(),
-                );
+                return Err(invalid(format!(
+                    "duplicate workbook threaded-comment ID '{}'",
+                    comment.id
+                )));
             }
             if !person_ids.contains(comment.person_id.as_str()) {
-                return Err(format!(
+                return Err(invalid(format!(
                     "threaded comment '{}' references missing person '{}'",
                     comment.id, comment.person_id
-                )
-                .into());
+                )));
             }
             validate_timestamp(comment.date_time.as_deref())?;
             if comment.parent_id.is_none() {
                 let cell = comment.cell_ref.as_deref().ok_or_else(|| {
-                    format!(
+                    invalid(format!(
                         "threaded-comment root '{}' is missing its cell reference",
                         comment.id
-                    )
+                    ))
                 })?;
                 if !root_cells.insert(cell) {
-                    return Err(
-                        format!("worksheet has multiple threaded-comment roots at {cell}").into(),
-                    );
+                    return Err(invalid(format!(
+                        "worksheet has multiple threaded-comment roots at {cell}"
+                    )));
                 }
             } else if comment.cell_ref.is_some() {
-                return Err(format!(
+                return Err(invalid(format!(
                     "threaded-comment reply '{}' must not carry a cell reference",
                     comment.id
-                )
-                .into());
+                )));
             }
             for mention in &comment.mentions {
                 if !person_ids.contains(mention.mention_person_id.as_str()) {
-                    return Err(format!(
+                    return Err(invalid(format!(
                         "mention '{}' references missing person '{}'",
                         mention.mention_id, mention.mention_person_id
-                    )
-                    .into());
+                    )));
                 }
                 if !mention_ids.insert(mention.mention_id.as_str()) {
-                    return Err(
-                        format!("duplicate workbook mention ID '{}'", mention.mention_id).into(),
-                    );
+                    return Err(invalid(format!(
+                        "duplicate workbook mention ID '{}'",
+                        mention.mention_id
+                    )));
                 }
             }
         }
@@ -916,11 +956,10 @@ pub fn validate_graph(graph: &Graph) -> SheetResult<()> {
                     .as_deref()
                     .unwrap_or_else(|| crate::error::panic_missing_invariant("filtered")),
             ) {
-                return Err(format!(
+                return Err(invalid(format!(
                     "threaded-comment reply '{}' must reference a root in the same worksheet",
                     reply.id
-                )
-                .into());
+                )));
             }
         }
     }

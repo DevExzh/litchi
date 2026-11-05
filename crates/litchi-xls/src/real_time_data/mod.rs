@@ -42,7 +42,7 @@ pub(crate) use codec::{CONTINUE_FRT_RECORD_TYPE, REAL_TIME_DATA_RECORD_TYPE};
     unreachable_pub,
     reason = "re-exports stage this feature module API"
 )]
-pub use edit::{Commit, Patch, Snapshot, Transaction, apply, read};
+pub use edit::{Commit, Diagnostics, Edit, Patch, Snapshot, apply, read};
 
 #[allow(
     unused_imports,

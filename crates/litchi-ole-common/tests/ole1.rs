@@ -37,8 +37,13 @@ fn linked_header() -> ObjectHeader {
 }
 
 fn embedded(presentation: Presentation) -> ObjectSnapshot {
-    ObjectSnapshot::new_embedded(embedded_header(), b"native bytes".to_vec(), presentation)
-        .expect("valid embedded object")
+    ObjectSnapshot::new_embedded(
+        embedded_header(),
+        b"native bytes".to_vec(),
+        presentation,
+        Limits::default(),
+    )
+    .expect("valid embedded object")
 }
 
 fn push_u32(bytes: &mut Vec<u8>, value: u32) {
@@ -88,12 +93,12 @@ fn canonical_authoring_covers_all_five_presentation_forms() {
 
     for (presentation, expected_kind) in values.into_iter().zip(expected) {
         let snapshot = embedded(presentation);
-        let borrowed = ObjectRef::parse(snapshot.bytes()).unwrap();
+        let borrowed = ObjectRef::parse(snapshot.bytes(), Limits::default()).unwrap();
         assert_eq!(borrowed.bytes(), snapshot.bytes());
-        let parsed = ObjectSnapshot::parse(snapshot.bytes()).unwrap();
+        let parsed = ObjectSnapshot::parse(snapshot.bytes(), Limits::default()).unwrap();
         assert_eq!(parsed.presentation().kind(), expected_kind);
         assert_eq!(
-            PresentationRef::parse(parsed.presentation().bytes())
+            PresentationRef::parse(parsed.presentation().bytes(), Limits::default())
                 .unwrap()
                 .kind(),
             expected_kind
@@ -110,20 +115,20 @@ fn source_noop_shares_arc_and_patch_is_exactly_reversible() {
     let mut edit = snapshot.edit();
     assert!(!edit.set_width(1).unwrap());
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert!(Arc::ptr_eq(&source_arc, &commit.snapshot().bytes_shared()));
+    assert!(Arc::ptr_eq(&source_arc, &commit.package().bytes_shared()));
 
     let mut changed = snapshot.edit();
     assert!(changed.set_width(-77).unwrap());
     let commit = changed.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().presentation().width(), Some(-77));
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.package().presentation().width(), Some(-77));
+    let restored = commit.patch().inverse().apply(commit.package()).unwrap();
     assert_eq!(restored.bytes(), snapshot.bytes());
     assert_eq!(
         commit.patch().apply(&snapshot).unwrap().bytes(),
-        commit.snapshot().bytes()
+        commit.package().bytes()
     );
 
     let source_arc = snapshot.bytes_shared();
@@ -131,10 +136,10 @@ fn source_noop_shares_arc_and_patch_is_exactly_reversible() {
     assert!(reverted.set_width(-13).unwrap());
     assert!(reverted.set_width(1).unwrap());
     let reverted_commit = reverted.commit().unwrap();
-    assert!(!reverted_commit.changed());
+    assert!(!reverted_commit.diagnostics().changed());
     assert!(Arc::ptr_eq(
         &source_arc,
-        &reverted_commit.snapshot().bytes_shared()
+        &reverted_commit.package().bytes_shared()
     ));
     let applied_noop = reverted_commit.patch().apply(&snapshot).unwrap();
     assert!(Arc::ptr_eq(&source_arc, &applied_noop.bytes_shared()));
@@ -148,7 +153,7 @@ fn edits_preserve_signed_dimensions_and_reserved_metafile_words() {
     let presentation_start = 8 + (4 + b"Test.Class\0".len()) + 4 + 4 + 4 + b"native bytes".len();
     let reserved_start = presentation_start + 8 + (4 + b"METAFILEPICT\0".len()) + 4 + 4 + 4;
     bytes[reserved_start..reserved_start + 8].copy_from_slice(&[1, 0, 2, 0, 3, 0, 4, 0]);
-    let snapshot = ObjectSnapshot::parse(&bytes).unwrap();
+    let snapshot = ObjectSnapshot::parse(&bytes, Limits::default()).unwrap();
     assert_eq!(
         snapshot.presentation().metafile_reserved(),
         Some([1, 2, 3, 4])
@@ -157,13 +162,13 @@ fn edits_preserve_signed_dimensions_and_reserved_metafile_words() {
     let mut edit = snapshot.edit();
     assert!(edit.set_height(-99).unwrap());
     let committed = edit.commit().unwrap();
-    assert_eq!(committed.snapshot().presentation().height(), Some(-99));
+    assert_eq!(committed.package().presentation().height(), Some(-99));
     assert_eq!(
-        committed.snapshot().presentation().metafile_reserved(),
+        committed.package().presentation().metafile_reserved(),
         Some([1, 2, 3, 4])
     );
     assert_eq!(
-        &committed.snapshot().bytes()[reserved_start..reserved_start + 8],
+        &committed.package().bytes()[reserved_start..reserved_start + 8],
         &[1, 0, 2, 0, 3, 0, 4, 0]
     );
 }
@@ -175,6 +180,7 @@ fn linked_source_keeps_network_encoding_and_updates_only_requested_field() {
         ansi(b"\\\\server\\share\\source.bin"),
         7,
         Presentation::bitmap(10, 20, b"bitmap".to_vec()).unwrap(),
+        Limits::default(),
     )
     .unwrap();
     assert_eq!(snapshot.kind(), ObjectKind::Linked);
@@ -187,9 +193,9 @@ fn linked_source_keeps_network_encoding_and_updates_only_requested_field() {
     let mut edit = snapshot.edit();
     assert!(edit.set_link_update_option(9).unwrap());
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().link_update_option(), Some(9));
+    assert_eq!(commit.package().link_update_option(), Some(9));
     assert_eq!(
-        commit.snapshot().network_name().unwrap().payload(),
+        commit.package().network_name().unwrap().payload(),
         snapshot.network_name().unwrap().payload()
     );
 }
@@ -206,7 +212,7 @@ fn registered_optional_name_is_rejected_when_two_complete_grammars_match() {
     push_u32(&mut bytes, 1);
     bytes.push(b'Z');
 
-    let snapshot = ObjectSnapshot::parse(&bytes).unwrap();
+    let snapshot = ObjectSnapshot::parse(&bytes, Limits::default()).unwrap();
     let presentation = snapshot.presentation();
     assert_eq!(presentation.kind(), PresentationKind::RegisteredClipboard);
     assert_eq!(
@@ -218,8 +224,8 @@ fn registered_optional_name_is_rejected_when_two_complete_grammars_match() {
     let mut edit = snapshot.edit();
     assert!(edit.set_presentation_data(vec![b'Y']).is_err());
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), bytes.as_slice());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().bytes(), bytes.as_slice());
 }
 
 #[test]
@@ -249,7 +255,7 @@ fn unicode_registered_name_retains_exact_utf16le_payload() {
     let committed = edit.commit().unwrap();
     assert_eq!(
         committed
-            .snapshot()
+            .package()
             .presentation()
             .registered_format_name()
             .unwrap()
@@ -265,7 +271,7 @@ fn registered_without_name_is_distinguished_and_source_only() {
     generic_registered_prefix(&mut bytes);
     push_u32(&mut bytes, 0);
 
-    let snapshot = ObjectSnapshot::parse(&bytes).unwrap();
+    let snapshot = ObjectSnapshot::parse(&bytes, Limits::default()).unwrap();
     let presentation = snapshot.presentation();
     assert_eq!(
         presentation.registered_form(),
@@ -282,7 +288,7 @@ fn malformed_lp_values_and_invalid_limits_are_rejected_before_editing() {
     assert!(EncodedString::ansi(vec![0, 1]).is_err());
     assert!(EncodedString::unicode(vec![b'A', 0]).is_err());
     assert!(
-        ObjectSnapshot::parse_with_limits(
+        ObjectSnapshot::parse(
             &[0u8; 1],
             Limits {
                 max_bytes: 0,
@@ -296,7 +302,7 @@ fn malformed_lp_values_and_invalid_limits_are_rejected_before_editing() {
         .bytes()
         .to_vec();
     bytes[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
-    assert!(ObjectSnapshot::parse(&bytes).is_err());
+    assert!(ObjectSnapshot::parse(&bytes, Limits::default()).is_err());
 }
 
 #[test]
@@ -311,6 +317,7 @@ fn fresh_authoring_enforces_registered_clipboard_and_link_path_rules() {
                 clipboard_format: 0x1234,
                 data: b"data".to_vec(),
             },
+            Limits::default(),
         )
         .is_err()
     );
@@ -361,11 +368,12 @@ fn fresh_authoring_enforces_registered_clipboard_and_link_path_rules() {
         ansi(b"\\\\server\\share\\source.bin"),
         0,
         Presentation::dib(1, 2, b"data".to_vec()).unwrap(),
+        Limits::default(),
     )
     .unwrap();
     let mut edit = source.edit();
     assert!(edit.set_topic_name(ansi(b"\\\\server\\\\")).is_err());
-    assert_eq!(edit.snapshot().bytes(), source.bytes());
+    assert_eq!(edit.staged().bytes(), source.bytes());
 }
 
 #[test]
@@ -380,7 +388,7 @@ fn fresh_authoring_preflights_all_strings_at_their_caller_bound() {
         max_registered_format_bytes: 6,
     };
     assert!(
-        ObjectSnapshot::new_embedded_with_limits(
+        ObjectSnapshot::new_embedded(
             header.clone(),
             b"native".to_vec(),
             presentation.clone(),
@@ -392,7 +400,7 @@ fn fresh_authoring_preflights_all_strings_at_their_caller_bound() {
     // The authored object is larger than max_bytes, but the string ceiling is
     // reported first because every string is admitted before output sizing or
     // reservation.
-    let string_error = ObjectSnapshot::new_embedded_with_limits(
+    let string_error = ObjectSnapshot::new_embedded(
         header,
         b"native".to_vec(),
         presentation,
@@ -414,7 +422,7 @@ fn fresh_authoring_preflights_all_strings_at_their_caller_bound() {
 
     let generic =
         Presentation::standard_clipboard(ansi(b"LongClass"), CF_DIB, b"data".to_vec()).unwrap();
-    let generic_error = ObjectSnapshot::new_embedded_with_limits(
+    let generic_error = ObjectSnapshot::new_embedded(
         ObjectHeader::embedded(ansi(b"C"), ansi(b""), ansi(b"")).unwrap(),
         b"native".to_vec(),
         generic,
@@ -434,7 +442,7 @@ fn fresh_authoring_preflights_all_strings_at_their_caller_bound() {
     ));
 
     let network = ansi(b"\\\\server\\share\\source.bin");
-    let linked_error = ObjectSnapshot::new_linked_with_limits(
+    let linked_error = ObjectSnapshot::new_linked(
         linked_header(),
         network.clone(),
         0,
@@ -465,7 +473,7 @@ fn source_reader_preserves_noncanonical_clipboard_and_topic_forms_without_typed_
     let presentation_offset = bytes.len() - presentation.len();
     let clipboard_offset = presentation_offset + 8 + (4 + b"Custom\0".len());
     bytes[clipboard_offset..clipboard_offset + 4].copy_from_slice(&0x1234u32.to_le_bytes());
-    let snapshot = ObjectSnapshot::parse(&bytes).unwrap();
+    let snapshot = ObjectSnapshot::parse(&bytes, Limits::default()).unwrap();
     assert_eq!(snapshot.presentation().clipboard_format(), Some(0x1234));
     assert!(!snapshot.rewrite_safe());
     assert!(
@@ -491,7 +499,7 @@ fn source_reader_preserves_noncanonical_clipboard_and_topic_forms_without_typed_
     push_u32(&mut linked, 0);
     push_u32(&mut linked, 0);
     linked.extend_from_slice(&snapshot.bytes()[presentation_offset..]);
-    let linked_snapshot = ObjectSnapshot::parse(&linked).unwrap();
+    let linked_snapshot = ObjectSnapshot::parse(&linked, Limits::default()).unwrap();
     assert!(!linked_snapshot.rewrite_safe());
     assert_eq!(linked_snapshot.bytes(), linked.as_slice());
 }
@@ -503,6 +511,7 @@ fn nonzero_link_reserved_is_preserved_for_noop_but_refuses_typed_rewrites() {
         EncodedString::ansi(Vec::new()).unwrap(),
         3,
         Presentation::dib(1, 2, b"data".to_vec()).unwrap(),
+        Limits::default(),
     )
     .unwrap();
     let mut bytes = source.bytes().to_vec();
@@ -510,13 +519,13 @@ fn nonzero_link_reserved_is_preserved_for_noop_but_refuses_typed_rewrites() {
     // fields.  Locate it from the exact authoring spellings used above.
     let reserved_offset = 8 + (4 + b"Test.Class\0".len()) + (4 + b"C:\\source.bin\0".len()) + 4 + 4;
     bytes[reserved_offset..reserved_offset + 4].copy_from_slice(&1u32.to_le_bytes());
-    let snapshot = ObjectSnapshot::parse(&bytes).unwrap();
+    let snapshot = ObjectSnapshot::parse(&bytes, Limits::default()).unwrap();
     assert!(!snapshot.rewrite_safe());
     let mut edit = snapshot.edit();
     assert!(edit.set_link_update_option(4).is_err());
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), bytes.as_slice());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().bytes(), bytes.as_slice());
 }
 
 #[test]
@@ -534,8 +543,8 @@ fn nested_format_zero_requires_explicit_empty_header_compatibility_and_is_source
     push_u32(&mut bytes, 0x501);
     push_u32(&mut bytes, 0);
 
-    assert!(ObjectSnapshot::parse(&bytes).is_err());
-    let snapshot = ObjectSnapshot::parse_with_limits_and_compatibility(
+    assert!(ObjectSnapshot::parse(&bytes, Limits::default()).is_err());
+    let snapshot = ObjectSnapshot::parse_with_compatibility(
         &bytes,
         Limits::default(),
         Compatibility::EmptyPresentationHeader,
@@ -546,12 +555,12 @@ fn nested_format_zero_requires_explicit_empty_header_compatibility_and_is_source
         PresentationKind::RawFormatZero
     );
     assert!(!snapshot.rewrite_safe());
-    assert!(snapshot.edit().snapshot().bytes() == bytes.as_slice());
+    assert!(snapshot.edit().staged().bytes() == bytes.as_slice());
 
     let mut trailing = bytes.clone();
     trailing.push(0);
     assert!(
-        ObjectSnapshot::parse_with_limits_and_compatibility(
+        ObjectSnapshot::parse_with_compatibility(
             &trailing,
             Limits::default(),
             Compatibility::EmptyPresentationHeader,
@@ -568,8 +577,8 @@ fn missing_embedded_presentation_requires_explicit_compatibility() {
     bytes[20..24].copy_from_slice(&(native.len() as u32).to_le_bytes());
     bytes.extend_from_slice(native);
 
-    assert!(ObjectSnapshot::parse(&bytes).is_err());
-    let snapshot = ObjectSnapshot::parse_with_limits_and_compatibility(
+    assert!(ObjectSnapshot::parse(&bytes, Limits::default()).is_err());
+    let snapshot = ObjectSnapshot::parse_with_compatibility(
         &bytes,
         Limits::default(),
         Compatibility::MissingPresentation,
@@ -583,8 +592,8 @@ fn missing_embedded_presentation_requires_explicit_compatibility() {
     assert!(!snapshot.rewrite_safe());
     assert!(snapshot.edit().set_presentation_data(Vec::new()).is_err());
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), bytes.as_slice());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().bytes(), bytes.as_slice());
 }
 
 #[test]
@@ -597,17 +606,17 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
         max_string_bytes: 64,
         max_registered_format_bytes: 64,
     };
-    assert!(ObjectSnapshot::parse_with_limits(snapshot.bytes(), exact).is_ok());
+    assert!(ObjectSnapshot::parse(snapshot.bytes(), exact).is_ok());
     let too_small = Limits {
         max_bytes: snapshot.bytes().len() - 1,
         ..exact
     };
     assert!(matches!(
-        ObjectSnapshot::parse_with_limits(snapshot.bytes(), too_small),
+        ObjectSnapshot::parse(snapshot.bytes(), too_small),
         Err(OleError::LimitExceeded { .. })
     ));
     assert!(matches!(
-        ObjectSnapshot::parse_with_limits(
+        ObjectSnapshot::parse(
             snapshot.bytes(),
             Limits {
                 max_native_bytes: b"native bytes".len() - 1,
@@ -620,7 +629,7 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
         })
     ));
     assert!(matches!(
-        ObjectSnapshot::parse_with_limits(
+        ObjectSnapshot::parse(
             snapshot.bytes(),
             Limits {
                 max_presentation_bytes: snapshot.presentation().bytes().len() - 1,
@@ -633,7 +642,7 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
         })
     ));
     assert!(matches!(
-        ObjectSnapshot::parse_with_limits(
+        ObjectSnapshot::parse(
             snapshot.bytes(),
             Limits {
                 max_string_bytes: 1,
@@ -647,7 +656,7 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
         })
     ));
 
-    let bounded = ObjectSnapshot::parse_with_limits(snapshot.bytes(), exact).unwrap();
+    let bounded = ObjectSnapshot::parse(snapshot.bytes(), exact).unwrap();
     let before = bounded.bytes().to_vec();
     let mut bounded_edit = bounded.edit();
     assert!(
@@ -655,15 +664,23 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
             .set_presentation_data(vec![1, 2, 3, 4, 5, 6, 7, 8])
             .is_err()
     );
-    assert_eq!(bounded_edit.snapshot().bytes(), before.as_slice());
+    assert_eq!(bounded_edit.staged().bytes(), before.as_slice());
 
     let mut edit = snapshot.edit();
     edit.set_width(3).unwrap();
     let commit = edit.commit().unwrap();
     let mut other_edit = snapshot.edit();
     other_edit.set_width(4).unwrap();
-    let other = other_edit.commit().unwrap().into_snapshot();
-    assert!(commit.patch().apply(&other).is_err());
+    let other = other_edit.commit().unwrap().into_package();
+    let equal_content = ObjectSnapshot::parse(snapshot.bytes(), Limits::default()).unwrap();
+    assert_eq!(
+        commit.patch().apply(&equal_content).unwrap().bytes(),
+        commit.package().bytes()
+    );
+    assert!(matches!(
+        commit.patch().apply(&other),
+        Err(litchi_ole_common::Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -673,7 +690,7 @@ fn decoded_ole_inline_fixture_uses_opaque_native_empty_presentation_profile() {
         return;
     };
     let bytes = std::fs::read(path).expect("decoded OLE1 fixture should be readable");
-    let snapshot = ObjectSnapshot::parse_with_limits_and_compatibility(
+    let snapshot = ObjectSnapshot::parse_with_compatibility(
         &bytes,
         Limits::default(),
         Compatibility::EmptyPresentationHeader,
@@ -688,5 +705,5 @@ fn decoded_ole_inline_fixture_uses_opaque_native_empty_presentation_profile() {
         0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1
     ])));
     assert!(!snapshot.rewrite_safe());
-    assert_eq!(snapshot.edit().commit().unwrap().snapshot().bytes(), bytes);
+    assert_eq!(snapshot.edit().commit().unwrap().package().bytes(), bytes);
 }

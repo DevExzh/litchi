@@ -21,7 +21,7 @@ use litchi_iwa_protos::comment_storage_codec::{
 };
 
 use super::budget::LifecycleBudget;
-use super::{SlideMediaLifecycleError, SlideMediaLifecycleLimitKind};
+use super::{Error, LimitKind};
 
 // The neutral lifecycle path performs four bounded source-width passes: the
 // source scan and rewrite measurement during preparation, followed by the
@@ -45,7 +45,7 @@ pub(super) fn rewrite_comment_payload(
     payload: &[u8],
     object_remap: &[(u64, u64)],
     budget: &mut LifecycleBudget,
-) -> Result<Vec<u8>, SlideMediaLifecycleError> {
+) -> Result<Vec<u8>, Error> {
     let (options, preparation) = bounded_comment_options(payload.len(), object_remap.len())?;
 
     // Preparation owns several temporary reply/remap vectors and performs a
@@ -82,18 +82,18 @@ struct PreparationBound {
 fn bounded_comment_options(
     payload_length: usize,
     remap_length: usize,
-) -> Result<(comment_storage_codec::DecodeOptions, PreparationBound), SlideMediaLifecycleError> {
+) -> Result<(comment_storage_codec::DecodeOptions, PreparationBound), Error> {
     let wire_limits = WireLimits::default();
     if payload_length > wire_limits.max_input_bytes() {
         return Err(limit(
-            SlideMediaLifecycleLimitKind::InputBytes,
+            LimitKind::InputBytes,
             payload_length,
             wire_limits.max_input_bytes(),
         ));
     }
     if remap_length > wire_limits.max_fields() {
         return Err(limit(
-            SlideMediaLifecycleLimitKind::References,
+            LimitKind::References,
             remap_length,
             wire_limits.max_fields(),
         ));
@@ -108,25 +108,21 @@ fn bounded_comment_options(
     let aggregate_field_limit = wire_limits
         .max_fields()
         .checked_mul(NEUTRAL_PASS_COUNT)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let fields = field_upper_bound
         .checked_mul(NEUTRAL_PASS_COUNT)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if fields > aggregate_field_limit {
-        return Err(limit(
-            SlideMediaLifecycleLimitKind::WireFields,
-            fields,
-            aggregate_field_limit,
-        ));
+        return Err(limit(LimitKind::WireFields, fields, aggregate_field_limit));
     }
     let references = reply_upper_bound
         .checked_mul(NEUTRAL_PASS_COUNT)
         .and_then(|count| count.max(remap_length).checked_add(1))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let aggregate_reference_limit = aggregate_field_limit;
     if references > aggregate_reference_limit {
         return Err(limit(
-            SlideMediaLifecycleLimitKind::References,
+            LimitKind::References,
             references,
             aggregate_reference_limit,
         ));
@@ -137,24 +133,24 @@ fn bounded_comment_options(
     // source-width reply count so it remains finite for dense hostile input.
     let message_growth = reply_upper_bound
         .checked_mul(MAX_REPLY_REWRITE_GROWTH)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message_bytes = source_length
         .checked_add(message_growth)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message_bytes > wire_limits.max_output_bytes() {
         return Err(limit(
-            SlideMediaLifecycleLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
             message_bytes,
             wire_limits.max_output_bytes(),
         ));
     }
 
-    let recursion_limit = u32::try_from(wire_limits.max_nesting().min(64))
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+    let recursion_limit =
+        u32::try_from(wire_limits.max_nesting().min(64)).map_err(|_| Error::InvalidSource)?;
     let source_pass_work = source_length
         .checked_mul(NEUTRAL_PASS_COUNT)
         .and_then(|passes| passes.checked_mul(SOURCE_PASS_WORK_PER_BYTE))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // The neutral validator sorts source reply IDs and replacement IDs, then
     // binary-searches each possible reply against the replacement table. The
     // terms below mirror those operations and charge the comparison-log work
@@ -165,13 +161,13 @@ fn bounded_comment_options(
     let sorting_work = reply_sort_work
         .checked_add(remap_sort_work)
         .and_then(|work| work.checked_add(remap_lookup_work))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let work_bytes = source_pass_work
         .checked_add(sorting_work)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if work_bytes > wire_limits.max_rewrite_work() {
         return Err(limit(
-            SlideMediaLifecycleLimitKind::WireWork,
+            LimitKind::WireWork,
             work_bytes,
             wire_limits.max_rewrite_work(),
         ));
@@ -180,7 +176,7 @@ fn bounded_comment_options(
     let source_scratch = reply_upper_bound
         .checked_mul(size_of::<u64>())
         .and_then(|bytes| bytes.checked_mul(2))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let remap_scratch = remap_length
         .checked_mul(size_of::<(u64, u64)>())
         .and_then(|bytes| {
@@ -188,11 +184,11 @@ fn bounded_comment_options(
                 .checked_mul(size_of::<u64>())
                 .and_then(|sorted| bytes.checked_add(sorted))
         })
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let scratch_bytes = source_scratch
         .checked_add(remap_scratch)
         .and_then(|bytes| bytes.checked_add(PREPARATION_GROUP_SCRATCH))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
 
     Ok((
         comment_storage_codec::DecodeOptions::new(
@@ -211,124 +207,109 @@ fn bounded_comment_options(
     ))
 }
 
-fn sort_work(length: usize) -> Result<usize, SlideMediaLifecycleError> {
+fn sort_work(length: usize) -> Result<usize, Error> {
     if length <= 1 {
         return Ok(0);
     }
-    let leading_zeroes = usize::try_from((length - 1).leading_zeros())
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+    let leading_zeroes =
+        usize::try_from((length - 1).leading_zeros()).map_err(|_| Error::InvalidSource)?;
     let bits = usize::try_from(usize::BITS)
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?
+        .map_err(|_| Error::InvalidSource)?
         .checked_sub(leading_zeroes)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     length
         .checked_mul(bits)
         .and_then(|comparisons| comparisons.checked_mul(size_of::<u64>()))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn lookup_work(reply_count: usize, remap_count: usize) -> Result<usize, SlideMediaLifecycleError> {
+fn lookup_work(reply_count: usize, remap_count: usize) -> Result<usize, Error> {
     if reply_count == 0 || remap_count == 0 {
         return Ok(0);
     }
-    let search_length = remap_count
-        .checked_add(1)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
-    let leading_zeroes = usize::try_from(search_length.leading_zeros())
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?;
+    let search_length = remap_count.checked_add(1).ok_or(Error::InvalidSource)?;
+    let leading_zeroes =
+        usize::try_from(search_length.leading_zeros()).map_err(|_| Error::InvalidSource)?;
     let bits = usize::try_from(usize::BITS)
-        .map_err(|_| SlideMediaLifecycleError::InvalidSource)?
+        .map_err(|_| Error::InvalidSource)?
         .checked_sub(leading_zeroes)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     reply_count
         .checked_mul(bits)
         .and_then(|searches| searches.checked_mul(3))
         .and_then(|searches| searches.checked_mul(size_of::<(u64, u64)>()))
-        .ok_or(SlideMediaLifecycleError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn charge_execution_requirements(
     requirements: RewriteExecutionRequirements,
     budget: &mut LifecycleBudget,
-) -> Result<(), SlideMediaLifecycleError> {
+) -> Result<(), Error> {
     budget.charge_output(requirements.output_bytes)?;
     budget.charge_wire_fields(requirements.fields)?;
     budget.charge_wire_work(requirements.work_bytes)?;
     budget.charge_wire_work(requirements.reference_bytes)?;
     budget.charge_nesting(
-        usize::try_from(requirements.max_depth)
-            .map_err(|_| SlideMediaLifecycleError::InvalidSource)?,
+        usize::try_from(requirements.max_depth).map_err(|_| Error::InvalidSource)?,
     )?;
     budget.charge_references(requirements.references)?;
     let retained_and_scratch = requirements
         .retained_bytes
         .checked_add(requirements.scratch_bytes)
-        .ok_or(SlideMediaLifecycleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_allocation_plan(retained_and_scratch, requirements.allocations)
 }
 
-fn map_comment_decode_error(error: comment_storage_codec::DecodeError) -> SlideMediaLifecycleError {
+fn map_comment_decode_error(error: comment_storage_codec::DecodeError) -> Error {
     let Some(limit_kind) = error.resource_limit() else {
-        return SlideMediaLifecycleError::InvalidSource;
+        return Error::InvalidSource;
     };
     use comment_storage_codec::DecodeLimit;
     match limit_kind {
         DecodeLimit::Bytes { observed, maximum } => {
-            mapped_limit(SlideMediaLifecycleLimitKind::InputBytes, observed, maximum)
+            mapped_limit(LimitKind::InputBytes, observed, maximum)
         },
         DecodeLimit::OutputBytes { observed, maximum }
         | DecodeLimit::Retained { observed, maximum } => {
-            mapped_limit(SlideMediaLifecycleLimitKind::OutputBytes, observed, maximum)
+            mapped_limit(LimitKind::OutputBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum }
         | DecodeLimit::Replies { observed, maximum }
         | DecodeLimit::ReferenceBytes { observed, maximum } => {
-            mapped_limit(SlideMediaLifecycleLimitKind::References, observed, maximum)
+            mapped_limit(LimitKind::References, observed, maximum)
         },
         DecodeLimit::Fields { observed, maximum } => {
-            mapped_limit(SlideMediaLifecycleLimitKind::WireFields, observed, maximum)
+            mapped_limit(LimitKind::WireFields, observed, maximum)
         },
         DecodeLimit::Nesting { observed, maximum } => limit_u64(
-            SlideMediaLifecycleLimitKind::WireNesting,
+            LimitKind::WireNesting,
             u64::from(observed),
             u64::from(maximum),
         ),
         DecodeLimit::Work { observed, maximum } | DecodeLimit::Text { observed, maximum } => {
-            mapped_limit(SlideMediaLifecycleLimitKind::WireWork, observed, maximum)
+            mapped_limit(LimitKind::WireWork, observed, maximum)
         },
         DecodeLimit::Allocations { observed, maximum }
         | DecodeLimit::Scratch { observed, maximum } => {
-            mapped_limit(SlideMediaLifecycleLimitKind::Allocations, observed, maximum)
+            mapped_limit(LimitKind::Allocations, observed, maximum)
         },
-        _ => SlideMediaLifecycleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn mapped_limit(
-    kind: SlideMediaLifecycleLimitKind,
-    observed: usize,
-    maximum: usize,
-) -> SlideMediaLifecycleError {
+fn mapped_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     let (Ok(observed), Ok(maximum)) = (u64::try_from(observed), u64::try_from(maximum)) else {
-        return SlideMediaLifecycleError::InvalidSource;
+        return Error::InvalidSource;
     };
     limit_u64(kind, observed, maximum)
 }
 
-fn limit(
-    kind: SlideMediaLifecycleLimitKind,
-    observed: usize,
-    maximum: usize,
-) -> SlideMediaLifecycleError {
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     mapped_limit(kind, observed, maximum)
 }
 
-fn limit_u64(
-    kind: SlideMediaLifecycleLimitKind,
-    observed: u64,
-    maximum: u64,
-) -> SlideMediaLifecycleError {
-    SlideMediaLifecycleError::LimitExceeded {
+fn limit_u64(kind: LimitKind, observed: u64, maximum: u64) -> Error {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -369,8 +350,13 @@ mod tests {
     fn reference(identifier: u64, marker: &[u8]) -> Vec<u8> {
         let mut output = Vec::new();
         append_varint_field(&mut output, 1, identifier).expect("reference identifier");
-        append_length_delimited_field(&mut output, UNKNOWN_REFERENCE_FIELD, marker)
-            .expect("reference marker");
+        append_length_delimited_field(
+            &mut output,
+            UNKNOWN_REFERENCE_FIELD,
+            marker,
+            WireLimits::DEFAULT,
+        )
+        .expect("reference marker");
         output
     }
 
@@ -385,36 +371,63 @@ mod tests {
     fn uuid(lower: u64, upper: u64) -> Vec<u8> {
         let mut output = Vec::new();
         append_varint_field(&mut output, UUID_LOWER_FIELD, lower).expect("uuid lower");
-        append_length_delimited_field(&mut output, UNKNOWN_REFERENCE_FIELD, b"uuid-unknown")
-            .expect("uuid marker");
+        append_length_delimited_field(
+            &mut output,
+            UNKNOWN_REFERENCE_FIELD,
+            b"uuid-unknown",
+            WireLimits::DEFAULT,
+        )
+        .expect("uuid marker");
         append_varint_field(&mut output, UUID_UPPER_FIELD, upper).expect("uuid upper");
         output
     }
 
     fn comment_payload(author: u64, replies: &[u64]) -> Vec<u8> {
         let mut output = Vec::new();
-        append_length_delimited_field(&mut output, TEXT_FIELD, b"adapter comment")
-            .expect("comment text");
+        append_length_delimited_field(
+            &mut output,
+            TEXT_FIELD,
+            b"adapter comment",
+            WireLimits::DEFAULT,
+        )
+        .expect("comment text");
         append_length_delimited_field(
             &mut output,
             CREATION_DATE_FIELD,
             &date(0x0102_0304_0506_0708),
+            WireLimits::DEFAULT,
         )
         .expect("comment date");
-        append_length_delimited_field(&mut output, AUTHOR_FIELD, &reference(author, b"author"))
-            .expect("comment author");
+        append_length_delimited_field(
+            &mut output,
+            AUTHOR_FIELD,
+            &reference(author, b"author"),
+            WireLimits::DEFAULT,
+        )
+        .expect("comment author");
         for &reply in replies {
-            append_length_delimited_field(&mut output, REPLIES_FIELD, &reference(reply, b"reply"))
-                .expect("comment reply");
+            append_length_delimited_field(
+                &mut output,
+                REPLIES_FIELD,
+                &reference(reply, b"reply"),
+                WireLimits::DEFAULT,
+            )
+            .expect("comment reply");
         }
         append_length_delimited_field(
             &mut output,
             STORAGE_UUID_FIELD,
             &uuid(0x1122_3344_5566_7788, 0x99aa_bbcc_ddee_ff00),
+            WireLimits::DEFAULT,
         )
         .expect("comment uuid");
-        append_length_delimited_field(&mut output, UNKNOWN_ROOT_FIELD, b"root-unknown")
-            .expect("unknown root field");
+        append_length_delimited_field(
+            &mut output,
+            UNKNOWN_ROOT_FIELD,
+            b"root-unknown",
+            WireLimits::DEFAULT,
+        )
+        .expect("unknown root field");
         output
     }
 
@@ -547,8 +560,8 @@ mod tests {
             .expect_err("oversized input");
         assert!(matches!(
             input_error,
-            SlideMediaLifecycleError::LimitExceeded {
-                kind: SlideMediaLifecycleLimitKind::InputBytes,
+            Error::Limit {
+                kind: LimitKind::InputBytes,
                 ..
             }
         ));
@@ -557,8 +570,8 @@ mod tests {
             .expect_err("oversized remap table");
         assert!(matches!(
             remap_error,
-            SlideMediaLifecycleError::LimitExceeded {
-                kind: SlideMediaLifecycleLimitKind::References,
+            Error::Limit {
+                kind: LimitKind::References,
                 ..
             }
         ));
@@ -570,8 +583,8 @@ mod tests {
         let work_error = bounded_comment_options(work_length, 0).expect_err("work bound");
         assert!(matches!(
             work_error,
-            SlideMediaLifecycleError::LimitExceeded {
-                kind: SlideMediaLifecycleLimitKind::WireWork,
+            Error::Limit {
+                kind: LimitKind::WireWork,
                 ..
             }
         ));
@@ -579,8 +592,8 @@ mod tests {
         let huge_error = bounded_comment_options(usize::MAX, 0).expect_err("huge source");
         assert!(matches!(
             huge_error,
-            SlideMediaLifecycleError::LimitExceeded {
-                kind: SlideMediaLifecycleLimitKind::InputBytes,
+            Error::Limit {
+                kind: LimitKind::InputBytes,
                 ..
             }
         ));
@@ -594,7 +607,7 @@ mod tests {
             .expect_err("empty comment payload");
         assert!(matches!(
             map_comment_decode_error(error),
-            SlideMediaLifecycleError::InvalidSource
+            Error::InvalidSource
         ));
     }
 }

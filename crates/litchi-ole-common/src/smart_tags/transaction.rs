@@ -34,13 +34,13 @@ impl Revision {
 
 /// An isolated edit over one source snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     store: PropertyBagStore,
     bags: Vec<PropertyBag>,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             store: source.store().clone(),
@@ -69,7 +69,7 @@ impl Transaction {
 
     /// Whether the typed draft differs from its source projection.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.store != *self.source.store() || self.bags != self.source.bags()
     }
 
@@ -259,22 +259,6 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Projects the current draft as a validated snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the draft cannot be encoded under the source
-    /// limits.
-    pub fn snapshot(&self) -> Result<Snapshot, Error> {
-        self.materialize()
-    }
-
-    /// Restores the source snapshot and discards this transaction.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validates and publishes the draft as a reversible source-checked edit.
     ///
     /// # Errors
@@ -284,12 +268,13 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(self.source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn materialize(&self) -> Result<Snapshot, Error> {
         let bytes = validation::encode(&self.store, &self.bags, self.source.limits())?;
-        if !self.is_changed() {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
         Ok(Snapshot::from_parts(
@@ -301,50 +286,12 @@ impl Transaction {
     }
 }
 
-/// The successful result of a typed smart-tag publication.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the exact serialized source bytes changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit into its published snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the commit into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Runs one isolated edit and publishes it atomically.
 ///
@@ -354,7 +301,7 @@ impl Commit {
 /// source limits.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), Error>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

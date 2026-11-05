@@ -192,7 +192,7 @@ fn evaluate_value(
     mode: Mode,
     limits: &Limits,
 ) -> Result<Observed, EvaluationFailure> {
-    let expression = Expression::parse(source).expect("test formula parses");
+    let expression = Expression::parse(source, &Default::default()).expect("test formula parses");
     let context = Context::new(execution, Position::new("Main", 0, 0)).with_mode(mode);
     let result = evaluate(&expression, resolver, &context, limits)?;
     Ok(match result.value() {

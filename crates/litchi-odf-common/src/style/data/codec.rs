@@ -2,14 +2,14 @@
 
 use super::tokens::{parse_map, parse_part_node};
 use super::{
-    FormatSource, Kind, LOEXT, Locale, MAX_AGGREGATE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_EVENTS,
-    MAX_MAPS, MAX_PARTS, MAX_STYLES, MAX_VALUE_BYTES, MAX_XML_BYTES, NUMBER, OFFICE, Part, Result,
-    STYLE, Section, Style, Styles, TextProperties, TransliterationStyle, Version, bad, invalid,
+    FormatSource, Kind, LOEXT, Locale, MAX_AGGREGATE_BYTES, MAX_ATTRIBUTES, MAX_MAPS, MAX_PARTS,
+    MAX_STYLES, MAX_VALUE_BYTES, NUMBER, OFFICE, Part, Result, STYLE, Section, Style, Styles,
+    TextProperties, TransliterationStyle, Version, bad, invalid,
 };
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
 #[derive(Clone)]
@@ -54,14 +54,15 @@ pub(crate) fn byte_offset(offset: u64, context: &str) -> Result<usize> {
 ///
 /// Returns an error when the XML is malformed, exceeds a parser safety limit, or
 /// contains an invalid data-style grammar.
-pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("data-style XML exceeds 64 MiB");
-    }
+pub fn parse_data_styles_xml(
+    xml: &str,
+    part: Part,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Styles, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("-style") {
         return Ok(Styles::default());
     }
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -71,16 +72,9 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
     let mut version = Version::V1_2;
     let mut xml_version = XmlVersion::Implicit1_0;
     let mut aggregate = 0usize;
-    let mut events = 0usize;
 
     loop {
-        events += 1;
-        if events > MAX_EVENTS {
-            return invalid("data-style XML has too many events");
-        }
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| bad(format!("invalid data-style XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         match event {
             Event::Decl(ref declaration) => {
                 xml_version = declaration
@@ -88,9 +82,6 @@ pub fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
             Event::Start(ref element) => {
-                if frames.len() >= MAX_DEPTH {
-                    return invalid("data-style XML is too deep");
-                }
                 let namespace = namespace_uri(&resolved)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 if frames.is_empty() {
@@ -361,7 +352,7 @@ pub(crate) fn push_style(output: &mut Styles, style: Style) -> Result<()> {
 }
 
 pub(crate) fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     version: XmlVersion,
     aggregate: &mut usize,
@@ -398,7 +389,7 @@ pub(crate) fn collect_attributes(
 }
 
 pub(crate) fn read_document_version(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     version: XmlVersion,
 ) -> Result<Version> {

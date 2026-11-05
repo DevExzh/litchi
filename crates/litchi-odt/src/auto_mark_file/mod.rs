@@ -27,7 +27,7 @@ const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 pub use model::AlphabeticalIndexAutoMarkFile;
 #[cfg(test)]
 pub(crate) use package::parse_auto_mark_file_parts;
-pub(crate) use package::parse_auto_mark_file_parts_with_budget;
+pub(crate) use package::parse_auto_mark_file_parts_with_budget_and_xml_limits;
 
 pub(super) fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))

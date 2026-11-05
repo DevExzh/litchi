@@ -39,7 +39,7 @@ fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::e
     assert!(text.contains("2026-08-07"));
     assert!(package.stats().total_objects() > 0);
     assert_eq!(package.stats().section_count(), 1);
-    let document = package.semantic_document();
+    let document = package.document_ref();
     let selected = document
         .select_section(SectionSelector::index(0))?
         .ok_or_else(|| std::io::Error::other("native Pages fixture has no first section"))?;

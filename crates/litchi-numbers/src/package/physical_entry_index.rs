@@ -81,7 +81,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/numbers/basic.numbers");
         let bytes = std::fs::read(path).expect("Numbers fixture");
-        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&bytes)
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&bytes, Default::default())
             .expect("physical Numbers catalog");
         let index = PhysicalEntryIndex::new(&catalog).expect("physical entry index");
         for entry in catalog.iter() {

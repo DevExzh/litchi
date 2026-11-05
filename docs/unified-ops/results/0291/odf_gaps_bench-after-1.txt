@@ -1,0 +1,20 @@
+ odg       batch_1  leaf     13247.9 µs  unified     13282.1 µs  ratio 1.003
+ odg      batch_10  leaf     46339.9 µs  unified     46551.6 µs  ratio 1.005
+ odg     batch_100  leaf    376900.7 µs  unified    378960.8 µs  ratio 1.005
+ odg    batch_1000  leaf   3684364.4 µs  unified   3683990.7 µs  ratio 1.000
+ odb       batch_1  leaf      2398.3 µs  unified      2401.0 µs  ratio 1.001
+ odb      batch_10  leaf     10141.6 µs  unified     10133.6 µs  ratio 0.999
+ odb     batch_100  leaf     89615.7 µs  unified     89349.0 µs  ratio 0.997
+ odb    batch_1000  leaf    983785.0 µs  unified    962858.9 µs  ratio 0.979
+ odf       batch_1  leaf      1542.9 µs  unified      1543.1 µs  ratio 1.000
+ odf      batch_10  leaf      8296.6 µs  unified      8296.2 µs  ratio 1.000
+ odf     batch_100  leaf     76596.0 µs  unified     76339.3 µs  ratio 0.997
+ odf    batch_1000  leaf    801945.8 µs  unified    801994.0 µs  ratio 1.000
+ odg  metadata_set  leaf      1294.6 µs  unified      1297.6 µs  ratio 1.002
+ odg   insert_page  leaf      1718.1 µs  unified      1726.0 µs  ratio 1.005
+ odg     move_page  leaf      1621.1 µs  unified      1621.1 µs  ratio 1.000
+ ods  metadata_set  leaf       544.2 µs  unified       544.4 µs  ratio 1.000
+ odp  metadata_set  leaf       957.4 µs  unified       959.4 µs  ratio 1.002
+ odc     title_set  leaf       146.8 µs  unified       148.5 µs  ratio 1.012
+ odi  geometry_set  leaf       161.7 µs  unified       163.0 µs  ratio 1.008
+{"rows":[{"format":"odg","leaf_us":13247.89912,"ratio_unified_leaf":1.0025786141402924,"scenario":"batch_1","unified_us":13282.06034},{"format":"odg","leaf_us":46339.8943,"ratio_unified_leaf":1.0045692698094912,"scenario":"batch_10","unified_us":46551.633780000004},{"format":"odg","leaf_us":376900.74730000005,"ratio_unified_leaf":1.0054657864564016,"scenario":"batch_100","unified_us":378960.8063},{"format":"odg","leaf_us":3684364.411,"ratio_unified_leaf":0.9998985632368818,"scenario":"batch_1000","unified_us":3683990.681},{"format":"odb","leaf_us":2398.30544,"ratio_unified_leaf":1.0011333085247056,"scenario":"batch_1","unified_us":2401.02346},{"format":"odb","leaf_us":10141.56608,"ratio_unified_leaf":0.9992096723586108,"scenario":"batch_10","unified_us":10133.550920000001},{"format":"odb","leaf_us":89615.6857,"ratio_unified_leaf":0.9970244160057796,"scenario":"batch_100","unified_us":89349.0267},{"format":"odb","leaf_us":983784.984,"ratio_unified_leaf":0.9787289871868994,"scenario":"batch_1000","unified_us":962858.881},{"format":"odf","leaf_us":1542.8541599999999,"ratio_unified_leaf":1.0001274261722832,"scenario":"batch_1","unified_us":1543.05076},{"format":"odf","leaf_us":8296.60376,"ratio_unified_leaf":0.999946363594927,"scenario":"batch_10","unified_us":8296.158759999998},{"format":"odf","leaf_us":76596.0354,"ratio_unified_leaf":0.9966479701115183,"scenario":"batch_100","unified_us":76339.28319999999},{"format":"odf","leaf_us":801945.773,"ratio_unified_leaf":1.0000601748916507,"scenario":"batch_1000","unified_us":801994.03},{"format":"odg","leaf_us":1294.64705,"ratio_unified_leaf":1.002309162176672,"scenario":"metadata_set","unified_us":1297.6366},{"format":"odg","leaf_us":1718.0945499999998,"ratio_unified_leaf":1.004627539270176,"scenario":"insert_page","unified_us":1726.0451},{"format":"odg","leaf_us":1621.1031500000001,"ratio_unified_leaf":0.999988248742839,"scenario":"move_page","unified_us":1621.0841},{"format":"ods","leaf_us":544.2175500000001,"ratio_unified_leaf":1.000347287587473,"scenario":"metadata_set","unified_us":544.40655},{"format":"odp","leaf_us":957.4100000000001,"ratio_unified_leaf":1.00204248963349,"scenario":"metadata_set","unified_us":959.3654999999999},{"format":"odc","leaf_us":146.7837,"ratio_unified_leaf":1.0119188983517926,"scenario":"title_set","unified_us":148.53320000000002},{"format":"odi","leaf_us":161.65525,"ratio_unified_leaf":1.00803252600828,"scenario":"geometry_set","unified_us":162.95375}]}

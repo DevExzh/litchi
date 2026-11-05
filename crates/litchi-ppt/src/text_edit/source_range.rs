@@ -12,7 +12,7 @@ use super::{
 };
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
-use crate::package::{Error as PackageError, RecordLimits};
+use crate::package::{Error as PackageError, SourceLimits};
 use crate::records::{Record, RecordParseSession};
 use litchi_cfb::SharedOleFile;
 use std::collections::{HashMap, HashSet};
@@ -53,9 +53,7 @@ impl<'a> StreamReader<'a> {
 
     fn read_into(&self, offset: u64, output: &mut [u8], label: &str) -> Result<()> {
         let end = offset
-            .checked_add(u64::try_from(output.len()).map_err(|_error| {
-                PackageError::ResourceLimit(format!("{label} range length does not fit u64"))
-            })?)
+            .checked_add(u64::try_from(output.len()).unwrap_or(u64::MAX))
             .ok_or_else(|| PackageError::Corrupted(format!("{label} range overflows")))?;
         if end > self.length {
             return Err(PackageError::Corrupted(format!(
@@ -91,9 +89,7 @@ impl<'a> StreamReader<'a> {
             .checked_add(data_len)
             .ok_or_else(|| PackageError::Corrupted(format!("{label} length overflows")))?;
         let end = offset
-            .checked_add(u64::try_from(total_len).map_err(|_error| {
-                PackageError::ResourceLimit(format!("{label} length does not fit u64"))
-            })?)
+            .checked_add(u64::try_from(total_len).unwrap_or(u64::MAX))
             .ok_or_else(|| PackageError::Corrupted(format!("{label} range overflows")))?;
         if end > self.length {
             return Err(PackageError::Corrupted(format!(
@@ -116,20 +112,22 @@ impl<'a> StreamReader<'a> {
         offset: u64,
         header: Header,
         label: &str,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Vec<u8>> {
         if header.data_len > limits.max_record_payload_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT record payload size {} exceeds limit {}",
-                header.data_len, limits.max_record_payload_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: header.data_len,
+                maximum: limits.max_record_payload_bytes,
+            }
             .into());
         }
         if header.total_len > limits.max_record_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT record size {} exceeds limit {}",
-                header.total_len, limits.max_record_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: header.total_len,
+                maximum: limits.max_record_bytes,
+            }
             .into());
         }
         let mut output = Vec::new();
@@ -176,7 +174,7 @@ pub(super) fn resolve_source_target(
     document_path: &[String],
     current_user_path: &[String],
     target: Target,
-    limits: RecordLimits,
+    limits: SourceLimits,
 ) -> Result<SourceResolved> {
     let document_refs: Vec<_> = document_path.iter().map(String::as_str).collect();
     let current_user_refs: Vec<_> = current_user_path.iter().map(String::as_str).collect();
@@ -184,33 +182,38 @@ pub(super) fn resolve_source_target(
     let current_user_length = shared
         .stream_len(&current_user_refs)
         .map_err(map_ole_error)?;
-    let aggregate_length = document_length
-        .checked_add(current_user_length)
-        .ok_or_else(|| PackageError::ResourceLimit("PPT metadata stream sizes overflow".into()))?;
-    let input_limit = u64::try_from(limits.max_input_bytes)
-        .map_err(|_error| PackageError::ResourceLimit("PPT input limit does not fit u64".into()))?;
-    let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes).map_err(|_error| {
-        PackageError::ResourceLimit("PPT aggregate input limit does not fit u64".into())
-    })?;
+    let aggregate_length =
+        document_length
+            .checked_add(current_user_length)
+            .ok_or(PackageError::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: usize::MAX,
+                maximum: limits.max_aggregate_input_bytes,
+            })?;
+    let input_limit = u64::try_from(limits.max_input_bytes).unwrap_or(u64::MAX);
+    let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes).unwrap_or(u64::MAX);
     if document_length > input_limit {
-        return Err(PackageError::ResourceLimit(format!(
-            "PowerPoint Document stream size {document_length} exceeds limit {}",
-            limits.max_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::EntryBytes,
+            observed: usize::try_from(document_length).unwrap_or(usize::MAX),
+            maximum: limits.max_input_bytes,
+        }
         .into());
     }
     if current_user_length > input_limit {
-        return Err(PackageError::ResourceLimit(format!(
-            "CurrentUser stream size {current_user_length} exceeds limit {}",
-            limits.max_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::EntryBytes,
+            observed: usize::try_from(current_user_length).unwrap_or(usize::MAX),
+            maximum: limits.max_input_bytes,
+        }
         .into());
     }
     if aggregate_length > aggregate_limit {
-        return Err(PackageError::ResourceLimit(format!(
-            "PPT Document and Current User streams total {aggregate_length} bytes, exceeding limit {}",
-            limits.max_aggregate_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::AggregateBytes,
+            observed: usize::try_from(aggregate_length).unwrap_or(usize::MAX),
+            maximum: limits.max_aggregate_input_bytes,
+        }
         .into());
     }
 
@@ -254,9 +257,13 @@ pub(super) fn resolve_source_target(
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
     // The edit path applies text-style repairs (see `crate::leniency`) while
     // resolving the source range without enumerating them; the presentation
-    // is being rewritten rather than read.
+    // is being rewritten rather than read. Only the shape's native identity is
+    // needed here, so no slide-list text is resolved; resolution never
+    // changes which shapes are returned (L-PPT-R1).
     let shapes = crate::slide::types::Slide::parse_shape_enums(
         &ppdrawing.data,
+        &[],
+        limits,
         &mut crate::leniency::ToleranceReport::default(),
     )?;
     let shape = shapes
@@ -281,7 +288,7 @@ pub(super) fn resolve_source_target(
     })
 }
 
-fn read_current_user(reader: &StreamReader<'_>, limits: RecordLimits) -> Result<CurrentUser> {
+fn read_current_user(reader: &StreamReader<'_>, limits: SourceLimits) -> Result<CurrentUser> {
     if reader.length < 28 {
         return Err(PackageError::Corrupted("CurrentUser stream too short".into()).into());
     }
@@ -302,7 +309,7 @@ fn read_current_user(reader: &StreamReader<'_>, limits: RecordLimits) -> Result<
 fn read_live_mapping(
     reader: &StreamReader<'_>,
     mut edit_offset: u32,
-    limits: RecordLimits,
+    limits: SourceLimits,
     session: &mut RecordParseSession,
 ) -> Result<LiveMapping> {
     let mut mappings = HashMap::new();
@@ -418,7 +425,7 @@ fn merge_directory(
     mapping: &mut HashMap<u32, u32>,
     directory: &[u8],
     directory_offset: u64,
-    limits: RecordLimits,
+    limits: SourceLimits,
     expanded_entries: &mut usize,
 ) -> Result<()> {
     let payload_len = directory
@@ -446,17 +453,24 @@ fn merge_directory(
         if count == 0 {
             return Err(PackageError::Corrupted("zero persist run".into()).into());
         }
-        let count = usize::try_from(count).map_err(|_error| {
-            PackageError::ResourceLimit("PersistDirectory run length does not fit usize".into())
+        let count = usize::try_from(count).map_err(|_error| PackageError::Limit {
+            kind: crate::SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: limits.max_records,
         })?;
-        let expanded = expanded_entries.checked_add(count).ok_or_else(|| {
-            PackageError::ResourceLimit("PPT persist mapping count overflows".into())
-        })?;
+        let expanded = expanded_entries
+            .checked_add(count)
+            .ok_or(PackageError::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: usize::MAX,
+                maximum: limits.max_records,
+            })?;
         if expanded > limits.max_records {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT persist mapping count {expanded} exceeds limit {}",
-                limits.max_records
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: expanded,
+                maximum: limits.max_records,
+            }
             .into());
         }
         mapping
@@ -501,7 +515,7 @@ fn merge_directory(
 fn build_slide_index(
     reader: &StreamReader<'_>,
     mapping: &LiveMapping,
-    limits: RecordLimits,
+    limits: SourceLimits,
     session: &mut RecordParseSession,
 ) -> Result<SlideIndex> {
     let document_header = reader.header(mapping.document_offset, "DocumentContainer")?;
@@ -636,22 +650,19 @@ fn build_slide_index(
                 ))
                 .into());
             }
-            let _ = set.text_interactions()?;
+            let _ = set.text_interactions(crate::text_interaction::limits_for_source(limits))?;
             let _ = set.outline_text_refs()?;
         }
     }
 
     // Keep the caller-selected limits in the signature and ensure the source
     // stream check remains explicit even when no SlideList is present.
-    if reader.length
-        > u64::try_from(limits.max_input_bytes).map_err(|_error| {
-            PackageError::ResourceLimit("PPT input limit does not fit u64".into())
-        })?
-    {
-        return Err(PackageError::ResourceLimit(format!(
-            "PowerPoint Document stream size {} exceeds limit {}",
-            reader.length, limits.max_input_bytes
-        ))
+    if reader.length > u64::try_from(limits.max_input_bytes).unwrap_or(u64::MAX) {
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::EntryBytes,
+            observed: usize::try_from(reader.length).unwrap_or(usize::MAX),
+            maximum: limits.max_input_bytes,
+        }
         .into());
     }
     Ok(SlideIndex { entries })
@@ -662,7 +673,7 @@ fn walk_document_children(
     start: u64,
     end: u64,
     depth: usize,
-    limits: RecordLimits,
+    limits: SourceLimits,
     session: &mut RecordParseSession,
     owners: &mut super::LiveMacroOwners,
     slide_list: &mut Option<Record>,
@@ -788,9 +799,9 @@ mod tests {
             &mut exact_mapping,
             &directory,
             100,
-            RecordLimits {
+            SourceLimits {
                 max_records: 2,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             &mut exact_expanded,
         )
@@ -805,14 +816,17 @@ mod tests {
                 &mut one_under_mapping,
                 &directory,
                 100,
-                RecordLimits {
+                SourceLimits {
                     max_records: 1,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 },
                 &mut one_under_expanded,
             ),
-            Err(Error::Package(PackageError::ResourceLimit(message)))
-                if message.contains("persist mapping count")
+            Err(Error::Package(PackageError::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: 2,
+                maximum: 1
+            }))
         ));
     }
 
@@ -832,7 +846,7 @@ mod tests {
                 &mut mapping,
                 &directory,
                 100,
-                RecordLimits::default(),
+                SourceLimits::default(),
                 &mut expanded,
             ),
             Err(Error::Package(PackageError::Corrupted(message)))
@@ -857,7 +871,7 @@ mod tests {
             &mut mapping,
             &current,
             100,
-            RecordLimits::default(),
+            SourceLimits::default(),
             &mut expanded,
         )
         .unwrap();
@@ -865,7 +879,7 @@ mod tests {
             &mut mapping,
             &historical,
             100,
-            RecordLimits::default(),
+            SourceLimits::default(),
             &mut expanded,
         )
         .unwrap();

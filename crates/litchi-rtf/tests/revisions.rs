@@ -9,15 +9,14 @@
 
 mod support;
 
-use litchi_rtf::{Revision, RevisionAuthor, RevisionType, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Revision, RevisionAuthor, RevisionType, write::Writer};
 use std::borrow::Cow;
 use std::fs;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -28,7 +27,7 @@ fn mixed_unicode_revisions_preserve_visible_and_deleted_semantics() {
         r#"A{\deleted\revauthdel1\revdttmdel12 old \u20320?}B"#,
         r#"{\revised\revauth1\revdttm13 new \u20320?}C}"#,
     );
-    let document = RtfDocument::parse(rtf).unwrap();
+    let document = Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(document.text(), "ABnew 你C");
     assert_eq!(
@@ -62,12 +61,13 @@ fn mixed_unicode_revisions_preserve_visible_and_deleted_semantics() {
     );
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap_or_else(|error| {
-        panic!(
-            "failed to parse writer output: {error}\n{}",
-            String::from_utf8_lossy(&output)
-        )
-    });
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default())
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to parse writer output: {error}\n{}",
+                String::from_utf8_lossy(&output)
+            )
+        });
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.revision_authors(), document.revision_authors());
     assert_eq!(reparsed.revisions(), document.revisions());
@@ -75,7 +75,11 @@ fn mixed_unicode_revisions_preserve_visible_and_deleted_semantics() {
 
 #[test]
 fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
-    let mut document = RtfDocument::parse(r"{\rtf1\ansi A\u20320?B}").unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1\ansi A\u20320?B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     document
         .push_revision_author(RevisionAuthor::new(Cow::Borrowed("Ada")).unwrap())
         .unwrap();
@@ -117,7 +121,8 @@ fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
     );
     assert!(document.clear_revision_authors().is_err());
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "A你B");
     assert_eq!(reparsed.revisions(), document.revisions());
 }
@@ -136,7 +141,10 @@ fn malformed_revision_grammar_is_rejected() {
         r"{\rtf1{\revised\revauth0\revdttm1 x}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 
@@ -157,13 +165,13 @@ fn handles_bundled_libreoffice_revision_fixtures() {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
         if *fixture == "sw/qa/extras/rtfexport/data/FWDP90_min.rtf" {
             assert!(matches!(
-                RtfDocument::parse_bytes(&bytes),
-                Err(litchi_rtf::RtfError::MalformedDocument(message))
+                Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()),
+                Err(litchi_rtf::Error::MalformedDocument(message))
                     if message.contains("trailing non-whitespace")
             ));
             continue;
         }
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(
             !document.revision_authors().is_empty(),
@@ -176,7 +184,7 @@ fn handles_bundled_libreoffice_revision_fixtures() {
     // the vendored bytes untouched.
     // Word and LibreOffice stop reading at the root group's closing brace,
     // so the trailing content is ignored and recorded.
-    let full = RtfDocument::parse_bytes(&malformed)
+    let full = Tree::parse_bytes(&malformed, litchi_rtf::read::OpenOptions::default())
         .unwrap_or_else(|error| panic!("failed to parse FWDP90_min.rtf: {error}"));
     assert_eq!(
         full.tolerance_report()
@@ -190,7 +198,7 @@ fn handles_bundled_libreoffice_revision_fixtures() {
     );
     let prefix = support::first_balanced_rtf_root_prefix(&malformed)
         .expect("FWDP90_min.rtf should have a balanced first root group");
-    let document = RtfDocument::parse_bytes(prefix)
+    let document = Tree::parse_bytes(prefix, litchi_rtf::read::OpenOptions::default())
         .unwrap_or_else(|error| panic!("failed to parse FWDP90_min.rtf root: {error}"));
     assert!(
         !document.revision_authors().is_empty(),

@@ -112,10 +112,11 @@ fn capture_source_inner(
 
     let part_count = package.iter_parts().count();
     if part_count > limits.max_package_parts {
-        return Err(invalid(format!(
-            "DOCX package part count exceeds {}",
-            limits.max_package_parts
-        )));
+        return Err(Error::StoryLimit {
+            kind: crate::package::story::LimitKind::PackageParts,
+            actual: part_count,
+            maximum: limits.max_package_parts,
+        });
     }
     fence(package)?;
 
@@ -290,10 +291,11 @@ fn discover_owned(
             })?;
         relationships.push((kind, relationship));
         if relationships.len() > limits.max_relationships_per_owner {
-            return Err(invalid(format!(
-                "story '{}' relationship count exceeds {}",
-                owner, limits.max_relationships_per_owner
-            )));
+            return Err(Error::StoryLimit {
+                kind: crate::package::story::LimitKind::RelationshipsPerOwner,
+                actual: relationships.len(),
+                maximum: limits.max_relationships_per_owner,
+            });
         }
     }
     relationships.sort_unstable_by(|left, right| {
@@ -318,10 +320,11 @@ fn discover_owned(
             .checked_add(1)
             .ok_or_else(|| invalid("DOCX story relationship count overflow"))?;
         if *relationship_count > limits.max_total_relationships {
-            return Err(invalid(format!(
-                "DOCX story relationship count exceeds {}",
-                limits.max_total_relationships
-            )));
+            return Err(Error::StoryLimit {
+                kind: crate::package::story::LimitKind::Relationships,
+                actual: *relationship_count,
+                maximum: limits.max_total_relationships,
+            });
         }
         if relationship.is_external() {
             return Err(invalid(format!(
@@ -379,10 +382,11 @@ fn push_candidate(
     limits: StoryLimits,
 ) -> Result<()> {
     if candidates.len() >= limits.max_stories {
-        return Err(invalid(format!(
-            "DOCX story count exceeds {}",
-            limits.max_stories
-        )));
+        return Err(Error::StoryLimit {
+            kind: crate::package::story::LimitKind::Stories,
+            actual: (candidates.len()).saturating_add(1),
+            maximum: limits.max_stories,
+        });
     }
     let name = part.partname().clone();
     owned.try_reserve(1).map_err(|source| Error::Allocation {
@@ -445,9 +449,11 @@ fn measure_topology(candidates: &[Candidate], limit: usize) -> Result<()> {
         size = super::add_size(size, 1)?;
     }
     if size > limit {
-        return Err(invalid(format!(
-            "DOCX story topology exceeds {limit} bytes"
-        )));
+        return Err(Error::StoryLimit {
+            kind: crate::package::story::LimitKind::TopologyBytes,
+            actual: size,
+            maximum: limit,
+        });
     }
     Ok(())
 }
@@ -479,19 +485,21 @@ fn load_stories(
         let declared_size = usize::try_from(declared_size)
             .map_err(|_| invalid("DOCX declared story byte count does not fit usize"))?;
         if declared_size > limits.max_story_bytes {
-            return Err(invalid(format!(
-                "DOCX story '{}' has {declared_size} bytes, exceeding {}",
-                candidate.part, limits.max_story_bytes
-            )));
+            return Err(Error::StoryLimit {
+                kind: crate::package::story::LimitKind::StoryBytes,
+                actual: declared_size,
+                maximum: limits.max_story_bytes,
+            });
         }
         declared_total = declared_total
             .checked_add(declared_size)
             .ok_or_else(|| invalid("DOCX aggregate story byte count overflow"))?;
         if declared_total > limits.max_total_story_bytes {
-            return Err(invalid(format!(
-                "DOCX aggregate story bytes exceed {}",
-                limits.max_total_story_bytes
-            )));
+            return Err(Error::StoryLimit {
+                kind: crate::package::story::LimitKind::TotalStoryBytes,
+                actual: declared_total,
+                maximum: limits.max_total_story_bytes,
+            });
         }
         declared.push(declared_size);
     }
@@ -517,19 +525,21 @@ fn load_stories(
             )));
         }
         if actual_size > limits.max_story_bytes {
-            return Err(invalid(format!(
-                "DOCX story '{}' has {actual_size} bytes, exceeding {}",
-                candidate.part, limits.max_story_bytes
-            )));
+            return Err(Error::StoryLimit {
+                kind: crate::package::story::LimitKind::StoryBytes,
+                actual: actual_size,
+                maximum: limits.max_story_bytes,
+            });
         }
         actual_total = actual_total
             .checked_add(actual_size)
             .ok_or_else(|| invalid("DOCX aggregate story byte count overflow"))?;
         if actual_total > limits.max_total_story_bytes {
-            return Err(invalid(format!(
-                "DOCX aggregate story bytes exceed {}",
-                limits.max_total_story_bytes
-            )));
+            return Err(Error::StoryLimit {
+                kind: crate::package::story::LimitKind::TotalStoryBytes,
+                actual: actual_total,
+                maximum: limits.max_total_story_bytes,
+            });
         }
         with_fence(
             package,
@@ -625,7 +635,14 @@ mod tests {
         }
         package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
         let bytes = PackageWriter::to_bytes(&package).unwrap();
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+        SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
     }
 
     #[test]

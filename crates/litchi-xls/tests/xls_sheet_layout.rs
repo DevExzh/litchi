@@ -2,12 +2,12 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_xls::Workbook;
-use litchi_xls::writer::{WorksheetLayoutOptions, Writer};
+use litchi_xls::raw::Reader;
+use litchi_xls::writer::{Builder, WorksheetLayoutOptions};
 
 #[test]
 fn worksheet_layout_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Layout").unwrap();
     writer
         .set_worksheet_layout(
@@ -37,8 +37,8 @@ fn worksheet_layout_round_trip() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 360);
     assert!(layout.empty_rows_hidden());
@@ -65,7 +65,7 @@ fn worksheet_layout_round_trip() {
 fn reads_poi_column_width_fixture_defaults() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/colwidth.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 255);
     assert_eq!(layout.default_column_width_chars(), 8);
@@ -78,7 +78,7 @@ fn reads_poi_column_width_fixture_defaults() {
 
 #[test]
 fn writer_rejects_invalid_layout_bounds() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Layout").unwrap();
     assert!(
         writer

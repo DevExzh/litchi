@@ -59,7 +59,7 @@ impl ComponentCatalog {
                 ));
             }
             objects = charge_semantic_iwa_objects(objects, archive.objects.len())?;
-            let encoded = archive.encoded_len_with_limits(limits.archive_limits())?;
+            let encoded = archive.encoded_len(limits.archive_limits())?;
             iwa_bytes = limits.charge_iwa_total_bytes(iwa_bytes, encoded as u64)?;
             let mut owned_name = String::new();
             owned_name
@@ -76,6 +76,7 @@ impl ComponentCatalog {
             components.push(Component {
                 name: owned_name.into_boxed_str(),
                 archive: ComponentArchive::Shared(archive),
+                decompressed_bytes: 0,
             });
         }
         components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
@@ -107,7 +108,7 @@ fn check(observed: u64, maximum: u64, kind: LimitKind) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_iwa_core::{ArchiveLimits, ArchiveObject, RawMessage};
+    use litchi_iwa_core::{ArchiveObject, Limits as ArchiveLimits, RawMessage};
 
     fn archive_with_objects(object_count: usize) -> Result<Arc<Archive>> {
         let mut objects = Vec::with_capacity(object_count);
@@ -120,6 +121,7 @@ mod tests {
                     type_: 6_000,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?);
         }
         Ok(Arc::new(Archive { objects }))
@@ -252,12 +254,14 @@ mod tests {
     fn shared_ingress_accepts_exact_aggregate_iwa_budget_and_rejects_one_below() -> Result<()> {
         let alpha = archive_with_objects(1)?;
         let bravo = archive_with_objects(1)?;
-        let alpha_bytes = u64::try_from(alpha.encoded_len()?).map_err(|_error| {
-            Error::InvalidBundle("test IWA length does not fit u64".to_owned())
-        })?;
-        let bravo_bytes = u64::try_from(bravo.encoded_len()?).map_err(|_error| {
-            Error::InvalidBundle("test IWA length does not fit u64".to_owned())
-        })?;
+        let alpha_bytes =
+            u64::try_from(alpha.encoded_len(Default::default())?).map_err(|_error| {
+                Error::InvalidBundle("test IWA length does not fit u64".to_owned())
+            })?;
+        let bravo_bytes =
+            u64::try_from(bravo.encoded_len(Default::default())?).map_err(|_error| {
+                Error::InvalidBundle("test IWA length does not fit u64".to_owned())
+            })?;
         let exact_total = alpha_bytes.checked_add(bravo_bytes).ok_or_else(|| {
             Error::InvalidBundle("test IWA aggregate length overflowed u64".to_owned())
         })?;
@@ -292,7 +296,7 @@ mod tests {
     #[test]
     fn shared_ingress_accepts_exact_archive_profile_and_rejects_one_below() -> Result<()> {
         let archive = archive_with_objects(2)?;
-        let encoded = archive.encoded_len()?;
+        let encoded = archive.encoded_len(Default::default())?;
         let exact_profile = ArchiveLimits::default()
             .with_archive_bytes(encoded)?
             .with_objects(2)?;

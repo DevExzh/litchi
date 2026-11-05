@@ -1,0 +1,47 @@
+{
+  "source": "65136c31d783aff4169b040106092850a94f675f",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 0,
+      "seconds": 0.5548775150000438,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v15/check-0.log",
+      "bytes": 60,
+      "sha256": "6d982f82f533d8d80f700f4952cc773013a451c68f1e72f50affd3e0482b255a",
+      "target_bytes_before": 18525898460,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 231.4851994290002,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v15/check-1.log",
+      "bytes": 200389,
+      "sha256": "cedd985c267a426758b6c4fad8d6bee333ff7ff52b102ce55041b7e6ac260461",
+      "target_bytes_before": 18525898460,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Focused OPC/ZIP passed. Workspace exposed DOCX stream/detachment calls, XLSB theme retained-policy initializers, ODP benchmark environment requirement and 340 policy qualifications plus stale XLSX constructor consumers. Harnesses not reached."
+}

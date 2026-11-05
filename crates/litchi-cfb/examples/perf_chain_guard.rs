@@ -363,7 +363,7 @@ mod benchmark {
     }
 
     fn stream_location(source: &[u8], expected_bytes: usize) -> AnyResult<(u32, bool)> {
-        let mut file = OleFile::open(Cursor::new(source))?;
+        let mut file = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
         let (start_sector, size, is_minifat) = {
             let entries = file.list_directory_entries(&[])?;
             let entry = entries
@@ -389,7 +389,8 @@ mod benchmark {
 
         // A second public open is intentional: it proves the writer output is
         // still independently reopenable before any malformed mutation.
-        let mut reopened = OleFile::open(Cursor::new(source))?;
+        let mut reopened =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
         let second_stream = reopened.open_stream(&[STREAM_NAME])?;
         if !pattern_matches(&second_stream, expected_bytes) {
             return Err("normal guard-stream reopen failed its content oracle".into());
@@ -522,7 +523,10 @@ mod benchmark {
         }
         let source_sha256 = sha256_hex(&source)?;
         let observed_error = if let Some(expected) = expected_error.as_deref() {
-            let error = match OleFile::open(Cursor::new(source.as_slice())) {
+            let error = match OleFile::open(
+                Cursor::new(source.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            ) {
                 Ok(_) => "malformed guard unexpectedly opened successfully".to_owned(),
                 Err(error) => {
                     corruption_message(&error).map_or_else(|| error.to_string(), ToOwned::to_owned)
@@ -557,7 +561,7 @@ mod benchmark {
         let expected = fixture.expected_error.as_deref();
         let reader = Cursor::new(fixture.source.as_slice());
         let started = Instant::now();
-        let result = OleFile::open(reader);
+        let result = OleFile::open(reader, litchi_cfb::OleFileLimits::default());
         let elapsed_ns = started.elapsed().as_nanos();
         let exact = match result {
             Ok(file) => {
@@ -635,7 +639,7 @@ mod benchmark {
         output.push_str(",\n");
         write!(
             &mut output,
-            "  \"warmup_iterations\": {},\n  \"sample_count\": {},\n  \"timed_operation\": \"OleFile::open(Cursor<&[u8]>)\",\n  \"cleanup_inside_timing\": false,\n  \"input_clone_outside_timing\": true,\n  \"allocation_counters\": {{\"available\": false, \"reason\": \"not instrumented by this public example\"}},\n",
+            "  \"warmup_iterations\": {},\n  \"sample_count\": {},\n  \"timed_operation\": \"OleFile::open(Cursor<&[u8]>, OleFileLimits)\",\n  \"cleanup_inside_timing\": false,\n  \"input_clone_outside_timing\": true,\n  \"allocation_counters\": {{\"available\": false, \"reason\": \"not instrumented by this public example\"}},\n",
             arguments.warmup,
             samples_ns.len()
         )?;

@@ -1,0 +1,15 @@
+{
+  "path": "/body/p[1]/r[2]",
+  "type": "run",
+  "text": "revenue grew",
+  "childCount": 0,
+  "format": {
+    "size": "10.5pt",
+    "italic": false,
+    "color": "accent1",
+    "underline": "single",
+    "highlight": "yellow",
+    "superscript": true
+  },
+  "children": []
+}

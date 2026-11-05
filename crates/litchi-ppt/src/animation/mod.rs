@@ -7,8 +7,12 @@
 //! - Interactive triggers
 //! - Sound support
 //! - Build animations (chart, diagram, paragraph)
+//!
+//! [`crate::Package::edit_animations`] stages edits of the persisted
+//! timelines, build lists and legacy shape animations; see [`Edit`].
 
 pub mod diagram_build;
+mod edit;
 mod editor;
 pub mod hash;
 mod linked_slide;
@@ -24,7 +28,10 @@ pub mod writer;
     clippy::module_name_repetitions,
     reason = "`LegacyShapeAnimation` is an established public API name; renaming the re-export would break downstream crates"
 )]
-pub use editor::{Editor, EditorLimits, LegacyShapeAnimation, Scope, Timeline};
+pub use edit::Edit;
+pub use editor::{LegacyShapeAnimation, Scope, Timeline};
+
+crate::scoped::family!("animation");
 
 pub use hash::{Hash10, Hash10Limits};
 pub use linked_slide::{LinkedShape, LinkedSlide, LinkedSlideLimits};

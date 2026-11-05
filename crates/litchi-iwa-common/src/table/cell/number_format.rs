@@ -8,6 +8,7 @@ const THOUSANDS_SEPARATOR_MASK: u8 = 0x80;
 
 /// Validation failures for table-cell numeric formats.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The requested fixed precision is outside the native inspector domain.
     #[error("table-cell decimal places {value} must not exceed {maximum}")]

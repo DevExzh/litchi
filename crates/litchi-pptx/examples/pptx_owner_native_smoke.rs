@@ -24,8 +24,8 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&directory)?;
 
     let destination = directory.join("table-style-owner.pptx");
-    let mut package = Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     slide.set_title("Litchi PPTX table-style owner");
     slide.add_text_box(
         "Typed style catalog",
@@ -34,19 +34,17 @@ fn main() -> Result<()> {
         7_315_200,
         914_400,
     );
-    package.save(&destination)?;
-
-    let package = Package::open(&destination)?;
-    let mut graph = package.opc()?.clone();
-    let conformance = style::conformance(&graph)?;
+    let package = builder.build()?;
+    let conformance = style::conformance(package.opc()?)?;
     let id = Id::parse(TABLE_STYLE)?;
-    let mut styles = style::load(&graph)?.unwrap_or_else(|| List::new(conformance, id));
+    let mut styles = style::load(package.opc()?)?.unwrap_or_else(|| List::new(conformance, id));
     let mut definition = Def::new(id, "Litchi native smoke")?;
     let expected = Parts::BACKGROUND | Parts::WHOLE | Parts::FIRST_ROW;
     let _ = definition.reset_parts(expected);
     styles.add(definition)?;
-    let _ = style::put(&mut graph, styles)?;
-    let mut package = Package::from_opc_package(graph)?;
+    let mut edit = package.edit_styles()?;
+    let _ = edit.set(styles)?;
+    let package = edit.commit()?.into_package();
     package.save(&destination)?;
 
     let reopened = Package::open(&destination)?;

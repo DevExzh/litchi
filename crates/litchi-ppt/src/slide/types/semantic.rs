@@ -4,7 +4,7 @@ use super::Slide;
 use super::model::{ParsedComment, ParsedSlideTiming};
 use crate::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::consts::RecordType;
-use crate::odraw::ShapeExt as _;
+use crate::odraw::ShapeLimitsExt as _;
 use crate::package::{Error, Result};
 use crate::records::Record;
 use crate::shapes::ShapeEnum;
@@ -13,6 +13,7 @@ use crate::slide_extension::SlideExtension;
 use crate::slide_round_trip::SlideRoundTripMetadata12;
 use crate::slide_sync::Synchronization;
 use crate::transition::{TransitionInfo, parse_transition};
+use std::sync::Arc;
 
 impl Slide<'_> {
     /// Get the slide number (1-based).
@@ -35,6 +36,10 @@ impl Slide<'_> {
 
     /// Get shapes on this slide (lazy-loaded).
     ///
+    /// A shape whose text box references slide-list text (an
+    /// `OutlineTextRefAtom`, MS-PPT 2.9.78) carries the text of the body the
+    /// reference selects (L-PPT-R1); see [`Self::outline_text_bodies`].
+    ///
     /// Non-structural text-style defects repaired while the shapes are parsed
     /// (see [`crate::TextPropDefect`]) are recorded alongside the cached
     /// shapes; enumerate them with [`Self::tolerance_report`] or thread a
@@ -50,7 +55,29 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
-        self.parsed_shapes().map(|(shapes, _)| shapes.as_slice())
+        self.parsed_shapes().map(|(shapes, _)| shapes.as_ref())
+    }
+
+    /// Share the cached native shape array without cloning shapes or text.
+    ///
+    /// The array owns its payloads and can outlive this slide. All handles
+    /// returned by this slide share the same immutable allocation.
+    ///
+    /// # Errors
+    /// Returns the same typed parse errors as [`Self::shapes`].
+    ///
+    /// ```
+    /// let mut builder = litchi_ppt::Builder::new();
+    /// builder.add_slide()?;
+    /// let package = builder.build()?;
+    /// let presentation = package.presentation()?;
+    /// let slide = presentation.slide_at(0)?.expect("authored slide");
+    /// let shapes = slide.shared_shapes()?;
+    /// assert!(shapes.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn shared_shapes(&self) -> Result<Arc<[ShapeEnum<'static>]>> {
+        self.parsed_shapes().map(|(shapes, _)| Arc::clone(shapes))
     }
 
     /// Get shapes on this slide (lazy-loaded), appending every non-structural
@@ -76,7 +103,7 @@ impl Slide<'_> {
     ) -> Result<&[ShapeEnum<'static>]> {
         let (shapes, tolerance) = self.parsed_shapes()?;
         report.append(tolerance);
-        Ok(shapes.as_slice())
+        Ok(shapes.as_ref())
     }
 
     /// Every non-structural defect repaired while this slide's shapes were
@@ -91,10 +118,52 @@ impl Slide<'_> {
         self.parsed_shapes().map(|(_, tolerance)| tolerance)
     }
 
+    /// The payload of this slide's first `PPDrawing` child, exactly the
+    /// bytes [`Self::shapes`] parses (record 0264 incremental readback).
+    pub(crate) fn drawing_payload(&self) -> Option<&[u8]> {
+        self.record
+            .find_child(RecordType::PPDrawing)
+            .map(|drawing| drawing.data.as_slice())
+    }
+
     fn parsed_shapes(
         &self,
-    ) -> Result<&(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)> {
-        self.shapes.get_or_try_init(|| self.parse_shapes())
+    ) -> Result<&(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)> {
+        self.shapes.get_or_try_init(|| {
+            if let Some(hit) = self.shape_memo.and_then(|memo| memo.get(self.persist_id)) {
+                return Ok(hit);
+            }
+            let (shapes, report) = self.parse_shapes()?;
+            let parsed = (Arc::from(shapes), report);
+            if let Some(memo) = self.shape_memo {
+                memo.put(self.persist_id, &parsed);
+            }
+            Ok(parsed)
+        })
+    }
+
+    /// Find a shape by its `OfficeArt` shape identifier (`spid`, see
+    /// [`ShapeEnum::id`]), searching group children depth-first in drawing
+    /// order (L-PPT-R4).
+    ///
+    /// MS-ODRAW requires identifiers to be unique within a drawing; when a
+    /// file repeats one, the first shape in drawing order is returned. `None`
+    /// when no returned shape has the identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shapes cannot be parsed.
+    pub fn shape_by_id(&self, id: u32) -> Result<Option<&ShapeEnum<'static>>> {
+        let mut pending = self.shapes()?.iter().rev().collect::<Vec<_>>();
+        while let Some(shape) = pending.pop() {
+            if shape.id() == id {
+                return Ok(Some(shape));
+            }
+            if let ShapeEnum::Group(group) = shape {
+                pending.extend(group.children().iter().rev());
+            }
+        }
+        Ok(None)
     }
 
     /// Get the number of shapes (triggers parsing if not yet loaded).
@@ -112,7 +181,9 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shape_interactions(&self) -> Result<Vec<crate::ShapeInteractionEntry>> {
-        self.shape_interactions_with_limits(crate::InteractionLimits::default())
+        self.shape_interactions_with_limits(crate::text_edit::runs::interaction_limits_for_source(
+            self.source_limits,
+        ))
     }
 
     /// Return shape interactions with caller-supplied record and name limits.
@@ -120,14 +191,17 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_interactions_with_limits(
+    pub(crate) fn shape_interactions_with_limits(
         &self,
         limits: crate::InteractionLimits,
     ) -> Result<Vec<crate::ShapeInteractionEntry>> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
@@ -149,7 +223,9 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shape_text_interactions(&self) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
-        self.shape_text_interactions_with_limits(crate::TextInteractionLimits::default())
+        self.shape_text_interactions_with_limits(crate::text_interaction::limits_for_source(
+            self.source_limits,
+        ))
     }
 
     /// Return shape text actions with caller-supplied resource limits.
@@ -157,14 +233,17 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_text_interactions_with_limits(
+    pub(crate) fn shape_text_interactions_with_limits(
         &self,
         limits: crate::TextInteractionLimits,
     ) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
@@ -186,9 +265,27 @@ impl Slide<'_> {
     }
 
     /// Validated outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78)
-    /// tying this slide's shapes to outline text bodies.
+    /// found among this slide's slide-list records.
+    ///
+    /// Conforming files keep these references in the shapes' text boxes,
+    /// not in the slide list, so this is normally empty; the slide reader
+    /// resolves the references the shapes hold (see
+    /// [`Self::outline_text_bodies`]).
     pub fn outline_text_refs(&self) -> &[crate::OutlineTextRef] {
         &self.outline_text_refs
+    }
+
+    /// This slide's slide-list text bodies, in slide-list order (MS-PPT
+    /// 2.4.14.3; L-PPT-R1).
+    ///
+    /// `PowerPoint` keeps the text of title and body placeholders here: the
+    /// placeholder's text box holds an `OutlineTextRefAtom` whose index
+    /// selects one of these bodies. [`Self::shapes`] and [`Self::text`]
+    /// already read such placeholders from the body they select. Empty when
+    /// the slide has no slide-list text or it could not be read
+    /// ([`crate::SlideListDefect::UnreadableSlideListText`]).
+    pub fn outline_text_bodies(&self) -> &[crate::OutlineTextBody] {
+        self.outline_text_bodies
     }
 
     /// Return every shape-scoped programmable-tag container on this slide.
@@ -205,14 +302,17 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_programmable_tags_with_limits(
+    pub(crate) fn shape_programmable_tags_with_limits(
         &self,
         limits: crate::ShapeProgrammableTagLimits,
     ) -> Result<Vec<crate::ShapeProgrammableTagsEntry>> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(programmable_tags) = shape.programmable_tags_with_limits(limits)? {
@@ -245,7 +345,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn programmable_tags_with_limits(
+    pub(crate) fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Option<crate::ProgTags>> {
@@ -266,14 +366,17 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_flags_with_limits(
+    pub(crate) fn shape_flags_with_limits(
         &self,
         limits: crate::ShapeFlagLimits,
     ) -> Result<Vec<crate::ShapeFlagEntry>> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(projection) = shape.ppt_flags_with(limits)? {
@@ -300,14 +403,17 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn placeholder_atoms_with_limits(
+    pub(crate) fn placeholder_atoms_with_limits(
         &self,
         limits: crate::PlaceholderLimits,
     ) -> Result<Vec<crate::PlaceholderEntry>> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut positions = std::collections::HashSet::new();
         let mut result = Vec::new();
         for shape in &escher_shapes {
@@ -339,7 +445,7 @@ impl Slide<'_> {
             .get_or_try_init(|| match &self.notes_descriptor {
                 Ok(None) => Ok(None),
                 Ok(Some(descriptor)) => {
-                    SpeakerNotes::parse_with_limits(*descriptor, self.source, self.record_limits)
+                    SpeakerNotes::parse_with_limits(*descriptor, self.source, self.source_limits)
                         .map(Some)
                 },
                 Err(error) => Err(Error::Corrupted(error.clone())),
@@ -374,7 +480,7 @@ impl Slide<'_> {
     /// Returns an error if the operation fails.
     pub fn powerpoint12_extension(&self) -> Result<&SlideExtension> {
         self.powerpoint12_extension
-            .get_or_try_init(|| SlideExtension::parse(&self.record))
+            .get_or_try_init(|| SlideExtension::parse(&self.record, &self.source_limits))
     }
 
     /// Return inert `PowerPoint` 12 slide-library synchronization metadata.
@@ -400,12 +506,18 @@ impl Slide<'_> {
 
     /// Extract all text from this slide (lazy-loaded).
     ///
+    /// The text is the slide's direct text records, then the text of every
+    /// text box in drawing order. A text box that references slide-list
+    /// text (an `OutlineTextRefAtom`, as title and body placeholders do)
+    /// contributes the body it selects (L-PPT-R1). When none of that yields
+    /// text, the slide's slide-list text is returned instead.
+    ///
     /// # Performance
     ///
     /// - Text is extracted and cached on first call
     /// - Includes text from:
     ///   * Direct text records in the slide
-    ///   * Shapes (via PPDrawing/Escher)
+    ///   * Shapes (via PPDrawing/Escher), with outline references resolved
     ///
     /// # Errors
     ///
@@ -447,8 +559,38 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error when the `PowerPoint` 10 programmable tag or a comment record is malformed.
+    /// The text, character runs and text hyperlinks of the shape with
+    /// `OfficeArt` ID `shape_id` (record 0323); an outline-backed placeholder
+    /// reads the slide-list body it selects. `None` for a shape without a
+    /// text body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shape's text records are malformed.
+    pub fn shape_text_runs(&self, shape_id: u32) -> Result<Option<crate::text_edit::TextRuns>> {
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
+            return Ok(None);
+        };
+        match crate::text_edit::runs::read(
+            &drawing.data,
+            self.outline_text_bodies,
+            shape_id,
+            self.source_limits,
+        ) {
+            Ok(runs) => Ok(runs),
+            // A body the run model does not cover (several text atoms, an
+            // ambiguous textbox) has no run projection.
+            Err(crate::text_edit::Error::Refused(_)) => Ok(None),
+            Err(crate::text_edit::Error::Package(error)) => Err(error),
+            Err(crate::text_edit::Error::Source(error)) => Err(Error::Corrupted(error.to_string())),
+            Err(
+                error @ (crate::text_edit::Error::PatchConflict | crate::text_edit::Error::Signed),
+            ) => Err(Error::Corrupted(error.to_string())),
+        }
+    }
+
     pub fn comments(&self) -> Result<Vec<ParsedComment>> {
-        crate::comments::parse_slide_comments(&self.record)
+        crate::comments::parse_slide_comments(&self.record, &self.source_limits)
     }
 
     /// Get the slide transition from the `SSSlideInfoAtom` record.

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships, Part};
 
-use super::codec::{self, ReadLimits};
+use super::codec::{self, SemanticLimits};
 use super::model::{Definition, Model, ModelPart};
 use super::package::{inspect_model_part, validate_definition_connections};
 use crate::package::error::{Error, Result};
@@ -14,7 +14,7 @@ use crate::package::error::{Error, Result};
 pub struct Snapshot {
     model: Option<Model>,
     connection_names: Option<Vec<String>>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
     package: Arc<OpcPackage>,
 }
@@ -31,13 +31,8 @@ impl PartialEq for Snapshot {
 impl Eq for Snapshot {}
 
 impl Snapshot {
-    /// Read a Data Model snapshot with conservative finite limits.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::read_with_limits(package, ReadLimits::DEFAULT)
-    }
-
     /// Read a Data Model snapshot with explicit finite limits.
-    pub fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+    pub(crate) fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         let limits = limits.validate()?;
         super::package::preflight_metadata(package, limits)?;
         crate::package::connections::package::preflight(
@@ -47,15 +42,15 @@ impl Snapshot {
         )?;
         let workbook = package.main_document_part()?;
         if workbook.blob().len() > limits.max_part_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "Data Model Workbook bytes",
-                actual: workbook.blob().len(),
-                maximum: limits.max_part_bytes,
-            });
+            return Err(Error::limit(
+                crate::data_model::LimitKind::WorkbookBytes,
+                workbook.blob().len(),
+                limits.max_part_bytes,
+            ));
         }
         let parsed = codec::parse_workbook(workbook.blob(), limits)?;
         let part = inspect_model_part(package)?;
-        let connections = crate::package::connections::package::load(package)?;
+        let connections = crate::package::connections::package::load(package, limits.raw)?;
         if connections
             .as_ref()
             .is_some_and(|value| value.connections.len() > limits.max_connections)
@@ -63,11 +58,11 @@ impl Snapshot {
             let actual = connections
                 .as_ref()
                 .map_or(0, |value| value.connections.len());
-            return Err(Error::LimitExceeded {
-                resource: "Data Model External Data Connections",
+            return Err(Error::limit(
+                crate::data_model::LimitKind::Connections,
                 actual,
-                maximum: limits.max_connections,
-            });
+                limits.max_connections,
+            ));
         }
         let connection_source = crate::package::connections::package::capture_source(package)?;
         let model = match (parsed.definition, part) {
@@ -143,7 +138,7 @@ impl Snapshot {
         let part = self
             .part()
             .ok_or_else(|| invalid("cannot prove a time grouping without a Data Model part"))?;
-        super::proof::prove_time_grouping(part.bytes(), grouping)
+        super::proof::prove_time_grouping(part.bytes(), grouping, self.limits.max_part_bytes)
     }
 
     /// Whether this workbook carries a complete Data Model pair.
@@ -152,15 +147,9 @@ impl Snapshot {
         self.model.is_some()
     }
 
-    /// Begin a detached, source-bound Data Model transaction.
-    #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
-    }
-
     /// Exact finite limits used to inspect and edit this snapshot.
     #[must_use]
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -202,27 +191,22 @@ impl SourceState {
         workbook: &dyn Part,
         model: Option<&Model>,
         connections: crate::package::connections::package::SourceImage,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let opc_limits = super::package::opc_capture_limits(limits)?;
-        let root_name =
-            litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let root_name = litchi_opc::PackURI::new("/")?;
         let workbook_name = workbook.partname();
-        let root_relationships =
-            package.source_relationships_with_limits(&root_name, opc_limits)?;
-        let workbook_relationships =
-            package.source_relationships_with_limits(workbook_name, opc_limits)?;
-        let content_types = package.source_content_types_with_limits(opc_limits)?;
+        let root_relationships = package.source_relationships(&root_name, opc_limits)?;
+        let workbook_relationships = package.source_relationships(workbook_name, opc_limits)?;
+        let content_types = package.source_content_types(opc_limits)?;
         let model_part = model
             .map(|model| {
-                let part_name = litchi_opc::PackURI::new(&model.part.part_name)
-                    .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                let part_name = litchi_opc::PackURI::new(&model.part.part_name)?;
                 Ok::<SourcePart, Error>(SourcePart {
                     name: model.part.part_name.clone(),
                     content_type: model.part.content_type.clone(),
                     bytes: Arc::clone(&model.part.bytes),
-                    relationships: package
-                        .source_relationships_with_limits(&part_name, opc_limits)?,
+                    relationships: package.source_relationships(&part_name, opc_limits)?,
                 })
             })
             .transpose()?;
@@ -246,6 +230,6 @@ impl SourceState {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

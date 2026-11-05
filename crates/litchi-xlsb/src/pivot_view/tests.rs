@@ -6,7 +6,7 @@
 //! Regression tests for the PivotTable-view model and codec.
 
 use super::*;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 
 fn view_stream(name: &str, cache_id: u32) -> Vec<u8> {
     let mut begin = vec![0u8; 32];
@@ -16,7 +16,7 @@ fn view_stream(name: &str, cache_id: u32) -> Vec<u8> {
         begin.extend_from_slice(&unit.to_le_bytes());
     }
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_SX_VIEW, &begin).unwrap();
     writer
         .write_record(kind::BEGIN_SX_LOCATION, &[0; 36])
@@ -29,7 +29,7 @@ fn view_stream(name: &str, cache_id: u32) -> Vec<u8> {
 #[test]
 fn preserves_complete_view_stream_and_extracts_binding() {
     let bytes = view_stream("Revenue Pivot", 17);
-    let view = Part::from_bytes(bytes.clone()).unwrap();
+    let view = Part::from_bytes(bytes.clone(), crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(view.name(), "Revenue Pivot");
     assert_eq!(view.cache_id(), 17);
     assert_eq!(view.version_created(), 0);
@@ -40,11 +40,32 @@ fn preserves_complete_view_stream_and_extracts_binding() {
 fn refuses_truncation_and_records_outside_view() {
     let mut truncated = view_stream("P", 1);
     truncated.pop();
-    assert!(Part::from_bytes(truncated).is_err());
+    assert!(Part::from_bytes(truncated, crate::raw::Limits::DEFAULT).is_err());
 
     let mut trailing = view_stream("P", 1);
-    Writer::new(&mut trailing)
+    Encoder::new(&mut trailing, crate::raw::Limits::DEFAULT)
         .write_record(kind::END_SX_LOCATION, &[])
         .unwrap();
-    assert!(Part::from_bytes(trailing).is_err());
+    assert!(Part::from_bytes(trailing, crate::raw::Limits::DEFAULT).is_err());
+}
+
+#[test]
+fn raw_limits_bound_view_payload_and_name() {
+    let bytes = view_stream("Revenue Pivot", 17);
+    let begin_payload = 32 + 4 + "Revenue Pivot".encode_utf16().count() * 2;
+    assert!(matches!(
+        Part::from_bytes(
+            bytes.clone(),
+            crate::raw::Limits::new(begin_payload - 1, 1_000_000),
+        ),
+        Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+    ));
+
+    assert!(matches!(
+        Part::from_bytes(
+            bytes,
+            crate::raw::Limits::new(begin_payload, "Revenue Pivot".encode_utf16().count() - 1),
+        ),
+        Err(Error::Wire(crate::raw::Error::StringLimit { .. }))
+    ));
 }

@@ -16,8 +16,8 @@ use litchi_iwa_core::archive::DataReferencePruning;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 
 use super::{
-    ArchivePlan, BodyTableDeletionError, ComponentEdit, FormulaPlan, GraphPlan, MessageEdit,
-    MetadataPlan, Package, RemovalPlan, table_lock,
+    ArchivePlan, ComponentEdit, Error, FormulaPlan, GraphPlan, MessageEdit, MetadataPlan, Package,
+    RemovalPlan, table_lock,
 };
 
 const MAX_VARINT_BYTES: usize = 10;
@@ -61,8 +61,8 @@ impl RemovalView<'_> {
 
     fn for_each_message(
         &self,
-        mut visit: impl FnMut(&MessageEdit) -> Result<(), BodyTableDeletionError>,
-    ) -> Result<(), BodyTableDeletionError> {
+        mut visit: impl FnMut(&MessageEdit) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         if let Some(edit) = self.text {
             visit(edit)?;
         }
@@ -80,8 +80,8 @@ impl RemovalView<'_> {
 
     fn for_each_object(
         &self,
-        mut visit: impl FnMut(&super::ObjectRemoval) -> Result<(), BodyTableDeletionError>,
-    ) -> Result<(), BodyTableDeletionError> {
+        mut visit: impl FnMut(&super::ObjectRemoval) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         for removal in &self.graph.object_removals {
             visit(removal)?;
         }
@@ -96,8 +96,8 @@ impl RemovalView<'_> {
 
     fn for_each_component(
         &self,
-        mut visit: impl FnMut(&super::ComponentRemoval) -> Result<(), BodyTableDeletionError>,
-    ) -> Result<(), BodyTableDeletionError> {
+        mut visit: impl FnMut(&super::ComponentRemoval) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         for removal in &self.graph.component_removals {
             visit(removal)?;
         }
@@ -123,10 +123,16 @@ pub(super) fn prepare(
     formula: &FormulaPlan,
     metadata: &MetadataPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<ArchivePlan, BodyTableDeletionError> {
+) -> Result<ArchivePlan, Error> {
     let source_catalog = &source.state.source;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(super::map_archive_error)?;
     if !source_catalog.source_is_exact() {
-        return Err(BodyTableDeletionError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
 
     // The body text edit is another source-authorized message replacement.
@@ -148,15 +154,15 @@ pub(super) fn prepare(
         .checked_add(removals.object_count())
         .and_then(|value| value.checked_add(removals.component_count()))
         .and_then(|value| value.checked_add(1))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(reserve_hint)
         .map_err(super::map_lock_error)?;
-    changed_components.try_reserve(reserve_hint).map_err(|_| {
-        BodyTableDeletionError::Allocation {
+    changed_components
+        .try_reserve(reserve_hint)
+        .map_err(|_| Error::Allocation {
             amount: reserve_hint,
-        }
-    })?;
+        })?;
     removals.for_each_message(|edit| {
         insert_component_index(&mut changed_components, edit.component_index, budget)?;
         Ok(())
@@ -198,14 +204,14 @@ pub(super) fn prepare(
         .map_err(super::map_lock_error)?;
     changed_entries
         .try_reserve_exact(changed_components.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: changed_components.len(),
         })?;
     for component_index in &changed_components {
         let component = source_catalog
             .components()
             .get_index(*component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mut scanned = 0usize;
         let entry = source_catalog
             .package()
@@ -214,7 +220,7 @@ pub(super) fn prepare(
                 scanned = scanned.saturating_add(1);
                 entry.name() == component.name()
             })
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget
             .charge_payload_work(scanned)
             .map_err(super::map_lock_error)?;
@@ -275,7 +281,7 @@ pub(super) fn prepare(
         .map_err(super::map_lock_error)?;
     plan.edits
         .try_reserve(changed_components.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: changed_components.len(),
         })?;
     budget
@@ -283,7 +289,7 @@ pub(super) fn prepare(
         .map_err(super::map_lock_error)?;
     plan.deleted_entries
         .try_reserve_exact(deleted_indices.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: deleted_indices.len(),
         })?;
     for (component_index, _component) in source_catalog.components().iter().enumerate() {
@@ -293,7 +299,7 @@ pub(super) fn prepare(
         let component = source_catalog
             .components()
             .get_index(component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget
             .charge_payload_work(component.name().len())
             .map_err(super::map_lock_error)?;
@@ -305,10 +311,10 @@ pub(super) fn prepare(
         let component = source_catalog
             .components()
             .get_index(component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if deleted_indices.contains(&component_index) {
             if has_live_records(component.archive(), component_index, &removals, budget)? {
-                return Err(BodyTableDeletionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         }
@@ -316,18 +322,12 @@ pub(super) fn prepare(
             .limits()
             .effective_archive_limits()
             .map_err(super::map_archive_error)?;
-        let stream = SnappyStream::decompress_with_limits(
-            entry.data(),
-            source_catalog
-                .limits()
-                .snappy_limits()
-                .map_err(super::map_archive_error)?,
-        )
-        .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let stream =
+            SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
         apply_component_changes(
             &mut archive,
@@ -341,17 +341,15 @@ pub(super) fn prepare(
             budget,
         )?;
         let encoded_len = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         budget
             .charge_payload_work(encoded_len)
             .map_err(super::map_lock_error)?;
-        let encoded = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&encoded).map_err(map_core_error)?;
+        let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
         if compressed.is_empty() {
-            return Err(BodyTableDeletionError::Verification);
+            return Err(Error::Verification);
         }
         budget
             .charge_payload_work(component.name().len())
@@ -359,7 +357,7 @@ pub(super) fn prepare(
         let name = try_clone_str(component.name())?;
         plan.edits
             .try_reserve(1)
-            .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+            .map_err(|_| Error::Allocation { amount: 1 })?;
         plan.edits.push(ComponentEdit {
             component_index,
             name,
@@ -368,7 +366,7 @@ pub(super) fn prepare(
         plan.touched_components = plan
             .touched_components
             .checked_add(1)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
 
     plan.removed_objects = removals.object_count();
@@ -380,23 +378,23 @@ fn validate_plan(
     source: &SourceCatalog,
     removals: &RemovalView<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let mut message_slots = HashSet::new();
     message_slots
         .try_reserve(removals.message_count())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removals.message_count(),
         })?;
     let mut object_slots = HashSet::new();
     object_slots
         .try_reserve(removals.object_count())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removals.object_count(),
         })?;
     let mut object_identifiers = HashSet::new();
     object_identifiers
         .try_reserve(removals.object_count())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removals.object_count(),
         })?;
     removals.for_each_message(|edit| {
@@ -407,22 +405,22 @@ fn validate_plan(
         let component = source
             .components()
             .get_index(edit.component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let object = component
             .archive()
             .objects
             .get(edit.object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(edit.object_identifier.get())
             || edit.message_index >= object.messages.len()
             || object.messages[edit.message_index].type_ != edit.message_type
             || !message_slots.insert((edit.component_index, edit.object_index, edit.message_index))
         {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if edit.data.len() > source.limits().max_iwa_stream_bytes() {
-            return Err(BodyTableDeletionError::LimitExceeded {
-                kind: super::BodyTableDeletionLimitKind::PayloadBytes,
+            return Err(Error::Limit {
+                kind: super::LimitKind::PayloadBytes,
                 observed: usize_to_u64(edit.data.len()),
                 maximum: usize_to_u64(source.limits().max_iwa_stream_bytes()),
             });
@@ -436,51 +434,51 @@ fn validate_plan(
         let component = source
             .components()
             .get_index(removal.component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let object = component
             .archive()
             .objects
             .get(removal.object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(removal.identifier.get())
             || !object_slots.insert((removal.component_index, removal.object_index))
             || !object_identifiers.insert(removal.identifier)
         {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(())
     })?;
     removals.for_each_message(|edit| {
         if object_slots.contains(&(edit.component_index, edit.object_index)) {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(())
     })?;
     let mut component_slots = HashSet::new();
     component_slots
         .try_reserve(removals.component_count())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removals.component_count(),
         })?;
     removals.for_each_component(|removal| {
         if !component_slots.insert(removal.component_index) {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if removal.identifier == 0 {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let component = source
             .components()
             .get_index(removal.component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if component.name() != removal.name.as_ref() {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(())
     })?;
     removals.for_each_message(|edit| {
         if component_slots.contains(&edit.component_index) {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(())
     })?;
@@ -490,7 +488,7 @@ fn validate_plan(
 fn collect_removed_object_ids(
     removals: &RemovalView<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<std::num::NonZeroU64>, BodyTableDeletionError> {
+) -> Result<Vec<std::num::NonZeroU64>, Error> {
     let count = removals.object_count();
     let sort_work = sort_work(count)?;
     budget
@@ -499,34 +497,32 @@ fn collect_removed_object_ids(
     let mut identifiers = Vec::new();
     identifiers
         .try_reserve_exact(count)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     removals.for_each_object(|removal| {
         identifiers.push(removal.identifier);
         Ok(())
     })?;
     identifiers.sort_unstable();
     if identifiers.windows(2).any(|window| window[0] == window[1]) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(identifiers)
 }
 
-fn sort_work(count: usize) -> Result<usize, BodyTableDeletionError> {
+fn sort_work(count: usize) -> Result<usize, Error> {
     let steps = if count < 2 {
         1
     } else {
         (usize::BITS - (count - 1).leading_zeros()) as usize
     };
-    count
-        .checked_mul(steps)
-        .ok_or(BodyTableDeletionError::InvalidSource)
+    count.checked_mul(steps).ok_or(Error::InvalidSource)
 }
 
 fn insert_component_index(
     indices: &mut Vec<usize>,
     index: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(indices.len().saturating_add(1))
         .map_err(super::map_lock_error)?;
@@ -535,7 +531,7 @@ fn insert_component_index(
     }
     indices
         .try_reserve(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     indices.push(index);
     Ok(())
 }
@@ -544,41 +540,39 @@ fn physical_deleted_indices(
     source: &SourceCatalog,
     removals: &RemovalView<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<HashSet<usize>, BodyTableDeletionError> {
+) -> Result<HashSet<usize>, Error> {
     let component_count = source.components().len();
     let work = component_count
         .checked_add(removals.object_count())
         .and_then(|value| value.checked_add(removals.component_count()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(work)
         .map_err(super::map_lock_error)?;
     let mut removed_counts: Vec<usize> = Vec::new();
     removed_counts
         .try_reserve_exact(component_count)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_count,
         })?;
     removed_counts.resize(component_count, 0usize);
     removals.for_each_object(|removal| {
         let count = removed_counts
             .get_mut(removal.component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
-        *count = count
-            .checked_add(1)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
         Ok(())
     })?;
     let mut deleted = HashSet::new();
     let reserve = component_count
         .checked_add(removals.component_count())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     deleted
         .try_reserve(reserve)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: reserve })?;
+        .map_err(|_| Error::Allocation { amount: reserve })?;
     removals.for_each_component(|removal| {
         if !deleted.insert(removal.component_index) {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         Ok(())
     })?;
@@ -586,7 +580,7 @@ fn physical_deleted_indices(
         let removed_count = removed_counts
             .get(component_index)
             .copied()
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if removed_count == component.archive().objects.len()
             && (removed_count != 0 || deleted.contains(&component_index))
         {
@@ -604,9 +598,9 @@ fn preflight_component_bounds(
     removals: &RemovalView<'_>,
     metadata_length: Option<usize>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     if changed_components.len() != changed_entries.len() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     // Compute every replacement bound before parsing any selected stream. A
     // deletion-only archive is omitted from this pass because reassembly will
@@ -618,9 +612,11 @@ fn preflight_component_bounds(
         let component = source
             .components()
             .get_index(*component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         let source_length = archive_source_length(component.archive())?;
         let archive_bound = component_archive_bound(
@@ -630,13 +626,17 @@ fn preflight_component_bounds(
             removals,
             metadata_length.filter(|_| component.name() == "Index/Metadata.iwa"),
         )?;
-        let compressed_bound = table_lock::snappy_compressed_bound(archive_bound)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+        let compressed_bound =
+            table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::InvalidSource)?;
         let physical_bound = match entry.metadata().central().compression_method() {
             0 => compressed_bound,
             8 => table_lock::deflate_compressed_bound(compressed_bound)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
-            _ => return Err(BodyTableDeletionError::UnsupportedSource),
+                .ok_or(Error::InvalidSource)?,
+            _ => {
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
+            },
         };
         budget
             .charge_payload_work(entry.data().len())
@@ -657,16 +657,16 @@ fn component_archive_bound(
     source_length: usize,
     removals: &RemovalView<'_>,
     metadata_length: Option<usize>,
-) -> Result<usize, BodyTableDeletionError> {
+) -> Result<usize, Error> {
     let component = source
         .components()
         .get_index(component_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut bound = source_length;
     let mut touched_objects = HashSet::new();
     touched_objects
         .try_reserve(removals.message_count())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removals.message_count(),
         })?;
     removals.for_each_message(|edit| {
@@ -677,27 +677,27 @@ fn component_archive_bound(
             .archive()
             .objects
             .get(edit.object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let old = object
             .messages
             .get(edit.message_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .data
             .len();
         bound = bound
             .checked_sub(old)
             .and_then(|value| value.checked_add(edit.data.len()))
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         // A changed message can widen its length field in ArchiveInfo, and
         // the object's framing prefix can widen once per touched object.
         // Reserve both kinds of headroom before parsing the mutable archive.
         bound = bound
             .checked_add(MAX_VARINT_BYTES)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if touched_objects.insert(edit.object_index) {
             bound = bound
                 .checked_add(MAX_VARINT_BYTES)
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         Ok(())
     })?;
@@ -709,11 +709,9 @@ fn component_archive_bound(
             .archive()
             .objects
             .get(removal.object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let old = object_encoded_len(object)?;
-        bound = bound
-            .checked_sub(old)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+        bound = bound.checked_sub(old).ok_or(Error::InvalidSource)?;
         Ok(())
     })?;
     if let Some(metadata_length) = metadata_length {
@@ -723,11 +721,11 @@ fn component_archive_bound(
             .iter()
             .flat_map(|object| object.messages.iter())
             .find(|message| message.type_ == 11_006)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         bound = bound
             .checked_sub(metadata_object.data.len())
             .and_then(|value| value.checked_add(metadata_length))
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     Ok(bound)
 }
@@ -739,7 +737,7 @@ fn apply_component_changes(
     metadata_payload: Option<&[u8]>,
     archive_limits: litchi_iwa_core::Limits,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     removals.for_each_message(|edit| {
         if edit.component_index != component_index {
             return Ok(());
@@ -747,14 +745,14 @@ fn apply_component_changes(
         let object = archive
             .objects
             .get(edit.object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(edit.object_identifier.get()) {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut object_references = Vec::new();
         object_references
             .try_reserve_exact(edit.remove_object_references.len())
-            .map_err(|_| BodyTableDeletionError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: edit.remove_object_references.len(),
             })?;
         object_references.extend(
@@ -765,7 +763,7 @@ fn apply_component_changes(
         let mut data_references = Vec::new();
         data_references
             .try_reserve_exact(edit.remove_data_references.len())
-            .map_err(|_| BodyTableDeletionError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: edit.remove_data_references.len(),
             })?;
         data_references.extend(
@@ -787,18 +785,14 @@ fn apply_component_changes(
         let object = archive
             .objects
             .get_mut(edit.object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object_references.is_empty() && data_references.is_empty() {
             object
-                .replace_message_preserving_header_with_limits(
-                    edit.message_index,
-                    replacement,
-                    archive_limits,
-                )
+                .replace_message_preserving_header(edit.message_index, replacement, archive_limits)
                 .map_err(map_core_error)?;
         } else {
             object
-                .replace_message_pruning_references_preserving_header_with_limits(
+                .replace_message_pruning_references_preserving_header(
                     edit.message_index,
                     replacement,
                     &object_references,
@@ -820,16 +814,16 @@ fn apply_component_changes(
             for (message_index, message) in object.messages.iter().enumerate() {
                 if message.type_ == 11_006 {
                     if found.replace((object_index, message_index)).is_some() {
-                        return Err(BodyTableDeletionError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                 }
             }
         }
-        let (object_index, message_index) = found.ok_or(BodyTableDeletionError::InvalidSource)?;
+        let (object_index, message_index) = found.ok_or(Error::InvalidSource)?;
         let object = archive
             .objects
             .get_mut(object_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let replacement = RawMessage {
             type_: 11_006,
             data: {
@@ -840,18 +834,14 @@ fn apply_component_changes(
             },
         };
         object
-            .replace_message_preserving_header_with_limits(
-                message_index,
-                replacement,
-                archive_limits,
-            )
+            .replace_message_preserving_header(message_index, replacement, archive_limits)
             .map_err(map_core_error)?;
     }
 
     let mut removals_by_index = Vec::new();
     removals_by_index
         .try_reserve(removals.object_count())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: removals.object_count(),
         })?;
     removals.for_each_object(|removal| {
@@ -866,7 +856,7 @@ fn apply_component_changes(
         if *object_index >= archive.objects.len()
             || (position > 0 && *object_index == removals_by_index[position - 1])
         {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     budget
@@ -875,7 +865,7 @@ fn apply_component_changes(
                 .objects
                 .len()
                 .checked_add(removals_by_index.len())
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(super::map_lock_error)?;
     let mut removal_position = 0usize;
@@ -891,11 +881,9 @@ fn apply_component_changes(
         !remove
     });
     if removal_position != removals_by_index.len() {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    archive
-        .validate_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    archive.validate(archive_limits).map_err(map_core_error)?;
     Ok(())
 }
 
@@ -904,13 +892,11 @@ fn has_live_records(
     component_index: usize,
     removals: &RemovalView<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableDeletionError> {
+) -> Result<bool, Error> {
     let mut removed_count = 0usize;
     removals.for_each_object(|removal| {
         if removal.component_index == component_index {
-            removed_count = removed_count
-                .checked_add(1)
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+            removed_count = removed_count.checked_add(1).ok_or(Error::InvalidSource)?;
         }
         Ok(())
     })?;
@@ -920,13 +906,13 @@ fn has_live_records(
                 .objects
                 .len()
                 .checked_add(removed_count)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(super::map_lock_error)?;
     Ok(removed_count != archive.objects.len())
 }
 
-fn archive_source_length(archive: &Archive) -> Result<usize, BodyTableDeletionError> {
+fn archive_source_length(archive: &Archive) -> Result<usize, Error> {
     archive
         .objects
         .last()
@@ -935,84 +921,74 @@ fn archive_source_length(archive: &Archive) -> Result<usize, BodyTableDeletionEr
                 .data_offset
                 .checked_add(object.data_length)
                 .and_then(|length| usize::try_from(length).ok())
-                .ok_or(BodyTableDeletionError::InvalidSource)
+                .ok_or(Error::InvalidSource)
         })
         .unwrap_or(Ok(0))
 }
 
-fn object_encoded_len(object: &ArchiveObject) -> Result<usize, BodyTableDeletionError> {
+fn object_encoded_len(object: &ArchiveObject) -> Result<usize, Error> {
     let payload = object
         .archive_info
         .message_infos
         .iter()
         .try_fold(0usize, |length, info| {
-            let message_length =
-                usize::try_from(info.length).map_err(|_| BodyTableDeletionError::InvalidSource)?;
+            let message_length = usize::try_from(info.length).map_err(|_| Error::InvalidSource)?;
             length
                 .checked_add(message_length)
-                .ok_or(BodyTableDeletionError::InvalidSource)
+                .ok_or(Error::InvalidSource)
         })?;
-    let header_len =
-        usize::try_from(object.header_length).map_err(|_| BodyTableDeletionError::InvalidSource)?;
-    header_len
-        .checked_add(payload)
-        .ok_or(BodyTableDeletionError::InvalidSource)
+    let header_len = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
+    header_len.checked_add(payload).ok_or(Error::InvalidSource)
 }
 
-fn try_clone_bytes(bytes: &[u8]) -> Result<Vec<u8>, BodyTableDeletionError> {
+fn try_clone_bytes(bytes: &[u8]) -> Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(bytes.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: bytes.len(),
         })?;
     output.extend_from_slice(bytes);
     Ok(output)
 }
 
-fn try_clone_str(value: &str) -> Result<Box<str>, BodyTableDeletionError> {
+fn try_clone_str(value: &str) -> Result<Box<str>, Error> {
     let mut output = String::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: value.len(),
         })?;
     output.push_str(value);
     Ok(output.into_boxed_str())
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyTableDeletionError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableDeletionError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => {
-                    super::BodyTableDeletionLimitKind::PayloadObjects
-                },
+                litchi_iwa_core::LimitKind::Objects => super::LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    super::BodyTableDeletionLimitKind::PayloadMessages
+                    super::LimitKind::PayloadMessages
                 },
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    super::BodyTableDeletionLimitKind::PayloadItems
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    super::BodyTableDeletionLimitKind::WireNesting
-                },
-                _ => super::BodyTableDeletionLimitKind::PayloadBytes,
+                | litchi_iwa_core::LimitKind::SnappyFrames => super::LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::HeaderNesting => super::LimitKind::WireNesting,
+                _ => super::LimitKind::PayloadBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyTableDeletionError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => BodyTableDeletionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

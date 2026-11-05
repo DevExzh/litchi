@@ -14,7 +14,7 @@
 //! and abort the process instead of returning a recoverable error. These tests
 //! pin the bound and the surrounding behaviour.
 
-use litchi_rtf::RtfDocument;
+use litchi_rtf::raw::Tree;
 
 /// Mirrors `parser::MAX_GROUP_NESTING_DEPTH`, which is a private implementation
 /// detail rather than part of the public surface.
@@ -35,8 +35,11 @@ fn accepts_nesting_within_the_supported_depth() {
     // The deepest nesting seen anywhere in the real-world compatibility corpus
     // is 15 levels, so documents of that shape must keep parsing.
     for depth in [1, 8, 15, MAX_GROUP_NESTING_DEPTH - 3] {
-        let document = RtfDocument::parse(&nested(depth, "content"))
-            .unwrap_or_else(|error| panic!("depth {depth} rejected: {error}"));
+        let document = Tree::parse(
+            &nested(depth, "content"),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap_or_else(|error| panic!("depth {depth} rejected: {error}"));
         assert_eq!(document.text(), "content", "depth {depth} lost its text");
     }
 }
@@ -44,7 +47,10 @@ fn accepts_nesting_within_the_supported_depth() {
 #[test]
 fn rejects_nesting_beyond_the_supported_depth() {
     for depth in [MAX_GROUP_NESTING_DEPTH + 1, 512, 20_000] {
-        let Err(error) = RtfDocument::parse(&nested(depth, "content")) else {
+        let Err(error) = Tree::parse(
+            &nested(depth, "content"),
+            litchi_rtf::read::OpenOptions::default(),
+        ) else {
             panic!("depth {depth} was accepted");
         };
         assert!(
@@ -60,7 +66,7 @@ fn pathological_nesting_reports_an_error_instead_of_aborting() {
     // error rather than unwinding the stack.
     let mut rtf = String::from(r"{\rtf1\ansi");
     rtf.push_str(&"{".repeat(250_000));
-    assert!(RtfDocument::parse(&rtf).is_err());
+    assert!(Tree::parse(&rtf, litchi_rtf::read::OpenOptions::default()).is_err());
 }
 
 #[test]
@@ -72,5 +78,5 @@ fn corrupt_binary_input_does_not_exhaust_the_stack() {
         .join("../../test-data/rtf/binary-garbage-nested-groups.rtf");
     let bytes = std::fs::read(&path)
         .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-    assert!(RtfDocument::from_bytes(&bytes).is_err());
+    assert!(Tree::from_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).is_err());
 }

@@ -5,6 +5,7 @@
 //! Glossary XML, semantic, and package boundary validation.
 
 use super::super::graph::{is_reserved_physical_part, is_signature_part};
+use super::super::limit::Limits;
 use super::super::model::{Catalog, Category, Conformance, Entry, Insert, Kind};
 use super::super::{Caseless, ContentType, Error, PackURI, Result, UnicodeNormalization, ct};
 use super::super::{MAX_GRAPH_BYTES, MAX_NAME_KEY, MAX_PARTS, MAX_STRING, R, RS, VML, W, WS};
@@ -12,10 +13,156 @@ use super::xml::{Content, Node};
 
 pub(in crate::glossary) fn validate_catalog_fields(v: &Catalog) -> Result<()> {
     if v.entries.len() > MAX_PARTS {
-        return Err(invalid("glossary entry limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::Entry,
+            actual: v.entries.len(),
+            maximum: MAX_PARTS,
+        });
     }
     for e in &v.entries {
         validate_entry_fields(e)?;
+    }
+    Ok(())
+}
+
+/// Apply the caller-selected semantic string and retained-payload budgets.
+///
+/// XML admission covers the source syntax, while this pass covers decoded
+/// semantic values and the canonical opaque subtrees that the model retains.
+/// It runs before the catalog rebuilds its name index or any publication plan
+/// allocates derived state.
+pub(in crate::glossary) fn validate_catalog_limits(value: &Catalog, limits: &Limits) -> Result<()> {
+    validate_catalog_limits_with_background(value, value.background.as_deref(), limits)
+}
+
+/// Validate a catalog against the selected policy while charging the
+/// background that would be retained after an edit.  This is separate from
+/// [`validate_catalog_limits`] because replacing a background must account for
+/// the new payload before it is installed, rather than validating the old
+/// payload and then rebinding the policy.
+pub(in crate::glossary) fn validate_catalog_limits_with_background(
+    value: &Catalog,
+    background: Option<&[u8]>,
+    limits: &Limits,
+) -> Result<()> {
+    if value.entries.len() > limits.values() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::Entry,
+            actual: value.entries.len(),
+            maximum: limits.values(),
+        });
+    }
+    let mut retained = background.map_or(0, <[u8]>::len);
+    if let Some(background) = background {
+        if background.len() > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: background.len(),
+                maximum: limits.xml_bytes(),
+            });
+        }
+    }
+    for entry in &value.entries {
+        validate_entry_limits(entry, limits)?;
+        if let Some(body) = &entry.body {
+            retained = retained
+                .checked_add(body.len())
+                .ok_or_else(|| invalid("glossary retained semantic bytes overflow"))?;
+        }
+        if let Some(producer) = &entry.producer {
+            retained = retained
+                .checked_add(producer.xml.len())
+                .ok_or_else(|| invalid("glossary producer bytes overflow"))?;
+        }
+    }
+    if retained > limits.graph_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: retained,
+            maximum: limits.graph_bytes(),
+        });
+    }
+    Ok(())
+}
+
+/// Validate one authored entry before any selected-policy-dependent parsing
+/// or derived-state allocation occurs.
+pub(in crate::glossary) fn validate_entry_limits(entry: &Entry, limits: &Limits) -> Result<()> {
+    validate_entry_fields(entry)?;
+    if let Some(body) = &entry.body {
+        if body.len() > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: body.len(),
+                maximum: limits.xml_bytes(),
+            });
+        }
+        if body.len() > limits.graph_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: body.len(),
+                maximum: limits.graph_bytes(),
+            });
+        }
+    }
+    if let Some(producer) = &entry.producer {
+        if producer.xml.len() > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: producer.xml.len(),
+                maximum: limits.xml_bytes(),
+            });
+        }
+        if producer.xml.len() > limits.graph_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: producer.xml.len(),
+                maximum: limits.graph_bytes(),
+            });
+        }
+    }
+    let Some(props) = &entry.props else {
+        return Ok(());
+    };
+    if let Some(name) = &props.name {
+        selected_name(name.as_str(), name.key.as_ref(), limits)?;
+    }
+    for value in [
+        props.style.as_deref(),
+        props.category.as_ref().map(Category::name),
+        props
+            .category
+            .as_ref()
+            .map(|category| category.gallery.as_str()),
+        props.description.as_deref(),
+        props.id.as_ref().map(|id| id.as_str()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        selected_string(value, limits)?;
+    }
+    Ok(())
+}
+
+fn selected_name(value: &str, key: &str, limits: &Limits) -> Result<()> {
+    if value.len() > limits.name_bytes() || key.len() > limits.name_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: value.len().max(key.len()),
+            maximum: limits.name_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn selected_string(value: &str, limits: &Limits) -> Result<()> {
+    if value.len() > limits.string_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: value.len(),
+            maximum: limits.string_bytes(),
+        });
     }
     Ok(())
 }
@@ -55,20 +202,6 @@ pub(in crate::glossary) fn validate_name(value: &str) -> Result<()> {
     } else {
         Ok(())
     }
-}
-
-pub(in crate::glossary) fn validate_raw_part(
-    name: &str,
-    content_type: &str,
-    len: usize,
-) -> Result<()> {
-    let uri = validate_physical_part(name, content_type, len)?;
-    if uri.as_str() == "/word/glossary/document.xml" {
-        return Err(invalid(
-            "glossary auxiliary part conflicts with the default root",
-        ));
-    }
-    Ok(())
 }
 
 pub(in crate::glossary) fn validate_physical_part(
@@ -134,6 +267,44 @@ pub(in crate::glossary) fn name_key(value: &str) -> Result<String> {
     Ok(key)
 }
 
+pub(in crate::glossary) fn name_key_with_limits(value: &str, limits: &Limits) -> Result<String> {
+    if value.len() > limits.name_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: value.len(),
+            maximum: limits.name_bytes(),
+        });
+    }
+    let mut key = String::new();
+    key.try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary semantic-name key",
+            source,
+        })?;
+    for character in value.chars().nfd().default_case_fold().nfd() {
+        let len = key
+            .len()
+            .checked_add(character.len_utf8())
+            .ok_or_else(|| invalid("glossary semantic-name key size overflow"))?;
+        if len > limits.name_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::StringBytes,
+                actual: len,
+                maximum: limits.name_bytes(),
+            });
+        }
+        if key.capacity() < len {
+            key.try_reserve(character.len_utf8())
+                .map_err(|source| Error::Allocation {
+                    resource: "glossary semantic-name key",
+                    source,
+                })?;
+        }
+        key.push(character);
+    }
+    Ok(key)
+}
+
 pub(in crate::glossary) fn canonical_id(value: &str) -> bool {
     let bytes = value.as_bytes();
     bytes.len() == 38
@@ -182,7 +353,17 @@ pub(in crate::glossary) fn is_ncname_char(character: char) -> bool {
 }
 
 pub(in crate::glossary) fn kids(n: &Node) -> Result<Vec<&Node>> {
+    let count = n
+        .content
+        .iter()
+        .filter(|content| matches!(content, Content::Node(_)))
+        .count();
     let mut v = Vec::new();
+    v.try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "glossary child-node projection",
+            source,
+        })?;
     for c in &n.content {
         match c {
             Content::Node(x) => v.push(x),
@@ -256,27 +437,36 @@ pub(in crate::glossary) fn expect_w(n: &Node) -> Result<()> {
         Err(invalid("expected WordprocessingML metadata"))
     }
 }
-pub(in crate::glossary) fn wval(n: &Node) -> Result<String> {
-    let v = wattr_get(n, "val")?.ok_or_else(|| invalid("missing w:val"))?;
-    bounded(&v)?;
+pub(in crate::glossary) fn wval_with_limits(n: &Node, limits: &Limits) -> Result<String> {
+    let v = wattr_get_with_limits(n, "val", limits)?.ok_or_else(|| invalid("missing w:val"))?;
+    bounded_with_limits(&v, limits)?;
     only_w(n, &["val"])?;
     leaf(n)?;
     Ok(v)
 }
-pub(in crate::glossary) fn wattr_get(n: &Node, l: &str) -> Result<Option<String>> {
-    let mut v = None;
-    for a in &n.attrs {
-        if matches!(a.ns.as_ref(), W | WS) && a.l == l {
-            if v.is_some() {
+pub(in crate::glossary) fn wattr_get_with_limits(
+    n: &Node,
+    l: &str,
+    limits: &Limits,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in &n.attrs {
+        if matches!(attribute.ns.as_ref(), W | WS) && attribute.l == l {
+            if value.is_some() {
                 return Err(invalid("duplicate WordprocessingML attribute"));
             }
-            v = Some(a.v.clone());
+            bounded_with_limits(&attribute.v, limits)?;
+            value = Some(attribute.v.clone());
         }
     }
-    Ok(v)
+    Ok(value)
 }
-pub(in crate::glossary) fn onoff(n: &Node, l: &str) -> Result<Option<bool>> {
-    let value = wattr_get(n, l)?;
+pub(in crate::glossary) fn onoff_with_limits(
+    n: &Node,
+    l: &str,
+    limits: &Limits,
+) -> Result<Option<bool>> {
+    let value = wattr_get_with_limits(n, l, limits)?;
     match value.as_deref() {
         None => Ok(None),
         Some("1" | "true") => Ok(Some(true)),
@@ -388,6 +578,22 @@ pub(in crate::glossary) fn split(q: &str) -> Result<(&str, &str)> {
 pub(in crate::glossary) fn bounded(v: &str) -> Result<()> {
     if v.len() > MAX_STRING {
         return Err(invalid("glossary metadata string exceeds 1 MiB"));
+    }
+    if !v.chars().all(xml_char) {
+        return Err(invalid(
+            "glossary metadata contains a character forbidden by XML 1.0",
+        ));
+    }
+    Ok(())
+}
+
+pub(in crate::glossary) fn bounded_with_limits(v: &str, limits: &Limits) -> Result<()> {
+    if v.len() > limits.string_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: v.len(),
+            maximum: limits.string_bytes(),
+        });
     }
     if !v.chars().all(xml_char) {
         return Err(invalid(

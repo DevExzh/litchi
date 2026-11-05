@@ -137,15 +137,15 @@ fn drawable_semantics(package: &Package) -> TestResult<Vec<DrawableSemantic>> {
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -155,8 +155,9 @@ fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
 }
 
 fn replace_component(source: &[u8], component_name: &str, archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -215,26 +216,27 @@ fn annotation_author_registry(source: &[u8]) -> TestResult<RegistrySnapshot> {
                         author_objects.insert(identifier);
                     },
                     ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE => {
-                        let references = WireView::parse(&message.data)?
-                            .fields()
-                            .filter(|field| field.number() == 1)
-                            .map(|field| {
-                                if field.wire_type() != 2 {
-                                    return Err(io::Error::other(
-                                        "author registry reference has the wrong wire type",
-                                    )
-                                    .into());
-                                }
-                                let reference = tsp::Reference::decode(field.payload())?;
-                                if reference.identifier == 0 {
-                                    return Err(io::Error::other(
-                                        "author registry contains a zero identifier",
-                                    )
-                                    .into());
-                                }
-                                Ok(reference.identifier)
-                            })
-                            .collect::<TestResult<Vec<_>>>()?;
+                        let references =
+                            WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
+                                .fields()
+                                .filter(|field| field.number() == 1)
+                                .map(|field| {
+                                    if field.wire_type() != 2 {
+                                        return Err(io::Error::other(
+                                            "author registry reference has the wrong wire type",
+                                        )
+                                        .into());
+                                    }
+                                    let reference = tsp::Reference::decode(field.payload())?;
+                                    if reference.identifier == 0 {
+                                        return Err(io::Error::other(
+                                            "author registry contains a zero identifier",
+                                        )
+                                        .into());
+                                    }
+                                    Ok(reference.identifier)
+                                })
+                                .collect::<TestResult<Vec<_>>>()?;
                         storage_references.insert(identifier, references);
                     },
                     _ => {},
@@ -267,7 +269,7 @@ fn document_root_payload(source: &[u8]) -> TestResult<Vec<u8>> {
 fn reference_at_path(payload: &[u8], path: &[u32]) -> TestResult<u64> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();
@@ -319,6 +321,7 @@ fn rewrite_document_root(
             type_: DOCUMENT_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     replace_component(source, DOCUMENT_COMPONENT, archive)
 }
@@ -386,6 +389,7 @@ fn mutate_root_storage_reference(source: &[u8], mutation: RootMutation) -> TestR
                                         &mut output,
                                         TSK_ANNOTATION_AUTHOR_STORAGE_FIELD,
                                         &replacement,
+                                        litchi_iwa_common::WireLimits::DEFAULT,
                                     )?;
                                     Ok(output)
                                 },
@@ -474,8 +478,9 @@ fn with_detached_registry(source: &[u8]) -> TestResult<(Vec<u8>, u64)> {
         new_identifier,
         &[(*identifier, new_identifier)],
         &source_object.messages,
+        Default::default(),
     )?;
-    archive.insert_object(clone)?;
+    archive.insert_object(clone, Default::default())?;
     Ok((
         replace_component(source, component_name, archive)?,
         new_identifier,
@@ -784,6 +789,7 @@ fn rewrite_storage_payload(
             type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
     replace_component(source, component_name, archive)
 }

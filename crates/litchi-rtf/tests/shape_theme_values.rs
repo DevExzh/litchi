@@ -9,16 +9,15 @@
 
 use std::borrow::Cow;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    PictureShapeProperties, RtfDocument, RtfWriter, Shape, ShapeProperty, ShapeThemeColor,
-    ShapeThemeValue, ShapeType,
+    PictureShapeProperties, Shape, ShapeProperty, ShapeThemeColor, ShapeThemeValue, ShapeType,
+    write::Writer,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -27,7 +26,7 @@ fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf"
     );
-    let producer = RtfDocument::parse_bytes(source).unwrap();
+    let producer = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let property = producer
         .shapes()
         .iter()
@@ -51,7 +50,8 @@ fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
         })
     );
 
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::Rectangle);
     shape.properties.push(ShapeProperty::new_themed(
         Cow::Borrowed(property.name.as_ref()),
@@ -63,7 +63,7 @@ fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
     assert!(String::from_utf8(output.clone()).unwrap().contains(
         "{\\sp{\\sn fillColor}{\\sv 4626167}{\\*\\hsv\\caccentsix\\ctint255\\cshade255}}"
     ));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_property = reparsed
         .background_shape()
         .unwrap()
@@ -77,9 +77,11 @@ fn parses_real_libreoffice_theme_metadata_and_round_trips_canonically() {
 
 #[test]
 fn typed_picture_property_theme_metadata_round_trips() {
-    let mut document =
-        RtfDocument::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}")
-            .unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     document
         .set_picture_shape_properties(
             0,
@@ -99,7 +101,7 @@ fn typed_picture_property_theme_metadata_round_trips() {
         .unwrap();
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.pictures()[0]
             .shape_properties
@@ -134,7 +136,7 @@ fn rejects_hostile_hsv_grammar() {
         r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}{\*\hsv\caccentone\ctint255\cshade255}{\*\hsv\caccenttwo\ctint255\cshade255}}}\pngblip 89504e470d0a1a0a}}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed {source}"
         );
     }

@@ -23,10 +23,11 @@ pub(crate) fn ensure_pair(before: Props, after: Props) -> Result<()> {
     ensure(before)?;
     ensure(after)?;
     if before.plot_area != after.plot_area {
-        return Err(Error::UnsupportedMutation {
-            operation: "sheet-props-patch",
-            reason: "PlotArea record presence cannot change in a fixed-record transaction",
-        });
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "sheet-props-patch",
+            "PlotArea record presence cannot change in a fixed-record transaction",
+        )));
     }
     Ok(())
 }

@@ -22,10 +22,11 @@ use std::sync::{
 };
 
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits,
-    OwnedSource, ReadAt, Resource, SourceVersion,
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
+    Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, SourceBackedPackage, SourceLimits};
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -33,8 +34,11 @@ const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org
 const ROOT_RELS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rDoc" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
 
 fn archive_bytes(payload: &[u8]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
-    writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
     writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
     writer.write_stored("word/document.xml", payload).unwrap();
     writer.finish_to_bytes().unwrap()
@@ -155,10 +159,12 @@ impl ReadAt for ShortReadSource {
 fn managed_fingerprint_repeated_calls_charge_work_and_input_and_release_memory() {
     let bytes = archive_bytes(b"<document>managed</document>");
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX, u64::MAX);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
-        context,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let artifact = package.source_artifact();
@@ -187,7 +193,14 @@ fn managed_fingerprint_repeated_calls_charge_work_and_input_and_release_memory()
 fn generic_stable_version_mutation_is_rehashed_on_every_fingerprint() {
     let bytes = archive_bytes(b"<document>stable</document>");
     let source = StableMutableSource::new(bytes);
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let artifact = package.source_artifact();
     let first = artifact.fingerprint().unwrap();
     let reads_after_first = source.reads.load(Ordering::Acquire);
@@ -195,7 +208,10 @@ fn generic_stable_version_mutation_is_rehashed_on_every_fingerprint() {
     source.mutate_without_version();
     let second = artifact.fingerprint().unwrap();
 
-    assert_ne!(second, first, "stable version must not authorize stale bytes");
+    assert_ne!(
+        second, first,
+        "stable version must not authorize stale bytes"
+    );
     assert!(source.reads.load(Ordering::Acquire) > reads_after_first);
 }
 
@@ -204,7 +220,14 @@ fn generic_short_reads_are_complete_and_overreported_reads_fail_before_digest() 
     let bytes = archive_bytes(b"<document>short</document>");
     let expected = Sha256::digest(&bytes);
     let source = ShortReadSource::new(bytes.clone(), 7);
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let artifact = package.source_artifact();
     assert_eq!(artifact.fingerprint().unwrap().as_sha256(), &expected[..]);
 

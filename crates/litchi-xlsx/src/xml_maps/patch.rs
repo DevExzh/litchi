@@ -1,6 +1,6 @@
 //! Reversible source-checked patches for workbook Custom XML Maps.
 
-use litchi_core::sheet::Result;
+use crate::error::Result;
 use litchi_opc::OpcPackage;
 
 use super::invalid;
@@ -32,7 +32,7 @@ impl Patch {
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -46,14 +46,21 @@ impl Patch {
     }
 
     /// Apply atomically after checking the workbook and owned-part source.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    ///
+    /// An empty patch publishes nothing and keeps a signed target exactly as
+    /// it was. Any other patch changes the target, so a signed target is
+    /// refused with a boxed [`crate::Error::Signed`]: remove its signature
+    /// explicitly first ([`OpcPackage::unsign`]). The inverse never restores
+    /// a signature.
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(invalid("custom XML maps patch source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
+        crate::signature_policy::ensure_unsigned(target)?;
 
         let mut candidate = target.clone();
         self.after.restore_into(&mut candidate)?;
@@ -71,44 +78,23 @@ impl Patch {
     }
 }
 
-/// Successful publication of one Custom XML Maps transaction.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
+crate::record::record_family!("Custom XML Maps");
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            changed,
-        }
+crate::record::limit_kinds!("Custom XML Maps", XmlMaps {
+    /// Bytes of the Custom XML Maps part.
+    PartBytes => "bytes of the Custom XML Maps part",
+    /// Schemas of the Custom XML Maps part.
+    Schemas => "schemas of the Custom XML Maps part",
+    /// Maps of the Custom XML Maps part.
+    Maps => "maps of the Custom XML Maps part",
+});
+
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
     }
 
-    /// Whether the workbook Custom XML Maps owner changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting immutable source snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
     }
 }

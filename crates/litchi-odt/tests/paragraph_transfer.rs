@@ -1,7 +1,8 @@
-use litchi_odf_common::package::raw_identical_members;
+use litchi_core::edit::RefusalKind;
+use litchi_odf_common::{Error as OdfError, package::raw_identical_members};
 use litchi_odt::{
-    Document,
-    transaction::{DurablePatch, Position, SealedPatch, Snapshot},
+    Package,
+    transaction::{DurablePatch, Position, SealedPatch},
 };
 
 mod support;
@@ -16,9 +17,9 @@ fn content(body: &str) -> String {
     )
 }
 
-fn snapshot(body: &str, marker: &[u8]) -> Snapshot {
+fn snapshot(body: &str, marker: &[u8]) -> Package {
     let xml = content(body);
-    Document::from_bytes(support::package(
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", xml.as_bytes()),
@@ -27,23 +28,19 @@ fn snapshot(body: &str, marker: &[u8]) -> Snapshot {
         ],
     ))
     .unwrap()
-    .snapshot()
-    .unwrap()
 }
 
-fn try_snapshot(body: &str, _marker: &[u8]) -> Option<Snapshot> {
+fn try_snapshot(body: &str, _marker: &[u8]) -> Option<Package> {
     let xml = content(body);
-    Document::from_bytes(support::package(
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[("content.xml", xml.as_bytes())],
     ))
-    .ok()?
-    .snapshot()
     .ok()
 }
 
-fn try_custom_snapshot(xml: &str, marker: &[u8]) -> Option<Snapshot> {
-    Document::from_bytes(support::package(
+fn try_custom_snapshot(xml: &str, marker: &[u8]) -> Option<Package> {
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", xml.as_bytes()),
@@ -51,12 +48,10 @@ fn try_custom_snapshot(xml: &str, marker: &[u8]) -> Option<Snapshot> {
             ("Pictures/opaque.bin", marker),
         ],
     ))
-    .ok()?
-    .snapshot()
     .ok()
 }
 
-fn texts(snapshot: &Snapshot) -> Vec<String> {
+fn texts(snapshot: &Package) -> Vec<String> {
     snapshot
         .document()
         .unwrap()
@@ -93,10 +88,10 @@ fn transfers_first_middle_last_and_only_lexical_fragments() {
         let mut edit = destination.edit();
         plan.apply(&mut edit).unwrap();
         let commit = edit.commit().unwrap();
-        assert_eq!(texts(commit.snapshot()), expected);
+        assert_eq!(texts(commit.package()), expected);
         assert_eq!(donor.as_bytes(), donor_before);
         let content = commit
-            .snapshot()
+            .package()
             .document()
             .unwrap()
             .get_file("content.xml")
@@ -112,7 +107,7 @@ fn transfers_first_middle_last_and_only_lexical_fragments() {
                 .any(|window| window == lexical)
         );
         let identical =
-            raw_identical_members(destination.as_bytes(), commit.snapshot().as_bytes()).unwrap();
+            raw_identical_members(destination.as_bytes(), commit.package().as_bytes()).unwrap();
         assert!(!identical.contains("content.xml"));
         for path in [
             "mimetype",
@@ -131,7 +126,7 @@ fn transfers_first_middle_last_and_only_lexical_fragments() {
         .unwrap();
     let mut edit = only_target.edit();
     plan.apply(&mut edit).unwrap();
-    assert_eq!(texts(edit.commit().unwrap().snapshot()), ["target", "only"]);
+    assert_eq!(texts(edit.commit().unwrap().package()), ["target", "only"]);
 }
 
 #[test]
@@ -153,19 +148,24 @@ fn batch_transfer_is_source_bound_durable_and_reversible() {
     let mut edit = destination.edit();
     edit.apply_plain_paragraph_transfer(&plan).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(texts(commit.snapshot()), ["X", "A", "C", "Y"]);
+    assert_eq!(texts(commit.package()), ["X", "A", "C", "Y"]);
     assert_eq!(commit.results().len(), 1);
 
     let patch = commit.patch();
     assert_eq!(
-        patch.apply(&destination).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        destination.apply(patch).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
-        patch.inverse().apply(commit.snapshot()).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
-    assert!(patch.apply(commit.snapshot()).is_err());
+    assert!(commit.package().apply(patch).is_err());
 
     let durable = patch.durable().unwrap();
     let wire = durable.to_deterministic_json().unwrap();
@@ -174,17 +174,17 @@ fn batch_transfer_is_source_bound_durable_and_reversible() {
     let reopened = DurablePatch::from_deterministic_json(&wire).unwrap();
     assert_eq!(
         reopened.apply(&destination).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     assert_eq!(
         reopened
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         destination.as_bytes()
     );
-    assert!(reopened.apply(commit.snapshot()).is_err());
+    assert!(reopened.apply(commit.package()).is_err());
 }
 
 #[test]
@@ -288,7 +288,7 @@ fn empty_transfer_is_exact_noop_and_target_or_donor_is_bound() {
     let mut edit = target.edit();
     plan.apply(&mut edit).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().as_bytes(), target.as_bytes());
+    assert_eq!(commit.package().as_bytes(), target.as_bytes());
     assert!(commit.results().is_empty());
 
     let foreign = snapshot("<t:p>foreign</t:p>", b"foreign");
@@ -313,7 +313,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
 
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", replacement).is_err());
 
@@ -322,7 +322,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
         .unwrap();
     let mut transfer = target.edit();
     plan.apply(&mut transfer).unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     let mut replacement = target.edit();
     replacement
         .replace_paragraph(Position::new(0), "changed")
@@ -335,13 +335,27 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     mixed
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let error = match mixed.commit() {
+        Ok(_) => panic!("a mixed transfer edit must be refused before publication"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        OdfError::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedOperation
+    ));
+
+    let mut mixed = target.edit();
+    plan.apply(&mut mixed).unwrap();
+    mixed
+        .replace_paragraph(Position::new(0), "changed")
+        .unwrap();
+    let mut joined = target.joined_edits();
     assert!(joined.join("mixed-single-edit", mixed).is_err());
 
     let mut duplicated = target.edit();
     plan.apply(&mut duplicated).unwrap();
     plan.apply(&mut duplicated).unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     assert!(joined.join("duplicate-transfers", duplicated).is_err());
 
     // Even a paragraph-count-preserving content edit can regenerate
@@ -355,7 +369,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     replacement
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("replace", replacement).unwrap();
     assert!(joined.join("transfer", transfer).is_err());
 
@@ -368,7 +382,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     replacement
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", replacement).is_err());
 
@@ -381,7 +395,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     shifted_replacement
         .replace_paragraph(Position::new(1), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", shifted_replacement).is_err());
 
@@ -394,7 +408,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     shifted_replacement
         .replace_paragraph(Position::new(1), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("replace", shifted_replacement).unwrap();
     assert!(joined.join("transfer", transfer).is_err());
 }
@@ -425,7 +439,7 @@ fn mixed_transfer_refuses_lexical_regeneration_for_cdata_and_prefixes() {
     let standalone = standalone.commit().unwrap();
     assert_eq!(donor.as_bytes(), donor_before.as_slice());
     let standalone_content = standalone
-        .snapshot()
+        .package()
         .document()
         .unwrap()
         .get_file("content.xml")
@@ -448,7 +462,7 @@ fn mixed_transfer_refuses_lexical_regeneration_for_cdata_and_prefixes() {
     batch.apply(&mut batched).unwrap();
     let batched = batched.commit().unwrap();
     let batched_content = batched
-        .snapshot()
+        .package()
         .document()
         .unwrap()
         .get_file("content.xml")
@@ -474,7 +488,7 @@ fn mixed_transfer_refuses_lexical_regeneration_for_cdata_and_prefixes() {
     replacement
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", replacement).is_err());
 }

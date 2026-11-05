@@ -108,7 +108,7 @@ impl Snapshot {
 
     /// Start an isolated, source-checked embedded-chart edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.charts.to_vec(),
@@ -140,19 +140,13 @@ impl Snapshot {
 
 /// Clone-staged embedded-chart edit over one immutable ODP package.
 #[derive(Clone, Debug)]
-pub struct Edit {
+pub(crate) struct Edit {
     before: Snapshot,
     draft: Vec<Chart>,
     next_add_token: usize,
 }
 
 impl Edit {
-    /// Borrow the current candidate chart inventory.
-    #[must_use]
-    pub fn charts(&self) -> &[Chart] {
-        &self.draft
-    }
-
     /// Replace one chart part, including occurrences sharing its package part.
     ///
     /// # Errors
@@ -162,7 +156,7 @@ impl Edit {
         clippy::needless_pass_by_value,
         reason = "replacement takes ownership of an authored chart part and may install it at multiple shared occurrences"
     )]
-    pub fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
+    pub(crate) fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,
     {
@@ -183,7 +177,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing or ambiguous selector.
-    pub fn remove<'a, S>(&mut self, selector: S) -> Result<Chart>
+    pub(crate) fn remove<'a, S>(&mut self, selector: S) -> Result<Chart>
     where
         S: Into<Selector<'a>>,
     {
@@ -197,7 +191,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid name, page selector, or resource-limit breach.
-    pub fn add<'a, P, N>(&mut self, page: P, name: N, storage: Storage, part: Part) -> Result<usize>
+    pub(crate) fn add<'a, P, N>(
+        &mut self,
+        page: P,
+        name: N,
+        storage: Storage,
+        part: Part,
+    ) -> Result<usize>
     where
         P: Into<Page<'a>>,
         N: Into<String>,
@@ -245,19 +245,13 @@ impl Edit {
         Ok(index)
     }
 
-    /// Restore the exact source chart inventory in this draft.
-    pub fn rollback(&mut self) {
-        self.draft = self.before.charts.to_vec();
-        self.next_add_token = 0;
-    }
-
     /// Rebuild, audit, reopen, and semantically verify the complete package.
     ///
     /// # Errors
     ///
     /// Returns an error when serialization, compactness auditing, package reopening, or typed
     /// readback fails. The source snapshot is never changed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let changed = !charts_semantically_equal(&self.before.charts, &self.draft);
         let snapshot = if changed {
             let presentation = self.before.to_presentation()?;
@@ -276,142 +270,21 @@ impl Edit {
         } else {
             self.before.clone()
         };
-        let diagnostics = Diagnostics::between(&self.before, &snapshot, changed);
-        Ok(Commit {
-            changed,
-            patch: Patch {
-                before: self.before,
-                after: snapshot.clone(),
-            },
-            snapshot,
-            diagnostics,
-        })
+        Ok(Commit { snapshot })
     }
 }
 
-/// Exact-byte-source-checked reversible ODP chart patch.
+/// A fully rehydrated chart publication.
 #[derive(Clone, Debug)]
-pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
-}
-
-impl Patch {
-    /// Apply this patch only to its exact complete-package source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `source` is not byte-for-byte identical to the accepted source.
-    pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
-        if !self.is_applicable_to(source) {
-            return invalid("stale ODP chart patch source");
-        }
-        let snapshot = self.after.clone();
-        let changed = !self.is_noop();
-        Ok(Commit {
-            changed,
-            diagnostics: Diagnostics::between(&self.before, &snapshot, changed),
-            snapshot,
-            patch: self.clone(),
-        })
-    }
-
-    /// Return the patch that restores the exact accepted source package.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-        }
-    }
-
-    /// Return whether this patch preserves the exact package bytes.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        same_source(&self.before, &self.after)
-    }
-
-    /// Return whether this patch accepts the exact supplied source snapshot.
-    #[must_use]
-    pub fn is_applicable_to(&self, source: &Snapshot) -> bool {
-        same_source(&self.before, source)
-    }
-}
-
-/// Content-free diagnostics for one chart publication.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Diagnostics {
-    charts_before: usize,
-    charts_after: usize,
-    changed: bool,
-}
-
-impl Diagnostics {
-    fn between(before: &Snapshot, after: &Snapshot, changed: bool) -> Self {
-        Self {
-            charts_before: before.charts.len(),
-            charts_after: after.charts.len(),
-            changed,
-        }
-    }
-
-    /// Return the chart occurrence count in the accepted source package.
-    #[must_use]
-    pub const fn charts_before(self) -> usize {
-        self.charts_before
-    }
-
-    /// Return the chart occurrence count in the published package.
-    #[must_use]
-    pub const fn charts_after(self) -> usize {
-        self.charts_after
-    }
-
-    /// Return whether complete-package bytes changed.
-    #[must_use]
-    pub const fn changed(self) -> bool {
-        self.changed
-    }
-}
-
-/// Fully rehydrated chart publication with its reversible patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-    changed: bool,
 }
 
 impl Commit {
-    /// Return whether complete-package bytes changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
     /// Borrow the resulting immutable chart snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Return content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume this publication into its immutable chart snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
     }
 }
 
@@ -445,8 +318,10 @@ pub(super) fn validate_compact_package(package: &OwnedPackage) -> Result<()> {
         )
         .map_err(|source| invalid_error(format!("invalid ODP chart XML audit limits: {source}")))?;
         let _report = audit::verify(&payload, limits).map_err(|source| match source {
-            audit::Error::NotCompact(_) => Error::Unsupported(format!(
-                "ODP chart XML part '{path}' is not compact: {source}"
+            audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.charts.snapshot",
+                "ODP chart XML part is not compact",
             )),
             audit::Error::Limit { .. }
             | audit::Error::Encoding { .. }
@@ -505,10 +380,6 @@ fn select(charts: &[Chart], selector: Selector<'_>) -> Result<Option<usize>> {
             Ok(selected)
         },
     }
-}
-
-fn same_source(left: &Snapshot, right: &Snapshot) -> bool {
-    Arc::ptr_eq(&left.source, &right.source) || left.source == right.source
 }
 
 fn validate_name(name: &str) -> Result<()> {

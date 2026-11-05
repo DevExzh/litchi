@@ -10,9 +10,11 @@
 //! - [`escape`] helpers for embedding literal text safely.
 //! - Unicode helpers for rendering super- and subscript characters.
 //!
-//! The crate intentionally has no knowledge of any concrete document format;
-//! concrete format adapters currently live in the `litchi` umbrella crate's
-//! focused `markdown` module.
+//! The crate intentionally has no knowledge of any concrete document format.
+//! The concrete format adapters implement [`ToMarkdown`] next to the types
+//! they convert: the unified `File` of `litchi-ops`, which the `litchi`
+//! umbrella crate re-exports, and the umbrella crate's older format-family
+//! types.
 //!
 //! # Re-exports
 //!
@@ -25,4 +27,5 @@ pub mod traits;
 pub mod unicode;
 
 pub use config::{FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
+pub use reader::OpenOptions;
 pub use traits::ToMarkdown;

@@ -133,7 +133,7 @@ impl ListLevel {
         buf.write_all(&self.start_at.to_le_bytes()).unwrap();
         // Offset 4: nfc (1 byte) — number format code
         buf.push(self.number_format as u8);
-        // Offset 5: jc:2 + typed flags:6. Writer-facing levels remain left aligned.
+        // Offset 5: jc:2 + typed flags:6. Builder-facing levels remain left aligned.
         let flags = metadata.map_or(0, |value| {
             (value.ignored_flags & 0x40)
                 | u8::from(value.legal_numbering) << 2
@@ -305,7 +305,7 @@ pub struct ListFormatOverride {
     pub lfo_id: u32,
 }
 
-/// Writer representation of one `LFOLVL` entry.
+/// Builder representation of one `LFOLVL` entry.
 #[derive(Debug, Clone)]
 pub struct ListLevelOverride {
     pub level: u8,

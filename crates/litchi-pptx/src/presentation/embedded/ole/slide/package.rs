@@ -8,9 +8,10 @@ use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use super::super::Limits;
 use super::super::package::load_slide;
 use super::transaction::{
-    Commit, PartSource, Patch, RelationshipState, Snapshot, sorted_parts, sorted_relationships,
+    Change, PartSource, Prepared, RelationshipState, Snapshot, sorted_parts, sorted_relationships,
 };
 use super::validation::{MAX_RELATIONSHIPS, validate_source};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::presentation::embedded::invalid;
 use crate::{Error, Result};
 
@@ -63,10 +64,17 @@ pub fn load(
 
 /// Publish a committed OLE graph replacement atomically.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load(
         package,
         patch.before().slide_index,
@@ -75,11 +83,12 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if !current.same_source(patch.before()) {
         return Err(super::validation::invalid_revision());
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
+    refuse_signed_change(package)?;
     let mut candidate = package.clone();
-    candidate.unsign();
+    settle_unsigned_change(&mut candidate)?;
     install(&mut candidate, patch)?;
     let resulting = load(
         &candidate,
@@ -95,14 +104,21 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     Ok(resulting)
 }
 
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, &commit.into_patch())
 }
 
-fn install(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     if before.slide_part_name != after.slide_part_name || before.slide_index != after.slide_index {
@@ -237,7 +253,8 @@ fn relationship_states<'a>(
         .is_some_and(|value| value > MAX_RELATIONSHIPS)
     {
         return Err(crate::presentation::embedded::limit(
-            "OLE relationship count",
+            crate::error::CodecLimitKind::Relationships,
+            relationships.size_hint().1.unwrap_or(usize::MAX),
             MAX_RELATIONSHIPS,
         ));
     }

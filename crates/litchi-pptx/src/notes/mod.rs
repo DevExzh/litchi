@@ -1,21 +1,31 @@
 //! Bounded, inert `PresentationML` notes-slide and notes-master package graphs.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
 mod validation;
 
 pub use codec::{master_xml, write_text, write_text_with};
-pub(crate) use codec::{rewrite_text, root_conformance_from_processed};
+pub(crate) use codec::{
+    rewrite_text, root_conformance_from_processed, root_conformance_with_limits,
+    scan_xml_with_limits, validate_resource_xml_with_limits,
+};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
-    SlideRootMemo, SlideRootProof, apply_commit, apply_patch, clear_checked, load, load_snapshot,
-    load_snapshot_with_slide_root_proofs, remove_checked,
+    SlideRootMemo, SlideRootProof, apply_commit, clear_checked_with_limits,
+    load_snapshot_with_limits, load_snapshot_with_slide_root_proofs_and_limits, load_with_limits,
+    remove_checked_with_limits, validate_replay_part, validate_replay_total,
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+#[cfg(test)]
+pub(crate) use package::{load, load_snapshot, remove_checked};
+pub(crate) use transaction::Draft;
+pub use transaction::{Revision, Snapshot};
+pub(crate) use validation::validate_id;
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -35,9 +45,75 @@ pub(crate) const MAX_TOTAL_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_NOTES_SLIDES: usize = 4096;
 pub(crate) const MAX_OWNED_PARTS: usize = 4_096;
 pub(crate) const MAX_NODES: usize = 100_000;
+/// The complete slide-root classifier shares the one-million-node admission
+/// used by the bounded slide readers. Notes parts retain their narrower
+/// [`MAX_NODES`] ceiling.
+pub(crate) const MAX_SLIDE_ROOT_NODES: usize = 1_000_000;
 pub(crate) const MAX_DEPTH: usize = 128;
 pub(crate) const MAX_ATTRIBUTES: usize = 500_000;
 pub(crate) const MAX_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;
+
+/// Resource policy for the raw notes XML codec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub max_attribute_bytes: usize,
+    pub max_text_bytes: usize,
+    pub max_total_bytes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_NOTES_XML,
+        max_output_bytes: MAX_NOTES_XML,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_attribute_bytes: MAX_ATTRIBUTE_BYTES,
+        max_text_bytes: MAX_NOTES_XML,
+        max_total_bytes: MAX_TOTAL_BYTES,
+    };
+
+    #[must_use]
+    pub const fn from_source(source: litchi_opc::SourceLimits) -> Self {
+        Self::DEFAULT.constrained_by_source(source)
+    }
+
+    /// Intersect a selected semantic policy with the physical source ceiling.
+    #[must_use]
+    pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
+        let part = cap_u64(source.max_part_bytes());
+        Self {
+            max_input_bytes: min_usize(self.max_input_bytes, part),
+            max_output_bytes: min_usize(self.max_output_bytes, part),
+            max_depth: min_usize(self.max_depth, source.max_depth()),
+            max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_attribute_bytes: min_usize(
+                self.max_attribute_bytes,
+                source.max_xml_attribute_bytes(),
+            ),
+            max_text_bytes: min_usize(self.max_text_bytes, part),
+            max_total_bytes: min_usize(
+                self.max_total_bytes,
+                cap_u64(source.max_total_part_bytes()),
+            ),
+        }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn cap_u64(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
+}
 
 pub(crate) fn checked_add(left: usize, right: usize, label: &str) -> crate::Result<usize> {
     left.checked_add(right)
@@ -53,23 +129,27 @@ pub(crate) fn own_blob(blob: &[u8], resource: &'static str) -> crate::Result<Vec
     Ok(owned)
 }
 
-pub(crate) fn xml_error(error: impl std::fmt::Display) -> crate::Error {
-    crate::Error::Xml(error.to_string())
+pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(error.to_string())
 }
 
-pub(crate) fn invalid(message: impl Into<String>) -> crate::Error {
-    crate::Error::Invalid(message.into())
+pub(crate) fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
 pub(crate) fn allocation(
     resource: &'static str,
     source: std::collections::TryReserveError,
-) -> crate::Error {
-    crate::Error::Allocation { resource, source }
+) -> Error {
+    Error::Allocation { resource, source }
 }
 
-pub(crate) fn limit(resource: &'static str, limit: usize) -> crate::Error {
-    crate::Error::Limit { resource, limit }
+pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// The namespace a resolved XML name is bound to as a string.

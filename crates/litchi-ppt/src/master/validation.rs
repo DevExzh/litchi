@@ -163,9 +163,14 @@ pub(super) fn notes(record: &Record) -> Result<()> {
         .ok_or_else(|| Error::Corrupted("Notes master is missing NotesAtom".to_string()))?;
     header(atom, RecordType::NotesAtom, 1, 0, Some(NOTES_ATOM_SIZE))?;
     let slide_id = read_u32(atom, 0, "NotesAtom.slideIdRef")?;
-    if slide_id != 0 {
+    let flags = atom
+        .data
+        .get(4..6)
+        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .ok_or_else(|| Error::Corrupted("NotesAtom.slideFlags is truncated".to_string()))?;
+    if !crate::master_layout::validation::is_notes_master_atom(slide_id, flags) {
         return Err(Error::InvalidFormat(
-            "Notes master NotesAtom.slideIdRef must be null".to_string(),
+            "Notes master NotesAtom.slideIdRef must be null or in the MasterId domain".to_string(),
         ));
     }
     Ok(())

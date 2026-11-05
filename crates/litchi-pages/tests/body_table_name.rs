@@ -9,16 +9,17 @@
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits as PackageLimits;
 use litchi_iwa_archive::{
     Limits,
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
-use litchi_iwa_core::{Archive, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use litchi_pages::{
-    BodyTableName, BodyTableNameError as Error, BodyTableNameValueError, BodyTableSelector,
-    Limits as PackageLimits, Package,
+    BodyTableSelector, Package, table::name::Error as BodyTableNameValueError,
+    table::name::Name as BodyTableName, table::name::transaction::Error,
 };
 use prost::Message as _;
 
@@ -58,13 +59,14 @@ fn source_package(names: [&str; 2]) -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -105,6 +107,7 @@ fn append_selected_model_raw(package: &[u8], raw: &[u8]) -> TestResult<Vec<u8>> 
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -184,7 +187,7 @@ fn append_unknown_model_group(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn model_field_varint(package: &[u8], field_number: u32) -> TestResult<u64> {
     let payload = model_payload(package, FIRST_MODEL_IDENTIFIER)?;
-    let field = WireView::parse(&payload)?
+    let field = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == field_number)
         .ok_or("missing model field")?;
@@ -192,7 +195,7 @@ fn model_field_varint(package: &[u8], field_number: u32) -> TestResult<u64> {
 }
 
 fn member_bytes(package: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -200,7 +203,7 @@ fn member_bytes(package: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
 
 fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(package)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(package, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &PREVIEWS,
             Limits::default(),
@@ -209,7 +212,7 @@ fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn sentinel(package: &[u8]) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == "Data/sentinel.bin")
         .ok_or("missing sentinel")?
@@ -218,14 +221,15 @@ fn sentinel(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_foreign_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let inbound =
         header_fixture::object(7_000, 7_001, vec![0x08, 0x01], &[FIRST_MODEL_IDENTIFIER])?;
     let foreign = SnappyStream::compress(
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members: Vec<(String, Vec<u8>)> = catalog
         .iter()
@@ -243,9 +247,13 @@ fn with_foreign_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut inbound = header_fixture::object(7_000, 7_001, vec![0x08, 0x01], &[])?;
-    let mut field = FieldInfo::new(FieldPath::from(vec![1]));
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.data_references.push(FIRST_MODEL_IDENTIFIER);
     inbound.archive_info.message_infos[0]
         .field_infos
@@ -254,7 +262,8 @@ fn with_foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members: Vec<(String, Vec<u8>)> = catalog
         .iter()
@@ -282,12 +291,15 @@ fn uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
 }
 
 fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
-    let source_catalog = Catalog::from_bytes(source)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
     let document = source_catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let archive = Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let mut identifiers = archive
         .objects
         .iter()
@@ -323,7 +335,8 @@ fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = source_catalog
         .iter()
@@ -345,12 +358,15 @@ fn rewrite_metadata(
     source: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_ID)
         .ok_or("missing metadata object")?;
@@ -368,8 +384,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -377,12 +395,15 @@ fn rewrite_metadata(
 }
 
 fn append_metadata_unknown(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_ID)
         .ok_or("missing metadata object")?;
@@ -399,8 +420,10 @@ fn append_metadata_unknown(source: &[u8]) -> TestResult<Vec<u8>> {
             type_: METADATA_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -409,7 +432,7 @@ fn append_metadata_unknown(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn assert_rejected(source: &[u8]) -> TestResult {
     let Ok(package) = Package::from_bytes(source) else {
-        Catalog::from_bytes(source)?;
+        Catalog::from_bytes(source, Default::default())?;
         return Ok(());
     };
     let before = package.exact_bytes();
@@ -434,13 +457,20 @@ fn selectors_read_current_name_and_reject_ambiguity() -> TestResult {
     assert_eq!(by_position, by_name);
     assert!(matches!(
         package.body_table_name(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::name::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ambiguous = Package::from_bytes(&source_package(["Revenue", "Revenue"])?)?;
     assert!(matches!(
         ambiguous.body_table_name(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::name::transaction::Refusal::AmbiguousTableName)
+                | Error::Refused(
+                    litchi_pages::table::name::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
     Ok(())
 }
@@ -545,14 +575,17 @@ fn empty_utf8_and_bounded_name_semantics_are_explicit() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = package.exact_bytes();
     let error = package
         .edit_body_table_name(0usize)?
         .set_name(&replacement)?
         .commit()
         .expect_err("output growth must be rejected at the physical ceiling");
-    assert!(matches!(error, Error::LimitExceeded { .. }));
+    assert!(matches!(error, Error::Limit { .. }));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -757,7 +790,10 @@ fn rename_to_existing_sibling_name_is_rejected_atomically() -> TestResult {
         .commit();
     assert!(matches!(
         result,
-        Err(Error::AmbiguousTableName | Error::InvalidSource)
+        Err(
+            Error::Refused(litchi_pages::table::name::transaction::Refusal::AmbiguousTableName)
+                | Error::InvalidSource
+        )
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -771,7 +807,7 @@ fn stale_patch_conflict_is_source_bound() -> TestResult {
         .edit_body_table_name(0usize)?
         .set_name("Candidate")?
         .commit()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let tampered_source = catalog.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered")],
         Limits::default(),
@@ -791,12 +827,12 @@ fn public_name_transaction_values_are_send_sync_debug_and_redacted() -> TestResu
 
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<BodyTableName>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNamePatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Diagnostics>();
     assert_send_sync_debug::<Error>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::LimitKind>();
     let package = Package::from_bytes(&source_package(["Revenue", "Costs"])?)?;
     let edit = package.edit_body_table_name(0usize)?;
     let debug = format!("{edit:?}");

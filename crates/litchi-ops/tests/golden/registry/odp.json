@@ -1,0 +1,2512 @@
+{
+  "format": "odp",
+  "elements": [
+    {
+      "format": "odp",
+      "element": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "slide",
+          "pathSegment": "slide"
+        },
+        {
+          "element": "slideMaster",
+          "pathSegment": "slidemaster"
+        },
+        {
+          "element": "slideLayout",
+          "pathSegment": "slidelayout"
+        }
+      ],
+      "properties": {
+        "slideCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "list",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "odp",
+      "element": "slide",
+      "parent": "presentation",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "media",
+          "pathSegment": "media"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "notes",
+          "pathSegment": "notes"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
+        },
+        {
+          "element": "noteSlide",
+          "pathSegment": "noteSlide"
+        },
+        {
+          "element": "animation",
+          "pathSegment": "animation"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "slideNumber": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "layout": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "master": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "shape",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "elementAliases": [
+        "textbox",
+        "title"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "shapeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "placeholderType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "isTitle": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "fill": {
+          "code": "unsupported_capability",
+          "followUp": "M6 ODP graphic styles",
+          "reason": "fill and line come from automatic graphic styles, which the adapter does not resolve"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ],
+        "aliases": {
+          "title": "isTitle"
+        }
+      }
+    },
+    {
+      "format": "odp",
+      "element": "placeholder",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "elementAliases": [
+        "ph"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/placeholder[N]",
+          "/slide[N]/placeholder[TYPE]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "shapeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "placeholderType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "isTitle": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "picture",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "elementAliases": [
+        "image",
+        "img",
+        "pic"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/picture[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "table",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "tr",
+          "pathSegment": "tr"
+        },
+        {
+          "element": "col",
+          "pathSegment": "col"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rows": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "tr",
+      "parent": "table",
+      "elementAliases": [
+        "row"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "tc",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "tc",
+      "parent": "tr",
+      "elementAliases": [
+        "cell"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/tr[N]/tc[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "colSpan": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rowSpan": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "chart",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "group",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/group[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "group",
+          "pathSegment": "group"
+        },
+        {
+          "element": "connector",
+          "pathSegment": "connector"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "media",
+          "pathSegment": "media"
+        },
+        {
+          "element": "video",
+          "pathSegment": "video"
+        },
+        {
+          "element": "audio",
+          "pathSegment": "audio"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "connector",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "elementAliases": [
+        "connection"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/connector[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "ole",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/ole[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "media",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/media[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "constraint": {
+            "minEmu": 0,
+            "maxEmu": 9223372036854775807
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "video",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/video[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mediaType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mimeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "loop": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mute": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "audio",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/audio[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "source": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "zorder": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mediaType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mimeType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "loop": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mute": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "paragraph",
+      "parent": [
+        "shape",
+        "placeholder",
+        "tc",
+        "notes"
+      ],
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        },
+        {
+          "element": "linebreak",
+          "pathSegment": "linebreak"
+        }
+      ],
+      "properties": {
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "level": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]/run[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        }
+      ],
+      "properties": {
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "link": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "linebreak",
+      "parent": "paragraph",
+      "elementAliases": [
+        "br"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/paragraph[N]/linebreak[N]"
+        ]
+      },
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "hyperlink",
+      "parent": [
+        "shape",
+        "run"
+      ],
+      "elementAliases": [
+        "hlink"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/shape[N]/hyperlink",
+          "/slide[N]/shape[N]/paragraph[N]/run[N]/hyperlink"
+        ]
+      },
+      "properties": {
+        "link": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "notes",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/notes"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "paragraph"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "comment",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/comment[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "equation",
+      "parent": [
+        "slide",
+        "group"
+      ],
+      "elementAliases": [
+        "formula",
+        "math"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/equation[N]"
+        ]
+      },
+      "properties": {
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "slideMaster",
+      "parent": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slidemaster[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "displayName": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "pageLayout": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "slideLayout",
+      "parent": "presentation",
+      "elementAliases": [
+        "layout"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slidelayout[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "displayName": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "notesMaster",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/notesMaster"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M6 ODP notes master",
+        "reason": "the master page's presentation:notes is not projected as a node"
+      }
+    },
+    {
+      "format": "odp",
+      "element": "noteSlide",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/noteSlide"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M6 ODP notes pages",
+        "reason": "speaker notes are exposed as /slide[N]/notes; the notes page's drawing objects are not nodes"
+      }
+    },
+    {
+      "format": "odp",
+      "element": "animation",
+      "parent": "slide",
+      "elementAliases": [
+        "animate"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/animation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M6 ODP animation nodes",
+        "reason": "the leaf keeps slide animation trees inert; they are not projected as nodes"
+      }
+    },
+    {
+      "format": "odp",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]/series[N]"
+        ]
+      },
+      "properties": {
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nameRef": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "chartType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "axis": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "pointCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/chart[N]/axis[N]",
+          "/slide[N]/chart[N]/axis[@role=ROLE]"
+        ]
+      },
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "dimension": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odp",
+      "element": "col",
+      "parent": "table",
+      "elementAliases": [
+        "column"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/table[N]/col[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "theme",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "modernComment",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "model3d",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "zoom",
+      "code": "unsupported_path",
+      "followUp": "none: a PresentationML-only concept",
+      "reason": "OpenDocument presentations have no themes, modern comments, 3D models or zoom frames"
+    },
+    {
+      "subject": "element",
+      "element": "diagram",
+      "code": "unsupported_path",
+      "followUp": "none: out of scope (record 0332, design §10)",
+      "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "run",
+      "context": "field-run",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP field editing",
+      "reason": "page-number, date and other field runs are computed by the producer and refuse text"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "shape",
+      "context": "character-format",
+      "code": "unsupported_capability",
+      "followUp": "0316 ODP inherited shape formatting",
+      "reason": "bold, italic, underline, size, colour and font are set on paragraphs, runs (links and fields included), and on a shape, table cell or notes story as a whole (each paragraph and every run that overrides the value); reads resolve the node's style chain through the common styles of styles.xml but not a shape's graphic or presentation style, and text sets write plain paragraphs in the first paragraph's style"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "shape",
+      "context": "non-paragraph-story",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP rich text boxes",
+      "reason": "a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "shape",
+      "context": "positioned-insert",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP z-order insertion",
+      "reason": "new text boxes are appended at the end of the slide's objects; move them afterwards"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "shape",
+      "context": "picture-table-chart",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP media and table creation",
+      "reason": "only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph",
+      "context": "story-reorder",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP paragraph ordering",
+      "reason": "paragraphs, runs, rows and cells are not moved or swapped; slides and top-level slide objects are"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "slide",
+      "context": "referenced-page",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP reference rewriting",
+      "reason": "a slide (or a renamed slide) whose name links, custom shows or other markup reference is refused rather than leaving a dangling reference"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "shape",
+      "context": "referenced-object",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODP reference rewriting",
+      "reason": "an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the root node's properties"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "presentation",
+      "context": "extended-metadata",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF user-defined and statistics metadata",
+      "reason": "/metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": true
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
+}

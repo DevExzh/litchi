@@ -4,8 +4,11 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_pptx::Package;
-use litchi_pptx::shape::designer::{DrawingProperties, Limits, Tag, Tags};
+use litchi_pptx::shape::designer::{DrawingProperties, Tag, Tags};
 
 fn tags(name: &str, value: &str) -> Tags {
     let mut tags = Tags::new();
@@ -47,17 +50,18 @@ fn swap_first_two_slide_ids(xml: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn package_designer_facades_round_trip_and_retire_only_on_change() {
+fn package_designer_facades_preserve_noops_and_round_trip_changes() {
     let properties = DrawingProperties::new().with_editable(Some(true));
     let slide_tags = tags("layout", "hero");
-    let mut package = Package::new().unwrap();
-    let slide = package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    let slide = builder.presentation().unwrap().add_slide().unwrap();
     slide
         .add_text_box("Designer", 0, 0, 1_000_000, 500_000)
         .set_designer_properties(properties.clone())
         .unwrap();
     slide.set_designer_tags(slide_tags.clone()).unwrap();
-    package.to_bytes().unwrap();
+    let mut package = builder.build().unwrap();
+    let before = package.to_bytes().unwrap();
 
     assert_eq!(
         package
@@ -72,23 +76,18 @@ fn package_designer_facades_round_trip_and_retire_only_on_change() {
     );
 
     package
-        .put_shape_designer_properties(0usize, 0usize, properties.clone())
+        .put_shape_designer_properties_in_place(0usize, 0usize, properties.clone())
         .unwrap();
     package
-        .put_slide_designer_tags(0usize, slide_tags.clone())
+        .put_slide_designer_tags_in_place(0usize, slide_tags.clone())
         .unwrap();
-    assert!(package.presentation_mut().is_ok());
+    assert_eq!(package.to_bytes().unwrap(), before);
 
     let changed = DrawingProperties::new().with_editable(Some(false));
     package
-        .put_shape_designer_properties_with_limits(
-            0usize,
-            0usize,
-            changed.clone(),
-            Limits::default(),
-        )
+        .put_shape_designer_properties_in_place(0usize, 0usize, changed.clone())
         .unwrap();
-    assert!(package.presentation_mut().is_err());
+    assert_ne!(package.to_bytes().unwrap(), before);
     assert_eq!(
         package
             .presentation()
@@ -105,13 +104,14 @@ fn package_designer_facades_round_trip_and_retire_only_on_change() {
 
 #[test]
 fn reopened_facades_support_names_limits_removal_and_stable_slide_ids() {
-    let mut authored = Package::new().unwrap();
-    authored
-        .presentation_mut()
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder
+        .presentation()
         .unwrap()
         .add_slide()
         .unwrap()
         .add_text_box("Named shape", 0, 0, 1_000_000, 500_000);
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_bytes(&bytes).unwrap();
     let (slide_name, shape_name) = {
@@ -124,25 +124,25 @@ fn reopened_facades_support_names_limits_removal_and_stable_slide_ids() {
 
     let properties = DrawingProperties::new().with_editable(Some(true));
     package
-        .put_shape_designer_properties(slide_name.as_str(), shape_name.as_str(), properties.clone())
+        .put_shape_designer_properties_in_place(
+            slide_name.as_str(),
+            shape_name.as_str(),
+            properties.clone(),
+        )
         .unwrap();
     package
-        .put_slide_designer_tags(slide_name.as_str(), tags("kind", "title"))
+        .put_slide_designer_tags_in_place(slide_name.as_str(), tags("kind", "title"))
         .unwrap();
     assert_eq!(
         package
-            .shape_designer_properties_with_limits(
-                slide_name.as_str(),
-                shape_name.as_str(),
-                Limits::default(),
-            )
+            .shape_designer_properties(slide_name.as_str(), shape_name.as_str())
             .unwrap()
             .properties(),
         Some(&properties)
     );
     assert_eq!(
         package
-            .slide_designer_tags_with_limits(slide_name.as_str(), Limits::default())
+            .slide_designer_tags(slide_name.as_str())
             .unwrap()
             .slide_id(),
         package.presentation().unwrap().slide_references().unwrap()[0].id()
@@ -150,48 +150,43 @@ fn reopened_facades_support_names_limits_removal_and_stable_slide_ids() {
 
     assert!(
         package
-            .remove_shape_designer_properties_with_limits(
-                slide_name.as_str(),
-                shape_name.as_str(),
-                Limits::default(),
-            )
+            .remove_shape_designer_properties_in_place(slide_name.as_str(), shape_name.as_str())
             .unwrap()
             .properties()
             .is_none()
     );
     assert!(
         package
-            .remove_slide_designer_tags_with_limits(slide_name.as_str(), Limits::default())
+            .remove_slide_designer_tags_in_place(slide_name.as_str())
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        package
+            .slide_designer_tags(slide_name.as_str())
             .unwrap()
             .tags()
             .unwrap()
             .is_none()
     );
-    assert!(matches!(
-        package.shape_designer_properties_with_limits(
-            slide_name.as_str(),
-            shape_name.as_str(),
-            Limits::default().with_xml_bytes(1),
-        ),
-        Err(litchi_pptx::Error::Limit { .. })
-    ));
 }
 
 #[test]
 fn slide_designer_tags_follow_stable_id_reorder_and_refuse_broken_binding() {
-    let mut authored = Package::new().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_bytes(&bytes).unwrap();
     let expected = tags("stable", "first");
-    let slide_id = package
-        .put_slide_designer_tags(0usize, expected.clone())
-        .unwrap()
-        .slide_id();
+    package
+        .put_slide_designer_tags_in_place(0usize, expected.clone())
+        .unwrap();
+    let slide_id = package.slide_designer_tags(0usize).unwrap().slide_id();
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part_name = opc.main_document_part()?.partname().clone();
             let reordered = swap_first_two_slide_ids(opc.get_part(&part_name)?.blob());
             opc.get_part_mut(&part_name)?.set_blob(reordered);
@@ -206,7 +201,7 @@ fn slide_designer_tags_follow_stable_id_reorder_and_refuse_broken_binding() {
         .relationship_id()
         .to_owned();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part_name = opc.main_document_part()?.partname().clone();
             opc.get_part_mut(&part_name)?
                 .rels_mut()

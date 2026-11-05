@@ -1,10 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
-use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_opc::{PackURI, SourceLimits};
+use litchi_pptx::SourceBackedPresentation;
+use litchi_pptx::source::{self, Package as SourcePackage};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -28,7 +29,7 @@ fn strict_xml(bytes: Vec<u8>) -> Vec<u8> {
 }
 
 fn strictify_package(source: &[u8]) -> Vec<u8> {
-    let reader = PhysPkgReader::new(source).unwrap();
+    let reader = PhysPkgReader::new(source, SourceLimits::default()).unwrap();
     let mut writer = PhysPkgWriter::new();
     for name in reader.member_names().unwrap() {
         let bytes = reader.read_member(&name).unwrap();
@@ -44,7 +45,7 @@ fn strictify_package(source: &[u8]) -> Vec<u8> {
 }
 
 fn member(package: &[u8], name: &str) -> Vec<u8> {
-    PhysPkgReader::new(package)
+    PhysPkgReader::new(package, SourceLimits::default())
         .unwrap()
         .read_member(name)
         .unwrap()
@@ -100,8 +101,14 @@ fn assert_strict_package(package: &[u8], attached: bool) {
 }
 
 fn assert_same_member_set(left: &[u8], right: &[u8]) {
-    let mut left_names = PhysPkgReader::new(left).unwrap().member_names().unwrap();
-    let mut right_names = PhysPkgReader::new(right).unwrap().member_names().unwrap();
+    let mut left_names = PhysPkgReader::new(left, SourceLimits::default())
+        .unwrap()
+        .member_names()
+        .unwrap();
+    let mut right_names = PhysPkgReader::new(right, SourceLimits::default())
+        .unwrap()
+        .member_names()
+        .unwrap();
     left_names.sort();
     right_names.sort();
     assert_eq!(left_names, right_names);
@@ -134,21 +141,31 @@ fn main() {
     assert_eq!(source_images.len(), 1);
     assert!(source_images[0].svg().is_none());
 
-    let editor = SourceBackedPresentationEditor::from_reader(strict_source.as_slice()).unwrap();
-    let mut attach = editor.edit_svg_attachment(0, 0).unwrap();
-    assert_eq!(attach.source().raster_relationship_type(), rt::STRICT_IMAGE);
-    assert!(attach.attach_svg(SVG).unwrap());
+    let editor = SourcePackage::from_presentation(&source_view).unwrap();
+    let mut attach = editor.edit_svg_images().unwrap();
+    assert_eq!(
+        attach.attachment(0, 0).unwrap().raster_relationship_type(),
+        rt::STRICT_IMAGE
+    );
+    let replacement = source::svg::AttachmentReplacement::new(SVG.to_vec());
+    assert!(attach.attach(0, 0, &replacement).unwrap());
     let attach_commit = attach.commit().unwrap();
     let restored = attach_commit
-        .patch()
-        .inverse()
-        .apply(attach_commit.snapshot())
+        .package()
+        .apply_svg_images(&attach_commit.patch().inverse())
         .unwrap();
-    assert!(restored.svg().is_none());
+    assert!(
+        restored
+            .into_package()
+            .edit_svg_images()
+            .unwrap()
+            .attachment(0, 0)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     let mut attached = Vec::new();
-    editor
-        .publish_svg_attachment_commit_to_stream(&mut attached, &attach_commit)
-        .unwrap();
+    attach_commit.package().write_to(&mut attached).unwrap();
     assert_strict_package(&attached, true);
     write_output(&output, "strict-attached", &attached);
 
@@ -162,20 +179,26 @@ fn main() {
             .bytes(),
         SVG
     );
-    let reopened_editor = SourceBackedPresentationEditor::from_reader(attached.as_slice()).unwrap();
-    let mut detach = reopened_editor.edit_svg_attachment(0, 0).unwrap();
-    assert!(detach.detach().unwrap());
+    let reopened_editor = SourcePackage::from_presentation(&attached_view).unwrap();
+    let mut detach = reopened_editor.edit_svg_images().unwrap();
+    assert!(detach.detach(0, 0).unwrap());
     let detach_commit = detach.commit().unwrap();
     let restored_attached = detach_commit
-        .patch()
-        .inverse()
-        .apply(detach_commit.snapshot())
+        .package()
+        .apply_svg_images(&detach_commit.patch().inverse())
         .unwrap();
-    assert!(restored_attached.svg().is_some());
+    assert!(
+        restored_attached
+            .into_package()
+            .edit_svg_images()
+            .unwrap()
+            .attachment(0, 0)
+            .unwrap()
+            .svg()
+            .is_some()
+    );
     let mut detached = Vec::new();
-    reopened_editor
-        .publish_svg_attachment_commit_to_stream(&mut detached, &detach_commit)
-        .unwrap();
+    detach_commit.package().write_to(&mut detached).unwrap();
     assert_strict_package(&detached, false);
     write_output(&output, "strict-detached", &detached);
 

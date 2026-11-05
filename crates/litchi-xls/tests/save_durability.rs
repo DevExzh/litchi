@@ -7,15 +7,16 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
-use litchi_xls::Workbook;
 use litchi_xls::cell_values::{Reference, Selector};
-use litchi_xls::comments::{Snapshot, Value};
-use litchi_xls::writer::Writer;
+use litchi_xls::comments::Value;
+use litchi_xls::raw::Reader;
+use litchi_xls::writer::Builder;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
@@ -53,28 +54,29 @@ fn scratch_directory() -> ScratchDirectory {
     ScratchDirectory(directory)
 }
 
-fn writer() -> Writer {
-    let mut writer = Writer::new();
-    let sheet = writer.add_worksheet("Notes").unwrap();
-    writer
+fn builder() -> Builder {
+    let mut builder = Builder::new();
+    let sheet = builder.add_worksheet("Notes").unwrap();
+    builder
         .write_string(sheet, 0, 0, "save durability 0761")
         .unwrap();
-    writer.add_comment(sheet, 0, 1, "Author", "note").unwrap();
-    writer
+    builder.add_comment(sheet, 0, 1, "Author", "note").unwrap();
+    builder
 }
 
 #[test]
 fn every_writer_level_publishes_the_default_save_bytes() {
     let directory = scratch_directory();
-    let mut writer = writer();
+    let mut builder = builder();
+    let package = builder.build().unwrap();
     let reference = directory.join("reference.xls");
-    writer.save(&reference).unwrap();
+    package.save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
 
     for durability in LEVELS {
         let destination = directory.join(format!("{}.xls", durability.as_str()));
         std::fs::write(&destination, b"old destination").unwrap();
-        writer
+        package
             .save_with_durability(&destination, durability)
             .unwrap();
         assert_eq!(
@@ -84,33 +86,39 @@ fn every_writer_level_publishes_the_default_save_bytes() {
         );
     }
 
-    Workbook::new(std::fs::File::open(directory.join("no-sync.xls")).unwrap()).unwrap();
+    Reader::new(std::fs::File::open(directory.join("no-sync.xls")).unwrap()).unwrap();
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 4);
 }
 
 #[test]
 fn every_source_backed_overlay_level_publishes_the_default_save_bytes() {
     let mut source = Cursor::new(Vec::new());
-    writer().write_to(&mut source).unwrap();
-    let mut edit = Snapshot::from_bytes(source.into_inner()).unwrap().edit();
+    builder().build().unwrap().write_to(&mut source).unwrap();
+    let mut edit = litchi_xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(source.into_inner()),
+    ))
+    .unwrap()
+    .edit_comments()
+    .unwrap();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author", "edit").unwrap(),
     )
     .unwrap();
-    let commit = edit.commit_source_backed().unwrap();
-    assert!(!commit.is_noop());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_noop());
 
     let directory = scratch_directory();
     let reference = directory.join("reference.xls");
-    commit.save(&reference).unwrap();
+    commit.package().save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
 
     for durability in LEVELS {
         let destination = directory.join(format!("{}.xls", durability.as_str()));
         std::fs::write(&destination, b"old destination").unwrap();
         commit
+            .package()
             .save_with_durability(&destination, durability)
             .unwrap();
         assert_eq!(

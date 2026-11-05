@@ -4,6 +4,7 @@
 //! ownership in `package`. The facade keeps the ADR 0018 API compact.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 
@@ -11,7 +12,10 @@ mod package;
 mod tests;
 
 pub use codec::{read, write};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Cell, Chain, Conformance, Flags, Sheet, Step, raw};
-pub use package::{load, put, remove};
+pub use package::load;
+#[cfg(test)]
+pub(crate) use package::{put, remove};
 
 pub(crate) use package::validate_package;

@@ -12,7 +12,7 @@ use std::io::Cursor;
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::{
     Defect, LayoutDefect, Package, ReservedFieldDefect, SourceBackedWorkbook, ToleranceReport,
     Workbook,
@@ -34,23 +34,30 @@ fn fixture() -> Vec<u8> {
 }
 
 fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let uri = PackURI::new(part).unwrap();
-    let mut stream: Stream = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Stream = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     transform(&mut stream);
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_type, payload) in &stream {
         writer.write_record(*record_type, payload).unwrap();
     }
     package.get_part_mut(&uri).unwrap().set_blob(blob);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -90,7 +97,7 @@ fn name_record(flags: u32, name: &str) -> Vec<u8> {
             rgce: vec![litchi_xlsb::ptg_types::PTG_INT, 1, 0],
             rgcb: Vec::new(),
         }
-        .to_bytes()
+        .to_bytes(litchi_xlsb::raw::Limits::DEFAULT)
         .unwrap(),
     );
     data.extend_from_slice(&u32::MAX.to_le_bytes());
@@ -162,7 +169,7 @@ fn the_unmodified_control_repairs_nothing() {
         );
     }
     assert!(
-        Package::from_bytes(fixture())
+        Package::from_bytes(&fixture())
             .unwrap()
             .tolerance_report()
             .is_clean()
@@ -262,9 +269,7 @@ fn open_workbook_fixture(bytes: &[u8]) -> ToleranceReport {
     let workbook = Workbook::new(Cursor::new(bytes.to_vec())).unwrap();
     let report = workbook.tolerance_report().clone();
     assert_eq!(
-        Package::from_bytes(bytes.to_vec())
-            .unwrap()
-            .tolerance_report(),
+        Package::from_bytes(bytes).unwrap().tolerance_report(),
         &report
     );
     for index in 0..workbook.worksheet_count() {
@@ -456,12 +461,14 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
     let mut calc = None;
     let mut border = None;
     let bytes = fixture();
-    let package = OpcPackage::from_reader(Cursor::new(bytes)).unwrap();
+    let package =
+        OpcPackage::from_reader(Cursor::new(bytes), litchi_opc::SourceLimits::default()).unwrap();
     for record in Records::new(
         package
             .get_part(&PackURI::new(WORKBOOK).unwrap())
             .unwrap()
             .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
     ) {
         let record = record.unwrap();
         if record.kind() == kind::CALC_PROP {
@@ -473,6 +480,7 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
             .get_part(&PackURI::new(STYLES).unwrap())
             .unwrap()
             .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
     ) {
         let record = record.unwrap();
         if record.kind() == kind::BORDER {
@@ -480,14 +488,14 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
         }
     }
     let mut calc = calc.unwrap();
-    litchi_xlsb::calc::read(&calc).unwrap();
+    litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     calc[25] |= 0x80;
-    assert!(litchi_xlsb::calc::read(&calc).is_err());
+    assert!(litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 
     let mut border = border.unwrap();
-    litchi_xlsb::styles::parse_border(&border).unwrap();
+    litchi_xlsb::styles::parse_border(&border, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     border[0] |= 0x80;
-    assert!(litchi_xlsb::styles::parse_border(&border).is_err());
+    assert!(litchi_xlsb::styles::parse_border(&border, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 }
 
 #[test]

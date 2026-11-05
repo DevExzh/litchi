@@ -190,6 +190,7 @@ pub(crate) fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<A
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -213,7 +214,15 @@ pub(crate) fn set_field_info(
         .message_infos
         .first_mut()
         .ok_or_else(|| io::Error::other("synthetic object has no message info"))?;
-    let mut field = FieldInfo::new(field_path);
+    let mut field = FieldInfo::new(
+        litchi_iwa_archive::iwa::FieldPath::new(
+            field_path,
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .unwrap(),
+        litchi_iwa_archive::iwa::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = references.to_vec();
     info.field_infos.push(field);
@@ -313,7 +322,6 @@ pub(crate) fn comment_segment() -> TestResult<ArchiveObject> {
                 length: 1,
             },
             entries: vec![comment_entry(1, ROOT_COMMENT_ID, 1)],
-            ..Default::default()
         }
         .encode_to_vec(),
     )?;
@@ -337,7 +345,6 @@ fn unrelated_comment_segment() -> TestResult<ArchiveObject> {
                 length: 1,
             },
             entries: vec![comment_entry(1, ROOT_COMMENT_ID, 1)],
-            ..Default::default()
         }
         .encode_to_vec(),
     )?;
@@ -425,13 +432,17 @@ pub(crate) fn sidecar(
     ];
     if matches!(corruption, Some(Corruption::MissingCommentList)) {
         messages.pop();
-        return Ok(ArchiveObject::new(SIDECAR_ID, messages)?);
+        return Ok(ArchiveObject::new(
+            SIDECAR_ID,
+            messages,
+            Default::default(),
+        )?);
     }
     if matches!(corruption, Some(Corruption::DuplicateListKey)) {
         messages.push(messages[3].clone());
     }
 
-    let mut result = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut result = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     let list_index = result
         .messages
         .iter()
@@ -461,7 +472,15 @@ pub(crate) fn sidecar(
         } else {
             3
         };
-        let mut field = FieldInfo::new(vec![field_number, u32::try_from(key + 1)?]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_archive::iwa::FieldPath::new(
+                vec![field_number, u32::try_from(key + 1)?],
+                litchi_iwa_archive::iwa::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![*root];
         info.field_infos.push(field);
@@ -540,7 +559,7 @@ pub(crate) fn comment_cell(key: Option<u32>) -> TestResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_number(42.0)?;
     cell.set_comment_identifier(key);
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 pub(crate) fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
@@ -679,9 +698,11 @@ pub(crate) fn reply_objects(
     };
     if !matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent) {
         let nested = matches!(corruption, Some(Corruption::NestedReplyReference));
-        let nested_replies = nested
-            .then(|| vec![reference(SECOND_REPLY_ID)])
-            .unwrap_or_default();
+        let nested_replies = if nested {
+            vec![reference(SECOND_REPLY_ID)]
+        } else {
+            Vec::new()
+        };
         result.push(comment_archive(
             FIRST_REPLY_ID,
             first_text,
@@ -702,13 +723,12 @@ pub(crate) fn reply_objects(
     if matches!(corruption, Some(Corruption::MissingReply)) {
         result.retain(|object| object.archive_info.identifier != Some(FIRST_REPLY_ID));
     }
-    if matches!(corruption, Some(Corruption::WrongReplyType)) {
-        if let Some(object) = result
+    if matches!(corruption, Some(Corruption::WrongReplyType))
+        && let Some(object) = result
             .iter_mut()
             .find(|object| object.archive_info.identifier == Some(FIRST_REPLY_ID))
-        {
-            object.messages[0].type_ = COMMENT_STORAGE_TYPE + 1;
-        }
+    {
+        object.messages[0].type_ = COMMENT_STORAGE_TYPE + 1;
     }
     if matches!(corruption, Some(Corruption::DuplicateRootPayload)) {
         let root = result
@@ -886,7 +906,10 @@ pub(crate) fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> Tes
 }
 
 pub(crate) fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 pub(crate) fn author_objects(empty: bool) -> TestResult<Vec<ArchiveObject>> {
@@ -1086,13 +1109,13 @@ pub(crate) fn source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> 
         FixtureMode::SingleRoot
     };
     let source = fixture(mode, None)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let stream = SnappyStream::decompress(document_entry.data())?;
-    let mut document = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
+    let mut document = Archive::parse(stream.as_bytes(), Default::default())?;
 
     let table_info = document
         .object_mut(TABLE_INFO_ID)
@@ -1171,24 +1194,27 @@ pub(crate) fn source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> 
             let Some(buffer) = row.cell_storage_buffer.as_mut() else {
                 continue;
             };
-            let mut cell = BncCell::parse(buffer.as_slice())?;
+            let mut cell =
+                BncCell::parse(buffer.as_slice(), &litchi_numbers_wire::Limits::DEFAULT)?;
             if cell.comment_identifier().is_some() {
                 cell.set_comment_identifier(Some(4));
-                *buffer = cell.encode();
+                *buffer = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
             }
             if !row.cell_storage_buffer_pre_bnc.is_empty() {
                 let pre_bnc = &mut row.cell_storage_buffer_pre_bnc;
-                let mut cell = BncCell::parse(pre_bnc.as_slice())?;
+                let mut cell =
+                    BncCell::parse(pre_bnc.as_slice(), &litchi_numbers_wire::Limits::DEFAULT)?;
                 if cell.comment_identifier().is_some() {
                     cell.set_comment_identifier(Some(4));
-                    *pre_bnc = cell.encode();
+                    *pre_bnc = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
                 }
             }
         }
         message.data = decoded.encode_to_vec();
     }
 
-    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1207,13 +1233,13 @@ pub(crate) fn source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> 
 )]
 pub(crate) fn source_built_comment_fixture_with_table_style(shared: bool) -> TestResult<Vec<u8>> {
     let source = source_built_comment_fixture(shared)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let stream = SnappyStream::decompress(document_entry.data())?;
-    let mut document = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
+    let mut document = Archive::parse(stream.as_bytes(), Default::default())?;
     let table_model = document
         .object_mut(TABLE_MODEL_ID)
         .ok_or_else(|| io::Error::other("comment fixture table model is missing"))?;
@@ -1231,8 +1257,10 @@ pub(crate) fn source_built_comment_fixture_with_table_style(shared: bool) -> Tes
             type_: TABLE_INFO_TYPE,
             data: model.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1245,13 +1273,13 @@ pub(crate) fn source_built_comment_fixture_with_table_style(shared: bool) -> Tes
 #[allow(dead_code, reason = "used by the migration-host compatibility suite")]
 pub(crate) fn form_based_source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> {
     let source = source_built_comment_fixture(shared)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let stream = SnappyStream::decompress(document_entry.data())?;
-    let mut document = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
+    let mut document = Archive::parse(stream.as_bytes(), Default::default())?;
     let sheet = document
         .object_mut(SHEET_ID)
         .ok_or_else(|| io::Error::other("comment fixture sheet is missing"))?;
@@ -1271,8 +1299,10 @@ pub(crate) fn form_based_source_built_comment_fixture(shared: bool) -> TestResul
             }
             .encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1284,7 +1314,7 @@ pub(crate) fn form_based_source_built_comment_fixture(shared: bool) -> TestResul
 #[allow(dead_code, reason = "used by the migration-host compatibility suite")]
 pub(crate) fn source_built_comment_fixture_without_metadata(shared: bool) -> TestResult<Vec<u8>> {
     let source = source_built_comment_fixture(shared)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let entries = catalog
         .iter()
         .filter(|entry| entry.name() != METADATA_MEMBER)
@@ -1304,13 +1334,13 @@ pub(crate) fn source_built_comment_fixture_with_metadata_payload(
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
     let source = source_built_comment_fixture(false)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let metadata_entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
-    let stream = SnappyStream::decompress(metadata_entry.data())?;
-    let mut metadata_archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(metadata_entry.data(), Default::default())?;
+    let mut metadata_archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let metadata = metadata_archive
         .object_mut(METADATA_OBJECT_ID)
         .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
@@ -1319,7 +1349,10 @@ pub(crate) fn source_built_comment_fixture_with_metadata_payload(
         .first_mut()
         .ok_or_else(|| io::Error::other("comment fixture metadata payload is missing"))?;
     message.data = payload.to_vec();
-    let compressed = SnappyStream::compress(&metadata_archive.to_bytes()?)?;
+    let compressed = SnappyStream::compress(
+        &metadata_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1337,14 +1370,14 @@ pub(crate) fn source_built_comment_fixture_with_metadata_payload(
 )]
 pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
     let source = fixture(FixtureMode::SingleRoot, None)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
 
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let document_stream = SnappyStream::decompress(document_entry.data())?;
-    let mut document = Archive::parse(document_stream.as_bytes())?;
+    let document_stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
+    let mut document = Archive::parse(document_stream.as_bytes(), Default::default())?;
 
     {
         let sheet = document
@@ -1363,7 +1396,15 @@ pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
             .first_mut()
             .ok_or_else(|| io::Error::other("comment fixture sheet metadata is missing"))?;
         info.object_references.push(SECOND_TABLE_INFO_ID);
-        let mut field = FieldInfo::new(vec![4, 2]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_archive::iwa::FieldPath::new(
+                vec![4, 2],
+                litchi_iwa_archive::iwa::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(SECOND_TABLE_INFO_ID);
         info.field_infos.push(field);
@@ -1466,14 +1507,15 @@ pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
         second_reply,
     ]);
 
-    let compressed_document = SnappyStream::compress(&document.to_bytes()?)?;
+    let compressed_document =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
 
     let metadata_entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
-    let metadata_stream = SnappyStream::decompress(metadata_entry.data())?;
-    let mut metadata_archive = Archive::parse(metadata_stream.as_bytes())?;
+    let metadata_stream = SnappyStream::decompress(metadata_entry.data(), Default::default())?;
+    let mut metadata_archive = Archive::parse(metadata_stream.as_bytes(), Default::default())?;
     let metadata = metadata_archive
         .object_mut(METADATA_OBJECT_ID)
         .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
@@ -1506,7 +1548,10 @@ pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
         }
     }
     metadata_message.data = package_metadata.encode_to_vec();
-    let compressed_metadata = SnappyStream::compress(&metadata_archive.to_bytes()?)?;
+    let compressed_metadata = SnappyStream::compress(
+        &metadata_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
 
     Ok(catalog.reassemble_to_bytes(
         &[
@@ -1526,13 +1571,13 @@ pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
 )]
 pub(crate) fn multitable_duplicate_name_fixture() -> TestResult<Vec<u8>> {
     let source = multitable_same_key_fixture()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let stream = SnappyStream::decompress(document_entry.data())?;
-    let mut document = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
+    let mut document = Archive::parse(stream.as_bytes(), Default::default())?;
     let model = document
         .object_mut(SECOND_TABLE_MODEL_ID)
         .ok_or_else(|| io::Error::other("second table model is missing"))?;
@@ -1550,8 +1595,10 @@ pub(crate) fn multitable_duplicate_name_fixture() -> TestResult<Vec<u8>> {
             type_: TABLE_MODEL_TYPE,
             data: archive.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&document.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1568,23 +1615,24 @@ pub(crate) fn multitable_duplicate_name_fixture() -> TestResult<Vec<u8>> {
 )]
 pub(crate) fn segmented_with_unrelated_segment_fixture() -> TestResult<Vec<u8>> {
     let source = fixture(FixtureMode::SegmentedRoot, None)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
 
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let document_stream = SnappyStream::decompress(document_entry.data())?;
-    let mut document = Archive::parse(document_stream.as_bytes())?;
+    let document_stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
+    let mut document = Archive::parse(document_stream.as_bytes(), Default::default())?;
     document.objects.push(unrelated_comment_segment()?);
-    let compressed_document = SnappyStream::compress(&document.to_bytes()?)?;
+    let compressed_document =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
 
     let metadata_entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
-    let metadata_stream = SnappyStream::decompress(metadata_entry.data())?;
-    let mut metadata_archive = Archive::parse(metadata_stream.as_bytes())?;
+    let metadata_stream = SnappyStream::decompress(metadata_entry.data(), Default::default())?;
+    let mut metadata_archive = Archive::parse(metadata_stream.as_bytes(), Default::default())?;
     let metadata = metadata_archive
         .object_mut(METADATA_OBJECT_ID)
         .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
@@ -1608,7 +1656,10 @@ pub(crate) fn segmented_with_unrelated_segment_fixture() -> TestResult<Vec<u8>> 
             .push(uuid_entry(UNRELATED_SEGMENT_ID));
     }
     metadata_message.data = package_metadata.encode_to_vec();
-    let compressed_metadata = SnappyStream::compress(&metadata_archive.to_bytes()?)?;
+    let compressed_metadata = SnappyStream::compress(
+        &metadata_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
 
     Ok(catalog.reassemble_to_bytes(
         &[

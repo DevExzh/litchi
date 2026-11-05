@@ -3,11 +3,12 @@
 use std::{fmt, sync::Arc};
 
 use litchi_core::{Error, Position, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 use crate::{
     codec::names as codec,
     model::names::{Definition, Scope},
-    package::Package,
+    package::Archive,
 };
 
 /// An exact semantic key for one named definition.
@@ -69,6 +70,7 @@ impl From<usize> for Selector<'_> {
 pub struct Snapshot {
     source: Arc<[u8]>,
     definitions: Arc<[Definition]>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for Snapshot {
@@ -88,15 +90,23 @@ impl Snapshot {
     ///
     /// Returns an error when the package or named-definition catalog is invalid.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        Self::from_arc(Arc::from(source))
+        Self::from_bytes_with_xml_limits(source, XmlStreamLimits::owner_default_value())
     }
 
-    fn from_arc(source: Arc<[u8]>) -> Result<Self> {
-        let package = Package::from_bytes(source.as_ref().to_vec())?;
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_arc_with_xml_limits(Arc::from(source), xml_limits)
+    }
+
+    fn from_arc_with_xml_limits(source: Arc<[u8]>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source.as_ref().to_vec(), xml_limits)?;
         let definitions = Arc::from(package.definitions()?);
         Ok(Self {
             source,
             definitions,
+            xml_limits,
         })
     }
 
@@ -127,7 +137,7 @@ impl Snapshot {
 
     /// Start a clone-staged, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.definitions.to_vec(),
@@ -247,8 +257,8 @@ impl Edit {
         self.draft.clear();
     }
 
-    /// Restore the exact semantic source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.definitions.to_vec();
     }
 
@@ -258,17 +268,27 @@ impl Edit {
     ///
     /// Returns an error when validation, compact XML enforcement, package rebuilding, or typed
     /// readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         crate::model::names::validate_collection(&self.draft)?;
         if self.draft.as_slice() == self.before.definitions() {
             return Ok(Commit::unchanged(self.before));
         }
 
-        let package = Package::from_bytes(self.before.source.as_ref().to_vec())?;
+        let package = Archive::from_bytes_with_xml_limits(
+            self.before.source.as_ref().to_vec(),
+            self.before.xml_limits,
+        )?;
         let content_xml = codec::replace(package.content_xml(), &self.draft)?;
-        litchi_odf_common::compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
+        litchi_odf_common::compact_xml::validate(
+            crate::package::compact_prolog(&content_xml).as_bytes(),
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .map_err(Error::from)?;
         let target_package = package.replace_content_xml(&content_xml)?;
-        let target = Snapshot::from_bytes(target_package.into_bytes())?;
+        let target = Snapshot::from_bytes_with_xml_limits(
+            target_package.into_bytes(),
+            self.before.xml_limits,
+        )?;
         if target.definitions() != self.draft {
             return Err(Error::InvalidFormat(
                 "ODS named-definition typed readback does not match the staged edit".to_string(),
@@ -287,7 +307,7 @@ impl Edit {
 
 /// An exact-source, reversible named-definition patch.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
 }
@@ -305,47 +325,14 @@ impl fmt::Debug for Patch {
 impl Patch {
     /// Return whether this patch changes package bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.source != self.target
-    }
-
-    /// Check exact applicability without mutating a snapshot.
-    #[must_use]
-    pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
-        self.source.as_ref() == snapshot.as_bytes()
-    }
-
-    /// Apply this patch only to the exact package snapshot that produced it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale source or invalid target package.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if !self.is_applicable_to(snapshot) {
-            return Err(Error::InvalidFormat(
-                "ODS named-definition patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_arc(self.target.clone())?;
-        Ok(Commit {
-            snapshot: target,
-            patch: self.clone(),
-        })
-    }
-
-    /// Return the exact-source patch that restores the accepted source.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
     }
 }
 
 /// A validated named-definition publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -364,32 +351,14 @@ impl Commit {
 
     /// Return whether package bytes changed.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.patch.changed()
     }
 
     /// Borrow the resulting immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume this publication into its immutable snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume this publication into exact ODS package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Arc<[u8]> {
-        self.snapshot.source
     }
 }
 

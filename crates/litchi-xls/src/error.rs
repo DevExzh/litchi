@@ -16,15 +16,55 @@ pub enum EncryptionKind {
     Unknown(u16),
 }
 
+/// Resource dimension governed by an XLS source or edit limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete source bytes, before the CFB container is parsed.
+    InputBytes,
+    /// Bytes in one named CFB stream entry.
+    EntryBytes,
+    /// Aggregate bytes in all declared CFB stream entries.
+    AggregateBytes,
+    /// Changes retained by one primary cell edit.
+    Operations,
+    /// A dimension of the embedded OLE-object capture/publication policy.
+    OleObject(crate::ole_object::LimitKind),
+}
+
+impl LimitKind {
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::InputBytes => "input bytes",
+            Self::EntryBytes => "entry bytes",
+            Self::AggregateBytes => "aggregate bytes",
+            Self::Operations => "staged changes",
+            Self::OleObject(kind) => kind.description(),
+        }
+    }
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.description())
+    }
+}
+
 /// Errors that can occur during XLS file parsing
-#[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// I/O error
     Io(std::io::Error),
     /// CFB (Compound File Binary) error
     Cfb(litchi_cfb::OleError),
+    /// Shared OLE object capture or publication failure.
+    Object(litchi_ole_common::Error),
     /// MS-OVBA project authoring or parsing error
     Vba(litchi_vba::Error),
+    /// Legacy Custom XML data-store parsing failure.
+    CustomXml(litchi_ole_common::custom_xml::Error),
+    /// XML signature verification failure.
+    Signature(litchi_sign::Error),
     /// Host-neutral Office Graph parsing or encoding error.
     Graph(litchi_ograph::Error),
     /// Invalid BIFF record
@@ -71,8 +111,42 @@ pub enum Error {
     UnsupportedFeature(String),
     /// Invalid data
     InvalidData(String),
-    /// A requested edit cannot preserve unsupported source records safely.
-    UnsafeEdit(String),
+    /// A well-formed edit request this route refuses, classified by
+    /// [`litchi_core::edit::RefusalKind`]. The refusal is content-free: its
+    /// operation and reason are static (record 0351 §2.4).
+    Refused(litchi_core::edit::Refusal),
+    /// A patch, plan or staged precondition was made against another source
+    /// than the one receiving it.
+    PatchConflict {
+        /// The edit route that detected the conflict.
+        operation: &'static str,
+        /// Static explanation of the mismatch.
+        reason: &'static str,
+    },
+    /// A changed write of a signed workbook (record 0351 §2.3 rule 5); remove
+    /// the signature explicitly before editing.
+    Signed,
+    /// A broken internal invariant of an edit route (for example a readback
+    /// that disagrees with the staged change); never caused by the request.
+    Internal(&'static str),
+    /// A caller supplied an invalid source or edit limit.
+    InvalidLimit {
+        /// Dimension whose configured value is invalid.
+        kind: LimitKind,
+        /// Requested value.
+        value: u64,
+        /// Hard safety ceiling.
+        maximum: u64,
+    },
+    /// A configured source or edit budget was exceeded.
+    Limit {
+        /// Dimension that exceeded its selected limit.
+        kind: LimitKind,
+        /// Observed value.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
     /// A string is longer than the BIFF8 field that would store it.
     ///
     /// The writer returns this before it produces any output; it never
@@ -110,13 +184,22 @@ pub enum Error {
     /// A decoded worksheet cannot be edited through the create-only worksheet API.
     ///
     /// Use a source-checked transaction when one exists for the selected XLS
-    /// feature, or author a new worksheet through [`crate::writer::Writer`].
+    /// feature, or author a new worksheet through [`crate::writer::Builder`].
     SourceBoundWorksheetMutation {
         /// The attempted create-only operation.
         operation: &'static str,
     },
     /// Weak legacy encryption authoring requires an explicit opt-in policy.
     WeakEncryptionRequiresExplicitPolicy,
+    /// RC4 authoring requires caller-supplied one-use salt and verifier bytes.
+    EncryptionEntropyRequired,
+    /// The metadata given to [`crate::Builder::set_metadata`] cannot be
+    /// stored in the OLE property sets.
+    Metadata(litchi_ole_common::property_set::summary_properties::MetadataError),
+    /// Document properties were combined with `CryptoAPI` RC4 encryption,
+    /// whose encrypted summary stream ([MS-OFFCRYPTO] 2.3.5.4) is not
+    /// produced; the builder refuses rather than store them in plaintext.
+    EncryptedMetadata,
     /// Unexpected record type
     UnexpectedRecordType {
         /// Expected record type
@@ -128,12 +211,177 @@ pub enum Error {
     Eof(&'static str),
 }
 
+impl fmt::Debug for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Preserve the established diagnostics for the native error arms.
+        // The foreign boundaries added by the unified API deliberately expose
+        // only their variant names; their typed causes remain available from
+        // `source()`.
+        match self {
+            Error::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
+            Error::Cfb(error) => formatter.debug_tuple("Error::Cfb").field(error).finish(),
+            Error::Object(error) => formatter.debug_tuple("Error::Object").field(error).finish(),
+            Error::Vba(_) => formatter.write_str("Error::Vba(..)"),
+            Error::CustomXml(_) => formatter.write_str("Error::CustomXml(..)"),
+            Error::Signature(_) => formatter.write_str("Error::Signature(..)"),
+            Error::Graph(error) => formatter.debug_tuple("Error::Graph").field(error).finish(),
+            Error::InvalidRecord {
+                record_type,
+                message,
+            } => formatter
+                .debug_struct("Error::InvalidRecord")
+                .field("record_type", record_type)
+                .field("message", message)
+                .finish(),
+            Error::UnsupportedBiffVersion(version) => formatter
+                .debug_tuple("Error::UnsupportedBiffVersion")
+                .field(version)
+                .finish(),
+            Error::PasswordProtected => formatter.write_str("Error::PasswordProtected"),
+            Error::PasswordRequired => formatter.write_str("Error::PasswordRequired"),
+            Error::InvalidPassword => formatter.write_str("Error::InvalidPassword"),
+            Error::UnsupportedEncryption(kind) => formatter
+                .debug_tuple("Error::UnsupportedEncryption")
+                .field(kind)
+                .finish(),
+            Error::MalformedFilePass(message) => formatter
+                .debug_tuple("Error::MalformedFilePass")
+                .field(message)
+                .finish(),
+            Error::InvalidLength { expected, found } => formatter
+                .debug_struct("Error::InvalidLength")
+                .field("expected", expected)
+                .field("found", found)
+                .finish(),
+            Error::Allocation(context) => formatter
+                .debug_tuple("Error::Allocation")
+                .field(context)
+                .finish(),
+            Error::UnexpectedEndOfStream(context) => formatter
+                .debug_tuple("Error::UnexpectedEndOfStream")
+                .field(context)
+                .finish(),
+            Error::InvalidFormula(message) => formatter
+                .debug_tuple("Error::InvalidFormula")
+                .field(message)
+                .finish(),
+            Error::InvalidCellReference(reference) => formatter
+                .debug_tuple("Error::InvalidCellReference")
+                .field(reference)
+                .finish(),
+            Error::WorksheetNotFound(name) => formatter
+                .debug_tuple("Error::WorksheetNotFound")
+                .field(name)
+                .finish(),
+            Error::InvalidFormat(code) => formatter
+                .debug_tuple("Error::InvalidFormat")
+                .field(code)
+                .finish(),
+            Error::Encoding(message) => formatter
+                .debug_tuple("Error::Encoding")
+                .field(message)
+                .finish(),
+            Error::UnsupportedFeature(feature) => formatter
+                .debug_tuple("Error::UnsupportedFeature")
+                .field(feature)
+                .finish(),
+            Error::InvalidData(message) => formatter
+                .debug_tuple("Error::InvalidData")
+                .field(message)
+                .finish(),
+            Error::Refused(refusal) => formatter
+                .debug_tuple("Error::Refused")
+                .field(refusal)
+                .finish(),
+            Error::PatchConflict { operation, reason } => formatter
+                .debug_struct("Error::PatchConflict")
+                .field("operation", operation)
+                .field("reason", reason)
+                .finish(),
+            Error::Signed => formatter.write_str("Error::Signed"),
+            Error::Internal(reason) => formatter
+                .debug_tuple("Error::Internal")
+                .field(reason)
+                .finish(),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => formatter
+                .debug_struct("Error::InvalidLimit")
+                .field("kind", kind)
+                .field("value", value)
+                .field("maximum", maximum)
+                .finish(),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => formatter
+                .debug_struct("Error::Limit")
+                .field("kind", kind)
+                .field("observed", observed)
+                .field("maximum", maximum)
+                .finish(),
+            Error::StringTooLong {
+                field,
+                utf16_units,
+                limit,
+            } => formatter
+                .debug_struct("Error::StringTooLong")
+                .field("field", field)
+                .field("utf16_units", utf16_units)
+                .field("limit", limit)
+                .finish(),
+            Error::TooMany { collection, limit } => formatter
+                .debug_struct("Error::TooMany")
+                .field("collection", collection)
+                .field("limit", limit)
+                .finish(),
+            Error::RecordTooLong {
+                record,
+                bytes,
+                limit,
+            } => formatter
+                .debug_struct("Error::RecordTooLong")
+                .field("record", record)
+                .field("bytes", bytes)
+                .field("limit", limit)
+                .finish(),
+            Error::SourceBoundWorksheetMutation { operation } => formatter
+                .debug_struct("Error::SourceBoundWorksheetMutation")
+                .field("operation", operation)
+                .finish(),
+            Error::WeakEncryptionRequiresExplicitPolicy => {
+                formatter.write_str("Error::WeakEncryptionRequiresExplicitPolicy")
+            },
+            Error::EncryptionEntropyRequired => {
+                formatter.write_str("Error::EncryptionEntropyRequired")
+            },
+            Error::Metadata(error) => formatter
+                .debug_tuple("Error::Metadata")
+                .field(error)
+                .finish(),
+            Error::EncryptedMetadata => formatter.write_str("Error::EncryptedMetadata"),
+            Error::UnexpectedRecordType { expected, found } => formatter
+                .debug_struct("Error::UnexpectedRecordType")
+                .field("expected", expected)
+                .field("found", found)
+                .finish(),
+            Error::Eof(context) => formatter.debug_tuple("Error::Eof").field(context).finish(),
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Io(e) => write!(f, "I/O error: {e}"),
             Error::Cfb(e) => write!(f, "CFB error: {e}"),
-            Error::Vba(e) => write!(f, "VBA project error: {e}"),
+            Error::Object(e) => write!(f, "OLE object error: {e}"),
+            Error::Vba(_) => f.write_str("XLS VBA operation failed"),
+            Error::CustomXml(_) => f.write_str("XLS Custom XML operation failed"),
+            Error::Signature(_) => f.write_str("XLS signature operation failed"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidRecord {
                 record_type,
@@ -185,7 +433,55 @@ impl fmt::Display for Error {
             Error::InvalidData(msg) => {
                 write!(f, "Invalid data: {msg}")
             },
-            Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::Refused(refusal) => fmt::Display::fmt(refusal, f),
+            Error::PatchConflict { operation, reason } => {
+                write!(f, "XLS {operation} patch conflict: {reason}")
+            },
+            Error::Internal(reason) => write!(f, "XLS edit invariant failed: {reason}"),
+            Error::Signed => f.write_str("changed XLS writes require explicit signature removal"),
+            Error::Limit {
+                kind: LimitKind::Operations,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "XLS staged change limit exceeded: {observed} > {maximum}"
+            ),
+            Error::Limit {
+                kind: LimitKind::OleObject(kind),
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "XLS {} limit exceeded: {observed} > {maximum}",
+                kind.description()
+            ),
+            Error::InvalidLimit {
+                kind: LimitKind::OleObject(kind),
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid XLS {} limit: {value} (maximum {maximum})",
+                kind.description()
+            ),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid XLS source limit for {kind}: {value} (maximum {maximum})"
+            ),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "XLS source limit exceeded for {}: {observed} > {maximum}",
+                kind.description()
+            ),
             Error::StringTooLong {
                 field,
                 utf16_units,
@@ -213,6 +509,14 @@ impl fmt::Display for Error {
                 f,
                 "BIFF8 XOR obfuscation requires an explicit weak-encryption policy"
             ),
+            Error::EncryptionEntropyRequired => {
+                write!(f, "BIFF8 RC4 authoring requires one-use EncryptionEntropy")
+            },
+            Error::Metadata(error) => write!(f, "XLS metadata error: {error}"),
+            Error::EncryptedMetadata => write!(
+                f,
+                "XLS document properties cannot be written with CryptoAPI RC4 encryption"
+            ),
             Error::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,
@@ -231,10 +535,26 @@ impl std::error::Error for Error {
         match self {
             Error::Io(e) => Some(e),
             Error::Cfb(e) => Some(e),
+            Error::Object(e) => Some(e),
             Error::Vba(e) => Some(e),
+            Error::CustomXml(e) => Some(e),
+            Error::Signature(e) => Some(e),
             Error::Graph(e) => Some(e),
+            Error::Metadata(e) => Some(e),
             _ => None,
         }
+    }
+}
+
+impl Error {
+    /// A content-free refusal of `operation` for `reason`.
+    #[must_use]
+    pub const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
     }
 }
 
@@ -250,15 +570,39 @@ impl From<litchi_cfb::OleError> for Error {
     }
 }
 
+impl From<litchi_ole_common::property_set::summary_properties::MetadataError> for Error {
+    fn from(err: litchi_ole_common::property_set::summary_properties::MetadataError) -> Self {
+        Error::Metadata(err)
+    }
+}
+
 impl From<litchi_vba::Error> for Error {
     fn from(err: litchi_vba::Error) -> Self {
         Error::Vba(err)
     }
 }
 
+impl From<litchi_ole_common::custom_xml::Error> for Error {
+    fn from(err: litchi_ole_common::custom_xml::Error) -> Self {
+        Error::CustomXml(err)
+    }
+}
+
+impl From<litchi_sign::Error> for Error {
+    fn from(err: litchi_sign::Error) -> Self {
+        Error::Signature(err)
+    }
+}
+
 impl From<litchi_ograph::Error> for Error {
     fn from(err: litchi_ograph::Error) -> Self {
-        Self::Graph(err)
+        match err {
+            litchi_ograph::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ograph::Error::PatchConflict { operation, reason } => {
+                Self::PatchConflict { operation, reason }
+            },
+            err => Self::Graph(err),
+        }
     }
 }
 
@@ -291,9 +635,149 @@ impl From<litchi_biff::Error> for Error {
     }
 }
 
+/// Classify an XLS error for the format-neutral sheet error the formula
+/// engine reports. The message is static: no sheet name, reference or
+/// record content crosses.
+impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
+    fn from(error: Error) -> Self {
+        use litchi_core::edit::RefusalKind;
+        let refused = |kind, reason| Self::refused(kind, "read", reason);
+        match error {
+            Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::SourceChanged {
+                ..
+            })) => Self::SourceChanged,
+            Error::Object(litchi_ole_common::Error::Cfb(
+                litchi_cfb::OleError::Io(_) | litchi_cfb::OleError::Committed { .. },
+            )) => Self::Io,
+            Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::Allocation {
+                ..
+            })) => Self::Internal("the XLS object allocation failed"),
+            Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::StreamNotFound)) => {
+                refused(RefusalKind::NotFound, "the XLS object stream was not found")
+            },
+            Error::Object(
+                litchi_ole_common::Error::Limit { .. }
+                | litchi_ole_common::Error::Cfb(litchi_cfb::OleError::LimitExceeded { .. }),
+            ) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLS workbook exceeds a configured limit",
+            ),
+            Error::Object(
+                litchi_ole_common::Error::InvalidLimit { .. }
+                | litchi_ole_common::Error::Cfb(litchi_cfb::OleError::InvalidLimit { .. }),
+            ) => refused(
+                RefusalKind::InvalidValue,
+                "the XLS object limit is not valid",
+            ),
+            Error::Object(litchi_ole_common::Error::PatchConflict) => Self::PatchConflict,
+            Error::Io(_) | Error::Cfb(_) => Self::Io,
+            Error::WorksheetNotFound(_) => refused(
+                RefusalKind::NotFound,
+                "the XLS workbook has no such worksheet",
+            ),
+            Error::InvalidCellReference(_) => {
+                refused(RefusalKind::InvalidValue, "the cell reference is not valid")
+            },
+            Error::PasswordProtected
+            | Error::PasswordRequired
+            | Error::InvalidPassword
+            | Error::UnsupportedEncryption(_) => {
+                refused(RefusalKind::Protected, "the XLS workbook is encrypted")
+            },
+            Error::UnsupportedBiffVersion(_) | Error::UnsupportedFeature(_) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLS workbook uses an unsupported feature",
+            ),
+            Error::Limit { .. } | Error::InvalidLimit { .. } | Error::Allocation(_) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLS workbook exceeds a configured limit",
+            ),
+            _ => Self::Malformed("the XLS data is malformed"),
+        }
+    }
+}
+
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn object_errors_keep_sheet_failure_categories() {
+        use litchi_core::{edit::RefusalKind, sheet::Error as SheetError};
+        use litchi_ole_common::{Error as ObjectError, LimitKind};
+        let convert = |error| SheetError::from(Error::Object(error));
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::Io(
+                std::io::Error::other("inert")
+            ))),
+            SheetError::Io
+        );
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::SourceChanged {
+                expected: litchi_core::SourceVersion::new(1, 0),
+                observed: litchi_core::SourceVersion::new(1, 1),
+            })),
+            SheetError::SourceChanged
+        );
+        assert_eq!(
+            convert(ObjectError::PatchConflict),
+            SheetError::PatchConflict
+        );
+        assert_eq!(
+            convert(ObjectError::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: 2,
+                maximum: 1
+            })
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::UnsupportedContent)
+        );
+        assert_eq!(
+            convert(ObjectError::InvalidLimit {
+                kind: LimitKind::StorageDepth,
+                value: 0,
+                maximum: 32
+            })
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::InvalidValue)
+        );
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: 2,
+                maximum: 1,
+            }))
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::UnsupportedContent)
+        );
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::InvalidLimit {
+                resource: "input bytes",
+                value: 0,
+                maximum: 1,
+            }))
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::InvalidValue)
+        );
+        assert!(matches!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::InvalidFormat(
+                "inert".into()
+            ))),
+            SheetError::Malformed(_)
+        ));
+    }
     use std::error::Error as StdError;
 
     #[test]
@@ -485,5 +969,22 @@ mod tests {
         // The CFB error doesn't have a source (unit variant), but test the variant
         let display = format!("{}", err);
         assert!(display.contains("Stream not found"));
+    }
+
+    #[test]
+    fn new_foreign_boundaries_redact_payloads_but_keep_typed_sources() {
+        let payload = "xls-secret-foreign-payload";
+        let errors = [
+            Error::Vba(litchi_vba::Error::InvalidData(payload.to_string())),
+            Error::CustomXml(litchi_ole_common::custom_xml::Error::Invalid(
+                payload.to_string(),
+            )),
+            Error::Signature(litchi_sign::Error::Xml(payload.to_string())),
+        ];
+        for error in errors {
+            assert!(error.source().is_some());
+            assert!(!error.to_string().contains(payload));
+            assert!(!format!("{error:?}").contains(payload));
+        }
     }
 }

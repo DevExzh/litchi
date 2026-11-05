@@ -1,0 +1,959 @@
+# Element paths harvested from OfficeCLI (upstream checkout, not in git):
+# the path arguments of `officecli get|set|add|remove|move|swap` and the
+# --after/--before/--to anchors in examples/{word,excel,ppt}/**, README.md,
+# SKILL.md, skills/**, and the schemas/help/**/*.json `paths` templates (with
+# N/M/K/ID/NAME placeholders made concrete). Strings only; no OfficeCLI code.
+# One path per line; `#` lines and blank lines are ignored.
+/
+/0-Hero
+/0-Hero/chart[1]
+/1-Area Fundamentals
+/1-Area Fundamentals/chart[1]
+/1-Bar Fundamentals
+/1-Bar Fundamentals/chart[1]
+/1-Basics & Quartile
+/1-Basics & Quartile/chart[1]
+/1-Binning Lab
+/1-Bubble Fundamentals
+/1-Bubble Fundamentals/chart[1]
+/1-Column Charts
+/1-Column Charts/chart[1]
+/1-Column Fundamentals
+/1-Column Fundamentals/chart[1]
+/1-Combo Fundamentals
+/1-Combo Fundamentals/chart[1]
+/1-Freeze-Panes
+/1-Line Fundamentals
+/1-Line Fundamentals/chart[1]
+/1-Pie Charts
+/1-Pie Charts/chart[1]
+/1-Radar Fundamentals
+/1-Radar Fundamentals/chart[1]
+/1-Sales Overview
+/1-Sales Overview/pivottable[1]
+/1-Scatter & Bubble
+/1-Scatter & Bubble/chart[1]
+/1-Scatter Fundamentals/chart[1]
+/1-Stock Fundamentals
+/1-Stock Fundamentals/chart[1]
+/1-Waterfall & Funnel
+/1-Waterfall & Funnel/chart[1]
+/1-Waterfall Fundamentals
+/1-Waterfall Fundamentals/chart[1]
+/10-Ultimate
+/11-Chinese Locale
+/12-Position + Aggregates
+/13-Calculated Field
+/14-Statistical
+/15-Independent Totals
+/16-Style Flags
+/17-Display Toggles
+/2-Area Variants
+/2-Axes & Styling
+/2-Bar Charts
+/2-Bar Variants
+/2-Bubble Styling
+/2-Column Variants
+/2-Combo & Radar
+/2-Combo Styling
+/2-Distribution Zoo
+/2-Doughnut Charts
+/2-Line Styles
+/2-Market Share
+/2-Print-Setup
+/2-Radar Styling
+/2-Stock Styling
+/2-Treemap & Sunburst
+/2-Waterfall Styling
+/3-Area Styling
+/3-Bar Styling
+/3-Bubble Advanced
+/3-Column Styling
+/3-Combo Advanced
+/3-Headers-Footers
+/3-Histogram & BoxWhisker
+/3-Labels & Legend
+/3-Line Charts
+/3-Line Variants
+/3-Pie Advanced
+/3-Product Deep Dive
+/3-Stock & Radar
+/3-Stock Advanced
+/3-Theme Gallery
+/3-Waterfall Labels & Axis
+/4-Advanced
+/4-Area Charts
+/4-Axis & Gridlines
+/4-Axis & Gridlines/chart[1]/axis[@role=value]
+/4-Axis & Labels
+/4-Bubble Series Data
+/4-Channel Analysis
+/4-Combo Effects
+/4-Display-Protection
+/4-Labels & Legend
+/4-Pareto
+/4-Typography
+/4-Waterfall Advanced
+/5-Advanced
+/5-Chart Meta
+/5-Labels & Legend
+/5-Legend & Layout
+/5-ML Dashboard
+/5-ML Dashboard/chart[1]
+/5-Priority Matrix
+/5-Sorted
+/5-Styling
+/6-Advanced
+/6-Compact 3-Level
+/6-Effects & Advanced
+/6-Hidden/A1
+/6-Layout
+/7-Axis Controls
+/7-Bar Shape & Gap
+/7-Effects
+/7-Line Elements
+/7-No Subtotals
+/8-Axis Extras
+/8-Date Grouping
+/9-Top 5 Products
+/Analysis
+/Analysis/A1
+/Analysis/B1
+/Analysis/C1
+/Analysis/D1
+/Assessment
+/Assessment/A1
+/Assessment/B1
+/Assessment/C1
+/Assessment/D1
+/Assumptions
+/Assumptions/B12
+/Assumptions/B31
+/Balance Sheet
+/Balance Sheet/B18:E18
+/Borders/B13
+/Borders/B15
+/Borders/B17
+/Borders/B3
+/Borders/B5
+/Borders/B7
+/Borders/B9
+/Cash Flow
+/Cash Flow/B21:E21
+/ColorScales
+/ColorScales/B1
+/Custom
+/DCF/C8
+/DCF/C9
+/Dashboard
+/Dashboard/A1
+/Dashboard/A2
+/Dashboard/col[A]
+/Dashboard/col[B]
+/Dashboard/slicer[1]
+/Data
+/Data/A11
+/Data/A13
+/Data/A9
+/Data/B15
+/Data/B5
+/Data/B7
+/DataBars
+/DateTime
+/Debt
+/Debt/C9
+/Exit
+/FormulaEtc
+/FormulaEtc/B1
+/IconSets
+/IconSets/A1
+/IconSets/B1
+/IconSets/C1
+/IconSets/D1
+/Messages
+/Number
+/P&L
+/Performance/A1
+/Performance/A2
+/Performance/B2
+/Performance/C2
+/Performance/D2
+/Performance/E2
+/Performance/F2
+/Performance/G2
+/Returns
+/Returns/B3
+/Returns/B4
+/RichText
+/RichText/A3
+/S&U/B10
+/S&U/B12
+/Sensitivity
+/Sensitivity/F17
+/Sheet
+/Sheet/E2
+/Sheet1
+/Sheet1/A1
+/Sheet1/A10
+/Sheet1/A11
+/Sheet1/A12
+/Sheet1/A13
+/Sheet1/A1:B1
+/Sheet1/A1:C10
+/Sheet1/A1:D10
+/Sheet1/A1:D100
+/Sheet1/A1:D50
+/Sheet1/A2
+/Sheet1/A3
+/Sheet1/A4
+/Sheet1/A5
+/Sheet1/A6
+/Sheet1/A7
+/Sheet1/A8
+/Sheet1/A9
+/Sheet1/B1
+/Sheet1/B10
+/Sheet1/B11
+/Sheet1/B12
+/Sheet1/B13
+/Sheet1/B2
+/Sheet1/B2:B13
+/Sheet1/B2:C3
+/Sheet1/B3
+/Sheet1/B4
+/Sheet1/B5
+/Sheet1/B6
+/Sheet1/B7
+/Sheet1/B8
+/Sheet1/B9
+/Sheet1/C1
+/Sheet1/C10
+/Sheet1/C11
+/Sheet1/C12
+/Sheet1/C13
+/Sheet1/C2
+/Sheet1/C3
+/Sheet1/C3/comment
+/Sheet1/C3/r[1]
+/Sheet1/C4
+/Sheet1/C5
+/Sheet1/C6
+/Sheet1/C7
+/Sheet1/C8
+/Sheet1/C9
+/Sheet1/D1
+/Sheet1/D10
+/Sheet1/D11
+/Sheet1/D12
+/Sheet1/D13
+/Sheet1/D2
+/Sheet1/D3
+/Sheet1/D4
+/Sheet1/D5
+/Sheet1/D6
+/Sheet1/D7
+/Sheet1/D8
+/Sheet1/D9
+/Sheet1/E1
+/Sheet1/E10
+/Sheet1/E11
+/Sheet1/E12
+/Sheet1/E13
+/Sheet1/E2
+/Sheet1/E3
+/Sheet1/E4
+/Sheet1/E5
+/Sheet1/E6
+/Sheet1/E7
+/Sheet1/E8
+/Sheet1/E9
+/Sheet1/F1
+/Sheet1/F2
+/Sheet1/N1
+/Sheet1/autofilter
+/Sheet1/cf[1]
+/Sheet1/chart[1]
+/Sheet1/chart[1]/axis[@role=category]
+/Sheet1/chart[1]/axis[@role=value]
+/Sheet1/chart[1]/series[3]
+/Sheet1/col[2]
+/Sheet1/col[A]
+/Sheet1/col[B]
+/Sheet1/colbreak[1]
+/Sheet1/comment[1]
+/Sheet1/dataValidation[1]
+/Sheet1/ole[1]
+/Sheet1/picture[1]
+/Sheet1/pivottable[1]
+/Sheet1/row[1]
+/Sheet1/row[2]
+/Sheet1/rowbreak[1]
+/Sheet1/shape[18]
+/Sheet1/shape[1]
+/Sheet1/shape[8]
+/Sheet1/slicer[1]
+/Sheet1/sparkline[1]
+/Sheet1/table[1]
+/Sheet1/validation[N]
+/Sheet2
+/StockData
+/StockData/A1
+/StockData/B1
+/StockData/C1
+/StockData/D1
+/StockData/E1
+/StockData/F1
+/Summary
+/Summary/A1
+/Summary/A2
+/Summary/A3
+/Summary/A4
+/Summary/A5
+/Summary/A6
+/Summary/B1
+/Summary/B2
+/Summary/B2:B5
+/Summary/B3
+/Summary/B4
+/Summary/B5
+/Summary/B6
+/Text
+/TextLength
+/TopBottom
+/body
+/body/group[1]
+/body/oMathPara[1]
+/body/p[10]
+/body/p[11]
+/body/p[11]/r[2]
+/body/p[13]
+/body/p[13]/r[1]
+/body/p[13]/r[2]
+/body/p[14]/r[1]
+/body/p[15]
+/body/p[15]/r[2]
+/body/p[18]
+/body/p[18]/r[2]
+/body/p[19]/r[1]
+/body/p[1]
+/body/p[1]/bookmarkEnd[2]
+/body/p[1]/chart[2]
+/body/p[1]/chart[2]/series[3]
+/body/p[1]/del[2]
+/body/p[1]/hyperlink[2]
+/body/p[1]/ins[2]
+/body/p[1]/oMath[2]
+/body/p[1]/permStart[2]
+/body/p[1]/permStart[@id=7]
+/body/p[1]/r[1]
+/body/p[1]/r[2]
+/body/p[1]/sdt[2]
+/body/p[1]/tab[3]
+/body/p[20]
+/body/p[21]
+/body/p[22]
+/body/p[2]
+/body/p[2]/ins[1]
+/body/p[2]/r[1]
+/body/p[3]
+/body/p[3]/r[2]
+/body/p[4]
+/body/p[4]/r[1]
+/body/p[5]
+/body/p[5]/r[1]
+/body/p[6]
+/body/p[6]/r[1]
+/body/p[6]/r[2]
+/body/p[7]/r[1]
+/body/p[8]
+/body/p[99]
+/body/p[9]
+/body/p[9]/r[2]
+/body/p[@paraId=1A2B3C4D]/r[1]
+/body/p[@paraId=1A2B3C4D]/tab[3]
+/body/p[@paraId=7]
+/body/p[@paraId=7]/r[1]
+/body/p[N]
+/body/p[last()]
+/body/p[last()]/oMath[1]
+/body/p[last()]/r[last()]
+/body/sdt[14]
+/body/sdt[15]
+/body/sdt[1]
+/body/sdt[2]
+/body/sdt[3]
+/body/sdt[@sdtId=3]
+/body/sdt[N]
+/body/sectPr[1]
+/body/shape[1]
+/body/tbl[1]
+/body/tbl[1]/col[1]
+/body/tbl[1]/tr[1]
+/body/tbl[1]/tr[1]/tc[1]
+/body/tbl[1]/tr[1]/tc[1]/p[1]
+/body/tbl[1]/tr[1]/tc[1]/p[1]/r[1]
+/body/tbl[1]/tr[1]/tc[1]/p[N]
+/body/tbl[1]/tr[1]/tc[2]
+/body/tbl[1]/tr[1]/tc[3]
+/body/tbl[1]/tr[1]/tc[4]
+/body/tbl[1]/tr[1]/tc[5]
+/body/tbl[1]/tr[1]/tc[6]
+/body/tbl[1]/tr[2]
+/body/tbl[1]/tr[2]/tc[1]
+/body/tbl[1]/tr[2]/tc[2]
+/body/tbl[1]/tr[2]/tc[3]
+/body/tbl[1]/tr[2]/tc[4]
+/body/tbl[1]/tr[2]/tc[5]
+/body/tbl[1]/tr[2]/tc[6]
+/body/tbl[1]/tr[3]/tc[1]
+/body/tbl[1]/tr[3]/tc[2]
+/body/tbl[1]/tr[3]/tc[3]
+/body/tbl[1]/tr[3]/tc[4]
+/body/tbl[1]/tr[3]/tc[5]
+/body/tbl[1]/tr[3]/tc[6]
+/body/tbl[1]/tr[4]/tc[1]
+/body/tbl[1]/tr[4]/tc[2]
+/body/tbl[1]/tr[4]/tc[3]
+/body/tbl[1]/tr[4]/tc[4]
+/body/tbl[1]/tr[4]/tc[5]
+/body/tbl[1]/tr[4]/tc[6]
+/body/tbl[1]/tr[5]
+/body/tbl[1]/tr[5]/tc[1]
+/body/tbl[1]/tr[5]/tc[2]
+/body/tbl[1]/tr[5]/tc[3]
+/body/tbl[1]/tr[5]/tc[4]
+/body/tbl[1]/tr[5]/tc[5]
+/body/tbl[1]/tr[5]/tc[6]
+/body/tbl[1]/tr[6]/tc[1]
+/body/tbl[1]/tr[6]/tc[2]
+/body/tbl[1]/tr[6]/tc[3]
+/body/tbl[1]/tr[6]/tc[4]
+/body/tbl[1]/tr[6]/tc[5]
+/body/tbl[1]/tr[6]/tc[6]
+/body/tbl[1]/tr[7]/tc[1]
+/body/tbl[1]/tr[7]/tc[2]
+/body/tbl[1]/tr[7]/tc[3]
+/body/tbl[1]/tr[7]/tc[4]
+/body/tbl[1]/tr[7]/tc[5]
+/body/tbl[1]/tr[7]/tc[6]
+/body/tbl[2]/tr[1]/tc[1]
+/body/tbl[2]/tr[1]/tc[2]
+/body/tbl[2]/tr[1]/tc[3]
+/body/tbl[2]/tr[1]/tc[4]
+/body/tbl[2]/tr[2]/tc[1]
+/body/tbl[2]/tr[2]/tc[2]
+/body/tbl[2]/tr[2]/tc[3]
+/body/tbl[2]/tr[2]/tc[4]
+/body/tbl[2]/tr[2]/tc[5]
+/body/tbl[2]/tr[3]/tc[1]
+/body/tbl[2]/tr[3]/tc[2]
+/body/tbl[2]/tr[3]/tc[3]
+/body/tbl[2]/tr[3]/tc[4]
+/body/tbl[2]/tr[3]/tc[5]
+/body/tbl[2]/tr[4]/tc[1]
+/body/tbl[2]/tr[4]/tc[2]
+/body/tbl[2]/tr[4]/tc[3]
+/body/tbl[2]/tr[4]/tc[4]
+/body/tbl[2]/tr[4]/tc[5]
+/body/tbl[2]/tr[5]/tc[1]
+/body/tbl[2]/tr[5]/tc[2]
+/body/tbl[2]/tr[5]/tc[3]
+/body/tbl[2]/tr[5]/tc[4]
+/body/tbl[2]/tr[5]/tc[5]
+/body/tbl[2]/tr[6]/tc[1]
+/body/tbl[2]/tr[6]/tc[2]
+/body/tbl[2]/tr[6]/tc[3]
+/body/tbl[2]/tr[6]/tc[4]
+/body/tbl[2]/tr[6]/tc[5]
+/body/tbl[2]/tr[7]/tc[1]
+/body/tbl[2]/tr[7]/tc[2]
+/body/tbl[2]/tr[7]/tc[3]
+/body/tbl[2]/tr[7]/tc[4]
+/body/tbl[2]/tr[7]/tc[5]
+/body/tbl[2]/tr[8]/tc[1]
+/body/tbl[2]/tr[8]/tc[2]
+/body/tbl[2]/tr[8]/tc[3]
+/body/tbl[2]/tr[8]/tc[4]
+/body/tbl[2]/tr[8]/tc[5]
+/body/tbl[3]/tr[1]/tc[1]
+/body/tbl[3]/tr[2]/tc[2]
+/body/tbl[3]/tr[2]/tc[3]
+/body/tbl[4]
+/body/tbl[4]/tr[1]
+/body/tbl[4]/tr[1]/tc[1]
+/body/tbl[4]/tr[1]/tc[2]
+/body/tbl[4]/tr[1]/tc[3]
+/body/tbl[4]/tr[1]/tc[4]
+/body/tbl[4]/tr[2]/tc[1]
+/body/tbl[4]/tr[2]/tc[2]
+/body/tbl[4]/tr[2]/tc[3]
+/body/tbl[4]/tr[2]/tc[4]
+/body/tbl[4]/tr[3]/tc[1]
+/body/tbl[4]/tr[3]/tc[2]
+/body/tbl[4]/tr[3]/tc[3]
+/body/tbl[4]/tr[3]/tc[4]
+/body/tbl[5]/tr[1]/tc[1]
+/body/tbl[5]/tr[1]/tc[3]
+/body/tbl[5]/tr[2]/tc[1]
+/body/tbl[5]/tr[2]/tc[2]
+/body/tbl[5]/tr[2]/tc[3]
+/body/tbl[6]/tr[1]/tc[1]
+/body/tbl[6]/tr[1]/tc[2]
+/body/tbl[6]/tr[2]/tc[1]
+/body/tbl[6]/tr[2]/tc[2]
+/body/textbox[1]
+/bookmarkEnd[1]
+/bookmarkEnd[@id=7]
+/bookmark[1]
+/bookmark[@name=Revenue]
+/chart[14]
+/chart[1]
+/chart[1]/axis[@role=value]
+/chart[1]/series[3]
+/chart[5]
+/comments/comment[1]
+/comments/comment[@commentId=7]
+/endnote[1]
+/field[1]
+/field[2]
+/footer[1]
+/footer[1]/p[1]
+/footer[1]/p[2]/r[3]
+/footer[1]/p[@paraId=1A2B3C4D]/r[1]
+/footnote[@footnoteId=7]
+/footnotes/footnote[1]
+/footnotes/footnote[N]
+/formfield[1]
+/formfield[@name=Revenue]
+/formfield[agree_terms]
+/formfield[dept_select]
+/formfield[emp_name]
+/header[1]
+/header[1]/p[1]
+/header[1]/p[2]/r[3]
+/header[1]/p[@paraId=1A2B3C4D]/r[1]
+/header[@type=default]
+/namedrange[1]
+/namedrange[@name=Revenue]
+/namedrange[Revenue]
+/numbering
+/numbering/abstractNum[1]
+/numbering/abstractNum[@id=100]
+/numbering/abstractNum[@id=100]/level[1]
+/numbering/abstractNum[@id=100]/level[3]
+/numbering/abstractNum[@id=400]/level[1]
+/numbering/abstractNum[@id=400]/level[2]
+/numbering/abstractNum[@id=7]
+/numbering/abstractNum[@id=7]/level[4]
+/numbering/num[1]
+/numbering/num[@id=7]
+/presentation
+/presentation/slides
+/revision
+/revision[1]
+/revision[@author=Alice]
+/revision[@author=Revenue]
+/revision[@author=Revenue][@type=ins]
+/revision[@id=42]
+/revision[@id=500]
+/revision[@id=500][@type=moveTo]
+/revision[@id=7]
+/revision[@id=7][@type=moveFrom]
+/revision[@type=del]
+/revision[@type=ins]
+/sdt[1]
+/section[1]
+/section[2]
+/section[3]
+/section[N]
+/settings
+/sheet[1]/A1
+/sheet[1]/A2
+/sheet[1]/A3
+/sheet[1]/B2
+/sheet[1]/B3
+/slide[10]
+/slide[10]/table[1]
+/slide[10]/table[2]
+/slide[11]
+/slide[11]/table[@name=SalesData]
+/slide[11]/table[@name=SalesData]/tr[2]/tc[2]
+/slide[12]
+/slide[14]
+/slide[17]
+/slide[18]
+/slide[19]
+/slide[1]
+/slide[1]/3dmodel[1]
+/slide[1]/audio[2]
+/slide[1]/chart[1]
+/slide[1]/chart[1]/axis[@role=value]
+/slide[1]/chart[1]/series[1]
+/slide[1]/chart[2]
+/slide[1]/chart[2]/animation[3]
+/slide[1]/chart[@id=7]
+/slide[1]/chart[@id=7]/series[@id=7]
+/slide[1]/comment[2]
+/slide[1]/connector[1]
+/slide[1]/connector[2]
+/slide[1]/group[2]
+/slide[1]/model3d[2]
+/slide[1]/modernComment[3]
+/slide[1]/modernComment[3]/reply[5]
+/slide[1]/notes
+/slide[1]/ole[1]
+/slide[1]/ole[2]
+/slide[1]/picture[1]
+/slide[1]/picture[2]
+/slide[1]/picture[3]
+/slide[1]/placeholder[2]
+/slide[1]/placeholder[2]/paragraph[3]/br[2]
+/slide[1]/placeholder[@id=7]
+/slide[1]/placeholder[@idx=7]
+/slide[1]/placeholder[@name=Revenue]
+/slide[1]/placeholder[@type=body][@idx=7]
+/slide[1]/placeholder[centertitle]
+/slide[1]/placeholder[ctrTitle]
+/slide[1]/placeholder[subTitle]
+/slide[1]/placeholder[subtitle]
+/slide[1]/shape[12]
+/slide[1]/shape[13]
+/slide[1]/shape[16]
+/slide[1]/shape[17]
+/slide[1]/shape[1]
+/slide[1]/shape[20]
+/slide[1]/shape[21]
+/slide[1]/shape[2]
+/slide[1]/shape[2]/animation[3]
+/slide[1]/shape[2]/hyperlink
+/slide[1]/shape[2]/oMath[3]
+/slide[1]/shape[2]/p[3]
+/slide[1]/shape[2]/p[3]/r[4]
+/slide[1]/shape[2]/p[3]/r[4]/hyperlink
+/slide[1]/shape[2]/paragraph[3]/br[2]
+/slide[1]/shape[3]
+/slide[1]/shape[4]
+/slide[1]/shape[6]
+/slide[1]/shape[@id=7]
+/slide[1]/shape[@name=Title]
+/slide[1]/table[1]
+/slide[1]/table[1]/tr[1]
+/slide[1]/table[1]/tr[1]/tc[1]
+/slide[1]/table[1]/tr[1]/tc[2]
+/slide[1]/table[1]/tr[1]/tc[4]
+/slide[1]/table[1]/tr[2]/tc[1]
+/slide[1]/table[1]/tr[2]/tc[2]
+/slide[1]/table[1]/tr[2]/tc[3]
+/slide[1]/table[1]/tr[2]/tc[4]
+/slide[1]/table[1]/tr[2]/tc[5]
+/slide[1]/table[1]/tr[3]/tc[1]
+/slide[1]/table[1]/tr[3]/tc[2]
+/slide[1]/table[1]/tr[3]/tc[3]
+/slide[1]/table[1]/tr[3]/tc[4]
+/slide[1]/table[1]/tr[3]/tc[5]
+/slide[1]/table[1]/tr[4]/tc[3]
+/slide[1]/table[1]/tr[4]/tc[4]
+/slide[1]/table[1]/tr[5]/tc[1]
+/slide[1]/table[2]
+/slide[1]/table[2]/col[1]
+/slide[1]/table[2]/tr[1]/tc[3]
+/slide[1]/table[2]/tr[1]/tc[4]
+/slide[1]/table[2]/tr[2]/tc[3]
+/slide[1]/table[2]/tr[2]/tc[4]
+/slide[1]/table[2]/tr[3]/tc[3]
+/slide[1]/table[2]/tr[3]/tc[4]
+/slide[1]/table[2]/tr[4]/tc[3]
+/slide[1]/table[2]/tr[4]/tc[4]
+/slide[1]/table[2]/tr[5]
+/slide[1]/table[2]/tr[5]/tc[1]
+/slide[1]/table[@id=7]
+/slide[1]/table[@name=Revenue]
+/slide[1]/video[2]
+/slide[1]/zoom[2]
+/slide[20]
+/slide[21]
+/slide[24]
+/slide[25]
+/slide[2]
+/slide[2]/3dmodel[1]
+/slide[2]/chart[1]
+/slide[2]/chart[2]
+/slide[2]/chart[3]
+/slide[2]/comment[1]
+/slide[2]/group[1]
+/slide[2]/model3d[1]
+/slide[2]/picture[2]
+/slide[2]/picture[4]
+/slide[2]/shape[1]
+/slide[2]/shape[2]
+/slide[2]/shape[3]
+/slide[2]/shape[3]/animation[1]
+/slide[2]/shape[4]
+/slide[2]/shape[5]
+/slide[2]/shape[6]
+/slide[2]/shape[7]
+/slide[2]/shape[8]
+/slide[2]/shape[9]
+/slide[2]/shape[@name=#s1-title]
+/slide[2]/shape[@name=#s2-card]
+/slide[2]/shape[@name=Card1]/paragraph[1]
+/slide[2]/shape[@name=HeroCard]
+/slide[2]/table[1]
+/slide[2]/table[1]/col[1]
+/slide[2]/table[1]/col[2]
+/slide[2]/table[1]/col[3]
+/slide[2]/table[1]/col[4]
+/slide[2]/table[1]/tr[11]/tc[1]
+/slide[2]/table[1]/tr[1]
+/slide[2]/table[1]/tr[1]/tc[1]
+/slide[2]/table[1]/tr[1]/tc[2]
+/slide[2]/table[1]/tr[1]/tc[3]
+/slide[2]/table[1]/tr[1]/tc[4]
+/slide[2]/table[1]/tr[2]
+/slide[2]/table[1]/tr[2]/tc[1]
+/slide[2]/table[1]/tr[2]/tc[2]
+/slide[2]/table[1]/tr[2]/tc[3]
+/slide[2]/table[1]/tr[2]/tc[4]
+/slide[2]/table[1]/tr[3]
+/slide[2]/table[1]/tr[3]/tc[1]
+/slide[2]/table[1]/tr[3]/tc[2]
+/slide[2]/table[1]/tr[3]/tc[3]
+/slide[2]/table[1]/tr[3]/tc[4]
+/slide[2]/table[1]/tr[3]/tc[6]
+/slide[2]/table[1]/tr[4]
+/slide[2]/table[1]/tr[4]/tc[1]
+/slide[2]/table[1]/tr[4]/tc[2]
+/slide[2]/table[1]/tr[4]/tc[3]
+/slide[2]/table[1]/tr[4]/tc[4]
+/slide[2]/table[1]/tr[5]/tc[1]
+/slide[2]/table[1]/tr[6]/tc[1]
+/slide[2]/table[1]/tr[6]/tc[2]
+/slide[2]/table[1]/tr[6]/tc[3]
+/slide[2]/table[1]/tr[6]/tc[4]
+/slide[2]/table[1]/tr[6]/tc[6]
+/slide[2]/table[1]/tr[7]/tc[1]
+/slide[2]/table[1]/tr[8]/tc[1]
+/slide[2]/table[1]/tr[8]/tc[2]
+/slide[2]/table[1]/tr[8]/tc[3]
+/slide[2]/table[1]/tr[8]/tc[4]
+/slide[2]/table[1]/tr[9]/tc[1]
+/slide[2]/table[1]/tr[9]/tc[2]
+/slide[2]/table[1]/tr[9]/tc[3]
+/slide[2]/table[1]/tr[9]/tc[4]
+/slide[2]/table[2]
+/slide[2]/video[1]
+/slide[3]
+/slide[3]/chart[1]
+/slide[3]/group[1]
+/slide[3]/picture[1]
+/slide[3]/picture[2]
+/slide[3]/shape[10]
+/slide[3]/shape[11]
+/slide[3]/shape[12]
+/slide[3]/shape[13]
+/slide[3]/shape[14]
+/slide[3]/shape[15]
+/slide[3]/shape[16]
+/slide[3]/shape[17]
+/slide[3]/shape[18]
+/slide[3]/shape[19]
+/slide[3]/shape[1]
+/slide[3]/shape[1]/p[1]
+/slide[3]/shape[20]
+/slide[3]/shape[21]
+/slide[3]/shape[2]
+/slide[3]/shape[2]/p[1]
+/slide[3]/shape[3]
+/slide[3]/shape[3]/p[1]
+/slide[3]/shape[4]
+/slide[3]/shape[5]
+/slide[3]/shape[6]
+/slide[3]/shape[9]
+/slide[3]/table[1]/tr[1]/tc[1]
+/slide[3]/table[1]/tr[1]/tc[2]
+/slide[3]/table[1]/tr[1]/tc[3]
+/slide[3]/table[1]/tr[1]/tc[4]
+/slide[3]/table[1]/tr[2]/tc[1]
+/slide[3]/table[1]/tr[2]/tc[2]
+/slide[3]/table[1]/tr[2]/tc[3]
+/slide[3]/table[1]/tr[2]/tc[4]
+/slide[3]/table[1]/tr[2]/tc[5]
+/slide[3]/table[1]/tr[3]/tc[1]
+/slide[3]/table[1]/tr[3]/tc[2]
+/slide[3]/table[1]/tr[3]/tc[3]
+/slide[3]/table[1]/tr[3]/tc[4]
+/slide[3]/table[1]/tr[3]/tc[5]
+/slide[3]/table[1]/tr[4]/tc[1]
+/slide[3]/table[1]/tr[4]/tc[2]
+/slide[3]/table[1]/tr[4]/tc[3]
+/slide[3]/table[1]/tr[4]/tc[4]
+/slide[3]/table[1]/tr[4]/tc[5]
+/slide[3]/table[1]/tr[5]/tc[1]
+/slide[3]/table[1]/tr[5]/tc[2]
+/slide[3]/table[1]/tr[5]/tc[5]
+/slide[3]/table[1]/tr[6]/tc[5]
+/slide[3]/table[2]/tr[1]/tc[1]
+/slide[3]/table[2]/tr[1]/tc[2]
+/slide[4]
+/slide[4]/chart[1]/axis[@role=value]
+/slide[4]/chart[2]
+/slide[4]/connector[1]
+/slide[4]/connector[4]
+/slide[4]/picture[1]
+/slide[4]/picture[3]
+/slide[4]/shape[1]
+/slide[4]/shape[1]/p[1]
+/slide[4]/shape[22]
+/slide[4]/shape[23]
+/slide[4]/shape[2]
+/slide[4]/shape[2]/p[1]
+/slide[4]/shape[3]
+/slide[4]/shape[3]/p[1]
+/slide[4]/shape[4]
+/slide[4]/shape[4]/p[1]
+/slide[4]/shape[5]
+/slide[4]/shape[6]
+/slide[4]/shape[9]
+/slide[4]/table[1]
+/slide[4]/table[1]/tr[1]/tc[1]
+/slide[4]/table[1]/tr[1]/tc[2]
+/slide[4]/table[1]/tr[2]/tc[1]
+/slide[4]/table[1]/tr[2]/tc[2]
+/slide[4]/table[1]/tr[3]/tc[1]
+/slide[4]/table[1]/tr[3]/tc[2]
+/slide[4]/table[1]/tr[4]
+/slide[4]/table[1]/tr[4]/tc[1]
+/slide[4]/table[1]/tr[4]/tc[2]
+/slide[4]/table[1]/tr[5]/tc[1]
+/slide[4]/table[1]/tr[5]/tc[2]
+/slide[4]/table[1]/tr[6]/tc[1]
+/slide[4]/table[1]/tr[6]/tc[2]
+/slide[4]/table[1]/tr[7]/tc[1]
+/slide[4]/table[1]/tr[7]/tc[2]
+/slide[4]/table[2]/tr[2]/tc[1]
+/slide[4]/table[2]/tr[5]/tc[1]
+/slide[4]/video[1]
+/slide[5]
+/slide[5]/chart[1]
+/slide[5]/chart[1]/axis[@role=value]
+/slide[5]/chart[1]/series[1]
+/slide[5]/picture[2]
+/slide[5]/picture[5]
+/slide[5]/shape[1]
+/slide[5]/shape[1]/p[1]
+/slide[5]/shape[22]
+/slide[5]/shape[23]
+/slide[5]/shape[24]
+/slide[5]/shape[25]
+/slide[5]/shape[26]
+/slide[5]/shape[27]
+/slide[5]/shape[2]
+/slide[5]/shape[3]
+/slide[5]/shape[3]/p[1]
+/slide[5]/shape[4]
+/slide[5]/shape[4]/p[1]
+/slide[5]/shape[5]
+/slide[5]/shape[6]
+/slide[5]/shape[8]
+/slide[5]/shape[@name=back]
+/slide[5]/shape[@name=cta-button]
+/slide[5]/shape[@name=front]
+/slide[5]/table[1]/tr[1]/tc[1]
+/slide[5]/table[1]/tr[1]/tc[2]
+/slide[5]/table[1]/tr[2]/tc[1]
+/slide[5]/table[1]/tr[2]/tc[2]
+/slide[5]/table[1]/tr[3]/tc[1]
+/slide[5]/table[1]/tr[3]/tc[2]
+/slide[5]/table[1]/tr[4]/tc[1]
+/slide[5]/table[1]/tr[4]/tc[2]
+/slide[5]/table[1]/tr[5]/tc[1]
+/slide[5]/table[1]/tr[5]/tc[2]
+/slide[5]/table[1]/tr[6]/tc[1]
+/slide[5]/table[1]/tr[6]/tc[2]
+/slide[5]/table[1]/tr[7]/tc[1]
+/slide[5]/table[1]/tr[7]/tc[2]
+/slide[5]/table[1]/tr[8]/tc[1]
+/slide[5]/table[1]/tr[8]/tc[2]
+/slide[6]
+/slide[6]/chart[1]
+/slide[6]/chart[3]
+/slide[6]/chart[4]/axis[@role=value]
+/slide[6]/shape[1]
+/slide[6]/shape[24]
+/slide[6]/shape[25]
+/slide[6]/shape[26]
+/slide[6]/shape[27]
+/slide[6]/shape[28]
+/slide[6]/shape[29]
+/slide[6]/shape[2]
+/slide[6]/shape[3]
+/slide[6]/shape[4]
+/slide[6]/shape[5]
+/slide[6]/shape[5]/animation[1]
+/slide[6]/shape[6]
+/slide[6]/shape[@name=tb-back]
+/slide[6]/shape[@name=tb-front]
+/slide[7]
+/slide[7]/chart[1]
+/slide[7]/chart[1]/axis[@role=value]
+/slide[7]/chart[2]/axis[@role=value]
+/slide[7]/chart[3]/axis[@role=value]
+/slide[7]/chart[4]/axis[@role=category]
+/slide[7]/shape[1]
+/slide[7]/shape[2]
+/slide[7]/shape[3]
+/slide[7]/shape[4]
+/slide[7]/shape[4]/animation[1]
+/slide[7]/shape[5]
+/slide[8]
+/slide[8]/chart[1]/axis[@role=value]
+/slide[8]/chart[1]/series[1]
+/slide[8]/chart[4]/series[1]
+/slide[8]/chart[4]/series[2]
+/slide[8]/chart[4]/series[3]
+/slide[8]/table[1]
+/slide[9]
+/slide[N]
+/slide[N]/chart[1]
+/slide[N]/chart[1]/series[1]
+/slide[N]/shape[M]
+/slide[last()]
+/slidelayout[2]
+/slidelayout[2]/shape[3]
+/slidemaster[1]
+/slidemaster[1]/shape[3]
+/slidemaster[1]/slidelayout[2]
+/slidemaster[1]/slidelayout[2]/shape[3]
+/styles
+/styles/Heading1
+/tableofcontents
+/theme
+/toc
+/toc[1]
+/watermark
+/workbook
+# Path forms quoted in OfficeCLI CLI help text, error suggestions, and handler
+# comments.
+/body/p[@paraId=1A2B3C4D]
+/header[@type=default]
+/slide[1]/shape[@id=10000]
+/Sheet1/row[@height=5]
+/Sheet1/row[last()]
+/sheet[last()]/A1
+/styles/paragraph
+/footnotes/footnote[2]
+/endnotes/endnote[1]
+/slide[2]/notes
+/slideMaster[1]/slideLayout[2]
+/notesMaster
+/noteSlide[1]
+/chart[1]/series[2]
+/Sheet1/cell[value>5000 or value<300]
+/body/p[1]/r[bold=true]
+/slide[1]/placeholder[@type=body][@idx=1]
+# Story-axis forms named in docs/UNIFIED_OPS_API_DESIGN.md section 2.
+/header[1]/p[1]
+/footnote[2]
+/comments/comment[3]
+/slide[2]/notes
+/slideMaster[1]/layout[2]

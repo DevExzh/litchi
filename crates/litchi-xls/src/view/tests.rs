@@ -151,7 +151,7 @@ fn rejects_cross_record_view_inconsistencies() {
 
 #[test]
 fn reads_poi_pane_and_zoom_fixtures() {
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::Path;
 
@@ -161,7 +161,7 @@ fn reads_poi_pane_and_zoom_fixtures() {
             .join(name)
     };
 
-    let zoomed = Workbook::new(File::open(fixture("41139.xls")).unwrap()).unwrap();
+    let zoomed = Reader::new(File::open(fixture("41139.xls")).unwrap()).unwrap();
     let view = zoomed.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert_eq!(view.zoom_fraction(), Some((3, 4)));
     assert_eq!(view.normal_zoom_percent(), Some(75));
@@ -174,7 +174,7 @@ fn reads_poi_pane_and_zoom_fixtures() {
     );
     assert_eq!(pane.active_pane(), PaneType::LowerRight);
 
-    let split = Workbook::new(File::open(fixture("50939.xls")).unwrap()).unwrap();
+    let split = Reader::new(File::open(fixture("50939.xls")).unwrap()).unwrap();
     let view = split.xls_worksheet(0).unwrap().worksheet_view().unwrap();
     assert!(view.has_frozen_panes());
     assert!(!view.is_frozen_without_split());

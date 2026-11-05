@@ -1,0 +1,32 @@
+[
+  {
+    "leaf_us": 767.68245,
+    "scenario": "text_set",
+    "unified_us": 1896.9163
+  },
+  {
+    "leaf_us": 1119.2223,
+    "scenario": "add_paragraph",
+    "unified_us": 2330.98405
+  },
+  {
+    "leaf_us": null,
+    "scenario": "run_bold",
+    "unified_us": 1523.7998499999999
+  },
+  {
+    "leaf_us": null,
+    "scenario": "find",
+    "unified_us": 5269.38775
+  },
+  {
+    "leaf_us": null,
+    "scenario": "mc_text_set",
+    "unified_us": 293.887
+  },
+  {
+    "leaf_us": null,
+    "scenario": "mc_add",
+    "unified_us": 251.30280000000002
+  }
+]

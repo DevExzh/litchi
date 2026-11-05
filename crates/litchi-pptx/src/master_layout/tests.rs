@@ -5,8 +5,8 @@
 )]
 
 use super::model::*;
+use super::placeholder::Limits as PlaceholderTypeExtensionLimits;
 use super::{PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension};
-use super::{PlaceholderSignaturePolicy, PlaceholderTypeExtensionLimits};
 use crate::Package;
 use litchi_opc::PackageWriter;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -120,7 +120,7 @@ fn malformed_layout_source() -> Vec<u8> {
     let original_layout = uri("/ppt/slideLayouts/slideLayout1.xml");
     let corrupt_layout = uri("/ppt/slideLayouts/corrupt.xml");
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let relationship_id = opc
                 .get_part(&master)
                 .unwrap()
@@ -156,7 +156,7 @@ fn malformed_orphan_theme_source() -> Vec<u8> {
     let notes_theme = uri("/ppt/theme/theme2.xml");
     let orphan_theme = uri("/ppt/theme/orphan.xml");
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             for part_name in [&master, &notes_master] {
                 let relationship_ids: Vec<String> = opc
                     .get_part(part_name)
@@ -188,7 +188,7 @@ fn malformed_orphan_theme_source() -> Vec<u8> {
 #[test]
 fn deferred_theme_fallback_is_forced_before_master_authoring() {
     let source = malformed_orphan_theme_source();
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(Cursor::new(source.clone())).unwrap();
     assert!(package.add_slide_master().is_err());
     assert_eq!(
         PackageWriter::to_bytes(package.opc().unwrap()).unwrap(),
@@ -199,14 +199,14 @@ fn deferred_theme_fallback_is_forced_before_master_authoring() {
 #[test]
 fn deferred_graph_failure_rolls_back_master_and_layout_authoring() {
     let source = malformed_layout_source();
-    let mut master_package = Package::from_vec(source.clone()).unwrap();
+    let mut master_package = Package::from_reader(Cursor::new(source.clone())).unwrap();
     assert!(master_package.add_slide_master().is_err());
     assert_eq!(
         PackageWriter::to_bytes(master_package.opc().unwrap()).unwrap(),
         source
     );
 
-    let mut layout_package = Package::from_vec(source.clone()).unwrap();
+    let mut layout_package = Package::from_reader(Cursor::new(source.clone())).unwrap();
     assert!(
         layout_package
             .add_slide_layout(
@@ -535,7 +535,7 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -550,13 +550,13 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
         .unwrap();
 
     let source = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     let before = source.source_xml().to_vec();
     let mut edit = source.edit();
     edit.set(PlaceholderTypeExtension::Unknown);
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert!(!commit.is_noop());
     assert!(
         commit
@@ -567,21 +567,21 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
     );
 
     package
-        .apply_placeholder_type_extension_patch(commit.patch())
+        .apply_placeholder_type_extension_slot_patch(commit.patch())
         .unwrap();
     let after = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
-    assert_eq!(after.value(), PlaceholderTypeExtension::Unknown);
+    assert_eq!(after.value(), Some(PlaceholderTypeExtension::Unknown));
     assert_ne!(after.source_xml(), before.as_slice());
 
     package
-        .apply_placeholder_type_extension_patch(&commit.patch().inverse())
+        .apply_placeholder_type_extension_slot_patch(&commit.patch().inverse())
         .unwrap();
     let restored = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
-    assert_eq!(restored.value(), PlaceholderTypeExtension::Cameo);
+    assert_eq!(restored.value(), Some(PlaceholderTypeExtension::Cameo));
     assert_eq!(restored.source_xml(), before.as_slice());
 }
 
@@ -600,7 +600,7 @@ fn p232_scalar_patch_preserves_an_inherited_alias_and_lexical_owner_bytes() {
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -617,19 +617,19 @@ fn p232_scalar_patch_preserves_an_inherited_alias_and_lexical_owner_bytes() {
         .unwrap();
 
     let source = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Alias")
+        .placeholder_type_extension_at(&layout.part_name, "Alias")
         .unwrap();
     let before = source.source_xml().to_vec();
     let mut edit = source.edit();
     edit.set(PlaceholderTypeExtension::Unknown);
     let commit = edit.commit().unwrap();
     package
-        .apply_placeholder_type_extension_patch(commit.patch())
+        .apply_placeholder_type_extension_slot_patch(commit.patch())
         .unwrap();
     let after = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Alias")
+        .placeholder_type_extension_at(&layout.part_name, "Alias")
         .unwrap();
-    assert_eq!(after.value(), PlaceholderTypeExtension::Unknown);
+    assert_eq!(after.value(), Some(PlaceholderTypeExtension::Unknown));
     assert!(
         after
             .source_xml()
@@ -663,7 +663,7 @@ fn p232_scalar_patch_updates_explicit_end_tag_without_touching_opaque_siblings()
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -682,17 +682,17 @@ fn p232_scalar_patch_updates_explicit_end_tag_without_touching_opaque_siblings()
         .unwrap();
 
     let snapshot = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Explicit")
+        .placeholder_type_extension_at(&layout.part_name, "Explicit")
         .unwrap();
     let before = snapshot.source_xml().to_vec();
     let mut edit = snapshot.edit();
     edit.set(PlaceholderTypeExtension::Unknown);
     let commit = edit.commit().unwrap();
     package
-        .apply_placeholder_type_extension_patch(commit.patch())
+        .apply_placeholder_type_extension_slot_patch(commit.patch())
         .unwrap();
     let changed = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Explicit")
+        .placeholder_type_extension_at(&layout.part_name, "Explicit")
         .unwrap();
     assert!(
         std::str::from_utf8(changed.source_xml())
@@ -706,11 +706,11 @@ fn p232_scalar_patch_updates_explicit_end_tag_without_touching_opaque_siblings()
     );
 
     package
-        .apply_placeholder_type_extension_patch(&commit.patch().inverse())
+        .apply_placeholder_type_extension_slot_patch(&commit.patch().inverse())
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_snapshot(&layout.part_name, "Explicit")
+            .placeholder_type_extension_at(&layout.part_name, "Explicit")
             .unwrap()
             .source_xml(),
         before.as_slice()
@@ -732,7 +732,7 @@ fn p232_noop_is_byte_stable_and_signature_policy_is_explicit() {
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.rels_mut().add_relationship(
                 rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
                 "_xmlsignatures/origin.sigs".to_owned(),
@@ -745,14 +745,14 @@ fn p232_noop_is_byte_stable_and_signature_policy_is_explicit() {
     assert!(package.opc().unwrap().is_signed());
 
     let source = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     let mut noop_edit = source.clone().edit();
     noop_edit.set(PlaceholderTypeExtension::Cameo);
     let noop = noop_edit.commit().unwrap();
     assert!(noop.is_noop());
     package
-        .apply_placeholder_type_extension_patch(noop.patch())
+        .apply_placeholder_type_extension_slot_patch(noop.patch())
         .unwrap();
     assert!(package.opc().unwrap().is_signed());
 
@@ -760,18 +760,16 @@ fn p232_noop_is_byte_stable_and_signature_policy_is_explicit() {
     changed_edit.set(PlaceholderTypeExtension::Unknown);
     let changed = changed_edit.commit().unwrap();
     let error = package
-        .apply_placeholder_type_extension_patch(changed.patch())
+        .apply_placeholder_type_extension_slot_patch(changed.patch())
         .unwrap_err();
     assert!(matches!(
         error,
         crate::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     ));
     assert!(package.opc().unwrap().is_signed());
+    package = package.unsign().unwrap();
     package
-        .apply_placeholder_type_extension_patch_with_policy(
-            changed.patch(),
-            PlaceholderSignaturePolicy::Invalidate,
-        )
+        .apply_placeholder_type_extension_slot_patch(changed.patch())
         .unwrap();
     assert!(!package.opc().unwrap().is_signed());
 }
@@ -791,7 +789,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
         )
         .unwrap();
     let source = package
-        .placeholder_type_extension_snapshot(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     let mut edit = source.clone().edit();
     edit.set(PlaceholderTypeExtension::Unknown);
@@ -799,7 +797,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
 
     let exact_limits =
         PlaceholderTypeExtensionLimits::new(source.source_xml().len() + 2, 2).unwrap();
-    let exact_snapshot = super::load_placeholder_type_extension_snapshot_with_limits(
+    let exact_snapshot = super::placeholder::load_slot_snapshot_with_limits(
         package.opc().unwrap(),
         &layout.part_name,
         "Cameo",
@@ -812,7 +810,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
 
     let tight_limits =
         PlaceholderTypeExtensionLimits::new(source.source_xml().len() + 2, 1).unwrap();
-    let tight_snapshot = super::load_placeholder_type_extension_snapshot_with_limits(
+    let tight_snapshot = super::placeholder::load_slot_snapshot_with_limits(
         package.opc().unwrap(),
         &layout.part_name,
         "Cameo",
@@ -824,7 +822,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
     assert!(tight_edit.commit().is_err());
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let mut bytes = part.blob().to_vec();
             bytes.extend_from_slice(b" ");
@@ -840,8 +838,8 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
         .blob()
         .to_vec();
     assert!(matches!(
-        package.apply_placeholder_type_extension_patch(&patch),
-        Err(crate::Error::StaleSource)
+        package.apply_placeholder_type_extension_slot_patch(&patch),
+        Err(crate::Error::PatchConflict)
     ));
     assert_eq!(
         package
@@ -854,7 +852,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
     );
 
     let bounded = PlaceholderTypeExtensionLimits::new(source.source_xml().len(), 1).unwrap();
-    let bounded_source = super::load_placeholder_type_extension_snapshot_with_limits(
+    let bounded_source = super::placeholder::load_slot_snapshot_with_limits(
         package.opc().unwrap(),
         &layout.part_name,
         "Cameo",
@@ -879,7 +877,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -894,14 +892,14 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .unwrap();
 
     let absent = package
-        .placeholder_type_extension_slot_snapshot(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(absent.value(), None);
     let before = absent.source_xml().to_vec();
     let mut add = absent.edit();
     add.set(PlaceholderTypeExtension::Cameo);
     let added = add.commit().unwrap();
-    assert!(added.is_changed());
+    assert!(added.diagnostics().changed());
     assert!(
         added
             .snapshot()
@@ -913,7 +911,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(added.patch())
         .unwrap();
     let present = package
-        .placeholder_type_extension_slot_snapshot(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(present.value(), Some(PlaceholderTypeExtension::Cameo));
 
@@ -924,7 +922,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(removed.patch())
         .unwrap();
     let restored_absent = package
-        .placeholder_type_extension_slot_snapshot(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(restored_absent.value(), None);
 
@@ -932,7 +930,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(&removed.patch().inverse())
         .unwrap();
     let restored_present = package
-        .placeholder_type_extension_slot_snapshot(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(
         restored_present.value(),
@@ -943,7 +941,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&layout.part_name, "Slot")
+            .placeholder_type_extension_at(&layout.part_name, "Slot")
             .unwrap()
             .source_xml(),
         before.as_slice()
@@ -965,7 +963,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -982,7 +980,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         .unwrap();
 
     let present = package
-        .placeholder_type_extension_slot_snapshot(&layout.part_name, "Lexical")
+        .placeholder_type_extension_at(&layout.part_name, "Lexical")
         .unwrap();
     let before = present.source_xml().to_vec();
     let mut remove = present.edit();
@@ -993,7 +991,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&layout.part_name, "Lexical")
+            .placeholder_type_extension_at(&layout.part_name, "Lexical")
             .unwrap()
             .value(),
         None
@@ -1003,7 +1001,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&layout.part_name, "Lexical")
+            .placeholder_type_extension_at(&layout.part_name, "Lexical")
             .unwrap()
             .source_xml(),
         before.as_slice()
@@ -1030,7 +1028,7 @@ fn p232_slot_add_targets_selected_shape_when_another_shape_has_ext_lst() {
         )
         .unwrap();
     let before = package
-        .placeholder_type_extension_slot_snapshot(&layout.part_name, "Missing")
+        .placeholder_type_extension_at(&layout.part_name, "Missing")
         .unwrap();
     assert_eq!(before.value(), None);
     let mut edit = before.edit();
@@ -1041,14 +1039,14 @@ fn p232_slot_add_targets_selected_shape_when_another_shape_has_ext_lst() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&layout.part_name, "Missing")
+            .placeholder_type_extension_at(&layout.part_name, "Missing")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Unknown)
     );
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&layout.part_name, "Existing")
+            .placeholder_type_extension_at(&layout.part_name, "Existing")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Cameo)
@@ -1062,7 +1060,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
     let slide_uri = uri("/ppt/slides/slide-p232.xml");
     let slide_xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sld>"#;
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.add_part(Box::new(BlobPart::new(
                 slide_uri.clone(),
                 ct::PML_SLIDE.to_string(),
@@ -1080,7 +1078,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         .store_placeholder_shape(&slide_uri, &slide_spec)
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&slide_uri)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -1110,7 +1108,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
             .any(|w| w == b"slide-keep")
     );
     let slide = package
-        .placeholder_type_extension_slot_snapshot(&slide_uri, "SlideSlot")
+        .placeholder_type_extension_at(&slide_uri, "SlideSlot")
         .unwrap();
     assert_eq!(slide.value(), Some(PlaceholderTypeExtension::Unknown));
     let mut remove = slide.clone().edit();
@@ -1121,7 +1119,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&slide_uri, "SlideSlot")
+            .placeholder_type_extension_at(&slide_uri, "SlideSlot")
             .unwrap()
             .value(),
         None
@@ -1131,7 +1129,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&slide_uri, "SlideSlot")
+            .placeholder_type_extension_at(&slide_uri, "SlideSlot")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Unknown)
@@ -1146,7 +1144,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         )
         .unwrap();
     let master_source = package
-        .placeholder_type_extension_slot_snapshot(&master.part_name, "MasterSlot")
+        .placeholder_type_extension_at(&master.part_name, "MasterSlot")
         .unwrap();
     assert_eq!(master_source.value(), Some(PlaceholderTypeExtension::Cameo));
 }
@@ -1166,7 +1164,7 @@ fn p232_legacy_facade_accepts_token_uri_whitespace_without_rewriting_it() {
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -1181,7 +1179,7 @@ fn p232_legacy_facade_accepts_token_uri_whitespace_without_rewriting_it() {
 
     assert_eq!(
         package
-            .placeholder_type_extension_slot_snapshot(&layout.part_name, "TokenSlot")
+            .placeholder_type_extension_at(&layout.part_name, "TokenSlot")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Cameo)
@@ -1295,12 +1293,10 @@ fn p232_legacy_facade_preflights_validation_and_preserves_noop_blob_sharing() {
 }
 
 #[test]
-fn p232_legacy_facade_flushes_new_slides_before_preflight_and_retires_writer() {
-    let mut package = Package::new().unwrap();
-    {
-        let presentation = package.presentation_mut().unwrap();
-        presentation.add_slide().unwrap();
-    }
+fn p232_built_package_composes_with_placeholder_preflight() {
+    let mut builder = crate::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let slide_uri = uri("/ppt/slides/slide1.xml");
     package
         .store_placeholder_shape(
@@ -1310,16 +1306,12 @@ fn p232_legacy_facade_flushes_new_slides_before_preflight_and_retires_writer() {
                 .with_type_extension(PlaceholderTypeExtension::Cameo),
         )
         .unwrap();
-    assert!(
-        package.presentation_mut().is_err(),
-        "raw placeholder mutation must retire the stale mutable writer"
-    );
 
     let bytes = package.to_bytes().unwrap();
     let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         reopened
-            .placeholder_type_extension_slot_snapshot(&slide_uri, "Pending slide")
+            .placeholder_type_extension_at(&slide_uri, "Pending slide")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Cameo)
@@ -1413,7 +1405,7 @@ fn p232_source_store_replaces_all_drawingml_text_runs() {
         )
         .unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&layout.part_name)?;
             let source = std::str::from_utf8(part.blob())
                 .map_err(|error| crate::Error::Invalid(error.to_string()))?;
@@ -1436,7 +1428,7 @@ fn p232_source_store_replaces_all_drawingml_text_runs() {
         )
         .unwrap();
     let part = package.opc().unwrap().get_part(&layout.part_name).unwrap();
-    let scene = crate::shape::Scene::read(part.blob()).unwrap();
+    let scene = crate::shape::Scene::read(part.blob(), crate::shape::Limits::DEFAULT).unwrap();
     let shape = scene.get("Runs").unwrap().unwrap();
     assert_eq!(shape.text(), Some("updated & escaped"));
     assert!(
@@ -1457,7 +1449,7 @@ fn p232_slot_rejects_mce_rewritten_owner_before_mutation() {
     let slide_uri = uri("/ppt/slides/mce-p232.xml");
     let xml = r#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><p:nvGrpSpPr/><p:grpSpPr/><mc:AlternateContent><mc:Choice Requires="x"><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph type="obj"><p:extLst><p:ext uri="urn:litchi:pptx:p232:phTypeExt"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></mc:Choice><mc:Fallback><p:sp><p:nvSpPr><p:cNvPr id="3" name="Fallback"/><p:nvPr><p:ph type="obj"/></p:nvPr></p:nvSpPr></p:sp></mc:Fallback></mc:AlternateContent></p:spTree>"#;
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.add_part(Box::new(BlobPart::new(
                 slide_uri.clone(),
                 ct::PML_SLIDE.to_string(),
@@ -1474,9 +1466,9 @@ fn p232_slot_rejects_mce_rewritten_owner_before_mutation() {
         .blob()
         .to_vec();
     let error = package
-        .placeholder_type_extension_slot_snapshot(&slide_uri, "Cameo")
+        .placeholder_type_extension_at(&slide_uri, "Cameo")
         .unwrap_err();
-    assert!(matches!(error, crate::Error::UnsafeEdit { .. }));
+    assert!(matches!(error, crate::Error::Refused(_)));
     assert_eq!(
         package.opc().unwrap().get_part(&slide_uri).unwrap().blob(),
         before.as_slice()
@@ -1493,7 +1485,7 @@ fn remove_layout_rejects_slide_references() {
 
     // Attach a slide part that references the layout.
     package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
             let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
             let mut slide = BlobPart::new(
                 slide_uri,

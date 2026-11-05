@@ -1,0 +1,14 @@
+{
+ "question": "odf_w6_probe odt/set and fodt/open_get are slower at the 0358a head than at the 0358 head; is it work or code generation?",
+ "routes_us": {
+  "full_probe_abba_default_profile": {"odt/set": [412.8, 441.6, 1.070], "fodt/open_get": [379.7, 413.9, 1.090], "note": "before = f755903f45, after = 77ab7cab8a; summary.json"},
+  "bisect_default_profile_A_B_A_B": {"0a86513faf": {"odt/set": [417.9, 420.6], "fodt/open_get": [380.6, 381.0]}, "e4a0614f5d": {"odt/set": [410.9, 413.3], "fodt/open_get": [376.9, 372.9]}},
+  "head_with_e4a0614f5d_kept_rs_vs_e4a0614f5d": {"head_without_kept_change": {"odt/set": [443.0, 442.3], "fodt/open_get": [394.1, 399.8]}, "e4a0614f5d": {"odt/set": [414.6, 413.0], "fodt/open_get": [377.8, 375.3]}},
+  "forced_alignment_-align-all-functions=6_-align-all-nofallthru-blocks=5": {"e4a0614f5d": {"odt/set": [412.9, 414.8], "fodt/open_get": [375.5, 377.8]}, "77ab7cab8a": {"odt/set": [415.8, 419.6], "fodt/open_get": [399.3, 391.0]}},
+  "two_route_probe_odf_w6_mini_default_profile": {"e4a0614f5d": {"odt/set": [413.8, 416.4], "fodt/open_get": [367.8, 374.3]}, "77ab7cab8a": {"odt/set": [433.5, 436.9], "fodt/open_get": [407.7, 404.7]}},
+  "two_route_probe_odf_w6_mini_codegen_units_1": {"e4a0614f5d": {"odt/set": [409.4, 410.9], "fodt/open_get": [361.0, 362.6]}, "77ab7cab8a": {"odt/set": [415.6, 416.2], "fodt/open_get": [374.0, 373.4]}, "ratio": {"odt/set": 1.014, "fodt/open_get": 1.032}}
+ },
+ "callgrind_full_probe_1_round": {"instructions_total": [4827253521, 4827822431], "litchi_ops::format::odt::Odt::from_flat_inclusive": [55956911, 55935717], "litchi_ops::format::odt::Odt::set_inclusive": [89354313, 89539537], "binaries": ["w6probe-e4a0", "w6probe-headnokept"]},
+ "cachegrind_two_route_probe_3_rounds": {"instructions": [390594879, 391682402], "conditional_mispredicts": [1454482, 1582485], "indirect_mispredicts": [619327, 640692], "largest_shifts": "Prefixes::resolve -1.30M Ir (inlined at head), drop_in_place<quick_xml::events::Event> +0.86M Ir (out of line at head); extra mispredicts in quick_xml read_event_impl, litchi_odt::body::Tree::build, index::Builder::character_data", "binaries": ["mini-e4a0614f5d", "mini-77ab7cab8a"]},
+ "conclusion": "the same work (instructions within 0.3%); the fat-LTO partition into 16 codegen units and its inlining moved with code added elsewhere in the binary (ODS/ODP source-backed families). With codegen-units=1 both routes are within the 1.05 budget (1.014, 1.032)."
+}

@@ -8,7 +8,7 @@ use litchi_opc::PackURI;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
 use litchi_pptx::parts::PresentationPart;
-use litchi_pptx::presentation_properties::metadata::sections::List;
+use litchi_pptx::presentation_properties::metadata::sections::{Limits, List};
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/sections/presentation.xml");
@@ -34,7 +34,7 @@ fn presentation_sections_include_slide_membership() {
         [256, 257, 258]
     );
 
-    let sections = List::from_xml(PRESENTATION_XML).unwrap();
+    let sections = List::from_xml(PRESENTATION_XML, Limits::DEFAULT).unwrap();
     assert_eq!(sections.sections().len(), 2);
     assert_eq!(sections.sections()[0].name.as_deref(), Some("Opening"));
     assert_eq!(

@@ -17,8 +17,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    At, Package, SheetSelector, TableSelector,
     cell::comment::{CommentReply, CommentReplyIndex, transaction::Error},
 };
 
@@ -72,7 +71,7 @@ fuzz_target!(|data: &[u8]| {
 // even when strict native document projection rejects the source, because
 // legacy builder snapshots intentionally omit unrelated native envelopes.
 fn exercise_compatibility_reads(bytes: &[u8], command: u8) {
-    let position = CellPosition::new(u32::from(command % 4), u32::from((command / 4) % 4));
+    let position = At::new(u32::from(command % 4), u32::from((command / 4) % 4));
     match Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
         bytes,
         options(),
@@ -111,23 +110,32 @@ fn command_prefix(data: &[u8]) -> (u8, &[u8]) {
     }
 }
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid reply archive limits: {error}"));
-        let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
-                .unwrap_or_else(|error| unreachable!("valid reply semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
-                .unwrap_or_else(|error| unreachable!("valid reply projection limits: {error}"));
-        PackageReadOptions::new(archive, semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid reply archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid reply semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid reply projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -175,7 +183,7 @@ fn native_metadata_package() -> &'static Package {
 fn verify_native_metadata(package: &Package) {
     let sheet = SheetSelector::name(NATIVE_SHEET);
     let table = TableSelector::name(NATIVE_TABLE);
-    let position = CellPosition::from_a1(NATIVE_COMMENT_ADDRESS)
+    let position = At::from_a1(NATIVE_COMMENT_ADDRESS)
         .unwrap_or_else(|error| unreachable!("native metadata address is valid: {error}"));
     let source_bytes = package_bytes(package);
     let root = package
@@ -326,7 +334,7 @@ fn exercise_native_refusal(
     package: &Package,
     sheet: SheetSelector<'_>,
     table: TableSelector<'_>,
-    position: CellPosition,
+    position: At,
     source_bytes: &[u8],
 ) {
     let oversized = "x".repeat(MAX_TEXT_BYTES.saturating_add(1));
@@ -375,16 +383,16 @@ fn find_reply_thread(
     package: &Package,
     data: &[u8],
     command: u8,
-) -> Option<(CellPosition, Box<[CommentReply]>)> {
+) -> Option<(At, Box<[CommentReply]>)> {
     let mut candidates = Vec::new();
     candidates.push(position_from_bytes(data, command));
     for row in 0..MAX_SCAN_ROWS {
         for column in 0..MAX_SCAN_COLUMNS {
-            candidates.push(CellPosition::new(row, column));
+            candidates.push(At::new(row, column));
         }
     }
     candidates.push(
-        CellPosition::from_a1("A1")
+        At::from_a1("A1")
             .unwrap_or_else(|error| unreachable!("A1 is a valid reply probe address: {error}")),
     );
 
@@ -405,7 +413,7 @@ fn find_reply_thread(
 
 fn exercise_missing_thread(
     package: &Package,
-    position: CellPosition,
+    position: At,
     stale: CommentReplyIndex,
     source_bytes: &[u8],
 ) {
@@ -449,12 +457,7 @@ fn exercise_missing_thread(
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_thread(
-    package: &Package,
-    position: CellPosition,
-    replies: &[CommentReply],
-    data: &[u8],
-) {
+fn exercise_thread(package: &Package, position: At, replies: &[CommentReply], data: &[u8]) {
     let sheet = SheetSelector::index(0);
     let table = TableSelector::index(0);
     let source_bytes = package_bytes(package);
@@ -621,7 +624,7 @@ fn observe_atomic_failure(
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition, index: CommentReplyIndex) {
+fn exercise_selector_errors(package: &Package, position: At, index: CommentReplyIndex) {
     if let Err(error) = package.table_cell_comment_reply(
         SheetSelector::name(PRIVATE_SHEET),
         TableSelector::index(0),
@@ -661,34 +664,38 @@ fn exercise_ingress_limits(source_bytes: &[u8]) {
     if source_len == 0 || source_len > MAX_INPUT_BYTES {
         return;
     }
-    let exact_archive = PackageLimits::new(
-        source_len,
-        MAX_ENTRIES,
-        MAX_ENTRY_BYTES,
-        MAX_EXPANDED_BYTES,
-        MAX_IWA_STREAM_BYTES,
-    )
-    .unwrap_or_else(|error| panic!("exact reply limits invalid: {error}"));
+    let exact_archive = litchi::numbers::SourceLimits::builder()
+        .max_input_bytes(source_len)
+        .and_then(|b| b.max_members(MAX_ENTRIES))
+        .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+        .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+        .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|b| b.build())
+        .unwrap_or_else(|error| panic!("exact reply limits invalid: {error}"));
     let exact = Package::from_bytes_with_options(
         source_bytes,
-        PackageReadOptions::new(exact_archive, PackageSemanticLimits::default()),
+        litchi::numbers::OpenOptions::new()
+            .source_limits(exact_archive)
+            .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
     );
     if let Err(error) = exact {
         observe_error(error);
         return;
     }
     if source_len > 1 {
-        let tight_archive = PackageLimits::new(
-            source_len - 1,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("tight reply limits invalid: {error}"));
+        let tight_archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(source_len - 1)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("tight reply limits invalid: {error}"));
         let tight = Package::from_bytes_with_options(
             source_bytes,
-            PackageReadOptions::new(tight_archive, PackageSemanticLimits::default()),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(tight_archive)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         );
         assert!(tight.is_err(), "reply input-minus-one was admitted");
         black_box(tight.err().map(|error| error.to_string()));
@@ -703,8 +710,8 @@ fn exercise_input_limit() {
     black_box(result.err().map(|error| error.to_string()));
 }
 
-fn position_from_bytes(data: &[u8], command: u8) -> CellPosition {
-    CellPosition::new(
+fn position_from_bytes(data: &[u8], command: u8) -> At {
+    At::new(
         u32::from(command) % MAX_SCAN_ROWS,
         u32::from(data.get(1).copied().unwrap_or_default()) % MAX_SCAN_COLUMNS,
     )

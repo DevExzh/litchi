@@ -18,7 +18,7 @@ use litchi_opc::constants::relationship_type;
 use super::super::codec;
 use super::super::model::Document;
 
-impl<'a> Document<'a> {
+impl Document {
     /// Get all sections in the document.
     ///
     /// Returns a `Sections` collection providing access to each section's
@@ -57,19 +57,14 @@ impl<'a> Document<'a> {
     /// Header and footer relationship IDs remain inert and no target part is
     /// resolved or read.
     pub fn section_inventory(&self) -> Result<crate::section::Inventory> {
-        self.section_inventory_with_limits(&crate::section::Limits::default())
+        self.section_inventory_bounded(self.limits.sections_value())
     }
 
-    /// Capture the section inventory with caller-provided semantic limits.
-    ///
-    /// Column-model repairs ([`crate::leniency::SectionDefect`]) carried by
-    /// the inventory are merged into [`Document::tolerance_report`].
-    pub fn section_inventory_with_limits(
+    pub(crate) fn section_inventory_bounded(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Inventory> {
-        let inventory =
-            crate::section::Inventory::parse_with_limits(self.part.xml_bytes(), limits)?;
+        let inventory = crate::section::Inventory::parse(self.part.xml_bytes(), limits)?;
         self.merge_tolerance(inventory.tolerance_report());
         Ok(inventory)
     }
@@ -107,7 +102,7 @@ impl<'a> Document<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn styles(&self) -> Result<Styles<'a>> {
+    pub fn styles(&self) -> Result<Styles<'_>> {
         // Try to find the styles part through the main document part's relationships
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -1601,14 +1596,14 @@ impl<'a> Document<'a> {
     ///
     /// Returns every classic `DrawingML` chart anchored in the main document
     /// body together with its style, color-style, and embedded-workbook
-    /// companion parts. See [`crate::chart::load`].
+    /// companion parts. See [`crate::chart::raw::load`].
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let main = self.opc.main_document_part()?.partname().clone();
-        crate::chart::load(self.opc, &main)
+        crate::chart::package::load_with_limits(&self.opc, &main, &crate::chart::Limits::DEFAULT)
     }
     /// Get all content controls in the document.
     ///

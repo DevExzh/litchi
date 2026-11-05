@@ -33,8 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let input_bytes: Arc<[u8]> = support::read_package(Path::new(&input), Limits::default())?;
-    let package = Catalog::from_shared_bytes(Arc::clone(&input_bytes))?;
-    package.write_to(File::create(&output)?)?;
+    let package = Catalog::from_shared_bytes(Arc::clone(&input_bytes), Default::default())?;
+    package.write_to(File::create(&output)?, Default::default())?;
 
     let output_bytes = fs::read(&output)?;
     if input_bytes.as_ref() != output_bytes.as_slice() {

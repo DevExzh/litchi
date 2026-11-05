@@ -17,11 +17,11 @@
 //! Run with:
 //!
 //! ```bash
-//! cargo run --example sheet_eval_complex_chains --features ooxml -- sheet_eval_complex_chains.xlsx
+//! cargo run --example sheet_eval_complex_chains --features xlsx,eval -- sheet_eval_complex_chains.xlsx
 //! ```
 
-use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
-use litchi::xlsx::{Formula, Value, Workbook};
+use litchi::sheet::FormulaEvaluator;
+use litchi::xlsx::{Formula, Package, Value};
 use std::env;
 use std::error::Error;
 
@@ -38,8 +38,11 @@ async fn main() -> ExampleResult<()> {
 
     build_sample_xlsx(path)?;
 
-    let xlsx_wb = open_workbook(path)?;
-    let evaluator = FormulaEvaluator::new(xlsx_wb.as_ref());
+    // Reopen the workbook with `litchi::open`. Its workbook view implements
+    // `WorkbookTrait` by static dispatch, so the evaluator borrows it directly.
+    let file = litchi::open(path)?;
+    let workbook = file.workbook()?;
+    let evaluator = FormulaEvaluator::new(&workbook);
 
     println!(
         "Evaluating complex chained formulas across multiple sheets in {}",
@@ -87,7 +90,7 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
 
     // Sheet 0: Chains - summary and chain-heavy formulas.
@@ -259,7 +262,7 @@ fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
         ws.set("D2", Formula::new("NETWORKDAYS(A2,B2,C2)")?)?;
     }
 
-    edit.commit()?.into_workbook().save(path)?;
+    edit.commit()?.into_package().save(path)?;
     println!("Created complex chains test workbook at {}", path);
 
     Ok(())

@@ -18,11 +18,11 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    ChartSelector, ChartValueAxisCommit, Limits, Package, ReadError, ReadOptions, SemanticLimits,
-    SlideSelector,
+    ChartSelector, OpenOptions, Package, ReadError, SemanticLimits, SlideSelector, SourceLimits,
     chart::axis::{
         Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
     },
+    chart::value_axis::Commit as ChartValueAxisCommit,
 };
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
@@ -96,27 +96,29 @@ fuzz_target!(|data: &[u8]| {
     exercise_redacted_selectors();
 });
 
-fn fuzz_options() -> ReadOptions {
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+fn fuzz_options() -> OpenOptions {
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid value-axis archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid value-axis semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|limits| limits.max_entries(MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid value-axis archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid value-axis semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -141,7 +143,7 @@ fn foreign_package_bytes() -> &'static [u8] {
     static BYTES: OnceLock<Box<[u8]>> = OnceLock::new();
     BYTES
         .get_or_init(|| {
-            let source = Catalog::from_bytes(source_package_bytes())
+            let source = Catalog::from_bytes(source_package_bytes(), Default::default())
                 .unwrap_or_else(|error| panic!("source value-axis catalog must parse: {error}"));
             let entries = source
                 .iter()
@@ -369,7 +371,7 @@ fn publish_and_reverse(
         );
         for preview in PREVIEWS {
             assert!(
-                Catalog::from_bytes(&committed_bytes)
+                Catalog::from_bytes(&committed_bytes, Default::default())
                     .expect("committed catalog must parse")
                     .iter()
                     .all(|entry| entry.name() != preview),
@@ -562,28 +564,38 @@ fn exercise_limit_guards() {
 
         let source = source_packages()[0].clone();
         let source_bytes = package_bytes(&source);
-        let low_archive = Limits::new(1, 1, 1, 1, 1)
+        let low_archive = SourceLimits::builder()
+            .max_input_bytes(1)
+            .and_then(|limits| limits.max_entries(1))
+            .and_then(|limits| limits.max_entry_bytes(1))
+            .and_then(|limits| limits.max_aggregate_bytes(1))
+            .and_then(|limits| limits.max_component_bytes(1))
+            .and_then(|limits| limits.build())
             .unwrap_or_else(|error| unreachable!("valid low value-axis archive limits: {error}"));
         match Package::from_bytes_with_options(
             &source_bytes,
-            ReadOptions::new(low_archive, SemanticLimits::default()),
+            OpenOptions::new().source_limits(low_archive),
         ) {
             Err(error) => observe_error(error),
             Ok(_) => panic!("low value-axis physical limits were not enforced"),
         }
 
-        let low_semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            1,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid low value-axis reference profile: {error}"));
+        let low_semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(1))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid low value-axis reference profile: {error}")
+            });
         match Package::from_bytes_with_options(
             &source_bytes,
-            ReadOptions::new(fuzz_options().archive(), low_semantic),
+            OpenOptions::new()
+                .source_limits(fuzz_options().source_limits_value())
+                .semantic_limits(low_semantic),
         ) {
             Err(error) => observe_error(error),
             Ok(package) => {
@@ -607,8 +619,8 @@ fn exercise_limit_guards() {
 }
 
 fn assert_locality(before: &[u8], after: &[u8], selected_axis: u64) {
-    let source = Catalog::from_bytes(before).expect("source value-axis catalog must parse");
-    let target = Catalog::from_bytes(after).expect("target value-axis catalog must parse");
+    let source = Catalog::from_bytes(before, Default::default()).expect("source value-axis catalog must parse");
+    let target = Catalog::from_bytes(after, Default::default()).expect("target value-axis catalog must parse");
     for name in ["Data/sentinel.bin", METADATA_MEMBER, FOREIGN_MEMBER] {
         let source_entry = source.iter().find(|entry| entry.name() == name);
         let target_entry = target.iter().find(|entry| entry.name() == name);
@@ -620,10 +632,10 @@ fn assert_locality(before: &[u8], after: &[u8], selected_axis: u64) {
     }
 
     let source_archive =
-        Archive::parse(&document_stream(before).expect("source document stream must parse"))
+        Archive::parse(&document_stream(before).expect("source document stream must parse"), Default::default())
             .expect("source archive must parse");
     let target_archive =
-        Archive::parse(&document_stream(after).expect("target document stream must parse"))
+        Archive::parse(&document_stream(after).expect("target document stream must parse"), Default::default())
             .expect("target archive must parse");
     for identifier in all_document_object_ids() {
         if identifier == selected_axis {
@@ -644,7 +656,7 @@ fn assert_locality(before: &[u8], after: &[u8], selected_axis: u64) {
 
 fn axis_message_data(package: &[u8], identifier: u64) -> Option<Vec<u8>> {
     let stream = document_stream(package).ok()?;
-    let archive = Archive::parse(&stream).ok()?;
+    let archive = Archive::parse(&stream, Default::default()).ok()?;
     archive.object(identifier).and_then(|object| {
         object
             .messages
@@ -655,12 +667,12 @@ fn axis_message_data(package: &[u8], identifier: u64) -> Option<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| std::io::Error::other("missing document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn package_bytes(package: &Package) -> Vec<u8> {
@@ -725,7 +737,7 @@ fn object(
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-    )?)
+     Default::default(),)?)
 }
 
 fn object_with_references(
@@ -762,11 +774,17 @@ fn chart_payload(chart: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         GENERATED_EXTENSION_FIELD,
         &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -799,6 +817,7 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
                 Axis::Value => 16,
             },
             title,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     let bounds = state.settings.bounds();
@@ -810,6 +829,7 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
                 number_archive: Some(minimum.value()),
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if let Some(maximum) = bounds.maximum() {
@@ -820,6 +840,7 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
                 number_archive: Some(maximum.value()),
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if let Some(major) = state.settings.steps().major() {
@@ -844,13 +865,19 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
         }),
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
     append_varint_field(&mut payload, SUPPORTS_SECONDARY_FEATURE_FIELD, 1)?;
     append_length_delimited_field(
         &mut payload,
         UNKNOWN_OUTER_FIELD,
         b"opaque value-axis bytes",
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -868,16 +895,31 @@ fn axis_style_payload() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         ..tsch::generated::ChartAxisStyleArchive::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
-    append_length_delimited_field(&mut payload, UNKNOWN_OUTER_FIELD, b"opaque axis style")?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_OUTER_FIELD,
+        b"opaque axis style",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn chart_non_style_payload(title: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut generated = Vec::new();
     append_varint_field(&mut generated, 21, 1)?;
-    append_length_delimited_field(&mut generated, 23, title.as_bytes())?;
+    append_length_delimited_field(
+        &mut generated,
+        23,
+        title.as_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut payload = tsch::ChartNonStyleArchive {
         super_: Some(tss::StyleArchive {
             stylesheet: Some(reference(81)),
@@ -885,12 +927,17 @@ fn chart_non_style_payload(title: &str) -> Result<Vec<u8>, Box<dyn std::error::E
         }),
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?)
 }
 
 fn chart_object_references(chart: usize) -> Vec<u64> {
@@ -957,6 +1004,7 @@ fn metadata_component_payload(
         &mut payload,
         METADATA_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -971,8 +1019,18 @@ fn metadata_payload() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let unrelated = metadata_component_payload(UNRELATED_COMPONENT, "Unrelated", 7, &[901])?;
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, 2_000)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
     let versioned = tsp::ComponentInfo {
         identifier: DOCUMENT_COMPONENT,
@@ -983,11 +1041,17 @@ fn metadata_payload() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         ..tsp::ComponentInfo::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -1146,7 +1210,7 @@ fn build_source_package() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         metadata_payload()?,
     )?])?;
     let foreign = component(vec![object(FOREIGN_OBJECT, 9_000, Vec::new())?])?;
-    let catalog = Catalog::from_bytes(&base)?;
+    let catalog = Catalog::from_bytes(&base, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))

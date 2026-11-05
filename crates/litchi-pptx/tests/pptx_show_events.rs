@@ -5,12 +5,9 @@
 )]
 
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::Error;
-use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::events::{
-    Draft, EXTENSION_URI, Kind, Trigger, store,
-};
+use litchi_pptx::presentation_properties::metadata::events::{Draft, EXTENSION_URI, Kind, Trigger};
 use litchi_pptx::time::Offset;
+use litchi_pptx::{Error, Package, Result};
 
 const LOCAL_SHOW_EVENTS: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/show-events/basic_show_events.xml");
@@ -66,6 +63,17 @@ fn event_owner_ignores_events_under_other_extensions() {
     assert!(xml.contains(EXTENSION_URI));
 }
 
+/// Store `events` on one slide of a raw graph through the package family.
+fn store(opc: &mut OpcPackage, slide: &PackURI, events: &[Draft]) -> Result<()> {
+    let package = Package::from_opc_package(opc.clone())?;
+    let mut edit = package.edit_show_events()?;
+    // Every fixture here has one slide.
+    assert_eq!(slide.as_str(), "/ppt/slides/slide1.xml");
+    edit.set(0_usize, events)?;
+    *opc = edit.commit()?.into_package().opc()?.clone();
+    Ok(())
+}
+
 fn event_drafts() -> Vec<Draft> {
     vec![
         Draft::trigger(Trigger::OnClick, Offset::ms(6950), 6),
@@ -79,16 +87,22 @@ fn event_drafts() -> Vec<Draft> {
 }
 
 fn package_with_slide() -> OpcPackage {
-    let mut authored = Package::new().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
-    OpcPackage::from_bytes(&authored.to_bytes().unwrap()).unwrap()
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let authored = builder.build().unwrap();
+    OpcPackage::from_bytes(
+        &authored.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
 }
 
 fn package_with_show_event_extension(extension: &str) -> OpcPackage {
-    let mut authored = Package::new().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
-    let mut package = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let slide = package.get_part_mut(&slide_name).unwrap();
     let xml = std::str::from_utf8(slide.blob()).unwrap();

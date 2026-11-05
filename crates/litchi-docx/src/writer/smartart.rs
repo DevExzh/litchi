@@ -20,8 +20,8 @@ use crate::error::{Error, Result};
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_core::xml::escape_xml;
 use litchi_drawingml::diagram::{
-    DGM_NAMESPACE, DiagramNode, SmartArt, generate_smartart_colors_xml, generate_smartart_data_xml,
-    generate_smartart_layout_xml, generate_smartart_quickstyle_xml,
+    DGM_NAMESPACE, DiagramNode, Limits, SmartArt as DiagramSmartArt, generate_smartart_colors_xml,
+    generate_smartart_data_xml, generate_smartart_layout_xml, generate_smartart_quickstyle_xml,
 };
 use std::fmt::Write as FmtWrite;
 
@@ -63,32 +63,32 @@ pub(crate) struct SmartArtPartXml {
 
 /// A mutable `SmartArt` diagram being authored in a document.
 ///
-/// Wraps a semantic [`SmartArt`] built with
+/// Wraps a semantic [`litchi_drawingml::diagram::SmartArt`] built with
 /// [`litchi_drawingml::diagram::SmartArtBuilder`], adding the drawing anchor
 /// identity and extents. Attach it to a document via
-/// [`crate::writer::MutableDocument::add_smart_art`].
+/// [`crate::builder::Document::add_smart_art`].
 ///
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::Package;
-/// use litchi_docx::writer::MutableSmartArt;
+/// use litchi_docx::Builder;
+/// use litchi_docx::builder::SmartArt;
 /// use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
 ///
-/// let mut package = Package::new()?;
+/// let mut builder = Builder::new()?;
 /// let smartart = SmartArtBuilder::new(DiagramType::Process)
 ///     .add_items(["Plan", "Build", "Ship"])
 ///     .build();
-/// package
-///     .document_mut()?
-///     .add_smart_art(MutableSmartArt::new(smartart)?)?;
-/// package.save("out.docx")?;
+/// builder
+///     .document()?
+///     .add_smart_art(SmartArt::new(smartart)?)?;
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
-pub struct MutableSmartArt {
+#[derive(Debug, Clone)]
+pub struct SmartArt {
     /// The semantic diagram model (nodes, type, layout name).
-    pub(crate) smartart: SmartArt,
+    pub(crate) smartart: DiagramSmartArt,
     /// Drawing name written to `wp:docPr@name`.
     pub(crate) name: String,
     /// Drawing element ID written to `wp:docPr@id`.
@@ -98,12 +98,12 @@ pub struct MutableSmartArt {
     /// Anchor height in EMUs.
     pub(crate) height_emu: i64,
     /// Per-document key used to bind the four relationship IDs at save time;
-    /// assigned by `MutableDocument::add_smart_art`.
+    /// assigned by `Document::add_smart_art`.
     pub(crate) anchor_key: String,
 }
 
-impl MutableSmartArt {
-    /// Wrap a built [`SmartArt`] for authoring.
+impl SmartArt {
+    /// Wrap a built [`litchi_drawingml::diagram::SmartArt`] for authoring.
     ///
     /// Validates the diagram: it must contain at least one node, and the node
     /// tree is bounded to `MAX_DIAGRAM_NODES` nodes and `MAX_DIAGRAM_DEPTH`
@@ -112,7 +112,7 @@ impl MutableSmartArt {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn new(smartart: SmartArt) -> Result<Self> {
+    pub fn new(smartart: DiagramSmartArt) -> Result<Self> {
         validate_smartart(&smartart)?;
         Ok(Self {
             smartart,
@@ -129,7 +129,7 @@ impl MutableSmartArt {
 
     /// Get the semantic diagram model.
     #[must_use]
-    pub fn smartart(&self) -> &SmartArt {
+    pub fn smartart(&self) -> &DiagramSmartArt {
         &self.smartart
     }
 
@@ -170,13 +170,14 @@ impl MutableSmartArt {
 
     /// Generate the four diagram part bodies (data, layout, quick style,
     /// colors) for this diagram.
-    pub(crate) fn generate_parts(&self) -> SmartArtPartXml {
-        SmartArtPartXml {
-            data_xml: generate_smartart_data_xml(&self.smartart),
-            layout_xml: generate_smartart_layout_xml(&self.smartart),
-            quick_style_xml: generate_smartart_quickstyle_xml(),
-            colors_xml: generate_smartart_colors_xml(),
-        }
+    pub(crate) fn generate_parts(&self) -> Result<SmartArtPartXml> {
+        let limits = Limits::default();
+        Ok(SmartArtPartXml {
+            data_xml: generate_smartart_data_xml(&self.smartart, &limits)?,
+            layout_xml: generate_smartart_layout_xml(&self.smartart, &limits)?,
+            quick_style_xml: generate_smartart_quickstyle_xml(&limits)?,
+            colors_xml: generate_smartart_colors_xml(&limits)?,
+        })
     }
 
     /// Serialize the `<w:drawing>` anchor with the `dgm:relIds` reference.
@@ -188,7 +189,7 @@ impl MutableSmartArt {
     pub(crate) fn to_xml(&self, xml: &mut String, rel_ids: Option<&SmartArtRelIds>) -> Result<()> {
         if self.anchor_key.is_empty() {
             return Err(Error::InvalidFormat(
-                "SmartArt has no anchor key; add it via MutableDocument::add_smart_art".to_string(),
+                "SmartArt has no anchor key; add it via Document::add_smart_art".to_string(),
             ));
         }
         let placeholder = |part: &str| format!("{{{{SMARTART_{part}_{}}}}}", self.anchor_key);
@@ -232,7 +233,7 @@ impl MutableSmartArt {
 }
 
 /// Validate the authored diagram against the bounded limits.
-fn validate_smartart(smartart: &SmartArt) -> Result<()> {
+fn validate_smartart(smartart: &DiagramSmartArt) -> Result<()> {
     if smartart.nodes.is_empty() {
         return Err(Error::InvalidFormat(
             "SmartArt diagram must contain at least one node".to_string(),
@@ -257,7 +258,7 @@ mod tests {
     use super::*;
     use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
 
-    fn built() -> SmartArt {
+    fn built() -> DiagramSmartArt {
         SmartArtBuilder::new(DiagramType::Process)
             .add_items(["Plan", "Build", "Ship"])
             .build()
@@ -265,10 +266,10 @@ mod tests {
 
     #[test]
     fn validates_diagram_bounds() {
-        assert!(MutableSmartArt::new(built()).is_ok());
-        assert!(MutableSmartArt::new(SmartArt::new(DiagramType::Process)).is_err());
+        assert!(SmartArt::new(built()).is_ok());
+        assert!(SmartArt::new(DiagramSmartArt::new(DiagramType::Process)).is_err());
 
-        let mut deep = SmartArt::new(DiagramType::Hierarchy);
+        let mut deep = DiagramSmartArt::new(DiagramType::Hierarchy);
         let mut node = DiagramNode::new("root");
         let mut cursor = &mut node;
         for level in 0..MAX_DIAGRAM_DEPTH {
@@ -276,12 +277,12 @@ mod tests {
             cursor = cursor.children.last_mut().unwrap();
         }
         deep.add_node(node);
-        assert!(MutableSmartArt::new(deep).is_err());
+        assert!(SmartArt::new(deep).is_err());
     }
 
     #[test]
     fn serializes_anchor_with_relationship_ids() {
-        let mut smartart = MutableSmartArt::new(built()).unwrap();
+        let mut smartart = SmartArt::new(built()).unwrap();
         smartart.set_id(7).set_name("Org Plan");
         smartart.anchor_key = "smartart1".to_string();
         let rel_ids = SmartArtRelIds {
@@ -301,10 +302,10 @@ mod tests {
 
     #[test]
     fn serializes_placeholders_and_requires_anchor_key() {
-        let smartart = MutableSmartArt::new(built()).unwrap();
+        let smartart = SmartArt::new(built()).unwrap();
         assert!(smartart.to_xml(&mut String::new(), None).is_err());
 
-        let mut smartart = MutableSmartArt::new(built()).unwrap();
+        let mut smartart = SmartArt::new(built()).unwrap();
         smartart.anchor_key = "smartart2".to_string();
         let mut xml = String::new();
         smartart.to_xml(&mut xml, None).unwrap();
@@ -314,7 +315,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_extents() {
-        let mut smartart = MutableSmartArt::new(built()).unwrap();
+        let mut smartart = SmartArt::new(built()).unwrap();
         assert!(smartart.set_size_emu(0, 914_400).is_err());
         assert!(smartart.set_size_emu(914_400, -1).is_err());
         assert!(smartart.set_size_emu(914_400, 914_400).is_ok());
@@ -326,20 +327,21 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
             document.add_paragraph_with_text("before the diagram");
 
             let mut hierarchy = DiagramNode::new("Root");
             hierarchy.add_child(DiagramNode::new("Child A"));
             hierarchy.add_child(DiagramNode::new("Child B"));
-            let mut smartart_model = SmartArt::new(DiagramType::Hierarchy);
+            let mut smartart_model = DiagramSmartArt::new(DiagramType::Hierarchy);
             smartart_model.add_node(hierarchy);
-            let mut smartart = MutableSmartArt::new(smartart_model).unwrap();
+            let mut smartart = SmartArt::new(smartart_model).unwrap();
             smartart.set_name("Org Chart").set_id(31);
             document.add_smart_art(smartart).unwrap();
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -378,13 +380,13 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
-            let first = MutableSmartArt::new(built()).unwrap();
+            let document = builder.document().unwrap();
+            let first = SmartArt::new(built()).unwrap();
             let first = document.add_smart_art(first).unwrap();
             assert_eq!(first.anchor_key(), "smartart1");
-            let second = MutableSmartArt::new(
+            let second = SmartArt::new(
                 SmartArtBuilder::new(DiagramType::Cycle)
                     .add_items(["Alpha", "Beta"])
                     .build(),
@@ -393,6 +395,7 @@ mod tests {
             let second = document.add_smart_art(second).unwrap();
             assert_eq!(second.anchor_key(), "smartart2");
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -418,18 +421,19 @@ mod tests {
 
     #[test]
     fn coexists_with_text_boxes_images_and_ole_objects() {
+        use crate::Package;
+        use crate::builder::{OleObject, TextBox};
         use crate::textbox::TextBoxAnchor;
-        use crate::{MutableOleObject, MutableTextBox, Package};
         use tempfile::NamedTempFile;
 
         const PNG_HEADER: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
 
-            let mut text_box = MutableTextBox::new("Companion Box", 914_400, 457200).unwrap();
+            let mut text_box = TextBox::new("Companion Box", 914_400, 457200).unwrap();
             text_box.add_run("box story").unwrap();
             document.add_text_box(text_box);
 
@@ -439,13 +443,14 @@ mod tests {
                 .unwrap();
 
             document
-                .add_ole_object(MutableOleObject::new("Package", b"payload".to_vec()).unwrap())
+                .add_ole_object(OleObject::new("Package", b"payload".to_vec()).unwrap())
                 .unwrap();
 
             document
-                .add_smart_art(MutableSmartArt::new(built()).unwrap())
+                .add_smart_art(SmartArt::new(built()).unwrap())
                 .unwrap();
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();

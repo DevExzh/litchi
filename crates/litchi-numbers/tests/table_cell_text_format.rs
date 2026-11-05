@@ -22,10 +22,7 @@ use litchi_numbers::cell::data_format::{
     scientific::transaction as scientific_transaction,
     text::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -50,12 +47,12 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn shared_source() -> TestResult<Vec<u8>> {
@@ -71,8 +68,8 @@ fn converted_source() -> TestResult<Vec<u8>> {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -103,9 +100,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -114,8 +113,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
         assert_eq!(
-            BncCell::parse(before)?.stored_value(),
-            BncCell::parse(after)?.stored_value(),
+            BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?.stored_value(),
+            BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?.stored_value(),
             "Text format edit changed the stored scalar"
         );
         assert_eq!(
@@ -178,7 +177,7 @@ fn assert_text_cell(source: &[u8], expected_flags: u16, expected_primary: u32) -
         .into_iter()
         .next()
         .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-    let cell = BncCell::parse(&cell_bytes)?;
+    let cell = BncCell::parse(&cell_bytes, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(cell.explicit_format_flags(), expected_flags);
     assert_eq!(
         cell.cell_format_kind(),
@@ -198,7 +197,7 @@ fn converted_generic_identifier(source: &[u8]) -> TestResult<u32> {
         .into_iter()
         .next()
         .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-    let parsed = BncCell::parse(&cell)?;
+    let parsed = BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(
         parsed.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT
@@ -224,13 +223,13 @@ fn rewrite_marker(source: &[u8], marker: u16) -> TestResult<Vec<u8>> {
 /// helper is deliberately scoped to the fixture's one tile member rather
 /// than exposing a general raw-package reader in the test API.
 fn native_fixture_cell(source: &[u8], row_index: u32, column: usize) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Tables/Tile.iwa")
         .ok_or_else(|| io::Error::other("native Tile member is missing"))?;
-    let decompressed = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(decompressed.as_bytes())?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
     let message = archive
         .objects
         .iter()
@@ -290,13 +289,13 @@ fn native_fixture_cell(source: &[u8], row_index: u32, column: usize) -> TestResu
 /// This validates the type-260 provenance asserted by the focused Text test
 /// without making native identifiers part of the public Numbers API.
 fn native_fixture_format_type(source: &[u8], key: u32) -> TestResult<u32> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().starts_with("Index/Tables/DataList"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -378,11 +377,15 @@ fn text_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_text_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_text_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -417,7 +420,10 @@ fn text_plain_0x80_reads_and_same_value_is_an_exact_noop() -> TestResult {
         litchi_numbers_wire::EXPLICIT_TEXT_FORMAT,
         fixture::FIRST_FORMAT_KEY,
     )?;
-    let first = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let first = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(first.secondary_format_identifier(), None);
     assert_eq!(first.stored_value(), StoredValue::Text(1));
 
@@ -468,7 +474,10 @@ fn text_converted_0x81_requires_and_preserves_generic_number_reference() -> Test
         .clear()
         .commit()?;
     let cleared_bytes = cleared.package().exact_bytes();
-    let cleared_cell = BncCell::parse(&fixture::tile_cells(&cleared_bytes)?[0])?;
+    let cleared_cell = BncCell::parse(
+        &fixture::tile_cells(&cleared_bytes)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(cleared_cell.explicit_format_flags(), 0);
     assert_eq!(cleared_cell.cell_format_kind(), None);
     assert_eq!(cleared_cell.format_identifier(), None);
@@ -593,7 +602,12 @@ fn text_converted_live_generic_number_payload_is_preserved_with_locality() -> Te
 
     let mut generic_payload = fixture::format_payload_by_key(&source, fixture::SECOND_FORMAT_KEY)?;
     append_varint_field(&mut generic_payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut generic_payload, 47, b"converted generic extension")?;
+    append_length_delimited_field(
+        &mut generic_payload,
+        47,
+        b"converted generic extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile = fixture::rewrite_format_payload_by_key(
         &source,
         fixture::SECOND_FORMAT_KEY,
@@ -788,7 +802,12 @@ fn text_rewrite_preserves_unknown_format_wire_and_member_locality() -> TestResul
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"text extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"text extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile =
         fixture::rewrite_format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY, &payload)?;
     let root_before = fixture::format_list_payload(&hostile)?;
@@ -811,7 +830,7 @@ fn text_rewrite_preserves_unknown_format_wire_and_member_locality() -> TestResul
     );
     for field_number in [46, 47] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -830,9 +849,9 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
         .join("../../test-data/iwork/numbers/basic.numbers");
     let package = Package::open(path)?;
     let source = package.exact_bytes();
-    let b2 = CellPosition::from_a1("B2")?;
+    let b2 = At::from_a1("B2")?;
     let b2_before = native_fixture_cell(&source, 1, 1)?;
-    let b2_before = BncCell::parse(&b2_before)?;
+    let b2_before = BncCell::parse(&b2_before, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(b2_before.explicit_format_flags(), 0);
     assert_eq!(
         b2_before.cell_format_kind(),
@@ -864,7 +883,7 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
         .set(Text)
         .commit()?;
     let b2_after = native_fixture_cell(&b2_set.package().exact_bytes(), 1, 1)?;
-    let b2_after = BncCell::parse(&b2_after)?;
+    let b2_after = BncCell::parse(&b2_after, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(
         b2_after.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_TEXT_FORMAT
@@ -885,10 +904,12 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
         Some(Text)
     );
 
-    let b3 = CellPosition::from_a1("B3")?;
+    let b3 = At::from_a1("B3")?;
     assert!(matches!(
         package.table_cell_text_format(0usize, 0usize, b3),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -899,16 +920,19 @@ fn text_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> TestRe
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_style_identifier(Some(23));
         cell.set_text_style_identifier(Some(29));
         cell.set_comment_identifier(Some(31));
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(b"text-format-tail");
         *first = encoded;
         Ok(())
     })?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(before.stored_value(), StoredValue::Text(1));
     let target = Package::from_bytes(&source)?
         .edit_table_cell_text_format(0usize, 0usize, selected_position())?
@@ -916,7 +940,10 @@ fn text_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> TestRe
         .commit()?
         .package()
         .exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), before.stored_value());
     assert_eq!(after.style_identifier(), before.style_identifier());
     assert_eq!(
@@ -942,11 +969,15 @@ fn text_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
         let before = package.exact_bytes();
         assert!(matches!(
             package.table_cell_text_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_text_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+            ))
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -955,23 +986,29 @@ fn text_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(currency_transaction::Error::WrongFormatFamily { .. })
+        Err(currency_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_scientific_format(0usize, 0usize, selected_position()),
-        Err(scientific_transaction::Error::WrongFormatFamily { .. })
+        Err(scientific_transaction::Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_fraction_format(0usize, 0usize, selected_position()),
-        Err(fraction_transaction::Error::WrongFormatFamily { .. })
+        Err(fraction_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::fraction::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -980,18 +1017,18 @@ fn text_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
 fn text_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&shared_source()?)?;
     let before = package.exact_bytes();
-    for position in [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ] {
+    for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_text_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_text_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -1102,41 +1139,58 @@ fn text_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> TestR
 #[test]
 fn text_input_and_operation_budgets_reject_before_publication() -> TestResult {
     let source = inherited_source()?;
-    let exact_limits = PackageLimits::new(
-        u64::try_from(source.len())?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     assert_eq!(
         exact.table_cell_text_format(0usize, 0usize, selected_position())?,
         None
     );
 
-    let tight = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -1147,7 +1201,7 @@ fn text_input_and_operation_budgets_reject_before_publication() -> TestResult {
         .set(Text)
         .commit();
     assert!(
-        matches!(result, Err(Error::LimitExceeded { .. })),
+        matches!(result, Err(Error::Limit { .. })),
         "unexpected Text operation-budget result: {result:?}"
     );
     assert_eq!(exact.exact_bytes(), before);
@@ -1229,11 +1283,8 @@ fn text_reopened_package_keeps_marker_family_and_selector_equivalence() -> TestR
 #[test]
 fn text_missing_metadata_is_rejected_without_publication() -> TestResult {
     let source = shared_source()?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[fixture::METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[fixture::METADATA_MEMBER], Limits::default())?;
     assert_rejected_or_owner(&without_metadata)?;
     Ok(())
 }
@@ -1245,11 +1296,11 @@ fn text_bnc_shape_rejects_non_text_storage_without_mutation() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_number_or_percentage_format_identifier_preserving_value(Some(
             fixture::FIRST_FORMAT_KEY,
         ))?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     assert_rejected_or_owner(&numeric)?;
@@ -1258,13 +1309,13 @@ fn text_bnc_shape_rejects_non_text_storage_without_mutation() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_data_format_identifier(
             fixture::FIRST_FORMAT_KEY,
             CellDataFormatKind::PopUpMenu,
             Some(77),
         )?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     assert_rejected_or_owner(&control)?;

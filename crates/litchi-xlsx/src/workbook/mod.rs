@@ -1,4 +1,4 @@
-//! Immutable workbook snapshots and selector-first sheet lookup.
+//! The read-only workbook projection and selector-first sheet lookup.
 //!
 //! The public surface is a semantic facade. Workbook and worksheet models are
 //! kept in `model`, OPC relationship ownership in `package`, raw-to-typed
@@ -15,7 +15,6 @@ mod codec;
 mod drawing;
 mod model;
 mod package;
-mod source_merge;
 
 #[cfg(test)]
 mod tests;
@@ -26,20 +25,15 @@ pub use drawing::{
     WorksheetSvgDescriptor, WorksheetSvgImage,
 };
 pub use edit::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, DurablePatch, Edit,
-    FormControlEdit, JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet, PackageChange,
-    Patch, RowEdit, SealedPatch, State, TabEdit, ThreeWayPlan, WorksheetEdit,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, Diagnostics, DurablePatch, Edit, EditOptions,
+    JoinError, JoinFailure, JoinNormalization, MergeChoice, MergeLimits, NewSheet, PackageChange,
+    Patch, SealedPatch, State, ThreeWayPlan,
 };
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;
 pub(crate) use model::Inner;
 pub use model::{DateSystem, Flavor, Selector, Visibility, Workbook, Worksheet, WorksheetKind};
 pub use source::{SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet};
-pub use source_merge::{
-    Commit as SourceBackedMergeCommit, Diagnostics as SourceBackedMergeDiagnostics,
-    Patch as SourceBackedMergePatch, Snapshot as SourceBackedMergeSnapshot,
-    SourceBackedEditor as SourceBackedMergeEditor, SourceEdit as SourceBackedMergeEdit,
-};
 
-/// Explicit budgeted undo/redo retention for immutable workbook snapshots.
-pub type History = litchi_core::patch::History<Workbook>;
+/// Explicit budgeted undo/redo retention for immutable package snapshots.
+pub type History = litchi_core::patch::History<crate::Package>;

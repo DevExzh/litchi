@@ -7,8 +7,8 @@ use super::{
     parse_axis_cross_mode, parse_axis_label_align, parse_axis_orientation, parse_axis_position,
     parse_bool_attr, parse_built_in_unit, parse_chart_lines, parse_layout, parse_number_format,
     parse_text_element, parse_tick_label_position, parse_tick_mark, parse_time_unit, parse_title,
-    required_f64_attr, required_positive_f64_attr, required_positive_u32_attr, required_u32_attr,
-    set_chart_lines,
+    required_axis_id_attr, required_f64_attr, required_positive_f64_attr,
+    required_positive_u32_attr, set_chart_lines,
 };
 
 #[derive(Default)]
@@ -168,20 +168,26 @@ pub(crate) fn parse_axis_common_element(
     common: &mut ParsedAxisCommon,
     element: &BytesStart<'_>,
     decoder: Decoder,
+    max_text_bytes: usize,
 ) -> Result<bool> {
     match element.local_name().as_ref() {
-        b"axId" => common.axis_id = Some(required_u32_attr(element, "chart axis ID")?),
+        b"axId" => common.axis_id = Some(required_axis_id_attr(element, "chart axis ID")?),
         b"orientation" => common.orientation = parse_axis_orientation(element)?,
         b"delete" => common.deleted = parse_bool_attr(element)?,
         b"axPos" => common.position = Some(parse_axis_position(element)?),
         b"numFmt" => {
-            common.number_format = Some(parse_number_format(element, decoder, "chart axis")?);
+            common.number_format = Some(parse_number_format(
+                element,
+                decoder,
+                max_text_bytes,
+                "chart axis",
+            )?);
         },
         b"majorTickMark" => common.major_tick_mark = parse_tick_mark(element)?,
         b"minorTickMark" => common.minor_tick_mark = parse_tick_mark(element)?,
         b"tickLblPos" => common.tick_label_position = parse_tick_label_position(element)?,
         b"crossAx" => {
-            common.cross_axis_id = Some(required_u32_attr(element, "chart crossing-axis ID")?);
+            common.cross_axis_id = Some(required_axis_id_attr(element, "chart crossing-axis ID")?);
         },
         b"crosses" => common.cross_mode = parse_axis_cross_mode(element)?,
         b"crossesAt" => {
@@ -332,7 +338,12 @@ pub(crate) fn parse_category_axis<R: BufRead>(
                 parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();
@@ -436,7 +447,12 @@ pub(crate) fn parse_value_axis<R: BufRead>(
                 ));
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();
@@ -678,22 +694,21 @@ pub(crate) fn parse_display_units_label<R: BufRead>(
                 saw_text = true;
                 in_text = true;
             },
-            Ok(Event::Text(value)) if in_text => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
-            Ok(Event::CData(value)) if in_text => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
+            Ok(Event::Text(value)) if in_text => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
+            Ok(Event::CData(value)) if in_text => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) if in_text => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
                 in_text = false;
@@ -768,7 +783,12 @@ pub(crate) fn parse_date_axis<R: BufRead>(
                 parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();
@@ -861,7 +881,12 @@ pub(crate) fn parse_series_axis<R: BufRead>(
                 parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();

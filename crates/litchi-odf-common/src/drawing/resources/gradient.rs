@@ -1,10 +1,10 @@
 //! Typed, inert ODF drawing gradient resources.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -13,7 +13,6 @@ const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const LOEXT_NS: &[u8] = b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_GRADIENTS: usize = 65_536;
 const MAX_STOPS: usize = 65_536;
@@ -609,15 +608,15 @@ type Attributes = HashMap<(NamespaceKind, String), String>;
 ///
 /// Returns an error if the XML is malformed, uses an invalid namespace, or
 /// violates a bounded gradient resource rule.
-pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
+pub fn parse_drawing_gradients(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Collection, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("gradient") && !xml.contains("Gradient") {
         return Ok(Collection::default());
     }
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("drawing gradient XML exceeds 64 MiB");
-    }
 
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -625,9 +624,7 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
     let mut result = Collection::default();
 
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid drawing gradient XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
@@ -638,25 +635,27 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                         (namespace, local.as_str()),
                         (NamespaceKind::Svg, "stop") | (NamespaceKind::Loext, "gradient-stop")
                     ) {
-                        return invalid("gradient stop elements must be empty");
+                        return invalid_odf("gradient stop elements must be empty");
                     }
-                    return invalid("gradient resource contains an unsupported child element");
+                    return invalid_odf("gradient resource contains an unsupported child element");
                 }
                 if let Some(value) = parse_gradient_start(&reader, namespace, &local, element)? {
                     ensure_location(&stack)?;
                     if result.gradients.len() >= MAX_GRADIENTS {
-                        return invalid(format!("drawing styles exceed {MAX_GRADIENTS} gradients"));
+                        return invalid_odf(format!(
+                            "drawing styles exceed {MAX_GRADIENTS} gradients"
+                        ));
                     }
                     active = Some(ActiveDefinition {
                         depth: stack.len(),
                         value,
                     });
                 } else if is_stop(namespace, &local) {
-                    return invalid("gradient stop must be inside a gradient resource");
+                    return invalid_odf("gradient stop must be inside a gradient resource");
                 }
                 stack.push(Frame { namespace, local });
                 if stack.len() > MAX_DEPTH {
-                    return invalid(format!("drawing gradient XML exceeds {MAX_DEPTH} levels"));
+                    return invalid_odf(format!("drawing gradient XML exceeds {MAX_DEPTH} levels"));
                 }
             },
             Event::Empty(ref element) => {
@@ -664,7 +663,7 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                 reject_spoofed_name(namespace, &local)?;
                 if let Some(active_definition) = active.as_mut() {
                     if stack.len() != active_definition.depth + 1 {
-                        return invalid("gradient stop must be a direct gradient child");
+                        return invalid_odf("gradient stop must be a direct gradient child");
                     }
                     add_stop(
                         &reader,
@@ -679,7 +678,7 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                     ensure_location(&stack)?;
                     result.gradients.push(value);
                 } else if is_stop(namespace, &local) {
-                    return invalid("gradient stop must be inside a gradient resource");
+                    return invalid_odf("gradient stop must be inside a gradient resource");
                 }
             },
             Event::End(_) => {
@@ -691,7 +690,7 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                     .is_some_and(|gradient| gradient.depth == stack.len())
                 {
                     if !is_gradient(frame.namespace, &frame.local) {
-                        return invalid("unexpected drawing gradient end element");
+                        return invalid_odf("unexpected drawing gradient end element");
                     }
                     let gradient = active.take().ok_or_else(|| {
                         make_error("drawing gradient ended without an active definition")
@@ -704,14 +703,14 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| make_error(format!("invalid gradient text: {error}")))?;
                 if !value.chars().all(char::is_whitespace) {
-                    return invalid("gradient resources cannot contain text");
+                    return invalid_odf("gradient resources cannot contain text");
                 }
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
-                return invalid("gradient resources cannot contain character data");
+                return invalid_odf("gradient resources cannot contain character data");
             },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid("DTDs and processing instructions are prohibited in gradients");
+                return invalid_odf("DTDs and processing instructions are prohibited in gradients");
             },
             Event::Eof => break,
             Event::Text(_)
@@ -723,14 +722,14 @@ pub fn parse_drawing_gradients(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     if !stack.is_empty() || active.is_some() {
-        return invalid("unterminated drawing gradient XML");
+        return invalid_odf("unterminated drawing gradient XML");
     }
     result.validate()?;
     Ok(result)
 }
 
 fn parse_gradient_start(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     namespace: NamespaceKind,
     local: &str,
     element: &BytesStart<'_>,
@@ -757,7 +756,7 @@ fn parse_gradient_start(
     }))
 }
 
-fn parse_legacy_gradient(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Legacy> {
+fn parse_legacy_gradient(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<Legacy> {
     let mut values = attributes(reader, element)?;
     let name = take(&mut values, NamespaceKind::Draw, "name");
     let display_name = take(&mut values, NamespaceKind::Draw, "display-name");
@@ -808,7 +807,10 @@ fn parse_legacy_gradient(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> 
     })
 }
 
-fn parse_linear_gradient(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<SvgLinear> {
+fn parse_linear_gradient(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<SvgLinear> {
     let mut values = attributes(reader, element)?;
     let common = parse_svg_common(&mut values)?;
     let x1 = take_coordinate(&mut values, "x1")?;
@@ -825,7 +827,10 @@ fn parse_linear_gradient(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> 
     })
 }
 
-fn parse_radial_gradient(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<SvgRadial> {
+fn parse_radial_gradient(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<SvgRadial> {
     let mut values = attributes(reader, element)?;
     let common = parse_svg_common(&mut values)?;
     let center_x = take_coordinate(&mut values, "cx")?;
@@ -871,7 +876,7 @@ fn parse_svg_common(values: &mut Attributes) -> Result<SvgCommon> {
 }
 
 fn add_stop(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     namespace: NamespaceKind,
     local: &str,
     element: &BytesStart<'_>,
@@ -907,7 +912,7 @@ fn add_stop(
     Ok(())
 }
 
-fn parse_svg_stop(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<SvgStop> {
+fn parse_svg_stop(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<SvgStop> {
     let mut values = attributes(reader, element)?;
     let offset = StopOffset::parse(&required(
         &mut values,
@@ -931,7 +936,10 @@ fn parse_svg_stop(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<
     Ok(value)
 }
 
-fn parse_loext_stop(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<LibreOfficeStop> {
+fn parse_loext_stop(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<LibreOfficeStop> {
     let mut values = attributes(reader, element)?;
     let offset = StopOffset::parse(&required(
         &mut values,
@@ -967,7 +975,7 @@ fn take_coordinate(values: &mut Attributes, local: &str) -> Result<Option<Coordi
         .transpose()
 }
 
-fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Attributes> {
+fn attributes(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<Attributes> {
     let mut result = HashMap::new();
     for attribute_result in element.attributes() {
         let attribute = attribute_result
@@ -1303,6 +1311,10 @@ fn decode_name(value: &[u8], context: &str) -> Result<String> {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))
+}
+
+fn invalid_odf<T>(message: impl Into<String>) -> std::result::Result<T, crate::Error> {
+    Err(crate::Error::from(make_error(message)))
 }
 
 fn make_error(message: impl Into<String>) -> Error {

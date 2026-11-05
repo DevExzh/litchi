@@ -1,0 +1,11 @@
+--- a/crates/litchi-ops/src/format/docx/write/coalesce.rs
++++ b/crates/litchi-ops/src/format/docx/write/coalesce.rs
+@@ -89,7 +89,7 @@
+         props: &Props<'_>,
+     ) -> Result<Option<Plan>> {
+         if let Some((key, proven)) = &self.last_target {
+-            if key.as_ref() == spelling {
++            if false && key.as_ref() == spelling {
+                 return self.base.owner().finish(plan(*proven, props));
+             }
+         }

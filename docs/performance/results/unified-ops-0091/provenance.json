@@ -1,0 +1,40 @@
+{
+  "head": "0314261beb53838bbc5e5c46aa94c8515ee945c6",
+  "dirty_worktree": true,
+  "rust_toml_source_files": 8159,
+  "rust_toml_source_sha256": "c69bf19ded1bbaaf2c1215b7411eb7e5a0c73b2bcd777eebd827222893811049",
+  "source_hash_method": "sorted crates/**/*.rs and crates/**/*.toml excluding target components, plus root Cargo.toml; SHA-256 of repeated UTF-8 relative path + NUL + content + NUL",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "cpu": "AMD EPYC 9R45",
+  "os": "Linux x86_64",
+  "affinity_cpu": 0,
+  "build_command": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/litchi-unified-0091-target cargo build --release --locked --manifest-path tools/perf-baseline/unified-docx-text-fanout/Cargo.toml",
+  "measure_command": "taskset -c 0 /tmp/litchi-unified-0091-{control,candidate}-bin 9",
+  "invocation_order": [
+    "control-1",
+    "candidate-1",
+    "candidate-2",
+    "control-2"
+  ],
+  "harness_files": {
+    "Cargo.lock": "8f4b270f97a30e23853b91b6c94ac0478f4697ddb04e4ecd5ec17ea90adf264e",
+    "Cargo.toml": "ee765911737b6ddd8bae12948025e9298411609986deeebf7288aeb5b742105a",
+    "README.md": "b433b9434f496e42185c5c140b5c0ed3fbde2bac529aef5d6a9d30a5cd71ad1f",
+    "src/main.rs": "c7c1b257b3c71a937be250415b92c14340fc982001d0f5ea7d41a1f1d8914b71",
+    "summarize.py": "2bc97cee51beb3b9b2445f974865336c404e17f8d9095259c11bc41c645ceeb6",
+    "without-body-cache.patch": "87de11c4e9b00160fb87ba9f3df82e2ccfbcb5b0ec0a31ef2caf1965293c4a5e"
+  },
+  "binaries": {
+    "control": {
+      "name": "litchi-unified-0091-control-bin",
+      "bytes": 105752856,
+      "sha256": "ef9f28fe55f7b2b1136ea24f273194a68ce0c868d68aa4b01d6b20038c58663a"
+    },
+    "candidate": {
+      "name": "litchi-unified-0091-candidate-bin",
+      "bytes": 105746184,
+      "sha256": "52ef48c9ce628dbc498c62877050a62e156067d6d58e8807e7768ed51a5d733d"
+    }
+  },
+  "control": "Apply without-body-cache.patch to candidate source; binary copied outside checkout before restoring candidate. All final validation applies to candidate."
+}

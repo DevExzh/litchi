@@ -1,0 +1,340 @@
+{
+ "source": [
+  {
+   "scenario": "doc/source_set",
+   "before_us": 3517.1,
+   "after_us": 3524.8,
+   "ratio": 1.002,
+   "before_runs": [
+    3525.4092000000005,
+    3508.8354
+   ],
+   "after_runs": [
+    3516.7956,
+    3532.7735999999995
+   ],
+   "output_identical": true,
+   "output_sha256": [
+    "d318ad95cfb1463e09a5ee39b5bfbe6adb8b4d0cd9060a34c9d627e6c89e3663"
+   ]
+  },
+  {
+   "scenario": "doc/batch1k_ops",
+   "before_us": 6662052.5,
+   "after_us": 1338031.8,
+   "ratio": 0.201,
+   "before_runs": [
+    6674531.4520000005,
+    6649573.495
+   ],
+   "after_runs": [
+    1348664.31,
+    1327399.217
+   ]
+  },
+  {
+   "scenario": "doc/batch1k_leaf",
+   "before_us": 1103361.3,
+   "after_us": 1475024.5,
+   "ratio": 1.337,
+   "before_runs": [
+    1112030.64,
+    1094692.016
+   ],
+   "after_runs": [
+    1473874.371,
+    1476174.672
+   ]
+  },
+  {
+   "scenario": "xls/source_cells1",
+   "before_us": 239.7,
+   "after_us": 209.3,
+   "ratio": 0.873,
+   "before_runs": [
+    240.39959999999996,
+    239.02939999999998
+   ],
+   "after_runs": [
+    210.09319999999997,
+    208.48540000000003
+   ],
+   "before_plan_us": 198.5,
+   "ratio_vs_plan": 1.054,
+   "output_identical": true,
+   "output_sha256": [
+    "595ab31fa6ced92034e6eff1663f2d880b886832a3be9095fde07f1e6f22f992"
+   ]
+  },
+  {
+   "scenario": "xls/source_cells100",
+   "before_us": 602.6,
+   "after_us": 265.0,
+   "ratio": 0.44,
+   "before_runs": [
+    604.8756,
+    600.3475999999999
+   ],
+   "after_runs": [
+    265.7534,
+    264.2836
+   ],
+   "before_plan_us": 253.8,
+   "ratio_vs_plan": 1.044,
+   "output_identical": true,
+   "output_sha256": [
+    "7b810037f305d037644a0aeee4dd196e883d8426a1b48c9b20a4ee420be08080"
+   ]
+  },
+  {
+   "scenario": "xls/source_comments1",
+   "before_us": 1510.6,
+   "after_us": 1214.3,
+   "ratio": 0.804,
+   "before_runs": [
+    1514.307,
+    1506.9209999999998
+   ],
+   "after_runs": [
+    1213.2608,
+    1215.2574
+   ],
+   "output_identical": true,
+   "output_sha256": [
+    "dd1faf8e5fb072ecd59e50fd9c7f549d39fdff4ddc2b874f1d1e8ac7bfe3a5bd"
+   ]
+  },
+  {
+   "scenario": "xls/source_comments256",
+   "before_us": 2013.0,
+   "after_us": 1732.7,
+   "ratio": 0.861,
+   "before_runs": [
+    2016.8301999999999,
+    2009.2378
+   ],
+   "after_runs": [
+    1729.9856,
+    1735.4346
+   ],
+   "output_identical": true,
+   "output_sha256": [
+    "6dc30ba00e98c80924488cba6e0af4a2add43770886636190d0e61bbcfeb2f16"
+   ]
+  },
+  {
+   "scenario": "xls/source_hide7",
+   "before_us": 76.9,
+   "after_us": 66.4,
+   "ratio": 0.863,
+   "before_runs": [
+    77.2824,
+    76.4804
+   ],
+   "after_runs": [
+    66.18639999999999,
+    66.5664
+   ],
+   "output_identical": true,
+   "output_sha256": [
+    "460f614162e09972b08518490580f235ac7ca6305f497e8571edc5d673b7bcdb"
+   ]
+  },
+  {
+   "scenario": "rtf/source_append",
+   "before_us": 298.9,
+   "after_us": 299.6,
+   "ratio": 1.002,
+   "before_runs": [
+    299.3198,
+    298.5138
+   ],
+   "after_runs": [
+    299.9256,
+    299.3378
+   ],
+   "output_identical": true,
+   "output_sha256": [
+    "9c1cc5368f99a988f1280446fcf43ec9485a1a88ff6e7245b26038676718731a"
+   ]
+  }
+ ],
+ "ops": [
+  {
+   "scenario": "doc/open_get",
+   "before_us": 847.4,
+   "after_us": 832.5,
+   "ratio": 0.982,
+   "before_runs": [
+    849.7611999999999,
+    845.1366
+   ],
+   "after_runs": [
+    825.6025999999999,
+    839.3029999999999
+   ]
+  },
+  {
+   "scenario": "doc/get",
+   "before_us": 0.2,
+   "after_us": 0.2,
+   "ratio": 0.96,
+   "before_runs": [
+    0.226,
+    0.22580000000000003
+   ],
+   "after_runs": [
+    0.218,
+    0.2158
+   ]
+  },
+  {
+   "scenario": "doc/set",
+   "before_us": 1727.9,
+   "after_us": 1729.1,
+   "ratio": 1.001,
+   "before_runs": [
+    1728.2086,
+    1727.6133999999997
+   ],
+   "after_runs": [
+    1731.4916,
+    1726.6444
+   ]
+  },
+  {
+   "scenario": "doc/batch256",
+   "before_us": 654585.5,
+   "after_us": 87368.3,
+   "ratio": 0.133,
+   "before_runs": [
+    646023.263,
+    663147.819
+   ],
+   "after_runs": [
+    87361.732,
+    87374.92099999999
+   ]
+  },
+  {
+   "scenario": "xls/open_get",
+   "before_us": 167.9,
+   "after_us": 149.7,
+   "ratio": 0.892,
+   "before_runs": [
+    167.489,
+    168.303
+   ],
+   "after_runs": [
+    150.1528,
+    149.2588
+   ]
+  },
+  {
+   "scenario": "xls/set",
+   "before_us": 99.8,
+   "after_us": 98.3,
+   "ratio": 0.985,
+   "before_runs": [
+    99.9766,
+    99.65259999999999
+   ],
+   "after_runs": [
+    97.93260000000001,
+    98.7266
+   ]
+  },
+  {
+   "scenario": "xls/batch1k",
+   "before_us": 4456.0,
+   "after_us": 4364.5,
+   "ratio": 0.979,
+   "before_runs": [
+    4456.827,
+    4455.085999999999
+   ],
+   "after_runs": [
+    4355.6539999999995,
+    4373.326999999999
+   ]
+  },
+  {
+   "scenario": "rtf/open_get",
+   "before_us": 207.0,
+   "after_us": 200.1,
+   "ratio": 0.966,
+   "before_runs": [
+    205.9514,
+    208.13119999999998
+   ],
+   "after_runs": [
+    198.3652,
+    201.7852
+   ]
+  },
+  {
+   "scenario": "rtf/set",
+   "before_us": 328.6,
+   "after_us": 323.4,
+   "ratio": 0.984,
+   "before_runs": [
+    324.866,
+    332.36379999999997
+   ],
+   "after_runs": [
+    324.3878,
+    322.486
+   ]
+  },
+  {
+   "scenario": "rtf/add",
+   "before_us": 560.3,
+   "after_us": 547.7,
+   "ratio": 0.977,
+   "before_runs": [
+    556.1714,
+    564.5072
+   ],
+   "after_runs": [
+    545.625,
+    549.7454
+   ]
+  },
+  {
+   "scenario": "rtf/batch1k",
+   "before_us": 5544.7,
+   "after_us": 6186.9,
+   "ratio": 1.116,
+   "before_runs": [
+    5545.414000000001,
+    5543.902
+   ],
+   "after_runs": [
+    6845.818,
+    5527.9439999999995
+   ]
+  }
+ ],
+ "doc_batch1k_unified_over_leaf": {
+  "before": {
+   "ops_us": 6662052.5,
+   "leaf_us": 1103361.3,
+   "ops_over_leaf": 6.038
+  },
+  "after": {
+   "ops_us": 1338031.8,
+   "leaf_us": 1475024.5,
+   "ops_over_leaf": 0.907
+  }
+ },
+ "max_rss_kb": {
+  "source-before-1.json": 15718368,
+  "ops-before-1.json": 1091728,
+  "source-after-2.json": 133056,
+  "ops-after-2.json": 22872,
+  "source-after-3.json": 133076,
+  "ops-after-3.json": 23680,
+  "source-before-4.json": 15717828,
+  "ops-before-4.json": 1091316
+ }
+}

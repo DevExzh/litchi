@@ -385,8 +385,12 @@ fn write_alignment(xml: &mut String, alignment: Alignment, conformance: Conforma
     if let Some(value) = alignment.relative_indent {
         attr(&mut element, "relativeIndent", &value.to_string())?;
     }
-    if alignment.justify_last_line {
-        attr(&mut element, "justifyLastLine", "1")?;
+    if let Some(value) = alignment.justify_last_line {
+        attr(
+            &mut element,
+            "justifyLastLine",
+            if value { "1" } else { "0" },
+        )?;
     }
     if alignment.shrink_to_fit {
         attr(&mut element, "shrinkToFit", "1")?;
@@ -445,7 +449,7 @@ fn write_string_color(xml: &mut String, element: &str, value: &str) -> Result<()
     Ok(())
 }
 
-fn write_font_color(xml: &mut String, element: &str, color: &FontColor) -> Result<()> {
+pub(crate) fn write_font_color(xml: &mut String, element: &str, color: &FontColor) -> Result<()> {
     let mut output = format!("<{element}");
     match color.kind() {
         FontColorKind::Default => {},

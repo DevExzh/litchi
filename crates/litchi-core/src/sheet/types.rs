@@ -1,8 +1,5 @@
 //! Common types for spreadsheet operations.
 
-/// Error type for spreadsheet operations.
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-
 /// Types of data that can be stored in a cell.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CellValue {

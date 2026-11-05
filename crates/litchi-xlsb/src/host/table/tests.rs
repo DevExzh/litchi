@@ -8,7 +8,7 @@
 use super::model::*;
 use super::parse::{parse_table_part, parse_table_part_rel_ids};
 use crate::package::error::{Error, Result};
-use crate::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
+use crate::raw::{Encoder, Error as WireError, Kind, Stage, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -28,7 +28,7 @@ fn nullable_wide_string(value: Option<&str>) -> Vec<u8> {
 
 fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -36,7 +36,7 @@ fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
 }
 
 fn parse(records: &[(Kind, Vec<u8>)]) -> Result<Table> {
-    parse_table_part(&stream(records))
+    parse_table_part(&stream(records), crate::raw::Limits::DEFAULT)
 }
 
 /// `BrtBeginList` payload: two-column table over A1:B10 with a header row.
@@ -266,7 +266,7 @@ fn skips_xml_column_properties_inside_columns() {
 fn rejects_truncated_and_malformed_streams() {
     // Empty stream.
     assert!(matches!(
-        parse_table_part(&[]),
+        parse_table_part(&[], crate::raw::Limits::DEFAULT),
         Err(Error::UnexpectedEndOfStream(_))
     ));
     // Wrong first record.
@@ -364,34 +364,40 @@ fn tolerates_out_of_order_collections() {
 
 #[test]
 fn extracts_table_part_relationship_ids_from_worksheet_stream() {
-    let rel_ids = parse_table_part_rel_ids(&stream(&[
-        (rt::BEGIN_SHEET, Vec::new()),
-        (Kind::new(0x0FFF).unwrap(), vec![0; 3]), // unknown record before the collection
-        (rt::BEGIN_LIST_PARTS, 2u32.to_le_bytes().to_vec()),
-        (rt::LIST_PART, wide_string("rIdTable1")),
-        (Kind::new(0x0ABC).unwrap(), vec![0]), // unknown record inside the collection
-        (rt::LIST_PART, wide_string("rIdTable2")),
-        (rt::END_LIST_PARTS, Vec::new()),
-        (rt::END_SHEET, Vec::new()),
-    ]))
+    let rel_ids = parse_table_part_rel_ids(
+        &stream(&[
+            (rt::BEGIN_SHEET, Vec::new()),
+            (Kind::new(0x0FFF).unwrap(), vec![0; 3]), // unknown record before the collection
+            (rt::BEGIN_LIST_PARTS, 2u32.to_le_bytes().to_vec()),
+            (rt::LIST_PART, wide_string("rIdTable1")),
+            (Kind::new(0x0ABC).unwrap(), vec![0]), // unknown record inside the collection
+            (rt::LIST_PART, wide_string("rIdTable2")),
+            (rt::END_LIST_PARTS, Vec::new()),
+            (rt::END_SHEET, Vec::new()),
+        ]),
+        crate::raw::Limits::DEFAULT,
+    )
     .unwrap();
     assert_eq!(rel_ids, ["rIdTable1".to_string(), "rIdTable2".to_string()]);
 
     // Declared count disagreement is rejected.
     assert!(matches!(
-        parse_table_part_rel_ids(&stream(&[
-            (rt::BEGIN_LIST_PARTS, 2u32.to_le_bytes().to_vec()),
-            (rt::LIST_PART, wide_string("rIdTable1")),
-            (rt::END_LIST_PARTS, Vec::new()),
-        ])),
+        parse_table_part_rel_ids(
+            &stream(&[
+                (rt::BEGIN_LIST_PARTS, 2u32.to_le_bytes().to_vec()),
+                (rt::LIST_PART, wide_string("rIdTable1")),
+                (rt::END_LIST_PARTS, Vec::new()),
+            ]),
+            crate::raw::Limits::DEFAULT
+        ),
         Err(Error::Unrecognized { .. })
     ));
     // Unterminated collection is rejected.
     assert!(matches!(
-        parse_table_part_rel_ids(&stream(&[(
-            rt::BEGIN_LIST_PARTS,
-            0u32.to_le_bytes().to_vec()
-        )])),
+        parse_table_part_rel_ids(
+            &stream(&[(rt::BEGIN_LIST_PARTS, 0u32.to_le_bytes().to_vec())]),
+            crate::raw::Limits::DEFAULT
+        ),
         Err(Error::UnexpectedEndOfStream(_))
     ));
 }
@@ -526,4 +532,22 @@ fn resolves_tables_through_workbook_relationships() {
     package.add_part(Box::new(sheet_part));
     package.add_part(Box::new(broken_table));
     assert!(Workbook::from_opc_package(package).is_err());
+}
+
+#[test]
+fn raw_limits_bound_table_records_and_strings() {
+    let bytes = stream(&minimal_table_records());
+    let list = list_payload();
+    // " quarterly numbers " is the longest string in the minimal stream.
+    let units = " quarterly numbers ".encode_utf16().count();
+    let exact = crate::raw::Limits::new(list.len(), units);
+    parse_table_part(&bytes, exact).unwrap();
+    assert!(matches!(
+        parse_table_part(&bytes, crate::raw::Limits::new(list.len() - 1, units)),
+        Err(Error::Wire(WireError::PayloadLimit { .. }))
+    ));
+    assert!(matches!(
+        parse_table_part(&bytes, crate::raw::Limits::new(list.len(), units - 1)),
+        Err(Error::Wire(WireError::StringLimit { .. }))
+    ));
 }

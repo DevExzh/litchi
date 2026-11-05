@@ -28,7 +28,7 @@ impl Snapshot {
     }
 
     /// Load calculation metadata from the package's resolved workbook part.
-    pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
+    pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
 
@@ -106,16 +106,6 @@ impl Snapshot {
             limits: source.limits,
             context: source.context.clone(),
         })
-    }
-
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
-    /// Alias for [`Self::load_with_limits`].
-    pub fn read_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
-        Self::load_with_limits(package, limits)
     }
 
     /// Exact authored `calcPr` state, if present.

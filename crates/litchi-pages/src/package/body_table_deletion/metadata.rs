@@ -18,8 +18,8 @@ use litchi_iwa_protos::package_metadata_codec::{
 };
 
 use super::{
-    BodyTableDeletionError, DataReferenceOwnerRemoval, ExternalReferenceRemoval, FormulaPlan,
-    GraphPlan, MetadataPlan, Package, RemovalPlan, UuidRemoval, table_lock,
+    DataReferenceOwnerRemoval, Error, ExternalReferenceRemoval, FormulaPlan, GraphPlan,
+    MetadataPlan, Package, RemovalPlan, UuidRemoval, table_lock,
 };
 
 const METADATA_MESSAGE_TYPE: u32 = 11_006;
@@ -195,7 +195,7 @@ impl PackageMetadataVisitor for MetadataFacts {
 fn build_fact_index<'facts>(
     facts: &'facts MetadataFacts,
     budget: &mut table_lock::WireBudget,
-) -> Result<MetadataFactIndex<'facts>, BodyTableDeletionError> {
+) -> Result<MetadataFactIndex<'facts>, Error> {
     let record_count = facts
         .components
         .len()
@@ -204,39 +204,39 @@ fn build_fact_index<'facts>(
         .and_then(|value| value.checked_add(facts.data_owners.len()))
         .and_then(|value| value.checked_add(facts.ambiguous.len()))
         .and_then(|value| value.checked_add(facts.maps.len()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let locator_bytes = facts
         .components
         .iter()
         .try_fold(0usize, |total, component| {
             total
                 .checked_add(component.locator.len())
-                .ok_or(BodyTableDeletionError::InvalidSource)
+                .ok_or(Error::InvalidSource)
         })?;
     budget
         .charge_payload_work(
             record_count
                 .checked_add(locator_bytes)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(super::map_lock_error)?;
 
     let mut component_by_locator = HashMap::new();
     component_by_locator
         .try_reserve(facts.components.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.components.len(),
         })?;
     let mut component_by_identifier = HashMap::new();
     component_by_identifier
         .try_reserve(facts.components.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.components.len(),
         })?;
     let mut versioned_component_ids = HashSet::new();
     versioned_component_ids
         .try_reserve(facts.components.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.components.len(),
         })?;
     for component in facts
@@ -248,13 +248,13 @@ fn build_fact_index<'facts>(
             .insert(component.locator.as_ref(), component)
             .is_some()
         {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if component_by_identifier
             .insert(component.identifier, component)
             .is_some()
         {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for component in facts
@@ -268,7 +268,7 @@ fn build_fact_index<'facts>(
     let mut uuids_by_object = HashMap::new();
     uuids_by_object
         .try_reserve(facts.uuids.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.uuids.len(),
         })?;
     for binding in facts.uuids.iter().copied() {
@@ -278,13 +278,13 @@ fn build_fact_index<'facts>(
     let mut externals_by_object = HashMap::new();
     externals_by_object
         .try_reserve(facts.externals.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.externals.len(),
         })?;
     let mut unknown_external_targets = HashSet::new();
     unknown_external_targets
         .try_reserve(facts.externals.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.externals.len(),
         })?;
     for reference in facts.externals.iter().copied() {
@@ -299,7 +299,7 @@ fn build_fact_index<'facts>(
     let mut data_owners_by_object = HashMap::new();
     data_owners_by_object
         .try_reserve(facts.data_owners.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.data_owners.len(),
         })?;
     for owner in facts.data_owners.iter().copied() {
@@ -309,7 +309,7 @@ fn build_fact_index<'facts>(
     let mut ambiguous_by_object = HashMap::new();
     ambiguous_by_object
         .try_reserve(facts.ambiguous.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: facts.ambiguous.len(),
         })?;
     for (component, object) in facts.ambiguous.iter().copied() {
@@ -332,20 +332,20 @@ fn push_indexed<T: Copy>(
     index: &mut HashMap<u64, Vec<T>>,
     key: u64,
     value: T,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     match index.entry(key) {
         HashMapEntry::Occupied(mut entry) => {
             entry
                 .get_mut()
                 .try_reserve(1)
-                .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             entry.get_mut().push(value);
         },
         HashMapEntry::Vacant(entry) => {
             let mut values = Vec::new();
             values
                 .try_reserve_exact(1)
-                .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             values.push(value);
             entry.insert(values);
         },
@@ -359,7 +359,7 @@ pub(super) fn prepare(
     graph: &GraphPlan,
     formula: &FormulaPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<MetadataPlan, BodyTableDeletionError> {
+) -> Result<MetadataPlan, Error> {
     let Some((_payload, last, facts)) = inspect(source, budget)? else {
         return Ok(MetadataPlan {
             removals: RemovalPlan::default(),
@@ -372,10 +372,10 @@ pub(super) fn prepare(
         .object_removals
         .len()
         .checked_add(formula.removals.object_removals.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object_ids
         .try_reserve(object_count)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
         })?;
     for removal in graph
@@ -389,7 +389,7 @@ pub(super) fn prepare(
     charge_sort_work(object_ids.len(), budget)?;
     object_ids.sort_unstable();
     if object_ids.windows(2).any(|window| window[0] == window[1]) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let component_removals = graph
@@ -404,18 +404,18 @@ pub(super) fn prepare(
         .len()
         .checked_add(formula.removals.component_removals.len())
         .and_then(|value| value.checked_add(source.state.source.components().len()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(component_removal_capacity)
         .map_err(super::map_lock_error)?;
     removed_components
         .try_reserve(component_removal_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_removal_capacity,
         })?;
     for removal in component_removals {
         if !removed_components.insert(removal.identifier) {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let exact = fact_index
             .component_by_locator
@@ -430,13 +430,17 @@ pub(super) fn prepare(
             .versioned_component_ids
             .contains(&removal.identifier);
         if versioned || !exact || current_count != 1 {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if fact_index
             .unknown_external_targets
             .contains(&removal.identifier)
         {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
     }
 
@@ -446,13 +450,13 @@ pub(super) fn prepare(
         .charge_payload_work(
             component_count
                 .checked_add(object_count)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(super::map_lock_error)?;
     let mut removed_counts: Vec<usize> = Vec::new();
     removed_counts
         .try_reserve_exact(component_count)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_count,
         })?;
     removed_counts.resize(component_count, 0usize);
@@ -464,10 +468,8 @@ pub(super) fn prepare(
     {
         let count = removed_counts
             .get_mut(removal.component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
-        *count = (*count)
-            .checked_add(1)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        *count = (*count).checked_add(1).ok_or(Error::InvalidSource)?;
     }
     for (component_index, removed_count) in removed_counts.iter().copied().enumerate() {
         if removed_count == 0 {
@@ -478,7 +480,7 @@ pub(super) fn prepare(
             .source
             .components()
             .get_index(component_index)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if removed_count != component.archive().objects.len() {
             continue;
         }
@@ -491,13 +493,17 @@ pub(super) fn prepare(
             .versioned_component_ids
             .contains(&metadata_component.identifier)
         {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if fact_index
             .unknown_external_targets
             .contains(&metadata_component.identifier)
         {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if !removed_components.insert(metadata_component.identifier) {
             continue;
@@ -507,7 +513,7 @@ pub(super) fn prepare(
         removals
             .component_removals
             .try_reserve(1)
-            .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+            .map_err(|_| Error::Allocation { amount: 1 })?;
         removals.component_removals.push(super::ComponentRemoval {
             component_index,
             identifier: metadata_component.identifier,
@@ -525,11 +531,15 @@ pub(super) fn prepare(
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         if owner_component.is_none() && !uuid_matches.is_empty() {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         for binding in uuid_matches {
             if owner_component != Some(binding.component) {
-                return Err(BodyTableDeletionError::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
         }
         if fact_index.ambiguous_by_object.contains_key(&object) {
@@ -538,22 +548,24 @@ pub(super) fn prepare(
             // selected object.  A component deletion later in the pipeline
             // cannot make the first registry scan safe, so refuse the source
             // regardless of which component owns the ambiguous record.
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         let current = uuid_matches.iter().filter(|binding| binding.current);
         let mut current_count = 0usize;
         let mut current_binding = None;
         for binding in current {
-            current_count = current_count
-                .checked_add(1)
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+            current_count = current_count.checked_add(1).ok_or(Error::InvalidSource)?;
             current_binding = Some(*binding);
         }
         if uuid_matches.iter().any(|binding| !binding.current) {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if current_count > 1 {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if let Some(binding) = current_binding {
             // UUID fields are removed in the first metadata pass.  Keep the
@@ -568,14 +580,18 @@ pub(super) fn prepare(
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         if owner_component.is_none() && !external_matches.is_empty() {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         for reference in external_matches.iter().copied() {
             // In PackageMetadata an external reference's object identifier is
             // owned by its target component.  A source component may point at
             // that object, but it cannot claim ownership of the removal.
             if owner_component != Some(reference.target) {
-                return Err(BodyTableDeletionError::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             // Registry field removals run before component registrations are
             // physically removed.  Authorize every matching current edge in
@@ -584,7 +600,9 @@ pub(super) fn prepare(
             // otherwise the codec sees a surviving intermediate edge to the
             // just-removed object and correctly rejects it as cross-component.
             if !reference.current || reference.unknown {
-                return Err(BodyTableDeletionError::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             push_external_removal(&mut removals, reference, budget)?;
         }
@@ -595,14 +613,20 @@ pub(super) fn prepare(
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         if owner_component.is_none() && !owner_matches.is_empty() {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         for owner in owner_matches.iter().copied() {
             if owner_component != Some(owner.component) {
-                return Err(BodyTableDeletionError::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             if !owner.current || owner.unknown {
-                return Err(BodyTableDeletionError::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             // Data-owner fields are also visited by the ordinary metadata
             // pass before a later component-registration removal.  Authorize
@@ -633,8 +657,8 @@ pub(super) fn rewrite_with_preflight(
     formula: &FormulaPlan,
     metadata: &MetadataPlan,
     budget: &mut table_lock::WireBudget,
-    mut preflight: impl FnMut(usize, &mut table_lock::WireBudget) -> Result<(), BodyTableDeletionError>,
-) -> Result<Option<Vec<u8>>, BodyTableDeletionError> {
+    mut preflight: impl FnMut(usize, &mut table_lock::WireBudget) -> Result<(), Error>,
+) -> Result<Option<Vec<u8>>, Error> {
     let Some((payload, last, facts)) = inspect(source, budget)? else {
         return Ok(None);
     };
@@ -652,20 +676,20 @@ pub(super) fn rewrite_with_preflight(
         .len()
         .checked_add(formula.removals.component_removals.len())
         .and_then(|value| value.checked_add(metadata.removals.component_removals.len()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(component_selector_capacity)
         .map_err(super::map_lock_error)?;
     let mut component_selectors = Vec::new();
     component_selectors
         .try_reserve_exact(component_selector_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_selector_capacity,
         })?;
     let mut component_selector_keys = HashSet::<(u64, &str)>::new();
     component_selector_keys
         .try_reserve(component_selector_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_selector_capacity,
         })?;
     for removal in component_removals {
@@ -677,7 +701,7 @@ pub(super) fn rewrite_with_preflight(
                     .locator()
                     .len()
                     .checked_add(1)
-                    .ok_or(BodyTableDeletionError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .map_err(super::map_lock_error)?;
         if component_selector_keys.insert((selector.identifier(), selector.locator())) {
@@ -691,7 +715,7 @@ pub(super) fn rewrite_with_preflight(
         .map_err(super::map_lock_error)?;
     uuid_removals
         .try_reserve(metadata.removals.uuid_removals.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: metadata.removals.uuid_removals.len(),
         })?;
     for removal in &metadata.removals.uuid_removals {
@@ -709,7 +733,7 @@ pub(super) fn rewrite_with_preflight(
         .map_err(super::map_lock_error)?;
     external_removals
         .try_reserve(metadata.removals.external_reference_removals.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: metadata.removals.external_reference_removals.len(),
         })?;
     for removal in &metadata.removals.external_reference_removals {
@@ -731,7 +755,7 @@ pub(super) fn rewrite_with_preflight(
         .map_err(super::map_lock_error)?;
     data_removals
         .try_reserve(metadata.removals.data_reference_owner_removals.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: metadata.removals.data_reference_owner_removals.len(),
         })?;
     let mut save_selectors = Vec::new();
@@ -748,19 +772,19 @@ pub(super) fn rewrite_with_preflight(
         .len()
         .checked_add(external_removals.len())
         .and_then(|value| value.checked_add(data_removals.len()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(save_selector_capacity)
         .map_err(super::map_lock_error)?;
     save_selectors
         .try_reserve(save_selector_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: save_selector_capacity,
         })?;
     let mut save_selector_keys = HashSet::<(u64, &str)>::new();
     save_selector_keys
         .try_reserve(save_selector_capacity)
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: save_selector_capacity,
         })?;
     for selector in uuid_removals
@@ -775,7 +799,7 @@ pub(super) fn rewrite_with_preflight(
                     .locator()
                     .len()
                     .checked_add(1)
-                    .ok_or(BodyTableDeletionError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .map_err(super::map_lock_error)?;
         if save_selector_keys.insert((selector.identifier(), selector.locator())) {
@@ -792,7 +816,7 @@ pub(super) fn rewrite_with_preflight(
     }
     let map_lookup_work = binary_search_work(removed_ids.len())?
         .checked_mul(facts.maps.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(map_lookup_work)
         .map_err(super::map_lock_error)?;
@@ -804,10 +828,12 @@ pub(super) fn rewrite_with_preflight(
             continue;
         }
         if map.unknown {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if removal_batch.data_metadata_map().is_some() {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         removal_batch =
             removal_batch.with_data_metadata_map(DataMetadataMapRemoval::new(map.object));
@@ -885,7 +911,7 @@ pub(super) fn rewrite_with_preflight(
 fn inspect<'a>(
     source: &'a Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<(&'a [u8], u64, MetadataFacts)>, BodyTableDeletionError> {
+) -> Result<Option<(&'a [u8], u64, MetadataFacts)>, Error> {
     let Some(payload) = metadata_payload(source, budget)? else {
         return Ok(None);
     };
@@ -918,7 +944,7 @@ fn inspect<'a>(
 fn metadata_payload<'a>(
     source: &'a Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<&'a [u8]>, BodyTableDeletionError> {
+) -> Result<Option<&'a [u8]>, Error> {
     let Some(component) = source.state.source.components().get("Index/Metadata.iwa") else {
         return Ok(None);
     };
@@ -933,19 +959,19 @@ fn metadata_payload<'a>(
                 .map_err(super::map_lock_error)?;
             if message.type_ == METADATA_MESSAGE_TYPE {
                 if location.replace(message.data.as_slice()).is_some() {
-                    return Err(BodyTableDeletionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         }
     }
-    Ok(Some(location.ok_or(BodyTableDeletionError::InvalidSource)?))
+    Ok(Some(location.ok_or(Error::InvalidSource)?))
 }
 
 fn metadata_options(
     source: &Package,
     payload_len: usize,
     budget: &table_lock::WireBudget,
-) -> Result<RewriteOptions, BodyTableDeletionError> {
+) -> Result<RewriteOptions, Error> {
     let limits = source.state.source.limits();
     let archive_limits = limits
         .effective_archive_limits()
@@ -976,16 +1002,18 @@ fn component_selector<'a>(
     fact_index: &'a MetadataFactIndex<'a>,
     identifier: u64,
     locator: &str,
-) -> Result<ComponentSelector<'a>, BodyTableDeletionError> {
+) -> Result<ComponentSelector<'a>, Error> {
     if fact_index.versioned_component_ids.contains(&identifier) {
-        return Err(BodyTableDeletionError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
     let component = fact_index
         .component_by_locator
         .get(locator)
         .filter(|component| component.identifier == identifier)
         .copied()
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(ComponentSelector::new(
         component.identifier,
         component.locator.as_ref(),
@@ -995,15 +1023,17 @@ fn component_selector<'a>(
 fn component_selector_by_identifier<'a>(
     fact_index: &'a MetadataFactIndex<'a>,
     identifier: u64,
-) -> Result<ComponentSelector<'a>, BodyTableDeletionError> {
+) -> Result<ComponentSelector<'a>, Error> {
     if fact_index.versioned_component_ids.contains(&identifier) {
-        return Err(BodyTableDeletionError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
     let component = fact_index
         .component_by_identifier
         .get(&identifier)
         .copied()
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(ComponentSelector::new(
         component.identifier,
         component.locator.as_ref(),
@@ -1013,16 +1043,16 @@ fn component_selector_by_identifier<'a>(
 fn metadata_component_for_physical<'a>(
     fact_index: &'a MetadataFactIndex<'a>,
     physical_name: &str,
-) -> Result<Option<&'a MetadataComponent>, BodyTableDeletionError> {
+) -> Result<Option<&'a MetadataComponent>, Error> {
     let locator = normalized_metadata_locator(physical_name)?;
     Ok(fact_index.component_by_locator.get(locator).copied())
 }
 
-fn clone_boxed_str(value: &str) -> Result<Box<str>, BodyTableDeletionError> {
+fn clone_boxed_str(value: &str) -> Result<Box<str>, Error> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(value.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: value.len(),
         })?;
     owned.push_str(value);
@@ -1034,16 +1064,16 @@ fn object_component_identifier(
     graph: &GraphPlan,
     identifier: std::num::NonZeroU64,
     fact_index: &MetadataFactIndex<'_>,
-) -> Result<Option<u64>, BodyTableDeletionError> {
+) -> Result<Option<u64>, Error> {
     let Some(location) = graph.index.get(identifier) else {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     let component = source
         .state
         .source
         .components()
         .get_index(location.component_index)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let locator = normalized_metadata_locator(component.name())?;
     Ok(fact_index
         .component_by_locator
@@ -1051,18 +1081,18 @@ fn object_component_identifier(
         .map(|component| component.identifier))
 }
 
-fn normalized_metadata_locator(physical_name: &str) -> Result<&str, BodyTableDeletionError> {
+fn normalized_metadata_locator(physical_name: &str) -> Result<&str, Error> {
     physical_name
         .strip_prefix("Index/")
         .and_then(|name| name.strip_suffix(".iwa"))
-        .ok_or(BodyTableDeletionError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn push_uuid_removal(
     plan: &mut RemovalPlan,
     binding: MetadataUuid,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(plan.uuid_removals.len())
         .map_err(super::map_lock_error)?;
@@ -1070,15 +1100,14 @@ fn push_uuid_removal(
         existing.component_identifier == binding.component
             && existing.object_identifier.get() == binding.object
     }) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     plan.uuid_removals
         .try_reserve(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     plan.uuid_removals.push(UuidRemoval {
         component_identifier: binding.component,
-        object_identifier: std::num::NonZeroU64::new(binding.object)
-            .ok_or(BodyTableDeletionError::InvalidSource)?,
+        object_identifier: std::num::NonZeroU64::new(binding.object).ok_or(Error::InvalidSource)?,
         expected_uuid: binding.uuid,
     });
     Ok(())
@@ -1088,7 +1117,7 @@ fn push_external_removal(
     plan: &mut RemovalPlan,
     reference: MetadataExternal,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(plan.external_reference_removals.len())
         .map_err(super::map_lock_error)?;
@@ -1098,21 +1127,19 @@ fn push_external_removal(
             && existing.object_identifier.get() == reference.object.unwrap_or(0)
             && existing.expected_is_weak == reference.weak
     }) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     plan.external_reference_removals
         .try_reserve(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     plan.external_reference_removals
         .push(ExternalReferenceRemoval {
             source_component_identifier: reference.source,
             target_component_identifier: reference.target,
             object_identifier: std::num::NonZeroU64::new(
-                reference
-                    .object
-                    .ok_or(BodyTableDeletionError::InvalidSource)?,
+                reference.object.ok_or(Error::InvalidSource)?,
             )
-            .ok_or(BodyTableDeletionError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
             expected_is_weak: reference.weak,
         });
     Ok(())
@@ -1122,7 +1149,7 @@ fn push_data_owner_removal(
     plan: &mut RemovalPlan,
     owner: MetadataDataOwner,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(plan.data_reference_owner_removals.len())
         .map_err(super::map_lock_error)?;
@@ -1131,18 +1158,17 @@ fn push_data_owner_removal(
             && existing.data_identifier.get() == owner.data
             && existing.object_identifier.get() == owner.object
     }) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     plan.data_reference_owner_removals
         .try_reserve(1)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: 1 })?;
+        .map_err(|_| Error::Allocation { amount: 1 })?;
     plan.data_reference_owner_removals
         .push(DataReferenceOwnerRemoval {
             component_identifier: owner.component,
-            data_identifier: std::num::NonZeroU64::new(owner.data)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+            data_identifier: std::num::NonZeroU64::new(owner.data).ok_or(Error::InvalidSource)?,
             object_identifier: std::num::NonZeroU64::new(owner.object)
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             expected_count: owner.count,
         });
     Ok(())
@@ -1152,17 +1178,17 @@ fn removed_object_ids(
     graph: &GraphPlan,
     formula: &FormulaPlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<std::num::NonZeroU64>, BodyTableDeletionError> {
+) -> Result<Vec<std::num::NonZeroU64>, Error> {
     let count = graph
         .removals
         .object_removals
         .len()
         .checked_add(formula.removals.object_removals.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut identifiers = Vec::new();
     identifiers
         .try_reserve(count)
-        .map_err(|_| BodyTableDeletionError::Allocation { amount: count })?;
+        .map_err(|_| Error::Allocation { amount: count })?;
     for identifier in graph
         .removals
         .object_removals
@@ -1175,7 +1201,7 @@ fn removed_object_ids(
     charge_sort_work(identifiers.len(), budget)?;
     identifiers.sort_unstable();
     if identifiers.windows(2).any(|window| window[0] == window[1]) {
-        return Err(BodyTableDeletionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(identifiers)
 }
@@ -1185,10 +1211,10 @@ fn released_watermark(
     removed: &[std::num::NonZeroU64],
     last: u64,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<u64>, BodyTableDeletionError> {
+) -> Result<Option<u64>, Error> {
     let lookup_work = binary_search_work(removed.len())?
         .checked_mul(graph.index.ordered.len())
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(lookup_work)
         .map_err(super::map_lock_error)?;
@@ -1205,31 +1231,30 @@ fn released_watermark(
             .binary_search_by_key(&identifier, |removed| removed.get())
             .is_ok();
         if identifier > last && !is_removed {
-            return Err(BodyTableDeletionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if identifier <= last && !is_removed {
             maximum_remaining = maximum_remaining.max(identifier);
         }
     }
     if maximum_remaining == 0 {
-        return Err(BodyTableDeletionError::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
     Ok(Some(maximum_remaining))
 }
 
-fn charge_sort_work(
-    count: usize,
-    budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+fn charge_sort_work(count: usize, budget: &mut table_lock::WireBudget) -> Result<(), Error> {
     let work = count
         .checked_mul(binary_search_work(count)?)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(work)
         .map_err(super::map_lock_error)
 }
 
-fn binary_search_work(count: usize) -> Result<usize, BodyTableDeletionError> {
+fn binary_search_work(count: usize) -> Result<usize, Error> {
     if count < 2 {
         Ok(1)
     } else {
@@ -1240,7 +1265,7 @@ fn binary_search_work(count: usize) -> Result<usize, BodyTableDeletionError> {
 fn charge_codec_report(
     report: package_metadata_codec::RewriteReport,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_payload_work(report.input_bytes())
         .and_then(|_| {
@@ -1257,7 +1282,7 @@ fn charge_codec_report(
 fn charge_codec_requirements(
     requirements: package_metadata_codec::RewriteExecutionRequirements,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     budget
         .charge_output_bytes(requirements.output_bytes())
         .and_then(|_| budget.charge_payload_items(requirements.fields()))
@@ -1273,7 +1298,7 @@ fn charge_codec_requirements(
 fn verify_codec_execution_report(
     report: package_metadata_codec::RewriteReport,
     requirements: package_metadata_codec::RewriteExecutionRequirements,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     if report.output_bytes() != requirements.output_bytes()
         || report.fields() != requirements.fields()
         || report.work_bytes() != requirements.work_bytes()
@@ -1283,66 +1308,52 @@ fn verify_codec_execution_report(
         || report.retained_bytes() != requirements.retained_bytes()
         || report.scratch_bytes() > requirements.scratch_bytes()
     {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
 
-fn map_metadata_error(error: RewriteError) -> BodyTableDeletionError {
+fn map_metadata_error(error: RewriteError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
-            package_metadata_codec::RewriteLimit::InputBytes { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::WireBytes,
-                observed,
-                maximum,
-            ),
-            package_metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::WireOutputBytes,
-                observed,
-                maximum,
-            ),
-            package_metadata_codec::RewriteLimit::Fields { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::WireFields,
-                observed,
-                maximum,
-            ),
-            package_metadata_codec::RewriteLimit::Work { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::WireWork,
-                observed,
-                maximum,
-            ),
+            package_metadata_codec::RewriteLimit::InputBytes { observed, maximum } => {
+                (super::LimitKind::WireBytes, observed, maximum)
+            },
+            package_metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => {
+                (super::LimitKind::WireOutputBytes, observed, maximum)
+            },
+            package_metadata_codec::RewriteLimit::Fields { observed, maximum } => {
+                (super::LimitKind::WireFields, observed, maximum)
+            },
+            package_metadata_codec::RewriteLimit::Work { observed, maximum } => {
+                (super::LimitKind::WireWork, observed, maximum)
+            },
             package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-                return BodyTableDeletionError::LimitExceeded {
-                    kind: super::BodyTableDeletionLimitKind::WireNesting,
+                return Error::Limit {
+                    kind: super::LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
                 };
             },
-            package_metadata_codec::RewriteLimit::Components { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::PayloadItems,
-                observed,
-                maximum,
-            ),
-            package_metadata_codec::RewriteLimit::References { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::PayloadReferences,
-                observed,
-                maximum,
-            ),
-            package_metadata_codec::RewriteLimit::Additions { observed, maximum } => (
-                super::BodyTableDeletionLimitKind::PayloadItems,
-                observed,
-                maximum,
-            ),
-            _ => return BodyTableDeletionError::InvalidSource,
+            package_metadata_codec::RewriteLimit::Components { observed, maximum } => {
+                (super::LimitKind::PayloadItems, observed, maximum)
+            },
+            package_metadata_codec::RewriteLimit::References { observed, maximum } => {
+                (super::LimitKind::PayloadReferences, observed, maximum)
+            },
+            package_metadata_codec::RewriteLimit::Additions { observed, maximum } => {
+                (super::LimitKind::PayloadItems, observed, maximum)
+            },
+            _ => return Error::InvalidSource,
         };
-        return BodyTableDeletionError::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some(amount) = error.allocation_request() {
-        return BodyTableDeletionError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     match error.invalid_reason() {
         Some(package_metadata_codec::InvalidReason::VersionedRemoval)
@@ -1350,9 +1361,9 @@ fn map_metadata_error(error: RewriteError) -> BodyTableDeletionError {
         | Some(package_metadata_codec::InvalidReason::CrossComponentRemoval)
         | Some(package_metadata_codec::InvalidReason::ExistingReferenceCollision)
         | Some(package_metadata_codec::InvalidReason::RemovalMismatch) => {
-            BodyTableDeletionError::UnsupportedSource
+            Error::Refused(crate::table::deletion::Refusal::UnsupportedSource)
         },
-        _ => BodyTableDeletionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

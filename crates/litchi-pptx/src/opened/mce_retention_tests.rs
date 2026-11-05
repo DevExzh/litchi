@@ -47,25 +47,33 @@ use crate::{Error, Package, Result};
 
 use super::model::mce_retention_test_hooks;
 
+fn assert_physical_xml_malformed(error: &Error) {
+    assert!(matches!(
+        error,
+        Error::Invalid(message) if message == "PPTX XML is malformed"
+    ));
+}
+
 const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const PRESENTATION_NAMESPACE: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 
 fn marked_slides_package(count: usize, marked: &[usize]) -> Result<Package> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     for index in 0..count {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         let slide = presentation.add_slide()?;
         slide.set_title(&format!("retention slide {index}"));
         if index == 0 {
             slide.set_notes("First notes");
         }
     }
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
-    let mut package = Package::from_vec(bytes)?;
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes))?;
     for &index in marked {
         add_mce_marker(&mut package, index)?;
     }
-    Package::from_vec(package.to_bytes()?)
+    Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 
 fn add_mce_marker(package: &mut Package, index: usize) -> Result<()> {
@@ -81,8 +89,7 @@ fn add_mce_marker(package: &mut Package, index: usize) -> Result<()> {
     if marked == xml {
         return Err(Error::Invalid("retention fixture has no p:sld root".into()));
     }
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(marked.into_bytes());
     Ok(())
@@ -271,11 +278,11 @@ fn transaction_and_commit_release_hooks_are_value_preserving() -> Result<()> {
     let slides = source.slides().to_vec();
 
     let mut transaction = source.edit();
-    assert!(transaction.retained_mce_bytes() > 0);
+    assert!(transaction.retained_mce_bytes()? > 0);
     transaction.release_retained_mce();
-    assert_eq!(transaction.retained_mce_bytes(), 0);
+    assert_eq!(transaction.retained_mce_bytes()?, 0);
     let mut commit = transaction.commit()?;
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().revision(), revision);
     assert_eq!(commit.snapshot().slides(), slides.as_slice());
     assert_eq!(commit.snapshot().retained_mce_bytes(), 0);
@@ -283,12 +290,12 @@ fn transaction_and_commit_release_hooks_are_value_preserving() -> Result<()> {
     let mut changed = source.edit();
     changed.set_shape_text(0, crate::shape::Key::Index(0), "release candidate")?;
     let mut changed_commit = changed.commit()?;
-    assert!(changed_commit.is_changed());
+    assert!(changed_commit.diagnostics().changed());
     let changed_revision = changed_commit.snapshot().revision();
     changed_commit.release_retained_mce();
     assert_eq!(changed_commit.snapshot().retained_mce_bytes(), 0);
     assert_eq!(changed_commit.snapshot().revision(), changed_revision);
-    assert!(changed_commit.is_changed());
+    assert!(changed_commit.diagnostics().changed());
     commit.release_retained_mce();
     Ok(())
 }
@@ -299,7 +306,7 @@ fn no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it(
     let source = package.opened_presentation_with_limits(Limits::default())?;
 
     let commit = source.edit().commit()?;
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().revision(), source.revision());
     assert_eq!(
         commit.snapshot().retained_mce_bytes(),
@@ -308,7 +315,12 @@ fn no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it(
     assert_same_output(&source, commit.snapshot(), 0);
     assert_same_output(&source, commit.snapshot(), 1);
 
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     assert_eq!(published.revision(), source.revision());
     assert_same_output(&source, &published, 0);
     assert_same_output(&source, &published, 1);
@@ -324,12 +336,17 @@ fn one_edit_misses_the_changed_slide_but_shares_the_untouched_slide_through_publ
     let mut transaction = source.edit();
     assert!(transaction.set_shape_text(0, crate::shape::Key::Index(0), "changed once")?);
     let commit = transaction.commit()?;
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_distinct_output(&source, commit.snapshot(), 0);
     assert_same_output(&source, commit.snapshot(), 1);
 
     let candidate = commit.snapshot().clone();
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     assert_distinct_output(&source, &published, 0);
     assert_same_output(&candidate, &published, 1);
     assert_eq!(
@@ -369,7 +386,7 @@ fn a_root_relationship_edit_runs_capture_validation_while_slide_outputs_hit() ->
     let second_name = source.slides[1].part_name.clone();
 
     let mut transaction = source.edit();
-    assert!(transaction.move_slide(0, 1)?);
+    assert!(transaction.move_slide(0, litchi_core::Position::new(1))?);
     let commit = transaction.commit()?;
     let candidate = commit.snapshot();
     assert_eq!(candidate.slides[0].part_name, second_name);
@@ -497,7 +514,7 @@ fn counted_marked_slides_package() -> Result<(Package, Arc<AtomicUsize>)> {
     let package = marked_slides_package(1, &[0])?;
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let observations = Arc::new(AtomicUsize::new(0));
-    let mut opc = package.opc.clone();
+    let mut opc = (*package.opc).clone();
     let counted =
         CountingBlobPart::from_part(opc.get_part(&slide_name)?, Arc::clone(&observations))?;
     assert!(opc.remove_part(&slide_name));
@@ -597,7 +614,10 @@ fn malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence() -> Resul
     let error = name
         .opened_presentation_with_limits(Limits::default())
         .expect_err("malformed slide name must remain a typed refusal");
-    assert!(error.to_string().contains("duplicated attribute"));
+    // Physical source admission runs before MCE, including duplicate
+    // attributes in a name projection. It intentionally reports the
+    // content-free physical refusal rather than exposing parser text.
+    assert_physical_xml_malformed(&error);
 
     let mut notes = marked_slides_package(2, &[0, 1])?;
     replace_notes_root(&mut notes)?;
@@ -627,8 +647,7 @@ fn remove_slide_relationship(package: &mut Package, index: usize) -> Result<()> 
         .ok_or_else(|| Error::Invalid("retention fixture slide is absent".into()))?
         .relationship_id()
         .to_owned();
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&presentation_name)?
         .rels_mut()
         .remove(&relationship_id);
@@ -662,8 +681,7 @@ fn rewrite_slide(
     let xml = std::str::from_utf8(package.opc.get_part(&part_name)?.blob())
         .map_err(|error| Error::Xml(error.to_string()))?
         .to_owned();
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(rewrite(xml).into_bytes());
     Ok(())
@@ -671,8 +689,7 @@ fn rewrite_slide(
 
 fn replace_notes_root(package: &mut Package) -> Result<()> {
     let part_name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").map_err(Error::Invalid)?;
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(format!(r#"<p:wrong xmlns:p="{PRESENTATION_NAMESPACE}"/>"#).into_bytes());
     Ok(())
@@ -817,7 +834,7 @@ fn foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_paylo
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let foreign = Arc::new(b"foreign payload with a different identity".to_vec());
 
-    let mut mismatched = package.opc.clone();
+    let mut mismatched = (*package.opc).clone();
     let foreign_part =
         MismatchedBlobArcPart::from_part(mismatched.get_part(&slide_name)?, Arc::clone(&foreign))?;
     assert!(mismatched.remove_part(&slide_name));
@@ -834,7 +851,7 @@ fn foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_paylo
 
     // A separate allocation carrying equal visible bytes is not an identity
     // proof. Reopening it must not answer from the first snapshot's output.
-    let mut separate = mismatched.opc.clone();
+    let mut separate = (*mismatched.opc).clone();
     let copied = separate.get_part(&slide_name)?.blob().to_vec();
     let relationships = separate.get_part(&slide_name)?.rels().clone();
     assert!(separate.remove_part(&slide_name));
@@ -900,12 +917,12 @@ fn rebound_keeps_a_package_owned_allocation_but_new_equal_slide_bytes_miss() -> 
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let unrelated_name = PackURI::new("/retained-source.bin").map_err(Error::Invalid)?;
     let raw = package.opc.get_part(&slide_name)?.blob_arc();
-    package.opc.try_add_part(Box::new(BlobPart::new_shared(
+    Arc::make_mut(&mut package.opc).try_add_part(Box::new(BlobPart::new_shared(
         unrelated_name.clone(),
         "application/octet-stream".into(),
         Arc::clone(&raw),
     )))?;
-    let package = Package::from_opc_package(package.opc)?;
+    let package = Package::from_opc_package((*package.opc).clone())?;
     let source = package.opened_presentation_with_limits(Limits::default())?;
     let original_output = output(&source, 0).expect("marked source output");
 

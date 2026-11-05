@@ -1,0 +1,149 @@
+{
+  "batch_mode": "atomic",
+  "build_provenance": {
+    "build_command": "CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/tmp/litchi-unified-0157-target CARGO_NET_OFFLINE=true cargo build --offline --release --manifest-path tools/perf-baseline/unified-pptx-command-batch/Cargo.toml",
+    "crate": "unified-pptx-command-batch-baseline",
+    "crate_version": "0.1.0",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "source_commit": "0314261beb53838bbc5e5c46aa94c8515ee945c6",
+    "target": "x86_64-unknown-linux-gnu"
+  },
+  "coalescing_contract": "each workload is one homogeneous direct-shape set family; unified diagnostics must report one native commit while preserving one result per command",
+  "command": "set",
+  "counts": [
+    10000
+  ],
+  "equivalence_scope": "warm-up outputs are compared by exact bytes, falling back to decoded ZIP members before timing",
+  "failures": [],
+  "format": "pptx",
+  "order": "ABBA",
+  "owners": [
+    "eager"
+  ],
+  "path_pattern": "/slide[1]/shape[i]",
+  "performance_claim": "scoped timing evidence only; full acceptance remains pending",
+  "results": [
+    {
+      "artifact": {
+        "bytes": 91398,
+        "count": 10000,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd"
+      },
+      "batch_mode": "atomic",
+      "count": 10000,
+      "equivalence": "exact_bytes",
+      "native_calls": 40,
+      "native_changed": 10000,
+      "native_chunk_size": 256,
+      "native_commits": 1,
+      "native_median_ns": 2639203356,
+      "native_ns": [
+        2639203356,
+        2638551102,
+        2631947018,
+        2660565969,
+        2625802185,
+        2664806639
+      ],
+      "native_route": "pptx_eager_native_primary_text_command_batch_v1",
+      "operation": "text",
+      "owner": "eager",
+      "path_pattern": "/slide[1]/shape[i]",
+      "unified_batch_calls": 1,
+      "unified_commits": 1,
+      "unified_leaf_operations": 10000,
+      "unified_median_ns": 2696438580,
+      "unified_ns": [
+        2682294993,
+        2699355364,
+        2679019035,
+        2696438580,
+        2706742874,
+        2684919139
+      ],
+      "unified_operations": 10000,
+      "unified_over_native": 1.0216865532054893,
+      "unified_route": "pptx_eager_unified_file_batch_text_command_batch_v1",
+      "unified_snapshot_bytes": 7168136
+    },
+    {
+      "artifact": {
+        "bytes": 91398,
+        "count": 10000,
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd"
+      },
+      "batch_mode": "atomic",
+      "count": 10000,
+      "equivalence": "exact_bytes",
+      "native_calls": 40,
+      "native_changed": 10000,
+      "native_chunk_size": 256,
+      "native_commits": 1,
+      "native_median_ns": 7481091779,
+      "native_ns": [
+        7464816401,
+        7481091779,
+        7484182389,
+        7468914690,
+        7477299202,
+        7491911782
+      ],
+      "native_route": "pptx_eager_native_primary_text_x_command_batch_v1",
+      "operation": "text_x",
+      "owner": "eager",
+      "path_pattern": "/slide[1]/shape[i]",
+      "unified_batch_calls": 1,
+      "unified_commits": 1,
+      "unified_leaf_operations": 10000,
+      "unified_median_ns": 7602462768,
+      "unified_ns": [
+        7585202125,
+        7602462768,
+        7574872888,
+        7621642122,
+        7592520689,
+        7606959458
+      ],
+      "unified_operations": 10000,
+      "unified_over_native": 1.0162237000407746,
+      "unified_route": "pptx_eager_unified_file_batch_text_x_command_batch_v1",
+      "unified_snapshot_bytes": 7218136
+    }
+  ],
+  "rounds": 3,
+  "routes": [
+    "pptx_eager_native_primary_text_command_batch_v1",
+    "pptx_eager_unified_file_batch_text_command_batch_v1",
+    "pptx_eager_native_primary_text_x_command_batch_v1",
+    "pptx_eager_unified_file_batch_text_x_command_batch_v1",
+    "pptx_source_native_primary_text_command_batch_v1",
+    "pptx_source_unified_file_batch_text_command_batch_v1",
+    "pptx_source_native_primary_text_x_command_batch_v1",
+    "pptx_source_unified_file_batch_text_x_command_batch_v1"
+  ],
+  "samples_per_leg": 6,
+  "schema": 1,
+  "timing_scope": "one native primary Edit with 256-target setter chunks plus one commit, or one unified File::batch Atomic call; excludes corpus generation, opening, command/props preparation, warm-up, output serialization/save, equivalence checks and drop",
+  "workload": "homogeneous-direct-shape-command-batch",
+  "binary": {
+    "name": "unified-pptx-command-batch-baseline",
+    "bytes": 10392816,
+    "sha256": "af241c034cf35efbbc6de4f6c486e02121acdee271c6844732e9072e9bbbf253"
+  },
+  "working_tree": {
+    "dirty": true,
+    "source_files": 8229,
+    "manifest_sha256": "267ca6f4f6e5c0fee3adf78124c599f6fa072ad2bd34db8bbcaafabdb127f899",
+    "manifest_algorithm": "Sorted relative paths under crates and harness with extension .rs or name Cargo.toml/Cargo.lock; concatenate SHA256(file), two spaces, path, LF; SHA256 UTF-8 concatenation."
+  },
+  "measurement": {
+    "cpu_affinity": [
+      0
+    ],
+    "rounds": 3,
+    "matrix_exit_code": 0,
+    "acceptance": "Focused eager 10000-command admission rerun passes both workloads with exact-byte equivalence and one unified native commit. Source scaling finding in record 0156 and full performance acceptance remain open."
+  }
+}

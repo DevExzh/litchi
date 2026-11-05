@@ -1,0 +1,160 @@
+{
+  "schema": "litchi.drawingml.owner-policy-validation.v2",
+  "record": "0362dvb",
+  "scope": "Owner-policy retention, O(1) ordinary no-op replay, typed producer limits, typed stale-patch refusal, and standalone chart lock provenance.",
+  "source": {
+    "precommit_base": "2d330c3305b79da79cd924bf371d2941b7f14cc4",
+    "precommit_base_tree": "174ba9ea59de9b7c2d98ecaf8eebbc10ff285547",
+    "validated_worktree_content": "f40464c502d7ae17e94cbd0bdf58b8e78bf9b5c9",
+    "postcommit_source": "f40464c502d7ae17e94cbd0bdf58b8e78bf9b5c9",
+    "postcommit_tree": "5ba5bb2b1d307cda63c0c3d669053433b96ffb87",
+    "changed_files": 52,
+    "insertions": 2396,
+    "deletions": 1101,
+    "execution_phase": "The final focused checks ran before the source commit on the staged-equivalent working tree. The resulting committed tree is f40464c502; no source content changed between the final check and that commit. This receipt was added afterward."
+  },
+  "api_shape": {
+    "editor_publication": "ink::actions::Edit::commit is sole editor publication; ink::actions::Draft::finish remains fresh authoring.",
+    "owner_entry": "Prepared::edit and edit_with_options retain the admitting EditOptions policy through Arc-shared Profile and reject wider child policies.",
+    "replay": "Prepared::apply, chart::edit::Package::apply, transform::Package::apply, and theme::family::Package::apply return the core Commit triad; stale source is PatchConflict.",
+    "no_op": "Same-policy unchanged owner commits reuse cached admission facts in O(1); narrower policies validate the required bounds.",
+    "typed_limits": "XML attribute, namespace, scalar, lexical-coordinate, source-byte, model3d, SVG, theme-family, InkML, chart, and action producers carry LimitKind plus observed and maximum.",
+    "compatibility": "No public alias or deprecation forwarding method was added; transform::Package::transform was removed."
+  },
+  "locks": {
+    "workspace": {
+      "path": "Cargo.lock",
+      "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "bytes": 139591,
+      "source": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation/Cargo.lock"
+    },
+    "standalone_manifest": {
+      "path": "tools/perf-baseline/unified-chart-add/Cargo.toml",
+      "sha256": "cb7652af84cb89cc7fc83d6bf91fd252ea24fe2d62d83204d19b716ff27768b1",
+      "bytes": 620
+    },
+    "standalone_transition": [
+      {
+        "label": "tracked-before-repair",
+        "path": "tools/perf-baseline/unified-chart-add/Cargo.lock",
+        "sha256": "b0b8b8fc4bcd6dceb0e6d1de8606878ecd7191c8403de836cfebf35761f7f847",
+        "bytes": 31748
+      },
+      {
+        "label": "manual-two-edge-attempt",
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-lock-manual.patch.lock",
+        "sha256": "b1d25ab8d54c6e779f928c93363035b263e4c78c58d7b97997640ac66dc0f72e",
+        "bytes": 31780
+      },
+      {
+        "label": "offline-resolved-final",
+        "path": "tools/perf-baseline/unified-chart-add/Cargo.lock",
+        "sha256": "811dc166f6aaec285dfea8276aa1a153e4d992c00f603f5e5f0113a4f71a7f3e",
+        "bytes": 31939
+      }
+    ],
+    "registry_changes": "none: offline resolution changed only local package graph edges and retained every registry version and checksum"
+  },
+  "environment": {
+    "path_prefix": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+    "litchi_mem_max": "20G",
+    "cargo_build_jobs": 1,
+    "cargo_incremental": 0,
+    "dev_test_release_bench_debug": 0,
+    "offline": true,
+    "locked": true,
+    "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp",
+    "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/focused-owner-target",
+    "target_bytes_after": 433740696
+  },
+  "focused_command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo test -p litchi-drawingml --all-features --offline --locked --lib --test ink_action_edit --test ink_action_profile --test svg_blip --test theme_family --test theme_family_xml_grammar --test theme_part --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/focused-owner-target",
+  "focused_attempts": [
+    {
+      "label": "first",
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/focused-owner-final-producer.log",
+        "bytes": 655,
+        "sha256": "60802fb3bbf3c2dd20596dcfeb07adca27501222a28a37fe4cf3530c5dc6abb1"
+      },
+      "finding": "unused qualification in theme/family/model.rs"
+    },
+    {
+      "label": "second",
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/focused-owner-final-producer-rerun.log",
+        "bytes": 720,
+        "sha256": "86f233a0e5f30b80fb288922fd4fe121d22b9afabc5fb8d4f08bd9136257f6a9"
+      },
+      "finding": "unused qualification in tests/svg_blip.rs"
+    },
+    {
+      "label": "third",
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/focused-owner-final-producer-rerun2.log",
+        "bytes": 908,
+        "sha256": "ed6b7a76a4be0473ef2c41dff38a9b28e94c23343c2632be17ef7175820f7b69"
+      },
+      "finding": "missing LimitKind import in coordinate/tests.rs"
+    },
+    {
+      "label": "final",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/focused-owner-final-producer-rerun3.log",
+        "bytes": 30640,
+        "sha256": "7c733eee6e5e3219c76ab1573628f5c926924e837c77ba6178942a822eda0c87"
+      },
+      "tests": {
+        "library": 237,
+        "ink_action_edit": 23,
+        "ink_action_profile": 21,
+        "svg_blip": 22,
+        "theme_family": 22,
+        "theme_family_xml_grammar": 13,
+        "theme_part": 22,
+        "total": 360
+      }
+    }
+  ],
+  "standalone_checks": [
+    {
+      "label": "locked-before-local-lock-repair",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check.log",
+        "bytes": 298,
+        "sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a"
+      }
+    },
+    {
+      "label": "offline-local-lock-resolution",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-unlocked-resolution.log",
+        "bytes": 5560,
+        "sha256": "fa33065a9258be4500d5d142c7636f52080d566daf9b0a05f73fb67a2aeb5723"
+      },
+      "registry_versions_or_checksums_changed": false
+    },
+    {
+      "label": "locked-final",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check-locked.log",
+        "bytes": 590,
+        "sha256": "a0d88f49ca29aed02c60152559c08380cbd6247aafbaf89699781e59f814856d"
+      }
+    }
+  ],
+  "precommit_guards": {
+    "rustfmt_and_diff_check_exit": 0,
+    "artifact_guard_output": "empty: no staged evidence object >= 1048576 bytes and no staged binaries",
+    "no_committed_target_or_binary": true
+  }
+}

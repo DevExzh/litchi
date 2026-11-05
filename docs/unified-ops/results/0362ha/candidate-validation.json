@@ -1,0 +1,1368 @@
+{
+  "schema": "litchi.w8.part-a-candidate.v1",
+  "base": "b34cb1b104",
+  "source_inputs": [
+    "b1ae817dc4",
+    "216c1ad422",
+    "84a64e8285 detection-only",
+    "3ce77d193a qualification source"
+  ],
+  "status": "source candidate; native qualification and final W4/W4b integration required",
+  "source_files": [
+    {
+      "path": "crates/litchi-cli/src/m4.rs",
+      "bytes": 13156,
+      "sha256": "147650828356a128d3f9971357038ba153285c79ace1208474aa47115a58cb42"
+    },
+    {
+      "path": "crates/litchi-cli/src/merge.rs",
+      "bytes": 9548,
+      "sha256": "615c7f79a6e27125fca7d6b524b8d7e6c545a9facdd8d15284f6d01e07c9dd59"
+    },
+    {
+      "path": "crates/litchi-cli/src/refresh.rs",
+      "bytes": 4653,
+      "sha256": "e8bd45473bf8cfcbd3da7b605fbc91c6964cb2bb651a1e9d3d938d9b0a3edf23"
+    },
+    {
+      "path": "crates/litchi-cli/src/run.rs",
+      "bytes": 16968,
+      "sha256": "b020b2febfcd4fc675f3205cbb7d57fcc6a4260a69673f869e73680dfa542c34"
+    },
+    {
+      "path": "crates/litchi-doc/src/body_text.rs",
+      "bytes": 307542,
+      "sha256": "eed9d60e30f1eed28c0f769f5b1402a03126c605ecfec66cb0ac6c6a8e7fe549"
+    },
+    {
+      "path": "crates/litchi-doc/src/source_backed/owner.rs",
+      "bytes": 155209,
+      "sha256": "571477e0344e92ebad7b324fc0cc0c422879b3ad01dc83ca783d1060fa005972"
+    },
+    {
+      "path": "crates/litchi-ops/examples/corpus_parity_bench.rs",
+      "bytes": 13377,
+      "sha256": "59df703d97e93c87dd08a0215f4b15e0fad3ca15b13bd8541a7b547c84ae8e29"
+    },
+    {
+      "path": "crates/litchi-ops/examples/dump_bench.rs",
+      "bytes": 5500,
+      "sha256": "3cfbb4e4e5f57da1c2f5aad78f0ebd263dd7a0d7ae92d22efddf3949f97589f9"
+    },
+    {
+      "path": "crates/litchi-ops/examples/file_w8_probe.rs",
+      "bytes": 12363,
+      "sha256": "b96ce20fcc35f19f3e85aacdfaea8d95dc3e9f8f5237928e1ef06541565c8605"
+    },
+    {
+      "path": "crates/litchi-ops/examples/file_w8_qualified_probe.rs",
+      "bytes": 59940,
+      "sha256": "3b59bf0eaad4220675087b3e43f534baa5a012714b96a0856f2e8699acf11c12"
+    },
+    {
+      "path": "crates/litchi-ops/examples/json_number_bench.rs",
+      "bytes": 4634,
+      "sha256": "00f6bab324e5572b4c5ce9ff39285426f9931e472c2d12ccf18ba5ef0c30215a"
+    },
+    {
+      "path": "crates/litchi-ops/examples/keynote_bench.rs",
+      "bytes": 31767,
+      "sha256": "e486abe154ba42fb88f32ac14ee123d1b8f67fb821d43ded90761e36ad3910a6"
+    },
+    {
+      "path": "crates/litchi-ops/examples/legacy_w5_probe.rs",
+      "bytes": 8734,
+      "sha256": "4d0bc094e6a876cfa01ce73e3356c345ccad2d9e3fbce44464db63996ceceadf"
+    },
+    {
+      "path": "crates/litchi-ops/examples/legacy_w5_source_probe.rs",
+      "bytes": 15629,
+      "sha256": "9580ae3775b8cebb8cd5afe23b8fd7bb4733dadf02f91f70ef15517b622dfa9e"
+    },
+    {
+      "path": "crates/litchi-ops/examples/m4_bench.rs",
+      "bytes": 14544,
+      "sha256": "9404f19b622567681810e4e74c8943b470ebe9c6d474e9f74732863be8be7381"
+    },
+    {
+      "path": "crates/litchi-ops/examples/m4_formats_bench.rs",
+      "bytes": 14084,
+      "sha256": "50af3d15ffca643067b3db3b84267607772a8a121e888ac7b1afefc031486b01"
+    },
+    {
+      "path": "crates/litchi-ops/examples/merge_bench.rs",
+      "bytes": 12394,
+      "sha256": "f47a1e8586ab40e56d9295c77910b9d71fa8365294f971bc75ccc45ae7984fea"
+    },
+    {
+      "path": "crates/litchi-ops/examples/numbers_unified_bench.rs",
+      "bytes": 40406,
+      "sha256": "485d45f8d66c8ebdaf77dc611d5a3a89b692a1f2dd46fbdd3106899e34e0ffdb"
+    },
+    {
+      "path": "crates/litchi-ops/examples/odf_gaps_bench.rs",
+      "bytes": 20166,
+      "sha256": "e54f02df0060bae1684b7c0198c54a7899b044429e984b81cecba37ebb34f388"
+    },
+    {
+      "path": "crates/litchi-ops/examples/odf_verbs_bench.rs",
+      "bytes": 12862,
+      "sha256": "bdd14f7c194ad46e6979e9ed8f3a965b8a18fa4202c633d5539c19bd13671173"
+    },
+    {
+      "path": "crates/litchi-ops/examples/odf_w6_probe.rs",
+      "bytes": 11730,
+      "sha256": "08bfe964fda3c675b036e2013fdf98e80dc5a1b8111e81a0e9e5134364a5c0b9"
+    },
+    {
+      "path": "crates/litchi-ops/examples/odp_unified_bench.rs",
+      "bytes": 10766,
+      "sha256": "bf22f212af7507bd39594b8686f7c79dae5c1f43673c416f2e557ead40810dae"
+    },
+    {
+      "path": "crates/litchi-ops/examples/ods_unified_bench.rs",
+      "bytes": 16988,
+      "sha256": "14351b1a58f4c34c4d12264171539f0bf9a3a9f8a35119d3d3d970cd40737e78"
+    },
+    {
+      "path": "crates/litchi-ops/examples/odt_paired_bench.rs",
+      "bytes": 11439,
+      "sha256": "3f8892b1c3ce84c75de2c74beddf605fc9db6214630ded290acda45070fc0bd2"
+    },
+    {
+      "path": "crates/litchi-ops/examples/pages_bench.rs",
+      "bytes": 20375,
+      "sha256": "efd1e74ba5d4c9649ad03441f514a3660c2da4a5965bc423e396c60774ff5805"
+    },
+    {
+      "path": "crates/litchi-ops/examples/phase_g_bench.rs",
+      "bytes": 5291,
+      "sha256": "cf0f1d32b5066bfb38e447a9461035a04c40bc3a2ab65861e7ee950e8681f0bd"
+    },
+    {
+      "path": "crates/litchi-ops/examples/ppt_batch_bench.rs",
+      "bytes": 19361,
+      "sha256": "2360a21b8348db2c9d4a036871997a89b8bfdd6bcb05c1f38850fe8be10e3b04"
+    },
+    {
+      "path": "crates/litchi-ops/examples/pptx_p0_bench.rs",
+      "bytes": 18362,
+      "sha256": "985c3f248810fd72c1a77edd01db701dbae003ce29a26ec40e001890d3c36d17"
+    },
+    {
+      "path": "crates/litchi-ops/examples/pptx_p0_final_bench.rs",
+      "bytes": 28867,
+      "sha256": "3ffe8688c264a7621849d7085e39e7353fee9a075d0c17036490511075c3a4af"
+    },
+    {
+      "path": "crates/litchi-ops/examples/refresh_bench.rs",
+      "bytes": 14199,
+      "sha256": "bf5f26fabdd692289e600ddced8180a065677978a68aad90b7199b9c2bd46b55"
+    },
+    {
+      "path": "crates/litchi-ops/examples/rtf_batch_set_bench.rs",
+      "bytes": 25881,
+      "sha256": "00cce6d1377354b1b486d7b7b878039886d0d797bd0f8750ba5637cdbafb847d"
+    },
+    {
+      "path": "crates/litchi-ops/examples/rtf_destination_bench.rs",
+      "bytes": 19416,
+      "sha256": "8af2c565e047c507899190a89df01659392e388597f1d9d4a7d381d83d351364"
+    },
+    {
+      "path": "crates/litchi-ops/examples/sheet_dispatch_bench.rs",
+      "bytes": 8891,
+      "sha256": "8d3c6b4de6413bca94f777984ecff82dbc275edcd53baf8419c5e06844929e0c"
+    },
+    {
+      "path": "crates/litchi-ops/examples/xls_batch_bench.rs",
+      "bytes": 26146,
+      "sha256": "c75ed7778a0eef08f5a0f3df831a076f4cfe349259c409511ba9906f9edfb866"
+    },
+    {
+      "path": "crates/litchi-ops/examples/xls_odp_followups_new_bench.rs",
+      "bytes": 11694,
+      "sha256": "8002767756dc387fb66fcb43715e0d2e878f76f7a102549ff5bbc126f5bf4d27"
+    },
+    {
+      "path": "crates/litchi-ops/fuzz/fuzz_targets/batch_apply_harness.rs",
+      "bytes": 2608,
+      "sha256": "5f1bda3dcbd90a0214f3c38b90e958c3281b819d1c00c4740fe871aef32d4fd3"
+    },
+    {
+      "path": "crates/litchi-ops/fuzz/fuzz_targets/batch_payload_harness.rs",
+      "bytes": 5188,
+      "sha256": "e60d087163f3e3b2d162e70ddc2673f0adffd43428795ed41e1677ebd364ae43"
+    },
+    {
+      "path": "crates/litchi-ops/src/batch.rs",
+      "bytes": 17118,
+      "sha256": "a1f3eda73f26cbaa84da12b0f31ef4fb1e3d290e60abc4d151e879c05b234639"
+    },
+    {
+      "path": "crates/litchi-ops/src/batch/decode.rs",
+      "bytes": 10950,
+      "sha256": "404e354d50092feee38d8006c57f49139cb0c18ccfa41b30d3310c4679abb202"
+    },
+    {
+      "path": "crates/litchi-ops/src/batch/dump.rs",
+      "bytes": 40602,
+      "sha256": "0de3e6222859d80c44f81c6e39483fa8826913d07aca65ffd80fa0d0a2d1885d"
+    },
+    {
+      "path": "crates/litchi-ops/src/batch/execute.rs",
+      "bytes": 34190,
+      "sha256": "fe408cfdde696d8d46208d887ff845c210ed5f7cf0bac3ba2d4ea81122ddf6e7"
+    },
+    {
+      "path": "crates/litchi-ops/src/batch/tests.rs",
+      "bytes": 13882,
+      "sha256": "732258e8c5a867f40e4fe5dc989a1de4b37ccda39a4ed0788dc91294e8e8c13c"
+    },
+    {
+      "path": "crates/litchi-ops/src/detect/detected.rs",
+      "bytes": 36379,
+      "sha256": "48038c7e41020e06951f2158747c399f6d4ba007a7d76d7edd59ceae1d109a5f"
+    },
+    {
+      "path": "crates/litchi-ops/src/detect/functions.rs",
+      "bytes": 45791,
+      "sha256": "226b428db43e710d16af91849090d368d70d6087a735aa8c3661e9763a1d3e36"
+    },
+    {
+      "path": "crates/litchi-ops/src/detect/mod.rs",
+      "bytes": 10674,
+      "sha256": "f8b7264012d6eb9b9d0075acb3e1b01d5151f344559a601503598abef730e0b8"
+    },
+    {
+      "path": "crates/litchi-ops/src/detect/ole2.rs",
+      "bytes": 3059,
+      "sha256": "113afb83f32af2ecff5c717f2a45a2499e351a78663d8ba1b60176578e5eb232"
+    },
+    {
+      "path": "crates/litchi-ops/src/detect/ooxml.rs",
+      "bytes": 10910,
+      "sha256": "3400ce511a7e329150316893a3fdb68cd4e98341654b1e0ee7004b6830613c4c"
+    },
+    {
+      "path": "crates/litchi-ops/src/detect/tail.rs",
+      "bytes": 8633,
+      "sha256": "f0474aa1c8552bb6c2b847263a624a275c724fd59d1c0e29d95f0922a92ebea4"
+    },
+    {
+      "path": "crates/litchi-ops/src/error.rs",
+      "bytes": 100389,
+      "sha256": "ebea6a4c994834504271ee9a47e681011966ab519bce521837ab1ac53cd01927"
+    },
+    {
+      "path": "crates/litchi-ops/src/file.rs",
+      "bytes": 31430,
+      "sha256": "be5ae22f14e8127afda53a154756c0d338248cbcb16f6013438eff76fcde60ea"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/doc.rs",
+      "bytes": 27764,
+      "sha256": "eafc44177b4fea48f0de7a58d3ebd302841cdf44c153b7789171fa40acfd91f0"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/docx.rs",
+      "bytes": 33937,
+      "sha256": "9a6fbdda12d99b6d80a0bcc92335a0def0403b003b2a34dd0d3a7ff7190d3d8a"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/docx/tests.rs",
+      "bytes": 26584,
+      "sha256": "c4d4f0733bfe949b07f98bc306fd5ae905560b8386049625b315e57fa836a043"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/odp/tests.rs",
+      "bytes": 7895,
+      "sha256": "1f9e79ec1af9f934c5108129353623d85cd54aafc1bb37a6309d43a478a6b4fa"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/ods/tests.rs",
+      "bytes": 10713,
+      "sha256": "5a26b23b398c8fa940b2b5bc3acaab7d3804e67a93020479506de6a9ebe8f263"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/odt/tests.rs",
+      "bytes": 11845,
+      "sha256": "a95d762bee774d8f0a24f5b57e10c8f4720ef16c426f5296f909a39bfecd3b85"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/ppt.rs",
+      "bytes": 45105,
+      "sha256": "a397b575923f445902855fcfbf54bc423227ae0ed4176a7f18bb1c24753a360f"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/pptx/tests.rs",
+      "bytes": 37312,
+      "sha256": "4dd301ad446cf9f91e2bf5783d303fa89020caf9ea9d05d4f6cd94213e8ad5a1"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/rtf/tests.rs",
+      "bytes": 6427,
+      "sha256": "d3469dce5362791cea2f23e58c341a106ea8994731f3ccf0d3b742d2782fdc79"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/xls.rs",
+      "bytes": 43591,
+      "sha256": "3adea492b61138a7cdc0fc64590b7dfc1adc72e7d7d81036a8b4691c0d5771e0"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/xlsb/metadata_tests.rs",
+      "bytes": 5755,
+      "sha256": "33c8ed9e3e00f312522f2bceebb302ab3b63b1a9bfebd0818bc4bfd5c640ff4e"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/xlsb/tests.rs",
+      "bytes": 25907,
+      "sha256": "35bb6e70c520870c688eae934aa2c207924713cc04c4d6021605f4b2a5704926"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/xlsx/tests.rs",
+      "bytes": 31908,
+      "sha256": "2f6b49580267cab1951d0a1a7c05d96a3195e7be4a7e3d74e6bd760d6244c770"
+    },
+    {
+      "path": "crates/litchi-ops/src/import.rs",
+      "bytes": 30972,
+      "sha256": "108fe6d832e6fbf3a55d0720ad3ccb4138199530803006be8ee72487da32c20f"
+    },
+    {
+      "path": "crates/litchi-ops/src/lib.rs",
+      "bytes": 8287,
+      "sha256": "f23f668001a7687edcba897893afe13120c5c13ec2dc7a140835eed4494b49b4"
+    },
+    {
+      "path": "crates/litchi-ops/src/merge.rs",
+      "bytes": 32870,
+      "sha256": "bc9250734924d047e33c928277a9556f7142b75c50a0a731e94c9aae9ff1721f"
+    },
+    {
+      "path": "crates/litchi-ops/src/merge/tests.rs",
+      "bytes": 7257,
+      "sha256": "38c9d0bf1d706b3197ea63186866d915f5c619dda75105f95257fa62ae9d0f92"
+    },
+    {
+      "path": "crates/litchi-ops/src/open.rs",
+      "bytes": 29706,
+      "sha256": "9094382ba11cd85e4d156cf52511183194e2e42f12eefc5b67efa557de22289a"
+    },
+    {
+      "path": "crates/litchi-ops/src/open/bytes.rs",
+      "bytes": 9802,
+      "sha256": "ecd4c4065037a3246510195ce6a3e3a4430d90998c35f6bbb89c5306dd6f5bb1"
+    },
+    {
+      "path": "crates/litchi-ops/src/open/path.rs",
+      "bytes": 21781,
+      "sha256": "0cf35e8ab430fef228a837857806858fcd7377376c80517d47641c5d1cb84ec7"
+    },
+    {
+      "path": "crates/litchi-ops/src/options.rs",
+      "bytes": 22427,
+      "sha256": "6e632ec5e356695d7ed38b10f8df3d7430492747418384df9388acc992a8b2a1"
+    },
+    {
+      "path": "crates/litchi-ops/src/refresh.rs",
+      "bytes": 42013,
+      "sha256": "72b25259c24d1cc85576d1dde0c55027b5088d37837ee7b04579c07a19d773fa"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests/document.rs",
+      "bytes": 74642,
+      "sha256": "62914c9da69efd9967a6e6eb3a8f2439227576116beb5c598eb75763dee13b05"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests/open.rs",
+      "bytes": 47765,
+      "sha256": "b34c57d709309ed9fb4242ed621ac34e08b7c8ca433891b1b5af6607a01beddd"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests/security.rs",
+      "bytes": 28830,
+      "sha256": "b2a1cd18269e813507de0fa6bf31210ecf55a6356b1d0f499269204a82ba9770"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests/workbook.rs",
+      "bytes": 48692,
+      "sha256": "ae994337038c6ba829aa4d1ff5472ed5e4a97b499ae1a3a30d92fb2ad0ff43c9"
+    },
+    {
+      "path": "crates/litchi-ops/src/transaction.rs",
+      "bytes": 151796,
+      "sha256": "f76b9ca44d061892bcde2a48a53bb9b0b1b25b5ed35b5d5e732aaf67271d014b"
+    },
+    {
+      "path": "crates/litchi-ops/src/transaction/import.rs",
+      "bytes": 7886,
+      "sha256": "1cde5588cc17f36824d7b9eddaf15631d871018aee01e8cd4425bff7ba59b5c8"
+    },
+    {
+      "path": "crates/litchi-ops/src/transaction/limits.rs",
+      "bytes": 10059,
+      "sha256": "d01180be7d3d391e7937c558808e0c3dbe6bea2fa02eb8f0bff815ebe223885a"
+    },
+    {
+      "path": "crates/litchi-ops/src/transaction/merge.rs",
+      "bytes": 11804,
+      "sha256": "d0d3cb9f661d84714650090fd77b7267ae4ec62511aef4330e65f62a3c149224"
+    },
+    {
+      "path": "crates/litchi-ops/src/transaction/options.rs",
+      "bytes": 1838,
+      "sha256": "24ca34f00d63381e6fc0e25ec1b045aef85cd5dda43fbeb9f786866185b55626"
+    },
+    {
+      "path": "crates/litchi-ops/src/transaction/refresh.rs",
+      "bytes": 10443,
+      "sha256": "9f5c97003193207beae8a3bd98eaae2c300d16df5f8f68461270b4b9a6c6ac00"
+    },
+    {
+      "path": "crates/litchi-ops/src/write.rs",
+      "bytes": 33272,
+      "sha256": "d6dd19dd8c0fc3ef537ec548b184300a8922f640060b47fe13011d74a2aae38e"
+    },
+    {
+      "path": "crates/litchi-ops/tests/calc.rs",
+      "bytes": 9092,
+      "sha256": "666f5276d06e74c4d6e40cef953ac3a22a38ebe8b64ba81885986408e61b84c7"
+    },
+    {
+      "path": "crates/litchi-ops/tests/cell_text_alias.rs",
+      "bytes": 3361,
+      "sha256": "175938ab852a6eb5996003a009b6d97507a8c3bc02ca562c8ac3270ebee3eba6"
+    },
+    {
+      "path": "crates/litchi-ops/tests/charts.rs",
+      "bytes": 28229,
+      "sha256": "4ca6699dab0bf0bb4c8c94d121a0b4076d4ea6266b1fe9830488256f99c28da7"
+    },
+    {
+      "path": "crates/litchi-ops/tests/corpus_fidelity.rs",
+      "bytes": 53189,
+      "sha256": "7adef868001099f8d7b8f587219734da99316be5250b2c018705e151c78339d0"
+    },
+    {
+      "path": "crates/litchi-ops/tests/crud_matrix.rs",
+      "bytes": 112890,
+      "sha256": "da646b5f41131f0c7cffcd5f12923c0519bd2431bb3208becb9a8bbba80a1a53"
+    },
+    {
+      "path": "crates/litchi-ops/tests/doc_unified_ops.rs",
+      "bytes": 24427,
+      "sha256": "5aaaf96ad564973b105d252ee16d00b9938bfeb84fae83798b8c771193cf326a"
+    },
+    {
+      "path": "crates/litchi-ops/tests/doc_unified_p0.rs",
+      "bytes": 20294,
+      "sha256": "7d8fd7495284e7f7e71973c1f207563242c4562c6412b716c127d4f4340946f8"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_batches.rs",
+      "bytes": 64775,
+      "sha256": "35e00cbfd09746dc5502e1894a66d7bdb0b43fac0b88dd8e978720f86b72bf25"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_find_replace.rs",
+      "bytes": 12891,
+      "sha256": "6cbf6f6c8c3e32e28e3cabf0053638f1bde79fd8021a8fe24e450de9a0064ab0"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_find_stories.rs",
+      "bytes": 18564,
+      "sha256": "ca8f54deb8853de8eb5c5feb0ff28e423be21531b175716dd634dcfd85d098b2"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_markup_compatibility.rs",
+      "bytes": 19667,
+      "sha256": "93b0a3bcd93800f4084323213ac971056815867ffb023f9a07c44fc260c15392"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_transactions.rs",
+      "bytes": 27704,
+      "sha256": "f8e14cd09af96025be633e41ebcb0ab29de970959f1285088acb0e22fff4e4e0"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_unified_save.rs",
+      "bytes": 26122,
+      "sha256": "35a739497554cb1663e6d1abd7d958af23c9afe5c78b22a5a9d4cd1424983e1a"
+    },
+    {
+      "path": "crates/litchi-ops/tests/docx_unified_write.rs",
+      "bytes": 37623,
+      "sha256": "d6398aaad34ee5aa20be76c967d095b0d0914280af64647ae34c91597671a7bb"
+    },
+    {
+      "path": "crates/litchi-ops/tests/dump_round_trip.rs",
+      "bytes": 13015,
+      "sha256": "5522b892867adf586c6e181343b26d5ca2d2525ea2804539ec278bb94d2b09a6"
+    },
+    {
+      "path": "crates/litchi-ops/tests/field_refresh_formats.rs",
+      "bytes": 10202,
+      "sha256": "2b98f12c2076392b27e404d198c9d4ef71a43bb8137c07d2da9a38b3d2d26ac5"
+    },
+    {
+      "path": "crates/litchi-ops/tests/find_merge_formats.rs",
+      "bytes": 18307,
+      "sha256": "4480976ca8181077ab0cf2e0623e19c14930a99932ce71f824981a9cc0f7ed38"
+    },
+    {
+      "path": "crates/litchi-ops/tests/flat_odf_unified.rs",
+      "bytes": 9518,
+      "sha256": "ee4c1677428a2b996ffc10163a232cd67438767df2d74ef0a1d25f6273e5edba"
+    },
+    {
+      "path": "crates/litchi-ops/tests/import.rs",
+      "bytes": 14238,
+      "sha256": "870ae2745da8f6f0d3df9e44f4eac213a7bb7766f60a36f754b444c57f6de3de"
+    },
+    {
+      "path": "crates/litchi-ops/tests/iwork_batch_equivalence.rs",
+      "bytes": 11608,
+      "sha256": "7555960c6e676e403e36b365f439a24db0969be75cb93bf99919a88c6b999c50"
+    },
+    {
+      "path": "crates/litchi-ops/tests/keynote_unified.rs",
+      "bytes": 36262,
+      "sha256": "32f4dfd996042cdc6eddd5fd592522ddc05c4fc7719481f48a2c4b106687e7f6"
+    },
+    {
+      "path": "crates/litchi-ops/tests/merge.rs",
+      "bytes": 23905,
+      "sha256": "2482e98553981aea02fca0c516b7818a7ffc26785ef6dbb884fac7bb2ec70740"
+    },
+    {
+      "path": "crates/litchi-ops/tests/metadata_keywords.rs",
+      "bytes": 6981,
+      "sha256": "e8048618c7b4e21397fa2fbbb168192f9ca104213c91c9814336c21ea9283ba9"
+    },
+    {
+      "path": "crates/litchi-ops/tests/numbers_unified.rs",
+      "bytes": 38739,
+      "sha256": "98c1fffdb588d520a8fd5c17c33e046995103876d9daad2fd58f36d13121b2e0"
+    },
+    {
+      "path": "crates/litchi-ops/tests/odf_objects_unified.rs",
+      "bytes": 41000,
+      "sha256": "e56bc0c9796f547ab51d136d4b0c85acf8b9ef36ce505be148f4128b25f0fe2c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/odm_unified.rs",
+      "bytes": 5626,
+      "sha256": "6fdfc5dff877e7cd9d5b4d8c72e462bb029196a71b2398c4633d8b40f4693f9c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/odp_character_format.rs",
+      "bytes": 12916,
+      "sha256": "70e5caa56b1074059ffe89da6d922e934c52f90703718b02797f6f95bad9bb71"
+    },
+    {
+      "path": "crates/litchi-ops/tests/odp_unified_write.rs",
+      "bytes": 13282,
+      "sha256": "8b937a4482919f2c8201e9fd203bf3a45cc79ecf865f4b882fd4896f8c2fa502"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ods_import.rs",
+      "bytes": 4380,
+      "sha256": "0735dfdaa01f44fce34cf881be8e9732dbb6fdf3e47f8b71b82277a29c9b2bce"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ods_unified_write.rs",
+      "bytes": 19614,
+      "sha256": "1d845f4916cf77d48a01bc71a0d8e58699c59717cd6b42010fa9bece34732523"
+    },
+    {
+      "path": "crates/litchi-ops/tests/odt_unified_write.rs",
+      "bytes": 13333,
+      "sha256": "19b6c82b4d4e6ac76aec7ccf3bf0b3f8ee736684bf7112dc94dbc42dbcda052d"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ole_metadata.rs",
+      "bytes": 6653,
+      "sha256": "4a7f9b9902fa24f0160cd5848bbe631ce967a6a013f30cac8ce0616a6c510275"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ooxml_metadata.rs",
+      "bytes": 8676,
+      "sha256": "bbbc3353bbf4ad817fbbe88b38f87cddf5ce829ff9979acf1abd54d9dc3c80d4"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pages_unified.rs",
+      "bytes": 21793,
+      "sha256": "81b522afd0194b30eab74057b0f6f88a454c9f78526be3e5c56d701194701089"
+    },
+    {
+      "path": "crates/litchi-ops/tests/phase_g_regressions.rs",
+      "bytes": 6097,
+      "sha256": "36e94a97497c38edaf29f4df64aae8691d761ae8de31f4fca04f7bfe37614156"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ppt_coalesced_set.rs",
+      "bytes": 21769,
+      "sha256": "fcc4069e35ef0cfe28594b19c8f471a8dacf17df8cef2239a4749beda824a5be"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ppt_elements.rs",
+      "bytes": 20937,
+      "sha256": "7d2c1918cdf4a3f17e9deecb93753ee8ada47ce0a78186be9e2facec1d7aefdc"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ppt_slide_add.rs",
+      "bytes": 6970,
+      "sha256": "a1639c060a7a4be27ad6b77654c55277509a4fc5cc377c1d097e3cf4399fab1a"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ppt_unified_structure.rs",
+      "bytes": 18966,
+      "sha256": "06a9fb62a1a6623845766d1ffef8c0c964435f8b6a023c7202175642bd7bd41c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ppt_unified_text.rs",
+      "bytes": 10999,
+      "sha256": "da1fee9b8d5cef30458a8fd80bf67843333e197a3b472ed7d235822df9d3c9e3"
+    },
+    {
+      "path": "crates/litchi-ops/tests/ppt_unified_write.rs",
+      "bytes": 21690,
+      "sha256": "4475d0debed3907116560d6ac33232ad6bdd3ad89fd1f8a83d2b35c034a72ad5"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_batch_equivalence.rs",
+      "bytes": 12790,
+      "sha256": "36a92644919b666121728943d73f4e7a778253ed3b88ffe4a212463f7011329c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_coalesced_format.rs",
+      "bytes": 5882,
+      "sha256": "d22be2e038a0c28c4f8ddc13821204ba0632a1ff86868daf9e5d0ec944aa6883"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_coalesced_set.rs",
+      "bytes": 23382,
+      "sha256": "1ddd599c6ba08f11d437fec2ac626f8761f6902928ac6b24e216bbea5874f9f1"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_corpus_parity.rs",
+      "bytes": 9629,
+      "sha256": "f0d8543e4f04bb9f8f2f5922c4688a8def11df3502142f759182bda0430e4798"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_find_replace.rs",
+      "bytes": 10784,
+      "sha256": "90f3ebddc4b18011b2721177210c08ebe5e268b9d65c613fae18762a37c254a8"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_large_shape_set.rs",
+      "bytes": 14737,
+      "sha256": "c4258c50f789d4241a22922db62c42fce721cea8612ce7a432ec8e8a6716a366"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_p0_final.rs",
+      "bytes": 40554,
+      "sha256": "3322e4b27551d2c7b43fda2700b99ac76f8db635250880ff2dcabfbd47e22574"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_shape_add.rs",
+      "bytes": 11499,
+      "sha256": "c58279cc8db80b032cba7ca733db722bdd4f11caa7de4d532f3a3690d1cdc353"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_shape_remove.rs",
+      "bytes": 6959,
+      "sha256": "f2c7d6ae712237500096ab8333fe901cd13ee7f24681d4eca1fab0696bb3c5c9"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_slide_add.rs",
+      "bytes": 15307,
+      "sha256": "666e2a64ba93a0196b8bcbea83cb5e070189ca9ea9456aa1f454bcf152407817"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_slide_order.rs",
+      "bytes": 9768,
+      "sha256": "26cd66a9862e9cbb048c72ca1b32288d7e241450b89a1fa1fd65dc5191d3421c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_slide_properties.rs",
+      "bytes": 10300,
+      "sha256": "fa739465448505a460236a1040935cc1f2d0ccf98764d227fd497c7506fee5d1"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_slide_remove.rs",
+      "bytes": 14858,
+      "sha256": "dedf1770d36d2ea4a5f81bacbd10f50c569424f97532edcfe8e1d413df2735f8"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_text_format.rs",
+      "bytes": 8615,
+      "sha256": "aa00065113db78004e5e6920d00d6b1880ebf8975489c290f6f3fe6655d59e29"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_text_structure.rs",
+      "bytes": 12027,
+      "sha256": "99380a7cd0247e68490b1954b34aab6351331fcbec502cf376f84a47307a6b45"
+    },
+    {
+      "path": "crates/litchi-ops/tests/pptx_unified_write.rs",
+      "bytes": 26377,
+      "sha256": "279241d5937f2e763711c3f18e72565455c67669e3532bb3b5daba5df2684437"
+    },
+    {
+      "path": "crates/litchi-ops/tests/producer_structure.rs",
+      "bytes": 13376,
+      "sha256": "0a4626b7477c4316a63f7e64b9eb3fd75f4fd7f4d0cc89674a69638747c20c35"
+    },
+    {
+      "path": "crates/litchi-ops/tests/refresh.rs",
+      "bytes": 13848,
+      "sha256": "7a44ea81faf0dd07b80bfb394eca14574fec7e5efde8912d51902b5239f37955"
+    },
+    {
+      "path": "crates/litchi-ops/tests/root_metadata.rs",
+      "bytes": 10772,
+      "sha256": "4bbf429bfa96ae791791227fbf58023edf9c8115ee20e8b0abd828c7b9548113"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_coalesced_set.rs",
+      "bytes": 33830,
+      "sha256": "3a4a9d4290194abc277b4c4ad3c631130e7f53b6c654df2da2a2eb141377b311"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_find_replace.rs",
+      "bytes": 2837,
+      "sha256": "c6b673e5099ddb154ff16286263d33da79970e871cba5a5d98f1bfa8271f34d3"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_add.rs",
+      "bytes": 12430,
+      "sha256": "c8bc37d6d9755ee69f08d440e4c3e9b729982e244eed29bfa5915d9c769ff39c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_alignment.rs",
+      "bytes": 9777,
+      "sha256": "2ff326fc8438568e043220eb6db087b7b8e6785723272b6ef928218b789e41f7"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_layout.rs",
+      "bytes": 11944,
+      "sha256": "3636fc20e89575465450575d299f987b4432c295a16a8421175915055aa03855"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_move.rs",
+      "bytes": 8806,
+      "sha256": "e4b85305d1653a1a22515ce16843f5b18048a2ccfcd1ad6c8af856daa54fb4f6"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_remove.rs",
+      "bytes": 8833,
+      "sha256": "c045a1eebd5a48d8a8b0d5b48035ae30867b757110cdbe9a40b1694c84e240cc"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_run_add.rs",
+      "bytes": 15800,
+      "sha256": "c8588c6103e3e3da4a45856944c9c55303bad7f743cc0143a32f5d9d1473701b"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_run_format.rs",
+      "bytes": 18450,
+      "sha256": "f978dfa0c6a9e7ec36faf7b2725ee607ad9e76e78410b5dc760e358c46e19fdf"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_run_remove.rs",
+      "bytes": 13043,
+      "sha256": "432c7fb2829ba8c72f3720a2975c815dbfc3508811f970ed13e6e22509f6c7a0"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_run_text.rs",
+      "bytes": 15801,
+      "sha256": "188964d9086fa4cbfa212e2ab1251caa08d903b2446dcfadd9f612a40edbb4a6"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_stories.rs",
+      "bytes": 20331,
+      "sha256": "948dede1dec2b6492d4ceec129eab442f5fbcb5e579a024838bf46796dd859b3"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_swap.rs",
+      "bytes": 9038,
+      "sha256": "02656a0dcf1ad90a321429f457aab5783956b99a1fe7a6dd893a5c0104f48a3a"
+    },
+    {
+      "path": "crates/litchi-ops/tests/rtf_unified_write.rs",
+      "bytes": 11733,
+      "sha256": "d6852d36f4688bb112dd9e8209225d0215719cb1c83c31bda95f9dae18d0e138"
+    },
+    {
+      "path": "crates/litchi-ops/tests/unsupported_warn.rs",
+      "bytes": 14435,
+      "sha256": "c15717f9ecfebfc9425b19eccb7fccb9afd28c2f976cb04929bdb52b438c4062"
+    },
+    {
+      "path": "crates/litchi-ops/tests/value_allocations.rs",
+      "bytes": 24325,
+      "sha256": "b893137f640b131c54f6b32ecab8c6d01cf81ea639c46223c6dd54c53c2966df"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_batch.rs",
+      "bytes": 34866,
+      "sha256": "2d42ae33992136a4c0d568f959d335cf64893c9704637ced2417eb28ac7ef913"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_format.rs",
+      "bytes": 7261,
+      "sha256": "8b0802ede1c211e7255b557b94405637f116e1941a7e0670763a3ae554c4db11"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_formula.rs",
+      "bytes": 8853,
+      "sha256": "f4249da6e1b15d9956d0be9c61b43e9c3eaf2f9cea54d7ef40eba5891a8afe85"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_layout.rs",
+      "bytes": 8122,
+      "sha256": "cb07c4ff586b9fffcc916676d8d5b28b8b8f5a34e0b898acaa10a2ec73d16494"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_remove.rs",
+      "bytes": 25205,
+      "sha256": "dca449145978494f0b2382d02d7ae654229cad2743945e338cf242fca9b47555"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_structure.rs",
+      "bytes": 17608,
+      "sha256": "b86e09f19f8971d2093148e7b3adb2227fb2d9808c6b3cf50535eefb2480ee1d"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xls_unified_write.rs",
+      "bytes": 33848,
+      "sha256": "f12b7ef4b1249f85fede1aa79b10e57466decc643a6fde386c213af202ae72e7"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_batch_remove_coalesce.rs",
+      "bytes": 2348,
+      "sha256": "04ac179062627d889ffe13fd02354025aa68757f6b1344247ed74900fed29528"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_cell_writes.rs",
+      "bytes": 34368,
+      "sha256": "d8377e53b4cde9ebc2112ed2991aa976b1d2ebe2a20b9cfba45c421a449ab805"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_p0_writes.rs",
+      "bytes": 20989,
+      "sha256": "045895c016e89ee560ef1213192dab0f795bf41cd678f7b04f91eae7a9ad84b2"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_remove.rs",
+      "bytes": 22527,
+      "sha256": "989e8e4729eaa16811a963258940f24e7541306d5be2b5feb0431571d9c04bb1"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_sheet_add.rs",
+      "bytes": 12207,
+      "sha256": "91135f6548bb8b6f47ea7f10bcc4271715535fa97e4932f136ad55180d5baba4"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_sheet_batch.rs",
+      "bytes": 28326,
+      "sha256": "2ea770b1750871d04c7bfbd9a30851cdbc7de668918bcb7afcf9343a0a53b219"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_sheet_name_dependencies.rs",
+      "bytes": 10477,
+      "sha256": "2ef3d39be2238603bf6a1dfe37296626257953695a4260b896b2a30bdf5b4232"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_sheet_names.rs",
+      "bytes": 7492,
+      "sha256": "2e3c4594ec25f6c8365b91490c83af02fb94611b3835e3f600aa2fcb648fad0c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_sheet_order.rs",
+      "bytes": 9819,
+      "sha256": "b9bbc212adf22a395a4d0cc094bad7ebe76c5573abd703023d0bf7b593a053d3"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_sheet_remove.rs",
+      "bytes": 15947,
+      "sha256": "e7110257f06fbcfdae6f825640a902cbb729da40be598ae00fc4ab1f88b9966a"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_visibility.rs",
+      "bytes": 30288,
+      "sha256": "86654d9f01b6cf544986c7c764e190f8ee0a821697e3f034e255c80ca6d38a22"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsb_writes.rs",
+      "bytes": 24149,
+      "sha256": "9b603aa263ac597c72e8a27c60bb084a9f038147d20dfa944ca5cb5d2ae526d1"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_cell_writes.rs",
+      "bytes": 211933,
+      "sha256": "bdb1fa3cdfbc39ff28780e6df86c9f3e03ee957d518e2ba27863000f12b9afa2"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_coalescing.rs",
+      "bytes": 17702,
+      "sha256": "5ee38e5386ccaec22e6069d0e5a208ec90f00789379899d883c60acd59436207"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_dimension_writes.rs",
+      "bytes": 16366,
+      "sha256": "a67c97bc97e97e876ea183da1aa966ad7a72f9f2275e9c01eb13bd260d72967c"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_find_replace.rs",
+      "bytes": 11368,
+      "sha256": "9e9814fcb33c837c5e021e99f8d49458ec578820b15377524d28a6a20038c839"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_merge_writes.rs",
+      "bytes": 28280,
+      "sha256": "36399d033ec8cf79d0f5e6598dfb4789158743ec66250e88654ca40b08db2b36"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_refresh.rs",
+      "bytes": 4833,
+      "sha256": "1181bdd4a4dbf87bbdf0756a0cbc5df269c54d251e4cdcc25fc0bad20f6c8bb8"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_structure.rs",
+      "bytes": 27795,
+      "sha256": "1d87a5812c62cf8824104e4fcda75b99fc9749e188b2ede68f77e938056aca10"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_target_writes.rs",
+      "bytes": 25053,
+      "sha256": "616398b6bc527ac958b7ef8c48047b7c0ba3d41b20a57fab532734c5b9a80207"
+    },
+    {
+      "path": "crates/litchi-ops/tests/xlsx_unified_save.rs",
+      "bytes": 27425,
+      "sha256": "c78cd19dba0c0307c7e6f0b64b39af889b8a2dac5d4d5d5c7b405cf1b4d5a04a"
+    },
+    {
+      "path": "crates/litchi/README.md",
+      "bytes": 25761,
+      "sha256": "66b64b4ca1735fc834a4af89fad6fc086e766e4cb74d6f88a8f7edd690992f2b"
+    },
+    {
+      "path": "crates/litchi/src/detection_smart.rs",
+      "bytes": 10616,
+      "sha256": "89cd601a7029188073b2f2f7da6d6e6c34407067fd0875d566d671b50d10c919"
+    },
+    {
+      "path": "crates/litchi/src/detection_smart/prepared_index_tests.rs",
+      "bytes": 9277,
+      "sha256": "825e84d70290fce765a3d47b2eb7b7a7422e7099f999a16c5463e8ef8d297297"
+    },
+    {
+      "path": "crates/litchi/src/detection_smart/tests.rs",
+      "bytes": 7855,
+      "sha256": "7fbd7ac7eec82da4c1f335c4d31e95ccb2bb646ef736f0749e200d094adb2929"
+    },
+    {
+      "path": "crates/litchi/src/lib.rs",
+      "bytes": 28112,
+      "sha256": "b3dd68badd77e38bb4ab2a48568f15d16ebc74eb40cea804d7d2f87981360d84"
+    },
+    {
+      "path": "crates/litchi/tests/catalog_detection_arbitration.rs",
+      "bytes": 25815,
+      "sha256": "a76a018462f2cd4412e2e59c23a99b64dc5665c62ae9e9b0d451f826d0b66b36"
+    },
+    {
+      "path": "crates/litchi/tests/catalog_first_detection.rs",
+      "bytes": 15867,
+      "sha256": "b44055218912ba587895c7f053344df24dbd711a93eef63c0b2d7bf66c4037dd"
+    },
+    {
+      "path": "crates/litchi/tests/read_limits_facade.rs",
+      "bytes": 9977,
+      "sha256": "16f8044bf2f09711b9faf99fe4c0cb7e6fdbe39d6a0f052ada17f55d5f6b71fe"
+    },
+    {
+      "path": "crates/litchi/tests/unified_open_facade.rs",
+      "bytes": 16774,
+      "sha256": "094739639b2f1eb824d1554fb49ada787eb29c3924b30a10275369da96c1210b"
+    },
+    {
+      "path": "crates/litchi/tests/unified_transaction.rs",
+      "bytes": 2068,
+      "sha256": "fa151fdfe27e416bbcd0366dbb2d332f7d480b2c5fd3809bca53b7a51d30d10f"
+    },
+    {
+      "path": "crates/pyo3-litchi/src/common.rs",
+      "bytes": 12508,
+      "sha256": "e9de3fc82ff8ce4da4d5d2037ee74da5296380e67710908544ede55dbf78f70b"
+    },
+    {
+      "path": "crates/pyo3-litchi/src/file.rs",
+      "bytes": 55521,
+      "sha256": "b310106cbbdbfc793935da20973d6a31f4bc552518c621aa4b2374c16c212b81"
+    },
+    {
+      "path": "crates/pyo3-litchi/src/m4.rs",
+      "bytes": 6562,
+      "sha256": "226e97da137bf74fa13466eb681e283d25c05913f92780d807c91646b3b6e1ea"
+    },
+    {
+      "path": "crates/pyo3-litchi/src/merge.rs",
+      "bytes": 3575,
+      "sha256": "74866dd9273a60a7acc4024e8eaf4434c7893043ae4ce0444fd9025942b5e331"
+    },
+    {
+      "path": "crates/pyo3-litchi/src/refresh.rs",
+      "bytes": 3317,
+      "sha256": "ff6ef41f36b244ccc2a4bd9a50ef62d5f8a1a3826f268c2cdcbb734e68e2ae7f"
+    },
+    {
+      "path": "crates/pyo3-litchi/src/write.rs",
+      "bytes": 31629,
+      "sha256": "29fdd3d5f0f97c2e1cc8a0937b2233f1dc16f5f2d5c0483cf680c249b704c10a"
+    },
+    {
+      "path": "tools/api_glossary.json",
+      "bytes": 736602,
+      "sha256": "9cdc3ac86f5b19f0bdb008ad8945cd22c555ed914569e25f26cda87f662aab36"
+    },
+    {
+      "path": "tools/perf-baseline/examples/ppt_paired_probe.rs",
+      "bytes": 21239,
+      "sha256": "51a7423eea9d8f5a6bedf87912ec3ae4e34a1a76c0285bdbe5682d62fe824c24"
+    },
+    {
+      "path": "tools/perf-baseline/src/unified_ops.rs",
+      "bytes": 147663,
+      "sha256": "16761902fad7e08fe3a0d7766cafa6e1befa468d2991cb1a7858e06d7b9d4fd1"
+    },
+    {
+      "path": "tools/perf-baseline/unified-batch-closure/src/main.rs",
+      "bytes": 12980,
+      "sha256": "99560d597c28c5a47298ef658332f9fda5a571f8545244754481af6f39d54b5b"
+    },
+    {
+      "path": "tools/perf-baseline/unified-docx-batch/src/main.rs",
+      "bytes": 7719,
+      "sha256": "76193fef9713998d413c8241fc9ab8502b8e67850dfa28d1a1f2026af8a9f1c2"
+    },
+    {
+      "path": "tools/perf-baseline/unified-docx-text-fanout/src/main.rs",
+      "bytes": 7789,
+      "sha256": "05dcf310ac04213e1905c160622ddfb1fae2a04f2a2dd4bbc937b85869576852"
+    },
+    {
+      "path": "tools/perf-baseline/unified-pptx-chunk-publication/src/main.rs",
+      "bytes": 22931,
+      "sha256": "bb09beab4745f87eff9f158c9263c3a04a6c8fa54c7ffe380137c3dff0c2ed63"
+    },
+    {
+      "path": "tools/perf-baseline/unified-pptx-command-batch/src/main.rs",
+      "bytes": 22932,
+      "sha256": "064ac9ce1fb01927273b056ee619121f8f0f3065524c8dd39daed2fc6f03e559"
+    },
+    {
+      "path": "tools/perf-baseline/unified-xlsb-cell-value/src/main.rs",
+      "bytes": 28513,
+      "sha256": "827f4d2fa757351770442a04b7d808784aa0d5aed67896ca64fc528a1eb580a5"
+    },
+    {
+      "path": "tools/perf-baseline/unified-xlsb-remove/src/main.rs",
+      "bytes": 31195,
+      "sha256": "2b057ff65204a8cd10c3ed9e0e3cf6a12f9959c068ff1a19cc6a5a20fdd2a8a7"
+    },
+    {
+      "path": "tools/perf-baseline/unified-xlsb-sheet-batch/src/main.rs",
+      "bytes": 27694,
+      "sha256": "06dd45d59196da2d9ff8da8e6256617a27a9a39c03c6f7884a2ade2fe5171a7c"
+    },
+    {
+      "path": "tools/perf-baseline/unified-xlsx-batch/src/main.rs",
+      "bytes": 8856,
+      "sha256": "cf1a86df4b6f59d9c38052cb8aea0194a2058d4dd76a84487e1efadd4ac70ac0"
+    },
+    {
+      "path": "tools/unified_bench_matrix.py",
+      "bytes": 172283,
+      "sha256": "3fdac3b64e7372d6afa3bc05aa1b984d8cd8a759514c3dad96ffd7f79da61aa9"
+    }
+  ],
+  "validation_attempts": [
+    {
+      "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/checks.json",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "litchi-py",
+            "-p",
+            "litchi-doc",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 101,
+          "seconds": 180.41894133202732,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/check-0.log",
+          "bytes": 10295,
+          "sha256": "6e5c5390e69ad943645ce91d7b94717ea74cec57b84fe89d54f7c255f3fc323f"
+        }
+      ]
+    },
+    {
+      "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/repaired-checks.json",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 26.548432487994432,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/repaired-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "litchi-py",
+            "-p",
+            "litchi-doc",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 101,
+          "seconds": 105.0379707190441,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/repaired-1.log",
+          "bytes": 2948,
+          "sha256": "d0634af2816096bf10f774a3cf4ee60885651f34c4c8a60bc0b4f33d44024a8f"
+        }
+      ]
+    },
+    {
+      "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v1/checks.json",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "-p",
+            "litchi-ops"
+          ],
+          "exit": 0,
+          "seconds": 2.7835955870104954,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v1/check-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--all-targets"
+          ],
+          "exit": 101,
+          "seconds": 6.994686350924894,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v1/check-1.log",
+          "bytes": 2586,
+          "sha256": "283c533b86f0d95083804602cc1aa3883303056c7142bd81e220f756a92fb5e3"
+        }
+      ]
+    },
+    {
+      "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v2/checks.json",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "-p",
+            "litchi-ops",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 2.715415747021325,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v2/check-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 9.160470107919537,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v2/check-1.log",
+          "bytes": 171,
+          "sha256": "b03ff1bd163beccbbc3f49ca6e80c04ab1b32e34e355445260cad51721dd52cf"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "rtf",
+            "--lib",
+            "rtf_detection_applies_exact_input_limits"
+          ],
+          "exit": 0,
+          "seconds": 26.46727991697844,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v2/check-2.log",
+          "bytes": 1620,
+          "sha256": "57af9f2341befeca8a86067a7954345df9084eac8998ca689d1ba669bfcf8066"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "litchi-py",
+            "-p",
+            "litchi-doc",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101,
+          "seconds": 280.3891654390609,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v2/check-3.log",
+          "bytes": 9973,
+          "sha256": "a6d09c56f147607373dc8014b7976dc351e4e54bdb54e58325e934c1b8fbc4bb"
+        }
+      ]
+    },
+    {
+      "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v3/checks.json",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "-p",
+            "litchi-ops"
+          ],
+          "exit": 0,
+          "seconds": 2.514563092030585,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v3/check-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "litchi-py",
+            "-p",
+            "litchi-doc",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 59.17782108206302,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v3/check-1.log",
+          "bytes": 283,
+          "sha256": "88dc96c487a4e4a14098898228212cc9c45d0b2a7999a85f71fbf84537b5b825"
+        }
+      ]
+    }
+  ],
+  "matrix_checks": [
+    {
+      "command": [
+        "python3",
+        "tools/unified_bench_matrix.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.23317188501823694,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/matrix-final-0.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_unified_bench_matrix"
+      ],
+      "exit": 0,
+      "seconds": 0.6168709450867027,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/matrix-final-1.log",
+      "bytes": 532,
+      "sha256": "537e295fc1a9031e545116f8827d0ff3defe8c1442a20e026022c0a3175629ba"
+    }
+  ],
+  "remaining": [
+    "full current-source ops library test is running",
+    "qualification workload/source-fidelity repairs from 0362ha review",
+    "untimed corrected probe preflight",
+    "final shared-surface integration and complete gate",
+    "matched performance qualification"
+  ]
+}

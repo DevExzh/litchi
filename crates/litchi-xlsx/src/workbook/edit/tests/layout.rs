@@ -12,7 +12,7 @@ use crate::column::Outline;
 use crate::{StyleState, Value};
 use litchi_opc::Part;
 
-fn page_break_workbook() -> Workbook {
+fn page_break_workbook() -> crate::Package {
     let source = two_sheet_workbook(WorksheetKind::Worksheet);
     let mut package = source.inner.package.clone();
     package
@@ -21,10 +21,10 @@ fn page_break_workbook() -> Workbook {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/><rowBreaks count="1" manualBreakCount="1"><brk id="4" max="16383" man="1"/></rowBreaks></worksheet>"#.to_vec(),
         );
-    Workbook::from_package(package).expect("page-break workbook")
+    crate::Package::from_opc(package).expect("page-break workbook")
 }
 
-fn malformed_page_break_workbook() -> Workbook {
+fn malformed_page_break_workbook() -> crate::Package {
     let source = page_break_workbook();
     let mut package = source.inner.package.clone();
     package
@@ -33,7 +33,7 @@ fn malformed_page_break_workbook() -> Workbook {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/><rowBreaks count="2"><brk id="4" max="16383"/></rowBreaks></worksheet>"#.to_vec(),
         );
-    Workbook::from_package(package).expect("malformed page-break workbook")
+    crate::Package::from_opc(package).expect("malformed page-break workbook")
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn worksheet_page_break_cache_is_shared_across_unchanged_publication() {
         .activate();
     let committed = edit.commit().expect("commit");
     let descendant = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("descendant lookup")
         .expect("descendant worksheet");
@@ -206,7 +206,7 @@ fn worksheet_page_break_cache_is_snapshot_local_across_clones_and_noop_edits() {
         .expect("source and target sheets");
     let changed = clone_edit.commit().expect("clone commit");
     let changed_sheet = changed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("changed lookup")
         .expect("changed worksheet");
@@ -222,7 +222,7 @@ fn worksheet_page_break_cache_is_snapshot_local_across_clones_and_noop_edits() {
         .commit()
         .expect("no-op commit");
     let no_op_sheet = no_op
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("no-op lookup")
         .expect("no-op worksheet");
@@ -245,12 +245,12 @@ fn worksheet_page_break_projection_is_invalidated_by_publication() {
         .expect("source and target sheets");
     let committed = edit.commit().expect("commit");
     let moved_source = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("source lookup")
         .expect("source worksheet");
     let moved_target = committed
-        .workbook()
+        .package()
         .sheet(1usize)
         .expect("target lookup")
         .expect("target worksheet");
@@ -287,7 +287,7 @@ fn worksheet_page_break_projection_is_invalidated_by_publication() {
 
 #[test]
 fn row_visibility_is_checked_reversible_and_patch_visible() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
@@ -295,7 +295,7 @@ fn row_visibility_is_checked_reversible_and_patch_visible() {
     sheet.row(1).expect("row 2").hide();
     let committed = edit.commit().expect("commit");
 
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert!(matches!(
         &committed.patch().changes()[1],
         Change::Row {
@@ -306,7 +306,7 @@ fn row_visibility_is_checked_reversible_and_patch_visible() {
         } if row.get() == 1 && properties.hidden()
     ));
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -315,15 +315,15 @@ fn row_visibility_is_checked_reversible_and_patch_visible() {
     assert!(row.hidden());
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
-    let mut edit = committed.workbook().edit().expect("show edit");
+    let mut edit = committed.package().edit().expect("show edit");
     edit.sheet(0usize)
         .expect("lookup")
         .expect("sheet")
@@ -332,7 +332,7 @@ fn row_visibility_is_checked_reversible_and_patch_visible() {
         .show();
     let shown = edit.commit().expect("show commit");
     let shown_sheet = shown
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -348,7 +348,7 @@ fn row_visibility_is_checked_reversible_and_patch_visible() {
         .row(10)
         .expect("row 11")
         .show();
-    assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+    assert!(no_op.commit().expect("no-op commit").patch().is_noop());
     let mut invalid = source.edit().expect("invalid row edit");
     let mut sheet = invalid.sheet(0usize).expect("lookup").expect("sheet");
     assert!(matches!(
@@ -358,7 +358,7 @@ fn row_visibility_is_checked_reversible_and_patch_visible() {
 }
 #[test]
 fn row_layout_is_typed_reversible_and_facet_composable() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     edit.sheet("Sheet1")
@@ -376,7 +376,7 @@ fn row_layout_is_typed_reversible_and_facet_composable() {
         .show_phonetic();
     let committed = edit.commit().expect("layout commit");
 
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
     let (_, before, after) = committed.patch().changes()[0].row().expect("row change");
     assert!(matches!(before, RowState::Missing));
     let RowState::Stored(properties) = after else {
@@ -394,7 +394,7 @@ fn row_layout_is_typed_reversible_and_facet_composable() {
     assert!(matches!(properties.style(), StyleState::Default));
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("sheet lookup")
         .expect("worksheet");
@@ -411,7 +411,7 @@ fn row_layout_is_typed_reversible_and_facet_composable() {
         Some(crate::LocalStyle::Default)
     ));
 
-    let mut reset = committed.workbook().edit().expect("reset edit");
+    let mut reset = committed.package().edit().expect("reset edit");
     reset
         .sheet("Sheet1")
         .expect("lookup")
@@ -427,7 +427,7 @@ fn row_layout_is_typed_reversible_and_facet_composable() {
         .hide_phonetic();
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -441,11 +441,11 @@ fn row_layout_is_typed_reversible_and_facet_composable() {
     assert!(!reset_row.phonetic());
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
@@ -484,7 +484,7 @@ fn row_layout_is_typed_reversible_and_facet_composable() {
     height.join(visibility).expect("disjoint facets on one row");
     let joined = height.commit().expect("joined commit");
     let joined_sheet = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -558,7 +558,7 @@ fn worksheet_defaults_are_typed_reversible_and_facet_composable() {
             .expect("checked row height");
     }
     let committed = edit.commit().expect("defaults commit");
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert!(committed.patch().graph.is_empty());
     let (before, after) = committed.patch().changes()[0]
         .defaults()
@@ -575,7 +575,7 @@ fn worksheet_defaults_are_typed_reversible_and_facet_composable() {
     assert!(after.thick_bottom());
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("worksheet");
@@ -585,11 +585,11 @@ fn worksheet_defaults_are_typed_reversible_and_facet_composable() {
     assert_eq!(row.height().map(crate::row::Height::get), Some(24.0));
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
@@ -611,7 +611,7 @@ fn worksheet_defaults_are_typed_reversible_and_facet_composable() {
     width.join(hidden).expect("disjoint default facets");
     let joined = width.commit().expect("joined defaults");
     let joined_sheet = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -665,7 +665,7 @@ fn worksheet_defaults_are_typed_reversible_and_facet_composable() {
 
 #[test]
 fn new_sheet_defaults_require_height_and_commit_with_short_selectors() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut incomplete = source.edit().expect("incomplete edit");
     incomplete
         .add("Incomplete")
@@ -700,7 +700,7 @@ fn new_sheet_defaults_require_height_and_commit_with_short_selectors() {
     }
     let committed = edit.commit().expect("new sheet commit");
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Grid")
         .expect("name lookup")
         .expect("new worksheet");
@@ -725,11 +725,11 @@ fn new_sheet_defaults_require_height_and_commit_with_short_selectors() {
     ));
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse new sheet");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
@@ -755,7 +755,7 @@ fn row_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
     assert!(matches!(properties.style(), StyleState::Shared(_)));
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -764,7 +764,7 @@ fn row_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
         Some(crate::LocalStyle::Shared(_))
     ));
 
-    let reopened = Workbook::from_bytes(source_bytes).expect("reopened source");
+    let reopened = crate::Package::from_bytes(&source_bytes).expect("reopened source");
     let replayed = reopened
         .apply(committed.patch())
         .expect("source-checked replay");
@@ -779,7 +779,7 @@ fn row_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
     };
     assert!(
         replayed
-            .workbook()
+            .package()
             .styles()
             .expect("replayed styles")
             .find(replayed_key)
@@ -806,7 +806,7 @@ fn row_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(changed_xml);
-    let changed = Workbook::from_package(changed_package).expect("changed style table");
+    let changed = crate::Package::from_opc(changed_package).expect("changed style table");
     assert!(matches!(
         changed.apply(committed.patch()),
         Err(Error::PatchConflict { part }) if part == "/xl/styles.xml"
@@ -815,7 +815,7 @@ fn row_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
 
 #[test]
 fn column_visibility_is_checked_reversible_and_composable() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
@@ -824,7 +824,7 @@ fn column_visibility_is_checked_reversible_and_composable() {
     sheet.column(1).expect("column B").hide();
     let committed = edit.commit().expect("commit");
 
-    assert_eq!(committed.patch().len(), 3);
+    assert_eq!(committed.patch().operation_count(), 3);
     assert!(committed.patch().changes().iter().any(|change| matches!(
         change,
         Change::Column {
@@ -835,7 +835,7 @@ fn column_visibility_is_checked_reversible_and_composable() {
         } if column.get() == 1 && properties.hidden()
     )));
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -849,15 +849,15 @@ fn column_visibility_is_checked_reversible_and_composable() {
     ));
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
-    let mut show = committed.workbook().edit().expect("show edit");
+    let mut show = committed.package().edit().expect("show edit");
     show.sheet(0usize)
         .expect("lookup")
         .expect("sheet")
@@ -866,7 +866,7 @@ fn column_visibility_is_checked_reversible_and_composable() {
         .show();
     let shown = show.commit().expect("show commit");
     let shown_sheet = shown
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -881,7 +881,7 @@ fn column_visibility_is_checked_reversible_and_composable() {
         sheet.column(litchi_sheet::COLUMNS),
         Err(Error::Coordinate(_))
     ));
-    assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+    assert!(no_op.commit().expect("no-op commit").patch().is_noop());
 
     let mut cell = source.edit().expect("cell edit");
     cell.sheet(0usize)
@@ -901,7 +901,7 @@ fn column_visibility_is_checked_reversible_and_composable() {
     assert!(
         cell.commit()
             .expect("joined commit")
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -936,7 +936,7 @@ fn column_visibility_is_checked_reversible_and_composable() {
 
 #[test]
 fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     edit.sheet("Sheet1")
@@ -953,7 +953,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
         .show_phonetic();
     let committed = edit.commit().expect("layout commit");
 
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
     let (_, before, after) = committed.patch().changes()[0]
         .column()
         .expect("column change");
@@ -974,7 +974,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
     assert!(matches!(properties.style(), StyleState::Default));
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("sheet lookup")
         .expect("worksheet");
@@ -987,7 +987,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
     assert!(column.custom_width());
     assert!(column.phonetic());
 
-    let mut reset = committed.workbook().edit().expect("reset edit");
+    let mut reset = committed.package().edit().expect("reset edit");
     reset
         .sheet("Sheet1")
         .expect("lookup")
@@ -1002,7 +1002,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
         .hide_phonetic();
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -1015,11 +1015,11 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
     assert!(!reset_column.phonetic());
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
@@ -1027,9 +1027,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
     let mut sheet = invalid.sheet(0usize).expect("lookup").expect("sheet");
     assert!(matches!(
         sheet.column("XFE"),
-        Err(Error::Coordinate(
-            litchi_sheet::CoordinateError::ColumnA1 { .. }
-        ))
+        Err(Error::Coordinate(litchi_sheet::CoordinateError::ColumnA1))
     ));
     assert!(matches!(
         sheet.column("B").expect("B").width(f64::NAN),
@@ -1062,7 +1060,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
         .expect("disjoint facets on one column");
     let joined = width.commit().expect("joined commit");
     let joined_sheet = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -1110,7 +1108,7 @@ fn column_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
     };
     assert!(matches!(properties.style(), StyleState::Shared(_)));
 
-    let reopened = Workbook::from_bytes(source_bytes).expect("reopened source");
+    let reopened = crate::Package::from_bytes(&source_bytes).expect("reopened source");
     let replayed = reopened
         .apply(committed.patch())
         .expect("source-checked replay");
@@ -1125,7 +1123,7 @@ fn column_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
     };
     assert!(
         replayed
-            .workbook()
+            .package()
             .styles()
             .expect("replayed styles")
             .find(replayed_key)
@@ -1152,7 +1150,7 @@ fn column_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(changed_xml);
-    let changed = Workbook::from_package(changed_package).expect("changed style table");
+    let changed = crate::Package::from_opc(changed_package).expect("changed style table");
     assert!(matches!(
         changed.apply(committed.patch()),
         Err(Error::PatchConflict { part }) if part == "/xl/styles.xml"
@@ -1190,7 +1188,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
             .expect("column width");
     }
     let committed = edit.commit().expect("style commit");
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
 
     let row_change = committed
         .patch()
@@ -1216,7 +1214,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
     assert!(matches!(column_after.style(), StyleState::Shared(_)));
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -1230,7 +1228,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
         Some(crate::LocalStyle::Shared(style)) if style.same(&accent)
     ));
 
-    let mut reset = committed.workbook().edit().expect("reset edit");
+    let mut reset = committed.package().edit().expect("reset edit");
     {
         let mut sheet = reset.sheet("Sheet1").expect("lookup").expect("sheet");
         sheet.row(1).expect("row 2").reset_style();
@@ -1238,7 +1236,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
     }
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -1253,15 +1251,15 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
     ));
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
-    let reopened = Workbook::from_bytes(source_bytes).expect("reopened source");
+    let reopened = crate::Package::from_bytes(&source_bytes).expect("reopened source");
     let replayed = reopened
         .apply(committed.patch())
         .expect("source-checked replay");
@@ -1279,7 +1277,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
     };
     assert!(
         replayed
-            .workbook()
+            .package()
             .styles()
             .expect("styles")
             .find(replayed_key)
@@ -1320,7 +1318,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
     styles.join(layout).expect("disjoint grid facets");
     let joined = styles.commit().expect("joined commit");
     let joined_sheet = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -1372,7 +1370,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
         })
     ));
 
-    let foreign = Workbook::new()
+    let foreign = crate::Package::new()
         .expect("foreign workbook")
         .styles()
         .expect("foreign styles")
@@ -1412,7 +1410,7 @@ fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
     }
     let added = add.commit().expect("new sheet commit");
     let sheet = added
-        .workbook()
+        .package()
         .sheet("Styled")
         .expect("lookup")
         .expect("sheet");

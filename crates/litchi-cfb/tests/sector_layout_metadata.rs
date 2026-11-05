@@ -13,7 +13,7 @@
 //! serializer, which publishes the model exactly. A caller that supplies no
 //! metadata keeps the source's values under a reused layout.
 
-use litchi_cfb::{OleFile, OleWriter, SectorLayoutFallback};
+use litchi_cfb::{OleFile, OleFileLimits, OleWriter, SectorLayoutFallback};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -43,7 +43,11 @@ fn source() -> Vec<u8> {
 /// A writer over the source's directory shape with one edited payload.
 fn edited(source: &[u8]) -> OleWriter {
     let mut writer = OleWriter::new();
-    assert!(writer.adopt_source_layout(source).unwrap());
+    assert!(
+        writer
+            .adopt_source_layout(source, OleFileLimits::default())
+            .unwrap()
+    );
     writer.create_storage(&["Storage"]).unwrap();
     writer
         .create_stream(&["Storage", "Payload"], &[9u8; 5000])
@@ -53,7 +57,7 @@ fn edited(source: &[u8]) -> OleWriter {
 }
 
 fn storage_metadata(bytes: &[u8]) -> (u32, u64, u64) {
-    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     let entry = ole
         .list_directory_entries(&[])
         .unwrap()
@@ -64,7 +68,7 @@ fn storage_metadata(bytes: &[u8]) -> (u32, u64, u64) {
 }
 
 fn payload(bytes: &[u8]) -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     ole.open_stream(&["Storage", "Payload"]).unwrap()
 }
 
@@ -148,7 +152,7 @@ fn changed_root_metadata_declines_to_the_from_scratch_writer() {
         report.fallback(),
         Some(SectorLayoutFallback::DirectoryMetadataChanged)
     );
-    let ole = OleFile::open(Cursor::new(output)).unwrap();
+    let ole = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(ole.root_entry().unwrap().modified_time, MODIFIED);
 }
 
@@ -166,7 +170,7 @@ fn shared_metadata_registration_matches_the_copying_form() {
     let copied = serialize(&mut copied);
     assert_eq!(serialize(&mut shared), copied);
 
-    let ole = OleFile::open(Cursor::new(copied)).unwrap();
+    let ole = OleFile::open(Cursor::new(copied), OleFileLimits::default()).unwrap();
     let entry = ole
         .list_directory_entries(&[])
         .unwrap()

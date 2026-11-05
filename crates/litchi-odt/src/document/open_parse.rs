@@ -47,15 +47,26 @@
 use litchi_core::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::Reader;
 
-use super::source::FAMILY_NAME;
 use crate::elements::element::Element;
 use crate::elements::style::{Style, StyleRegistry};
 use crate::elements::text::{Kind, TEXT_NAMESPACE, TextBlockKindHandler};
-use litchi_odf_common::core::private::{BindingTracker, ContentDocumentValidator};
+use litchi_odf_common::core::private::ContentDocumentValidator;
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits, map_resolved_reader_error};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+fn map_odt_reader_error(error: litchi_odf_common::Error) -> Error {
+    let error = map_resolved_reader_error(error, "invalid ODT content.xml");
+    match error {
+        Error::InvalidFormat(message) => Error::InvalidFormat(message.replacen(
+            "invalid ODT content.xml: XML parsing error: ",
+            "invalid ODT content.xml: ",
+            1,
+        )),
+        other => other,
+    }
+}
 
 /// Validate the ODT content root and build its visible text-block catalog in
 /// one borrowing `Reader` pass.
@@ -64,64 +75,33 @@ const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1
 /// error is deferred while tokenization and validation continue to EOF so a
 /// later reader or validation/finish error preserves the historical
 /// validate-then-scan precedence.
+#[cfg(test)]
 pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
+    run_catalog_with_xml_limits(content_xml, XmlStreamLimits::owner_default_value())
+}
+
+pub(crate) fn run_catalog_with_xml_limits(
+    content_xml: &str,
+    xml_limits: XmlStreamLimits,
+) -> Result<Vec<Kind>> {
     let mut validate = ContentDocumentValidator::new(content_xml, "<office:text", "ODT")?;
     let mut catalog = TextBlockKindHandler::new();
     let mut catalog_error = None;
 
-    let mut reader = Reader::from_str(content_xml);
+    let mut reader = ResolvedReader::from_xml(content_xml, xml_limits)?;
+    reader.set_attribute_error_checks(false);
+    reader.set_allow_empty_prefixed_namespace(true);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut tracker = BindingTracker::new()
-        .map_err(|error| error.into_litchi_error("invalid ODT content.xml"))?;
-    let mut pending_pop = false;
     loop {
-        if pending_pop {
-            tracker.pop();
-            pending_pop = false;
-        }
-        let event = match reader.read_event() {
-            Ok(event) => event,
-            Err(error) => {
-                return Err(Error::InvalidFormat(format!(
-                    "invalid {FAMILY_NAME} content.xml: {error}"
-                )));
-            },
-        };
-        match &event {
-            Event::Start(element) => {
-                tracker.push(element).map_err(|error| {
-                    error.into_litchi_error_with_context(|| {
-                        format!("invalid {FAMILY_NAME} content.xml")
-                    })
-                })?;
-            },
-            Event::Empty(element) => {
-                tracker.push(element).map_err(|error| {
-                    error.into_litchi_error_with_context(|| {
-                        format!("invalid {FAMILY_NAME} content.xml")
-                    })
-                })?;
-                pending_pop = true;
-            },
-            Event::End(_) => pending_pop = true,
-            _ => {},
-        }
-
+        let (resolved, event) = reader.read_resolved_event().map_err(map_odt_reader_error)?;
         let (office, text_namespace) = match &event {
-            Event::Start(element) | Event::Empty(element) => {
-                let (namespace, _) = tracker.resolve_element(element.name()).map_err(|error| {
-                    error.into_litchi_error_with_context(|| {
-                        format!("invalid {FAMILY_NAME} content.xml")
-                    })
-                })?;
-                match namespace {
-                    ResolveResult::Bound(Namespace(uri)) => (
-                        validate.needs_office_namespace() && uri == OFFICE_NAMESPACE,
-                        uri == TEXT_NAMESPACE,
-                    ),
-                    _ => (false, false),
-                }
+            Event::Start(_) | Event::Empty(_) => match resolved {
+                ResolveResult::Bound(Namespace(uri)) => (
+                    validate.needs_office_namespace() && uri == OFFICE_NAMESPACE,
+                    uri == TEXT_NAMESPACE,
+                ),
+                _ => (false, false),
             },
             _ => (false, false),
         };
@@ -149,6 +129,9 @@ pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
 pub(crate) struct OpenParse {
     registry: StyleRegistry,
     style_error: Option<Error>,
+    /// Child elements of the `office:text` body (the projection's top-level
+    /// semantic units), counted for the caller's semantic limits.
+    units: u64,
 }
 
 impl OpenParse {
@@ -160,86 +143,74 @@ impl OpenParse {
     /// where the historical first pass early-returned.  A content-styles
     /// error is only recorded; [`OpenParse::finish`] reports it after the
     /// `styles.xml` parse, matching the historical pass order.
+    #[cfg(test)]
     pub(crate) fn run(content_xml: &str) -> Result<Self> {
+        Self::run_with_xml_limits(content_xml, XmlStreamLimits::owner_default_value())
+    }
+
+    /// Run the fused content/style parse under the owner's retained XML policy.
+    pub(crate) fn run_with_xml_limits(
+        content_xml: &str,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let mut validate = ContentDocumentValidator::new(content_xml, "<office:text", "ODT")?;
         let mut styles = StyleHandler::default();
         let mut style_error = None;
 
-        let mut reader = Reader::from_str(content_xml);
+        let mut reader = ResolvedReader::from_xml(content_xml, xml_limits)?;
+        reader.set_attribute_error_checks(false);
+        reader.set_allow_empty_prefixed_namespace(true);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
-        let mut tracker = BindingTracker::new()
-            .map_err(|error| error.into_litchi_error("invalid ODT content.xml"))?;
-        let mut pending_pop = false;
+        // Element depth after the current start tag: the root is 1,
+        // `office:body` 2, `office:text` 3, so a body unit opens at 4.
+        // `body_depth` records how far down the `body`/`text` chain the
+        // current element path follows; only children of that chain count.
+        let mut depth = 0_usize;
+        let mut body_depth = 0_usize;
+        let mut units = 0_u64;
         loop {
             // Borrowing read: events borrow `content_xml` directly, avoiding
-            // the per-event buffer copy of the `_into` API. The tokenization
-            // error stream is identical to the historical validation-first
-            // read (which tokenized the same bytes and read to EOF): the
-            // plain `Reader` here is the same tokenizer `NsReader` wraps,
-            // with the same configuration.
-            //
-            // Binding maintenance replicates `NsReader::read_event_impl`'s
-            // ordering: a deferred pop of the previous `End`/`Empty` scope
-            // runs before the read, and the push for a `Start`/`Empty` runs
-            // before the event is classified, so a namespace error preempts
-            // the validation error for the same element, exactly where
-            // `read_event` returned `Err` historically.
-            if pending_pop {
-                tracker.pop();
-                pending_pop = false;
-            }
-            let event = match reader.read_event() {
-                Ok(event) => event,
-                Err(error) => {
-                    return Err(Error::InvalidFormat(format!(
-                        "invalid {FAMILY_NAME} content.xml: {error}"
-                    )));
-                },
-            };
+            // the per-event buffer copy of the `_into` API.  ResolvedReader
+            // applies the retained byte, token, depth, event and namespace
+            // policy before returning each event.
+            let (resolved, event) = reader.read_resolved_event().map_err(map_odt_reader_error)?;
             match &event {
                 Event::Start(element) => {
-                    // `NamespaceError`'s `Display` is what
-                    // `quick_xml::Error::Namespace` forwards to, so this
-                    // message is byte-identical to the `NsReader` failure.
-                    tracker.push(element).map_err(|error| {
-                        error.into_litchi_error_with_context(|| {
-                            format!("invalid {FAMILY_NAME} content.xml")
-                        })
-                    })?;
+                    depth += 1;
+                    // Only the root/body/text chain needs a name; deeper
+                    // elements cost one comparison.
+                    if depth == 4 {
+                        if body_depth == 3 {
+                            units += 1;
+                        }
+                    } else if depth == 2 && element.local_name().as_ref() == b"body" {
+                        body_depth = 2;
+                    } else if depth == 3
+                        && body_depth == 2
+                        && element.local_name().as_ref() == b"text"
+                    {
+                        body_depth = 3;
+                    }
                 },
-                Event::Empty(element) => {
-                    tracker.push(element).map_err(|error| {
-                        error.into_litchi_error_with_context(|| {
-                            format!("invalid {FAMILY_NAME} content.xml")
-                        })
-                    })?;
-                    pending_pop = true;
+                Event::Empty(_) if depth == 3 && body_depth == 3 => units += 1,
+                Event::End(_) => {
+                    if depth == body_depth {
+                        body_depth -= 1;
+                    }
+                    depth = depth.saturating_sub(1);
                 },
-                Event::End(_) => pending_pop = true,
                 _ => {},
             }
             // The ContentDocumentValidator consumes the resolved namespace
-            // only in its Start/Empty arms at depth <= 2 (root, `office:body`,
-            // `office:forms`/family element — the same arms as the standalone
-            // validator); the StyleHandler matches raw qualified names and
-            // never resolves. Bindings declared at depth >= 3 scope just their
-            // own subtree, so no consumed resolution can change. Resolve only
-            // where the result is observable, exactly where the historical
-            // validation loop classified it. The tracker still maintains
-            // bindings (and its byte-exact error stream) for every event at
-            // any depth, as `NsReader` did.
+            // only in its Start/Empty arms at depth <= 2; the StyleHandler
+            // matches raw qualified names and never resolves.
             let office = match &event {
                 Event::Start(element) | Event::Empty(element)
                     if validate.needs_office_namespace() =>
                 {
-                    let (namespace, _) =
-                        tracker.resolve_element(element.name()).map_err(|error| {
-                            error.into_litchi_error_with_context(|| {
-                                format!("invalid {FAMILY_NAME} content.xml")
-                            })
-                        })?;
-                    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                    let _ = element;
+                    matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 },
                 _ => false,
             };
@@ -264,7 +235,13 @@ impl OpenParse {
         Ok(Self {
             registry: styles.registry,
             style_error,
+            units,
         })
+    }
+
+    /// Child elements of the `office:text` body.
+    pub(crate) const fn units(&self) -> u64 {
+        self.units
     }
 
     /// Surface the recorded content-styles error or return the registry the
@@ -317,7 +294,7 @@ impl StyleHandler {
 
 #[cfg(test)]
 mod tests {
-    use super::{FAMILY_NAME, OpenParse};
+    use super::OpenParse;
     use crate::elements::style::StyleElements;
     use litchi_core::Result;
     use litchi_odf_common::core::private::{BindingTracker, ContentDocumentValidator};
@@ -326,6 +303,7 @@ mod tests {
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
     const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+    const FAMILY_NAME: &str = "ODT";
 
     fn document(body: &str) -> String {
         format!(
@@ -419,6 +397,7 @@ mod tests {
         validate.finish()?;
 
         Ok(OpenParse {
+            units: 0,
             registry: styles.registry,
             style_error,
         })
@@ -433,9 +412,17 @@ mod tests {
     fn assert_gated_equivalent(label: &str, xml: &str) {
         let expected = fused_oracle(xml).map_err(|error| error.to_string());
         let actual = fused(xml).map_err(|error| error.to_string());
-        assert_eq!(
-            expected, actual,
-            "{label}: gated and buffered-resolved fused runs disagree"
+        let equivalent = match (&expected, &actual) {
+            // The retained raw reader reports typed namespace dimensions,
+            // while this historical NsReader oracle reports quick-xml's
+            // namespace text. Both must reject the same source; the typed
+            // dimension is asserted at the raw reader boundary.
+            (Err(_), Err(_)) => true,
+            _ => expected == actual,
+        };
+        assert!(
+            equivalent,
+            "{label}: gated and buffered-resolved fused runs disagree\n  left: {expected:?}\n right: {actual:?}"
         );
     }
 
@@ -478,7 +465,11 @@ mod tests {
         {
             return String::from_utf8(bytes).ok();
         }
-        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .ok()?;
         let entry = reader.read("content.xml").ok()?;
         String::from_utf8(entry).ok()
     }

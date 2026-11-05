@@ -1,9 +1,10 @@
 //! Normative logical slide directory for binary `PowerPoint` files.
 
+use super::notes::NotesIndex;
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
 use crate::leniency::{DefectLocation, PersistDefect, SlideListDefect, ToleranceReport};
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::Record;
 use std::collections::HashMap;
@@ -23,6 +24,7 @@ pub struct SlideDirectoryEntry {
     list_text: String,
     outline_text_interactions: Vec<crate::TextBodyInteractions>,
     outline_text_refs: Vec<crate::OutlineTextRef>,
+    outline_text_bodies: Vec<crate::OutlineTextBody>,
 }
 
 impl SlideDirectoryEntry {
@@ -61,6 +63,16 @@ impl SlideDirectoryEntry {
     pub fn outline_text_refs(&self) -> &[crate::OutlineTextRef] {
         &self.outline_text_refs
     }
+
+    /// This slide's slide-list text bodies, in slide-list order (MS-PPT
+    /// 2.4.14.3): the bodies an `OutlineTextRefAtom` in one of the slide's
+    /// shapes selects by index. Empty when the slide has no slide-list text
+    /// or it could not be read
+    /// ([`crate::SlideListDefect::UnreadableSlideListText`]).
+    #[must_use]
+    pub fn outline_text_bodies(&self) -> &[crate::OutlineTextBody] {
+        &self.outline_text_bodies
+    }
 }
 
 /// Ordered logical presentation slides from the live `DocumentContainer`.
@@ -75,6 +87,9 @@ pub struct SlideDirectory {
     entries: Vec<SlideDirectoryEntry>,
     by_slide_id: HashMap<u32, usize>,
     by_persist_id: HashMap<u32, usize>,
+    /// The notes pages by `NotesId`, read from the same `DocumentContainer`
+    /// at open so no slide selection parses the document again (L-PPT-R2).
+    notes: NotesIndex,
 }
 
 impl SlideDirectory {
@@ -88,7 +103,7 @@ impl SlideDirectory {
             document_data,
             current_user_data,
             persist_mapping,
-            RecordLimits::default(),
+            SourceLimits::default(),
             &mut ToleranceReport::default(),
         )
     }
@@ -101,7 +116,7 @@ impl SlideDirectory {
         document_data: &[u8],
         current_user_data: &[u8],
         persist_mapping: &PersistMapping,
-        limits: RecordLimits,
+        limits: SourceLimits,
         report: &mut ToleranceReport,
     ) -> Result<Self> {
         let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
@@ -121,15 +136,15 @@ impl SlideDirectory {
         document_data: &[u8],
         user_edit_offset: u32,
         persist_mapping: &PersistMapping,
-        limits: RecordLimits,
+        limits: SourceLimits,
         report: &mut ToleranceReport,
     ) -> Result<Self> {
         if document_data.len() > limits.max_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PowerPoint Document stream size {} exceeds limit {}",
-                document_data.len(),
-                limits.max_input_bytes
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::EntryBytes,
+                observed: document_data.len(),
+                maximum: limits.max_input_bytes,
+            });
         }
         let user_edit_offset = usize::try_from(user_edit_offset).map_err(|_err| {
             Error::Corrupted("current edit offset does not fit usize".to_string())
@@ -184,8 +199,7 @@ impl SlideDirectory {
         let document_offset_usize = usize::try_from(document_offset).map_err(|_err| {
             Error::Corrupted("document persist offset does not fit usize".to_string())
         })?;
-        let (document, _) =
-            Record::parse_with_limits(document_data, document_offset_usize, limits)?;
+        let (document, _) = Record::parse(document_data, document_offset_usize, &limits)?;
         if document.record_type != RecordType::Document
             || document.version != 0x0f
             || document.instance != 0
@@ -238,14 +252,8 @@ impl SlideDirectory {
             let mut current = None;
             for child in &slide_list_container.children {
                 if child.record_type != RecordType::SlidePersistAtom {
-                    if let Some(entry) = current.and_then(|index: usize| entries.get_mut(index))
-                        && let Ok(value) = child.extract_text()
-                        && !value.is_empty()
-                    {
-                        if !entry.list_text.is_empty() {
-                            entry.list_text.push('\n');
-                        }
-                        entry.list_text.push_str(&value);
+                    if let Some(entry) = current.and_then(|index: usize| entries.get_mut(index)) {
+                        append_list_text(&mut entry.list_text, child);
                     }
                     continue;
                 }
@@ -277,15 +285,20 @@ impl SlideDirectory {
                 // Slide-list text is isolated per slide: a content-level
                 // failure leaves this slide's outline interactions and
                 // references empty, as LibreOffice ignores slide-list text it
-                // cannot map; limits stay fatal (finding F5.10).
-                match set
-                    .text_interactions()
+                // cannot map; limits stay fatal (finding F5.10). The text
+                // bodies the slide's shapes reference (L-PPT-R1) are isolated
+                // the same way, after the interactions and references, so a
+                // body that cannot be framed never drops them.
+                let read = set
+                    .text_interactions(crate::text_interaction::limits_for_source(limits))
                     .and_then(|interactions| Ok((interactions, set.outline_text_refs()?)))
-                {
-                    Ok((interactions, refs)) => {
+                    .and_then(|(interactions, refs)| {
                         entries[index].outline_text_interactions = interactions;
                         entries[index].outline_text_refs = refs;
-                    },
+                        crate::OutlineTextBody::collect(&set.slide_records, limits)
+                    });
+                match read {
+                    Ok(bodies) => entries[index].outline_text_bodies = bodies,
                     Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
                         let entry = &entries[index];
                         report.record_at(
@@ -302,12 +315,18 @@ impl SlideDirectory {
             }
         }
 
+        // The notes index reads the DocumentContainer parsed above; a notes
+        // list it cannot read is kept as the error of the slides that name a
+        // notes page, as before, and never fails the open (L-PPT-R2).
+        let notes = NotesIndex::from_document(&document);
+
         Ok(Self {
             document_persist_id,
             document_offset: document_offset_usize,
             entries,
             by_slide_id,
             by_persist_id,
+            notes,
         })
     }
 
@@ -349,6 +368,11 @@ impl SlideDirectory {
         self.document_offset
     }
 
+    /// The presentation's notes index, built once at open.
+    pub(crate) fn notes_index(&self) -> &NotesIndex {
+        &self.notes
+    }
+
     #[cfg(test)]
     pub(crate) fn new_for_test(document_offset: usize) -> Self {
         Self {
@@ -357,6 +381,7 @@ impl SlideDirectory {
             entries: Vec::new(),
             by_slide_id: HashMap::new(),
             by_persist_id: HashMap::new(),
+            notes: NotesIndex::default(),
         }
     }
 }
@@ -376,7 +401,7 @@ impl SlideDirectory {
 pub(crate) fn locate_head_user_edit(
     document_data: &[u8],
     current_user_data: Option<&[u8]>,
-    limits: RecordLimits,
+    limits: SourceLimits,
     report: &mut ToleranceReport,
 ) -> Result<u32> {
     let defect = match current_user_data {
@@ -443,17 +468,18 @@ fn is_live_user_edit(document_data: &[u8], offset: u32) -> bool {
 /// The offset of the last well-formed `UserEditAtom` among the document
 /// stream's top-level records. The walk stops at the first header that does
 /// not fit in the stream, as LibreOffice's record manager does.
-fn last_user_edit(document_data: &[u8], limits: RecordLimits) -> Result<Option<u32>> {
+fn last_user_edit(document_data: &[u8], limits: SourceLimits) -> Result<Option<u32>> {
     let mut offset = 0usize;
     let mut records = 0usize;
     let mut last = None;
     while let Ok(header) = read_header(document_data, offset, "top-level record") {
         records += 1;
         if records > limits.max_records {
-            return Err(Error::ResourceLimit(format!(
-                "PowerPoint Document top-level record count exceeds limit {}",
-                limits.max_records
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: records,
+                maximum: limits.max_records,
+            });
         }
         let offset_u32 = u32::try_from(offset)
             .map_err(|_err| Error::Corrupted("UserEditAtom offset overflow".to_string()))?;
@@ -466,6 +492,59 @@ fn last_user_edit(document_data: &[u8], limits: RecordLimits) -> Result<Option<u
             .ok_or_else(|| Error::Corrupted("top-level record offset overflow".to_string()))?;
     }
     Ok(last)
+}
+
+/// Appends one slide-list record's text to a slide's list text, separated
+/// by `\n` from the text before it, exactly as appending
+/// [`Record::extract_text`]'s non-empty result would.
+///
+/// Character atoms, nearly every record with text in a slide list, are
+/// decoded straight into `list_text` — up to the first NUL for
+/// `TextCharsAtom`, with trailing `\r` and NUL trimmed, as
+/// `parse_text_chars_atom` and `parse_text_bytes_atom` do — instead of
+/// through four temporary strings; every other record takes
+/// [`Record::extract_text`].
+fn append_list_text(list_text: &mut String, record: &Record) {
+    let start = list_text.len();
+    if start != 0 {
+        list_text.push('\n');
+    }
+    let text_start = list_text.len();
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only the two character atoms take the direct path"
+    )]
+    match record.record_type {
+        RecordType::TextCharsAtom => {
+            let units = record
+                .data
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| u16::from_le_bytes(*pair))
+                .take_while(|&unit| unit != 0);
+            list_text.extend(
+                char::decode_utf16(units).map(|unit| unit.unwrap_or(char::REPLACEMENT_CHARACTER)),
+            );
+        },
+        RecordType::TextBytesAtom => {
+            list_text.extend(record.data.iter().map(|&byte| char::from(byte)));
+        },
+        _ => {
+            if let Ok(value) = record.extract_text() {
+                list_text.push_str(&value);
+            }
+            if list_text.len() == text_start {
+                list_text.truncate(start);
+            }
+            return;
+        },
+    }
+    let kept = list_text[text_start..].trim_end_matches(['\r', '\0']).len();
+    list_text.truncate(text_start + kept);
+    if list_text.len() == text_start {
+        list_text.truncate(start);
+    }
 }
 
 /// Decode one presentation `SlidePersistAtom` into a directory entry,
@@ -538,6 +617,7 @@ fn directory_entry(
         list_text: String::new(),
         outline_text_interactions: Vec::new(),
         outline_text_refs: Vec::new(),
+        outline_text_bodies: Vec::new(),
     }))
 }
 
@@ -621,7 +701,7 @@ fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
 
     fn record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + data.len());
@@ -739,7 +819,7 @@ mod tests {
             stream,
             current_user,
             mapping,
-            RecordLimits::default(),
+            SourceLimits::default(),
             &mut report,
         )
         .unwrap();
@@ -942,7 +1022,7 @@ mod tests {
     ) -> (Result<u32>, Vec<(crate::Defect, u32)>) {
         let mut report = ToleranceReport::default();
         let head =
-            locate_head_user_edit(stream, current_user, RecordLimits::default(), &mut report);
+            locate_head_user_edit(stream, current_user, SourceLimits::default(), &mut report);
         let defects = report
             .defects()
             .iter()
@@ -1112,11 +1192,51 @@ mod tests {
         assert_eq!(bodies[0].interactions[0].range.end(), 3);
     }
 
+    /// The direct character-atom path builds exactly the list text that
+    /// joining each record's non-empty `extract_text` with `\n` builds.
+    #[test]
+    fn list_text_matches_joined_record_text() {
+        let utf16 =
+            |text: &str| -> Vec<u8> { text.encode_utf16().flat_map(u16::to_le_bytes).collect() };
+        let mut nul_terminated = utf16("Title\r");
+        nul_terminated.extend_from_slice(&[0, 0, b'x', 0]);
+        let mut odd = utf16("Odd");
+        odd.push(b'!');
+        let records = [
+            record(0, 0, 3999, &0u32.to_le_bytes()),
+            record(0, 0, 4000, &nul_terminated),
+            record(0, 0, 4001, &[0; 10]),
+            record(0, 0, 4000, &[]),
+            record(0, 0, 4008, b"Bytes\r\0\r"),
+            record(0, 0, 4008, b"\r\r"),
+            record(0, 0, 4000, &odd),
+            record(0, 0, 4000, &[0x00, 0xd8, b'a', 0]),
+            record(0, 0, 4026, &utf16("cstring")),
+            record(0x0f, 0, 4082, &record(0, 0, 4083, &[0; 16])),
+            record(0, 0, 4008, b"  spaced  "),
+        ];
+        let mut fast = String::new();
+        let mut joined = String::new();
+        for bytes in &records {
+            let (parsed, _) = Record::parse(bytes, 0, &SourceLimits::default()).unwrap();
+            append_list_text(&mut fast, &parsed);
+            let value = parsed.extract_text().unwrap();
+            if !value.is_empty() {
+                if !joined.is_empty() {
+                    joined.push('\n');
+                }
+                joined.push_str(&value);
+            }
+        }
+        assert_eq!(fast, joined);
+        assert_eq!(fast, "Title\nBytes\nOdd\n\u{fffd}a\ncstring\n  spaced  ");
+    }
+
     #[test]
     fn poi_reordered_and_basic_fixtures_match_normative_ids() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/slideshow");
-        let mut package = Package::open(root.join("incorrect_slide_order.ppt")).unwrap();
+        let mut package = Reader::open(root.join("incorrect_slide_order.ppt")).unwrap();
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         assert_eq!(
@@ -1138,7 +1258,7 @@ mod tests {
             assert!(text.contains(title), "expected {title:?}, got {text:?}");
         }
 
-        let mut basic_package = Package::open(root.join("basic_test_ppt_file.ppt")).unwrap();
+        let mut basic_package = Reader::open(root.join("basic_test_ppt_file.ppt")).unwrap();
         let basic_presentation = basic_package.presentation().unwrap();
         let basic_slides = basic_presentation.slides().unwrap();
         assert_eq!(

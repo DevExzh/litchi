@@ -5,12 +5,12 @@
 )]
 
 use litchi_core::Error;
-use litchi_odp::FlatPresentation;
+use litchi_odp::flat::Presentation as FlatPresentation;
 
 const SEED: &str = r#"<?xml version="1.0"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:mimetype="application/vnd.oasis.opendocument.presentation"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="automatic" smil:type="fade"/></style:style></office:automatic-styles><office:body><office:presentation><draw:page draw:name="s1" draw:style-name="dp1"><draw:g draw:name="group"><draw:custom-shape><draw:enhanced-geometry draw:type="rectangle"><draw:equation draw:name="f1" draw:formula="width/2"/><draw:handle draw:handle-position="$0 0"/></draw:enhanced-geometry><text:p>custom</text:p></draw:custom-shape></draw:g><presentation:notes><text:p>speaker notes</text:p></presentation:notes></draw:page></office:presentation></office:body></office:document>"#;
 
 fn exercise(bytes: Vec<u8>) -> Option<Error> {
-    match FlatPresentation::from_bytes(bytes) {
+    match FlatPresentation::from_bytes(&bytes) {
         Ok(flat) => {
             let _ = flat.slides();
             for result in [
@@ -25,7 +25,7 @@ fn exercise(bytes: Vec<u8>) -> Option<Error> {
             }
             None
         },
-        Err(error) => Some(error),
+        Err(error) => Some(error.into()),
     }
 }
 

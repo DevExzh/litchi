@@ -4,10 +4,9 @@
 )]
 
 use litchi_xlsb::external_link::{
-    DdeItem, ExternalLinkLimits, ExternalLinkLimitsError, ExternalLinkResource, Link,
-    apply_with_limits, parse_external_link_model_with_limits, parse_external_link_with_limits,
-    parse_external_link_with_relationship_with_limits, read_with_limits,
-    write_external_link_stream_with_limits,
+    DdeItem, ExternalLinkLimits, ExternalLinkLimitsError, ExternalLinkResource, Link, apply,
+    parse_external_link, parse_external_link_model, parse_external_link_with_relationship, read,
+    write_external_link_stream,
 };
 
 #[test]
@@ -190,31 +189,26 @@ fn public_with_limits_apis_round_trip_an_authored_dde_link() {
     let link = Link::dde_with_items("server", "topic", vec![item]).expect("valid DDE link");
     let limits = ExternalLinkLimits::DEFAULT;
 
-    let encoded = write_external_link_stream_with_limits(&link, None, limits)
-        .expect("write under default limits");
-    let parsed = parse_external_link_with_limits(&encoded, limits).expect("parse under limits");
+    let encoded =
+        write_external_link_stream(&link, None, limits).expect("write under default limits");
+    let parsed = parse_external_link(&encoded, limits).expect("parse under limits");
     assert_eq!(parsed.link(), &link);
     assert_eq!(
-        parse_external_link_model_with_limits(&encoded, limits).expect("model parse under limits"),
+        parse_external_link_model(&encoded, limits).expect("model parse under limits"),
         link
     );
     assert_eq!(
-        parse_external_link_with_relationship_with_limits(&encoded, limits)
+        parse_external_link_with_relationship(&encoded, limits)
             .expect("relationship parse under limits")
             .link(),
         &link
     );
 
-    let snapshot = read_with_limits(&encoded, limits).expect("read under limits");
+    let snapshot = read(&encoded, limits).expect("read under limits");
     assert_eq!(snapshot.link(), &link);
-    let patch = snapshot
-        .edit()
-        .commit()
-        .expect("empty transaction")
-        .patch()
-        .clone();
+    let (_, patch) = snapshot.draft().finish().expect("empty transaction");
     assert_eq!(
-        apply_with_limits(&encoded, &patch, limits).expect("apply under limits"),
+        apply(&encoded, &patch, limits).expect("apply under limits"),
         encoded
     );
 }

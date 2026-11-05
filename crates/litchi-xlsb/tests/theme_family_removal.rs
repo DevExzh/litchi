@@ -12,6 +12,34 @@ use std::path::Path;
 use litchi_opc::PackURI;
 use litchi_xlsb::Workbook;
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _};
+
+/// Package-route steps on an owned workbook projection (record 0360b).
+trait ThemeSteps {
+    fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit>;
+    fn publish_theme(
+        &mut self,
+        patch: &litchi_xlsb::theme::Patch,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>>;
+}
+
+impl ThemeSteps for Workbook {
+    fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit> {
+        self.to_package().edit_theme()
+    }
+
+    fn publish_theme(
+        &mut self,
+        patch: &litchi_xlsb::theme::Patch,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>> {
+        let published = self.to_package().apply_theme(patch)?.into_package();
+        *self = published.owned_workbook()?;
+        self.theme()
+    }
+}
+
 const FIXTURE: &str = "test-data/ooxml/xlsb/hyperlink.xlsb";
 const THEME_NAME: &str = "/xl/theme/theme1.xml";
 const FAMILY_URI: &str = "{05A4C25C-085E-4340-85A3-A5531E510DB2}";
@@ -45,7 +73,10 @@ fn theme_bytes(workbook: &Workbook) -> Vec<u8> {
 
 fn saved_bytes(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save XLSB workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save XLSB workbook");
     output.into_inner()
 }
 
@@ -118,12 +149,11 @@ fn direct_extension_mce(source: &[u8]) -> Vec<u8> {
 fn native_family_removal_closes_wrappers_and_save_reopen_inverse_is_exact() {
     let mut workbook = workbook();
     let original = theme_bytes(&workbook);
-    let snapshot = workbook.theme().expect("read Theme").expect("native Theme");
-    let mut edit = snapshot.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     assert!(edit.remove_family().expect("stage native family removal"));
     let removal = edit.commit().expect("commit native family removal");
     workbook
-        .apply_theme(&removal)
+        .publish_theme(removal.patch())
         .expect("publish native family removal");
 
     let removed = theme_bytes(&workbook);
@@ -152,7 +182,7 @@ fn native_family_removal_closes_wrappers_and_save_reopen_inverse_is_exact() {
     );
 
     workbook
-        .apply_theme_patch(&removal.patch().inverse())
+        .publish_theme(&removal.patch().inverse())
         .expect("publish exact family removal inverse");
     assert_eq!(theme_bytes(&workbook), original);
     let reopened_restored =
@@ -184,7 +214,7 @@ fn xlsb_removal_retains_comment_and_foreign_payload_wrappers() {
         .replace("?>\r\n", "?>")
         .into_bytes();
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package
                 .get_part_mut(&theme_uri())
                 .expect("Theme part")
@@ -193,15 +223,11 @@ fn xlsb_removal_retains_comment_and_foreign_payload_wrappers() {
         })
         .expect("replace Theme source");
 
-    let snapshot = workbook
-        .theme()
-        .expect("read payload Theme")
-        .expect("payload Theme");
-    let mut edit = snapshot.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     assert!(edit.remove_family().expect("stage payload family removal"));
     let removal = edit.commit().expect("commit payload family removal");
     workbook
-        .apply_theme(&removal)
+        .publish_theme(removal.patch())
         .expect("publish payload family removal");
 
     let removed = theme_bytes(&workbook);
@@ -222,7 +248,7 @@ fn xlsb_add_refuses_direct_extension_mce_child_without_source_mutation() {
         .replace("?>\r\n", "?>")
         .into_bytes();
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package
                 .get_part_mut(&theme_uri())
                 .expect("Theme part")
@@ -238,7 +264,7 @@ fn xlsb_add_refuses_direct_extension_mce_child_without_source_mutation() {
         .expect("MCE Theme");
     assert!(before.family().is_none());
 
-    let mut edit = before.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     edit.set_family(
         litchi_xlsb::theme::Family::new(
             "Fresh Direct Family",
@@ -275,15 +301,17 @@ fn native_family_name_edit_preserves_declaration_crlf_through_save_and_inverse()
         b"name=\"Saved Native Family\"",
     );
     let expected = replace_bytes(&original, old_fragment, &expected_fragment);
-    let mut edit = snapshot.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     edit.set_family(family).expect("stage name edit");
     let commit = edit.commit().expect("commit name edit");
-    workbook.apply_theme(&commit).expect("publish edit");
+    workbook
+        .publish_theme(commit.patch())
+        .expect("publish edit");
     assert_eq!(theme_bytes(&workbook), expected);
     let reopened = Workbook::new(Cursor::new(saved_bytes(&workbook))).expect("reopen edit");
     assert_eq!(theme_bytes(&reopened), expected);
     workbook
-        .apply_theme_patch(&commit.patch().inverse())
+        .publish_theme(&commit.patch().inverse())
         .expect("publish inverse");
     let restored = Workbook::new(Cursor::new(saved_bytes(&workbook))).expect("reopen inverse");
     assert_eq!(theme_bytes(&restored), original);

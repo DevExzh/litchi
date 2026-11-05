@@ -5,7 +5,9 @@
 )]
 
 use litchi_pptx::Error;
-use litchi_pptx::presentation_properties::metadata::guides::{ColorKind, Guides, Orientation};
+use litchi_pptx::presentation_properties::metadata::guides::{
+    ColorKind, Guides, Limits, Orientation,
+};
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/extended-guides/presentation.xml");
@@ -14,7 +16,7 @@ const INVALID_PRESENTATION_XML: &[u8] =
 
 #[test]
 fn presentation_extended_guides_are_available_at_the_metadata_owner() {
-    let guides = Guides::from_xml(PRESENTATION_XML).unwrap();
+    let guides = Guides::from_xml(PRESENTATION_XML, Limits::DEFAULT).unwrap();
 
     let slide = guides.slide.as_ref().unwrap();
     assert_eq!(slide.guides.len(), 1);
@@ -29,7 +31,7 @@ fn presentation_extended_guides_are_available_at_the_metadata_owner() {
 
 #[test]
 fn presentation_extended_guides_preserve_validation_errors() {
-    let error = Guides::from_xml(INVALID_PRESENTATION_XML).unwrap_err();
+    let error = Guides::from_xml(INVALID_PRESENTATION_XML, Limits::DEFAULT).unwrap_err();
     assert!(matches!(
         error,
         Error::Invalid(_) | Error::Xml(_) | Error::MarkupCompatibility(_) | Error::Decode(_)

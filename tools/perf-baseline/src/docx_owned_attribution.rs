@@ -408,9 +408,9 @@ fn prepare_oracle(corpus: &super::Corpus) -> Result<Oracle, Box<dyn Error>> {
     )))?;
     let snapshot = package.section_layout_snapshot()?;
     super::verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
-    let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-        super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-    )))?;
+    let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+        Position::new(super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+    ))?;
     edit.set_columns(Some(litchi_docx::section::Columns {
         equal_width: true,
         count: 3,
@@ -419,13 +419,14 @@ fn prepare_oracle(corpus: &super::Corpus) -> Result<Oracle, Box<dyn Error>> {
         columns: Vec::new(),
     }))?;
     let commit = edit.commit()?;
-    if !commit.patch().changed() || commit.patch().is_noop() {
+    if commit.patch().is_noop() {
         return Err("DOCX owned attribution oracle commit is not changed".into());
     }
     let mut output = Vec::new();
-    let publication = package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+    let publication = package.apply_section_layout(commit.patch())?;
+    publication.package().write_to(&mut output)?;
     super::verify_docx_section_layout_output(corpus, &output, [3, 2, 2])?;
-    super::verify_docx_section_layout_controls(corpus, &commit, &publication)?;
+    super::verify_docx_section_layout_controls(corpus, &publication)?;
     let output_sha256 = super::sha256_hex(&output);
     let maximum_sink_bytes = u64::try_from(output.len())?
         .checked_mul(2)
@@ -446,7 +447,12 @@ fn open_owned_package(
 ) -> Result<litchi_docx::source_backed::Package, Box<dyn Error>> {
     match route {
         Route::OwnedVec => {
-            let opc = SourceBackedPackage::from_vec(input)?;
+            let opc = SourceBackedPackage::from_vec(
+                input,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?;
             Ok(litchi_docx::source_backed::Package::from_source_backed_package(opc)?)
         },
         Route::OwnedReader => {
@@ -838,9 +844,9 @@ fn run_workload(
         black_box(&snapshot);
         let query_ns = super::elapsed_ns(query_started.elapsed())?;
         let edit_started = Instant::now();
-        let mut layout_edit = snapshot.edit(litchi_docx::section::Selector::paragraph(
-            Position::new(payload_marker),
-        ))?;
+        let mut layout_edit = package.edit_section_layout(
+            litchi_docx::section::Selector::paragraph(Position::new(payload_marker)),
+        )?;
         layout_edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -856,8 +862,8 @@ fn run_workload(
         let commit_ns = super::elapsed_ns(commit_started.elapsed())?;
         let before_publication_after_commit = package.cache_diagnostics();
         let publication_started = Instant::now();
-        let layout_publication =
-            package.publish_section_layout_commit_to_stream(&mut sink, &layout_commit)?;
+        let layout_publication = package.apply_section_layout(layout_commit.patch())?;
+        layout_publication.package().write_to(&mut sink)?;
         black_box(&layout_publication);
         let publication_ns = super::elapsed_ns(publication_started.elapsed())?;
         let operation_ns = preparation_ns
@@ -870,29 +876,44 @@ fn run_workload(
         let wall_ns = super::elapsed_ns(wall_started.elapsed())?;
 
         super::verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
-        let changed_nonnoop_columns_verified = layout_commit.patch().changed()
-            && !layout_commit.patch().is_noop()
-            && layout_commit.snapshot().inventory().sections()[0]
+        let changed_nonnoop_columns_verified = !layout_commit.patch().is_noop()
+            && layout_publication
+                .package()
+                .section_layout_snapshot()?
+                .inventory()
+                .sections()[0]
                 .columns()
                 .map(|columns| columns.count)
                 == Some(3);
         if !changed_nonnoop_columns_verified {
             return Err("DOCX owned attribution commit changed an unexpected section".into());
         }
-        let replayed = layout_commit.patch().apply(&snapshot)?;
-        let restored_snapshot = layout_commit.patch().inverse().apply(&replayed)?;
+        let mut raw_tree = snapshot.raw_tree_at(
+            litchi_docx::section::Selector::paragraph(Position::new(payload_marker)),
+            &litchi_docx::section::Limits::default(),
+        )?;
+        raw_tree.set_columns(Some(litchi_docx::section::Columns {
+            equal_width: true,
+            count: 3,
+            space: Some(litchi_docx::section::Emu::from_twips(240)),
+            separator: true,
+            columns: Vec::new(),
+        }))?;
+        let raw_patch = raw_tree.patch()?;
+        let replayed = raw_patch.apply(&snapshot)?;
+        let restored_snapshot = raw_patch.inverse().apply(&replayed)?;
         let patch_forward_inverse_stale_verified = restored_snapshot.inventory().sections()
             == snapshot.inventory().sections()
             && layout_commit
-                .patch()
-                .apply(layout_commit.snapshot())
+                .package()
+                .apply_section_layout(layout_commit.patch())
                 .is_err();
         if !patch_forward_inverse_stale_verified {
             return Err("DOCX owned attribution patch oracle failed".into());
         }
         let publication_inverse_applicable_verified = layout_publication
-            .inverse_patch()
-            .apply(layout_publication.snapshot())
+            .package()
+            .apply_section_layout(&layout_publication.patch().inverse())
             .is_ok();
         if !publication_inverse_applicable_verified {
             return Err("DOCX owned attribution publication inverse is not applicable".into());
@@ -907,7 +928,10 @@ fn run_workload(
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored, &layout_publication)?;
+        reopened
+            .apply_section_layout(&layout_publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored)?;
         let inverse_verified = restored == corpus.archive;
         if !inverse_verified {
             return Err("DOCX owned attribution inverse did not restore source".into());

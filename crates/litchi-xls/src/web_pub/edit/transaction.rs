@@ -1,12 +1,13 @@
 //! Failure-atomic semantic edits over one inert `WebPub` snapshot.
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use crate::{Error, Result};
 
 use super::super::codec::rewrite_preserving_source;
 use super::super::model::{WebPageType, WebPub, WebPubRange};
-use super::model::{Commit, Patch, Snapshot};
+use super::model::{Commit, Diagnostics, Patch, Snapshot};
 
 /// A detached transaction over bounded BIFF8 web-publication metadata.
 ///
@@ -14,13 +15,13 @@ use super::model::{Commit, Patch, Snapshot};
 /// values but cannot add/remove `srcName`, `ref8`, or `crtID`. Every rejected
 /// operation leaves the candidate untouched.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
     publication: WebPub,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -57,21 +58,6 @@ impl Transaction {
     #[must_use]
     pub const fn web_publication(&self) -> &WebPub {
         self.publication()
-    }
-
-    /// Materializes the current candidate as a validated immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
-    }
-
-    /// Whether a staged edit changes any payload byte.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
     }
 
     /// Replaces the page behavior while retaining all other wire fields.
@@ -134,8 +120,10 @@ impl Transaction {
     /// Replaces the source name when this record already carries `srcName`.
     pub fn set_source_name(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         if self.publication.source_name.is_none() {
-            return Err(Error::UnsafeEdit(
-                "this WebPub source does not carry editable srcName metadata".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "this WebPub source does not carry editable srcName metadata",
             ));
         }
         let mut replacement = self.publication.clone();
@@ -146,8 +134,10 @@ impl Transaction {
     /// Replaces the range when this record already carries `ref8`.
     pub fn set_range(&mut self, value: WebPubRange) -> Result<&mut Self> {
         if self.publication.range.is_none() {
-            return Err(Error::UnsafeEdit(
-                "this WebPub source does not carry editable ref8 metadata".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "this WebPub source does not carry editable ref8 metadata",
             ));
         }
         let mut replacement = self.publication.clone();
@@ -159,19 +149,15 @@ impl Transaction {
     /// `crtID`.
     pub fn set_chart_shape_id(&mut self, value: u32) -> Result<&mut Self> {
         if self.publication.chart_shape_id.is_none() {
-            return Err(Error::UnsafeEdit(
-                "this WebPub source does not carry editable crtID metadata".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "this WebPub source does not carry editable crtID metadata",
             ));
         }
         let mut replacement = self.publication.clone();
         replacement.chart_shape_id = Some(value);
         self.replace(replacement)
-    }
-
-    /// Discards all staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate with a reversible source-checked
@@ -180,11 +166,12 @@ impl Transaction {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit::new(source, patch));
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse_shared(Arc::from(self.candidate.into_boxed_slice()))?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit::new(snapshot, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace(&mut self, replacement: WebPub) -> Result<&mut Self> {

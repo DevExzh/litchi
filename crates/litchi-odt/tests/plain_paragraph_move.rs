@@ -1,6 +1,6 @@
 use litchi_odf_common::package::raw_identical_members;
 use litchi_odt::{
-    Document,
+    Package,
     core::{PackageWriter, Profile},
     protection::Policy,
     transaction::{DurablePatch, Position},
@@ -18,9 +18,9 @@ fn content(body: &str) -> String {
     )
 }
 
-fn snapshot(body: &str) -> litchi_odt::transaction::Snapshot {
+fn snapshot(body: &str) -> Package {
     let xml = content(body);
-    Document::from_bytes(support::package(
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", xml.as_bytes()),
@@ -28,8 +28,6 @@ fn snapshot(body: &str) -> litchi_odt::transaction::Snapshot {
             ("Pictures/opaque.bin", &[0x5a; 512]),
         ],
     ))
-    .unwrap()
-    .snapshot()
     .unwrap()
 }
 
@@ -47,7 +45,7 @@ fn moves_exact_plain_fragments_and_raw_preserves_every_other_member() {
         .unwrap();
     let commit = edit.commit().unwrap();
     let target_content = commit
-        .snapshot()
+        .package()
         .document()
         .unwrap()
         .get_file("content.xml")
@@ -78,7 +76,7 @@ fn moves_exact_plain_fragments_and_raw_preserves_every_other_member() {
         );
     }
 
-    let identical = raw_identical_members(source.as_bytes(), commit.snapshot().as_bytes()).unwrap();
+    let identical = raw_identical_members(source.as_bytes(), commit.package().as_bytes()).unwrap();
     assert!(!identical.contains("content.xml"));
     for path in [
         "mimetype",
@@ -89,7 +87,7 @@ fn moves_exact_plain_fragments_and_raw_preserves_every_other_member() {
         assert!(identical.contains(path), "{path}");
     }
     let texts = commit
-        .snapshot()
+        .package()
         .document()
         .unwrap()
         .paragraphs()
@@ -108,19 +106,23 @@ fn patch_is_exact_deterministic_reversible_and_stale_checked() {
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        commit.patch().apply(&source).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
+    assert!(commit.package().apply(commit.patch()).is_err());
 
     let durable = commit.patch().durable().unwrap();
     let json = durable.to_deterministic_json().unwrap();
@@ -128,17 +130,17 @@ fn patch_is_exact_deterministic_reversible_and_stale_checked() {
     let decoded = DurablePatch::from_deterministic_json(&json).unwrap();
     assert_eq!(
         decoded.apply(&source).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     assert_eq!(
         decoded
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
-    assert!(decoded.apply(commit.snapshot()).is_err());
+    assert!(decoded.apply(commit.package()).is_err());
 }
 
 #[test]
@@ -148,7 +150,7 @@ fn equal_positions_are_an_exact_noop_without_staging() {
     edit.move_plain_paragraph(Position::new(1), Position::new(1))
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().as_bytes(), source.as_bytes());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
     assert!(commit.results().is_empty());
 }
 
@@ -163,7 +165,7 @@ fn paragraph_move_conflicts_with_intervening_content_edits() {
     replacement
         .replace_paragraph(Position::new(1), "changed")
         .unwrap();
-    let mut joined = source.joined_edit();
+    let mut joined = source.joined_edits();
     joined.join("move", movement).unwrap();
     assert!(joined.join("replace-middle", replacement).is_err());
 }
@@ -200,15 +202,15 @@ fn refuses_duplicate_or_stray_empty_body_ownership() {
             r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}"><o:text/><o:body><o:text><t:p>one</t:p><t:p>two</t:p></o:text></o:body></o:document-content>"#
         ),
     ] {
-        let document = match Document::from_bytes(support::package(
+        let document = match Package::from_bytes(&support::package(
             MIMETYPE,
             &[("content.xml", xml.as_bytes())],
         )) {
             Ok(document) => document,
-            Err(litchi_core::Error::InvalidFormat(_)) => continue,
+            Err(litchi_odt::Error::Core(litchi_core::Error::InvalidFormat(_))) => continue,
             Err(error) => panic!("open produced a non-format error: {error:?}"),
         };
-        let source = document.snapshot().unwrap();
+        let source = document.clone();
         assert_move_refused(&source);
     }
 }
@@ -218,37 +220,34 @@ fn refuses_scripts_signatures_and_protection() {
     let scripted_xml = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0"><o:scripts><o:script s:language="x"><![CDATA[payload]]></o:script></o:scripts><o:body><o:text><t:p>one</t:p><t:p>two</t:p></o:text></o:body></o:document-content>"#
     );
-    let scripted = Document::from_bytes(support::package(
+    let scripted = Package::from_bytes(&support::package(
         MIMETYPE,
         &[("content.xml", scripted_xml.as_bytes())],
     ))
-    .unwrap()
-    .snapshot()
     .unwrap();
     assert_move_refused(&scripted);
 
     let signed_xml = content("<t:p>one</t:p><t:p>two</t:p>");
-    let signed = Document::from_bytes(support::package(
+    let signed = Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", signed_xml.as_bytes()),
             ("META-INF/documentsignatures.xml", b"opaque signature"),
         ],
     ))
-    .unwrap()
-    .snapshot()
     .unwrap();
     let mut signed_noop = signed.edit();
     signed_noop
         .move_plain_paragraph(Position::new(0), Position::new(0))
         .unwrap();
     assert_eq!(
-        signed_noop.commit().unwrap().snapshot().as_bytes(),
+        signed_noop.commit().unwrap().package().as_bytes(),
         signed.as_bytes()
     );
     assert_move_refused(&signed);
 
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer.set_mimetype(MIMETYPE).unwrap();
     encrypted_writer
         .set_encryption("secret", Profile::compatible())
@@ -260,9 +259,7 @@ fn refuses_scripts_signatures_and_protection() {
         )
         .unwrap();
     let encrypted =
-        Document::from_bytes_with_password(encrypted_writer.finish_to_bytes().unwrap(), "secret")
-            .unwrap()
-            .snapshot()
+        Package::from_bytes_with_password(&encrypted_writer.finish_to_bytes().unwrap(), "secret")
             .unwrap();
     assert_move_refused(&encrypted);
 
@@ -271,7 +268,7 @@ fn refuses_scripts_signatures_and_protection() {
     protection
         .set_protection(&Policy::default().with_read_only(Some(true)))
         .unwrap();
-    let protected = protection.commit().unwrap().into_snapshot();
+    let protected = protection.commit().unwrap().into_package();
     assert_move_refused(&protected);
 }
 
@@ -298,7 +295,7 @@ fn checks_position_and_paragraph_bounds() {
     assert!(edit.commit().is_err());
 }
 
-fn assert_move_refused(source: &litchi_odt::transaction::Snapshot) {
+fn assert_move_refused(source: &Package) {
     let mut edit = source.edit();
     edit.move_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();

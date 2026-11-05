@@ -6,11 +6,8 @@ use super::model::{Limits, MAX_COLUMN, MAX_ROW, MappedTable, SingleCellBinding};
 use super::{XmlMapInfo, XmlMapLimits};
 use crate::package::error::{Error, Result};
 
-pub(crate) fn invalid(typ: impl Into<String>, value: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: value.into(),
-    }
+pub(crate) fn invalid(typ: &'static str, value: &'static str) -> Error {
+    Error::Unrecognized { typ, val: value }
 }
 
 pub(crate) fn nonzero_id(value: u32, typ: &'static str) -> Result<()> {
@@ -23,7 +20,7 @@ pub(crate) fn nonzero_id(value: u32, typ: &'static str) -> Result<()> {
 
 pub(crate) fn list_id(value: u32, typ: &'static str) -> Result<()> {
     if value == 0 || value == u32::MAX {
-        Err(invalid(typ, format!("{value}, expected 1..=4294967294")))
+        Err(invalid(typ, ", expected 14294967294"))
     } else {
         Ok(())
     }
@@ -33,17 +30,14 @@ pub(crate) fn xml_data_type(value: u32) -> Result<()> {
     if (1..=0x2D).contains(&value) {
         Ok(())
     } else {
-        Err(invalid("XmlDataType", format!("0x{value:08X}")))
+        Err(invalid("XmlDataType", "0x"))
     }
 }
 
 pub(crate) fn xpath(value: &str, max_units: usize) -> Result<()> {
     let units = value.encode_utf16().count();
     if units == 0 || units > max_units {
-        return Err(invalid(
-            "XmlMappedXpath",
-            format!("{units} UTF-16 units, expected 1..={max_units}"),
-        ));
+        return Err(invalid("XmlMappedXpath", "UTF-16 units, expected 1..="));
     }
     if !value.starts_with('/') {
         return Err(invalid("XmlMappedXpath", "XPath is not absolute"));
@@ -198,16 +192,10 @@ fn parse_qname(value: &str, offset: usize) -> Result<usize> {
 
 pub(crate) fn cell(row: u32, column: u32) -> Result<()> {
     if row > MAX_ROW {
-        return Err(invalid(
-            "single-cell row",
-            format!("{row} exceeds {MAX_ROW}"),
-        ));
+        return Err(invalid("single-cell row", "exceeds"));
     }
     if column > MAX_COLUMN {
-        return Err(invalid(
-            "single-cell column",
-            format!("{column} exceeds {MAX_COLUMN}"),
-        ));
+        return Err(invalid("single-cell column", "exceeds"));
     }
     Ok(())
 }
@@ -223,10 +211,7 @@ pub(crate) fn mapped_table(value: &MappedTable, limits: Limits) -> Result<()> {
     let mut ids = HashSet::with_capacity(value.columns().len());
     for binding in value.columns() {
         if !ids.insert(binding.column_id()) {
-            return Err(invalid(
-                "mapped table",
-                format!("duplicate column ID {}", binding.column_id()),
-            ));
+            return Err(invalid("mapped table", "duplicate column ID"));
         }
         xpath(binding.xpath().as_str(), limits.max_xpath_units)?;
     }
@@ -247,20 +232,10 @@ pub(crate) fn single_cells(values: &[SingleCellBinding], limits: Limits) -> Resu
         cell(value.cell().row(), value.cell().column())?;
         xpath(value.xpath().as_str(), limits.max_xpath_units)?;
         if !table_ids.insert(value.table_id()) {
-            return Err(invalid(
-                "single-cell tables",
-                format!("duplicate table ID {}", value.table_id()),
-            ));
+            return Err(invalid("single-cell tables", "duplicate table ID"));
         }
         if !cells.insert(value.cell()) {
-            return Err(invalid(
-                "single-cell tables",
-                format!(
-                    "duplicate cell ({}, {})",
-                    value.cell().row(),
-                    value.cell().column()
-                ),
-            ));
+            return Err(invalid("single-cell tables", "duplicate cell (, )"));
         }
     }
     Ok(())
@@ -268,7 +243,7 @@ pub(crate) fn single_cells(values: &[SingleCellBinding], limits: Limits) -> Resu
 
 /// Validate the shared catalog under caller-selected resource ceilings.
 pub fn validate_catalog(info: &XmlMapInfo, limits: XmlMapLimits) -> Result<()> {
-    litchi_ooxml_common::spreadsheet_xml_maps::validate_xml_map_info_with_limits(info, &limits)?;
+    litchi_ooxml_common::spreadsheet_xml_maps::validate_xml_map_info(info, &limits)?;
     Ok(())
 }
 
@@ -285,10 +260,7 @@ pub fn validate_binding_map_ids(
         .chain(single_cells.iter().map(SingleCellBinding::column_binding))
     {
         if !map_ids.contains(&binding.map_id()) {
-            return Err(invalid(
-                "XML map binding",
-                format!("unknown map ID {}", binding.map_id()),
-            ));
+            return Err(invalid("XML map binding", "unknown map ID"));
         }
     }
     Ok(())

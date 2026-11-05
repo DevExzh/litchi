@@ -91,6 +91,13 @@ impl OdfValidationLimits {
         self
     }
 
+    /// Returns a copy with a new `mimetype` member ceiling.
+    #[must_use]
+    pub const fn with_max_mimetype_bytes(mut self, maximum: u64) -> Self {
+        self.max_mimetype_bytes = maximum;
+        self
+    }
+
     /// Returns a copy with a new per-member declared-size ceiling.
     #[must_use]
     pub const fn with_max_archive_entry_bytes(mut self, maximum: u64) -> Self {
@@ -179,6 +186,12 @@ impl OdfValidationLimits {
         self.max_manifest_bytes
     }
 
+    /// Returns the `mimetype` member ceiling.
+    #[must_use]
+    pub const fn max_mimetype_bytes(self) -> u64 {
+        self.max_mimetype_bytes
+    }
+
     /// Returns the manifest file-entry ceiling.
     #[must_use]
     pub const fn max_manifest_entries(self) -> usize {
@@ -256,25 +269,6 @@ impl From<ValidationReportError> for OdfValidationError {
     }
 }
 
-/// Validate borrowed ODF package bytes under default finite input and report
-/// bounds without changing or retaining the package.
-///
-/// The immutable slice is the source-identity bracket for the entire call.
-/// ZIP metadata is bounded-indexed once. A separate allocation-free raw-header
-/// pass checks path spelling and the mimetype local header; ordinary package
-/// payloads remain unread.
-///
-/// # Errors
-///
-/// Returns an error only if a bounded allocation or report construction fails.
-pub fn validate_package(data: &[u8]) -> Result<ValidateReport, OdfValidationError> {
-    validate_package_with_limits(
-        data,
-        OdfValidationLimits::default(),
-        ValidationLimits::default(),
-    )
-}
-
 /// Validate borrowed ODF package bytes under explicit finite input and report
 /// bounds without changing or retaining the package.
 ///
@@ -289,7 +283,7 @@ pub fn validate_package(data: &[u8]) -> Result<ValidateReport, OdfValidationErro
 /// # Errors
 ///
 /// Returns an error only if a bounded allocation or report construction fails.
-pub fn validate_package_with_limits(
+pub fn validate_package(
     data: &[u8],
     input_limits: OdfValidationLimits,
     report_limits: ValidationLimits,
@@ -312,7 +306,7 @@ pub fn validate_package_with_limits(
         },
     };
 
-    let archive = match ArchiveReader::new_with_limits(data, input_limits.archive) {
+    let archive = match ArchiveReader::new(data, input_limits.archive) {
         Ok(archive) => archive,
         Err(error) => {
             if allocation_failure(&error) {

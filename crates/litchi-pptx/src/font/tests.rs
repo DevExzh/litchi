@@ -119,6 +119,7 @@ fn strict_xml_round_trip_and_mce_fallback() {
 fn loads_libreoffice_and_poi_reference_packages() {
     let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
         root().join("test-data/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx"),
+        litchi_opc::SourceLimits::default(),
     )
     .unwrap();
     let mut libreoffice = package(Conformance::Transitional);
@@ -158,6 +159,7 @@ fn loads_libreoffice_and_poi_reference_packages() {
     );
     let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
         root().join("test-data/poi/test-data/slideshow/placeholder-layout-color.pptx"),
+        litchi_opc::SourceLimits::default(),
     )
     .unwrap();
     let mut poi = package(Conformance::Transitional);
@@ -348,6 +350,17 @@ fn present_empty_and_loaded_false_flag_round_trip_exactly() {
     assert!(!put(&mut empty, loaded).unwrap());
     assert!(empty.is_signed());
     assert_eq!(empty.get_part(&uri).unwrap().blob(), before);
+    // Removing the empty list changes the presentation, so it refuses the
+    // signed package until the signature is removed explicitly (ADR 0006).
+    assert!(matches!(
+        remove(&mut empty),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(empty.is_signed());
+    assert_eq!(empty.get_part(&uri).unwrap().blob(), before);
+    empty.unsign();
     assert!(remove(&mut empty).unwrap().is_some());
     assert!(load(&empty).unwrap().is_none());
     assert!(
@@ -510,6 +523,18 @@ fn generated_crud_allocates_collisions_and_preserves_unknown_xml_atomically() {
         .with_charset(Charset::DEFAULT);
     replacement.rename("Renamed").unwrap();
     changed.add(replacement).unwrap();
+    // A changed collection refuses the signed package before any mutation
+    // (ADR 0006); it is published after the signature is removed explicitly.
+    assert!(matches!(
+        put(&mut package, changed.clone()),
+        Err(Error::Opc(
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ));
+    assert!(package.is_signed());
+    assert_eq!(package.get_part(&presentation_uri).unwrap().blob(), before);
+    assert_eq!(package.part_count(), parts);
+    package.unsign();
     assert!(put(&mut package, changed).unwrap());
     assert!(!package.is_signed());
     assert_eq!(

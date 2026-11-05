@@ -3,7 +3,7 @@
 use super::codec;
 use super::model::{EntryKind, Limits, Links, Metadata, Sid};
 use super::validation;
-use litchi_cfb::{DirectoryEntry, OleError};
+use litchi_cfb::DirectoryEntry;
 use std::sync::Arc;
 
 /// The typed projection retained alongside one raw CFB directory entry.
@@ -106,29 +106,20 @@ impl Catalog {
     ///
     /// Returns an error when an entry violates CFB invariants or resource
     /// limits, or when copying the supplied entries cannot be allocated.
-    pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, OleError> {
-        let projections = validation::validate_catalog(entries, limits)?;
+    pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, crate::Error> {
+        let projections =
+            validation::validate_catalog(entries, limits).map_err(crate::Error::from)?;
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(entries.len())
-            .map_err(|source| OleError::Allocation {
+            .map_err(|source| litchi_cfb::OleError::Allocation {
                 resource: "CFB directory catalog entries",
                 source,
-            })?;
+            })
+            .map_err(crate::Error::from)?;
         owned.extend(entries.iter().cloned());
         let raw: Arc<[DirectoryEntry]> = owned.into();
         Ok(Self::from_parts(raw, projections, limits))
-    }
-
-    /// Parses a directory catalog with the default resource bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when an entry violates CFB invariants or the default
-    /// resource limits, or when copying the supplied entries cannot be
-    /// allocated.
-    pub fn parse_default(entries: &[DirectoryEntry]) -> Result<Self, OleError> {
-        Self::parse(entries, Limits::default())
     }
 
     /// Captures owned directory entries under explicit resource bounds.
@@ -137,8 +128,12 @@ impl Catalog {
     ///
     /// Returns an error when an entry violates CFB invariants or the supplied
     /// resource limits.
-    pub fn from_entries(entries: Vec<DirectoryEntry>, limits: Limits) -> Result<Self, OleError> {
-        let projections = validation::validate_catalog(&entries, limits)?;
+    pub fn from_entries(
+        entries: Vec<DirectoryEntry>,
+        limits: Limits,
+    ) -> Result<Self, crate::Error> {
+        let projections =
+            validation::validate_catalog(&entries, limits).map_err(crate::Error::from)?;
         let raw: Arc<[DirectoryEntry]> = entries.into();
         Ok(Self::from_parts(raw, projections, limits))
     }
@@ -152,15 +147,15 @@ impl Catalog {
     pub fn from_entries_shared(
         entries: Arc<[DirectoryEntry]>,
         limits: Limits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, crate::Error> {
         Self::from_shared(entries, limits)
     }
 
     pub(crate) fn from_shared(
         raw: Arc<[DirectoryEntry]>,
         limits: Limits,
-    ) -> Result<Self, OleError> {
-        let projections = validation::validate_catalog(&raw, limits)?;
+    ) -> Result<Self, crate::Error> {
+        let projections = validation::validate_catalog(&raw, limits).map_err(crate::Error::from)?;
         Ok(Self::from_parts(raw, projections, limits))
     }
 

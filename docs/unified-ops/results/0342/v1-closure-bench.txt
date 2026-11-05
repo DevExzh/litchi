@@ -1,0 +1,18 @@
+# record 0342: v1_closure_bench on dee393b29e + working tree (row/table single-edit staging); taskset -c 7; ABBA, median of 41 rounds per leg
+# cargo build --release -p litchi-ops --features docx,pptx --example v1_closure_bench; sha256 9f283dfa2162aac0
+## run 1
+docx set / extended.company: native 37110 ns, unified 37300 ns, ratio 1.005
+docx set / title: native 12470 ns, unified 12550 ns, ratio 1.006
+docx set table border.top: native 99370 ns, unified 100680 ns, ratio 1.013
+docx resolve table vs row path (attribution): native 320 ns, unified 4400 ns, ratio 13.750
+docx set row header height.exact: native 50800 ns, unified 57320 ns, ratio 1.128
+docx add paragraph listStyle=bullet: native 79881 ns, unified 81140 ns, ratio 1.016
+pptx set table switches: native 313162 ns, unified 314921 ns, ratio 1.006
+## run 2
+docx set / extended.company: native 36451 ns, unified 36881 ns, ratio 1.012
+docx set / title: native 12380 ns, unified 12760 ns, ratio 1.031
+docx set table border.top: native 101690 ns, unified 102870 ns, ratio 1.012
+docx resolve table vs row path (attribution): native 350 ns, unified 4400 ns, ratio 12.571
+docx set row header height.exact: native 50970 ns, unified 57461 ns, ratio 1.127
+docx add paragraph listStyle=bullet: native 79791 ns, unified 81501 ns, ratio 1.021
+pptx set table switches: native 312912 ns, unified 315881 ns, ratio 1.009

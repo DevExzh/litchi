@@ -1,9 +1,10 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_core::{HistoryLimits, Position};
+use litchi_odf_common::Error;
 use litchi_odf_common::core::PackageWriter;
 use litchi_odm::{
-    Master,
+    Package,
     style::Origin,
     transaction::{
         ActiveContentPolicy, Conflict, MergeError, ResourceSpec, SectionSpec, SecurityPolicy,
@@ -40,8 +41,8 @@ const META: &str = concat!(
     r#"</office:meta></office:document-meta>"#,
 );
 
-fn source() -> Master {
-    let mut writer = PackageWriter::new();
+fn source() -> Package {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
     writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
@@ -56,11 +57,11 @@ fn source() -> Master {
     writer
         .add_file_with_media_type("Pictures/cover.png", b"cover", "image/png")
         .unwrap();
-    Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+    Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
 }
 
-fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Master {
-    let mut writer = PackageWriter::new();
+fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Package {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("styles.xml", styles.as_bytes()).unwrap();
@@ -72,11 +73,11 @@ fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Master {
             "application/vnd.oasis.opendocument.text",
         )
         .unwrap();
-    Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+    Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
 }
 
-fn master_without_styles(content: &str, chapter: &[u8]) -> Master {
-    let mut writer = PackageWriter::new();
+fn master_without_styles(content: &str, chapter: &[u8]) -> Package {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("meta.xml", META.as_bytes()).unwrap();
@@ -87,13 +88,13 @@ fn master_without_styles(content: &str, chapter: &[u8]) -> Master {
             "application/vnd.oasis.opendocument.text",
         )
         .unwrap();
-    Master::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+    Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
 }
 
 #[test]
 fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
     let source = source();
-    let mut metadata = source.metadata().unwrap().clone();
+    let mut metadata = source.document().metadata().unwrap().clone();
     metadata.title = Some("After".to_string());
     metadata.author = Some("Revised author".to_string());
     metadata.subject = Some("Book".to_string());
@@ -119,14 +120,15 @@ fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
         .remove_resource("Pictures/cover.png")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let changed = commit.snapshot();
-    assert_eq!(changed.title(), Some("After"));
+    let changed = commit.package();
+    assert_eq!(changed.document().title(), Some("After"));
     assert_eq!(
-        changed.metadata().unwrap().author.as_deref(),
+        changed.document().metadata().unwrap().author.as_deref(),
         Some("Revised author")
     );
     assert!(
         changed
+            .document()
             .section_tree()
             .sections()
             .iter()
@@ -135,6 +137,7 @@ fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
     );
     assert!(
         changed
+            .document()
             .section_tree()
             .sections()
             .iter()
@@ -142,12 +145,14 @@ fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
     );
     assert!(
         changed
+            .document()
             .styles()
             .iter()
             .any(|style| style.name() == "RenamedSectionStyle")
     );
     assert!(
         changed
+            .document()
             .resources()
             .resources()
             .iter()
@@ -155,16 +160,21 @@ fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
     );
     assert!(
         !changed
+            .document()
             .resources()
             .resources()
             .iter()
             .any(|resource| resource.path() == "Pictures/cover.png")
     );
     assert_eq!(
-        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
-    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
+    assert!(Package::from_bytes(changed.as_bytes()).is_ok());
 }
 
 #[test]
@@ -180,11 +190,11 @@ fn section_and_style_create_delete_are_reversible() {
                 .unwrap(),
         )
         .unwrap();
-    let added = add.commit().unwrap().into_snapshot();
-    let section_position = Position::new(added.section_tree().sections().len() - 1);
+    let added = add.commit().unwrap().into_package();
+    let section_position = Position::new(added.document().section_tree().sections().len() - 1);
     let mut remove = added.edit();
     remove.remove_section(section_position).unwrap();
-    let without_section = remove.commit().unwrap().into_snapshot();
+    let without_section = remove.commit().unwrap().into_package();
     let mut remove_style = without_section.edit();
     remove_style
         .remove_style(Origin::Styles, "Disposable")
@@ -192,17 +202,18 @@ fn section_and_style_create_delete_are_reversible() {
     let commit = remove_style.commit().unwrap();
     assert!(
         !commit
-            .snapshot()
+            .package()
+            .document()
             .styles()
             .iter()
             .any(|style| style.name() == "Disposable")
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         without_section.as_bytes()
     );
@@ -259,11 +270,14 @@ fn transfer_durable_stale_and_three_way_plan_share_the_strong_boundary() {
     let decoded = litchi_odm::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     assert_eq!(
         decoded.apply(&source).unwrap().as_bytes(),
-        transfer_commit.snapshot().as_bytes()
+        transfer_commit.package().as_bytes()
     );
-    assert!(decoded.apply(transfer_commit.snapshot()).is_err());
+    assert!(matches!(
+        decoded.apply(transfer_commit.package()),
+        Err(Error::PatchConflict { .. })
+    ));
 
-    let mut metadata = source.metadata().unwrap().clone();
+    let mut metadata = source.document().metadata().unwrap().clone();
     metadata.description = Some("planned".to_string());
     let mut metadata_edit = source.edit();
     metadata_edit.set_metadata(metadata).unwrap();
@@ -273,13 +287,17 @@ fn transfer_durable_stale_and_three_way_plan_share_the_strong_boundary() {
         .plan_three_way(transfer_commit.patch())
         .unwrap();
     assert!(metadata_plan.can_commit());
-    let merged = metadata_plan.commit().unwrap().apply(&source).unwrap();
+    let merged = source
+        .apply(&metadata_plan.commit().unwrap())
+        .unwrap()
+        .into_package();
     assert_eq!(
-        merged.metadata().unwrap().description.as_deref(),
+        merged.document().metadata().unwrap().description.as_deref(),
         Some("planned")
     );
     assert!(
         merged
+            .document()
             .resources()
             .resources()
             .iter()
@@ -312,7 +330,7 @@ fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
     let source = source();
     let mut destination_edit = source.edit();
     destination_edit.set_title("Destination master").unwrap();
-    let destination = destination_edit.commit().unwrap().into_snapshot();
+    let destination = destination_edit.commit().unwrap().into_package();
     let mut transfer = destination.edit_with_policy(SecurityPolicy::strict());
     transfer
         .transfer_linked_section(
@@ -323,19 +341,22 @@ fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
         )
         .unwrap();
     let commit = transfer.commit().unwrap();
-    let changed = commit.snapshot();
-    let imported = changed
+    let changed = commit.package();
+    let changed_document = changed.document();
+    let imported = changed_document
         .section_tree()
         .sections()
         .iter()
         .find(|section| section.name() == "Imported chapter")
         .unwrap();
-    let reference = &changed.subdocuments()[imported.reference().unwrap().get()];
+    let changed_document = changed.document();
+    let reference = &changed_document.subdocuments()[imported.reference().unwrap().get()];
     assert_eq!(reference.href(), "Chapters/imported.odt");
     assert_eq!(reference.source_section(), None);
-    assert_eq!(changed.resources().missing(), &[]);
+    assert_eq!(changed.document().resources().missing(), &[]);
     assert_eq!(
         changed
+            .document()
             .resources()
             .resources()
             .iter()
@@ -346,6 +367,7 @@ fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
     );
 
     let imported_position = changed
+        .document()
         .section_tree()
         .sections()
         .iter()
@@ -356,9 +378,10 @@ fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
     cleanup
         .remove_section_with_orphaned_resources(imported_position)
         .unwrap();
-    let cleaned = cleanup.commit().unwrap().into_snapshot();
+    let cleaned = cleanup.commit().unwrap().into_package();
     assert!(
         cleaned
+            .document()
             .section_tree()
             .sections()
             .iter()
@@ -366,14 +389,19 @@ fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
     );
     assert!(
         cleaned
+            .document()
             .resources()
             .resources()
             .iter()
             .all(|resource| resource.path() != "Chapters/imported.odt")
     );
-    assert!(Master::from_bytes(cleaned.as_bytes().to_vec()).is_ok());
+    assert!(Package::from_bytes(cleaned.as_bytes()).is_ok());
     assert_eq!(
-        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
 }
@@ -386,8 +414,8 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
     missing_edit
         .set_link(Position::new(0), "Chapters/missing.odt")
         .unwrap();
-    let missing_snapshot = missing_edit.commit().unwrap().into_snapshot();
-    assert!(!missing_snapshot.resources().missing().is_empty());
+    let missing_snapshot = missing_edit.commit().unwrap().into_package();
+    assert!(!missing_snapshot.document().resources().missing().is_empty());
     let mut strict_change = missing_snapshot.edit_with_policy(SecurityPolicy::strict());
     strict_change.set_title("blocked by final graph").unwrap();
     assert!(strict_change.commit().is_err());
@@ -398,27 +426,29 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
         .unwrap()
         .remove_style(Origin::Content, "AutoSection")
         .unwrap();
-    let cleaned = atomic_cleanup.commit().unwrap().into_snapshot();
+    let cleaned = atomic_cleanup.commit().unwrap().into_package();
     assert!(
         cleaned
+            .document()
             .styles()
             .iter()
             .all(|style| style.name() != "AutoSection")
     );
     assert!(
         cleaned
+            .document()
             .resources()
             .resources()
             .iter()
             .all(|resource| resource.path() != "Chapters/a.odt")
     );
 
-    let mut author_metadata = source.metadata().unwrap().clone();
+    let mut author_metadata = source.document().metadata().unwrap().clone();
     author_metadata.author = Some("Left author".to_string());
     let mut author_edit = source.edit();
     author_edit.set_metadata(author_metadata).unwrap();
     let author_commit = author_edit.commit().unwrap();
-    let mut description_metadata = source.metadata().unwrap().clone();
+    let mut description_metadata = source.document().metadata().unwrap().clone();
     description_metadata.description = Some("Right description".to_string());
     let mut description_edit = source.edit();
     description_edit.set_metadata(description_metadata).unwrap();
@@ -428,13 +458,26 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
         .plan_three_way(description_commit.patch())
         .unwrap();
     assert!(metadata_plan.can_commit());
-    let metadata_merged = metadata_plan.commit().unwrap().apply(&source).unwrap();
+    let metadata_merged = source
+        .apply(&metadata_plan.commit().unwrap())
+        .unwrap()
+        .into_package();
     assert_eq!(
-        metadata_merged.metadata().unwrap().author.as_deref(),
+        metadata_merged
+            .document()
+            .metadata()
+            .unwrap()
+            .author
+            .as_deref(),
         Some("Left author")
     );
     assert_eq!(
-        metadata_merged.metadata().unwrap().description.as_deref(),
+        metadata_merged
+            .document()
+            .metadata()
+            .unwrap()
+            .description
+            .as_deref(),
         Some("Right description")
     );
     let mut title_edit = source.edit();
@@ -450,10 +493,13 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
             .plan_three_way(title_commit.patch())
             .unwrap(),
     ] {
-        let merged = plan.commit().unwrap().apply(&source).unwrap();
-        assert_eq!(merged.title(), Some("Planned title"));
+        let merged = source
+            .apply(&plan.commit().unwrap())
+            .unwrap()
+            .into_package();
+        assert_eq!(merged.document().title(), Some("Planned title"));
         assert_eq!(
-            merged.metadata().unwrap().author.as_deref(),
+            merged.document().metadata().unwrap().author.as_deref(),
             Some("Left author")
         );
     }
@@ -468,9 +514,11 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
         .plan_three_way(left_commit.patch())
         .unwrap();
     assert!(identical_plan.can_commit());
-    let identical = identical_plan.commit().unwrap().apply(&source).unwrap();
+    let identical = source.apply(&identical_plan.commit().unwrap()).unwrap();
     assert_eq!(
         identical
+            .into_package()
+            .document()
             .section_tree()
             .sections()
             .iter()
@@ -533,7 +581,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     );
     let master = master_from_parts(content, STYLES, b"chapter");
     assert_eq!(
-        master.structure().items(),
+        master.document().structure().items(),
         &[
             Kind::Paragraph,
             Kind::GeneratedIndex(IndexKind::TableOfContents),
@@ -545,11 +593,13 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
             Kind::Table,
         ]
     );
-    let local = &master.section_tree().local_references()[0];
+    let master_document = master.document();
+    let local = &master_document.section_tree().local_references()[0];
     assert_eq!(local.owner(), Position::new(1));
     assert_eq!(local.target_name(), "Target");
     assert_eq!(local.target(), Some(Position::new(0)));
-    let unresolved = master
+    let master_document = master.document();
+    let unresolved = master_document
         .section_tree()
         .unresolved_local_references()
         .next()
@@ -558,6 +608,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     assert_eq!(unresolved.target_name(), "Missing");
     assert_eq!(
         master
+            .document()
             .section_tree()
             .get(Position::new(1))
             .unwrap()
@@ -566,6 +617,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     );
     assert_eq!(
         master
+            .document()
             .section_tree()
             .get(Position::new(1))
             .unwrap()
@@ -574,6 +626,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     );
     assert!(
         master
+            .document()
             .section_tree()
             .get(Position::new(2))
             .unwrap()
@@ -581,6 +634,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     );
     assert_eq!(
         master
+            .document()
             .section_tree()
             .get(Position::new(2))
             .unwrap()
@@ -589,16 +643,19 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     );
     assert!(
         master
+            .document()
             .security()
             .active_content()
             .iter()
             .any(|item| item.kind() == ActiveKind::Dde)
     );
-    let generated = &master.structure().generated_indexes()[0];
+    let master_document = master.document();
+    let generated = &master_document.structure().generated_indexes()[0];
     assert_eq!(generated.item(), Position::new(1));
     assert_eq!(generated.name(), Some("Contents"));
     assert_eq!(generated.xml_id(), Some("toc1"));
-    let listener = master
+    let master_document = master.document();
+    let listener = master_document
         .security()
         .active_content()
         .iter()
@@ -608,7 +665,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     assert_eq!(listener.target(), Some("Main.Run"));
     assert_eq!(listener.link(), Some("vnd.sun.star.script:Main.Run"));
     assert_eq!(
-        master.security().changed_write_disposition(),
+        master.document().security().changed_write_disposition(),
         litchi_odm::security::ChangedWriteDisposition::RequiresInertActiveContentOptIn
     );
 
@@ -618,18 +675,17 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         .rename_generated_index(Position::new(1), "Renamed Contents")
         .unwrap();
     let index_commit = index_edit.commit().unwrap();
-    let renamed = index_commit.snapshot();
+    let renamed = index_commit.package();
     assert_eq!(
-        renamed.structure().generated_indexes()[0].name(),
+        renamed.document().structure().generated_indexes()[0].name(),
         Some("Renamed Contents")
     );
     assert_eq!(index_commit.patch().changes().generated_indexes().len(), 1);
     assert_eq!(
-        index_commit
-            .patch()
-            .inverse()
-            .apply(renamed)
+        renamed
+            .apply(&index_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         master.as_bytes()
     );
@@ -647,15 +703,13 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     let mut title_edit = master.edit_with_policy(policy);
     title_edit.set_title("Index merge").unwrap();
     let title_commit = title_edit.commit().unwrap();
-    let merged = index_commit
-        .patch()
-        .merge(title_commit.patch())
+    let merged = master
+        .apply(&index_commit.patch().merge(title_commit.patch()).unwrap())
         .unwrap()
-        .apply(&master)
-        .unwrap();
-    assert_eq!(merged.title(), Some("Index merge"));
+        .into_package();
+    assert_eq!(merged.document().title(), Some("Index merge"));
     assert_eq!(
-        merged.structure().generated_indexes()[0].name(),
+        merged.document().structure().generated_indexes()[0].name(),
         Some("Renamed Contents")
     );
     let mut competing_edit = master.edit_with_policy(policy);
@@ -678,25 +732,30 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         .remove_style(Origin::Styles, "Standard")
         .unwrap();
     let body_commit = body_edit.commit().unwrap();
-    let body_changed = body_commit.snapshot();
+    let body_changed = body_commit.package();
     assert_eq!(
-        body_changed.structure().items()[0],
+        body_changed.document().structure().items()[0],
         Kind::GeneratedIndex(IndexKind::TableOfContents)
     );
-    assert!(!body_changed.content_xml().contains(">front</text:p>"));
     assert!(
         !body_changed
+            .document()
+            .content_xml()
+            .contains(">front</text:p>")
+    );
+    assert!(
+        !body_changed
+            .document()
             .styles()
             .iter()
             .any(|style| style.name() == "Standard")
     );
     assert_eq!(body_commit.patch().changes().body_items().len(), 1);
     assert_eq!(
-        body_commit
-            .patch()
-            .inverse()
-            .apply(body_changed)
+        body_changed
+            .apply(&body_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         master.as_bytes()
     );
@@ -716,18 +775,16 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     assert_eq!(body_history.current().as_bytes(), master.as_bytes());
     assert!(body_history.redo());
     assert_eq!(body_history.current().as_bytes(), body_changed.as_bytes());
-    let merged_body = body_commit
-        .patch()
-        .merge(index_commit.patch())
+    let merged_body = master
+        .apply(&body_commit.patch().merge(index_commit.patch()).unwrap())
         .unwrap()
-        .apply(&master)
-        .unwrap();
+        .into_package();
     assert_eq!(
-        merged_body.structure().generated_indexes()[0].name(),
+        merged_body.document().structure().generated_indexes()[0].name(),
         Some("Renamed Contents")
     );
     assert_eq!(
-        merged_body.structure().items()[0],
+        merged_body.document().structure().items()[0],
         Kind::GeneratedIndex(IndexKind::TableOfContents)
     );
     let mut remove_index_edit = master.edit_with_policy(policy);
@@ -752,7 +809,8 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     let container_commit = container_edit.commit().unwrap();
     assert!(
         !container_commit
-            .snapshot()
+            .package()
+            .document()
             .structure()
             .items()
             .iter()
@@ -760,24 +818,29 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     );
     assert_eq!(
         container_commit
-            .patch()
-            .inverse()
-            .apply(container_commit.snapshot())
+            .package()
+            .apply(&container_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         master.as_bytes()
     );
 
     let no_op = master.edit().commit().unwrap();
-    assert_eq!(no_op.snapshot().as_bytes(), master.as_bytes());
+    assert_eq!(no_op.package().as_bytes(), master.as_bytes());
     let mut refused = master.edit();
     refused.set_title("refused").unwrap();
     assert!(refused.commit().is_err());
     let mut preserved = master.edit_with_policy(policy);
     preserved.set_title("preserved inertly").unwrap();
-    let changed = preserved.commit().unwrap().into_snapshot();
-    assert!(changed.content_xml().contains("office:dde-source"));
-    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
+    let changed = preserved.commit().unwrap().into_package();
+    assert!(
+        changed
+            .document()
+            .content_xml()
+            .contains("office:dde-source")
+    );
+    assert!(Package::from_bytes(changed.as_bytes()).is_ok());
 }
 
 #[test]
@@ -811,28 +874,39 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(source.as_bytes(), source_before);
-    let changed = commit.snapshot();
-    let imported = changed
+    let changed = commit.package();
+    let changed_document = changed.document();
+    let imported = changed_document
         .section_tree()
         .sections()
         .iter()
         .find(|section| section.name() == "Imported")
         .unwrap();
     assert_eq!(imported.style_name(), Some("ImportedSection__import1"));
-    let reference = &changed.subdocuments()[imported.reference().unwrap().get()];
+    let reference = &changed_document.subdocuments()[imported.reference().unwrap().get()];
     assert_eq!(reference.href(), "Chapters/a__import1.odt");
     assert!(
         changed
+            .document()
             .styles()
             .iter()
             .any(|style| { style.name() == "BaseSection__import1" && style.parent().is_none() })
     );
-    assert!(changed.styles().iter().any(|style| {
+    assert!(changed.document().styles().iter().any(|style| {
         style.name() == "ImportedSection__import1" && style.parent() == Some("BaseSection__import1")
     }));
-    assert!(changed.content_xml().contains("fo:margin-left=\"1cm\""));
+    assert!(
+        changed
+            .document()
+            .content_xml()
+            .contains("fo:margin-left=\"1cm\"")
+    );
     assert_eq!(
-        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
 
@@ -851,25 +925,25 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
         .plan_three_way(title_commit.patch())
         .unwrap()
         .commit()
-        .unwrap()
-        .apply(&destination)
         .unwrap();
-    assert_eq!(merged.title(), Some("parallel metadata"));
+    let merged = destination.apply(&merged).unwrap().into_package();
+    assert_eq!(merged.document().title(), Some("parallel metadata"));
     assert!(
         merged
+            .document()
             .section_tree()
             .sections()
             .iter()
             .any(|section| section.name() == "Imported")
     );
-    assert!(Master::from_bytes(merged.as_bytes().to_vec()).is_ok());
+    assert!(Package::from_bytes(merged.as_bytes()).is_ok());
     let durable = commit.patch().durable().unwrap();
     assert_eq!(
         durable.apply(&destination).unwrap().as_bytes(),
         changed.as_bytes()
     );
     assert_eq!(
-        changed.security().changed_write_disposition(),
+        changed.document().security().changed_write_disposition(),
         litchi_odm::security::ChangedWriteDisposition::Allowed
     );
 }
@@ -906,7 +980,7 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
     let source = master_from_parts(source_content, source_styles, b"source chapter");
     let source_before = source.as_bytes().to_vec();
     let destination = master_without_styles(destination_content, b"occupied chapter");
-    assert!(destination.styles_xml().is_none());
+    assert!(destination.document().styles_xml().is_none());
 
     let mut edit = destination.edit();
     edit.transfer_linked_section(
@@ -918,20 +992,26 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
     .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(source.as_bytes(), source_before);
-    let changed = commit.snapshot();
-    let styles = changed.styles_xml().unwrap();
+    let changed = commit.package();
+    let changed_document = changed.document();
+    let styles = changed_document.styles_xml().unwrap();
     assert!(!styles.contains('\n'));
     assert!(styles.contains("style:name=\"NamedBase\""));
     assert!(styles.contains("style:name=\"NamedSection\""));
     assert!(styles.contains("fo:margin-right=\"1cm\""));
     assert!(
         changed
+            .document()
             .styles()
             .iter()
             .any(|style| { style.name() == "NamedSection" && style.parent() == Some("NamedBase") })
     );
     assert_eq!(
-        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
     let durable = commit.patch().durable().unwrap();
@@ -942,19 +1022,17 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
     let mut history = destination.history(HistoryLimits::new(3, u64::MAX));
     history.record(&commit).unwrap();
     assert!(history.undo());
-    assert!(history.current().styles_xml().is_none());
+    assert!(history.current().document().styles_xml().is_none());
     assert!(history.redo());
-    assert!(history.current().styles_xml().is_some());
+    assert!(history.current().document().styles_xml().is_some());
     let mut title_edit = destination.edit();
     title_edit.set_title("parallel styles owner").unwrap();
     let title_commit = title_edit.commit().unwrap();
-    let merged = commit
-        .patch()
-        .merge(title_commit.patch())
+    let merged = destination
+        .apply(&commit.patch().merge(title_commit.patch()).unwrap())
         .unwrap()
-        .apply(&destination)
-        .unwrap();
-    assert_eq!(merged.title(), Some("parallel styles owner"));
-    assert!(merged.styles_xml().is_some());
-    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
+        .into_package();
+    assert_eq!(merged.document().title(), Some("parallel styles owner"));
+    assert!(merged.document().styles_xml().is_some());
+    assert!(Package::from_bytes(changed.as_bytes()).is_ok());
 }

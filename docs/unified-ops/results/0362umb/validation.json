@@ -1,0 +1,54 @@
+{
+  "record": "0362umb",
+  "source_commit": "b5207b27c1",
+  "source_parent": "410bd99f00fdfb4161a94215710340f16ea536bb",
+  "scope": "ODP documentation consumers only",
+  "changes": [
+    "Seven mutable-presentation examples bind the fallible slides() result before inspection.",
+    "The Presentation example uses std::result::Result<(), litchi_odp::Error> instead of the private CoreResult alias.",
+    "All other ODP documentation was scanned for direct slides() consumers and CoreResult references."
+  ],
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "memory_cap": "20G",
+    "cargo_build_jobs": 1,
+    "rust_test_threads": 1,
+    "offline": true,
+    "locked": true
+  },
+  "inputs": {
+    "lock_bytes": 139591,
+    "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+    "lock_source": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation/Cargo.lock",
+    "cargo_shim_sha256": "1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8",
+    "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+    "target": "/home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/target",
+    "target_bytes_after": 410690676
+  },
+  "checks": [
+    {
+      "command": "cargo test --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/target -p litchi-odp --all-features --doc",
+      "result": "pass",
+      "tests_passed": 19,
+      "tests_failed": 0,
+      "elapsed_seconds": 43.74,
+      "max_rss_kb": 630252
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-odp/src/authoring/mutable.rs crates/litchi-odp/src/package/presentation.rs",
+      "result": "pass"
+    },
+    {
+      "command": "cargo check --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/target -p litchi-odp --all-features --all-targets",
+      "result": "pass",
+      "elapsed_seconds": 27.45,
+      "max_rss_kb": 501524
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "receipts": "/home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/receipts/receipt-manifest.log"
+}

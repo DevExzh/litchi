@@ -99,6 +99,20 @@ impl SharedOleFileLimits {
     pub const fn max_allocation_table_bytes(self) -> u64 {
         self.max_allocation_table_bytes
     }
+
+    /// Reconstructs the equivalent low-level parser profile.
+    ///
+    /// Shared-reader validation and the cursor parser must retain the same
+    /// physical bounds when a composed positional view is reopened. Keeping
+    /// this conversion beside the profile prevents callers from silently
+    /// falling back to [`OleFileLimits::default`].
+    pub(crate) fn to_ole_file_limits(self) -> Result<OleFileLimits, OleError> {
+        OleFileLimits::new(self.max_input_bytes)
+            .and_then(|limits| limits.with_max_directory_bytes(self.max_directory_bytes))
+            .and_then(|limits| {
+                limits.with_max_allocation_table_bytes(self.max_allocation_table_bytes)
+            })
+    }
 }
 
 impl Default for SharedOleFileLimits {
@@ -610,18 +624,19 @@ impl SharedOleFile {
         SharedOleBulkRead::new(self, context)
     }
 
-    /// Opens and validates a positional source under the default finite input
-    /// ceiling.
+    /// Opens and validates a positional source under caller-selected finite
+    /// physical CFB bounds.
     ///
     /// # Errors
     ///
-    /// Returns an error when the source exceeds the default limit, changes
+    /// Returns an error when the source exceeds the selected limit, changes
     /// during parsing, or is not a valid CFB file.
-    pub fn open(source: Arc<dyn ReadAt>) -> Result<Self, OleError> {
-        Self::open_with_limits(source, SharedOleFileLimits::default())
+    pub fn open(source: Arc<dyn ReadAt>, limits: SharedOleFileLimits) -> Result<Self, OleError> {
+        Self::open_source_with_limits(source, limits, false)
     }
 
-    /// Opens bytes whose immutable ownership is retained by the CFB reader.
+    /// Opens bytes whose immutable ownership is retained by the CFB reader
+    /// under caller-selected finite physical CFB bounds.
     ///
     /// Unlike a type-erased [`ReadAt`] adapter, an `Arc<[u8]>` cannot change
     /// while this reader and its derived plans retain a clone. Planning and
@@ -631,16 +646,22 @@ impl SharedOleFile {
     /// arbitrary positional source as immutable through a flag or version
     /// token.
     ///
+    /// Selected bounds apply before parser allocations.
+    ///
     /// # Errors
     ///
-    /// Returns an error when the source exceeds the default limit or is not a
-    /// valid CFB file.
-    pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OleError> {
-        Self::open_sealed(SealedBytes::Slice(source), version)
+    /// Returns a typed CFB limit or validation error.
+    pub fn open_owned(
+        source: Arc<[u8]>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        Self::open_sealed_with_limits(SealedBytes::Slice(source), version, limits)
     }
 
     /// Opens a shared vector whose immutable ownership is retained by the CFB
-    /// reader, without copying it into an `Arc<[u8]>`.
+    /// reader, without copying it into an `Arc<[u8]>`, under caller-selected
+    /// finite physical CFB bounds.
     ///
     /// This is [`Self::open_owned`] for callers that already hold their bytes
     /// as an `Arc<Vec<u8>>`. The vector cannot change while this reader and
@@ -651,37 +672,95 @@ impl SharedOleFile {
     ///
     /// # Errors
     ///
-    /// Returns an error when the source exceeds the default limit or is not a
-    /// valid CFB file.
-    pub fn open_owned_vec(source: Arc<Vec<u8>>, version: SourceVersion) -> Result<Self, OleError> {
-        Self::open_sealed(SealedBytes::Vec(source), version)
+    /// Returns a typed limit or CFB validation error.
+    pub fn open_owned_vec(
+        source: Arc<Vec<u8>>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        Self::open_sealed_with_limits(SealedBytes::Vec(source), version, limits)
     }
 
-    fn open_sealed(bytes: SealedBytes, version: SourceVersion) -> Result<Self, OleError> {
+    /// Adopts an in-memory [`OleFile`] that is already parsed, without parsing
+    /// the container a second time.
+    ///
+    /// The reader's vector becomes the sealed owned source of the returned
+    /// view, exactly as [`Self::open_owned_vec`] seals it, and the validated
+    /// directory/FAT index moves across unchanged. No byte is copied. Only
+    /// the cursor's validation and read scratch state is dropped; a mini
+    /// stream the cursor reader had loaded is read again lazily on first use.
+    ///
+    /// `limits` must be no wider than the limits `ole` was parsed under. This
+    /// call checks the input length against them, but it cannot re-run the
+    /// directory and allocation-table checks the parse already ran.
+    /// [`OleFile::open`] receives its own explicit [`OleFileLimits`]; this
+    /// call must receive the corresponding shared limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::LimitExceeded`] when the input is longer than
+    /// `limits` admits, and [`OleError::InvalidData`] when the reader's length
+    /// differs from the length the parse captured.
+    pub fn from_owned_ole_file(
+        ole: OleFile<io::Cursor<Vec<u8>>>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        let (cursor, index) = ole.into_reader_and_parsed_index();
+        let bytes = cursor.into_inner();
+        let length = u64::try_from(bytes.len())
+            .map_err(|_error| OleError::InvalidData("owned CFB length exceeds u64".into()))?;
+        if length != index.file_size {
+            return Err(OleError::InvalidData(format!(
+                "owned CFB length {length} differs from parsed length {}",
+                index.file_size
+            )));
+        }
+        if length > limits.max_input_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: length,
+                maximum: limits.max_input_bytes(),
+            });
+        }
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
+            bytes: SealedBytes::Vec(Arc::new(bytes)),
+            version,
+            #[cfg(test)]
+            read_count: None,
+        });
+        Ok(Self {
+            source,
+            expected_version: version,
+            source_is_owned_immutable: true,
+            limits,
+            index: Arc::new(index),
+            ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_singleflight: MiniFATSingleFlight::new(),
+        })
+    }
+
+    /// Whether this view reads sealed bytes it owns ([`Self::open_owned`],
+    /// [`Self::open_owned_vec`], [`Self::from_owned_ole_file`]) rather than a
+    /// caller-supplied positional source whose bytes could change.
+    #[must_use]
+    pub const fn is_owned_immutable(&self) -> bool {
+        self.source_is_owned_immutable
+    }
+
+    fn open_sealed_with_limits(
+        bytes: SealedBytes,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
             bytes,
             version,
             #[cfg(test)]
             read_count: None,
         });
-        Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
-    }
-
-    /// Opens and validates a positional source under caller-selected limits.
-    ///
-    /// The source version is captured before parsing and compared after the
-    /// existing cursor-based parser has completely validated allocation chains,
-    /// overlaps, directory trees, and final-sector truncation rules.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the source exceeds the limit, changes during
-    /// parsing, or fails the normal [`OleFile`] validation rules.
-    pub fn open_with_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SharedOleFileLimits,
-    ) -> Result<Self, OleError> {
-        Self::open_source_with_limits(source, limits, false)
+        Self::open_source_with_limits(source, limits, true)
     }
 
     fn open_source_with_limits(
@@ -715,7 +794,7 @@ impl SharedOleFile {
         let parser_limits = OleFileLimits::new(limits.max_input_bytes())?
             .with_max_directory_bytes(limits.max_directory_bytes())?
             .with_max_allocation_table_bytes(limits.max_allocation_table_bytes())?;
-        let parsed = OleFile::open_with_limits(
+        let parsed = OleFile::open(
             ReadAtCursor::new(source.clone(), source_length),
             parser_limits,
         );
@@ -767,6 +846,14 @@ impl SharedOleFile {
             read_count: Some(read_count),
         });
         Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
+    }
+
+    /// Physical admission profile retained by this source owner.
+    /// Format owners use it when admitting later edits so a reopen cannot
+    /// silently widen the source's selected input or metadata bounds.
+    #[must_use]
+    pub const fn limits(&self) -> SharedOleFileLimits {
+        self.limits
     }
 
     /// Physical length captured while parsing this CFB file.
@@ -1005,6 +1092,126 @@ impl SharedOleFile {
     /// reading stream payloads.
     pub fn directory_entries(&self) -> impl Iterator<Item = &DirectoryEntry> {
         self.index.dir_entries.iter().filter_map(Option::as_ref)
+    }
+
+    /// Returns the number of validated directory slots retained by this
+    /// shared CFB view.
+    ///
+    /// The parsed index has already been admitted under the shared reader's
+    /// directory bounds, so this is an O(1) metadata lookup.  It mirrors
+    /// [`OleFile::directory_entry_count`] and intentionally includes the
+    /// retained slot vector's finite upper bound rather than walking the
+    /// entry iterator.
+    #[must_use]
+    pub fn directory_entry_count(&self) -> usize {
+        self.index.dir_entries.len()
+    }
+
+    /// Visits the direct children of one storage through the immutable,
+    /// already-validated directory index.
+    ///
+    /// The callback receives each entry in the same in-order traversal as
+    /// [`OleFile::visit_directory_entry_refs`].  `max_entries` bounds both
+    /// callbacks and the directory SIDs discovered while walking the sibling
+    /// tree, so a caller can preserve the raw reader's event limit without
+    /// reparsing the source or materializing a child vector.
+    pub fn visit_directory_entry_refs<F, E>(
+        &self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&DirectoryEntry) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.index
+                    .root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != crate::consts::STGTY_STORAGE
+                && directory.entry_type != crate::consts::STGTY_ROOT
+            {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != crate::consts::NOSTREAM || !pending.is_empty() {
+            while current != crate::consts::NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .index
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let entry = self
+                .index
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?;
+            let right = entry.sid_right;
+            visit(entry)?;
+            current = right;
+        }
+        Ok(())
     }
 
     /// Materializes one stream through immutable positional reads.
@@ -3022,6 +3229,72 @@ impl SharedOleStreamCursor<'_> {
         }
     }
 
+    /// Reads exactly `output.len()` bytes like [`Self::read_exact`], but
+    /// defers the success fence to the caller (record 0287).
+    ///
+    /// A failed read still observes the source, and a `SourceChanged` error
+    /// wins over the read's own error, as in [`Self::read_exact`]. A
+    /// successful read takes no observation: its bytes are unverified until a
+    /// later [`Self::read_exact`] or [`Self::check_source`] on this cursor
+    /// succeeds. Source versions only advance, so that later observation
+    /// proves the source unchanged across this read as well. The caller must
+    /// not let the bytes, or anything derived from them, outlive a failure of
+    /// that observation, and must fence every error path between the two
+    /// (with [`Self::check_source`], preferring its `SourceChanged`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::read_exact`], except that a successful read is not fenced.
+    pub fn read_exact_deferred(&mut self, output: &mut [u8]) -> Result<(), OleError> {
+        let state = self.state;
+        let position = self.position;
+        let result = (|| {
+            let requested = output.len() as u64;
+            let end = position.checked_add(requested).ok_or_else(|| {
+                OleError::InvalidData("stream cursor read end overflow".to_string())
+            })?;
+            if end > self.length {
+                return Err(OleError::InvalidData(format!(
+                    "stream cursor read {position}..{end} exceeds length {}",
+                    self.length
+                )));
+            }
+            let state = self.read_from_state(state, output)?;
+            let state = if end == self.length {
+                SharedOleStreamCursorState::End
+            } else {
+                state
+            };
+            Ok((state, end))
+        })();
+        match result {
+            Ok((state, position)) => {
+                self.state = state;
+                self.position = position;
+                Ok(())
+            },
+            Err(error) => Err(self.fence_error(error)),
+        }
+    }
+
+    /// Observes the source: `Ok` when it still has the opened version.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source's I/O error or `SourceChanged`.
+    pub fn check_source(&self) -> Result<(), OleError> {
+        self.file.check_source_version()
+    }
+
+    /// `error`, unless the source changed, whose `SourceChanged` error wins.
+    #[must_use]
+    pub fn fence_error(&self, error: OleError) -> OleError {
+        match self.file.check_source_version() {
+            Err(changed @ OleError::SourceChanged { .. }) => changed,
+            _ => error,
+        }
+    }
+
     fn move_forward(&mut self, bytes: u64) -> Result<(), OleError> {
         let state = self.state;
         let position = self.position;
@@ -3963,7 +4236,11 @@ mod tests {
         writer.write_to(&mut output).unwrap();
         let mut bytes = output.into_inner();
 
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let entry = parsed.find_entry(&["Large"]).unwrap();
         let sector_size = parsed.index.sector_size;
         let mut chain = Vec::new();
@@ -3997,6 +4274,87 @@ mod tests {
         output.into_inner()
     }
 
+    #[test]
+    fn owned_ole_file_adoption_matches_a_fresh_owned_open() {
+        let bytes = multi_mini_bytes();
+        let version = SourceVersion::new(0x0A0D_0E1F, 0);
+        let mut ole = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
+        // A cursor read that loads the mini stream must not leak into the
+        // adopted view's state.
+        assert_eq!(ole.open_stream(&["Mini"]).unwrap().len(), 200);
+        let adopted =
+            SharedOleFile::from_owned_ole_file(ole, version, SharedOleFileLimits::default())
+                .unwrap();
+        let reopened = SharedOleFile::open_owned_vec(
+            Arc::new(bytes.clone()),
+            version,
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
+
+        assert!(adopted.is_owned_immutable());
+        assert!(reopened.is_owned_immutable());
+        assert_eq!(adopted.file_size(), reopened.file_size());
+        assert_eq!(adopted.source_version().unwrap(), version);
+        assert_eq!(
+            adopted.open_stream(&["Mini"]).unwrap(),
+            reopened.open_stream(&["Mini"]).unwrap()
+        );
+        let names = |file: &SharedOleFile| {
+            file.directory_entries()
+                .map(|entry| entry.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(&adopted), names(&reopened));
+        // The adopted source is the moved vector itself.
+        let mut first = [0_u8; 8];
+        assert_eq!(adopted.source_arc().read_at(0, &mut first).unwrap(), 8);
+        assert_eq!(&first, &bytes[..8]);
+
+        let positional = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
+        assert!(!positional.is_owned_immutable());
+    }
+
+    #[test]
+    fn owned_open_with_limits_preserves_provenance_and_all_physical_bounds() {
+        let bytes: Arc<[u8]> = multi_mini_bytes().into();
+        let version = SourceVersion::new(0x0195, 0);
+        let exact = SharedOleFileLimits::new(bytes.len() as u64).unwrap();
+        let opened = SharedOleFile::open_owned(Arc::clone(&bytes), version, exact).unwrap();
+        assert_eq!(opened.limits(), exact);
+        assert!(opened.is_owned_immutable());
+        assert_eq!(opened.source_version().unwrap(), version);
+        assert_eq!(opened.open_stream(&["Mini"]).unwrap().len(), 200);
+        for limits in [
+            SharedOleFileLimits::new(bytes.len() as u64 - 1).unwrap(),
+            exact.with_max_directory_bytes(1).unwrap(),
+            exact.with_max_allocation_table_bytes(1).unwrap(),
+        ] {
+            assert!(matches!(
+                SharedOleFile::open_owned(Arc::clone(&bytes), version, limits),
+                Err(OleError::LimitExceeded { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn owned_ole_file_adoption_enforces_the_input_ceiling() {
+        let bytes = multi_mini_bytes();
+        let length = u64::try_from(bytes.len()).unwrap();
+        let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
+        let limits = SharedOleFileLimits::new(length - 1).unwrap();
+        let error =
+            SharedOleFile::from_owned_ole_file(ole, SourceVersion::new(1, 0), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            OleError::LimitExceeded { observed, .. } if observed == length
+        ));
+    }
+
     fn two_mini_bytes(length: usize) -> (Vec<u8>, Vec<u8>) {
         assert!(length < 4096);
         let mut writer = OleWriter::new();
@@ -4016,7 +4374,11 @@ mod tests {
 
     fn truncated_two_mini_file() -> (SharedOleFile, Arc<TestSource>, u64, usize) {
         let (bytes, _selected) = two_mini_bytes(4095);
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let other = parsed.find_entry(&["Other"]).unwrap();
         let other_start = other.start_sector;
         let mini_sector_size = parsed.index.mini_sector_size;
@@ -4072,7 +4434,7 @@ mod tests {
     }
 
     fn shared(source: Arc<TestSource>) -> SharedOleFile {
-        SharedOleFile::open(source).unwrap()
+        SharedOleFile::open(source, SharedOleFileLimits::default()).unwrap()
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -4266,6 +4628,56 @@ mod tests {
     }
 
     #[test]
+    fn shared_directory_visit_preserves_order_and_discovery_bounds() {
+        let bytes = serialized_streams(&[
+            &["Storage", "Alpha"],
+            &["Storage", "Beta"],
+            &["Storage", "Gamma"],
+            &["Sibling"],
+        ]);
+        let eager = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
+        let file = shared(Arc::new(TestSource::new(bytes)));
+        for path in [&[][..], &["storage"][..]] {
+            let mut expected = Vec::new();
+            eager
+                .visit_directory_entry_refs(path, 3, |entry| {
+                    expected.push(entry.name.clone());
+                    Ok::<(), OleError>(())
+                })
+                .unwrap();
+            let mut actual = Vec::new();
+            file.visit_directory_entry_refs(path, expected.len(), |entry| {
+                actual.push(entry.name.clone());
+                Ok::<(), OleError>(())
+            })
+            .unwrap();
+            assert_eq!(actual, expected);
+
+            for maximum in [0, expected.len() - 1] {
+                let mut callbacks = 0;
+                let error = file
+                    .visit_directory_entry_refs(path, maximum, |_| {
+                        callbacks += 1;
+                        Ok::<(), OleError>(())
+                    })
+                    .unwrap_err();
+                assert!(matches!(error, OleError::LimitExceeded {
+                    resource: "directory entries", observed, maximum: ceiling,
+                } if observed == maximum as u64 + 1 && ceiling == maximum as u64));
+                assert!(callbacks <= maximum);
+            }
+        }
+        assert!(matches!(
+            file.visit_directory_entry_refs(&["Missing"], 3, |_| Ok::<(), OleError>(())),
+            Err(OleError::StreamNotFound)
+        ));
+        assert!(matches!(
+            file.visit_directory_entry_refs(&["Sibling"], 3, |_| Ok::<(), OleError>(())),
+            Err(OleError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
     fn shared_lookup_does_not_bypass_missing_or_mismatched_name_cache() {
         let bytes = serialized_streams(&[&["Alpha"], &["Beta"]]);
         let mut file = shared(Arc::new(TestSource::new(bytes)));
@@ -4362,7 +4774,7 @@ mod tests {
         let source: Arc<dyn ReadAt> = Arc::new(TestSource::new(bytes));
 
         assert!(matches!(
-            SharedOleFile::open(source),
+            SharedOleFile::open(source, SharedOleFileLimits::default()),
             Err(OleError::NotOleFile)
         ));
     }
@@ -4373,7 +4785,7 @@ mod tests {
         let limits = SharedOleFileLimits::new(512).unwrap();
 
         assert!(matches!(
-            SharedOleFile::open_with_limits(source, limits),
+            SharedOleFile::open(source, limits),
             Err(OleError::LimitExceeded {
                 resource: "input bytes",
                 observed,
@@ -4462,7 +4874,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            SharedOleFile::open_with_limits(source, limits),
+            SharedOleFile::open(source, limits),
             Err(OleError::LimitExceeded {
                 resource: "directory bytes",
                 observed,
@@ -4480,7 +4892,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            SharedOleFile::open_with_limits(source, limits),
+            SharedOleFile::open(source, limits),
             Err(OleError::LimitExceeded {
                 resource: "allocation table bytes",
                 observed,
@@ -4502,7 +4914,7 @@ mod tests {
             .unwrap()
             .with_max_directory_bytes(1024)
             .unwrap();
-        let mut file = SharedOleFile::open_with_limits(source, limits).unwrap();
+        let mut file = SharedOleFile::open(source, limits).unwrap();
         file.limits = file.limits.with_max_directory_bytes(512).unwrap();
 
         let report = file
@@ -4522,7 +4934,7 @@ mod tests {
         let limits = SharedOleFileLimits::new(512).unwrap();
 
         assert!(matches!(
-            SharedOleFile::open_with_limits(source.clone(), limits),
+            SharedOleFile::open(source.clone(), limits),
             Err(OleError::LimitExceeded {
                 resource: "input bytes",
                 observed,
@@ -4538,7 +4950,7 @@ mod tests {
         source.change_on_read.store(true, AtomicOrdering::SeqCst);
 
         assert!(matches!(
-            SharedOleFile::open(source),
+            SharedOleFile::open(source, SharedOleFileLimits::default()),
             Err(OleError::SourceChanged { .. })
         ));
     }
@@ -6137,7 +6549,11 @@ mod tests {
     #[test]
     fn open_stream_selected_minifat_preserves_fragmented_logical_order() {
         let (mut bytes, expected) = two_mini_bytes(4095);
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let entry = parsed.find_entry(&["Selected"]).unwrap();
         let start_sector = entry.start_sector;
         let mini_sector_size = parsed.index.mini_sector_size;
@@ -6356,7 +6772,11 @@ mod tests {
     #[test]
     fn fragmented_minifat_chain_keeps_logical_order_and_separates_physical_runs() {
         let (mut bytes, expected) = large_mini_bytes(512, 4_095);
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let entry = parsed.find_entry(&["Mini"]).unwrap();
         let entry_sid = usize::try_from(entry.sid).unwrap();
         let start_sector = entry.start_sector;
@@ -8213,7 +8633,11 @@ mod tests {
     #[test]
     fn stream_cursor_fragmented_fat_reads_match_logical_order() {
         let mut bytes = sample_bytes();
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let entry = parsed.find_entry(&["Large"]).unwrap();
         let sector_size = parsed.index.sector_size;
         let mut chain = Vec::new();
@@ -8269,7 +8693,11 @@ mod tests {
     #[test]
     fn stream_cursor_minifat_handles_partial_root_tail_like_range_reader() {
         let (bytes, _selected) = two_mini_bytes(4095);
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let mut index = match Arc::try_unwrap(parsed.index) {
             Ok(index) => index,
             Err(_index) => panic!("test owns the parsed index"),
@@ -8768,7 +9196,7 @@ mod tests {
         let source = Arc::new(TestSource::new(bytes.clone()));
         source.change_while_observing_length();
         let limits = SharedOleFileLimits::new(64).unwrap();
-        let error = SharedOleFile::open_with_limits(source, limits).unwrap_err();
+        let error = SharedOleFile::open(source, limits).unwrap_err();
         assert!(
             matches!(error, OleError::SourceChanged { .. }),
             "expected SourceChanged, found: {error:?}"
@@ -8777,7 +9205,7 @@ mod tests {
         // Without the mutation the same call still reports the limit.
         let stable = Arc::new(TestSource::new(bytes));
         let limits = SharedOleFileLimits::new(64).unwrap();
-        let error = SharedOleFile::open_with_limits(stable, limits).unwrap_err();
+        let error = SharedOleFile::open(stable, limits).unwrap_err();
         assert!(
             matches!(
                 error,
@@ -8798,7 +9226,7 @@ mod tests {
         let source = Arc::new(TestSource::new(bytes.clone()));
         source.change_while_observing_length();
         source.fail_next_len();
-        let error = SharedOleFile::open(source).unwrap_err();
+        let error = SharedOleFile::open(source, SharedOleFileLimits::default()).unwrap_err();
         assert!(
             matches!(error, OleError::SourceChanged { .. }),
             "expected SourceChanged, found: {error:?}"
@@ -8806,7 +9234,7 @@ mod tests {
 
         let stable = Arc::new(TestSource::new(bytes));
         stable.fail_next_len();
-        let error = SharedOleFile::open(stable).unwrap_err();
+        let error = SharedOleFile::open(stable, SharedOleFileLimits::default()).unwrap_err();
         assert!(
             format!("{error}").contains("injected source length failure"),
             "expected the length failure, found: {error}"
@@ -8916,9 +9344,70 @@ mod tests {
     }
 
     #[test]
+    fn deferred_reads_leave_the_success_fence_to_the_next_fenced_read() {
+        // Record 0287: a deferred read takes no observation on success; the
+        // next fenced read or check observes a change made before either.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.reset_observation_counts();
+        let mut header = [0u8; 4];
+        cursor.read_exact_deferred(&mut header).unwrap();
+        assert_eq!(header, [0xA5; 4]);
+        assert_eq!(cursor.position(), 4);
+        let (reads, versions) = source.observation_counts();
+        assert_eq!(
+            (reads, versions),
+            (1, 0),
+            "no observation after a deferred read"
+        );
+        source.revision.store(1, AtomicOrdering::SeqCst);
+        let mut payload = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut payload),
+            Err(OleError::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            cursor.check_source(),
+            Err(OleError::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            cursor.fence_error(OleError::InvalidData("payload".into())),
+            OleError::SourceChanged { .. }
+        ));
+
+        // A failed deferred read still observes the source, and a change
+        // wins over the read's own error.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact_deferred(&mut header),
+            Err(OleError::Io(_))
+        ));
+        assert_eq!(cursor.position(), 0, "a failed read does not commit");
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact_deferred(&mut header),
+            Err(OleError::SourceChanged { .. })
+        ));
+        let mut beyond = vec![0u8; usize::try_from(cursor.len()).unwrap() + 1];
+        assert!(matches!(
+            cursor.read_exact_deferred(&mut beyond),
+            Err(OleError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
     fn fragmented_fat_ranges_follow_logical_chain_order() {
         let mut bytes = sample_bytes();
-        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let parsed = SharedOleFile::open(
+            Arc::new(TestSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let entry = parsed.find_entry(&["Large"]).unwrap();
         let sector_size = parsed.index.sector_size;
         let mut chain = Vec::new();

@@ -175,8 +175,7 @@ impl<'a> Compiler<'a> {
                     );
                 }
                 return Err(Error::UnsupportedFeature(
-                    "external cell references are not supported by this compilation context"
-                        .to_string(),
+                    "external cell references are not supported by this compilation context",
                 ));
             }
             let (first_sheet, last_sheet) = Self::split_sheet_qualifier(&sheet_qualifier)?;
@@ -200,11 +199,9 @@ impl<'a> Compiler<'a> {
             return self.compile_resident_table_reference(&identifier, selection);
         }
         if self.consume("(") {
-            let function = builtin_function_by_name(&identifier).ok_or_else(|| {
-                Error::UnsupportedFeature(format!(
-                    "XLSB formula function {identifier} is not in the supported Ftab set"
-                ))
-            })?;
+            let function = builtin_function_by_name(&identifier).ok_or(
+                Error::UnsupportedFeature("XLSB formula function is not in the supported Ftab set"),
+            )?;
             let mut arguments = Vec::new();
             if !self.consume(")") {
                 loop {
@@ -225,17 +222,10 @@ impl<'a> Compiler<'a> {
                     }
                 }
             }
-            let argument_count = u8::try_from(arguments.len()).map_err(|_| {
-                Error::InvalidFormula(format!("{} has more than 255 arguments", function.name))
-            })?;
+            let argument_count = u8::try_from(arguments.len())
+                .map_err(|_| Error::InvalidFormula("has more than 255 arguments"))?;
             if !function.accepts_arg_count(argument_count) {
-                return Err(Error::InvalidFormula(format!(
-                    "{} does not accept {} arguments (range {}..={})",
-                    function.name,
-                    arguments.len(),
-                    function.min_args,
-                    function.max_args,
-                )));
+                return Err(Error::InvalidFormula("does not accept arguments (range)"));
             }
             return Ok(CompileExpr::Function(function, arguments));
         }
@@ -416,7 +406,7 @@ impl<'a> Compiler<'a> {
     ) -> Result<(TableRowType, TableNamedColumns)> {
         if separators.len() + 1 != items.len() {
             return Err(Error::InvalidFormula(
-                "structured-reference separator count is invalid".to_string(),
+                "structured-reference separator count is invalid",
             ));
         }
 
@@ -443,15 +433,14 @@ impl<'a> Compiler<'a> {
                 rows.push(row);
                 item_is_column.push(false);
             } else if !item.first_character_escaped && item.text.starts_with('#') {
-                return Err(Error::InvalidFormula(format!(
-                    "unknown structured-reference row selector {:?}",
-                    item.text
-                )));
+                return Err(Error::InvalidFormula(
+                    "unknown structured-reference row selector",
+                ));
             } else if !item.first_character_escaped && item.text.starts_with('@') {
                 let column = item.text[1..].to_string();
                 if column.is_empty() || !rows.is_empty() {
                     return Err(Error::InvalidFormula(
-                        "invalid or duplicate current-row structured reference".to_string(),
+                        "invalid or duplicate current-row structured reference",
                     ));
                 }
                 rows.push(TableRowType::Current);
@@ -469,19 +458,19 @@ impl<'a> Compiler<'a> {
                 ':' if item_is_column[index] && item_is_column[index + 1] => {
                     if colon.replace(index).is_some() {
                         return Err(Error::InvalidFormula(
-                            "structured reference has more than one column range".to_string(),
+                            "structured reference has more than one column range",
                         ));
                     }
                 },
                 ',' if !item_is_column[index] || !item_is_column[index + 1] => {},
                 ',' => {
                     return Err(Error::InvalidFormula(
-                        "disjoint structured-reference columns cannot fit one PtgList".to_string(),
+                        "disjoint structured-reference columns cannot fit one PtgList",
                     ));
                 },
                 _ => {
                     return Err(Error::InvalidFormula(
-                        "structured-reference separator has invalid operands".to_string(),
+                        "structured-reference separator has invalid operands",
                     ));
                 },
             }
@@ -494,7 +483,7 @@ impl<'a> Compiler<'a> {
             [TableRowType::DataAlternate, TableRowType::Totals] => TableRowType::DataAndTotals,
             _ => {
                 return Err(Error::InvalidFormula(
-                    "structured-reference row union cannot fit one PtgList".to_string(),
+                    "structured-reference row union cannot fit one PtgList",
                 ));
             },
         };
@@ -507,7 +496,7 @@ impl<'a> Compiler<'a> {
             },
             _ => {
                 return Err(Error::InvalidFormula(
-                    "structured-reference columns cannot fit one PtgList".to_string(),
+                    "structured-reference columns cannot fit one PtgList",
                 ));
             },
         };
@@ -546,32 +535,29 @@ impl<'a> Compiler<'a> {
         table_name: &str,
         selection: ParsedStructuredReference,
     ) -> Result<CompileExpr> {
-        let context = self.context.ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "structured table reference {table_name:?} requires workbook compilation context"
-            ))
+        let context = self.context.ok_or({
+            Error::UnresolvedDependency(
+                "structured table reference requires workbook compilation context",
+            )
         })?;
         let mut matches = context
             .tables
             .iter()
             .filter(|table| excel_name_eq(table.display_name(), table_name));
-        let table = matches.next().ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "structured reference names missing table {table_name:?}"
-            ))
-        })?;
+        let table = matches.next().ok_or(Error::UnresolvedDependency(
+            "structured reference names missing table",
+        ))?;
         if matches.next().is_some() {
-            return Err(Error::UnresolvedDependency(format!(
-                "structured reference table name {table_name:?} is ambiguous"
-            )));
+            return Err(Error::UnresolvedDependency(
+                "structured reference table name is ambiguous",
+            ));
         }
         let current_sheet = usize::try_from(context.current_sheet)
-            .map_err(|_| Error::InvalidFormula("current worksheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("current worksheet index overflow"))?;
         if table.sheet_index() != current_sheet {
-            return Err(Error::InvalidFormula(format!(
-                "table {table_name:?} is on worksheet {}, not the formula worksheet {current_sheet}",
-                table.sheet_index()
-            )));
+            return Err(Error::InvalidFormula(
+                "table is on worksheet, not the formula worksheet",
+            ));
         }
         let columns = match selection.columns {
             TableNamedColumns::All => TableColumns::All,
@@ -583,7 +569,7 @@ impl<'a> Compiler<'a> {
                 let last = Self::resolve_table_column(table, &last)?;
                 if first > last {
                     return Err(Error::InvalidFormula(
-                        "structured-reference column range is reversed".to_string(),
+                        "structured-reference column range is reversed",
                     ));
                 }
                 TableColumns::Range { first, last }
@@ -592,9 +578,9 @@ impl<'a> Compiler<'a> {
         let sheet_index = u16::try_from(current_sheet)
             .ok()
             .and_then(|index| index.checked_add(2))
-            .ok_or_else(|| {
+            .ok_or({
                 Error::InvalidFormula(
-                    "table worksheet cannot be represented in the extern-sheet table".to_string(),
+                    "table worksheet cannot be represented in the extern-sheet table",
                 )
             })?;
         Ok(CompileExpr::TableReference(TableReference {
@@ -616,20 +602,16 @@ impl<'a> Compiler<'a> {
             .iter()
             .enumerate()
             .filter(|(_, column)| excel_name_eq(column, name));
-        let (index, _) = matches.next().ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "structured reference names missing column {name:?} in table {:?}",
-                table.display_name()
-            ))
-        })?;
+        let (index, _) = matches.next().ok_or(Error::UnresolvedDependency(
+            "structured reference names missing column in table",
+        ))?;
         if matches.next().is_some() {
-            return Err(Error::UnresolvedDependency(format!(
-                "structured-reference column {name:?} is ambiguous"
-            )));
+            return Err(Error::UnresolvedDependency(
+                "structured-reference column is ambiguous",
+            ));
         }
-        u16::try_from(index).map_err(|_| {
-            Error::InvalidFormula("structured-reference column index overflow".to_string())
-        })
+        u16::try_from(index)
+            .map_err(|_| Error::InvalidFormula("structured-reference column index overflow"))
     }
 
     fn compile_external_table_reference(
@@ -658,9 +640,9 @@ impl<'a> Compiler<'a> {
     }
 
     fn resolve_external_table_xti(&self, qualifier: &str) -> Result<u16> {
-        let close = qualifier.find(']').ok_or_else(|| {
-            Error::InvalidFormula("external structured reference omits ']'".to_string())
-        })?;
+        let close = qualifier.find(']').ok_or(Error::InvalidFormula(
+            "external structured reference omits ']'",
+        ))?;
         if !qualifier.starts_with('[')
             || close == 1
             || close + 1 == qualifier.len()
@@ -668,21 +650,21 @@ impl<'a> Compiler<'a> {
             || qualifier[close + 1..].contains('[')
             || qualifier[close + 1..].contains(']')
         {
-            return Err(Error::InvalidFormula(format!(
-                "invalid external structured-reference qualifier {qualifier:?}"
-            )));
+            return Err(Error::InvalidFormula(
+                "invalid external structured-reference qualifier",
+            ));
         }
         let target = &qualifier[1..close];
         let sheet = &qualifier[close + 1..];
         if sheet.contains(':') {
             return Err(Error::InvalidFormula(
-                "external structured reference must select exactly one worksheet".to_string(),
+                "external structured reference must select exactly one worksheet",
             ));
         }
 
-        let context = self.context.ok_or_else(|| {
+        let context = self.context.ok_or({
             Error::UnresolvedDependency(
-                "external structured reference requires workbook compilation context".to_string(),
+                "external structured reference requires workbook compilation context",
             )
         })?;
 
@@ -690,10 +672,7 @@ impl<'a> Compiler<'a> {
         let mut unsupported = None;
         for (xti_index, xti) in context.external_sheets.iter().enumerate() {
             let link_index = usize::try_from(xti.external_link).map_err(|_| {
-                Error::InvalidFormula(format!(
-                    "external structured-reference external-link index {} overflows",
-                    xti.external_link
-                ))
+                Error::InvalidFormula("external structured-reference external-link index overflows")
             })?;
             let Some(link) = context.supporting_links.get(link_index) else {
                 continue;
@@ -701,9 +680,7 @@ impl<'a> Compiler<'a> {
             let book_index = match link {
                 SupportingLink::ExternalWorkbook(book_index) => usize::try_from(*book_index)
                     .map_err(|_| {
-                        Error::InvalidFormula(format!(
-                            "external structured-reference book index {book_index} overflows"
-                        ))
+                        Error::InvalidFormula("external structured-reference book index overflows")
                     })?,
                 SupportingLink::AddIn => continue,
                 SupportingLink::SelfWorkbook | SupportingLink::SameSheet => continue,
@@ -712,21 +689,19 @@ impl<'a> Compiler<'a> {
                 continue;
             };
             if xti.first_sheet < 0 || xti.last_sheet < 0 {
-                return Err(Error::InvalidFormula(format!(
-                    "external structured-reference Xti {xti_index} has negative worksheet bounds {}..={}",
-                    xti.first_sheet, xti.last_sheet
-                )));
+                return Err(Error::InvalidFormula(
+                    "external structured-reference Xti has negative worksheet bounds",
+                ));
             }
             if xti.last_sheet < xti.first_sheet {
-                return Err(Error::InvalidFormula(format!(
-                    "external structured-reference Xti {xti_index} has reversed worksheet bounds {}..={}",
-                    xti.first_sheet, xti.last_sheet
-                )));
+                return Err(Error::InvalidFormula(
+                    "external structured-reference Xti has reversed worksheet bounds",
+                ));
             }
             if xti.first_sheet != xti.last_sheet {
-                return Err(Error::InvalidFormula(format!(
-                    "external structured-reference Xti {xti_index} must select exactly one worksheet"
-                )));
+                return Err(Error::InvalidFormula(
+                    "external structured-reference Xti must select exactly one worksheet",
+                ));
             }
             if !book.metadata.is_workbook() {
                 if excel_name_eq(book.metadata.source(), target) {
@@ -742,9 +717,7 @@ impl<'a> Compiler<'a> {
                 continue;
             }
             let sheet_index = usize::try_from(xti.first_sheet).map_err(|_| {
-                Error::InvalidFormula(
-                    "external structured-reference worksheet index overflows".to_string(),
-                )
+                Error::InvalidFormula("external structured-reference worksheet index overflows")
             })?;
             let Some(candidate) = book.metadata.sheet_names().get(sheet_index) else {
                 continue;
@@ -752,29 +725,28 @@ impl<'a> Compiler<'a> {
             if !excel_name_eq(candidate, sheet) {
                 continue;
             }
-            let xti_index = u16::try_from(xti_index).map_err(|_| {
-                Error::InvalidFormula("external structured-reference Xti overflow".to_string())
-            })?;
+            let xti_index = u16::try_from(xti_index)
+                .map_err(|_| Error::InvalidFormula("external structured-reference Xti overflow"))?;
             if xti_index == u16::MAX {
                 return Err(Error::InvalidFormula(
-                    "external structured-reference Xti overflow".to_string(),
+                    "external structured-reference Xti overflow",
                 ));
             }
             if found.replace(xti_index).is_some() {
-                return Err(Error::UnresolvedDependency(format!(
-                    "external structured-reference qualifier {qualifier:?} is ambiguous"
-                )));
+                return Err(Error::UnresolvedDependency(
+                    "external structured-reference qualifier is ambiguous",
+                ));
             }
         }
         if let Some(xti_index) = found {
             return Ok(xti_index);
         }
-        if let Some(message) = unsupported {
-            return Err(Error::UnsupportedFeature(message));
+        if let Some(_message) = unsupported {
+            return Err(Error::UnsupportedFeature("the feature is not supported"));
         }
-        Err(Error::UnresolvedDependency(format!(
-            "external structured-reference qualifier {qualifier:?} is missing"
-        )))
+        Err(Error::UnresolvedDependency(
+            "external structured-reference qualifier is missing",
+        ))
     }
 
     fn parse_string(&mut self) -> Result<String> {
@@ -799,7 +771,7 @@ impl<'a> Compiler<'a> {
         }
         if value.encode_utf16().count() > 255 {
             return Err(Error::InvalidFormula(
-                "formula string literal exceeds 255 UTF-16 code units".to_string(),
+                "formula string literal exceeds 255 UTF-16 code units",
             ));
         }
         Ok(value)
@@ -854,7 +826,7 @@ impl<'a> Compiler<'a> {
             values.push(value);
             current_cols = current_cols
                 .checked_add(1)
-                .ok_or_else(|| Error::InvalidFormula("array column count overflow".to_string()))?;
+                .ok_or(Error::InvalidFormula("array column count overflow"))?;
 
             if self.consume(",") {
                 continue;
@@ -867,7 +839,7 @@ impl<'a> Compiler<'a> {
                 }
                 rows = rows
                     .checked_add(1)
-                    .ok_or_else(|| Error::InvalidFormula("array row count overflow".to_string()))?;
+                    .ok_or(Error::InvalidFormula("array row count overflow"))?;
                 current_cols = 0;
                 continue;
             }
@@ -971,9 +943,7 @@ impl<'a> Compiler<'a> {
             return Ok((value, None));
         };
         if first.is_empty() || last.is_empty() || last.contains(':') {
-            return Err(Error::InvalidFormula(format!(
-                "invalid worksheet range {value:?}"
-            )));
+            return Err(Error::InvalidFormula("invalid worksheet range"));
         }
         Ok((first, Some(last)))
     }
@@ -1003,9 +973,9 @@ impl<'a> Compiler<'a> {
     }
 
     fn resolve_sheet_range(&self, first_sheet: &str, last_sheet: Option<&str>) -> Result<u16> {
-        let context = self.context.ok_or_else(|| {
+        let context = self.context.ok_or({
             Error::UnresolvedDependency(
-                "sheet-qualified reference requires workbook compilation context".to_string(),
+                "sheet-qualified reference requires workbook compilation context",
             )
         })?;
 
@@ -1016,14 +986,14 @@ impl<'a> Compiler<'a> {
                 .enumerate()
                 .filter(|(_, candidate)| excel_name_eq(candidate, sheet));
             let Some((index, _)) = matches.next() else {
-                return Err(Error::UnresolvedDependency(format!(
-                    "worksheet {sheet:?} is missing from workbook metadata"
-                )));
+                return Err(Error::UnresolvedDependency(
+                    "worksheet is missing from workbook metadata",
+                ));
             };
             if matches.next().is_some() {
-                return Err(Error::UnresolvedDependency(format!(
-                    "worksheet {sheet:?} is ambiguous in workbook metadata"
-                )));
+                return Err(Error::UnresolvedDependency(
+                    "worksheet is ambiguous in workbook metadata",
+                ));
             }
             Ok(index)
         };
@@ -1035,25 +1005,25 @@ impl<'a> Compiler<'a> {
             first_index
         };
         if last_index < first_index {
-            return Err(Error::InvalidFormula(format!(
-                "worksheet range {first_sheet:?}:{last_sheet:?} is in reverse workbook order"
-            )));
+            return Err(Error::InvalidFormula(
+                "worksheet range: is in reverse workbook order",
+            ));
         }
         if first_index == last_index {
             return u16::try_from(first_index)
                 .ok()
                 .and_then(|index| index.checked_add(2))
-                .ok_or_else(|| {
-                    Error::InvalidFormula(format!(
-                        "worksheet {first_sheet:?} cannot be represented in the extern-sheet table"
-                    ))
+                .ok_or({
+                    Error::InvalidFormula(
+                        "worksheet cannot be represented in the extern-sheet table",
+                    )
                 });
         }
 
         let first = u32::try_from(first_index)
-            .map_err(|_| Error::InvalidFormula("first sheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("first sheet index overflow"))?;
         let last = u32::try_from(last_index)
-            .map_err(|_| Error::InvalidFormula("last sheet index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("last sheet index overflow"))?;
         let mut ranges = context.sheet_ranges.borrow_mut();
         let range_index = if let Some(index) = ranges
             .iter()
@@ -1065,13 +1035,13 @@ impl<'a> Compiler<'a> {
                 .worksheet_names
                 .len()
                 .checked_add(2)
-                .ok_or_else(|| Error::InvalidFormula("Xti count overflow".to_string()))?;
+                .ok_or(Error::InvalidFormula("Xti count overflow"))?;
             if base_count
                 .checked_add(ranges.len())
                 .is_none_or(|count| count >= usize::from(u16::MAX))
             {
                 return Err(Error::InvalidFormula(
-                    "formula sheet ranges exceed the XLSB extern-sheet limit".to_string(),
+                    "formula sheet ranges exceed the XLSB extern-sheet limit",
                 ));
             }
             ranges.push((first, last));
@@ -1082,17 +1052,14 @@ impl<'a> Compiler<'a> {
             .len()
             .checked_add(2)
             .and_then(|base| base.checked_add(range_index))
-            .ok_or_else(|| Error::InvalidFormula("Xti index overflow".to_string()))?;
-        u16::try_from(xti_index)
-            .map_err(|_| Error::InvalidFormula("Xti index overflow".to_string()))
+            .ok_or(Error::InvalidFormula("Xti index overflow"))?;
+        u16::try_from(xti_index).map_err(|_| Error::InvalidFormula("Xti index overflow"))
     }
 
     fn resolve_defined_name(&self, name: &str) -> Result<u32> {
-        let context = self.context.ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "defined name {name:?} requires workbook compilation context"
-            ))
-        })?;
+        let context = self.context.ok_or(Error::UnresolvedDependency(
+            "defined name requires workbook compilation context",
+        ))?;
 
         let mut local = context
             .defined_names
@@ -1104,10 +1071,9 @@ impl<'a> Compiler<'a> {
             });
         let index = if let Some((index, _)) = local.next() {
             if local.next().is_some() {
-                return Err(Error::UnresolvedDependency(format!(
-                    "defined name {name:?} is ambiguous for worksheet {}",
-                    context.current_sheet
-                )));
+                return Err(Error::UnresolvedDependency(
+                    "defined name is ambiguous for worksheet",
+                ));
             }
             index
         } else {
@@ -1119,22 +1085,21 @@ impl<'a> Compiler<'a> {
                     candidate.sheet_id.is_none() && excel_name_eq(&candidate.name, name)
                 });
             let Some((index, _)) = global.next() else {
-                return Err(Error::UnresolvedDependency(format!(
-                    "defined name {name:?} is not visible from worksheet {}",
-                    context.current_sheet
-                )));
+                return Err(Error::UnresolvedDependency(
+                    "defined name is not visible from worksheet",
+                ));
             };
             if global.next().is_some() {
-                return Err(Error::UnresolvedDependency(format!(
-                    "defined name {name:?} is ambiguous in workbook metadata"
-                )));
+                return Err(Error::UnresolvedDependency(
+                    "defined name is ambiguous in workbook metadata",
+                ));
             }
             index
         };
         u32::try_from(index)
             .ok()
             .and_then(|index| index.checked_add(1))
-            .ok_or_else(|| Error::InvalidFormula("defined-name index overflow".to_string()))
+            .ok_or(Error::InvalidFormula("defined-name index overflow"))
     }
 
     fn consume(&mut self, text: &str) -> bool {
@@ -1157,7 +1122,7 @@ impl<'a> Compiler<'a> {
         self.input[self.offset..].chars().next()
     }
 
-    pub(super) fn error(&self, message: &str) -> Error {
-        Error::InvalidFormula(format!("{message} at byte {}", self.offset))
+    pub(super) fn error(&self, _message: &str) -> Error {
+        Error::InvalidFormula("at byte")
     }
 }

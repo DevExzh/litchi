@@ -5,12 +5,15 @@ pub use litchi_odf_common::style::master::{Child, ChildKind, Master};
 
 use litchi_core::Result;
 
-impl crate::Package {
+impl crate::GenericPackage {
     /// Parse inert master-page metadata from packaged `styles.xml`.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
         self.styles_xml()?.map_or_else(
             || Ok(Vec::new()),
-            |xml| litchi_odf_common::style::master::reader::read(&xml),
+            |xml| {
+                litchi_odf_common::style::master::reader::read(&xml, self.xml_limits_value())
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 }
@@ -18,6 +21,7 @@ impl crate::Package {
 impl crate::FlatDocument {
     /// Parse inert master-page metadata from a flat `OpenDocument`.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
-        litchi_odf_common::style::master::reader::read(self.xml())
+        litchi_odf_common::style::master::reader::read(self.xml(), self.xml_limits_value())
+            .map_err(litchi_core::Error::from)
     }
 }

@@ -1,0 +1,91 @@
+{
+  "schema": "litchi.iwa-constructor-push-admission.v1",
+  "status": "deterministic return; native qualification pending",
+  "source": {
+    "commit": "70930f91c3",
+    "changes": [
+      "Default-profile dispatch uses a private marker without widening Limits.",
+      "Minimal collection totals defer fixed fields, memory and metadata counts until publication.",
+      "A minimal prefix is materialized before a later nonminimal push.",
+      "push(MessageInfo) still checks the current public shape, length and limits."
+    ],
+    "probe_source_sha256": {
+      "base": "91f5cdacb8725780ee6e3cc8ed18f449fb37bb8b02007791718a20bca4a1273e",
+      "candidate": "c1a08d75e2bbf211152240f405026656981b739a73d8cc36465b9754a7ac0bad"
+    },
+    "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a"
+  },
+  "method": {
+    "release_build": "systemd-run --user --scope -p MemoryMax=20G env TMPDIR=$ROOT/tmp CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_TARGET_DIR=$ROOT/count-target-{base,candidate} cargo build --release --offline --locked --manifest-path $ROOT/count-{base,candidate}-v14/Cargo.toml",
+    "base_feature": "before",
+    "allocator_feature": "allocations (base also before)",
+    "callgrind": "valgrind --tool=callgrind --collect-jumps=no; Ir totals are for the 12,000-iteration leg",
+    "message_count": 8,
+    "iterations": 12000,
+    "fixture": "metadata assembly and certified collection construction are inside each end-to-end iteration",
+    "callgrind_source_state": "The v15f captures exercise all-minimal routes and predate only the mixed-prefix materialization branch; that branch is not reached by these routes.",
+    "binaries": {
+      "base_current_noalloc_sha256": "858bc0ca15473c6a0fb73a8dbb99fe4309cc3fab74831f94821010275e646bb3",
+      "candidate_current_noalloc_sha256": "c7d3860e9cde92ab189fee4e7fb317072eccab7951f474d63f3e547b30bc186e",
+      "base_alloc_sha256": "62b02b58e6579f85452c8647869a1812230cb3ba1f05f33f74620c318eb7eab4",
+      "candidate_alloc_sha256": "f663d6e515df200315f40eadaebc86a3e0c3383fdee0e53725b52fa97c6c8bd7"
+    },
+    "captures": {
+      "base_push_new": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_e2e-base-8-12000.out",
+        "sha256": "5d88a4a5e51c664297fdc0a3a0ae4f864321b24daa3f0666aa148976842fa445"
+      },
+      "candidate_push_new": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_e2e-candidate-8-12000.out",
+        "sha256": "7fdb449783f1db9da1da3883975ba701cf746c86e15d51360757bb2d863ac7"
+      },
+      "base_generic": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_generic_e2e-base-8-12000.out",
+        "sha256": "ba40aa619299a3117fc69ca1f91c1a009dd7a192809d91904bae2923381d89b1"
+      },
+      "candidate_generic": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_generic_e2e-candidate-8-12000.out",
+        "sha256": "3c939c2c71c2f5c6dd742e631acd2972bee7b778b3dd91ea3544b6cb1ae0ba03"
+      }
+    }
+  },
+  "callgrind_results": {
+    "output_checksum": 299883,
+    "output_bytes": 8299,
+    "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+    "routes": {
+      "archive_info_e2e_push_new": {
+        "base_ir": 27558858,
+        "candidate_ir": 54839971,
+        "candidate_over_base": 1.9899
+      },
+      "archive_info_generic_e2e_push": {
+        "base_ir": 27594949,
+        "candidate_ir": 73032058,
+        "candidate_over_base": 2.6466
+      }
+    }
+  },
+  "allocation_results": {
+    "iterations": 100,
+    "rows": [
+      {"route":"archive_info_e2e","messages":1,"base":{"peak":220,"allocated":22100,"allocations":300},"candidate":{"peak":220,"allocated":22200,"allocations":400}},
+      {"route":"archive_info_e2e","messages":8,"base":{"peak":1760,"allocated":176100,"allocations":1000},"candidate":{"peak":1760,"allocated":176200,"allocations":1100}},
+      {"route":"archive_info_e2e","messages":32,"base":{"peak":7040,"allocated":704200,"allocations":3400},"candidate":{"peak":7040,"allocated":704400,"allocations":3500}},
+      {"route":"archive_info_generic_e2e","messages":1,"base":{"peak":220,"allocated":22100,"allocations":300},"candidate":{"peak":428,"allocated":42900,"allocations":400}},
+      {"route":"archive_info_generic_e2e","messages":8,"base":{"peak":1760,"allocated":176100,"allocations":1000},"candidate":{"peak":3424,"allocated":342500,"allocations":1100}},
+      {"route":"archive_info_generic_e2e","messages":32,"base":{"peak":7040,"allocated":704200,"allocations":3400},"candidate":{"peak":13696,"allocated":1369800,"allocations":3500}}
+    ],
+    "interpretation": "push_new adds one collection allocation per timed operation while retaining equal peak live bytes. The generic route retains the caller Vec while moving records into the certified collection, which accounts for its higher peak and allocated bytes."
+  },
+  "validation": {
+    "rustfmt_touched_files": "pass",
+    "release_builds": "pass",
+    "focused_tests": [
+      "default_archive_info_admission_checks_public_message_length_mutations",
+      "message_info_collection_admission_is_invalidated_by_public_mutation"
+    ],
+    "archive_test_suite": "56 passed, 3 retained-reference-pruning failures with the existing ArchiveInfo nested encoded length mismatch; no constructor-focused test failed",
+    "mixed_prefix_regression": "added in 70930f91c3; not rerun after commit because shared free space fell below the 12 GB build floor"
+  }
+}

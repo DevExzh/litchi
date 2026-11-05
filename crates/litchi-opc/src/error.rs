@@ -1,7 +1,7 @@
 //! Error types for OPC package operations
 use std::collections::TryReserveError;
 
-use crate::ReadResource;
+use crate::SourceLimitKind;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -11,20 +11,22 @@ use thiserror::Error;
     reason = "the error type is named for the OPC domain it covers; renaming the public `OpcError` type would break the crate's public API"
 )]
 pub enum OpcError {
-    #[error("invalid OPC read limit for {resource}: {value}")]
-    InvalidReadLimit {
+    #[error("invalid OPC source limit for {kind}: {value} (expected 1..={maximum})")]
+    InvalidLimit {
         /// Limit that was invalid.
-        resource: ReadResource,
+        kind: SourceLimitKind,
         /// Invalid configured value.
         value: u64,
+        /// Largest permitted value, including bounds imposed by other limits.
+        maximum: u64,
     },
 
-    #[error("OPC read limit exceeded for {resource}: {actual} > {maximum}")]
-    ReadLimit {
+    #[error("OPC source limit exceeded for {kind}: {observed} > {maximum}")]
+    Limit {
         /// Resource whose configured maximum was exceeded.
-        resource: ReadResource,
+        kind: SourceLimitKind,
         /// Observed resource use.
-        actual: u64,
+        observed: u64,
         /// Configured maximum.
         maximum: u64,
     },
@@ -65,6 +67,12 @@ pub enum OpcError {
 
     #[error("Duplicate OPC part name: {0}")]
     DuplicatePartName(String),
+
+    #[error("Duplicate OPC batch payload target: {0}")]
+    DuplicatePartPayload(String),
+
+    #[error("Batch payload replacement requires built-in OPC parts")]
+    UnsupportedCustomPartPayload,
 
     #[error("ASCII-case-equivalent OPC part names coexist: '{existing}' and '{candidate}'")]
     EquivalentPartNames { existing: String, candidate: String },
@@ -363,29 +371,27 @@ impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
         match err.into_kind() {
             soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
-            soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-                map_io_error(error)
-            },
+            soapberry_zip::ErrorKind::IO(error) => map_io_error(error),
             soapberry_zip::ErrorKind::LimitExceeded {
                 resource,
                 actual,
                 maximum,
-            } => Self::ReadLimit {
-                resource: match resource {
-                    soapberry_zip::LimitResource::FileCount => ReadResource::ArchiveMembers,
+            } => Self::Limit {
+                kind: match resource {
+                    soapberry_zip::LimitResource::FileCount => SourceLimitKind::Members,
                     soapberry_zip::LimitResource::MemberNameBytes => {
-                        ReadResource::ArchiveMemberNameBytes
+                        SourceLimitKind::ArchiveMemberNameBytes
                     },
                     soapberry_zip::LimitResource::MetadataBytes => {
-                        ReadResource::ArchiveMetadataBytes
+                        SourceLimitKind::ArchiveMetadataBytes
                     },
                     soapberry_zip::LimitResource::CompressedSize => {
-                        ReadResource::ArchiveCompressedBytes
+                        SourceLimitKind::ArchiveCompressedBytes
                     },
-                    soapberry_zip::LimitResource::EntrySize => ReadResource::ArchiveEntryBytes,
-                    soapberry_zip::LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
+                    soapberry_zip::LimitResource::EntrySize => SourceLimitKind::EntryBytes,
+                    soapberry_zip::LimitResource::TotalSize => SourceLimitKind::AggregateBytes,
                 },
-                actual,
+                observed: actual,
                 maximum,
             },
             soapberry_zip::ErrorKind::Allocation { resource, source } => {
@@ -440,13 +446,13 @@ pub(crate) fn execution_io_error(error: litchi_core::ExecutionError) -> std::io:
 /// `ZipError` carrying the original rendering so no refusal can be lost.
 pub(crate) fn replicate_deferred_error(error: &OpcError) -> OpcError {
     match error {
-        OpcError::ReadLimit {
-            resource,
-            actual,
+        OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
-        } => OpcError::ReadLimit {
-            resource: *resource,
-            actual: *actual,
+        } => OpcError::Limit {
+            kind: *resource,
+            observed: *actual,
             maximum: *maximum,
         },
         OpcError::Allocation { resource, source } => OpcError::Allocation {
@@ -531,14 +537,15 @@ impl From<OpcError> for litchi_core::Error {
             OpcError::ValidationReport(error) => litchi_core::Error::Other(error.to_string()),
             error @ (OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::PreservationUnavailable { .. }
+            | OpcError::UnsupportedCustomPartPayload
             | OpcError::SignedSourceRequiresExplicitPolicy
             | OpcError::SourceArtifactMismatch { .. }
             | OpcError::SourceBackedBatchWorkerPanic { .. }
             | OpcError::SourceBackedBatchInvariant { .. }) => {
                 litchi_core::Error::Unsupported(error.to_string())
             },
-            OpcError::InvalidReadLimit { .. }
-            | OpcError::ReadLimit { .. }
+            OpcError::InvalidLimit { .. }
+            | OpcError::Limit { .. }
             | OpcError::Cancelled
             | OpcError::Execution(_)
             | OpcError::ParallelRead(_)
@@ -552,6 +559,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)
+            | OpcError::DuplicatePartPayload(_)
             | OpcError::EquivalentPartNames { .. }
             | OpcError::DerivedPartNames { .. }
             | OpcError::RelationshipNotFound(_)

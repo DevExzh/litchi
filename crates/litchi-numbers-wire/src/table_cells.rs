@@ -4,7 +4,8 @@
 //! maps, and their aggregate budget implementation. This module owns the
 //! common tile/row topology checks, sparse offset validation, and source-backed
 //! cell classification. A sink must stage its side effects and publish them
-//! only after [`read_table_cells`] returns successfully.
+//! only after [`read_table_cells`](crate::table_cells::read_table_cells)
+//! returns successfully.
 
 use std::collections::HashSet;
 
@@ -12,6 +13,7 @@ use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;
 
 use crate::cell_value::{self, CellValueSource};
 pub use crate::table_data_list::Message;
+use crate::{LimitKind, Limits};
 
 /// Native message type for one table tile.
 pub const TILE_MESSAGE_KIND: u32 = 6_002;
@@ -148,6 +150,18 @@ pub enum TableCellIssue {
     DuplicateTileRow { tile_index: u32, row_index: u32 },
     /// A counter could not be represented by the host platform.
     CounterOverflow,
+    /// A raw Numbers-wire byte or repeated-item ceiling was exceeded before
+    /// the owner budget was consulted.  The owner budget is intentionally
+    /// independent: it may be tighter, but it cannot make this ingress cap
+    /// disappear.
+    RawLimitExceeded {
+        /// Raw dimension that exceeded its selected ceiling.
+        kind: LimitKind,
+        /// Observed source amount.
+        observed: usize,
+        /// Selected raw ceiling.
+        maximum: usize,
+    },
     /// A sparse cell span does not borrow from the active row storage.
     CellStorageOutOfBounds { row: u32, column: u32 },
     /// The shared storage codec rejected a tile or row payload.
@@ -260,6 +274,7 @@ pub trait CellValueSink<Budget: TableCellReadBudget> {
 /// aggregate ledger without interior mutability.
 pub fn read_table_cells<'source, Tiles, Messages, Resolve, Budget, Sink>(
     dimensions: TableDimensions,
+    limits: &Limits,
     tile_references: Tiles,
     mut resolve_tile: Resolve,
     budget: &mut Budget,
@@ -280,8 +295,19 @@ where
     let columns = usize::try_from(dimensions.columns)
         .map_err(|_| budget.map_issue(TableCellIssue::CounterOverflow))?;
     let mut report = TableCellReadReport::default();
+    let mut tile_references_seen = 0usize;
 
     for tile_reference in tile_references {
+        tile_references_seen = tile_references_seen
+            .checked_add(1)
+            .ok_or_else(|| budget.map_issue(TableCellIssue::CounterOverflow))?;
+        if tile_references_seen > limits.max_items() {
+            return Err(budget.map_issue(TableCellIssue::RawLimitExceeded {
+                kind: LimitKind::Items,
+                observed: tile_references_seen,
+                maximum: limits.max_items(),
+            }));
+        }
         if tile_reference.tile_index >= tile_count {
             return Err(budget.map_issue(TableCellIssue::TileIndexOutOfBounds {
                 tile_index: tile_reference.tile_index,
@@ -313,13 +339,22 @@ where
                 object_id: tile_reference.object_id,
             }));
         };
+        if payload.len() > limits.max_input_bytes() {
+            return Err(budget.map_issue(TableCellIssue::RawLimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed: payload.len(),
+                maximum: limits.max_input_bytes(),
+            }));
+        }
 
         let options = budget.storage_options(payload)?;
         let mut visitor = TileVisitor::new(
             tile_reference.tile_index,
             dimensions,
             columns,
+            report.rows,
             report.cells,
+            *limits,
             budget,
             sink,
         );
@@ -364,7 +399,9 @@ where
     tile_index: u32,
     dimensions: TableDimensions,
     columns: usize,
+    previous_rows: usize,
     previous_cells: usize,
+    limits: Limits,
     budget: &'budget mut Budget,
     sink: &'sink mut Sink,
     seen_rows: HashSet<u32>,
@@ -382,7 +419,9 @@ where
         tile_index: u32,
         dimensions: TableDimensions,
         columns: usize,
+        previous_rows: usize,
         previous_cells: usize,
+        limits: Limits,
         budget: &'budget mut Budget,
         sink: &'sink mut Sink,
     ) -> Self {
@@ -390,7 +429,9 @@ where
             tile_index,
             dimensions,
             columns,
+            previous_rows,
             previous_cells,
+            limits,
             budget,
             sink,
             seen_rows: HashSet::new(),
@@ -420,6 +461,36 @@ where
 
     fn cumulative_cells(&self, tile_cells: usize) -> Option<usize> {
         self.previous_cells.checked_add(tile_cells)
+    }
+
+    fn cumulative_rows(&self, tile_rows: usize) -> Option<usize> {
+        self.previous_rows.checked_add(tile_rows)
+    }
+
+    fn raw_items_exceeded(&mut self, observed: usize) -> bool {
+        if observed > self.limits.max_items() {
+            self.record_structural(TableCellIssue::RawLimitExceeded {
+                kind: LimitKind::Items,
+                observed,
+                maximum: self.limits.max_items(),
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    fn raw_input_exceeded(&mut self, observed: usize) -> bool {
+        if observed > self.limits.max_input_bytes() {
+            self.record_structural(TableCellIssue::RawLimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed,
+                maximum: self.limits.max_input_bytes(),
+            });
+            true
+        } else {
+            false
+        }
     }
 
     fn into_parts(
@@ -484,6 +555,34 @@ where
             },
         };
 
+        let next_rows = match self.report.rows.checked_add(1) {
+            Some(value) => value,
+            None => {
+                self.record_structural(TableCellIssue::CounterOverflow);
+                return Ok(());
+            },
+        };
+        let Some(cumulative_rows) = self.cumulative_rows(next_rows) else {
+            self.record_structural(TableCellIssue::CounterOverflow);
+            return Ok(());
+        };
+        if self.raw_items_exceeded(cumulative_rows) || self.raw_items_exceeded(declared_cells) {
+            return Ok(());
+        }
+
+        let (storage_bytes, offsets) = row.cell_storage_and_offsets();
+        if self.raw_input_exceeded(storage_bytes.len())
+            || self.raw_input_exceeded(offsets.len())
+            || self.raw_input_exceeded(
+                storage_bytes
+                    .len()
+                    .checked_add(offsets.len())
+                    .unwrap_or(usize::MAX),
+            )
+        {
+            return Ok(());
+        }
+
         // Reserve the row identity before charging the materialized-cell
         // count.  This preserves the legacy admission order: a refused
         // staging allocation never consumes a cell-count charge, while the
@@ -517,7 +616,6 @@ where
             }
         }
 
-        let (_, offsets) = row.cell_storage_and_offsets();
         let options = match self.budget.storage_options(offsets) {
             Ok(options) => options,
             Err(error) => {
@@ -540,23 +638,21 @@ where
             self.record_structural(TableCellIssue::CounterOverflow);
             return Ok(());
         };
+        let Some(cumulative_cells) = self.cumulative_cells(next_cells) else {
+            self.record_structural(TableCellIssue::CounterOverflow);
+            return Ok(());
+        };
+        if self.raw_items_exceeded(spans.len()) || self.raw_items_exceeded(cumulative_cells) {
+            return Ok(());
+        }
         if allow_semantic_work {
-            let Some(cumulative_cells) = self.cumulative_cells(next_cells) else {
-                self.record_structural(TableCellIssue::CounterOverflow);
-                return Ok(());
-            };
             if let Err(error) = self.budget.check_materialized_cells(cumulative_cells) {
                 self.record_budget_error(error);
                 return Ok(());
             }
         }
-        let Some(next_rows) = self.report.rows.checked_add(1) else {
-            self.record_structural(TableCellIssue::CounterOverflow);
-            return Ok(());
-        };
         self.report.rows = next_rows;
         self.report.cells = next_cells;
-        let (storage_bytes, _) = row.cell_storage_and_offsets();
         for span in spans.iter() {
             let column = span.column();
             let Ok(column_u32) = u32::try_from(column) else {
@@ -570,6 +666,9 @@ where
                 });
                 continue;
             };
+            if self.raw_input_exceeded(cell_bytes.len()) {
+                continue;
+            }
             if !allow_semantic_work || self.semantic_error.is_some() {
                 continue;
             }
@@ -577,7 +676,7 @@ where
                 self.record_budget_error(error);
                 continue;
             }
-            let value = match cell_value::decode_cell_value(cell_bytes) {
+            let value = match cell_value::decode_cell_value(cell_bytes, &self.limits) {
                 Ok(value) => value,
                 Err(error) => {
                     self.record_semantic(TableCellIssue::CellValueDecode {

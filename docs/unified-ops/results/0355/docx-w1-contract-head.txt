@@ -1,0 +1,18 @@
+# run run1
+docx open (1,000 paragraphs): native 65811 ns, unified 39110 ns, ratio 0.594
+docx set paragraph text: native 567463 ns, unified 65470 ns, ratio 0.115
+docx add paragraph: native 952475 ns, unified 127731 ns, ratio 0.134
+docx set / title: native 11870 ns, unified 12120 ns, ratio 1.021
+docx File::edit 1k paragraph text sets: native 4816516 ns, unified 1451425481 ns, ratio 301.343
+docx File::batch 1k paragraph text sets: native 4824055 ns, unified 1458227032 ns, ratio 302.282
+docx save (to_bytes) after one set: native 70270 ns, unified 68200 ns, ratio 0.971
+docx repeated save of one package (second to_bytes): native 140861 ns, unified 136480 ns, ratio 0.969
+# run run2
+docx open (1,000 paragraphs): native 65950 ns, unified 39020 ns, ratio 0.592
+docx set paragraph text: native 569013 ns, unified 64501 ns, ratio 0.113
+docx add paragraph: native 955985 ns, unified 125151 ns, ratio 0.131
+docx set / title: native 11880 ns, unified 12160 ns, ratio 1.024
+docx File::edit 1k paragraph text sets: native 4794174 ns, unified 1456255374 ns, ratio 303.755
+docx File::batch 1k paragraph text sets: native 4769855 ns, unified 1454690798 ns, ratio 304.976
+docx save (to_bytes) after one set: native 69830 ns, unified 67881 ns, ratio 0.972
+docx repeated save of one package (second to_bytes): native 139381 ns, unified 135791 ns, ratio 0.974

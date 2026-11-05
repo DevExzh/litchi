@@ -1,0 +1,343 @@
+{
+  "record": "0362yd",
+  "scope": "Matched ODP source-owner allocator and Callgrind lifecycles after the bounded streamed reader correction",
+  "baseline": {
+    "commit": "e4a0614f5d3a1d768346cc33a4a3b86522dda986",
+    "role": "0358a changed-route pre-source-backed-family baseline",
+    "binary": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_baseline_e4a0614f5d",
+      "bytes": 3048448,
+      "sha256": "6af07f71a4257195fb2b66eb6e34159a5b0d1159250ae3ef431a5748265e225f"
+    }
+  },
+  "candidate": {
+    "commit": "12385bc0453978b5406da808d430abae9ce77b5b",
+    "binary": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_candidate_12385bc",
+      "bytes": 3541224,
+      "sha256": "37dfcc678f563552af0b07e5073e33bf62537522fe4d2a48fa5fd3bc0e4cf1d0"
+    }
+  },
+  "fixture": {
+    "slides": 2000,
+    "content_xml_bytes": 591185,
+    "media_bytes": 4194304,
+    "source_archive_bytes": 4215428
+  },
+  "probe_sources": {
+    "common": {
+      "path": "docs/unified-ops/results/0362yd/odp_0362yd_probe.rs",
+      "sha256": "9069b06bed97f7918773a44cef4cf08fde62cd0cf0dacb01ab12c61b2c22db5b"
+    },
+    "before_route": {
+      "path": "docs/unified-ops/results/0362yd/route_before.rs",
+      "sha256": "14ac6b9ad6089c9355eaeff2694aee1f704314110f810cc20b55483374d3afd1"
+    },
+    "after_route": {
+      "path": "docs/unified-ops/results/0362yd/route_after.rs",
+      "sha256": "285c55ed19a923b92a8d9324765cb5d33930944e05472d8b6db3176e2057297e"
+    },
+    "callgrind_runner": {
+      "path": "docs/unified-ops/results/0362yd/run_callgrind.sh",
+      "sha256": "017ef8d49b5df9e338adb52d41e147f8e893dd41678b4a00192b16a0109676d0"
+    },
+    "allocator_runner": {
+      "path": "docs/unified-ops/results/0362yd/run_allocator_routes.sh",
+      "sha256": "37f28f816198d1b97be599c7c6486c21ec9e5d0ebac5be52cb7a0de0262643d4"
+    }
+  },
+  "rows": [
+    {
+      "route": "open",
+      "before": {
+        "peak": 693231,
+        "allocs": 71,
+        "reallocs": 8,
+        "allocated": 777196,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "after": {
+        "peak": 116001,
+        "allocs": 72,
+        "reallocs": 7,
+        "allocated": 200325,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "peak_ratio": 0.167333832,
+      "allocated_ratio": 0.257753514,
+      "instruction_references": {
+        "before": 829899694,
+        "after": 830564967
+      },
+      "instruction_ratio": 1.000801631,
+      "instruction_delta": 665273
+    },
+    {
+      "route": "first_slide",
+      "before": {
+        "peak": 693231,
+        "allocs": 20084,
+        "reallocs": 22,
+        "allocated": 3210706,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "after": {
+        "peak": 116001,
+        "allocs": 20087,
+        "reallocs": 21,
+        "allocated": 2714155,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "peak_ratio": 0.167333832,
+      "allocated_ratio": 0.845345229,
+      "instruction_references": {
+        "before": 886552327,
+        "after": 895150022
+      },
+      "instruction_ratio": 1.009697899,
+      "instruction_delta": 8597695
+    },
+    {
+      "route": "repeat_slide",
+      "before": {
+        "peak": 1500637,
+        "allocs": 50094,
+        "reallocs": 7951,
+        "allocated": 6785233,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "after": {
+        "peak": 990891,
+        "allocs": 50099,
+        "reallocs": 7950,
+        "allocated": 6369002,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "peak_ratio": 0.660313587,
+      "allocated_ratio": 0.938656344,
+      "instruction_references": {
+        "before": 954358638,
+        "after": 970980884
+      },
+      "instruction_ratio": 1.01741719,
+      "instruction_delta": 16622246
+    },
+    {
+      "route": "first_text",
+      "before": {
+        "peak": 1500637,
+        "allocs": 34081,
+        "reallocs": 7946,
+        "allocated": 4672388,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "after": {
+        "peak": 990891,
+        "allocs": 34084,
+        "reallocs": 7945,
+        "allocated": 4175837,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "peak_ratio": 0.660313587,
+      "allocated_ratio": 0.893726506,
+      "instruction_references": {
+        "before": 899166760,
+        "after": 907983019
+      },
+      "instruction_ratio": 1.009804921,
+      "instruction_delta": 8816259
+    },
+    {
+      "route": "repeat_text",
+      "before": {
+        "peak": 1500637,
+        "allocs": 68092,
+        "reallocs": 15884,
+        "allocated": 8673358,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "after": {
+        "peak": 990891,
+        "allocs": 68097,
+        "reallocs": 15883,
+        "allocated": 8257127,
+        "output_bytes": 0,
+        "output_siphash": 15130871412783076140
+      },
+      "peak_ratio": 0.660313587,
+      "allocated_ratio": 0.952010398,
+      "instruction_references": {
+        "before": 968364698,
+        "after": 985472794
+      },
+      "instruction_ratio": 1.017666997,
+      "instruction_delta": 17108096
+    },
+    {
+      "route": "write_text",
+      "before": {
+        "peak": 693231,
+        "allocs": 18076,
+        "reallocs": 18,
+        "allocated": 2350086,
+        "output_bytes": 105778,
+        "output_siphash": 18333823960124859280
+      },
+      "after": {
+        "peak": 116001,
+        "allocs": 18080,
+        "reallocs": 19,
+        "allocated": 1853913,
+        "output_bytes": 105778,
+        "output_siphash": 18333823960124859280
+      },
+      "peak_ratio": 0.167333832,
+      "allocated_ratio": 0.78887028,
+      "instruction_references": {
+        "before": 877896502,
+        "after": 889723814
+      },
+      "instruction_ratio": 1.013472331,
+      "instruction_delta": 11827312
+    },
+    {
+      "route": "repeat_write_text",
+      "before": {
+        "peak": 693231,
+        "allocs": 36081,
+        "reallocs": 28,
+        "allocated": 3922976,
+        "output_bytes": 211556,
+        "output_siphash": 6976564693146433600
+      },
+      "after": {
+        "peak": 116001,
+        "allocs": 36088,
+        "reallocs": 31,
+        "allocated": 3507501,
+        "output_bytes": 211556,
+        "output_siphash": 6976564693146433600
+      },
+      "peak_ratio": 0.167333832,
+      "allocated_ratio": 0.894091883,
+      "instruction_references": {
+        "before": 925915980,
+        "after": 948900371
+      },
+      "instruction_ratio": 1.024823409,
+      "instruction_delta": 22984391
+    },
+    {
+      "route": "unchanged_write",
+      "before": {
+        "peak": 6074765,
+        "allocs": 365,
+        "reallocs": 46,
+        "allocated": 6782817,
+        "output_bytes": 4215428,
+        "output_siphash": 12221861870545843138
+      },
+      "after": {
+        "peak": 5484699,
+        "allocs": 366,
+        "reallocs": 45,
+        "allocated": 6205946,
+        "output_bytes": 4215428,
+        "output_siphash": 12221861870545843138
+      },
+      "peak_ratio": 0.902866037,
+      "allocated_ratio": 0.914951118,
+      "instruction_references": {
+        "before": 845063682,
+        "after": 845731874
+      },
+      "instruction_ratio": 1.0007907,
+      "instruction_delta": 668192
+    },
+    {
+      "route": "append_commit_write",
+      "before": {
+        "peak": 612845,
+        "allocs": 36175,
+        "reallocs": 98,
+        "allocated": 5737255,
+        "output_bytes": 4215645,
+        "output_siphash": 5546059324926701325
+      },
+      "after": {
+        "peak": 612845,
+        "allocs": 36185,
+        "reallocs": 99,
+        "allocated": 5853743,
+        "output_bytes": 4215645,
+        "output_siphash": 5546059324926701325
+      },
+      "peak_ratio": 1.0,
+      "allocated_ratio": 1.020303786,
+      "instruction_references": {
+        "before": 1348811788,
+        "after": 1351943593
+      },
+      "instruction_ratio": 1.002321899,
+      "instruction_delta": 3131805
+    },
+    {
+      "route": "replay",
+      "before": {
+        "peak": 612845,
+        "allocs": 36175,
+        "reallocs": 98,
+        "allocated": 5737255,
+        "output_bytes": 4215645,
+        "output_siphash": 5546059324926701325
+      },
+      "after": {
+        "peak": 612845,
+        "allocs": 36187,
+        "reallocs": 99,
+        "allocated": 5853759,
+        "output_bytes": 4215645,
+        "output_siphash": 5546059324926701325
+      },
+      "peak_ratio": 1.0,
+      "allocated_ratio": 1.020306575,
+      "instruction_references": {
+        "before": 1348769234,
+        "after": 1351952251
+      },
+      "instruction_ratio": 1.002359942,
+      "instruction_delta": 3183017
+    }
+  ],
+  "output_equivalence": {
+    "all_routes": true,
+    "comparison": "output_bytes and deterministic DefaultHasher SipHash equal for every route; replay baseline is old equivalent publication because e4a predates Patch"
+  },
+  "commands": {
+    "before_build": "ODP_PROBE_ROUTE=/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_before.rs CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target CARGO_BUILD_JOBS=1 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp cargo run --offline --release -p litchi-ops --features odp --example odp_0362yd_probe",
+    "after_build": "ODP_PROBE_ROUTE=/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_after.rs CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-candidate-target CARGO_BUILD_JOBS=1 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp cargo run --offline --release -p litchi-ops --features odp --example odp_0362yd_probe",
+    "allocator": "TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp docs/unified-ops/results/0362yd/run_allocator_routes.sh /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_probe before-or-after /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/allocator-before-or-after",
+    "callgrind": "TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp docs/unified-ops/results/0362yd/run_callgrind.sh /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_probe before-or-after /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/callgrind-before-or-after",
+    "before_prepare": "cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/odp_0362yd_probe.rs crates/litchi-ops/examples/odp_0362yd_probe.rs; cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_before.rs /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd/route_baseline.rs",
+    "after_prepare": "cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/odp_0362yd_probe.rs crates/litchi-ops/examples/odp_0362yd_probe.rs; cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_after.rs /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd/route_candidate.rs"
+  },
+  "f755_secondary_attempt": {
+    "commit": "f755903f4536582bbdce0a610c0651b9cbe19b7d",
+    "reason": "later 0358 record head, not the 0358a changed-route baseline",
+    "binary_bytes": 3048576,
+    "binary_sha256": "ac4e7def67295292afd0891ec5f9c8101308d53d8a4b6b0f814cb0fb90823490"
+  },
+  "qualification": {
+    "native_timing": "not run",
+    "status": "matched deterministic allocator and instruction diagnostics; no native ABBA claim"
+  }
+}

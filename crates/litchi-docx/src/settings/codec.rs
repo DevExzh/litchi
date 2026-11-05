@@ -70,9 +70,11 @@ impl Settings<NoteNumberFormat> {
     /// Returns an error if the operation cannot be completed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_SETTINGS_XML_BYTES {
-            return Err(invalid(format!(
-                "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
-            )));
+            return Err(crate::Error::SettingsLimit {
+                kind: crate::settings::LimitKind::XmlBytes,
+                actual: xml.len(),
+                maximum: MAX_SETTINGS_XML_BYTES,
+            });
         }
 
         let mut reader = NsReader::from_reader(xml);
@@ -100,9 +102,11 @@ impl Settings<NoteNumberFormat> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML node counter overflow"))?;
                 if nodes > MAX_SETTINGS_XML_NODES {
-                    return Err(invalid(format!(
-                        "settings XML exceeds {MAX_SETTINGS_XML_NODES} nodes"
-                    )));
+                    return Err(crate::Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: MAX_SETTINGS_XML_NODES,
+                    });
                 }
             }
 
@@ -112,9 +116,11 @@ impl Settings<NoteNumberFormat> {
                         .checked_add(1)
                         .ok_or_else(|| invalid("Word settings XML nesting is too deep"))?;
                     if depth > MAX_SETTINGS_XML_DEPTH {
-                        return Err(invalid(format!(
-                            "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                        )));
+                        return Err(crate::Error::SettingsLimit {
+                            kind: crate::settings::LimitKind::XmlDepth,
+                            actual: depth,
+                            maximum: MAX_SETTINGS_XML_DEPTH,
+                        });
                     }
                     if depth == 1 {
                         validate_settings_root(&namespace, &element, saw_root)?;
@@ -156,9 +162,11 @@ impl Settings<NoteNumberFormat> {
                         .checked_add(1)
                         .ok_or_else(|| invalid("Word settings XML nesting is too deep"))?;
                     if child_depth > MAX_SETTINGS_XML_DEPTH {
-                        return Err(invalid(format!(
-                            "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                        )));
+                        return Err(crate::Error::SettingsLimit {
+                            kind: crate::settings::LimitKind::XmlDepth,
+                            actual: child_depth,
+                            maximum: MAX_SETTINGS_XML_DEPTH,
+                        });
                     }
                     if child_depth == 1 {
                         validate_settings_root(&namespace, &element, saw_root)?;

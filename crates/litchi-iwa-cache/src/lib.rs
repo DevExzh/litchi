@@ -441,15 +441,6 @@ where
     /// Default bound for concurrently running parser generations.
     pub const DEFAULT_MAX_FLIGHTS: usize = 64;
 
-    /// Construct a cache with a positive total-weight budget.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`WeightError::ZeroCapacity`] when `max_weight` is zero.
-    pub fn new(max_weight: usize) -> Result<Self, WeightError> {
-        Self::new_with_limits(max_weight, Self::DEFAULT_MAX_FLIGHTS)
-    }
-
     /// Construct a cache with explicit value-weight and active-flight budgets.
     ///
     /// Bounding active flights prevents a burst of distinct slow parser keys
@@ -461,7 +452,7 @@ where
     ///
     /// Returns [`WeightError::ZeroCapacity`] when `max_weight` is zero or
     /// [`WeightError::ZeroFlightCapacity`] when `max_flights` is zero.
-    pub fn new_with_limits(max_weight: usize, max_flights: usize) -> Result<Self, WeightError> {
+    pub fn new(max_weight: usize, max_flights: usize) -> Result<Self, WeightError> {
         if max_weight == 0 {
             return Err(WeightError::ZeroCapacity);
         }

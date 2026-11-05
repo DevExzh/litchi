@@ -4,7 +4,7 @@ use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, T
 
 use super::model::{
     BlockKind, BlockRecord, Dialect, Error, InlineKind, InlineRecord, NestedBlockRecord,
-    ReadLimits, ReferenceKind, ReferenceRecord, Snapshot, State,
+    OpenOptions, ReadLimits, ReferenceKind, ReferenceRecord, Snapshot, State,
 };
 
 struct OpenBlock {
@@ -28,10 +28,12 @@ struct OpenInline {
     reference: Option<ReferenceRecord>,
 }
 
-pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
+pub(crate) fn read(source: &str, options: OpenOptions) -> Result<Snapshot, Error> {
+    let dialect = options.dialect_value();
+    let limits = options.read_limits_value();
     validate_input(source, limits)?;
-    let options = parser_options(dialect);
-    let parser = Parser::new_ext(source, options);
+    let parser_options = parser_options(dialect);
+    let parser = Parser::new_ext(source, parser_options);
     let (mut blocks, mut references) = collect_reference_definitions(&parser, limits)?;
     collect_event_blocks(
         parser,
@@ -70,8 +72,7 @@ pub(crate) fn read(source: &str, dialect: Dialect, limits: ReadLimits) -> Result
             source: retained_source,
             blocks: blocks.into_boxed_slice(),
             references: references.into_boxed_slice(),
-            dialect,
-            limits,
+            options,
         }),
     })
 }

@@ -1,0 +1,18 @@
+{"corpus":"new","pair":"unified-source / leaf-source","leaf_ns":18900,"unified_ns":19580,"ratio":1.0360}
+{"corpus":"new","pair":"unified-source / leaf-eager","leaf_ns":31880,"unified_ns":19920,"ratio":0.6248}
+{"corpus":"new","pair":"unified-eager / leaf-eager","leaf_ns":32331,"unified_ns":35360,"ratio":1.0937}
+{"corpus":"new","pair":"save: unified-source / leaf-source","leaf_ns":48881,"unified_ns":49830,"ratio":1.0194}
+{"corpus":"new","pair":"save: unified-source / leaf-eager","leaf_ns":58540,"unified_ns":51330,"ratio":0.8768}
+{"corpus":"new","pair":"save: unified-eager / leaf-eager","leaf_ns":57600,"unified_ns":62630,"ratio":1.0873}
+{"corpus":"Simple.xlsb","pair":"unified-source / leaf-source","leaf_ns":32370,"unified_ns":33060,"ratio":1.0213}
+{"corpus":"Simple.xlsb","pair":"unified-source / leaf-eager","leaf_ns":53740,"unified_ns":33180,"ratio":0.6174}
+{"corpus":"Simple.xlsb","pair":"unified-eager / leaf-eager","leaf_ns":54790,"unified_ns":60530,"ratio":1.1048}
+{"corpus":"Simple.xlsb","pair":"save: unified-source / leaf-source","leaf_ns":77430,"unified_ns":78950,"ratio":1.0196}
+{"corpus":"Simple.xlsb","pair":"save: unified-source / leaf-eager","leaf_ns":95371,"unified_ns":83161,"ratio":0.8720}
+{"corpus":"Simple.xlsb","pair":"save: unified-eager / leaf-eager","leaf_ns":93790,"unified_ns":103250,"ratio":1.1009}
+{"corpus":"8x2000 cells","pair":"unified-source / leaf-source","leaf_ns":29450,"unified_ns":29971,"ratio":1.0177}
+{"corpus":"8x2000 cells","pair":"unified-source / leaf-eager","leaf_ns":132740,"unified_ns":30501,"ratio":0.2298}
+{"corpus":"8x2000 cells","pair":"unified-eager / leaf-eager","leaf_ns":134821,"unified_ns":142980,"ratio":1.0605}
+{"corpus":"8x2000 cells","pair":"save: unified-source / leaf-source","leaf_ns":92131,"unified_ns":93441,"ratio":1.0142}
+{"corpus":"8x2000 cells","pair":"save: unified-source / leaf-eager","leaf_ns":188551,"unified_ns":98030,"ratio":0.5199}
+{"corpus":"8x2000 cells","pair":"save: unified-eager / leaf-eager","leaf_ns":186871,"unified_ns":203131,"ratio":1.0870}

@@ -1,0 +1,190 @@
+{
+  "schema": "litchi.native-qualification.v1",
+  "lane": "w4-xlsx-raw",
+  "output_dir": "$NATIVE_QUAL_OUTPUT",
+  "path_prepend": ["$LITCHI_COORD_BIN"],
+  "rounds": 31,
+  "abba_order": ["before", "after", "after", "before"],
+  "validators": [
+    {
+      "id": "xlsx-raw-identity",
+      "script": "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/xlsx_raw_identity_validator.py",
+      "argv": [
+        "python3",
+        "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/xlsx_raw_identity_validator.py",
+        "{output_dir}",
+        "$XLSX_BEFORE_REVISION",
+        "$XLSX_AFTER_REVISION",
+        "$XLSX_TARGET_ROOT/before",
+        "$XLSX_TARGET_ROOT/after",
+        "$XLSX_BEFORE_SOURCE",
+        "$XLSX_AFTER_SOURCE",
+        "$XLSX_PREPARATION_RECEIPT"
+      ],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
+  "shared": {
+    "preparation_receipt": "$XLSX_PREPARATION_RECEIPT",
+    "probe_paths": [
+      "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml",
+      "tools/perf-baseline/unified-xlsx-raw-identity/src/lib.rs",
+      "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_alloc.rs",
+      "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_native.rs",
+      "tools/perf-baseline/src/allocation_metrics.rs",
+      "tools/perf-baseline/src/xlsx_raw_identity.rs",
+      "tools/perf-baseline/src/bin/support/counting_allocator.rs"
+    ],
+    "fixture_paths": []
+  },
+  "legs": {
+    "before": {
+      "source_root": "$XLSX_BEFORE_SOURCE",
+      "target_dir": "$XLSX_TARGET_ROOT/before",
+      "allow_dirty": true,
+      "lock_paths": ["tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock"],
+      "build": [
+        {
+          "id": "xlsx_raw_identity",
+          "argv": [
+            "cargo",
+            "build",
+            "--release",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml",
+            "--no-default-features",
+            "--features",
+            "allocator-metrics,legacy-xlsx-raw-opc",
+            "--bin",
+            "xlsx-raw-identity-alloc",
+            "--bin",
+            "xlsx-raw-identity-native"
+          ],
+          "artifacts": [
+            "{target_dir}/release/xlsx-raw-identity-alloc",
+            "{target_dir}/release/xlsx-raw-identity-native"
+          ]
+        }
+      ],
+      "programs": [
+        {
+          "id": "raw-alloc",
+          "binary": "{target_dir}/release/xlsx-raw-identity-alloc",
+          "argv": [
+            "xlsx-raw-identity",
+            "--api-variant",
+            "original",
+            "--source-revision",
+            "$XLSX_BEFORE_REVISION",
+            "--iterations",
+            "5",
+            "--warmups",
+            "2",
+            "--json",
+            "{output}"
+          ],
+          "outputs": ["{output_dir}/xlsx-raw-alloc-{leg}-{index}.json"],
+          "stdout": "{output_dir}/xlsx-raw-alloc-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/xlsx-raw-alloc-{leg}-{index}.stderr",
+          "require_stdout": false
+        },
+        {
+          "id": "raw-native",
+          "binary": "{target_dir}/release/xlsx-raw-identity-native",
+          "argv": [
+            "xlsx-raw-identity",
+            "--api-variant",
+            "original",
+            "--source-revision",
+            "$XLSX_BEFORE_REVISION",
+            "--iterations",
+            "5",
+            "--warmups",
+            "2",
+            "--json",
+            "{output}"
+          ],
+          "outputs": ["{output_dir}/xlsx-raw-native-{leg}-{index}.json"],
+          "stdout": "{output_dir}/xlsx-raw-native-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/xlsx-raw-native-{leg}-{index}.stderr",
+          "require_stdout": false
+        }
+      ]
+    },
+    "after": {
+      "source_root": "$XLSX_AFTER_SOURCE",
+      "target_dir": "$XLSX_TARGET_ROOT/after",
+      "lock_paths": ["tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock"],
+      "build": [
+        {
+          "id": "xlsx_raw_identity",
+          "argv": [
+            "cargo",
+            "build",
+            "--release",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml",
+            "--features",
+            "allocator-metrics,current-xlsx-raw-opc",
+            "--bin",
+            "xlsx-raw-identity-alloc",
+            "--bin",
+            "xlsx-raw-identity-native"
+          ],
+          "artifacts": [
+            "{target_dir}/release/xlsx-raw-identity-alloc",
+            "{target_dir}/release/xlsx-raw-identity-native"
+          ]
+        }
+      ],
+      "programs": [
+        {
+          "id": "raw-alloc",
+          "binary": "{target_dir}/release/xlsx-raw-identity-alloc",
+          "argv": [
+            "xlsx-raw-identity",
+            "--api-variant",
+            "candidate",
+            "--source-revision",
+            "$XLSX_AFTER_REVISION",
+            "--iterations",
+            "5",
+            "--warmups",
+            "2",
+            "--json",
+            "{output}"
+          ],
+          "outputs": ["{output_dir}/xlsx-raw-alloc-{leg}-{index}.json"],
+          "stdout": "{output_dir}/xlsx-raw-alloc-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/xlsx-raw-alloc-{leg}-{index}.stderr",
+          "require_stdout": false
+        },
+        {
+          "id": "raw-native",
+          "binary": "{target_dir}/release/xlsx-raw-identity-native",
+          "argv": [
+            "xlsx-raw-identity",
+            "--api-variant",
+            "candidate",
+            "--source-revision",
+            "$XLSX_AFTER_REVISION",
+            "--iterations",
+            "5",
+            "--warmups",
+            "2",
+            "--json",
+            "{output}"
+          ],
+          "outputs": ["{output_dir}/xlsx-raw-native-{leg}-{index}.json"],
+          "stdout": "{output_dir}/xlsx-raw-native-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/xlsx-raw-native-{leg}-{index}.stderr",
+          "require_stdout": false
+        }
+      ]
+    }
+  }
+}

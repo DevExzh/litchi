@@ -2,6 +2,7 @@
 
 use litchi_opc::{OpcPackage, PackURI};
 
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::parts::SlidePart;
 use crate::{Error, Result};
 
@@ -28,10 +29,7 @@ pub(crate) fn store(
         let part = package.get_part(slide_name)?;
         let slide = SlidePart::from_part(part)?;
         if slide.part().blob() != value.base_xml() {
-            return Err(Error::UnsafeEdit {
-                operation: "put_zooms",
-                reason: "the zoom owner source changed after it was loaded",
-            });
+            return Err(Error::PatchConflict);
         }
 
         let mut previous = Owner::read(slide.part().blob())?;
@@ -46,9 +44,10 @@ pub(crate) fn store(
     if previous.xml() == staged {
         return Ok(Some(previous));
     }
+    refuse_signed_change(package)?;
 
     package.get_part_mut(slide_name)?.set_blob(staged);
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(Some(previous))
 }
 

@@ -7,6 +7,8 @@
 
 pub mod custom_xml;
 pub mod dataspaces;
+mod error;
+pub use error::{Error, LimitKind};
 pub mod leniency;
 pub mod object;
 pub mod ole1;

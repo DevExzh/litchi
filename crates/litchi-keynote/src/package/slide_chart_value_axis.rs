@@ -29,19 +29,15 @@ use litchi_iwa_core::{
     SnappyLimits, SnappyStream,
 };
 use litchi_iwa_protos::keynote_chart_axis_value_settings_codec::{
-    AxisValueBound as CodecBound, AxisValueBounds as CodecBounds,
-    AxisValueSettingsSnapshot as CodecSnapshot, AxisValueSettingsWrite as CodecWrite,
-    AxisValueSteps as CodecSteps, DecodeError as CodecError, DecodeLimit as CodecLimit,
-    DecodeOptions as CodecOptions, DecodeReport as CodecReport,
-    RewriteExecutionRequirements as CodecRequirements, Scale as CodecScale,
+    DecodeError as CodecError, DecodeLimit as CodecLimit, DecodeOptions as CodecOptions,
+    DecodeReport as CodecReport, RewriteExecutionRequirements as CodecRequirements,
     decode_axis_value_settings_with_report, prepare_axis_value_settings_rewrite,
 };
-use thiserror::Error;
+use litchi_iwa_style::value_axis;
+use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
-use crate::chart::axis::{
-    Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
-};
+use crate::chart::axis::{Bounds, Scale, Steps, ValueAxisSettings};
 use crate::{ChartSelector, SlideSelector};
 
 const CHART_AXIS_MESSAGE_TYPE: u32 = 5_027;
@@ -62,7 +58,7 @@ const SNAPPY_FRAME_HEADER_BYTES: usize = 4;
 /// Resource categories charged by one aggregate value-axis transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartValueAxisLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -87,7 +83,7 @@ pub enum ChartValueAxisLimitKind {
     WireWork,
 }
 
-impl fmt::Display for ChartValueAxisLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -106,9 +102,44 @@ impl fmt::Display for ChartValueAxisLimitKind {
 }
 
 /// A content-redacted failure raised by a value-axis transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartValueAxisError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or selected native payload is malformed.
+    #[error("the Keynote chart value-axis source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote chart value-axis settings {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart value-axis transaction")]
+    Allocation { amount: usize },
+    /// Full candidate reopening did not reproduce the requested settings.
+    #[error("the edited Keynote chart value-axis settings failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart value-axis patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart value-axis edits")]
     UnsupportedSource,
@@ -136,30 +167,31 @@ pub enum ChartValueAxisError {
     /// The semantic aggregate is unsuitable for native Keynote settings.
     #[error("the Keynote chart value-axis settings are invalid")]
     InvalidSettings,
-    /// The source graph or selected native payload is malformed.
-    #[error("the Keynote chart value-axis source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote chart value-axis settings {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its ceiling.
-        kind: ChartValueAxisLimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart value-axis transaction")]
-    Allocation { amount: usize },
-    /// Full candidate reopening did not reproduce the requested settings.
-    #[error("the edited Keynote chart value-axis settings failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart value-axis patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. }
+            | Self::InvalidSettings { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A checked envelope for heap-owned vectors used by the lower layers.
@@ -177,20 +209,18 @@ struct HeapFootprint {
 }
 
 impl HeapFootprint {
-    fn add_counter(current: &mut usize, amount: usize) -> Result<(), ChartValueAxisError> {
-        *current = current
-            .checked_add(amount)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+    fn add_counter(current: &mut usize, amount: usize) -> Result<(), Error> {
+        *current = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         Ok(())
     }
 
-    fn add_vector<T>(&mut self, capacity: usize, scratch: bool) -> Result<(), ChartValueAxisError> {
+    fn add_vector<T>(&mut self, capacity: usize, scratch: bool) -> Result<(), Error> {
         if capacity == 0 {
             return Ok(());
         }
         let bytes = capacity
             .checked_mul(size_of::<T>())
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Self::add_counter(&mut self.allocations, 1)?;
         if scratch {
             Self::add_counter(&mut self.scratch, bytes)?;
@@ -200,7 +230,7 @@ impl HeapFootprint {
         Ok(())
     }
 
-    fn add_bytes(&mut self, bytes: usize, scratch: bool) -> Result<(), ChartValueAxisError> {
+    fn add_bytes(&mut self, bytes: usize, scratch: bool) -> Result<(), Error> {
         if bytes == 0 {
             return Ok(());
         }
@@ -213,14 +243,14 @@ impl HeapFootprint {
         Ok(())
     }
 
-    fn merge(&mut self, other: Self) -> Result<(), ChartValueAxisError> {
+    fn merge(&mut self, other: Self) -> Result<(), Error> {
         Self::add_counter(&mut self.allocations, other.allocations)?;
         Self::add_counter(&mut self.bytes, other.bytes)?;
         Self::add_counter(&mut self.scratch, other.scratch)
     }
 }
 
-/// Metadata vectors cloned by `Archive::to_bytes_with_limits` and by the
+/// Metadata vectors cloned by `Archive::to_bytes` and by the
 /// compatibility conversion used by the IWA header encoder.
 ///
 /// `use_capacity` is used for a source-owned clone. Conversion targets use
@@ -231,7 +261,7 @@ fn archive_info_heap(
     info: &ArchiveInfo,
     use_capacity: bool,
     scratch: bool,
-) -> Result<HeapFootprint, ChartValueAxisError> {
+) -> Result<HeapFootprint, Error> {
     let mut footprint = HeapFootprint::default();
     let message_capacity = if use_capacity {
         info.message_infos.capacity()
@@ -249,7 +279,7 @@ fn message_info_heap(
     info: &MessageInfo,
     use_capacity: bool,
     scratch: bool,
-) -> Result<HeapFootprint, ChartValueAxisError> {
+) -> Result<HeapFootprint, Error> {
     let mut footprint = HeapFootprint::default();
     let capacity = |length: usize, source_capacity: usize| {
         if use_capacity {
@@ -258,10 +288,15 @@ fn message_info_heap(
             length
         }
     };
-    footprint.add_vector::<u32>(
-        capacity(info.versions.len(), info.versions.capacity()),
-        scratch,
-    )?;
+    // An inline SmallVec clone has no source-owned heap allocation. The
+    // compatibility conversion still allocates its target Vec, so retain the
+    // logical-length charge for scratch conversions.
+    let versions_capacity = if use_capacity && !info.versions.spilled() {
+        0
+    } else {
+        capacity(info.versions.len(), info.versions.capacity())
+    };
+    footprint.add_vector::<u32>(versions_capacity, scratch)?;
     footprint.add_vector::<FieldInfo>(
         capacity(info.field_infos.len(), info.field_infos.capacity()),
         scratch,
@@ -314,7 +349,7 @@ fn field_info_heap(
     info: &FieldInfo,
     use_capacity: bool,
     scratch: bool,
-) -> Result<HeapFootprint, ChartValueAxisError> {
+) -> Result<HeapFootprint, Error> {
     let mut footprint = HeapFootprint::default();
     let capacity = |length: usize, source_capacity: usize| {
         if use_capacity {
@@ -359,13 +394,13 @@ fn field_info_heap(
 /// Return checked metadata work for one archive. This is deliberately based
 /// on every vector length rather than only object/message counts so late
 /// metadata mismatches cannot spend uncharged comparison work.
-fn archive_metadata_work(archive: &Archive) -> Result<usize, ChartValueAxisError> {
+fn archive_metadata_work(archive: &Archive) -> Result<usize, Error> {
     let mut work = archive.objects.len();
     for object in &archive.objects {
         work = work
             .checked_add(object.messages.len())
             .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for info in &object.archive_info.message_infos {
             work = work
                 .checked_add(info.versions.len())
@@ -375,16 +410,16 @@ fn archive_metadata_work(archive: &Archive) -> Result<usize, ChartValueAxisError
                 .and_then(|value| value.checked_add(info.diff_merge_version.len()))
                 .and_then(|value| value.checked_add(info.diff_read_version.len()))
                 .and_then(|value| value.checked_add(info.fields_to_remove.len()))
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if let Some(path) = &info.diff_field_path {
                 work = work
                     .checked_add(path.path.len())
-                    .ok_or(ChartValueAxisError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
             for path in &info.fields_to_remove {
                 work = work
                     .checked_add(path.path.len())
-                    .ok_or(ChartValueAxisError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
             for field in &info.field_infos {
                 work = work
@@ -398,19 +433,19 @@ fn archive_metadata_work(archive: &Archive) -> Result<usize, ChartValueAxisError
                             .as_ref()
                             .map_or(Some(value), |feature| value.checked_add(feature.len()))
                     })
-                    .ok_or(ChartValueAxisError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
         }
     }
     Ok(work)
 }
 
-fn archive_metadata_work_for_object(object: &ArchiveObject) -> Result<usize, ChartValueAxisError> {
+fn archive_metadata_work_for_object(object: &ArchiveObject) -> Result<usize, Error> {
     let mut work = object
         .messages
         .len()
         .checked_add(object.archive_info.message_infos.len())
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for info in &object.archive_info.message_infos {
         work = work
             .checked_add(info.versions.len())
@@ -420,16 +455,16 @@ fn archive_metadata_work_for_object(object: &ArchiveObject) -> Result<usize, Cha
             .and_then(|value| value.checked_add(info.diff_merge_version.len()))
             .and_then(|value| value.checked_add(info.diff_read_version.len()))
             .and_then(|value| value.checked_add(info.fields_to_remove.len()))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if let Some(path) = &info.diff_field_path {
             work = work
                 .checked_add(path.path.len())
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for path in &info.fields_to_remove {
             work = work
                 .checked_add(path.path.len())
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for field in &info.field_infos {
             work = work
@@ -443,7 +478,7 @@ fn archive_metadata_work_for_object(object: &ArchiveObject) -> Result<usize, Cha
                         .as_ref()
                         .map_or(Some(value), |feature| value.checked_add(feature.len()))
                 })
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     Ok(work)
@@ -456,68 +491,29 @@ fn archive_metadata_work_for_object(object: &ArchiveObject) -> Result<usize, Cha
 fn snappy_output_plan(
     input_len: usize,
     limits: SnappyLimits,
-) -> Result<(usize, usize, usize), ChartValueAxisError> {
-    if input_len > limits.max_decompressed_stream() {
-        return Err(ChartValueAxisError::LimitExceeded {
-            kind: ChartValueAxisLimitKind::EntryBytes,
-            observed: usize_to_u64(input_len),
-            maximum: usize_to_u64(limits.max_decompressed_stream()),
-        });
-    }
-    let frame_count = input_len
-        .checked_add(SnappyStream::WRITE_CHUNK_SIZE - 1)
-        .map_or(0, |length| length / SnappyStream::WRITE_CHUNK_SIZE);
-    if frame_count > limits.max_frames() {
-        return Err(ChartValueAxisError::LimitExceeded {
-            kind: ChartValueAxisLimitKind::WireWork,
-            observed: usize_to_u64(frame_count),
-            maximum: usize_to_u64(limits.max_frames()),
-        });
-    }
-
-    let mut remaining = input_len;
-    let mut compressed = 0usize;
-    let mut maximum_frame = 0usize;
-    while remaining != 0 {
-        let chunk = remaining.min(SnappyStream::WRITE_CHUNK_SIZE);
-        if chunk > limits.max_uncompressed_chunk() {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::EntryBytes,
-                observed: usize_to_u64(chunk),
-                maximum: usize_to_u64(limits.max_uncompressed_chunk()),
-            });
-        }
-        let frame = SnappyStream::maximum_compressed_len(chunk).map_err(map_core_error)?;
-        let compressed_chunk = frame
+) -> Result<(usize, usize, usize), Error> {
+    let compressed =
+        SnappyStream::maximum_compressed_len(input_len, limits).map_err(map_core_error)?;
+    let chunk_size = SnappyStream::WRITE_CHUNK_SIZE.min(limits.max_uncompressed_chunk());
+    let frame_count = input_len.div_ceil(chunk_size);
+    // The encoder allocates a raw frame before checking its actual compressed
+    // length. Its temporary allocation is independent of the output ceiling,
+    // so this scratch bound deliberately uses the uncapped frame profile.
+    let maximum_frame = if input_len == 0 {
+        0
+    } else {
+        SnappyStream::maximum_compressed_len(input_len.min(chunk_size), Default::default())
+            .map_err(map_core_error)?
             .checked_sub(SNAPPY_FRAME_HEADER_BYTES)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
-        if compressed_chunk > limits.max_compressed_chunk() {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::EntryBytes,
-                observed: usize_to_u64(compressed_chunk),
-                maximum: usize_to_u64(limits.max_compressed_chunk()),
-            });
-        }
-        compressed = compressed
-            .checked_add(frame)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
-        maximum_frame = maximum_frame.max(compressed_chunk);
-        remaining -= chunk;
-    }
-    if compressed > limits.max_compressed_stream() {
-        return Err(ChartValueAxisError::LimitExceeded {
-            kind: ChartValueAxisLimitKind::EntryBytes,
-            observed: usize_to_u64(compressed),
-            maximum: usize_to_u64(limits.max_compressed_stream()),
-        });
-    }
+            .ok_or(Error::InvalidSource)?
+    };
     Ok((frame_count, compressed, maximum_frame))
 }
 
 /// Estimate allocations made while parsing one already-known archive shape.
 /// The source archive is the topology authority for a candidate reopen; the
 /// candidate is later required to retain these counts by locality checks.
-fn archive_reopen_heap(archive: &Archive) -> Result<HeapFootprint, ChartValueAxisError> {
+fn archive_reopen_heap(archive: &Archive) -> Result<HeapFootprint, Error> {
     let mut footprint = HeapFootprint::default();
     footprint.add_vector::<ArchiveObject>(archive.objects.capacity(), false)?;
     for object in &archive.objects {
@@ -531,8 +527,7 @@ fn archive_reopen_heap(archive: &Archive) -> Result<HeapFootprint, ChartValueAxi
         // metadata and the temporary compatibility vectors are charged.
         footprint.merge(archive_info_heap(&object.archive_info, true, false)?)?;
         footprint.merge(archive_info_heap(&object.archive_info, false, true)?)?;
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| ChartValueAxisError::InvalidSource)?;
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         // Raw and canonical header copies are retained only for a
         // non-canonical source, but charging both is the safe envelope for a
         // candidate whose source bytes are not known until reopen.
@@ -542,14 +537,14 @@ fn archive_reopen_heap(archive: &Archive) -> Result<HeapFootprint, ChartValueAxi
     Ok(footprint)
 }
 
-/// Estimate `Archive::to_bytes_with_limits`' per-object metadata work and the
+/// Estimate `Archive::to_bytes`' per-object metadata work and the
 /// multi-frame Snappy output it feeds. The output-free encoded length check is
 /// intentionally excluded; this helper covers only allocation-bearing work.
 fn archive_to_bytes_heap(
     archive: &Archive,
     encoded: usize,
     snappy_limits: SnappyLimits,
-) -> Result<(HeapFootprint, usize), ChartValueAxisError> {
+) -> Result<(HeapFootprint, usize), Error> {
     let (frames, compressed, maximum_frame) = snappy_output_plan(encoded, snappy_limits)?;
     let mut footprint = HeapFootprint::default();
 
@@ -561,13 +556,21 @@ fn archive_to_bytes_heap(
         footprint.merge(archive_info_heap(&object.archive_info, false, true)?)?;
         footprint.merge(archive_info_heap(&object.archive_info, true, false)?)?;
         footprint.merge(archive_info_heap(&object.archive_info, false, true)?)?;
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| ChartValueAxisError::InvalidSource)?;
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         footprint.add_bytes(header, true)?;
     }
 
     // SnappyStream::compress reserves the complete maximum output once and
-    // `compress_vec` creates one temporary compressed vector per frame.
+    // Conservatively allow the temporary vector for every frame: tight
+    // encoded ceilings can require the fallback even when the result fits.
+    // Direct encoding into the reserved output uses less scratch.
+    // snap 1.1.2 also retains a 16,384-entry u16 encoder table for blocks
+    // larger than its 1,024-entry inline table.
+    if encoded.min(SnappyStream::WRITE_CHUNK_SIZE.min(snappy_limits.max_uncompressed_chunk()))
+        > 1_024
+    {
+        footprint.add_bytes(32 * 1024, true)?;
+    }
     footprint.add_bytes(compressed, false)?;
     for _ in 0..frames {
         footprint.add_bytes(maximum_frame, true)?;
@@ -599,7 +602,7 @@ struct ValueAxisBudget {
 }
 
 impl ValueAxisBudget {
-    fn new(package: &Package) -> Result<Self, ChartValueAxisError> {
+    fn new(package: &Package) -> Result<Self, Error> {
         let limits = package.wire_limits().map_err(map_wire_error)?;
         let configured_input = limits.max_input_bytes();
         let source_bytes = match &package.state.source {
@@ -607,8 +610,8 @@ impl ValueAxisBudget {
             PhysicalSource::Semantic(_) => 0,
         };
         if source_bytes > MAX_VALUE_AXIS_TRANSACTION_BYTES {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::InputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_bytes),
                 maximum: usize_to_u64(MAX_VALUE_AXIS_TRANSACTION_BYTES),
             });
@@ -625,10 +628,10 @@ impl ValueAxisBudget {
         let aggregate = baseline
             .checked_mul(16)
             .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_BYTES))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if source_bytes > aggregate {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::InputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_bytes),
                 maximum: usize_to_u64(aggregate),
             });
@@ -644,7 +647,7 @@ impl ValueAxisBudget {
             .checked_mul(VALUE_AXIS_TRANSACTION_MEMORY_MULTIPLIER)
             .and_then(|value| value.checked_add(VALUE_AXIS_TRANSACTION_FIXED_OVERHEAD))
             .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_MEMORY))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         // One physical byte can participate in several independently
         // bounded allocation-bearing passes: selector graph construction,
         // canonical wire scans, archive cloning, candidate reopening, and
@@ -655,7 +658,7 @@ impl ValueAxisBudget {
             .checked_mul(VALUE_AXIS_TRANSACTION_ALLOCATION_MULTIPLIER)
             .and_then(|value| value.checked_add(VALUE_AXIS_TRANSACTION_FIXED_ALLOCATIONS))
             .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_ITEMS))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(Self {
             limits,
             maximum_input: aggregate,
@@ -664,18 +667,18 @@ impl ValueAxisBudget {
                 .max_fields()
                 .checked_mul(16)
                 .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_ITEMS))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_work: limits
                 .max_rewrite_work()
                 .checked_mul(16)
                 .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_BYTES))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_references: package
                 .semantic_limits()
                 .max_references()
                 .checked_mul(16)
                 .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_ITEMS))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             maximum_allocations,
             maximum_retained: memory,
             maximum_scratch: memory,
@@ -695,13 +698,11 @@ impl ValueAxisBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: ChartValueAxisLimitKind,
-    ) -> Result<(), ChartValueAxisError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(ChartValueAxisError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
@@ -711,82 +712,77 @@ impl ValueAxisBudget {
         Ok(())
     }
 
-    fn input(&mut self, amount: usize) -> Result<(), ChartValueAxisError> {
+    fn input(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.input,
             amount,
             self.maximum_input,
-            ChartValueAxisLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), ChartValueAxisError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.output,
             amount,
             self.maximum_output,
-            ChartValueAxisLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn fields(&mut self, amount: usize) -> Result<(), ChartValueAxisError> {
+    fn fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.fields,
             amount,
             self.maximum_fields,
-            ChartValueAxisLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), ChartValueAxisError> {
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.work,
             amount,
             self.maximum_work,
-            ChartValueAxisLimitKind::WireWork,
+            LimitKind::WireWork,
         )
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), ChartValueAxisError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.references,
             amount,
             self.maximum_references,
-            ChartValueAxisLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn allocations(
-        &mut self,
-        count: usize,
-        retained: usize,
-        scratch: usize,
-    ) -> Result<(), ChartValueAxisError> {
+    fn allocations(&mut self, count: usize, retained: usize, scratch: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.allocations,
             count,
             self.maximum_allocations,
-            ChartValueAxisLimitKind::Entries,
+            LimitKind::Entries,
         )?;
         Self::charge_counter(
             &mut self.retained,
             retained,
             self.maximum_retained,
-            ChartValueAxisLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )?;
         Self::charge_counter(
             &mut self.scratch,
             scratch,
             self.maximum_scratch,
-            ChartValueAxisLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )
     }
 
-    fn charge_heap(&mut self, footprint: HeapFootprint) -> Result<(), ChartValueAxisError> {
+    fn charge_heap(&mut self, footprint: HeapFootprint) -> Result<(), Error> {
         self.allocations(footprint.allocations, footprint.bytes, footprint.scratch)
     }
 
-    fn charge_owned_clone(&mut self, bytes: usize) -> Result<(), ChartValueAxisError> {
+    fn charge_owned_clone(&mut self, bytes: usize) -> Result<(), Error> {
         self.work(bytes)?;
         self.allocations(1, bytes, bytes)
     }
@@ -799,12 +795,8 @@ impl ValueAxisBudget {
     /// rewritten header copies. The exact allocator behavior is deliberately
     /// not promised; this is a checked upper envelope for those logical
     /// buffers and allocation events.
-    fn charge_replace_message_buffers(
-        &mut self,
-        object: &ArchiveObject,
-    ) -> Result<(), ChartValueAxisError> {
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| ChartValueAxisError::InvalidSource)?;
+    fn charge_replace_message_buffers(&mut self, object: &ArchiveObject) -> Result<(), Error> {
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         let mut footprint = HeapFootprint::default();
         // validate, canonical-before, replace-before/after validation, the
         // decoded verification metadata, and canonical-after each invoke the
@@ -816,7 +808,7 @@ impl ValueAxisBudget {
 
         let wire_capacity = header.max(1);
         // One field vector for the outer ArchiveInfo and one for its nested
-        // MessageInfo are grown by parse_wire_fields_with_limits.
+        // MessageInfo are grown by parse_wire_fields.
         footprint.add_vector::<WireField>(wire_capacity, true)?;
         footprint.add_vector::<WireField>(wire_capacity, true)?;
         // rewritten_message, rewritten_header, and canonical/header copies.
@@ -831,61 +823,60 @@ impl ValueAxisBudget {
             header
                 .checked_mul(8)
                 .and_then(|value| value.checked_add(metadata_work))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_heap(footprint)
     }
 
-    fn codec_options(&self, source_len: usize) -> Result<CodecOptions, ChartValueAxisError> {
+    fn codec_options(&self, source_len: usize) -> Result<CodecOptions, Error> {
         let input = self
             .maximum_input
             .checked_sub(self.input)
             .map(|value| value.min(self.limits.max_input_bytes()))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let output = self
             .maximum_output
             .checked_sub(self.output)
             .map(|value| value.min(self.limits.max_output_bytes()))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let fields = self
             .maximum_fields
             .checked_sub(self.fields)
             .map(|value| value.min(self.limits.max_fields()))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let work = self
             .maximum_work
             .checked_sub(self.work)
             .map(|value| value.min(self.limits.max_rewrite_work()))
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if input < source_len || input == 0 {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::InputBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_len.max(1)),
                 maximum: usize_to_u64(input),
             });
         }
-        let depth = u32::try_from(self.limits.max_nesting())
-            .map_err(|_| ChartValueAxisError::InvalidSource)?;
+        let depth = u32::try_from(self.limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
         Ok(CodecOptions::new(input, fields, work, depth)
             .with_max_output_bytes(output)
             .with_max_allocations(
                 self.maximum_allocations
                     .checked_sub(self.allocations)
-                    .ok_or(ChartValueAxisError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .with_max_retained_bytes(
                 self.maximum_retained
                     .checked_sub(self.retained)
-                    .ok_or(ChartValueAxisError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .with_max_scratch_bytes(
                 self.maximum_scratch
                     .checked_sub(self.scratch)
-                    .ok_or(ChartValueAxisError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             ))
     }
 
-    fn charge_codec_report(&mut self, report: CodecReport) -> Result<(), ChartValueAxisError> {
+    fn charge_codec_report(&mut self, report: CodecReport) -> Result<(), Error> {
         self.input(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -897,10 +888,7 @@ impl ValueAxisBudget {
         )
     }
 
-    fn charge_requirements(
-        &mut self,
-        requirements: CodecRequirements,
-    ) -> Result<(), ChartValueAxisError> {
+    fn charge_requirements(&mut self, requirements: CodecRequirements) -> Result<(), Error> {
         self.output(requirements.output_bytes)?;
         self.fields(requirements.fields)?;
         self.work(requirements.work_bytes)?;
@@ -912,13 +900,12 @@ impl ValueAxisBudget {
         )
     }
 
-    fn charge_depth(&mut self, depth: u32) -> Result<(), ChartValueAxisError> {
+    fn charge_depth(&mut self, depth: u32) -> Result<(), Error> {
         self.max_depth = self.max_depth.max(depth);
-        let maximum = u32::try_from(self.limits.max_nesting())
-            .map_err(|_| ChartValueAxisError::InvalidSource)?;
+        let maximum = u32::try_from(self.limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
         if self.max_depth > maximum {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(self.max_depth),
                 maximum: u64::from(maximum),
             });
@@ -932,15 +919,15 @@ impl ValueAxisBudget {
         decompressed: usize,
         archive: &Archive,
         snappy_limits: SnappyLimits,
-    ) -> Result<(), ChartValueAxisError> {
+    ) -> Result<(), Error> {
         // Route the physical member charge through the shared support
-        // contract as well as the local ledger implementation.  This keeps
+        // contract as the local ledger implementation.  This keeps
         // the graph budget's input accounting live for every owner.
         <Self as super::chart_axis_support::AxisSupportBudget>::charge_input(self, compressed)
             .map_err(map_support_error)?;
         if compressed > snappy_limits.max_compressed_stream() {
-            return Err(ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::EntryBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(compressed),
                 maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
             });
@@ -962,7 +949,7 @@ impl ValueAxisBudget {
                 .checked_add(decompressed)
                 .and_then(|value| value.checked_add(metadata_work))
                 .and_then(|value| value.checked_add(frames))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_heap(footprint)
     }
@@ -972,9 +959,9 @@ impl ValueAxisBudget {
         archive: &Archive,
         archive_limits: litchi_iwa_core::Limits,
         snappy_limits: SnappyLimits,
-    ) -> Result<(usize, usize), ChartValueAxisError> {
+    ) -> Result<(usize, usize), Error> {
         let encoded = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let (footprint, frames) = archive_to_bytes_heap(archive, encoded, snappy_limits)?;
         let compressed = snappy_output_plan(encoded, snappy_limits)?.1;
@@ -982,14 +969,14 @@ impl ValueAxisBudget {
         self.output(
             encoded
                 .checked_add(compressed)
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.work(
             encoded
                 .checked_add(compressed)
                 .and_then(|value| value.checked_add(metadata_work))
                 .and_then(|value| value.checked_add(frames))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_heap(footprint)?;
         Ok((encoded, compressed))
@@ -998,14 +985,14 @@ impl ValueAxisBudget {
     fn charge_reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<litchi_iwa_archive::package::ReassemblyExecutionLimits, ChartValueAxisError> {
+    ) -> Result<litchi_iwa_archive::package::ReassemblyExecutionLimits, Error> {
         self.output(requirements.output_bytes())?;
         self.work(
             requirements
                 .output_bytes()
                 .checked_add(requirements.scratch_bytes())
                 .and_then(|value| value.checked_add(requirements.offset_count()))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.allocations(
             requirements.allocations(),
@@ -1021,14 +1008,12 @@ impl ValueAxisBudget {
         catalog_entries: usize,
         deleted_entries: usize,
         replacement_bytes: usize,
-    ) -> Result<(), ChartValueAxisError> {
+    ) -> Result<(), Error> {
         // Preparation parses the complete ZIP and constructs entry-indexed
         // maps/sets before it exposes execution requirements.  Charge a
         // conservative bound for that work up front; the exact execution
         // requirements are charged separately after preparation.
-        let selected = deleted_entries
-            .checked_add(1)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+        let selected = deleted_entries.checked_add(1).ok_or(Error::InvalidSource)?;
         let mut footprint = HeapFootprint::default();
         // ZipArchive keeps physical entries and central-directory order, and
         // Catalog keeps a second entry/index view. The concrete lower-layer
@@ -1051,22 +1036,18 @@ impl ValueAxisBudget {
         let index_bytes = footprint
             .bytes
             .checked_add(footprint.scratch)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.input(source_bytes)?;
         self.work(
             source_bytes
                 .checked_add(index_bytes)
                 .and_then(|value| value.checked_add(replacement_bytes))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_heap(footprint)
     }
 
-    fn charge_candidate_reopen(
-        &mut self,
-        source: &Package,
-        bytes: usize,
-    ) -> Result<(), ChartValueAxisError> {
+    fn charge_candidate_reopen(&mut self, source: &Package, bytes: usize) -> Result<(), Error> {
         let catalog = physical_catalog(source)?;
         let archive_limits = source
             .state
@@ -1087,7 +1068,7 @@ impl ValueAxisBudget {
             let archive = component.archive();
             footprint.merge(archive_reopen_heap(archive)?)?;
             let encoded = archive
-                .encoded_len_with_limits(archive_limits)
+                .encoded_len(archive_limits)
                 .map_err(map_core_error)?;
             let (frames, _, _) = snappy_output_plan(encoded, snappy_limits)?;
             let metadata_work = archive_metadata_work(archive)?;
@@ -1097,10 +1078,10 @@ impl ValueAxisBudget {
                 .checked_add(component.name().len())
                 .and_then(|value| value.checked_add(encoded))
                 .and_then(|value| value.checked_add(metadata_work))
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             objects = objects
                 .checked_add(archive.objects.len())
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             // Component names are owned by the reopened SourceCatalog.
             footprint.add_bytes(component.name().len(), false)?;
         }
@@ -1120,7 +1101,7 @@ impl ValueAxisBudget {
         let footprint_work = footprint
             .bytes
             .checked_add(footprint.scratch)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.input(bytes)?;
         self.output(bytes)?;
         self.scan_pass(source, 0)?;
@@ -1128,7 +1109,7 @@ impl ValueAxisBudget {
             bytes
                 .checked_add(topology_work)
                 .and_then(|value| value.checked_add(footprint_work))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_heap(footprint)
     }
@@ -1136,7 +1117,7 @@ impl ValueAxisBudget {
 
 /// One mutable aggregate of value-axis settings staged against an immutable
 /// package snapshot.
-pub struct ChartValueAxisEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     slide_position: Position,
     chart_position: Position,
@@ -1149,10 +1130,10 @@ pub struct ChartValueAxisEdit<'a> {
     after: ValueAxisSettings,
 }
 
-impl fmt::Debug for ChartValueAxisEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartValueAxisEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("before", &self.before)
@@ -1161,12 +1142,12 @@ impl fmt::Debug for ChartValueAxisEdit<'_> {
     }
 }
 
-impl<'a> ChartValueAxisEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide, 'chart>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<Self, ChartValueAxisError> {
+    ) -> Result<Self, Error> {
         let mut budget = ValueAxisBudget::new(source)?;
         let selection = select_value_axis(
             source,
@@ -1203,34 +1184,34 @@ impl<'a> ChartValueAxisEdit<'a> {
     }
 
     /// Stage all value-axis settings atomically.
-    pub fn set(mut self, settings: ValueAxisSettings) -> Result<Self, ChartValueAxisError> {
-        self.after = validate_settings(settings)?;
+    pub fn set(mut self, settings: ValueAxisSettings) -> Result<Self, Error> {
+        self.after = validate_settings_refused(settings)?;
         Ok(self)
     }
 
     /// Stage replacement bounds while retaining steps and scale.
-    pub fn set_bounds(mut self, bounds: Bounds) -> Result<Self, ChartValueAxisError> {
+    pub fn set_bounds(mut self, bounds: Bounds) -> Result<Self, Error> {
         self.after = self.after.with_bounds(bounds);
-        self.after = validate_settings(self.after)?;
+        self.after = validate_settings_refused(self.after)?;
         Ok(self)
     }
 
     /// Stage replacement major/minor steps while retaining bounds and scale.
-    pub fn set_steps(mut self, steps: Steps) -> Result<Self, ChartValueAxisError> {
+    pub fn set_steps(mut self, steps: Steps) -> Result<Self, Error> {
         self.after = self.after.with_steps(steps);
-        self.after = validate_settings(self.after)?;
+        self.after = validate_settings_refused(self.after)?;
         Ok(self)
     }
 
     /// Stage replacement scale while retaining bounds and steps.
-    pub fn set_scale(mut self, scale: Scale) -> Result<Self, ChartValueAxisError> {
+    pub fn set_scale(mut self, scale: Scale) -> Result<Self, Error> {
         self.after = self.after.with_scale(scale);
-        self.after = validate_settings(self.after)?;
+        self.after = validate_settings_refused(self.after)?;
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<ChartValueAxisCommit, ChartValueAxisError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let mut budget = ValueAxisBudget::new(self.source)?;
@@ -1242,16 +1223,17 @@ impl<'a> ChartValueAxisEdit<'a> {
             &mut budget,
         )?;
         let current = read_value_axis_settings(self.source, &source_selection, &mut budget)?;
-        if !same_selection(&source_selection, &self) || !settings_equal_exact(current, self.before)
+        if !same_selection(&source_selection, &self)
+            || !value_axis::equal_exact(current, self.before)
         {
-            return Err(ChartValueAxisError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        if settings_equal_exact(self.before, self.after) {
+        if value_axis::equal_exact(self.before, self.after) {
             budget.scan_pass(self.source, 0)?;
             self.source.validate().map_err(map_read_error)?;
-            return Ok(ChartValueAxisCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: ChartValueAxisPatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     slide_position: self.slide_position,
                     chart_position: self.chart_position,
@@ -1267,11 +1249,11 @@ impl<'a> ChartValueAxisEdit<'a> {
                     deleted_previews: 0,
                     target_requires_invalidated_previews: false,
                 },
-                diagnostics: ChartValueAxisDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartValueAxisError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         budget.scan_pass(self.source, 0)?;
         self.source.validate().map_err(map_read_error)?;
@@ -1291,9 +1273,9 @@ impl<'a> ChartValueAxisEdit<'a> {
         let candidate_settings =
             read_value_axis_settings(&package, &candidate_selection, &mut budget)?;
         if !same_selection(&candidate_selection, &self)
-            || !settings_equal_exact(candidate_settings, self.after)
+            || !value_axis::equal_exact(candidate_settings, self.after)
         {
-            return Err(ChartValueAxisError::Verification);
+            return Err(Error::Verification);
         }
         super::chart_axis_support::verify_package_locality_with_expected_message(
             self.source,
@@ -1304,9 +1286,9 @@ impl<'a> ChartValueAxisEdit<'a> {
             &mut budget,
         )
         .map_err(map_support_error)?;
-        Ok(ChartValueAxisCommit {
+        Ok(Commit {
             package,
-            patch: ChartValueAxisPatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
                 slide_position: self.slide_position,
                 chart_position: self.chart_position,
@@ -1322,14 +1304,14 @@ impl<'a> ChartValueAxisEdit<'a> {
                 deleted_previews,
                 target_requires_invalidated_previews: true,
             },
-            diagnostics: ChartValueAxisDiagnostics::published(deleted_previews),
+            diagnostics: Diagnostics::published(deleted_previews),
         })
     }
 }
 
 /// An exact-source-checked reversible aggregate value-axis patch.
 #[derive(Clone, PartialEq)]
-pub struct ChartValueAxisPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     chart_position: Position,
@@ -1349,10 +1331,10 @@ pub struct ChartValueAxisPatch {
     target_requires_invalidated_previews: bool,
 }
 
-impl fmt::Debug for ChartValueAxisPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartValueAxisPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("before", &self.before)
@@ -1361,7 +1343,7 @@ impl fmt::Debug for ChartValueAxisPatch {
     }
 }
 
-impl ChartValueAxisPatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -1401,7 +1383,7 @@ impl ChartValueAxisPatch {
     /// Return whether this patch preserves the exact source bytes.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        settings_equal_exact(self.before, self.after) && self.artifacts.is_byte_noop()
+        value_axis::equal_exact(self.before, self.after) && self.artifacts.is_byte_noop()
     }
 
     /// Return an exact reversible patch from target back to source.
@@ -1429,14 +1411,14 @@ impl ChartValueAxisPatch {
 
 /// Compact evidence describing one value-axis settings commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartValueAxisDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl ChartValueAxisDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -1483,13 +1465,13 @@ impl ChartValueAxisDiagnostics {
 /// Fully verified result of one immutable value-axis settings transaction.
 #[must_use = "a Keynote chart value-axis commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct ChartValueAxisCommit {
+pub struct Commit {
     package: Package,
-    patch: ChartValueAxisPatch,
-    diagnostics: ChartValueAxisDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl ChartValueAxisCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -1502,15 +1484,21 @@ impl ChartValueAxisCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &ChartValueAxisPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &ChartValueAxisDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -1521,7 +1509,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ValueAxisSettings, ChartValueAxisError> {
+    ) -> Result<ValueAxisSettings, Error> {
         let mut budget = ValueAxisBudget::new(self)?;
         let selection = select_value_axis(
             self,
@@ -1538,19 +1526,16 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ChartValueAxisEdit<'_>, ChartValueAxisError> {
-        ChartValueAxisEdit::new(self, slide_selector, chart_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, chart_selector)
     }
 
     /// Apply an exact-source-checked aggregate value-axis patch.
-    pub fn apply_slide_chart_value_axis_settings(
-        &self,
-        patch: &ChartValueAxisPatch,
-    ) -> Result<ChartValueAxisCommit, ChartValueAxisError> {
+    pub fn apply_slide_chart_value_axis_settings(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(ChartValueAxisError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = ValueAxisBudget::new(self)?;
         let selection = select_value_axis(
@@ -1562,35 +1547,35 @@ impl Package {
         )?;
         let current = read_value_axis_settings(self, &selection, &mut budget)?;
         if !selection_matches_patch(&selection, patch)
-            || !settings_equal_exact(current, patch.before)
+            || !value_axis::equal_exact(current, patch.before)
         {
-            return Err(ChartValueAxisError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             budget.scan_pass(self, 0)?;
             self.validate().map_err(map_read_error)?;
-            return Ok(ChartValueAxisCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: ChartValueAxisDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         let expected_source_message = patch
             .before_message
             .as_deref()
-            .ok_or(ChartValueAxisError::PatchConflict)?;
+            .ok_or(Error::PatchConflict)?;
         budget.work(expected_source_message.len())?;
         let source_message = self
             .object(patch.axis_identifier)
             .and_then(|object| object.messages.get(patch.axis_message_index))
             .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
-            .ok_or(ChartValueAxisError::PatchConflict)?;
+            .ok_or(Error::PatchConflict)?;
         if source_message.data.as_slice() != expected_source_message {
-            return Err(ChartValueAxisError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         budget.scan_pass(self, 0)?;
         if !catalog.source_is_exact() {
-            return Err(ChartValueAxisError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         budget.charge_candidate_reopen(self, patch.artifacts.target().len())?;
         let candidate =
@@ -1607,14 +1592,12 @@ impl Package {
         )?;
         let candidate_settings =
             read_value_axis_settings(&candidate, &candidate_selection, &mut budget)?;
-        let expected_selected_message = patch
-            .after_message
-            .as_deref()
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+        let expected_selected_message =
+            patch.after_message.as_deref().ok_or(Error::InvalidSource)?;
         if !selection_matches_patch(&candidate_selection, patch)
-            || !settings_equal_exact(candidate_settings, patch.after)
+            || !value_axis::equal_exact(candidate_settings, patch.after)
         {
-            return Err(ChartValueAxisError::Verification);
+            return Err(Error::Verification);
         }
         super::chart_axis_support::verify_package_locality_with_expected_message(
             self,
@@ -1625,10 +1608,10 @@ impl Package {
             &mut budget,
         )
         .map_err(map_support_error)?;
-        Ok(ChartValueAxisCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: ChartValueAxisDiagnostics::published(patch.deleted_previews),
+            diagnostics: Diagnostics::published(patch.deleted_previews),
         })
     }
 }
@@ -1639,7 +1622,7 @@ fn select_value_axis(
     chart_selector: ChartSelector<'_>,
     mutation_guards: bool,
     budget: &mut ValueAxisBudget,
-) -> Result<super::chart_axis_support::AxisSelection, ChartValueAxisError> {
+) -> Result<super::chart_axis_support::AxisSelection, Error> {
     super::chart_axis_support::select_axis(
         package,
         slide_selector,
@@ -1655,15 +1638,15 @@ fn read_value_axis_settings(
     package: &Package,
     selection: &super::chart_axis_support::AxisSelection,
     budget: &mut ValueAxisBudget,
-) -> Result<ValueAxisSettings, ChartValueAxisError> {
+) -> Result<ValueAxisSettings, Error> {
     let object = package
         .object(selection.axis_identifier)
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = object
         .messages
         .get(selection.axis_message_index)
         .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let fields = super::chart_axis_support::accounted_wire_fields(&message.data, limits, budget)
         .map_err(map_support_error)?;
@@ -1681,7 +1664,7 @@ fn read_value_axis_settings(
         != 1
         || field.wire_type() != 2
     {
-        return Err(ChartValueAxisError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing(&message.data)
@@ -1691,13 +1674,10 @@ fn read_value_axis_settings(
     let (snapshot, report) =
         decode_axis_value_settings_with_report(extension, options).map_err(map_codec_error)?;
     budget.charge_codec_report(report)?;
-    common_settings(snapshot)
+    value_axis::from_snapshot(snapshot).map_err(|_| Error::InvalidSource)
 }
 
-fn same_selection(
-    selection: &super::chart_axis_support::AxisSelection,
-    edit: &ChartValueAxisEdit<'_>,
-) -> bool {
+fn same_selection(selection: &super::chart_axis_support::AxisSelection, edit: &Edit<'_>) -> bool {
     selection.slide_position == edit.slide_position
         && selection.chart_position == edit.chart_position
         && selection.chart_identifier == edit.chart_identifier
@@ -1709,7 +1689,7 @@ fn same_selection(
 
 fn selection_matches_patch(
     selection: &super::chart_axis_support::AxisSelection,
-    patch: &ChartValueAxisPatch,
+    patch: &Patch,
 ) -> bool {
     selection.slide_position == patch.slide_position
         && selection.chart_position == patch.chart_position
@@ -1720,209 +1700,92 @@ fn selection_matches_patch(
         && selection.slide_identifier == patch.slide_identifier
 }
 
-fn common_settings(snapshot: CodecSnapshot<'_>) -> Result<ValueAxisSettings, ChartValueAxisError> {
-    let bounds = snapshot.bounds();
-    let minimum = bounds
-        .minimum()
-        .map(|bound| Bound::new(bound.value()))
-        .transpose()
-        .map_err(|_| ChartValueAxisError::InvalidSource)?;
-    let maximum = bounds
-        .maximum()
-        .map(|bound| Bound::new(bound.value()))
-        .transpose()
-        .map_err(|_| ChartValueAxisError::InvalidSource)?;
-    let bounds = Bounds::new(minimum, maximum).map_err(|_| ChartValueAxisError::InvalidSource)?;
-    let steps = snapshot.steps();
-    let major = steps
-        .major()
-        .map(MajorStepCount::new)
-        .transpose()
-        .map_err(|_| ChartValueAxisError::InvalidSource)?;
-    let minor = steps
-        .minor()
-        .map(MinorStepCount::new)
-        .transpose()
-        .map_err(|_| ChartValueAxisError::InvalidSource)?;
-    let settings = ValueAxisSettings::new(
-        bounds,
-        Steps::new(major, minor),
-        Scale::from_native(snapshot.scale().native_value()),
-    );
-    // A malformed source must not be silently promoted to a publishable
-    // value-axis state.  In particular, native logarithmic axes cannot have
-    // an explicit non-positive endpoint.
-    validate_settings(settings).map_err(|_| ChartValueAxisError::InvalidSource)
+fn validate_settings_refused(settings: ValueAxisSettings) -> Result<ValueAxisSettings, Error> {
+    value_axis::validate(settings).map_err(|_| Error::Refused(Refusal::InvalidSettings))
 }
 
-fn validate_settings(
-    settings: ValueAxisSettings,
-) -> Result<ValueAxisSettings, ChartValueAxisError> {
-    let minimum = settings.bounds().minimum();
-    let maximum = settings.bounds().maximum();
-    if minimum.is_some_and(|bound| !bound.value().is_finite())
-        || maximum.is_some_and(|bound| !bound.value().is_finite())
-        || matches!((minimum, maximum), (Some(low), Some(high)) if low.value() > high.value())
-    {
-        return Err(ChartValueAxisError::InvalidSettings);
-    }
-    if settings.scale() == Scale::Logarithmic
-        && (minimum.is_some_and(|bound| bound.value() <= 0.0)
-            || maximum.is_some_and(|bound| bound.value() <= 0.0))
-    {
-        return Err(ChartValueAxisError::InvalidSettings);
-    }
-    // Values 1 and 2 are canonicalized so a caller cannot stage an
-    // Unsupported variant which the native reader necessarily maps back to a
-    // known scale during candidate verification.
-    Ok(settings.with_scale(Scale::from_native(settings.scale().native_value())))
-}
-
-fn settings_equal_exact(left: ValueAxisSettings, right: ValueAxisSettings) -> bool {
-    let left_bounds = left.bounds();
-    let right_bounds = right.bounds();
-    let bounds_equal = match (
-        left_bounds.minimum(),
-        right_bounds.minimum(),
-        left_bounds.maximum(),
-        right_bounds.maximum(),
-    ) {
-        (Some(left), Some(right), Some(left_max), Some(right_max)) => {
-            left.value() == right.value() && left_max.value() == right_max.value()
-        },
-        (Some(left), Some(right), None, None) => left.value() == right.value(),
-        (None, None, Some(left), Some(right)) => left.value() == right.value(),
-        (None, None, None, None) => true,
-        _ => false,
-    };
-    bounds_equal
-        && left.steps() == right.steps()
-        && Scale::from_native(left.scale().native_value())
-            == Scale::from_native(right.scale().native_value())
-}
-
-fn codec_settings(
-    settings: ValueAxisSettings,
-) -> Result<
-    litchi_iwa_protos::keynote_chart_axis_value_settings_codec::AxisValueSettings,
-    ChartValueAxisError,
-> {
-    let bounds = settings.bounds();
-    let minimum = bounds
-        .minimum()
-        .map(|bound| CodecBound::new(bound.value()))
-        .transpose()
-        .map_err(|_| ChartValueAxisError::InvalidSettings)?;
-    let maximum = bounds
-        .maximum()
-        .map(|bound| CodecBound::new(bound.value()))
-        .transpose()
-        .map_err(|_| ChartValueAxisError::InvalidSettings)?;
-    let bounds =
-        CodecBounds::new(minimum, maximum).map_err(|_| ChartValueAxisError::InvalidSettings)?;
-    let steps = settings.steps();
-    let steps = CodecSteps::new(
-        steps.major().map(|value| value.value()),
-        steps.minor().map(|value| value.value()),
-    )
-    .map_err(|_| ChartValueAxisError::InvalidSettings)?;
-    let scale = CodecScale::from_native(settings.scale().native_value());
-    Ok(
-        litchi_iwa_protos::keynote_chart_axis_value_settings_codec::AxisValueSettings::new(
-            bounds, steps, scale,
-        ),
-    )
-}
-
-fn codec_write(
-    snapshot: CodecSnapshot<'_>,
-    settings: ValueAxisSettings,
-) -> Result<CodecWrite, ChartValueAxisError> {
-    let native = codec_settings(settings)?;
-    let write = CodecWrite::preserve()
-        .with_bounds(native.bounds())
-        .with_steps(native.steps());
-    Ok(if snapshot.scale_present() {
-        write.with_explicit_scale(native.scale())
-    } else {
-        write.with_scale(native.scale())
-    })
-}
-
-fn map_support_error(error: super::chart_axis_support::AxisSupportError) -> ChartValueAxisError {
+fn map_support_error(error: super::chart_axis_support::AxisSupportError) -> Error {
     use super::chart_axis_support::{
         AxisSupportError, AxisSupportLimitKind, AxisSupportSelectorError,
     };
     match error {
         AxisSupportError::Selector(selector) => match selector {
-            AxisSupportSelectorError::UnsupportedSource => ChartValueAxisError::UnsupportedSource,
-            AxisSupportSelectorError::AmbiguousSelector => ChartValueAxisError::AmbiguousSelector,
-            AxisSupportSelectorError::EmptySlideName => ChartValueAxisError::EmptySlideName,
-            AxisSupportSelectorError::SlideNameNotFound => ChartValueAxisError::SlideNameNotFound,
+            AxisSupportSelectorError::UnsupportedSource => {
+                Error::Refused(Refusal::UnsupportedSource)
+            },
+            AxisSupportSelectorError::AmbiguousSelector => {
+                Error::Refused(Refusal::AmbiguousSelector)
+            },
+            AxisSupportSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+            AxisSupportSelectorError::SlideNameNotFound => {
+                Error::Refused(Refusal::SlideNameNotFound)
+            },
             AxisSupportSelectorError::SlidePositionNotFound { position } => {
-                ChartValueAxisError::SlidePositionNotFound { position }
+                Error::Refused(Refusal::SlidePositionNotFound { position })
             },
-            AxisSupportSelectorError::ChartNameNotFound => ChartValueAxisError::ChartNameNotFound,
+            AxisSupportSelectorError::ChartNameNotFound => {
+                Error::Refused(Refusal::ChartNameNotFound)
+            },
             AxisSupportSelectorError::ChartPositionNotFound { position } => {
-                ChartValueAxisError::ChartPositionNotFound { position }
+                Error::Refused(Refusal::ChartPositionNotFound { position })
             },
-            AxisSupportSelectorError::EmptyChartName => ChartValueAxisError::EmptyChartName,
+            AxisSupportSelectorError::EmptyChartName => Error::Refused(Refusal::EmptyChartName),
         },
-        AxisSupportError::InvalidSource => ChartValueAxisError::InvalidSource,
+        AxisSupportError::InvalidSource => Error::InvalidSource,
         AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => ChartValueAxisError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                AxisSupportLimitKind::InputBytes => ChartValueAxisLimitKind::InputBytes,
-                AxisSupportLimitKind::OutputBytes => ChartValueAxisLimitKind::OutputBytes,
-                AxisSupportLimitKind::WireBytes => ChartValueAxisLimitKind::WireBytes,
-                AxisSupportLimitKind::Entries => ChartValueAxisLimitKind::Entries,
-                AxisSupportLimitKind::EntryBytes => ChartValueAxisLimitKind::EntryBytes,
-                AxisSupportLimitKind::TotalBytes => ChartValueAxisLimitKind::TotalBytes,
-                AxisSupportLimitKind::Slides => ChartValueAxisLimitKind::Slides,
-                AxisSupportLimitKind::References => ChartValueAxisLimitKind::References,
-                AxisSupportLimitKind::WireFields => ChartValueAxisLimitKind::WireFields,
-                AxisSupportLimitKind::WireNesting => ChartValueAxisLimitKind::WireNesting,
-                AxisSupportLimitKind::WireWork => ChartValueAxisLimitKind::WireWork,
+                AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
+                AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
+                AxisSupportLimitKind::WireBytes => LimitKind::WireBytes,
+                AxisSupportLimitKind::Entries => LimitKind::Entries,
+                AxisSupportLimitKind::EntryBytes => LimitKind::EntryBytes,
+                AxisSupportLimitKind::TotalBytes => LimitKind::TotalBytes,
+                AxisSupportLimitKind::Slides => LimitKind::Slides,
+                AxisSupportLimitKind::References => LimitKind::References,
+                AxisSupportLimitKind::WireFields => LimitKind::WireFields,
+                AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
+                AxisSupportLimitKind::WireWork => LimitKind::WireWork,
                 AxisSupportLimitKind::TextStorages
                 | AxisSupportLimitKind::TextFragments
                 | AxisSupportLimitKind::TextBytes
-                | AxisSupportLimitKind::TitleBytes => ChartValueAxisLimitKind::WireBytes,
+                | AxisSupportLimitKind::TitleBytes => LimitKind::WireBytes,
             },
             observed,
             maximum,
         },
-        AxisSupportError::Allocation { amount } => ChartValueAxisError::Allocation { amount },
+        AxisSupportError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
-fn map_budget_error(error: ChartValueAxisError) -> super::chart_axis_support::AxisSupportError {
+fn map_budget_error(error: Error) -> super::chart_axis_support::AxisSupportError {
     use super::chart_axis_support::{AxisSupportError, AxisSupportLimitKind};
     match error {
-        ChartValueAxisError::LimitExceeded {
+        Error::Limit {
             kind,
             observed,
             maximum,
         } => AxisSupportError::LimitExceeded {
             kind: match kind {
-                ChartValueAxisLimitKind::InputBytes => AxisSupportLimitKind::InputBytes,
-                ChartValueAxisLimitKind::OutputBytes => AxisSupportLimitKind::OutputBytes,
-                ChartValueAxisLimitKind::WireBytes => AxisSupportLimitKind::WireBytes,
-                ChartValueAxisLimitKind::Entries => AxisSupportLimitKind::Entries,
-                ChartValueAxisLimitKind::EntryBytes => AxisSupportLimitKind::EntryBytes,
-                ChartValueAxisLimitKind::TotalBytes => AxisSupportLimitKind::TotalBytes,
-                ChartValueAxisLimitKind::Slides => AxisSupportLimitKind::Slides,
-                ChartValueAxisLimitKind::References => AxisSupportLimitKind::References,
-                ChartValueAxisLimitKind::WireFields => AxisSupportLimitKind::WireFields,
-                ChartValueAxisLimitKind::WireNesting => AxisSupportLimitKind::WireNesting,
-                ChartValueAxisLimitKind::WireWork => AxisSupportLimitKind::WireWork,
+                LimitKind::InputBytes => AxisSupportLimitKind::InputBytes,
+                LimitKind::OutputBytes => AxisSupportLimitKind::OutputBytes,
+                LimitKind::WireBytes => AxisSupportLimitKind::WireBytes,
+                LimitKind::Entries => AxisSupportLimitKind::Entries,
+                LimitKind::EntryBytes => AxisSupportLimitKind::EntryBytes,
+                LimitKind::TotalBytes => AxisSupportLimitKind::TotalBytes,
+                LimitKind::Slides => AxisSupportLimitKind::Slides,
+                LimitKind::References => AxisSupportLimitKind::References,
+                LimitKind::WireFields => AxisSupportLimitKind::WireFields,
+                LimitKind::WireNesting => AxisSupportLimitKind::WireNesting,
+                LimitKind::WireWork => AxisSupportLimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        ChartValueAxisError::Allocation { amount } => AxisSupportError::Allocation { amount },
+        Error::Allocation { amount } => AxisSupportError::Allocation { amount },
         _ => AxisSupportError::InvalidSource,
     }
 }
@@ -1931,17 +1794,17 @@ fn copy_selected_message(
     package: &Package,
     selection: &super::chart_axis_support::AxisSelection,
     budget: &mut ValueAxisBudget,
-) -> Result<Arc<[u8]>, ChartValueAxisError> {
+) -> Result<Arc<[u8]>, Error> {
     let message = package
         .object(selection.axis_identifier)
         .and_then(|object| object.messages.get(selection.axis_message_index))
         .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_owned_clone(message.data.len())?;
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(message.data.len())
-        .map_err(|_| ChartValueAxisError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: message.data.len(),
         })?;
     bytes.extend_from_slice(&message.data);
@@ -1953,15 +1816,15 @@ fn rewrite_value_axis_settings(
     selection: &super::chart_axis_support::AxisSelection,
     after: ValueAxisSettings,
     budget: &mut ValueAxisBudget,
-) -> Result<(Package, usize, Arc<[u8]>), ChartValueAxisError> {
+) -> Result<(Package, usize, Arc<[u8]>), Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.axis_component_name)
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(ChartValueAxisError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = source
         .state
@@ -1981,10 +1844,10 @@ fn rewrite_value_axis_settings(
         .components()
         .iter()
         .find(|component| component.name() == selection.axis_component_name)
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let decompressed_bound = component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.charge_native_decompress_parse(
         entry.data().len(),
@@ -1992,10 +1855,8 @@ fn rewrite_value_axis_settings(
         component.archive(),
         snappy_limits,
     )?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     super::chart_axis_support::validate_canonical_object_length_prefixes_with_budget(
         stream.as_bytes(),
         &archive,
@@ -2005,19 +1866,19 @@ fn rewrite_value_axis_settings(
     let message_data = {
         let object = archive
             .object(selection.axis_identifier)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let message = object
             .messages
             .get(selection.axis_message_index)
             .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
-            .ok_or(ChartValueAxisError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         budget.charge_owned_clone(message.data.len())?;
         let mut cloned = Vec::new();
-        cloned.try_reserve_exact(message.data.len()).map_err(|_| {
-            ChartValueAxisError::Allocation {
+        cloned
+            .try_reserve_exact(message.data.len())
+            .map_err(|_| Error::Allocation {
                 amount: message.data.len(),
-            }
-        })?;
+            })?;
         cloned.extend_from_slice(&message.data);
         cloned
     };
@@ -2034,12 +1895,12 @@ fn rewrite_value_axis_settings(
         .count()
         > 1
     {
-        return Err(ChartValueAxisError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(field) = extension_field
         && field.wire_type() != 2
     {
-        return Err(ChartValueAxisError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (extension, snapshot) = if let Some(field) = extension_field {
         field
@@ -2058,7 +1919,8 @@ fn rewrite_value_axis_settings(
         budget.charge_codec_report(report)?;
         (Vec::new(), snapshot)
     };
-    let write = codec_write(snapshot, after)?;
+    let write = value_axis::codec_write(snapshot, after)
+        .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
     let options = budget.codec_options(extension.len())?;
     let prepared =
         prepare_axis_value_settings_rewrite(&extension, write, options).map_err(map_codec_error)?;
@@ -2076,12 +1938,12 @@ fn rewrite_value_axis_settings(
     let expected_message: Arc<[u8]> = patched.clone().into();
     let object = archive
         .object(selection.axis_identifier)
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge_replace_message_buffers(object)?;
     archive
         .object_mut(selection.axis_identifier)
-        .ok_or(ChartValueAxisError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
             selection.axis_message_index,
             RawMessage {
                 type_: CHART_AXIS_MESSAGE_TYPE,
@@ -2092,12 +1954,10 @@ fn rewrite_value_axis_settings(
         .map_err(map_core_error)?;
     let (_encoded_bound, _compressed_bound) =
         budget.charge_archive_snappy_plan(&archive, archive_limits, snappy_limits)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_| ChartValueAxisError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let edit = EntryEdit::new(
         selection.axis_component_name.as_str(),
         compressed.as_slice(),
@@ -2131,9 +1991,8 @@ fn rewrite_chart_axis_extension(
     replacement: &[u8],
     limits: WireLimits,
     budget: &mut ValueAxisBudget,
-) -> Result<Vec<u8>, ChartValueAxisError> {
-    let replacement_length =
-        u64::try_from(replacement.len()).map_err(|_| ChartValueAxisError::InvalidSource)?;
+) -> Result<Vec<u8>, Error> {
+    let replacement_length = u64::try_from(replacement.len()).map_err(|_| Error::InvalidSource)?;
     let key_length = extension_field.map_or_else(
         || encoded_len((u64::from(GENERATED_CHART_AXIS_EXTENSION_FIELD) << 3) | 2),
         |field| field.key_end() - field.start(),
@@ -2141,7 +2000,7 @@ fn rewrite_chart_axis_extension(
     let replacement_field_length = key_length
         .checked_add(encoded_len(replacement_length))
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let output_length = extension_field
         .map_or_else(
             || data.len().checked_add(replacement_field_length),
@@ -2151,10 +2010,10 @@ fn rewrite_chart_axis_extension(
                     .and_then(|length| length.checked_add(replacement_field_length))
             },
         )
-        .ok_or(ChartValueAxisError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() || output_length > MAX_VALUE_AXIS_BYTES {
-        return Err(ChartValueAxisError::LimitExceeded {
-            kind: ChartValueAxisLimitKind::OutputBytes,
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes().min(MAX_VALUE_AXIS_BYTES)),
         });
@@ -2165,7 +2024,7 @@ fn rewrite_chart_axis_extension(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_length)
-        .map_err(|_| ChartValueAxisError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: output_length,
         })?;
     match extension_field {
@@ -2190,69 +2049,69 @@ fn rewrite_chart_axis_extension(
     Ok(output)
 }
 
-fn map_codec_error(error: CodecError) -> ChartValueAxisError {
+fn map_codec_error(error: CodecError) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            CodecLimit::Bytes { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::WireBytes,
+            CodecLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Fields { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::WireFields,
+            CodecLimit::Fields { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Work { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::WireWork,
+            CodecLimit::Work { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Output { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::OutputBytes,
+            CodecLimit::Output { observed, maximum } => Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Nesting { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::WireNesting,
+            CodecLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             },
-            CodecLimit::Allocations { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::Entries,
+            CodecLimit::Allocations { observed, maximum } => Error::Limit {
+                kind: LimitKind::Entries,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
             CodecLimit::Retained { observed, maximum }
-            | CodecLimit::Scratch { observed, maximum } => ChartValueAxisError::LimitExceeded {
-                kind: ChartValueAxisLimitKind::TotalBytes,
+            | CodecLimit::Scratch { observed, maximum } => Error::Limit {
+                kind: LimitKind::TotalBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            _ => ChartValueAxisError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartValueAxisError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    ChartValueAxisError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_read_error(error: ReadError) -> ChartValueAxisError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => ChartValueAxisError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                SemanticLimitKind::Objects => ChartValueAxisLimitKind::Entries,
-                SemanticLimitKind::Slides => ChartValueAxisLimitKind::Slides,
-                SemanticLimitKind::References => ChartValueAxisLimitKind::References,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
                 SemanticLimitKind::TextStorages
                 | SemanticLimitKind::TextFragments
-                | SemanticLimitKind::TextBytes => ChartValueAxisLimitKind::Entries,
+                | SemanticLimitKind::TextBytes => LimitKind::Entries,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -2262,66 +2121,64 @@ fn map_read_error(error: ReadError) -> ChartValueAxisError {
             observed,
             maximum,
             ..
-        } => ChartValueAxisError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => ChartValueAxisLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => ChartValueAxisLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => ChartValueAxisLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => ChartValueAxisLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => ChartValueAxisError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
         | ReadError::Metadata(_)
-        | ReadError::Io(_) => ChartValueAxisError::InvalidSource,
+        | ReadError::Io(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> ChartValueAxisError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartValueAxisError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => ChartValueAxisLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => ChartValueAxisLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => ChartValueAxisLimitKind::Entries,
-                litchi_iwa_archive::LimitKind::EntryBytes => ChartValueAxisLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => ChartValueAxisLimitKind::TotalBytes,
-                _ => ChartValueAxisLimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            ChartValueAxisError::Allocation { amount }
-        },
-        _ => ChartValueAxisError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> ChartValueAxisError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartValueAxisError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::ArchiveBytes => ChartValueAxisLimitKind::TotalBytes,
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => ChartValueAxisLimitKind::Entries,
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
                 litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -2329,51 +2186,44 @@ fn map_core_error(error: litchi_iwa_core::Error) -> ChartValueAxisError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    ChartValueAxisLimitKind::WireBytes
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => ChartValueAxisLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => ChartValueAxisLimitKind::WireNesting,
-                litchi_iwa_core::LimitKind::SnappyFrames => ChartValueAxisLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            ChartValueAxisError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => ChartValueAxisError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> ChartValueAxisError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => ChartValueAxisError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => ChartValueAxisLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => ChartValueAxisLimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    ChartValueAxisLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => ChartValueAxisLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => ChartValueAxisLimitKind::WireWork,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            ChartValueAxisError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => ChartValueAxisError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -2381,7 +2231,7 @@ fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartValueAxisError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     super::chart_axis_support::physical_catalog(package).map_err(map_support_error)
 }
 
@@ -2415,7 +2265,7 @@ impl super::chart_axis_support::AxisSupportBudget for ValueAxisBudget {
             .ok_or(AxisSupportError::InvalidSource)?;
         self.input(payload).map_err(map_budget_error)?;
         self.work(payload).map_err(map_budget_error)?;
-        // parse_wire_fields_with_limits grows this vector one element at a
+        // parse_wire_fields grows this vector one element at a
         // time. Charge a conservative event per payload-sized capacity while
         // retaining the exposed WireField byte shape.
         self.allocations(payload.max(1), bytes, bytes)
@@ -2527,11 +2377,7 @@ impl super::chart_axis_support::AxisSupportBudget for ValueAxisBudget {
 }
 
 impl ValueAxisBudget {
-    fn scan_pass(
-        &mut self,
-        package: &Package,
-        retained_vectors: usize,
-    ) -> Result<(), ChartValueAxisError> {
+    fn scan_pass(&mut self, package: &Package, retained_vectors: usize) -> Result<(), Error> {
         let mut objects = 0usize;
         let mut messages = 0usize;
         let mut references = 0usize;
@@ -2539,30 +2385,26 @@ impl ValueAxisBudget {
         for component in package.state.source.components().iter() {
             self.work(component.name().len())?;
             for object in &component.archive().objects {
-                objects = objects
-                    .checked_add(1)
-                    .ok_or(ChartValueAxisError::InvalidSource)?;
+                objects = objects.checked_add(1).ok_or(Error::InvalidSource)?;
                 for (index, message) in object.messages.iter().enumerate() {
-                    messages = messages
-                        .checked_add(1)
-                        .ok_or(ChartValueAxisError::InvalidSource)?;
+                    messages = messages.checked_add(1).ok_or(Error::InvalidSource)?;
                     bytes = bytes
                         .checked_add(message.data.len())
-                        .ok_or(ChartValueAxisError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     let info = object
                         .archive_info
                         .message_infos
                         .get(index)
-                        .ok_or(ChartValueAxisError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     references = references
                         .checked_add(info.object_references.len())
                         .and_then(|value| value.checked_add(info.data_references.len()))
-                        .ok_or(ChartValueAxisError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     for field in &info.field_infos {
                         references = references
                             .checked_add(field.object_references.len())
                             .and_then(|value| value.checked_add(field.data_references.len()))
-                            .ok_or(ChartValueAxisError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
             }
@@ -2572,7 +2414,7 @@ impl ValueAxisBudget {
             let vector_bytes = retained_vectors
                 .checked_mul(objects.max(1))
                 .and_then(|value| value.checked_mul(size_of::<u64>()))
-                .ok_or(ChartValueAxisError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             self.allocations(retained_vectors, vector_bytes, vector_bytes)?;
         }
         Ok(())
@@ -2583,20 +2425,82 @@ impl ValueAxisBudget {
         messages: usize,
         references: usize,
         bytes: usize,
-    ) -> Result<(), ChartValueAxisError> {
+    ) -> Result<(), Error> {
         self.work(
             objects
                 .checked_add(messages)
                 .and_then(|value| value.checked_add(bytes))
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.references(references)?;
         self.allocations(
-            objects
-                .checked_add(messages)
-                .ok_or(ChartValueAxisError::InvalidSource)?,
+            objects.checked_add(messages).ok_or(Error::InvalidSource)?,
             0,
             0,
         )
+    }
+}
+
+#[cfg(test)]
+mod message_info_heap_tests {
+    use super::message_info_heap;
+    use litchi_iwa_core::{Limits, MessageInfo};
+    use std::mem::size_of;
+
+    #[test]
+    fn inline_versions_have_no_source_heap_charge_but_conversion_still_has_one() {
+        let message = MessageInfo::new(7, 1, Limits::default()).expect("default metadata");
+        let source = message_info_heap(&message, true, false).expect("source footprint");
+        assert_eq!(source.allocations, 0);
+        assert_eq!(source.bytes, 0);
+
+        let conversion = message_info_heap(&message, false, true).expect("conversion footprint");
+        assert_eq!(conversion.allocations, 1);
+        assert_eq!(conversion.scratch, 3 * size_of::<u32>());
+
+        let mut spilled = message.clone();
+        spilled.versions.reserve(1);
+        assert!(spilled.versions.spilled());
+        let spilled_source = message_info_heap(&spilled, true, false).expect("spilled footprint");
+        assert_eq!(spilled_source.allocations, 1);
+        assert!(spilled_source.bytes >= 4 * size_of::<u32>());
+    }
+}
+
+#[cfg(test)]
+mod snappy_output_plan_tests {
+    use super::{SNAPPY_FRAME_HEADER_BYTES, snappy_output_plan};
+    use litchi_iwa_core::{SnappyLimits, SnappyStream};
+
+    #[test]
+    fn tiny_output_cap_keeps_uncapped_frame_scratch() {
+        let limits = SnappyLimits::default()
+            .with_compressed_stream_bytes(1)
+            .expect("positive compressed output cap");
+        let (frames, compressed, maximum_frame) =
+            snappy_output_plan(1, limits).expect("the plan has one frame");
+        let uncapped_frame = SnappyStream::maximum_compressed_len(1, Default::default())
+            .expect("one byte has a finite Snappy bound");
+
+        assert_eq!(frames, 1);
+        assert_eq!(compressed, 1);
+        assert_eq!(maximum_frame, uncapped_frame - SNAPPY_FRAME_HEADER_BYTES);
+        assert!(maximum_frame > compressed);
+    }
+
+    #[test]
+    fn small_configured_chunk_changes_frame_count_and_scratch_shape() {
+        let limits = SnappyLimits::new(8, 64)
+            .expect("decoded limits")
+            .with_input_limits(32, 128, 16)
+            .expect("compressed input limits");
+        let (frames, compressed, maximum_frame) =
+            snappy_output_plan(25, limits).expect("four eight-byte frames");
+        let uncapped_frame = SnappyStream::maximum_compressed_len(8, Default::default())
+            .expect("an eight-byte frame has a finite bound");
+
+        assert_eq!(frames, 4);
+        assert!(compressed <= limits.max_compressed_stream());
+        assert_eq!(maximum_frame, uncapped_frame - SNAPPY_FRAME_HEADER_BYTES);
     }
 }

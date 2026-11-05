@@ -14,10 +14,10 @@ use crate::raw::{Cursor, Kind, Record, Records, kind as rt};
 /// looking for the record that opens a part stream.
 const MAX_LEADING_WRAPPER_BLOCKS: usize = 16;
 
-pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> Error {
+pub(crate) fn malformed(context: &'static str, detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
+        typ: context,
+        val: detail,
     }
 }
 
@@ -31,27 +31,41 @@ pub(crate) struct RecordWalker<'a, 't> {
     iter: Records<'a>,
     tolerance: Tolerance<'t>,
     current: Option<(Kind, usize)>,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> RecordWalker<'a, 'static> {
-    /// Walk `data`, refusing every defect (no report can carry a repair).
-    pub(crate) fn new(data: &'a [u8]) -> Self {
+    /// Walk `data` under `limits`, refusing every defect (no report can
+    /// carry a repair).
+    pub(crate) fn new(data: &'a [u8], limits: crate::raw::Limits) -> Self {
         RecordWalker {
-            iter: Records::new(data),
+            iter: Records::new(data, limits),
             tolerance: Tolerance::refusing(),
             current: None,
+            limits,
         }
     }
 }
 
 impl<'a, 't> RecordWalker<'a, 't> {
-    /// Walk `data`, recording Excel-compatible repairs into `report`.
-    pub(crate) fn recording(data: &'a [u8], report: &'t mut ToleranceReport) -> Self {
+    /// Walk `data` under `limits`, recording Excel-compatible repairs into
+    /// `report`.
+    pub(crate) fn recording(
+        data: &'a [u8],
+        report: &'t mut ToleranceReport,
+        limits: crate::raw::Limits,
+    ) -> Self {
         RecordWalker {
-            iter: Records::new(data),
+            iter: Records::new(data, limits),
             tolerance: Tolerance::recording(report),
             current: None,
+            limits,
         }
+    }
+
+    /// The raw profile this walk admits records and payload strings under.
+    pub(crate) const fn limits(&self) -> crate::raw::Limits {
+        self.limits
     }
 
     pub(crate) fn next(&mut self) -> Result<Option<Record<'a>>> {
@@ -80,8 +94,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
     }
 
     pub(crate) fn required(&mut self, context: &'static str) -> Result<Record<'a>> {
-        self.next()?
-            .ok_or_else(|| Error::UnexpectedEndOfStream(context.to_string()))
+        self.next()?.ok_or(Error::UnexpectedEndOfStream(context))
     }
 
     /// Read the record that opens a part stream, requiring it to be
@@ -138,7 +151,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
                 }
             }
         }
-        Err(Error::UnexpectedEndOfStream(context.to_string()))
+        Err(Error::UnexpectedEndOfStream(context))
     }
 
     /// Skip a record the parser does not handle: a balanced collection when
@@ -164,7 +177,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
             }
             self.skip_unhandled(record_type, context)?;
         }
-        Err(Error::UnexpectedEndOfStream(context.to_string()))
+        Err(Error::UnexpectedEndOfStream(context))
     }
 }
 

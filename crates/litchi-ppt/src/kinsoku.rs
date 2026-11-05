@@ -2,6 +2,7 @@
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 use crate::consts::RecordType;
 
 /// Language whose East Asian line-breaking behavior is being queried.
@@ -77,8 +78,8 @@ impl BaseKinsokuSettings {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(record: &Record) -> Result<Self> {
-        parse_base(record)
+    pub fn parse(record: &Record, limits: &SourceLimits) -> Result<Self> {
+        parse_base(record, limits)
     }
 }
 
@@ -109,8 +110,8 @@ impl KinsokuSettings9 {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(record: &Record) -> Result<Self> {
-        parse_powerpoint9(record)
+    pub fn parse(record: &Record, limits: &SourceLimits) -> Result<Self> {
+        parse_powerpoint9(record, limits)
     }
 
     /// Return the stored level for one language.
@@ -152,7 +153,7 @@ impl Kinsoku {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Self> {
+    pub fn parse(root: &Record, limits: &SourceLimits) -> Result<Self> {
         let mut base_records = Vec::new();
         collect_records(root, RecordType::Kinsoku, &mut base_records);
         if base_records.len() > 1 {
@@ -162,16 +163,16 @@ impl Kinsoku {
         }
         let base = base_records
             .first()
-            .map(|record| BaseKinsokuSettings::parse(record))
+            .map(|record| parse_base(record, limits))
             .transpose()?;
 
         let mut powerpoint9 = None;
-        for record in root.versioned_binary_tag_records(9)? {
+        for record in root.versioned_binary_tag_records(9, limits)? {
             if record.record_type != RecordType::Kinsoku {
                 continue;
             }
             if powerpoint9
-                .replace(KinsokuSettings9::parse(&record)?)
+                .replace(parse_powerpoint9(&record, limits)?)
                 .is_some()
             {
                 return Err(Error::Corrupted(
@@ -221,9 +222,10 @@ impl Kinsoku {
     }
 }
 
-fn parse_base(record: &Record) -> Result<BaseKinsokuSettings> {
+fn parse_base(record: &Record, limits: &SourceLimits) -> Result<BaseKinsokuSettings> {
     validate_container_header(record)?;
-    let children = Record::parse_sequence_strict(&record.data, "base Kinsoku container")?;
+    let children =
+        Record::parse_sequence_strict_with_limits(&record.data, "base Kinsoku container", *limits)?;
     let (level_word, leading_characters, following_characters) = parse_children(&children, false)?;
     let level = KinsokuLevel::parse_base(level_word)?;
     let has_both_lists = leading_characters.is_some() && following_characters.is_some();
@@ -239,9 +241,13 @@ fn parse_base(record: &Record) -> Result<BaseKinsokuSettings> {
     })
 }
 
-fn parse_powerpoint9(record: &Record) -> Result<KinsokuSettings9> {
+fn parse_powerpoint9(record: &Record, limits: &SourceLimits) -> Result<KinsokuSettings9> {
     validate_container_header(record)?;
-    let children = Record::parse_sequence_strict(&record.data, "PowerPoint 9 Kinsoku container")?;
+    let children = Record::parse_sequence_strict_with_limits(
+        &record.data,
+        "PowerPoint 9 Kinsoku container",
+        *limits,
+    )?;
     let (levels, leading_characters, following_characters) = parse_children(&children, true)?;
     if levels & 0xffff_ff00 != 0 {
         return Err(Error::Corrupted(
@@ -462,7 +468,11 @@ mod tests {
 
     #[test]
     fn resolves_base_and_powerpoint9_precedence() {
-        let settings = Kinsoku::parse(&root(Some(container(1, None)), None)).unwrap();
+        let settings = Kinsoku::parse(
+            &root(Some(container(1, None)), None),
+            &SourceLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             settings.effective_level(KinsokuLanguage::Japanese),
             KinsokuLevel::Strict
@@ -472,10 +482,13 @@ mod tests {
             KinsokuLevel::Standard
         );
 
-        let custom_settings = Kinsoku::parse(&root(
-            Some(container(2, Some(("（", "）")))),
-            Some(container(2, None)),
-        ))
+        let custom_settings = Kinsoku::parse(
+            &root(
+                Some(container(2, Some(("（", "）")))),
+                Some(container(2, None)),
+            ),
+            &SourceLimits::default(),
+        )
         .unwrap();
         assert_eq!(
             custom_settings.effective_level(KinsokuLanguage::Korean),
@@ -494,10 +507,10 @@ mod tests {
     #[test]
     fn resolves_powerpoint9_owned_custom_lists() {
         let japanese_custom = 2 << 6;
-        let settings = Kinsoku::parse(&root(
-            None,
-            Some(container(japanese_custom, Some(("「", "」")))),
-        ))
+        let settings = Kinsoku::parse(
+            &root(None, Some(container(japanese_custom, Some(("「", "」"))))),
+            &SourceLimits::default(),
+        )
         .unwrap();
         assert_eq!(
             settings.effective_custom_characters(KinsokuLanguage::Japanese),
@@ -507,31 +520,37 @@ mod tests {
 
     #[test]
     fn rejects_malformed_kinsoku_settings() {
-        assert!(Kinsoku::parse(&root(Some(container(3, None)), None)).is_err());
-        assert!(Kinsoku::parse(&root(Some(container(2, None)), None)).is_err());
-        assert!(Kinsoku::parse(&root(None, Some(container(1, None)))).is_err());
-        assert!(Kinsoku::parse(&root(None, Some(container(2 | (2 << 2), None)))).is_err());
-        assert!(Kinsoku::parse(&root(None, Some(container(1 << 8, None)))).is_err());
-        assert!(Kinsoku::parse(&root(None, Some(container(0, Some(("A", "B")))))).is_err());
+        let limits = SourceLimits::default();
+        assert!(Kinsoku::parse(&root(Some(container(3, None)), None), &limits).is_err());
+        assert!(Kinsoku::parse(&root(Some(container(2, None)), None), &limits).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(1, None))), &limits).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(2 | (2 << 2), None))), &limits).is_err());
+        assert!(Kinsoku::parse(&root(None, Some(container(1 << 8, None))), &limits).is_err());
         assert!(
-            Kinsoku::parse(&root(
-                Some(container(2, Some(("A", "B")))),
-                Some(container(2, Some(("C", "D")))),
-            ))
+            Kinsoku::parse(&root(None, Some(container(0, Some(("A", "B"))))), &limits).is_err()
+        );
+        assert!(
+            Kinsoku::parse(
+                &root(
+                    Some(container(2, Some(("A", "B")))),
+                    Some(container(2, Some(("C", "D")))),
+                ),
+                &limits
+            )
             .is_err()
         );
 
         let mut invalid_utf16 = container(2, Some(("A", "B")));
         invalid_utf16.data[20..22].copy_from_slice(&0xd800u16.to_le_bytes());
-        assert!(parse_base(&invalid_utf16).is_err());
+        assert!(parse_base(&invalid_utf16, &SourceLimits::default()).is_err());
 
         let mut missing_following = container(2, Some(("A", "B")));
         missing_following.data.to_mut().truncate(22);
         missing_following.data_length = u32::try_from(missing_following.data.len()).unwrap();
-        assert!(parse_base(&missing_following).is_err());
+        assert!(parse_base(&missing_following, &SourceLimits::default()).is_err());
 
         let mut invalid_header = container(0, None);
         invalid_header.instance = 0;
-        assert!(BaseKinsokuSettings::parse(&invalid_header).is_err());
+        assert!(BaseKinsokuSettings::parse(&invalid_header, &limits).is_err());
     }
 }

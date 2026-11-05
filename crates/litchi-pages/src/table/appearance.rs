@@ -8,10 +8,7 @@
 /// appearance.
 pub mod transaction {
     pub use crate::package::body_table_appearance::{
-        BodyTableAppearanceCommit as Commit, BodyTableAppearanceDiagnostics as Diagnostics,
-        BodyTableAppearanceEdit as Edit, BodyTableAppearanceError as Error,
-        BodyTableAppearanceLimitKind as LimitKind, BodyTableAppearancePatch as Patch,
-        BodyTableAppearancePath as Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 pub use litchi_iwa_common::table::appearance::{

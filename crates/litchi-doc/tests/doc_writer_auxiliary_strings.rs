@@ -32,7 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_doc::{AssociatedStringSlot, Package, SavedByEntry, SavedByTable, Writer};
+use litchi_doc::{AssociatedStringSlot, Builder, SavedByEntry, SavedByTable, raw::Reader};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -49,8 +49,8 @@ fn temporary_doc_path() -> std::path::PathBuf {
     ))
 }
 
-fn configured_writer() -> (Writer, SavedByTable) {
-    let mut writer = Writer::new();
+fn configured_writer() -> (Builder, SavedByTable) {
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     writer
         .set_associated_string(AssociatedStringSlot::TemplatePath, "C:\\模板\\Normal.dot")
@@ -84,7 +84,7 @@ fn configured_writer() -> (Writer, SavedByTable) {
 }
 
 fn assert_configured_document(
-    package: &mut Package<Cursor<Vec<u8>>>,
+    package: &mut Reader<Cursor<Vec<u8>>>,
     expected_saved_by: &SavedByTable,
 ) {
     let document = package.document().unwrap();
@@ -120,12 +120,12 @@ fn assert_configured_document(
 
 #[test]
 fn write_to_emits_the_mandatory_default_associated_string_table() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let associated = document.associated_strings().unwrap();
     assert!(associated.iter().all(|(_, value)| value.is_empty()));
@@ -148,8 +148,8 @@ fn write_to_emits_the_mandatory_default_associated_string_table() {
 fn associated_strings_and_saved_by_round_trip_through_write_to() {
     let (mut writer, expected_saved_by) = configured_writer();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_configured_document(&mut package, &expected_saved_by);
 }
 
@@ -157,17 +157,17 @@ fn associated_strings_and_saved_by_round_trip_through_write_to() {
 fn associated_strings_and_saved_by_round_trip_through_file_save() {
     let (mut writer, expected_saved_by) = configured_writer();
     let path = temporary_doc_path();
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(path).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     assert_configured_document(&mut package, &expected_saved_by);
 }
 
 #[test]
 fn writer_mutations_are_atomic_and_clearable() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .set_associated_string(AssociatedStringSlot::Title, "kept")
         .unwrap();

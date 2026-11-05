@@ -12,7 +12,7 @@ use super::codec::{
 };
 use super::model::{Cache, MAX_CACHES, MAX_VIEWS, Views, validate_cache, validate_views};
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Records, kind};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::char;
 use std::collections::HashSet;
@@ -41,21 +41,15 @@ pub struct ViewPart {
 
 const MAX_REL_ID_UNITS: usize = 255;
 
-fn invalid(typ: &str, value: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.to_string(),
-        val: value.into(),
-    }
+fn invalid(typ: &'static str, value: &'static str) -> Error {
+    Error::Unrecognized { typ, val: value }
 }
 
-fn parse_rel_id(payload: &[u8], typ: &str) -> Result<String> {
-    let mut cursor = Cursor::new(payload, "FRTHeader.RelID");
+fn parse_rel_id(payload: &[u8], typ: &'static str) -> Result<String> {
+    let mut cursor = Cursor::new(payload, "FRTHeader.RelID", crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u32()?;
     if flags != 0x08 {
-        return Err(invalid(
-            typ,
-            format!("invalid FRTHeader flags 0x{flags:08X}"),
-        ));
+        return Err(invalid(typ, "invalid FRTHeader flags"));
     }
     let units = usize::from(cursor.read_u16()?);
     if units == 0 || units > MAX_REL_ID_UNITS {
@@ -84,7 +78,7 @@ fn write_rel_id(value: &str) -> Result<Vec<u8>> {
         return Err(invalid("FRTHeader.RelID", "invalid relationship ID"));
     }
     let mut output = Vec::with_capacity(6 + units * 2);
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_u32(0x08)?;
     writer.write_u16(units as u16)?;
     for unit in value.encode_utf16() {
@@ -98,7 +92,7 @@ fn record_span(
     begin: crate::raw::Kind,
     end: crate::raw::Kind,
 ) -> Result<Option<(usize, usize)>> {
-    let mut iterator = Records::new(data);
+    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
     let mut start = None;
     let mut result = None;
     while let Some(record) = iterator.next() {
@@ -119,15 +113,13 @@ fn record_span(
         }
     }
     if start.is_some() {
-        return Err(Error::UnexpectedEndOfStream(
-            "timeline BIFF12 integration".to_string(),
-        ));
+        return Err(Error::UnexpectedEndOfStream("timeline BIFF12 integration"));
     }
     Ok(result)
 }
 
-fn parse_collection_refs(data: &[u8], typ: &str) -> Result<Vec<String>> {
-    let mut iterator = Records::new(data);
+fn parse_collection_refs(data: &[u8], typ: &'static str) -> Result<Vec<String>> {
+    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
     let mut inside = false;
     let mut item_open = false;
     let mut refs = Vec::new();
@@ -164,7 +156,7 @@ fn parse_collection_refs(data: &[u8], typ: &str) -> Result<Vec<String>> {
         }
     }
     if inside || item_open {
-        return Err(Error::UnexpectedEndOfStream(typ.to_string()));
+        return Err(Error::UnexpectedEndOfStream(typ));
     }
     let mut unique = HashSet::with_capacity(refs.len());
     if refs
@@ -176,8 +168,8 @@ fn parse_collection_refs(data: &[u8], typ: &str) -> Result<Vec<String>> {
     Ok(refs)
 }
 
-fn parse_single_ref(data: &[u8], typ: &str) -> Result<Option<String>> {
-    let mut iterator = Records::new(data);
+fn parse_single_ref(data: &[u8], typ: &'static str) -> Result<Option<String>> {
+    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
     let mut value = None;
     let mut open = false;
     while let Some(record) = iterator.next() {
@@ -200,14 +192,14 @@ fn parse_single_ref(data: &[u8], typ: &str) -> Result<Option<String>> {
         }
     }
     if open {
-        return Err(Error::UnexpectedEndOfStream(typ.to_string()));
+        return Err(Error::UnexpectedEndOfStream(typ));
     }
     Ok(value)
 }
 
 fn write_collection_refs(refs: &[String]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_TIMELINE_CACHE_IDS, &[])?;
     for value in refs {
         writer.write_record(kind::BEGIN_TIMELINE_CACHE_ID, &write_rel_id(value)?)?;
@@ -219,7 +211,7 @@ fn write_collection_refs(refs: &[String]) -> Result<Vec<u8>> {
 
 fn write_single_ref(value: &str) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_TIMELINE_EX, &write_rel_id(value)?)?;
     writer.write_record(kind::END_TIMELINE_EX, &[])?;
     Ok(output)
@@ -234,7 +226,7 @@ fn rewrite_block(
     let (start, end) = if let Some(span) = existing {
         span
     } else if replacement.is_some() {
-        let mut iterator = Records::new(data);
+        let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
         let mut offset = None;
         while let Some(record) = iterator.next() {
             let record = record?;
@@ -318,17 +310,19 @@ fn validate_cache_set(caches: &[Cache]) -> Result<()> {
 }
 
 /// Load all workbook timeline cache parts.
-pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<CachePart>> {
+pub fn load_caches(
+    package: &OpcPackage,
+    workbook: &PackURI,
+    xml_limits: litchi_core::Limits,
+) -> Result<Vec<CachePart>> {
     let workbook_part = package.get_part(workbook)?;
     let refs = parse_collection_refs(workbook_part.blob(), "timeline cache references")?;
     let mut output = Vec::with_capacity(refs.len());
     for relationship_id in &refs {
-        let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
-            invalid(
-                "timeline cache references",
-                format!("missing relationship {relationship_id}"),
-            )
-        })?;
+        let relationship = workbook_part
+            .rels()
+            .get(relationship_id)
+            .ok_or_else(|| invalid("timeline cache references", "missing relationship"))?;
         if relationship.is_external() || relationship.reltype() != CACHE_RELATIONSHIP_TYPE {
             return Err(invalid(
                 "timeline cache relationship",
@@ -346,7 +340,7 @@ pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Cache
         output.push(CachePart {
             relationship_id: relationship_id.clone(),
             part_name: target.as_str().to_string(),
-            cache: parse_cache(part.blob())?,
+            cache: parse_cache(part.blob(), xml_limits)?,
         });
     }
     let referenced: HashSet<_> = output.iter().map(|part| part.part_name.as_str()).collect();
@@ -369,12 +363,10 @@ fn remove_caches(package: &mut OpcPackage, workbook: &PackURI) -> Result<()> {
     {
         let part = package.get_part(workbook)?;
         for relationship_id in &refs {
-            let relationship = part.rels().get(relationship_id).ok_or_else(|| {
-                invalid(
-                    "timeline cache references",
-                    format!("missing relationship {relationship_id}"),
-                )
-            })?;
+            let relationship = part
+                .rels()
+                .get(relationship_id)
+                .ok_or_else(|| invalid("timeline cache references", "missing relationship"))?;
             if relationship.is_external() || relationship.reltype() != CACHE_RELATIONSHIP_TYPE {
                 return Err(invalid(
                     "timeline cache relationship",
@@ -401,9 +393,15 @@ fn remove_caches(package: &mut OpcPackage, workbook: &PackURI) -> Result<()> {
 }
 
 /// Replace workbook timeline caches and their BIFF12 references.
-pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cache]) -> Result<()> {
+pub(crate) fn store_caches(
+    package: &mut OpcPackage,
+    workbook: &PackURI,
+    caches: &[Cache],
+    xml_limits: litchi_core::Limits,
+) -> Result<()> {
     validate_cache_set(caches)?;
-    let _ = load_caches(package, workbook)?;
+    crate::signature_policy::ensure_unsigned(package)?;
+    let _ = load_caches(package, workbook, xml_limits)?;
     let old_block = record_span(
         package.get_part(workbook)?.blob(),
         kind::BEGIN_TIMELINE_CACHE_IDS,
@@ -414,7 +412,6 @@ pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cach
     if caches.is_empty() {
         let updated = rewrite_block(&workbook_blob, old_block, None, kind::END_BOOK)?;
         package.get_part_mut(workbook)?.set_blob(updated);
-        package.unsign();
         return Ok(());
     }
     let mut used: HashSet<String> = package
@@ -432,7 +429,7 @@ pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cach
             }
         };
         let uri = next_part(package, "xl/timelineCaches", "timelineCache", "xml")?;
-        let bytes = write_cache(cache)?;
+        let bytes = write_cache(cache, xml_limits)?;
         package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             CACHE_CONTENT_TYPE.to_string(),
@@ -458,12 +455,15 @@ pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cach
         );
     }
     part.set_blob(workbook_blob);
-    package.unsign();
     Ok(())
 }
 
 /// Load one worksheet timeline view part, if attached.
-pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<ViewPart>> {
+pub fn load_views(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    xml_limits: litchi_core::Limits,
+) -> Result<Option<ViewPart>> {
     let worksheet_part = package.get_part(worksheet)?;
     let reference = parse_single_ref(worksheet_part.blob(), "timeline views")?;
     let relationships: Vec<_> = worksheet_part
@@ -503,21 +503,32 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
     Ok(Some(ViewPart {
         relationship_id: relationship.r_id().to_string(),
         part_name: target.as_str().to_string(),
-        views: parse_views(part.blob())?,
+        views: parse_views(part.blob(), xml_limits)?,
     }))
 }
 
 /// Replace one worksheet's timeline view part and BIFF12 reference.
-pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+pub(crate) fn store_views(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    views: &Views,
+    xml_limits: litchi_core::Limits,
+) -> Result<()> {
     let mut candidate = package.clone();
-    store_views_inner(&mut candidate, worksheet, views)?;
+    store_views_inner(&mut candidate, worksheet, views, xml_limits)?;
     *package = candidate;
     Ok(())
 }
 
-fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+fn store_views_inner(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    views: &Views,
+    xml_limits: litchi_core::Limits,
+) -> Result<()> {
     validate_views(views)?;
-    if let Some(existing) = load_views(package, worksheet)? {
+    crate::signature_policy::ensure_unsigned(package)?;
+    if let Some(existing) = load_views(package, worksheet, xml_limits)? {
         let target = PackURI::new(&existing.part_name)?;
         crate::package::owner_transaction::require_exclusive_inbound(
             package,
@@ -539,7 +550,7 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
     )?;
     let mut worksheet_blob = package.get_part(worksheet)?.blob().to_vec();
     let original_worksheet_blob = worksheet_blob.clone();
-    if let Some(old) = load_views(package, worksheet)? {
+    if let Some(old) = load_views(package, worksheet, xml_limits)? {
         let part = package.get_part_mut(worksheet)?;
         part.rels_mut().remove(&old.relationship_id);
         package.remove_part(&PackURI::new(&old.part_name)?);
@@ -548,7 +559,6 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
         let updated = rewrite_block(&worksheet_blob, old_block, None, kind::END_SHEET)?;
         crate::worksheet_index::maintain(package, worksheet, &worksheet_blob, &updated)?;
         package.get_part_mut(worksheet)?.set_blob(updated);
-        package.unsign();
         return Ok(());
     }
     let uri = next_part(package, "xl/timelines", "timeline", "xml")?;
@@ -556,7 +566,7 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
         VIEWS_CONTENT_TYPE.to_string(),
-        write_views(views)?,
+        write_views(views, xml_limits)?,
     )))?;
     let replacement = write_single_ref(&relationship_id)?;
     worksheet_blob = rewrite_block(
@@ -581,6 +591,5 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
         &worksheet_blob,
     )?;
     package.get_part_mut(worksheet)?.set_blob(worksheet_blob);
-    package.unsign();
     Ok(())
 }

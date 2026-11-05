@@ -82,7 +82,8 @@ fn raw_document_fixture(document: &[u8]) -> Vec<u8> {
         r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="{}" Target="word/document.xml"/></Relationships>"#,
         rt::OFFICE_DOCUMENT
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -108,10 +109,15 @@ fn managed_raw_document(document: &[u8]) -> source_backed::Package {
         0,
     )
     .unwrap();
-    source_backed::Package::from_read_at_with_execution_context(
+    source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_docx::ReadLimits::default(),
-        litchi_core::ExecutionContext::new(budget, cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(litchi_core::ExecutionContext::new(
+                budget,
+                cancellation,
+                execution_limits,
+            )),
     )
     .unwrap()
 }
@@ -127,7 +133,7 @@ fn table_signature(table: &litchi_docx::Table) -> litchi_docx::Result<String> {
 }
 
 fn eager_block_signature(
-    document: &litchi_docx::document::Document<'_>,
+    document: &litchi_docx::document::Document,
 ) -> litchi_docx::Result<Vec<String>> {
     document
         .blocks()?
@@ -136,6 +142,7 @@ fn eager_block_signature(
             Block::Paragraph(paragraph) => Ok(format!("p:{}", paragraph.text()?)),
             Block::Table(table) => Ok(format!("t:{}", table_signature(&table)?)),
             Block::Alt(chunk) => Ok(format!("a:{}", chunk.relationship().as_str())),
+            Block::Sdt(control) => Ok(format!("s:{}", control.text()?)),
             Block::Unknown(block) => {
                 Ok(format!("u:{}", String::from_utf8_lossy(block.xml_bytes())))
             },
@@ -151,6 +158,7 @@ fn source_block_signature(document: &source_backed::Document) -> litchi_docx::Re
             Block::Paragraph(paragraph) => Ok(format!("p:{}", paragraph.text()?)),
             Block::Table(table) => Ok(format!("t:{}", table_signature(&table)?)),
             Block::Alt(chunk) => Ok(format!("a:{}", chunk.relationship().as_str())),
+            Block::Sdt(control) => Ok(format!("s:{}", control.text()?)),
             Block::Unknown(block) => {
                 Ok(format!("u:{}", String::from_utf8_lossy(block.xml_bytes())))
             },
@@ -159,7 +167,7 @@ fn source_block_signature(document: &source_backed::Document) -> litchi_docx::Re
 }
 
 fn eager_element_signature(
-    document: &litchi_docx::document::Document<'_>,
+    document: &litchi_docx::document::Document,
 ) -> litchi_docx::Result<Vec<String>> {
     document
         .elements()?
@@ -282,12 +290,12 @@ fn source_metadata_matches_dialects_absence_and_graph_failures() {
         false,
     );
     let eager = Package::from_reader(io::Cursor::new(transitional.clone())).unwrap();
-    let eager_props = eager.props().unwrap();
+    let eager_props = eager.metadata().unwrap();
     let source =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(transitional))).unwrap();
     let metadata = source.metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), eager_props.title.as_deref());
-    assert_eq!(metadata.author.as_deref(), eager_props.creator.as_deref());
+    assert_eq!(metadata.author.as_deref(), eager_props.author.as_deref());
     assert_eq!(
         metadata.revision.as_deref(),
         eager_props.revision.as_deref()
@@ -538,9 +546,9 @@ fn source_queries_read_only_selected_payloads_and_preserve_stale_precedence() {
     during_snapshot_source.arm_main_change();
     assert!(matches!(
         during_snapshot_package.document_snapshot(),
-        Err(litchi_docx::document::TransactionError::Document(
-            Error::Opc(OpcError::SourceChanged { .. })
-        ))
+        Err(litchi_docx::document::Error::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
     ));
 }
 
@@ -554,13 +562,46 @@ fn source_package_materializes_through_the_owned_docx_facade_on_explicit_request
         "fallbackouternestedtail"
     );
 
-    let adopted_opc =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(semantic_fixture()))).unwrap();
+    let adopted_opc = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(semantic_fixture())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let adopted = source_backed::Package::from_source_backed_package(adopted_opc).unwrap();
     assert_eq!(
         adopted.document().unwrap().extract_text().unwrap(),
         "fallbackouternestedtail"
     );
+}
+
+#[test]
+fn source_edit_budget_refuses_before_main_payload_capture() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>payload</w:t></w:r></w:p></w:body></w:document>"#
+    );
+    let bytes = package_bytes(document.clone(), None, false);
+    let source = Arc::new(ProbeSource::new(bytes, None));
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let maximum = document.len().saturating_sub(1);
+
+    let edit = package
+        .edit_with_options(
+            litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
+        )
+        .expect("the lazy constructor retains the edit policy");
+    let result = edit.source().map(|_| ());
+    assert!(matches!(
+        result,
+        Err(litchi_docx::document::Error::Limit {
+            kind: litchi_docx::document::LimitKind::ProjectedXmlBytes,
+            observed,
+            maximum: actual,
+        }) if observed == document.len() && actual == maximum
+    ));
+    assert_eq!(source.main_reads.load(Ordering::SeqCst), 0);
 }
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -595,10 +636,11 @@ fn source_document_is_send_sync_and_managed_arc_views_refuse_consistently() {
     )
     .unwrap();
     let context = litchi_core::ExecutionContext::new(budget, cancellation, limits);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_docx::ReadLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let document = package.document().unwrap();
@@ -617,7 +659,7 @@ fn source_document_is_send_sync_and_managed_arc_views_refuse_consistently() {
         document.blocks().unwrap_err(),
         document.elements().unwrap_err(),
     ] {
-        assert!(matches!(error, Error::UnsafeEdit { .. }));
+        assert!(matches!(error, Error::Refused(_)));
     }
     cancellation_source.cancel();
     assert!(matches!(
@@ -697,7 +739,7 @@ fn managed_source_preflight_rejects_special_events_and_extra_roots() {
             Err(error) => error,
         };
         assert!(
-            matches!(error, Error::UnsafeEdit { .. } | Error::InvalidFormat(_)),
+            matches!(error, Error::Refused(_) | Error::InvalidFormat(_)),
             "{label}: {error:?}"
         );
     }
@@ -893,8 +935,781 @@ fn managed_source_paragraph_queries_keep_their_eager_index() {
     assert_eq!(view.paragraph_text(2).unwrap(), None);
     assert_eq!(view.extract_text().unwrap(), "onetwo");
     // Arc-backed selective views stay refused on the managed route.
+    assert!(matches!(view.paragraphs().unwrap_err(), Error::Refused(_)));
+}
+
+fn effective_xml(text: &str) -> Vec<u8> {
+    format!(r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>"#).into_bytes()
+}
+
+#[test]
+fn effective_owner_reads_publishes_and_materializes_current_graph() {
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("before"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+    let old_view = owner.document().unwrap();
+    assert_eq!(old_view.paragraph_count().unwrap(), 1);
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_replace_part(
+        PackURI::new("/word/document.xml").unwrap(),
+        effective_xml("after"),
+    )
+    .unwrap();
+    plan.try_remove_part(PackURI::new("/word/unrelated.bin").unwrap())
+        .unwrap();
+    let candidate = physical.clone().prepare_topology(plan).unwrap();
+    let changed = owner.with_prepared_topology(candidate).unwrap();
+    let view = changed.document().unwrap();
+    assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("after"));
+    assert_eq!(
+        changed
+            .to_owned_package()
+            .unwrap()
+            .document()
+            .unwrap()
+            .text()
+            .unwrap(),
+        "after"
+    );
+    let mut bytes = Vec::new();
+    changed.write_to(&mut bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        bytes,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    assert!(
+        reopened
+            .part(&PackURI::new("/word/unrelated.bin").unwrap())
+            .is_err()
+    );
+    assert_eq!(
+        source_backed::Package::from_source_backed_package(reopened)
+            .unwrap()
+            .document()
+            .unwrap()
+            .extract_text()
+            .unwrap(),
+        "after"
+    );
+    assert_eq!(old_view.extract_text().unwrap(), "before");
+    assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    let two = String::from_utf8(effective_xml("second")).unwrap().replace(
+        "</w:body>",
+        "<w:p><w:r><w:t>third</w:t></w:r></w:p></w:body>",
+    );
+    plan.try_replace_part(
+        PackURI::new("/word/document.xml").unwrap(),
+        two.into_bytes(),
+    )
+    .unwrap();
+    let later = changed
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    assert_eq!(later.document().unwrap().paragraph_count().unwrap(), 2);
+    assert_eq!(view.paragraph_count().unwrap(), 1);
+    drop(later);
+    drop(changed);
+    drop(owner);
+    assert_eq!(view.extract_text().unwrap(), "after");
+}
+
+#[test]
+fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("before"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+    let commit = owner.edit().unwrap().commit().unwrap();
+    for changed in [false, true] {
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        if changed {
+            plan.try_replace_part(
+                PackURI::new("/word/document.xml").unwrap(),
+                effective_xml("after"),
+            )
+            .unwrap();
+        }
+        let effective = owner
+            .with_prepared_topology(physical.clone().prepare_topology(plan).unwrap())
+            .unwrap();
+        assert!(effective.source_backed_package().is_err());
+        assert!(effective.document_snapshot().is_ok());
+        assert!(effective.edit().is_ok());
+        assert!(effective.metadata().is_ok());
+        assert!(effective.embedded().is_err());
+        assert!(effective.ink().is_err());
+        assert!(effective.section_layout_snapshot().is_err());
+        assert!(effective.document_variables_snapshot().is_err());
+        assert!(
+            effective
+                .external_hyperlink_sanitization_snapshot()
+                .is_err()
+        );
+        assert!(effective.story_hyperlinks_only_snapshot().is_err());
+        // Record 0355a: a detached patch replays by content. The no-op
+        // patch of "before" applies to the unchanged effective owner (and
+        // writes its artifact) and is refused as stale by the changed one.
+        let applied = effective.apply(commit.patch());
+        if changed {
+            assert!(applied.is_err());
+        } else {
+            let applied = applied.unwrap();
+            let (mut written, mut expected) = (Vec::new(), Vec::new());
+            applied.package().write_to(&mut written).unwrap();
+            effective.write_to(&mut expected).unwrap();
+            assert_eq!(written, expected);
+        }
+        let mut sink = Vec::new();
+        effective
+            .write_text_to(&mut sink, litchi_core::TextOutputOptions::default())
+            .unwrap();
+        assert_eq!(
+            sink,
+            if changed {
+                b"after".as_slice()
+            } else {
+                b"before".as_slice()
+            }
+        );
+    }
+    let foreign = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("foreign"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+    .unwrap();
     assert!(matches!(
-        view.paragraphs().unwrap_err(),
-        Error::UnsafeEdit { .. }
+        owner.with_prepared_topology(foreign),
+        Err(Error::PatchConflict { .. })
     ));
+}
+
+#[test]
+fn effective_owner_managed_document_retains_admissions_and_uses_fresh_indexes() {
+    let owner = managed_raw_document(&effective_xml("before"));
+    let physical = owner.source_backed_package().unwrap().clone();
+    let old_view = owner.document().unwrap();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_replace_part(
+        PackURI::new("/word/document.xml").unwrap(),
+        effective_xml("after"),
+    )
+    .unwrap();
+    let changed = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    let view = changed.document().unwrap();
+    assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("after"));
+    assert!(view.paragraphs().is_err());
+    assert!(matches!(
+        changed.to_owned_package(),
+        Err(Error::Opc(OpcError::ManagedPackageMaterialization))
+    ));
+    drop(changed);
+    drop(owner);
+    assert_eq!(view.extract_text().unwrap(), "after");
+    assert_eq!(old_view.extract_text().unwrap(), "before");
+}
+
+#[test]
+fn effective_owner_checks_donor_fences_through_source_version() {
+    let donor_source = Arc::new(ProbeSource::new(
+        package_bytes(effective_xml("donor"), None, false),
+        None,
+    ));
+    let donor = SourceBackedPackage::from_read_at(
+        donor_source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let xml = donor.main_document_part().unwrap().source_xml().unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("base"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_add_source_xml_part(PackURI::new("/word/copied.xml").unwrap(), xml)
+        .unwrap();
+    plan.try_replace_internal_relationship(
+        PackURI::new("/").unwrap(),
+        "rId1",
+        rt::OFFICE_DOCUMENT,
+        PackURI::new("/word/copied.xml").unwrap(),
+    )
+    .unwrap();
+    let owner = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    let view = owner.document().unwrap();
+    assert_eq!(view.extract_text().unwrap(), "donor");
+    donor_source.changed();
+    assert!(matches!(
+        owner.source_version(),
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(owner.document().is_err());
+    assert!(owner.to_owned_package().is_err());
+    let mut sink = Vec::new();
+    assert!(owner.write_to(&mut sink).is_err());
+    assert!(sink.is_empty());
+    assert_eq!(view.extract_text().unwrap(), "donor");
+}
+
+#[test]
+fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
+    let memory = 16 * 1024 * 1024;
+    let budget = litchi_core::Budget::root(
+        "effective-donor",
+        litchi_core::Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancel, cancellation) = litchi_core::CancellationSource::pair();
+    let limits = litchi_core::ExecutionLimits::new(
+        std::num::NonZeroUsize::MIN,
+        std::num::NonZeroUsize::MIN,
+        std::num::NonZeroU64::new(memory).unwrap(),
+        0,
+    )
+    .unwrap();
+    let donor = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(package_bytes(
+            effective_xml("donor"),
+            None,
+            false,
+        ))),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(litchi_core::ExecutionContext::new(
+            budget.clone(),
+            cancellation,
+            limits,
+        )),
+    )
+    .unwrap();
+    let xml = donor.main_document_part().unwrap().source_xml().unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("base"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_add_source_xml_part(PackURI::new("/word/copied.xml").unwrap(), xml)
+        .unwrap();
+    plan.try_replace_internal_relationship(
+        PackURI::new("/").unwrap(),
+        "rId1",
+        rt::OFFICE_DOCUMENT,
+        PackURI::new("/word/copied.xml").unwrap(),
+    )
+    .unwrap();
+    let owner = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    let view = owner.document().unwrap();
+    assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("donor"));
+    assert!(matches!(view.body_blocks(), Err(Error::Refused(_))));
+    assert!(matches!(view.paragraph(0), Err(Error::Refused(_))));
+    assert!(matches!(view.blocks(), Err(Error::Refused(_))));
+    assert!(matches!(view.elements(), Err(Error::Refused(_))));
+    assert!(matches!(
+        owner.document_snapshot(),
+        Err(litchi_docx::document::Error::Document(Error::Opc(
+            OpcError::ManagedPackageMaterialization
+        )))
+    ));
+    assert!(
+        owner
+            .edit()
+            .and_then(|edit| edit.commit().map(|_| ()))
+            .is_err()
+    );
+    drop(donor);
+    drop(owner);
+    assert!(budget.used(litchi_core::Resource::Memory) > 0);
+    cancel.cancel();
+    assert!(matches!(
+        view.extract_text(),
+        Err(Error::Opc(OpcError::Cancelled))
+    ));
+    assert!(matches!(
+        view.paragraph_count(),
+        Err(Error::Opc(OpcError::Cancelled))
+    ));
+    drop(view);
+    assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
+}
+
+#[test]
+fn retained_semantic_patches_chain_and_inverse_without_reopening() {
+    for managed in [false, true] {
+        let xml = effective_xml("before");
+        let source = if managed {
+            managed_raw_document(&xml)
+        } else {
+            source_backed::Package::from_read_at(Arc::new(OwnedSource::new(package_bytes(
+                xml, None, false,
+            ))))
+            .unwrap()
+        };
+        let mut edit = source.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "first")
+            .unwrap();
+        let first = edit.commit().unwrap();
+        let current = first.package().clone();
+        assert_eq!(current.document().unwrap().extract_text().unwrap(), "first");
+        let mut edit = current.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "second")
+            .unwrap();
+        let second = edit.commit().unwrap();
+        let next = second.clone().into_package();
+        assert_eq!(next.document().unwrap().extract_text().unwrap(), "second");
+        assert!(next.apply(first.patch()).is_err());
+        let restored = next
+            .apply(&second.patch().inverse())
+            .unwrap()
+            .into_package()
+            .apply(&first.patch().inverse())
+            .unwrap()
+            .into_package();
+        let mut before = Vec::new();
+        source.write_to(&mut before).unwrap();
+        let mut after = Vec::new();
+        restored.write_to(&mut after).unwrap();
+        assert_eq!(before, after);
+        assert_eq!(current.document().unwrap().extract_text().unwrap(), "first");
+        assert_eq!(source.document().unwrap().extract_text().unwrap(), "before");
+    }
+}
+
+#[test]
+fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
+    for policy in [
+        "",
+        "<w:documentProtection w:enforcement=\"1\"/>",
+        "<w:trackRevisions/>",
+    ] {
+        let physical = SourceBackedPackage::from_vec(
+            package_bytes(effective_xml("before"), None, false),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        let settings = PackURI::new("/word/settings.xml").unwrap();
+        plan.try_add_part(
+            settings.clone(),
+            ct::WML_SETTINGS,
+            format!("<w:settings xmlns:w=\"{W}\">{policy}</w:settings>").into_bytes(),
+        )
+        .unwrap();
+        plan.try_add_internal_relationship(
+            PackURI::new("/word/document.xml").unwrap(),
+            "rSettings",
+            rt::SETTINGS,
+            settings.clone(),
+        )
+        .unwrap();
+        plan.try_remove_part(PackURI::new("/word/unrelated.bin").unwrap())
+            .unwrap();
+        let owner = owner
+            .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+            .unwrap();
+        let noop = owner.edit().unwrap().commit().unwrap();
+        owner.apply(noop.patch()).unwrap();
+        let mut edit = owner.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+            .unwrap();
+        let result = edit.commit();
+        if !policy.is_empty() {
+            assert!(matches!(
+                result,
+                Err(litchi_docx::document::Error::Document(Error::Refused(_)))
+            ));
+            let mut canonical = owner.edit().unwrap();
+            canonical
+                .replace_paragraph_text(litchi_core::Position::new(0), "after")
+                .unwrap();
+            assert!(matches!(
+                canonical.commit(),
+                Err(litchi_docx::document::Error::Document(Error::Refused(_)))
+            ));
+            assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");
+            continue;
+        }
+        assert!(result.is_ok());
+        let mut canonical = owner.edit().unwrap();
+        canonical
+            .replace_paragraph_text(litchi_core::Position::new(0), "after")
+            .unwrap();
+        let next = canonical.commit().unwrap().into_package();
+        let mut bytes = Vec::new();
+        next.write_to(&mut bytes).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            bytes,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        assert!(package.part(&settings).is_ok());
+        assert!(
+            package
+                .main_document_part()
+                .unwrap()
+                .rels()
+                .get("rSettings")
+                .is_some()
+        );
+        assert!(
+            package
+                .part(&PackURI::new("/word/unrelated.bin").unwrap())
+                .is_err()
+        );
+        assert_eq!(next.document().unwrap().extract_text().unwrap(), "after");
+        assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");
+    }
+}
+
+#[test]
+fn retained_semantic_apply_preserves_declaration_bom_and_revision_spelling() {
+    use litchi_core::Position;
+    use litchi_docx::document::{RevisionAction, RevisionKind, RevisionSelector};
+    let xml = format!(
+        "\u{feff}<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<w:document xmlns:w=\"{W}\"><w:body>\n<w:p><w:ins w:id=\"1\" w:author=\"A\"><w:r><w:t>inserted</w:t></w:r></w:ins></w:p>\n</w:body></w:document>"
+    );
+    let owner = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(package_bytes(
+        xml.as_bytes().to_vec(),
+        None,
+        false,
+    ))))
+    .unwrap();
+    let mut edit = owner.edit().unwrap();
+    edit.apply_revision(
+        RevisionSelector::new(Position::new(0), RevisionKind::Insertion, Position::new(0)),
+        RevisionAction::Accept,
+    )
+    .unwrap();
+    let committed = edit.commit().unwrap();
+    let next = owner.apply(committed.patch()).unwrap().into_package();
+    let snapshot = next.document_snapshot().unwrap();
+    assert!(snapshot.xml_bytes().starts_with(b"\xef\xbb\xbf<?xml"));
+    assert_eq!(snapshot.xml_bytes(), committed.patch().target().xml_bytes());
+    let restored = next
+        .apply(&committed.patch().inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(
+        restored.document_snapshot().unwrap().xml_bytes(),
+        xml.as_bytes()
+    );
+}
+
+#[test]
+fn canonical_source_edit_owns_package_and_isolates_staged_clones() {
+    for managed in [false, true] {
+        let xml = effective_xml("before");
+        let source = if managed {
+            managed_raw_document(&xml)
+        } else {
+            source_backed::Package::from_read_at(Arc::new(OwnedSource::new(package_bytes(
+                xml, None, false,
+            ))))
+            .unwrap()
+        };
+        let mut edit: litchi_docx::document::Edit<source_backed::Package> = source.edit().unwrap();
+        let view = source.document().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "first")
+            .unwrap();
+        let mut sibling = edit.try_clone().unwrap();
+        sibling
+            .replace_paragraph_text(litchi_core::Position::new(0), "second")
+            .unwrap();
+        drop(source);
+        let commit: litchi_docx::document::Commit<source_backed::Package> = edit.commit().unwrap();
+        assert_eq!(
+            commit.package().document().unwrap().extract_text().unwrap(),
+            "first"
+        );
+        assert_eq!(view.extract_text().unwrap(), "before");
+        let (owner, patch) = commit.into_parts();
+        assert!(!patch.is_noop());
+        assert_eq!(
+            owner
+                .apply(&patch.inverse())
+                .unwrap()
+                .into_package()
+                .document()
+                .unwrap()
+                .extract_text()
+                .unwrap(),
+            "before"
+        );
+        assert_eq!(
+            sibling
+                .commit()
+                .unwrap()
+                .into_package()
+                .document()
+                .unwrap()
+                .extract_text()
+                .unwrap(),
+            "second"
+        );
+        let mut abandoned = owner.edit().unwrap();
+        abandoned
+            .replace_paragraph_text(litchi_core::Position::new(0), "abandoned")
+            .unwrap();
+        drop(abandoned);
+        assert_eq!(owner.document().unwrap().extract_text().unwrap(), "first");
+    }
+}
+
+#[test]
+fn canonical_source_commit_refuses_a_changed_physical_source() {
+    let physical = Arc::new(ProbeSource::new(
+        package_bytes(effective_xml("before"), None, false),
+        None,
+    ));
+    let owner = source_backed::Package::from_read_at(physical.clone()).unwrap();
+    let mut edit = owner.edit().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+        .unwrap();
+    physical.changed();
+    assert!(matches!(
+        edit.commit(),
+        Err(litchi_docx::document::Error::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
+}
+
+#[test]
+fn effective_metadata_tracks_payload_relationships_and_owner_reports() {
+    let bytes = package_bytes(
+        effective_xml("before"),
+        Some((&transitional_core("original"), rt::CORE_PROPERTIES)),
+        false,
+    );
+    let physical = SourceBackedPackage::from_vec(
+        bytes,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+    assert_eq!(owner.metadata().unwrap().title.as_deref(), Some("original"));
+    let mut edit = owner.edit().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+        .unwrap();
+    let committed = edit.commit().unwrap().into_package();
+    assert_eq!(
+        committed.metadata().unwrap().title.as_deref(),
+        Some("original")
+    );
+    let core = PackURI::new("/docProps/core.xml").unwrap();
+    let root = PackURI::new("/").unwrap();
+    let core_id = physical
+        .rels()
+        .iter()
+        .find(|rel| rel.reltype() == rt::CORE_PROPERTIES)
+        .unwrap()
+        .r_id()
+        .to_owned();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_replace_part(core.clone(), transitional_core("changed").into_bytes())
+        .unwrap();
+    let changed = owner
+        .with_prepared_topology(physical.clone().prepare_topology(plan).unwrap())
+        .unwrap();
+    assert_eq!(
+        changed.metadata().unwrap().title.as_deref(),
+        Some("changed")
+    );
+    assert_eq!(owner.metadata().unwrap().title.as_deref(), Some("original"));
+
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    let target = PackURI::new("/custom/metadata.xml").unwrap();
+    plan.try_add_part(
+        target.clone(),
+        ct::OPC_CORE_PROPERTIES,
+        transitional_core("redirected").into_bytes(),
+    )
+    .unwrap();
+    plan.try_remove_part(core.clone()).unwrap();
+    plan.try_replace_internal_relationship(
+        root.clone(),
+        core_id.clone(),
+        STRICT_CORE_RELATIONSHIP,
+        target,
+    )
+    .unwrap();
+    let redirected = owner
+        .with_prepared_topology(physical.clone().prepare_topology(plan).unwrap())
+        .unwrap();
+    assert_eq!(
+        redirected.metadata().unwrap().title.as_deref(),
+        Some("redirected")
+    );
+    let repairs = redirected.tolerance_report().total();
+    assert!(repairs > owner.tolerance_report().total());
+    redirected.metadata().unwrap();
+    assert_eq!(redirected.tolerance_report().total(), repairs);
+
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_remove_relationship(root, core_id).unwrap();
+    plan.try_remove_part(core).unwrap();
+    let removed = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    assert_eq!(removed.metadata().unwrap().title, None);
+    assert_eq!(
+        changed.metadata().unwrap().title.as_deref(),
+        Some("changed")
+    );
+}
+
+#[test]
+fn effective_metadata_reads_only_selected_payload_and_fences_source_changes() {
+    for malformed in [false, true] {
+        let core_xml = if malformed {
+            "<broken/>".to_owned()
+        } else {
+            transitional_core("selected")
+        };
+        let bytes = package_bytes(
+            effective_xml("before"),
+            Some((&core_xml, rt::CORE_PROPERTIES)),
+            false,
+        );
+        let range = payload_range(&bytes, "docProps/core.xml");
+        let observed = Arc::new(ProbeSource::new(bytes, Some(range)));
+        let physical = SourceBackedPackage::from_read_at(
+            observed.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        plan.try_replace_part(
+            PackURI::new("/word/document.xml").unwrap(),
+            effective_xml("after"),
+        )
+        .unwrap();
+        let owner = owner
+            .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+            .unwrap();
+        let main_reads = observed.main_reads.load(Ordering::SeqCst);
+        let unrelated_reads = observed.unrelated_reads.load(Ordering::SeqCst);
+        observed.arm_core_change();
+        assert!(matches!(
+            owner.metadata(),
+            Err(Error::Opc(OpcError::SourceChanged { .. }))
+        ));
+        assert!(observed.core_reads.load(Ordering::SeqCst) > 0);
+        assert_eq!(observed.main_reads.load(Ordering::SeqCst), main_reads);
+        assert_eq!(
+            observed.unrelated_reads.load(Ordering::SeqCst),
+            unrelated_reads
+        );
+    }
+}
+
+#[test]
+fn effective_metadata_checks_managed_donor_context_and_releases_admissions() {
+    let memory = 16 * 1024 * 1024;
+    let budget = litchi_core::Budget::root(
+        "metadata-donor",
+        litchi_core::Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancel, cancellation) = litchi_core::CancellationSource::pair();
+    let limits = litchi_core::ExecutionLimits::new(
+        std::num::NonZeroUsize::MIN,
+        std::num::NonZeroUsize::MIN,
+        std::num::NonZeroU64::new(memory).unwrap(),
+        0,
+    )
+    .unwrap();
+    let donor = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(package_bytes(
+            effective_xml("donor"),
+            Some((&transitional_core("donor-title"), rt::CORE_PROPERTIES)),
+            false,
+        ))),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(litchi_core::ExecutionContext::new(
+            budget.clone(),
+            cancellation,
+            limits,
+        )),
+    )
+    .unwrap();
+    let core = PackURI::new("/docProps/core.xml").unwrap();
+    let xml = donor.part(&core).unwrap().source_xml().unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("base"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    plan.try_add_source_xml_part(core.clone(), xml).unwrap();
+    plan.try_add_internal_relationship(
+        PackURI::new("/").unwrap(),
+        "rCore",
+        rt::CORE_PROPERTIES,
+        core,
+    )
+    .unwrap();
+    let owner = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    drop(donor);
+    assert_eq!(
+        owner.metadata().unwrap().title.as_deref(),
+        Some("donor-title")
+    );
+    assert!(budget.used(litchi_core::Resource::Memory) > 0);
+    cancel.cancel();
+    assert!(matches!(
+        owner.metadata(),
+        Err(Error::Opc(OpcError::Cancelled))
+    ));
+    drop(owner);
+    assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
 }

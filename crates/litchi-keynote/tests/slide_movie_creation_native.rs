@@ -15,7 +15,9 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd};
-use litchi_keynote::{MediaPart, MovieKind, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{
+    MovieKind, MovieSelector, Package, SlideSelector, slide::media::data::MediaPart,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -118,12 +120,13 @@ fn fresh_poster(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<Archive>> {
-    Catalog::from_bytes(source)?
+    Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
         .map(|entry| {
             Ok(Archive::parse(
-                &SnappyStream::decompress(entry.data())?.into_bytes(),
+                &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+                Default::default(),
             )?)
         })
         .collect()
@@ -826,14 +829,17 @@ fn assert_replay_and_inverse(
     let source = Package::from_bytes(source_bytes)?;
     let source_snapshot = exact_bytes(&source)?;
     let commit = with_context(
-        source.add_slide_movie(
-            SlideSelector::index(0),
-            "native-replay-movie.mov",
-            movie_data,
-            "native-replay-poster.png",
-            poster_data,
-            options,
-        ),
+        source
+            .edit_slide_movie_creation()
+            .add(
+                SlideSelector::index(0),
+                "native-replay-movie.mov",
+                movie_data,
+                "native-replay-poster.png",
+                poster_data,
+                options,
+            )
+            .and_then(|edit| edit.commit()),
         "create another movie from native saved fixture",
     )?;
     let candidate = exact_bytes(commit.package())?;

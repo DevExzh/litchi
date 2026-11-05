@@ -18,9 +18,7 @@ pub(super) fn parse_table_row_type(value: u8) -> Result<TableRowType> {
         0x08 => Ok(TableRowType::Totals),
         0x0C => Ok(TableRowType::DataAndTotals),
         0x10 => Ok(TableRowType::Current),
-        _ => Err(Error::InvalidFormula(format!(
-            "invalid PtgRowType 0x{value:02X}"
-        ))),
+        _ => Err(Error::InvalidFormula("invalid PtgRowType")),
     }
 }
 
@@ -77,14 +75,14 @@ pub(super) fn builtin_function_by_index(index: u16) -> Option<BuiltinFunction> {
     })
 }
 
-pub(super) fn validate_xnum(value: f64, context: &str) -> Result<()> {
+pub(super) fn validate_xnum(value: f64, _context: &str) -> Result<()> {
     if !value.is_finite()
         || (value == 0.0 && value.is_sign_negative())
         || (value != 0.0 && !value.is_normal())
     {
-        return Err(Error::InvalidFormula(format!(
-            "{context} contains a non-finite, denormalized, or negative-zero Xnum"
-        )));
+        return Err(Error::InvalidFormula(
+            "contains a non-finite, denormalized, or negative-zero Xnum",
+        ));
     }
     Ok(())
 }

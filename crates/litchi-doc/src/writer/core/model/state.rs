@@ -5,19 +5,16 @@ use super::{
     WriterPicture, WriterShape,
 };
 use crate::encryption::EncryptionProfile;
-use std::collections::HashMap;
 use zeroize::Zeroizing;
 
 /// DOC file writer
 ///
 /// Provides methods to create and modify DOC files.
-pub struct Writer {
+pub struct Builder {
     /// Paragraphs in the document
     pub(in crate::writer::core) paragraphs: Vec<WritableParagraph>,
     /// Tables in the document
     pub(in crate::writer::core) tables: Vec<WritableTable>,
-    /// Document properties
-    pub(in crate::writer::core) properties: HashMap<String, String>,
     /// Header/footer paragraphs (`None` means the story is not set).
     /// Indices map to plcfHdd entries (following Apache POI `HeaderStories` indexing):
     /// 0..5: footnote/endnote separators (unused here)
@@ -50,7 +47,7 @@ pub struct Writer {
     /// Optional glossary-only `AutoText` metadata over the main story.
     pub(in crate::writer::core) glossary_metadata: Option<GlossaryMetadata>,
     /// Optional distinct AutoText-only document attached to this template.
-    pub(in crate::writer::core) attached_glossary: Option<Box<Writer>>,
+    pub(in crate::writer::core) attached_glossary: Option<Box<Builder>>,
     /// Property revision metadata for the writer's single document section
     pub(in crate::writer::core) section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -65,9 +62,9 @@ pub struct Writer {
     pub(in crate::writer::core) numbering: NumberingWriter,
     /// User-defined styles appended after the fifteen fixed style slots
     pub(in crate::writer::core) styles: Vec<crate::writer::stylesheet::StyleDefinition>,
-    /// Inline pictures embedded via [`Writer::insert_picture`]
+    /// Inline pictures embedded via [`Builder::insert_picture`]
     pub(in crate::writer::core) pictures: Vec<WriterPicture>,
-    /// Primitive drawing shapes embedded via [`Writer::insert_floating_shape`]
+    /// Primitive drawing shapes embedded via [`Builder::insert_floating_shape`]
     pub(in crate::writer::core) shapes: Vec<WriterShape>,
     /// Text boxes anchored in the header story, in insertion order.
     pub(in crate::writer::core) header_shapes: Vec<WriterShape>,
@@ -82,6 +79,9 @@ pub struct Writer {
     pub(in crate::writer::core) encryption: Option<WriterEncryption>,
     /// Complete inert MS-OVBA project written under the MS-DOC `Macros` storage.
     pub(in crate::writer::core) vba_project: Option<litchi_vba::Payload>,
+    /// Document properties for the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams; none are written while empty.
+    pub(in crate::writer::core) properties: litchi_ole_common::property_set::SummaryProperties,
 }
 
 pub(in crate::writer::core) struct WriterEncryption {

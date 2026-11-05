@@ -10,7 +10,7 @@
 //! Parser robustness sweeps: truncation and single-byte mutation of
 //! feature-rich seeds must never panic, only yield typed results or errors.
 
-use litchi_rtf::RtfDocument;
+use litchi_rtf::raw::Tree;
 
 /// Feature-rich seeds, one per feature family.
 const SEEDS: &[(&str, &str)] = &[
@@ -123,7 +123,10 @@ const SEEDS: &[(&str, &str)] = &[
 
 fn parse_all(prefixes: &[u8]) {
     for end in 0..=prefixes.len() {
-        drop(RtfDocument::parse_bytes(&prefixes[..end]));
+        drop(Tree::parse_bytes(
+            &prefixes[..end],
+            litchi_rtf::read::OpenOptions::default(),
+        ));
     }
 }
 
@@ -133,13 +136,19 @@ fn mutate_all(seed: &[u8]) {
         for &replacement in REPLACEMENTS {
             let mut mutated = seed.to_vec();
             mutated[index] = replacement;
-            drop(RtfDocument::parse_bytes(&mutated));
+            drop(Tree::parse_bytes(
+                &mutated,
+                litchi_rtf::read::OpenOptions::default(),
+            ));
         }
         // Also flip the byte through all values that change control-word shape.
         for replacement in *b"a9- *" {
             let mut mutated = seed.to_vec();
             mutated[index] = replacement;
-            drop(RtfDocument::parse_bytes(&mutated));
+            drop(Tree::parse_bytes(
+                &mutated,
+                litchi_rtf::read::OpenOptions::default(),
+            ));
         }
     }
 }
@@ -149,7 +158,7 @@ fn truncation_sweeps_never_panic() {
     for (name, seed) in SEEDS {
         parse_all(seed.as_bytes());
         // The seed itself must parse: sweeps only guard against panics.
-        RtfDocument::parse(seed)
+        Tree::parse(seed, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("seed {name} does not parse: {error}"));
     }
 }
@@ -166,11 +175,11 @@ fn single_byte_mutation_sweeps_never_panic() {
 #[test]
 fn hex_escape_at_char_boundary_is_a_typed_error() {
     for rtf in ["{\rtf1\\'ÿ9}", "{\rtf1\\'é}", "{\rtf1\\'ÿ}", "{\rtf1\\'0ÿ}"] {
-        let Err(error) = RtfDocument::parse(rtf) else {
+        let Err(error) = Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()) else {
             panic!("accepted boundary-split hex escape {rtf:?}")
         };
         assert!(
-            matches!(error, litchi_rtf::RtfError::InvalidUnicode(_)),
+            matches!(error, litchi_rtf::Error::InvalidUnicode(_)),
             "expected typed InvalidUnicode for {rtf:?}, got {error}"
         );
     }
@@ -222,7 +231,7 @@ fn targeted_malformed_documents_fail_typed() {
     ];
     for rtf in cases {
         assert!(
-            RtfDocument::parse(rtf).is_err(),
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed input {rtf:?}"
         );
     }
@@ -239,7 +248,7 @@ fn deep_nesting_beyond_limits_fails_typed() {
         rtf.push('}');
     }
     rtf.push('}');
-    assert!(RtfDocument::parse(&rtf).is_err());
+    assert!(Tree::parse(&rtf, litchi_rtf::read::OpenOptions::default()).is_err());
 
     // Math nesting past the math depth limit.
     let mut math = "{\\rtf1{\\mmath".to_string();
@@ -251,7 +260,7 @@ fn deep_nesting_beyond_limits_fails_typed() {
         math.push_str("}}");
     }
     math.push_str("}}");
-    assert!(RtfDocument::parse(&math).is_err());
+    assert!(Tree::parse(&math, litchi_rtf::read::OpenOptions::default()).is_err());
 
     // Custom XML nesting past its depth limit.
     let mut xml = "{\\rtf1".to_string();
@@ -263,5 +272,5 @@ fn deep_nesting_beyond_limits_fails_typed() {
         xml.push_str(r"{\xmlclose t}");
     }
     xml.push('}');
-    assert!(RtfDocument::parse(&xml).is_err());
+    assert!(Tree::parse(&xml, litchi_rtf::read::OpenOptions::default()).is_err());
 }

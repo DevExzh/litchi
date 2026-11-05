@@ -1,0 +1,45 @@
+{
+  "source": "152eb8a53b3dbd6b07a59f44ff2b9a4b6223e474",
+  "pid": 2735982,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v4-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v4"
+  ],
+  "started_unix_seconds": 1792772572.7146783,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "-p",
+        "litchi-ops"
+      ],
+      "exit": 101,
+      "seconds": 14.743206290000671,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v4/check-0.log",
+      "bytes": 3429,
+      "sha256": "4e4503e1d13d8b58d64fd6a43058bede58bf615a9cf43d377789553d25a3192a",
+      "target_bytes_before": 639379748,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Stopped on four common metadata preparation compiler errors; no dependent native/facade or no-feature pass inferred."
+}

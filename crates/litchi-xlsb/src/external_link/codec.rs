@@ -29,7 +29,7 @@ pub(crate) fn parse_source_with_budget(data: &[u8], budget: &mut Budget) -> Resu
     let mut unknown_bytes = 0usize;
     let mut after_known = 0usize;
 
-    for record in crate::raw::Records::with_limits(data, limits) {
+    for record in crate::raw::Records::new(data, limits) {
         let record = record?;
         let is_known = is_modeled_record(record.kind());
         if is_known {
@@ -105,13 +105,9 @@ pub(crate) fn is_modeled_record(kind: crate::raw::Kind) -> bool {
     )
 }
 
-/// Parse one complete XLSB External Link part stream.
-pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
-    parse_external_link_with_limits(data, ExternalLinkLimits::DEFAULT)
-}
-
-/// Parse one complete stream under an explicit finite resource policy.
-pub fn parse_external_link_with_limits(data: &[u8], limits: ExternalLinkLimits) -> Result<Parsed> {
+/// Parse one complete XLSB External Link part stream under an explicit
+/// finite resource policy.
+pub fn parse_external_link(data: &[u8], limits: ExternalLinkLimits) -> Result<Parsed> {
     let mut budget = limits.budget();
     parse_external_link_with_budget(data, &mut budget)
 }
@@ -150,7 +146,7 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
     let mut saw_end = false;
     let mut extern_table_open = false;
 
-    for record in crate::raw::Records::with_limits(data, limits) {
+    for record in crate::raw::Records::new(data, limits) {
         let record = record?;
         let cache_region = extern_table_open
             || record.kind() == crate::raw::kind::EXTERN_TABLE_START
@@ -183,7 +179,7 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
                     return Err(invalid("invalid BrtBeginSupBook framing"));
                 }
                 let mut cursor =
-                    crate::raw::Cursor::with_limits(record.payload(), "BrtBeginSupBook", limits);
+                    crate::raw::Cursor::new(record.payload(), "BrtBeginSupBook", limits);
                 let kind = cursor.read_u16()?;
                 let first =
                     read_external_wide_string(&mut cursor, budget, "BrtBeginSupBook string1")?;
@@ -230,7 +226,7 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
                     return Err(invalid("unexpected BrtSupNameStart"));
                 }
                 let mut cursor =
-                    crate::raw::Cursor::with_limits(record.payload(), "BrtSupNameStart", limits);
+                    crate::raw::Cursor::new(record.payload(), "BrtSupNameStart", limits);
                 let name = read_external_wide_string(&mut cursor, budget, "BrtSupNameStart")?;
                 cursor.finish()?;
                 validate_defined_name(&name)?;
@@ -246,7 +242,7 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
                     return Err(invalid("unexpected BrtSupNameFmla"));
                 }
                 let mut cursor =
-                    crate::raw::Cursor::with_limits(record.payload(), "BrtSupNameFmla", limits);
+                    crate::raw::Cursor::new(record.payload(), "BrtSupNameFmla", limits);
                 if record.payload().len() < 4 {
                     return Err(Error::InvalidLength {
                         expected: 4,
@@ -295,11 +291,8 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
                 {
                     return Err(invalid("unexpected BrtSupNameValueStart"));
                 }
-                let mut cursor = crate::raw::Cursor::with_limits(
-                    record.payload(),
-                    "BrtSupNameValueStart",
-                    limits,
-                );
+                let mut cursor =
+                    crate::raw::Cursor::new(record.payload(), "BrtSupNameValueStart", limits);
                 let rows = cursor.read_u32()?;
                 let columns = cursor.read_u32()?;
                 cursor.finish()?;
@@ -495,31 +488,18 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
     })
 }
 
-/// Explicitly named alias for callers that need the unresolved relationship
-/// metadata as well as the typed link.
-pub fn parse_external_link_with_relationship(data: &[u8]) -> Result<Parsed> {
-    parse_external_link(data)
-}
-
-/// Explicitly named relationship-aware parser under an explicit policy.
-pub fn parse_external_link_with_relationship_with_limits(
+/// Explicitly named relationship-aware parser: the unresolved relationship
+/// metadata as well as the typed link, under an explicit policy.
+pub fn parse_external_link_with_relationship(
     data: &[u8],
     limits: ExternalLinkLimits,
 ) -> Result<Parsed> {
-    parse_external_link_with_limits(data, limits)
+    parse_external_link(data, limits)
 }
 
-/// Parse a stream when the caller only needs its inert semantic model.
-pub fn parse_external_link_model(data: &[u8]) -> Result<Link> {
-    parse_external_link(data).map(Parsed::into_link)
-}
-
-/// Parse only the inert semantic model under an explicit policy.
-pub fn parse_external_link_model_with_limits(
-    data: &[u8],
-    limits: ExternalLinkLimits,
-) -> Result<Link> {
-    parse_external_link_with_limits(data, limits).map(Parsed::into_link)
+/// Parse only the inert semantic model of a stream under an explicit policy.
+pub fn parse_external_link_model(data: &[u8], limits: ExternalLinkLimits) -> Result<Link> {
+    parse_external_link(data, limits).map(Parsed::into_link)
 }
 
 fn parse_external_cached_value(
@@ -548,14 +528,12 @@ fn parse_external_cached_value(
                     found: data.len(),
                 });
             }
-            let mut cursor = crate::raw::Cursor::with_limits(data, "BrtSupNameSt", limits);
+            let mut cursor = crate::raw::Cursor::new(data, "BrtSupNameSt", limits);
             let value = read_external_wide_string(&mut cursor, budget, "BrtSupNameSt")?;
             cursor.finish()?;
             Ok(CachedValue::String(value))
         },
-        _ => Err(invalid(format!(
-            "invalid cached external value record {record_type}"
-        ))),
+        _ => Err(invalid("invalid cached external value record")),
     }
 }
 
@@ -570,13 +548,11 @@ fn parse_external_sheet_names(
             found: data.len(),
         });
     }
-    let mut cursor = crate::raw::Cursor::with_limits(data, "BrtSupTabs", limits);
+    let mut cursor = crate::raw::Cursor::new(data, "BrtSupTabs", limits);
     let count = usize::try_from(cursor.read_u32()?)
         .map_err(|_| invalid("external sheet-name count overflow"))?;
     if count > MAX_COLLECTION_ITEMS {
-        return Err(invalid(format!(
-            "external sheet-name count {count} exceeds 65,535"
-        )));
+        return Err(invalid("external sheet-name count exceeds 65,535"));
     }
     let mut names = Vec::new();
     budget.retained_objects(1)?;
@@ -596,15 +572,15 @@ fn parse_external_sheet_names(
             || name.starts_with('\'')
             || name.ends_with('\'')
         {
-            return Err(invalid(format!(
-                "external sheet name {name:?} does not follow sheet-name grammar"
-            )));
+            return Err(invalid(
+                "external sheet name does not follow sheet-name grammar",
+            ));
         }
         if names
             .iter()
             .any(|existing: &String| excel_name_eq(existing, &name))
         {
-            return Err(invalid(format!("duplicate external sheet name {name:?}")));
+            return Err(invalid("duplicate external sheet name"));
         }
         names.push(name);
     }
@@ -633,15 +609,15 @@ fn validate_external_name_bits(kind: u16, bits: &[u8; 7]) -> Result<()> {
         _ => false,
     };
     if !valid {
-        return Err(invalid(format!(
-            "invalid BrtSupNameBits properties for external-link kind {kind}"
-        )));
+        return Err(invalid(
+            "invalid BrtSupNameBits properties for external-link kind",
+        ));
     }
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormula(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormula(message)
 }
 
 fn copy_bytes(data: &[u8], resource: &'static str) -> Result<Vec<u8>> {
@@ -782,7 +758,7 @@ mod tests {
         EXT_PTG_AREA, EXT_PTG_AREA_ERROR, EXT_PTG_ERROR, EXT_PTG_REFERENCE,
         EXT_PTG_REFERENCE_ERROR, REFERENCE_ERROR_CODE,
     };
-    use crate::raw::Writer;
+    use crate::raw::Encoder;
 
     #[test]
     fn accepts_exactly_the_five_external_name_token_structures() {
@@ -878,8 +854,9 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = write_external_link_stream(&link, Some("rIdPath")).unwrap();
-        let parsed = parse_external_link(&bytes).unwrap();
+        let bytes = write_external_link_stream(&link, Some("rIdPath"), ExternalLinkLimits::DEFAULT)
+            .unwrap();
+        let parsed = parse_external_link(&bytes, ExternalLinkLimits::DEFAULT).unwrap();
         assert_eq!(parsed.relationship_id(), Some("rIdPath"));
         assert_eq!(parsed.link().source(), "rIdPath");
         assert_eq!(parsed.link().sheet_names(), link.sheet_names());
@@ -911,8 +888,11 @@ mod tests {
             ],
         )
         .unwrap();
-        let dde_bytes = write_external_link_stream(&dde, None).unwrap();
-        let parsed_dde = parse_external_link(&dde_bytes).unwrap().into_link();
+        let dde_bytes =
+            write_external_link_stream(&dde, None, ExternalLinkLimits::DEFAULT).unwrap();
+        let parsed_dde = parse_external_link(&dde_bytes, ExternalLinkLimits::DEFAULT)
+            .unwrap()
+            .into_link();
         assert_eq!(parsed_dde, dde);
 
         let ole = Link::ole_with_items(
@@ -928,8 +908,9 @@ mod tests {
             ],
         )
         .unwrap();
-        let ole_bytes = write_external_link_stream(&ole, Some("rIdOle")).unwrap();
-        let parsed_ole = parse_external_link(&ole_bytes).unwrap();
+        let ole_bytes =
+            write_external_link_stream(&ole, Some("rIdOle"), ExternalLinkLimits::DEFAULT).unwrap();
+        let parsed_ole = parse_external_link(&ole_bytes, ExternalLinkLimits::DEFAULT).unwrap();
         assert_eq!(parsed_ole.relationship_id(), Some("rIdOle"));
         assert_eq!(parsed_ole.resolve_source("Model.xlsx").unwrap(), ole);
     }
@@ -937,10 +918,11 @@ mod tests {
     #[test]
     fn owner_parser_rejects_trailing_records_after_end() {
         let link = Link::dde("Excel", "System", vec!["StatusItem".to_string()]).unwrap();
-        let mut bytes = write_external_link_stream(&link, None).unwrap();
-        Writer::new(&mut bytes)
+        let mut bytes =
+            write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
+        Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT)
             .write_record(crate::raw::kind::SUP_NAME_END, &[])
             .unwrap();
-        assert!(parse_external_link(&bytes).is_err());
+        assert!(parse_external_link(&bytes, ExternalLinkLimits::DEFAULT).is_err());
     }
 }

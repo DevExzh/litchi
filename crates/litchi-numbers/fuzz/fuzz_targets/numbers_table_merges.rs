@@ -13,9 +13,7 @@ use std::{hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi_numbers::table::merge::Region;
-use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 const MAX_DESCRIPTOR_BYTES: usize = 64 * 1024;
 const MAX_PACKAGE_BYTES: u64 = 512 * 1024;
@@ -59,20 +57,30 @@ fuzz_target!(|data: &[u8]| {
     exercise_arbitrary_package(&descriptor);
 });
 
-fn bounded_options() -> PackageReadOptions {
-    let physical = PackageLimits::new(
-        MAX_PACKAGE_BYTES,
-        MAX_PACKAGE_ENTRIES,
-        MAX_PACKAGE_ENTRY_BYTES,
-        MAX_PACKAGE_TOTAL_BYTES,
-        MAX_IWA_STREAM_BYTES,
-    )
-    .expect("fuzz physical profile is valid");
-    let semantic = PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+fn bounded_options() -> litchi_numbers::OpenOptions {
+    let physical = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(MAX_PACKAGE_BYTES)
+        .and_then(|b| b.max_members(MAX_PACKAGE_ENTRIES))
+        .and_then(|b| b.max_entry_bytes(MAX_PACKAGE_ENTRY_BYTES))
+        .and_then(|b| b.max_aggregate_bytes(MAX_PACKAGE_TOTAL_BYTES))
+        .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|b| b.build())
+        .expect("fuzz physical profile is valid");
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|b| b.max_sheets(MAX_SHEETS))
+        .and_then(|b| b.max_tables(MAX_TABLES))
+        .and_then(|b| b.max_references(MAX_REFERENCES))
+        .and_then(|b| b.build())
         .expect("fuzz semantic profile is valid")
-        .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_OUTPUT_TEXT_BYTES)
+        .to_builder()
+        .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+        .and_then(|b| b.max_output_text_bytes(MAX_OUTPUT_TEXT_BYTES))
+        .and_then(|b| b.build())
         .expect("fuzz projection profile is valid");
-    PackageReadOptions::new(physical, semantic)
+    litchi_numbers::OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(semantic)
 }
 
 fn normalize_input(data: &[u8]) -> Option<Vec<u8>> {
@@ -137,13 +145,9 @@ fn exercise_fixed_selectors() {
         ),
     ] {
         let result = package.table_merges(sheet, table);
-        if matches!(
-            sheet,
-            SheetSelector::Index(0) | SheetSelector::Name(NATIVE_SHEET)
-        ) && matches!(
-            table,
-            TableSelector::Index(0) | TableSelector::Name(NATIVE_TABLE)
-        ) {
+        if (sheet == SheetSelector::index(0) || sheet == SheetSelector::Name(NATIVE_SHEET))
+            && (table == TableSelector::index(0) || table == TableSelector::Name(NATIVE_TABLE))
+        {
             let expected = [Region::new(10, 1, 2, 2).expect("native merge geometry is valid")];
             assert_eq!(
                 result

@@ -1,0 +1,39 @@
+{
+  "source": "5e1edd7b012b66b2ac4ed2fcac910cd717c6e64f",
+  "pid": 3111324,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v19-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v19"
+  ],
+  "started_unix_seconds": 1792786314.8652875,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 71.67390136399626,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v19/check-0.log",
+      "bytes": 234088,
+      "sha256": "dad77f9282210bc9e9702b751fb997a53588c9d4b30399096ce31cc021faf661",
+      "target_bytes_before": 3776748446,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "OPC lint correction passes. Workspace Clippy reaches common OOXML and reports two production lints: a lazy closure producing only a fixed primitive Limit value, and an unnecessary mutable borrow of relationship IDs. Corrected without changing admission, limits or relationship allocation order; no lint allowance."
+}

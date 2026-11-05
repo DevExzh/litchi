@@ -6,30 +6,38 @@
 
 mod codec;
 mod model;
-mod package;
+pub(crate) mod package;
+mod summary;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{
-    parse, parse as parse_slide_media, write_pictures, write_pictures as write_slide_media_pictures,
-};
+pub use codec::{parse, write_pictures};
 pub use model::{
     Bookmark, Conformance, Data, Extension, ExtensionList, Fade, Kind, List, Picture, Poster,
     Resource, Transform, Trim,
 };
-pub use package::{load, load as load_slide_media, store, store as store_slide_media};
+pub use package::load;
+#[cfg(test)]
+pub(crate) use package::store_with;
+pub(crate) use package::{store_with_limits, validate_replay_part, validate_replay_references};
+pub use summary::{Summary, summary};
 
 // These are crate-private seams shared by the XML and package layers and by
 // the in-module regression tests; they do not expand the external API.
 #[cfg(test)]
 pub(crate) use codec::{BoundedXml, write_picture};
-pub(crate) use codec::{bounded, document_conformance, validate_id, xml_error};
+pub(crate) use codec::{
+    document_conformance, document_conformance_with_limits, validate_id, xml_error,
+};
 #[cfg(test)]
 pub(crate) use package::resource_uri;
-pub(crate) use package::{parse_time, validate_value};
+#[cfg(test)]
+pub(crate) use package::validate_value;
+pub(crate) use package::{parse_time, validate_value_with_limits};
 
+use crate::Result;
+use crate::error::CodecLimitKind;
 use crate::time::{Offset, ParseError as TimeParseError};
-use crate::{Error, Result};
 use litchi_drawingml::coordinate::{Coordinate, Extent, ParseError as CoordinateParseError};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -62,21 +70,110 @@ pub(crate) const MAX_MEDIA_EXTENSION_XML_BYTES: usize = 4 * 1024 * 1024;
 pub(crate) const MAX_PAYLOAD_BYTES: usize = 128 * 1024 * 1024;
 pub(crate) const MAX_TOTAL_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
 
+/// Resource policy for the raw slide-media XML codec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub max_string_bytes: usize,
+    pub max_media: usize,
+    pub max_bookmarks: usize,
+    pub max_extension_bytes: usize,
+    pub max_payload_bytes: usize,
+    pub max_total_payload_bytes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_string_bytes: MAX_STRING_BYTES,
+        max_media: MAX_MEDIA,
+        max_bookmarks: MAX_BOOKMARKS,
+        max_extension_bytes: MAX_MEDIA_EXTENSION_XML_BYTES,
+        max_payload_bytes: MAX_PAYLOAD_BYTES,
+        max_total_payload_bytes: MAX_TOTAL_PAYLOAD_BYTES,
+    };
+
+    #[must_use]
+    pub const fn from_source(source: litchi_opc::SourceLimits) -> Self {
+        Self::DEFAULT.constrained_by_source(source)
+    }
+
+    /// Intersect a selected semantic policy with the physical source ceiling.
+    ///
+    /// The source policy remains authoritative for bytes, parser depth and
+    /// event count; a caller-selected semantic policy can only narrow it.
+    #[must_use]
+    pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
+        let part = cap_u64(source.max_part_bytes());
+        Self {
+            max_input_bytes: min_usize(self.max_input_bytes, part),
+            max_output_bytes: min_usize(self.max_output_bytes, part),
+            max_depth: min_usize(self.max_depth, source.max_depth()),
+            max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_string_bytes: min_usize(self.max_string_bytes, source.max_xml_attribute_bytes()),
+            max_extension_bytes: min_usize(self.max_extension_bytes, part),
+            max_payload_bytes: min_usize(self.max_payload_bytes, cap_u64(source.max_entry_bytes())),
+            max_total_payload_bytes: min_usize(
+                self.max_total_payload_bytes,
+                cap_u64(source.max_total_part_bytes()),
+            ),
+            ..self
+        }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn cap_u64(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
+}
+
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(name: &str) -> Error {
-    invalid(format!("slide media {name} limit exceeded"))
+pub(crate) fn limit(kind: CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
-pub(crate) fn output_limit(maximum: usize) -> Error {
+pub(crate) fn output_limit(maximum: usize, observed: usize) -> Error {
     Error::Limit {
-        resource: "slide media serialized XML bytes",
-        limit: maximum,
+        kind: LimitKind::Codec(CodecLimitKind::OutputBytes),
+        observed,
+        maximum,
     }
 }
 
 pub(crate) fn coordinate_error(error: CoordinateParseError, name: &str) -> Error {
-    invalid(format!("invalid media transform {name}: {error}"))
+    match error {
+        CoordinateParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Drawing(litchi_drawingml::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }),
+        _ => invalid(format!("invalid media transform {name}")),
+    }
 }
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

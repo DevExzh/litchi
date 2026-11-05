@@ -1,0 +1,21 @@
+{
+  "reviewer": "w8_file; independent read-only review requested by coordinator",
+  "source_base": "00673b9006",
+  "candidate": "be72b3a163f4fc1bc58a54c4d9a18b7fb8eba0b6",
+  "result": "Early candidate-length admission defect repaired; performance remains unaccepted.",
+  "checked": [
+    "Shared visitor matches eager in-order traversal and discovered-SID bounds",
+    "Retained CFB index contains only root-reachable entries; excludes root signature-name false positives",
+    "Signature fast path and bounded visitor retain source fences",
+    "Base::is_signed checks source freshness before memo access",
+    "Native snapshot reuses admitted presentation under source checks and retained options",
+    "Unsigned memo seeded only after closed typed publication and signature refusal",
+    "Compact u32 block spans cover admitted 1GiB source ceiling"
+  ],
+  "limitation": "Does not replace native performance acceptance or integrated workspace gates",
+  "finding": {
+    "before": "Base::publish constructed compact block spans before admitting target length. The admitted-source bound alone did not prove the target bound.",
+    "fix": "Admit the target against the retained source byte ceiling before building ranges/spans; preserve SourceChanged then Signed precedence on an oversized candidate.",
+    "coverage": "exact limit, limit+1, usize::MAX virtual observations; actual oversized publication; signed source and changed positional source."
+  }
+}

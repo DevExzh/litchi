@@ -3,14 +3,16 @@
 use super::{codec, model, validation};
 use crate::model::protection as wire;
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 
 /// Return the compact protection state needed by source-backed cell edits
 /// without retaining a second copy of `content.xml`.
 pub(crate) fn source_edit_protection(
     content_xml: &str,
     styles_xml: Option<&str>,
+    limits: &XmlStreamLimits,
 ) -> Result<(bool, Vec<String>)> {
-    let (location, document, sheets, styles) = codec::parse(content_xml, styles_xml)?;
+    let (location, document, sheets, styles) = codec::parse(content_xml, styles_xml, limits)?;
     validation::validate_snapshot(content_xml, &location, &document, &sheets, &styles)?;
     let mut protected = Vec::new();
     protected
@@ -37,6 +39,7 @@ pub struct Snapshot {
     pub(super) document: model::Document,
     pub(super) sheets: Vec<model::Sheet>,
     pub(super) styles: model::Styles,
+    pub(super) xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -44,10 +47,15 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(content_xml: impl Into<String>, styles_xml: Option<&str>) -> Result<Self> {
+    pub fn parse(
+        content_xml: impl Into<String>,
+        styles_xml: Option<&str>,
+        limits: &XmlStreamLimits,
+    ) -> Result<Self> {
         let source = content_xml.into();
         let styles_xml = styles_xml.map(str::to_owned);
-        let (location, document, sheets, styles) = codec::parse(&source, styles_xml.as_deref())?;
+        let (location, document, sheets, styles) =
+            codec::parse(&source, styles_xml.as_deref(), limits)?;
         validation::validate_snapshot(&source, &location, &document, &sheets, &styles)?;
         Ok(Self {
             source,
@@ -56,11 +64,16 @@ impl Snapshot {
             document,
             sheets,
             styles,
+            xml_limits: *limits,
         })
     }
 
-    pub(crate) fn from_parts(content_xml: &str, styles_xml: Option<&str>) -> Result<Self> {
-        Self::parse(content_xml.to_owned(), styles_xml)
+    pub(crate) fn from_parts(
+        content_xml: &str,
+        styles_xml: Option<&str>,
+        limits: &XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::parse(content_xml.to_owned(), styles_xml, limits)
     }
 
     /// Document-level protection, including inert password-verifier metadata.
@@ -95,80 +108,25 @@ impl Snapshot {
 
     /// Start a failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             draft: self.clone(),
         }
     }
 }
 
-/// A reversible protection patch bound to the exact XML source it edits.
-///
-/// Full source and target XML remain private.  Applying a patch verifies the
-/// complete captured source before parsing the target again, so a stale patch
-/// can never publish a protection change into a different spreadsheet.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: String,
-    target: String,
-}
-
-impl Patch {
-    /// Whether this patch makes no change.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return the exact-source patch that restores the accepted source.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
-
-    /// Apply this patch only to the exact snapshot that produced it.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source_xml() != self.source {
-            return Err(litchi_core::Error::InvalidFormat(
-                "ODS protection patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_parts(&self.target, snapshot.styles_xml.as_deref())?;
-        Ok(Commit {
-            snapshot: target,
-            changed: !self.is_empty(),
-            patch: self.clone(),
-        })
-    }
-}
-
 /// A staged protection candidate derived from one immutable [`Snapshot`].
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     draft: Snapshot,
 }
 
-impl Transaction {
-    /// Create a transaction from a snapshot.
-    #[must_use]
-    pub fn new(snapshot: Snapshot) -> Self {
-        Self {
-            before: snapshot.clone(),
-            draft: snapshot,
-        }
-    }
-
+impl Edit {
     /// The current immutable candidate.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn current(&self) -> &Snapshot {
         &self.draft
     }
 
@@ -209,14 +167,14 @@ impl Transaction {
         self.draft.styles = styles;
     }
 
-    /// Restore the source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.clone();
     }
 
     /// Whether the candidate changes any protected owner.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.before.document != self.draft.document
             || self.before.sheets != self.draft.sheets
             || self.before.styles != self.draft.styles
@@ -226,7 +184,7 @@ impl Transaction {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         validation::validate_candidate(
             &self.before.location,
             &self.before.sheets,
@@ -236,14 +194,9 @@ impl Transaction {
             &self.draft.styles,
         )?;
         if !self.is_changed() {
-            let patch = Patch {
-                source: self.before.source,
-                target: self.draft.source.clone(),
-            };
             return Ok(Commit {
                 snapshot: self.draft,
                 changed: false,
-                patch,
             });
         }
         let styles_changed = self.before.styles != self.draft.styles;
@@ -255,61 +208,43 @@ impl Transaction {
             &self.draft.styles,
             styles_changed,
         )?;
-        let snapshot = Snapshot::from_parts(&content_xml, self.before.styles_xml.as_deref())?;
+        let snapshot = Snapshot::from_parts(
+            &content_xml,
+            self.before.styles_xml.as_deref(),
+            &self.before.xml_limits,
+        )?;
         Ok(Commit {
             snapshot,
             changed: true,
-            patch: Patch {
-                source: self.before.source,
-                target: content_xml,
-            },
         })
     }
 }
 
 /// A validated protection publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     changed: bool,
-    patch: Patch,
 }
 
 impl Commit {
     /// Whether the candidate changed the source.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.changed
     }
 
+    #[cfg(test)]
     /// The resulting immutable snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the reversible exact-source patch produced by this commit.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 
     /// The resulting `content.xml`.
     #[must_use]
-    pub fn content_xml(&self) -> &str {
+    pub(crate) fn content_xml(&self) -> &str {
         &self.snapshot.source
-    }
-
-    /// Consume the publication into the rebuilt snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume the publication into package-owned XML.
-    #[must_use]
-    pub fn into_owned_xml(self) -> String {
-        self.snapshot.source
     }
 }
 
@@ -318,9 +253,9 @@ impl Commit {
 ///
 /// # Errors
 /// Returns an error when the operation cannot be completed.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
+pub(crate) fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
 where
-    F: FnOnce(&mut Transaction) -> Result<()>,
+    F: FnOnce(&mut Edit) -> Result<()>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

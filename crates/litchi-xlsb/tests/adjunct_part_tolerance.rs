@@ -13,12 +13,12 @@ use std::io::Cursor;
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::package::connections::{
     CommandType, Connection, Connections, DbProperties, Properties, SourceType,
 };
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::{
     Defect, LayoutDefect, Package, ReservedFieldDefect, SourceBackedWorkbook, ToleranceReport,
     Workbook,
@@ -34,15 +34,13 @@ fn test_data(name: &str) -> Vec<u8> {
     .unwrap()
 }
 
-fn save(workbook: &Workbook) -> Vec<u8> {
-    let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
-    output.into_inner()
-}
-
 /// The first part whose name contains `fragment`.
 fn part_name(package_bytes: &[u8], fragment: &str) -> String {
-    let package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .iter_parts()
         .map(|part| part.partname().to_string())
@@ -51,23 +49,30 @@ fn part_name(package_bytes: &[u8], fragment: &str) -> String {
 }
 
 fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let uri = PackURI::new(part).unwrap();
-    let mut stream: Stream = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Stream = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     transform(&mut stream);
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_type, payload) in &stream {
         writer.write_record(*record_type, payload).unwrap();
     }
     package.get_part_mut(&uri).unwrap().set_blob(blob);
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -94,7 +99,7 @@ fn assert_single(
 
 /// A workbook with one structured table on its first sheet.
 fn table_workbook() -> Vec<u8> {
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "Region");
     data.set_cell(0, 1, "Amount");
     data.set_cell(1, 0, "North");
@@ -126,39 +131,47 @@ fn table_workbook() -> Vec<u8> {
         ..Table::default()
     })
     .unwrap();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(data);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
 /// A workbook carrying one inert ODBC connection.
 fn connections_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "value");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
-    let mut workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
-    workbook
-        .set_connections(Connections {
-            connections: vec![Connection {
-                connection_id: 42,
-                source_type: SourceType::Odbc,
-                name: "Sales".to_string(),
-                properties: Properties::Database(DbProperties {
-                    command_type: CommandType::Sql,
-                    connection_string: "Driver={Generated};Server=example.invalid".to_string(),
-                    command: Some("SELECT 1".to_string()),
-                    server_command: None,
-                }),
-                ..Connection::default()
-            }],
-        })
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
         .unwrap();
-    save(&workbook)
+    let package = Package::from_bytes(&output.into_inner()).unwrap();
+    let mut edit = package.edit_connections().unwrap();
+    edit.replace(Some(Connections {
+        connections: vec![Connection {
+            connection_id: 42,
+            source_type: SourceType::Odbc,
+            name: "Sales".to_string(),
+            properties: Properties::Database(DbProperties {
+                command_type: CommandType::Sql,
+                connection_string: "Driver={Generated};Server=example.invalid".to_string(),
+                command: Some("SELECT 1".to_string()),
+                server_command: None,
+            }),
+            ..Connection::default()
+        }],
+    }))
+    .unwrap();
+    edit.commit().unwrap().into_package().to_bytes().unwrap()
 }
 
 #[test]
@@ -181,7 +194,7 @@ fn conformant_adjunct_parts_repair_nothing() {
             );
         }
         assert!(
-            Package::from_bytes(bytes)
+            Package::from_bytes(&bytes)
                 .unwrap()
                 .tolerance_report()
                 .is_clean()
@@ -212,9 +225,7 @@ fn trailing_table_record_bytes_are_ignored_and_recorded_once() {
         Some("SalesTable")
     );
     assert_eq!(
-        Package::from_bytes(bytes.clone())
-            .unwrap()
-            .tolerance_report(),
+        Package::from_bytes(&bytes).unwrap().tolerance_report(),
         workbook.tolerance_report()
     );
 
@@ -278,7 +289,7 @@ fn trailing_pivot_cache_definition_bytes_are_ignored_and_recorded() {
         format!("{:?}", control.pivot_cache_definitions())
     );
     assert_eq!(
-        Package::from_bytes(bytes).unwrap().tolerance_report(),
+        Package::from_bytes(&bytes).unwrap().tolerance_report(),
         workbook.tolerance_report()
     );
 }

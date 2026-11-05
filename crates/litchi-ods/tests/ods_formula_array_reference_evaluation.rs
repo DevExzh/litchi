@@ -263,7 +263,8 @@ fn make_execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext)
 }
 
 fn parse(source: &str) -> Expression {
-    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
+    Expression::parse(source, &Default::default())
+        .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
 }
 
 fn evaluate_at<'expr>(
@@ -344,7 +345,9 @@ fn assert_large_duplicate_union(pattern: &[(&str, [usize; 3], [usize; 3])], scop
     let source = repeated_union_source(&reference_sources, COUNT);
     let expected: Vec<_> = pattern
         .iter()
-        .map(|(source, _, _)| Reference::parse(source).expect("valid expected reference"))
+        .map(|(source, _, _)| {
+            Reference::parse(source, &Default::default()).expect("valid expected reference")
+        })
         .collect();
     let resolver = FixtureResolver::new();
     let (budget, _cancellation, execution) = make_execution(scope);

@@ -45,7 +45,13 @@ fn reads_schema_boolean_forms_and_replaces_only_the_typed_range() {
         Some(true)
     );
 
-    let updated = transaction::set(&original, &source, false).expect("set");
+    let updated = transaction::set(
+        &original,
+        &source,
+        false,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     let parsed = codec::read(&updated).expect("updated source");
     assert_eq!(
         parsed.snapshot.as_ref().and_then(Snapshot::value),
@@ -80,12 +86,22 @@ fn unknown_extension_entries_and_known_extension_children_are_lossless() {
         2
     );
 
-    let updated = transaction::set(&xml, &source, false).expect("set");
+    let updated = transaction::set(
+        &xml,
+        &source,
+        false,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     assert!(contains(&updated, b"<f:payload answer=\"42\"/>"));
     assert!(contains(&updated, b"<f:future keep=\"yes\"/>"));
-    let removed = transaction::remove(&updated, &codec::read(&updated).expect("updated source"))
-        .expect("remove")
-        .expect("removed value");
+    let removed = transaction::remove(
+        &updated,
+        &codec::read(&updated).expect("updated source"),
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("remove")
+    .expect("removed value");
     assert_eq!(
         codec::read(&removed).expect("removed source").snapshot,
         None
@@ -98,7 +114,13 @@ fn unknown_extension_entries_and_known_extension_children_are_lossless() {
 fn creates_and_removes_extension_lists_without_touching_the_shape_tail() {
     let xml = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:nvSpPr><p:cNvPr id="1" name="Box"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp>"#;
     let source = codec::read(xml).expect("source");
-    let updated = transaction::set(xml, &source, true).expect("set");
+    let updated = transaction::set(
+        xml,
+        &source,
+        true,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     let parsed = codec::read(&updated).expect("updated source");
     assert_eq!(
         parsed.snapshot.as_ref().and_then(Snapshot::value),
@@ -107,30 +129,18 @@ fn creates_and_removes_extension_lists_without_touching_the_shape_tail() {
     assert!(contains(&updated, b"<p:spPr/>"));
 
     let source = codec::read(&updated).expect("updated source");
-    let removed = transaction::remove(&updated, &source)
-        .expect("remove")
-        .expect("removed value");
+    let removed = transaction::remove(
+        &updated,
+        &source,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("remove")
+    .expect("removed value");
     assert_eq!(
         codec::read(&removed).expect("removed source").snapshot,
         None
     );
     assert!(contains(&removed, b"<p:nvPr/>"));
-}
-
-#[test]
-fn detached_edits_are_atomic_and_preserve_the_snapshot_contract() {
-    let snapshot = Snapshot::new(true);
-    let mut editor = snapshot.edit();
-    editor.set(false).expect("set");
-    assert!(editor.is_changed());
-    assert_eq!(editor.snapshot().value(), Some(false));
-    let committed = editor.commit().expect("commit");
-    assert_eq!(snapshot.value(), Some(true));
-    assert_eq!(committed.value(), Some(false));
-
-    let mut editor = committed.edit();
-    editor.clear();
-    assert_eq!(editor.commit().expect("clear").value(), None);
 }
 
 #[test]
@@ -141,27 +151,34 @@ fn package_operations_are_selector_first_and_atomic() {
     ));
 
     assert_eq!(
-        package::load(&package, &owner, "Box")
+        package::load_with_limits(&package, &owner, "Box", crate::shape::Limits::DEFAULT)
             .expect("load")
             .and_then(|snapshot| snapshot.value()),
         Some(true)
     );
-    let previous = package::put(&mut package, &owner, 0_usize, false)
-        .expect("put")
-        .expect("previous");
+    let previous = package::put_with_limits(
+        &mut package,
+        &owner,
+        0_usize,
+        false,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("put")
+    .expect("previous");
     assert_eq!(previous.value(), Some(true));
     assert_eq!(
-        package::load(&package, &owner, "Box")
+        package::load_with_limits(&package, &owner, "Box", crate::shape::Limits::DEFAULT)
             .expect("load")
             .and_then(|snapshot| snapshot.value()),
         Some(false)
     );
-    let removed = package::remove(&mut package, &owner, "Box")
-        .expect("remove")
-        .expect("removed");
+    let removed =
+        package::remove_with_limits(&mut package, &owner, "Box", crate::shape::Limits::DEFAULT)
+            .expect("remove")
+            .expect("removed");
     assert_eq!(removed.value(), Some(false));
     assert!(
-        package::load(&package, &owner, 0_usize)
+        package::load_with_limits(&package, &owner, 0_usize, crate::shape::Limits::DEFAULT)
             .expect("load after remove")
             .is_none()
     );
@@ -169,13 +186,17 @@ fn package_operations_are_selector_first_and_atomic() {
 
 #[test]
 fn public_package_and_slide_facades_use_the_same_shape_selector() {
-    let mut authored = crate::package::Package::new().expect("package");
+    let mut builder = crate::builder::Builder::new().expect("builder");
     {
-        let presentation = authored.presentation_mut().expect("mutable presentation");
+        let presentation = builder.presentation().expect("mutable presentation");
         let slide = presentation.add_slide().expect("slide");
         slide.add_text_box("Designer", 914_400, 914_400, 2_743_200, 914_400);
     }
-    let bytes = authored.to_bytes().expect("serialize");
+    let bytes = builder
+        .build()
+        .expect("build")
+        .to_bytes()
+        .expect("serialize");
     let mut package = crate::package::Package::from_bytes(&bytes).expect("reopen");
 
     assert!(
@@ -228,7 +249,13 @@ fn validation_rejects_invalid_values_and_duplicate_known_extensions() {
 fn strict_profile_uses_the_strict_presentation_namespace() {
     let xml = br#"<p:sp xmlns:p="http://purl.oclc.org/ooxml/presentationml/main"><p:nvSpPr><p:cNvPr id="1" name="Box"/><p:cNvSpPr/><p:nvPr><p:extLst/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>"#;
     let source = codec::read(xml).expect("source");
-    let updated = transaction::set(xml, &source, true).expect("set");
+    let updated = transaction::set(
+        xml,
+        &source,
+        true,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     assert!(contains(
         &updated,
         b"http://purl.oclc.org/ooxml/presentationml/main"

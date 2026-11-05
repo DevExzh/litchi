@@ -17,7 +17,7 @@
 //! Bounded Strict/Transitional XML codec for the `WordprocessingML` font table.
 
 use crate::{Error, Result};
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use quick_xml::{XmlVersion, events::Event, reader::Reader};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -34,8 +34,8 @@ impl Table {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
-        write(self, conformance)
+    pub fn xml(&self, conformance: Conformance, limits: &super::Limits) -> Result<Vec<u8>> {
+        super::raw::write(self, conformance, limits)
     }
 }
 
@@ -62,15 +62,52 @@ struct Node {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse(xml: &[u8]) -> Result<Table> {
+pub(super) fn parse(xml: &[u8], limits: &super::Limits) -> Result<Table> {
+    // The raw admission scan must run before MCE processing or the semantic
+    // tree is allocated.  Run it again on the projected bytes because MCE can
+    // expand both element and text counts.
+    super::raw::admit_xml(xml, limits)?;
     if xml.len() > MAX_XML {
         return Err(invalid("font-table part is too large"));
     }
-    let xml = process_ooxml(xml)?;
+    let mce_limits = MceLimits {
+        max_input_bytes: limits.xml_bytes(),
+        max_output_bytes: limits.xml_bytes(),
+        max_depth: limits.depth(),
+        max_namespace_bindings: limits.attributes(),
+        max_directive_tokens: limits.nodes(),
+        max_choices_per_alternate: limits.nodes(),
+        max_attributes_per_element: limits
+            .attributes()
+            .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
+    };
+    let xml = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
     if xml.len() > MAX_XML {
         return Err(invalid("MCE-expanded font table is too large"));
     }
-    parse_table_node(&parse_tree(xml.as_ref())?)
+    if xml.len() > limits.xml_bytes() {
+        return Err(Error::FontLimit {
+            kind: crate::font::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: limits.xml_bytes(),
+        });
+    }
+    super::raw::admit_xml(xml.as_ref(), limits)?;
+    let root = parse_tree(xml.as_ref())?;
+    let conformance = if root.ns == WT {
+        Conformance::Transitional
+    } else if root.ns == WS {
+        Conformance::Strict
+    } else {
+        return Err(invalid("font-table root has an invalid Word namespace"));
+    };
+    let table = parse_table_node(&root)?;
+    // The XML scanner admits encoded shape and text before the DOM is built;
+    // this second pass admits decoded semantic fields (font count, text,
+    // attributes, and deduplicated embedded resources) under the caller's
+    // selected policy before the table can escape this codec.
+    super::raw::admit_table(&table, conformance, limits)?;
+    Ok(table)
 }
 
 fn parse_tree(xml: &[u8]) -> Result<Node> {
@@ -86,7 +123,19 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Start(e) => {
                 count += 1;
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("font-table XML resource limit exceeded"));
+                    return Err(if count > MAX_NODES {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: count,
+                            maximum: MAX_NODES,
+                        }
+                    } else {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: (stack.len()).saturating_add(1),
+                            maximum: MAX_DEPTH,
+                        }
+                    });
                 }
                 let parent = scopes
                     .last()
@@ -98,7 +147,19 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Empty(e) => {
                 count += 1;
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("font-table XML resource limit exceeded"));
+                    return Err(if count > MAX_NODES {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: count,
+                            maximum: MAX_NODES,
+                        }
+                    } else {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: (stack.len()).saturating_add(1),
+                            maximum: MAX_DEPTH,
+                        }
+                    });
                 }
                 let parent = scopes
                     .last()
@@ -219,7 +280,11 @@ fn attach(n: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
 fn append_text(stack: &mut [Node], v: &str) -> Result<()> {
     if let Some(n) = stack.last_mut() {
         if n.text.len().saturating_add(v.len()) > MAX_TEXT {
-            return Err(invalid("font-table text limit exceeded"));
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::Text,
+                actual: n.text.len().saturating_add(v.len()),
+                maximum: MAX_TEXT,
+            });
         }
         n.text.push_str(v);
     } else if !v.trim().is_empty() {
@@ -464,7 +529,7 @@ fn parse_embed(n: &Node, style: Style) -> Result<Embed> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
+pub(super) fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
     validate_table_value(t, false)?;
     let mut o = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();
     o.extend_from_slice(b"<w:fonts xmlns:w=\"");

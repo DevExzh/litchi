@@ -14,10 +14,9 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, 
 use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{
-    CellPosition, Document, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits,
-    TableCellCommentError, TableCellCommentPath,
-};
+use litchi_numbers::cell::comment::Error as TableCellCommentError;
+use litchi_numbers::cell::comment::Path as TableCellCommentPath;
+use litchi_numbers::{At, Package, Workbook};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -127,6 +126,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -142,7 +142,15 @@ fn set_message_info(
         .ok_or_else(|| std::io::Error::other("synthetic object has no message info"))?;
     info.object_references = references.to_vec();
     for (field_index, reference) in references.iter().copied().enumerate() {
-        let mut field = FieldInfo::new(vec![u32::try_from(field_index.saturating_add(1))?]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![u32::try_from(field_index.saturating_add(1))?],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(reference);
         info.field_infos.push(field);
@@ -191,7 +199,8 @@ fn metadata_entry(object_ids: &[u64]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![metadata_object],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?)
 }
 
@@ -262,11 +271,13 @@ fn formula_error_cell(identifier: u32) -> TestResult<Vec<u8>> {
     // fields in the canonical layout.  The test-only raw construction keeps
     // the wire fixture independent of private production constants while
     // exercising the public BncCell parser on the resulting bytes.
-    let mut bytes = BncCell::minimal().encode();
+    let mut bytes = BncCell::minimal()
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap();
     bytes[1] = 8;
     bytes[8..12].copy_from_slice(&FORMULA_ERROR_FLAG.to_le_bytes());
     bytes.extend_from_slice(&identifier.to_le_bytes());
-    BncCell::parse(&bytes)?;
+    BncCell::parse(&bytes, &litchi_numbers_wire::Limits::DEFAULT)?;
     Ok(bytes)
 }
 
@@ -371,6 +382,7 @@ fn segment_object(
                 ],
                 2,
             )?,
+            Default::default(),
         )?);
     }
     let mut result = object(identifier, TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE, data)?;
@@ -482,7 +494,7 @@ fn sidecar_object_with_message_type(
         // the production strict list codec rejects this non-canonical wire.
         payloads[0].data.extend_from_slice(&[0x08, 0x01]);
     }
-    let mut result = ArchiveObject::new(SIDECAR_ID, payloads)?;
+    let mut result = ArchiveObject::new(SIDECAR_ID, payloads, Default::default())?;
     set_message_info(
         &mut result,
         4,
@@ -604,6 +616,7 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
                 ],
                 2,
             )?,
+            Default::default(),
         )?);
     }
     if matches!(corruption, Corruption::CommentDuplicateMalformedPayload) {
@@ -625,6 +638,7 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
                 ],
                 2,
             )?,
+            Default::default(),
         )?);
     }
     let mut result = object(COMMENT_STORAGE_ID, COMMENT_STORAGE_MESSAGE_TYPE, data)?;
@@ -765,11 +779,19 @@ fn table_tile(comment_identifier: u32) -> TestResult<tst::Tile> {
     number_cell.set_comment_identifier(Some(comment_identifier));
 
     let rows = [
-        string_cell.encode(),
-        formula_cell.encode(),
+        string_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
+        formula_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
         error_cell,
-        rich_text_cell.encode(),
-        number_cell.encode(),
+        rich_text_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
+        number_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
     ];
     let mut row_infos = Vec::new();
     row_infos.try_reserve(rows.len())?;
@@ -905,7 +927,7 @@ fn synthetic_table_data_list_package_with_message_type(
         .filter_map(|object| object.archive_info.identifier)
         .collect::<Vec<_>>();
     let archive = Archive { objects };
-    let iwa = SnappyStream::compress(&archive.to_bytes()?)?;
+    let iwa = SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let metadata = metadata_entry(&object_ids)?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -921,20 +943,20 @@ fn rewrite_iwa_member(
     name: &str,
     rewrite: impl FnOnce(Vec<u8>) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| std::io::Error::other(format!("missing {name}")))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let rewritten = SnappyStream::compress(&rewrite(stream)?)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let rewritten = SnappyStream::compress(&rewrite(stream)?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(name, &rewritten)],
         ArchiveLimits::default(),
     )?)
 }
 
-fn assert_semantics(document: &Document) -> TestResult {
+fn assert_semantics(document: &Workbook) -> TestResult {
     document.validate()?;
     let sheet = document
         .sheet(0)?
@@ -982,7 +1004,7 @@ fn assert_rejected_by_both_readers(corruption: Corruption) -> TestResult {
         bytes, original,
         "Package parsing mutated its borrowed source"
     );
-    assert!(Document::from_bytes(&bytes).is_err());
+    assert!(Workbook::from_bytes(&bytes).is_err());
     assert_eq!(
         bytes, original,
         "Document parsing mutated its borrowed source"
@@ -996,21 +1018,21 @@ fn mixed_root_and_segments_project_all_selected_lists_through_package_and_reopen
     let original = bytes.clone();
 
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
-    assert_eq!(package.sheets(), package.document().sheets());
+    assert_semantics(package.workbook_ref())?;
+    assert_eq!(package.sheets(), package.workbook_ref().sheets());
     assert_eq!(
         bytes, original,
         "Package parsing mutated its borrowed source"
     );
 
-    let borrowed = Document::from_bytes(&bytes)?;
+    let borrowed = Workbook::from_bytes(&bytes)?;
     assert_semantics(&borrowed)?;
     assert_eq!(
         bytes, original,
         "Document parsing mutated its borrowed source"
     );
 
-    let reopened = Document::from_shared_bytes(Arc::from(bytes.clone()))?;
+    let reopened = Workbook::from_shared_bytes(Arc::from(bytes.clone()))?;
     assert_semantics(&reopened)?;
     assert_eq!(bytes, original, "Document reopen mutated its source copy");
     Ok(())
@@ -1025,20 +1047,20 @@ fn type_6201_hosts_use_strict_lists_without_public_raw_ids() -> TestResult {
     )?;
     let original = bytes.clone();
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
+    assert_semantics(package.workbook_ref())?;
     assert_eq!(bytes, original, "Package parsing mutated its source");
 
     // The public package/document boundary retains only semantic values. In
     // particular, the alternate host message type and physical archive IDs
     // from this fixture do not appear in either public debug representation.
     assert_eq!(format!("{package:?}"), "Package { .. }");
-    let document_debug = format!("{:?}", package.document());
+    let document_debug = format!("{:?}", package.workbook_ref());
     assert!(!document_debug.contains("6201"));
     assert!(!document_debug.contains("identifier"));
     assert!(!document_debug.contains("ArchiveObject"));
     assert!(!document_debug.contains("RawMessage"));
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
 
@@ -1063,7 +1085,7 @@ fn type_6201_hosts_use_strict_lists_without_public_raw_ids() -> TestResult {
         .expect_err("6201 non-canonical list host must be rejected by strict ingress");
     assert!(!package_error.to_string().contains("6201"));
     assert_eq!(malformed, malformed_original);
-    let document_error = Document::from_bytes(&malformed)
+    let document_error = Workbook::from_bytes(&malformed)
         .expect_err("Document must reject the same strict 6201 list host");
     assert!(!document_error.to_string().contains("6201"));
     assert_eq!(malformed, malformed_original);
@@ -1116,8 +1138,8 @@ fn document_ignores_valid_and_dangling_comment_ids_while_package_stays_strict() 
     let valid = synthetic_table_data_list_package(Corruption::None, 12)?;
     let valid_original = valid.clone();
     let package = Package::from_bytes(&valid)?;
-    assert_semantics(package.document())?;
-    let document = Document::from_bytes(&valid)?;
+    assert_semantics(package.workbook_ref())?;
+    let document = Workbook::from_bytes(&valid)?;
     assert_semantics(&document)?;
     assert_eq!(valid, valid_original);
 
@@ -1125,7 +1147,7 @@ fn document_ignores_valid_and_dangling_comment_ids_while_package_stays_strict() 
     let dangling_original = dangling.clone();
     assert!(Package::from_bytes(&dangling).is_err());
     assert_eq!(dangling, dangling_original);
-    let document = Document::from_bytes(&dangling)?;
+    let document = Workbook::from_bytes(&dangling)?;
     assert_semantics(&document)?;
     assert_eq!(dangling, dangling_original);
     Ok(())
@@ -1141,11 +1163,11 @@ fn package_projects_full_comment_metadata_and_replies_without_mutating_source() 
     // payload (including date, author, UUID, and both replies); the structured
     // compatibility projection exercises that same strict path a second time.
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
+    assert_semantics(package.workbook_ref())?;
     assert_eq!(package.extract_structured_tables()?.len(), 1);
     assert_eq!(bytes, original, "Package parsing mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1157,11 +1179,11 @@ fn missing_comment_text_is_an_empty_strict_value_and_document_still_skips_commen
     let original = bytes.clone();
 
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
+    assert_semantics(package.workbook_ref())?;
     assert_eq!(package.extract_structured_tables()?.len(), 1);
     assert_eq!(bytes, original, "Package parsing mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1175,7 +1197,7 @@ fn package_cell_comment_replies_preserve_direct_source_order_for_selector_and_a1
     let sheet = "Mixed table-data-list sheet";
     let table = "Mixed table-data-list table";
 
-    let selected = package.table_cell_comment_replies(sheet, table, CellPosition::new(4, 0))?;
+    let selected = package.table_cell_comment_replies(sheet, table, At::new(4, 0))?;
     assert_eq!(
         selected
             .iter()
@@ -1205,7 +1227,7 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
             .table_cell_comment_replies(
                 "Mixed table-data-list sheet",
                 "Mixed table-data-list table",
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )?
             .is_empty()
     );
@@ -1234,14 +1256,14 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
         .table_cell_comment_replies(
             "Mixed table-data-list sheet",
             "Mixed table-data-list table",
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )
         .expect_err("a cell without a root comment must be rejected");
     assert_eq!(
         error,
-        TableCellCommentError::CommentNotFound {
+        TableCellCommentError::Refused(litchi_numbers::cell::comment::Refusal::CommentNotFound {
             path: expected_path,
-        }
+        })
     );
     let error = package
         .table_cell_comment_replies_a1(
@@ -1252,9 +1274,9 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
         .expect_err("A1 lookup without a root comment must be rejected");
     assert_eq!(
         error,
-        TableCellCommentError::CommentNotFound {
+        TableCellCommentError::Refused(litchi_numbers::cell::comment::Refusal::CommentNotFound {
             path: expected_path,
-        }
+        })
     );
     assert!(matches!(
         package.table_cell_comment_replies_a1(
@@ -1262,7 +1284,9 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
             "Mixed table-data-list table",
             "not-an-address",
         ),
-        Err(TableCellCommentError::InvalidAddress)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::InvalidAddress
+        ))
     ));
     assert_eq!(
         empty_bytes, empty_original,
@@ -1352,13 +1376,13 @@ fn external_and_nested_reply_references_fail_in_selector_projection_atomically()
 fn comment_reply_reference_limit_rejects_atomically() -> TestResult {
     let bytes = synthetic_table_data_list_package(Corruption::None, 2)?;
     let original = bytes.clone();
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        1,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     assert!(Package::from_bytes_with_options(&bytes, options).is_err());
     assert_eq!(
         bytes, original,
@@ -1375,7 +1399,7 @@ fn comment_and_reply_debug_redact_authored_text_across_transactions() -> TestRes
         .table_cell_comment(
             "Mixed table-data-list sheet",
             "Mixed table-data-list table",
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .ok_or_else(|| std::io::Error::other("threaded synthetic comment is missing"))?;
     let reply = threaded
@@ -1397,7 +1421,7 @@ fn comment_and_reply_debug_redact_authored_text_across_transactions() -> TestRes
     let edit = editable.edit_table_cell_comment(
         "Mixed table-data-list sheet",
         "Mixed table-data-list table",
-        CellPosition::new(4, 0),
+        At::new(4, 0),
     )?;
     let edit_debug = format!("{edit:?}");
     assert!(!edit_debug.contains("Comment retained by Package"));
@@ -1424,7 +1448,7 @@ fn assert_package_rejects_comment_but_document_skips_it(corruption: Corruption) 
     assert!(Package::from_bytes(&bytes).is_err());
     assert_eq!(bytes, original, "Package rejection mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1450,7 +1474,7 @@ fn duplicate_comment_storage_payload_is_atomic_in_package_and_skipped_by_documen
     );
     assert_eq!(bytes, original, "Package rejection mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1470,7 +1494,7 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
     let bytes = synthetic_table_data_list_package(Corruption::None, 50)?;
     let original_bytes = bytes.clone();
     let package = Package::from_bytes(&bytes)?;
-    let position = CellPosition::from_a1("A5")?;
+    let position = At::from_a1("A5")?;
     let sheet = "Mixed table-data-list sheet";
     let table = "Mixed table-data-list table";
 
@@ -1510,21 +1534,22 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         Some(original.clone())
     );
 
-    let clear_error = package
-        .clear_table_cell_comment(sheet, table, position)
-        .expect_err("changed clear must be refused without graph cleanup");
-    assert!(matches!(
-        clear_error,
-        TableCellCommentError::UnsupportedDependency {
-            path: TableCellCommentPath::Cell {
-                sheet: 0,
-                table: 0,
-                row: 4,
-                column: 0,
-            },
-        }
-    ));
-    assert_eq!(bytes, original_bytes, "clear refusal mutated source bytes");
+    // The storage is registered in the package metadata's object-UUID map:
+    // the clear removes that registration with it (record 0318).
+    let cleared = package.clear_table_cell_comment(sheet, table, position)?;
+    assert_eq!(
+        cleared
+            .package()
+            .table_cell_comment(sheet, table, position)?,
+        None
+    );
+    let restored = cleared
+        .package()
+        .apply_table_cell_comment(&cleared.patch().inverse())?;
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes)?;
+    assert_eq!(restored_bytes, original_bytes);
+    assert_eq!(bytes, original_bytes, "the clear mutated the source bytes");
     assert_eq!(
         package.table_cell_comment(sheet, table, position)?,
         Some(original.clone()),
@@ -1550,14 +1575,16 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         .expect_err("segment-backed text replacement must be refused");
     assert!(matches!(
         segmented_error,
-        TableCellCommentError::UnsupportedDependency {
-            path: TableCellCommentPath::Cell {
-                sheet: 0,
-                table: 0,
-                row: 4,
-                column: 0,
-            },
-        }
+        TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 4,
+                    column: 0,
+                },
+            }
+        )
     ));
     assert_eq!(
         segmented_bytes, segmented_original_bytes,
@@ -1572,14 +1599,16 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         .expect_err("segmented changed clear must be refused");
     assert!(matches!(
         segmented_clear_error,
-        TableCellCommentError::UnsupportedDependency {
-            path: TableCellCommentPath::Cell {
-                sheet: 0,
-                table: 0,
-                row: 4,
-                column: 0,
-            },
-        }
+        TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 4,
+                    column: 0,
+                },
+            }
+        )
     ));
     assert_eq!(
         segmented_bytes, segmented_original_bytes,
@@ -1612,7 +1641,7 @@ fn metadata_backed_root_comment_clear_reopens_and_inverts_exactly() -> TestResul
     let mut selected = None;
     'rows: for row in 0..table.dimensions().rows() {
         for column in 0..table.dimensions().columns() {
-            let position = CellPosition::new(row, column);
+            let position = At::new(row, column);
             if let Some(comment) =
                 package.table_cell_comment(sheet.name(), table.name(), position)?
             {
@@ -1668,22 +1697,40 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
         Ok(stream)
     })?;
     let extra_storage_message = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let storage = archive
             .objects
             .iter_mut()
             .find(|object| object.archive_info.identifier == Some(51))
             .ok_or_else(|| std::io::Error::other("fixture storage object is missing"))?;
-        storage.push_message(RawMessage {
-            type_: 99_999,
-            data: vec![0x08, 0x01],
-        })?;
-        Ok(archive.to_bytes()?)
+        storage.push_message(
+            RawMessage {
+                type_: 99_999,
+                data: vec![0x08, 0x01],
+            },
+            Default::default(),
+        )?;
+        Ok(archive.to_bytes(Default::default())?)
+    })?;
+    let unknown_storage_field = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
+        let mut archive = Archive::parse(&stream, Default::default())?;
+        let storage = archive
+            .objects
+            .iter_mut()
+            .find(|object| object.archive_info.identifier == Some(51))
+            .ok_or_else(|| std::io::Error::other("fixture storage object is missing"))?;
+        let message = storage
+            .messages
+            .iter_mut()
+            .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+            .ok_or_else(|| std::io::Error::other("fixture comment storage message is missing"))?;
+        litchi_iwa_common::wire::append_varint_field(&mut message.data, 99, 1)?;
+        Ok(archive.to_bytes(Default::default())?)
     })?;
     let opaque_table_candidate = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         archive.objects.push(object(99_998, 6_000, Vec::new())?);
-        Ok(archive.to_bytes()?)
+        Ok(archive.to_bytes(Default::default())?)
     })?;
 
     for (candidate, expected) in [
@@ -1700,14 +1747,29 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
         ),
         (
             extra_storage_message,
-            TableCellCommentError::UnsupportedDependency {
-                path: TableCellCommentPath::Cell {
-                    sheet: 0,
-                    table: 0,
-                    row: 1,
-                    column: 1,
+            TableCellCommentError::Refused(
+                litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                    path: TableCellCommentPath::Cell {
+                        sheet: 0,
+                        table: 0,
+                        row: 1,
+                        column: 1,
+                    },
                 },
-            },
+            ),
+        ),
+        (
+            unknown_storage_field,
+            TableCellCommentError::Refused(
+                litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                    path: TableCellCommentPath::Cell {
+                        sheet: 0,
+                        table: 0,
+                        row: 1,
+                        column: 1,
+                    },
+                },
+            ),
         ),
         (
             opaque_table_candidate,
@@ -1728,7 +1790,7 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
             .next()
             .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
         let error = package
-            .clear_table_cell_comment(sheet.name(), table.name(), CellPosition::new(1, 1))
+            .clear_table_cell_comment(sheet.name(), table.name(), At::new(1, 1))
             .expect_err("lossy clear source must fail closed");
         assert_eq!(error, expected);
         let mut retained = Vec::new();
@@ -1741,11 +1803,14 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
 #[test]
 fn root_comment_clear_supersedes_a_failed_staged_replacement() -> TestResult {
     let source = include_bytes!("fixtures/comment-edit-root.numbers").as_slice();
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(PackageSemanticLimits::MAX_MATERIALIZED_CELLS, 64)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(litchi_numbers::SemanticLimits::MAXIMUM.max_materialized_cells())
+        .and_then(|b| b.max_output_text_bytes(64))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let sheet = package
         .sheets()
@@ -1755,7 +1820,7 @@ fn root_comment_clear_supersedes_a_failed_staged_replacement() -> TestResult {
         .tables()
         .next()
         .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
-    let position = CellPosition::new(1, 1);
+    let position = At::new(1, 1);
 
     let cleared = package
         .edit_table_cell_comment(sheet.name(), table.name(), position)?

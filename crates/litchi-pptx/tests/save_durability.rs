@@ -15,7 +15,7 @@ const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durabil
 #[test]
 fn every_level_publishes_the_default_save_bytes() {
     let directory = tempfile::tempdir().unwrap();
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let reference = directory.path().join("reference.pptx");
     package.save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();

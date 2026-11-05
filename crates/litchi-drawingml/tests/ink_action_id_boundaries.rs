@@ -1,9 +1,8 @@
 //! ID spelling must not change the semantics of a source-backed removal.
 use litchi_drawingml::ink::{
     ACTION_NAMESPACE,
-    actions::{
-        self, ActionDataDraft, ActionSelector, ActionType, Edit, Limits, OpaquePayload, RootChild,
-    },
+    actions::builder::{ActionDataDraft, ActionSelector, EditOptions, OpaquePayload},
+    actions::{self, ActionType, Edit, RootChild},
 };
 
 #[test]
@@ -19,12 +18,17 @@ fn short_ids_and_non_reference_text_do_not_block_removal() {
         let xml = format!(
             r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms">{comment}<a:action xml:id="{removed}" type="add" startTime="0"/><a:action xml:id="{retained}" type="add" startTime="1"/></a:actions>"#
         );
-        let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+        let mut edit = Edit::new(
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+            EditOptions::default(),
+        )
+        .unwrap();
         edit.remove_action(ActionSelector::ordinal(0)).unwrap();
         let commit = edit
-            .finish()
+            .commit()
             .expect("unreferenced action can be removed regardless of ID spelling");
         let ids: Vec<_> = commit
+            .package()
             .profile()
             .children()
             .iter()
@@ -34,12 +38,18 @@ fn short_ids_and_non_reference_text_do_not_block_removal() {
             })
             .collect();
         assert_eq!(ids, [retained]);
+        let inverse = commit.patch().clone().inverse();
         assert_eq!(
-            commit.patch().inverse().apply(commit.as_bytes()).unwrap(),
+            commit
+                .package()
+                .apply(&inverse)
+                .unwrap()
+                .package()
+                .as_bytes(),
             xml.as_bytes()
         );
         assert!(
-            std::str::from_utf8(commit.as_bytes())
+            std::str::from_utf8(commit.package().as_bytes())
                 .unwrap()
                 .contains(comment)
         );
@@ -52,10 +62,14 @@ fn encoded_local_fragment_cannot_bypass_reference_closure() {
         let xml = format!(
             r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action xml:id="a" type="add" startTime="0"/><a:action xml:id="b" type="add" startTime="1"><a:actionData ref="{reference}"/></a:action></a:actions>"#
         );
-        let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+        let mut edit = Edit::new(
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+            EditOptions::default(),
+        )
+        .unwrap();
         edit.remove_action(ActionSelector::ordinal(0)).unwrap();
         assert!(
-            edit.finish().is_err(),
+            edit.commit().is_err(),
             "local reference {reference:?} must retain the same target after XML/URI decoding"
         );
     }
@@ -66,10 +80,14 @@ fn removing_action_cannot_orphan_id_owned_by_opaque_trace() {
     let xml = format!(
         r##"<a:actions xmlns:a="{ACTION_NAMESPACE}" xmlns:i="http://www.w3.org/2003/InkML" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"><a:actionData><i:trace xml:id="stroke">0 0, 1 1</i:trace></a:actionData></a:action><a:action type="add" startTime="1"><a:actionData ref="#stroke"/></a:action></a:actions>"##
     );
-    let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+    let mut edit = Edit::new(
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+        EditOptions::default(),
+    )
+    .unwrap();
     edit.remove_action(ActionSelector::ordinal(0)).unwrap();
     assert!(
-        edit.finish().is_err(),
+        edit.commit().is_err(),
         "removal must account for IDs declared inside a removed opaque payload"
     );
 }
@@ -80,11 +98,15 @@ fn trace_draft_cannot_silently_disappear_as_comment_only_payload() {
         let xml = format!(
             r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"/></a:actions>"#
         );
-        let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+        let mut edit = Edit::new(
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+            EditOptions::default(),
+        )
+        .unwrap();
         let result = (|| {
             let data = ActionDataDraft::new().trace(OpaquePayload::new(payload)?)?;
             edit.add_data(ActionSelector::ordinal(0), data)?;
-            edit.finish()
+            edit.commit()
         })();
         assert!(
             result.is_err(),
@@ -98,10 +120,14 @@ fn empty_custom_type_remains_an_exact_source_noop() {
     let xml = format!(
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type='' startTime="0"/></a:actions>"#
     );
-    let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+    let mut edit = Edit::new(
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+        EditOptions::default(),
+    )
+    .unwrap();
     edit.set_action_type(ActionSelector::ordinal(0), ActionType::custom("").unwrap())
         .unwrap();
-    assert_eq!(edit.finish().unwrap().as_bytes(), xml.as_bytes());
+    assert_eq!(edit.commit().unwrap().package().as_bytes(), xml.as_bytes());
 }
 
 #[test]
@@ -110,11 +136,15 @@ fn trace_draft_cannot_be_read_back_as_a_transform() {
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"/></a:actions>"#
     );
     let payload = format!(r#"<a:transform xmlns:a="{ACTION_NAMESPACE}"/>"#);
-    let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+    let mut edit = Edit::new(
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+        EditOptions::default(),
+    )
+    .unwrap();
     let result = (|| {
         let data = ActionDataDraft::new().trace(OpaquePayload::new(payload)?)?;
         edit.add_data(ActionSelector::ordinal(0), data)?;
-        edit.finish()
+        edit.commit()
     })();
     assert!(
         result.is_err(),
@@ -127,28 +157,28 @@ fn opaque_descendants_count_toward_the_authored_depth_limit() {
     let xml = format!(
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"/></a:actions>"#
     );
-    let profile = actions::read_profile(xml.as_bytes()).unwrap();
+    let profile = actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap();
     let data = ActionDataDraft::new().trace(OpaquePayload::new(
         r#"<i:trace xmlns:i="http://www.w3.org/2003/InkML" xmlns:x="urn:future"><x:future>0 0</x:future></i:trace>"#,
     ).unwrap()).unwrap();
-    let mut generous = Edit::new(profile.clone()).unwrap();
+    let mut generous = Edit::new(profile.clone(), EditOptions::default()).unwrap();
     generous
         .add_data(ActionSelector::ordinal(0), data.clone())
         .unwrap();
-    generous
-        .finish()
+    let _ = generous
+        .commit()
         .expect("opaque payload is valid under the normal depth limit");
-    let mut bounded = Edit::with_limits(
+    let mut bounded = Edit::new(
         profile,
-        Limits {
+        EditOptions {
             max_depth: 4,
-            ..Limits::default()
+            ..EditOptions::default()
         },
     )
     .unwrap();
     let result = bounded
         .add_data(ActionSelector::ordinal(0), data)
-        .and_then(|()| bounded.finish());
+        .and_then(|()| bounded.commit());
     assert!(
         result.is_err(),
         "root/action/data/trace/descendant requires depth five"
@@ -173,9 +203,12 @@ fn malformed_opaque_trace_xml_is_refused_before_publication() {
             format!(r#"<i:trace xmlns:i="http://www.w3.org/2003/InkML">{body}</i:trace>"#);
         let result = (|| {
             let data = ActionDataDraft::new().trace(OpaquePayload::new(payload)?)?;
-            let mut edit = Edit::new(actions::read_profile(xml.as_bytes())?)?;
+            let mut edit = Edit::new(
+                actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT)?,
+                EditOptions::default(),
+            )?;
             edit.add_data(ActionSelector::ordinal(0), data)?;
-            edit.finish()
+            edit.commit()
         })();
         assert!(result.is_err(), "invalid opaque XML was accepted: {body:?}");
     }
@@ -187,20 +220,31 @@ fn legal_opaque_comment_and_cdata_survive_authored_trace() {
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"/></a:actions>"#
     );
     let payload = r#"<i:trace xmlns:i="http://www.w3.org/2003/InkML"><!-- <? retained --> <![CDATA[<?x & raw <]]></i:trace>"#;
-    let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+    let mut edit = Edit::new(
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+        EditOptions::default(),
+    )
+    .unwrap();
     let data = ActionDataDraft::new()
         .trace(OpaquePayload::new(payload).unwrap())
         .unwrap();
     edit.add_data(ActionSelector::ordinal(0), data).unwrap();
-    let commit = edit.finish().unwrap();
+    let commit = edit.commit().unwrap();
     assert!(
         commit
+            .package()
             .as_bytes()
             .windows(payload.len())
             .any(|bytes| bytes == payload.as_bytes())
     );
+    let inverse = commit.patch().clone().inverse();
     assert_eq!(
-        commit.patch().inverse().apply(commit.as_bytes()).unwrap(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .package()
+            .as_bytes(),
         xml.as_bytes()
     );
 }
@@ -210,10 +254,14 @@ fn clearing_action_cannot_orphan_a_retained_data_reference() {
     let xml = format!(
         r##"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"><a:actionData xml:id="d1"/></a:action><a:action type="add" startTime="1"><a:actionData ref="#d1"/></a:action></a:actions>"##
     );
-    let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+    let mut edit = Edit::new(
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+        EditOptions::default(),
+    )
+    .unwrap();
     let result = edit
         .clear(ActionSelector::ordinal(0))
-        .and_then(|()| edit.finish());
+        .and_then(|()| edit.commit());
     assert!(
         result.is_err(),
         "clear must preserve retained reference closure"
@@ -231,7 +279,11 @@ fn source_edit_refuses_invalid_payload_namespace_context_before_finish() {
         "<i:trace xmlns:i='http://www.w3.org/2003/InkML'><x:future/></i:trace>",
         "<i:trace xmlns:i='http://www.w3.org/2003/InkML' xmlns:x='urn:future' xmlns:y='urn:future' x:value='1' y:value='2'/>",
     ] {
-        let mut edit = Edit::new(actions::read_profile(xml.as_bytes()).unwrap()).unwrap();
+        let mut edit = Edit::new(
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
+            EditOptions::default(),
+        )
+        .unwrap();
         let result = ActionDataDraft::new()
             .trace(OpaquePayload::new(payload).unwrap())
             .and_then(|data| edit.add_data(ActionSelector::ordinal(0), data));
@@ -239,7 +291,7 @@ fn source_edit_refuses_invalid_payload_namespace_context_before_finish() {
             result.is_err(),
             "payload must be refused during staging: {payload}"
         );
-        assert_eq!(edit.finish().unwrap().as_bytes(), xml.as_bytes());
+        assert_eq!(edit.commit().unwrap().package().as_bytes(), xml.as_bytes());
     }
 }
 
@@ -248,21 +300,27 @@ fn cleared_children_release_the_final_node_budget() {
     let xml = format!(
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"><a:actionData/></a:action><a:action type="add" startTime="1"><a:actionData/></a:action></a:actions>"#
     );
-    let profile = actions::read_profile(xml.as_bytes()).unwrap();
-    let mut edit = Edit::with_limits(
+    let profile = actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    let mut edit = Edit::new(
         profile,
-        Limits {
+        EditOptions {
             max_nodes: 5,
-            ..Limits::default()
+            ..EditOptions::default()
         },
     )
     .unwrap();
     edit.clear(ActionSelector::ordinal(0)).unwrap();
     edit.add_data(ActionSelector::ordinal(1), ActionDataDraft::new())
         .unwrap();
-    let commit = edit.finish().expect("five final nodes fit the node budget");
+    let commit = edit.commit().expect("five final nodes fit the node budget");
+    let inverse = commit.patch().clone().inverse();
     assert_eq!(
-        commit.patch().inverse().apply(commit.as_bytes()).unwrap(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .package()
+            .as_bytes(),
         xml.as_bytes()
     );
 }

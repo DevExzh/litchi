@@ -1,7 +1,7 @@
 //! Persistent, bounded namespace environments for source and typed XML trees.
 
-use super::invalid;
-use litchi_core::sheet::Result;
+use super::{LimitKind, invalid, limit};
+use crate::error::Result;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -100,7 +100,7 @@ impl NamespaceContext {
             .checked_add(1)
             .ok_or_else(|| invalid("connections namespace depth overflowed"))?;
         if depth > self.limits.max_depth {
-            return Err(invalid("connections namespace depth limit exceeded"));
+            return Err(limit(LimitKind::Depth, depth, self.limits.max_depth));
         }
 
         let mut local = Vec::new();
@@ -121,7 +121,11 @@ impl NamespaceContext {
                 .and_then(|bindings| bindings.checked_add(1))
                 .ok_or_else(|| invalid("connections namespace binding count overflowed"))?;
             if bindings > self.limits.max_bindings {
-                return Err(invalid("connections namespace binding limit exceeded"));
+                return Err(limit(
+                    LimitKind::NamespaceBindings,
+                    bindings,
+                    self.limits.max_bindings,
+                ));
             }
             local_prefixes
                 .try_reserve(1)
@@ -143,7 +147,11 @@ impl NamespaceContext {
                 .checked_add(local_bytes)
                 .ok_or_else(|| invalid("connections namespace metadata size overflowed"))?;
             if bytes > self.limits.max_bytes {
-                return Err(invalid("connections namespace metadata limit exceeded"));
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    bytes,
+                    self.limits.max_bytes,
+                ));
             }
             local
                 .try_reserve(1)
@@ -175,7 +183,7 @@ impl NamespaceContext {
             .checked_add(1)
             .ok_or_else(|| invalid("connections namespace lookup depth overflowed"))?;
         if layers > self.limits.max_depth {
-            return Err(invalid("connections namespace lookup depth limit exceeded"));
+            return Err(limit(LimitKind::Depth, layers, self.limits.max_depth));
         }
         let local_bindings = local.len();
         let bindings = self

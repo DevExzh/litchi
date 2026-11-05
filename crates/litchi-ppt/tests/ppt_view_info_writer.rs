@@ -7,10 +7,10 @@
 use std::io::Cursor;
 
 use litchi_ppt::writer::{
-    Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,
-    Writer, ZoomViewInfo,
+    Builder, Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind,
+    ViewOrigin, ZoomViewInfo,
 };
-use litchi_ppt::{Package, Record};
+use litchi_ppt::{Record, raw::Reader};
 
 fn slide_view() -> SlideViewInfo {
     let scale = Ratio::new(3, 4).unwrap();
@@ -36,16 +36,18 @@ fn notes_view() -> SlideViewInfo {
     .unwrap()
 }
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 fn view_records(bytes: &[u8]) -> Vec<Record> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
-    let (document, _) = Record::parse(&stream, 0).unwrap();
+    let (document, _) = Record::parse(&stream, 0, &litchi_ppt::SourceLimits::default()).unwrap();
     let doc_info = document
         .children
         .iter()
@@ -61,7 +63,7 @@ fn view_records(bytes: &[u8]) -> Vec<Record> {
 
 #[test]
 fn emits_exact_slide_and_notes_view_record_structure() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     writer.set_notes_view_info(notes_view()).unwrap();
@@ -91,12 +93,12 @@ fn emits_exact_slide_and_notes_view_record_structure() {
 
 #[test]
 fn simultaneous_slide_and_notes_views_round_trip_through_writer_and_reader() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     writer.set_notes_view_info(notes_view()).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let information = presentation.slide_view_information().unwrap();
     let slide = information.slide().unwrap();
@@ -113,7 +115,7 @@ fn simultaneous_slide_and_notes_views_round_trip_through_writer_and_reader() {
 
 #[test]
 fn setters_reject_wrong_kinds_atomically_and_models_enforce_limits() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     assert!(writer.set_slide_view_info(notes_view()).is_err());

@@ -3,8 +3,8 @@
 use litchi_core::Position;
 
 use super::super::slide_media_replacement::{
-    MediaBudget, MediaPart, SlideMediaDataError, SlideMediaDataLimitKind, read_selected_media,
-    read_selected_media_pair, select_media, select_media_pair,
+    Error as SlideMediaDataError, LimitKind as SlideMediaDataLimitKind, MediaBudget, MediaPart,
+    read_selected_media, read_selected_media_pair, select_media, select_media_pair,
 };
 use super::{CreationBudget, Package, SlideAudioCreationError, SlideAudioCreationLimitKind};
 use crate::{MovieSelector, SlideSelector};
@@ -96,7 +96,7 @@ fn read_part<'a>(
 
 fn map_error(error: SlideMediaDataError) -> SlideAudioCreationError {
     match error {
-        SlideMediaDataError::LimitExceeded {
+        SlideMediaDataError::Limit {
             kind,
             observed,
             maximum,
@@ -115,7 +115,7 @@ fn map_error(error: SlideMediaDataError) -> SlideAudioCreationError {
                 SlideMediaDataLimitKind::WireWork => SlideAudioCreationLimitKind::WireWork,
                 SlideMediaDataLimitKind::Allocations => SlideAudioCreationLimitKind::Allocations,
             };
-            SlideAudioCreationError::LimitExceeded {
+            SlideAudioCreationError::Limit {
                 kind,
                 observed,
                 maximum,

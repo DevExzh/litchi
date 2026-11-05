@@ -171,7 +171,7 @@
 //! # );
 //! // The reference in the unselected branch is never resolved, and IFERROR
 //! // catches the selected branch's formula-level division error.
-//! let expression = Expression::parse("of:=IF(FALSE();[.A1];IFERROR(1/0;42))")?;
+//! let expression = Expression::parse("of:=IF(FALSE();[.A1];IFERROR(1/0;42))", &Default::default())?;
 //! let result = evaluate_scalar_with_context(
 //!     &expression, &execution, &EvaluationLimits::default(),
 //! )?;
@@ -2320,7 +2320,7 @@ mod tests {
             ("=2^3^2", 64.0),
             ("=50%", 0.5),
         ] {
-            let expression = Expression::parse(source).unwrap();
+            let expression = Expression::parse(source, &Default::default()).unwrap();
             let result =
                 evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
                     .unwrap();
@@ -2331,7 +2331,7 @@ mod tests {
     #[test]
     fn preserves_text_and_maps_errors() {
         let (_, execution) = context();
-        let expression = Expression::parse("=\"a\"&1").unwrap();
+        let expression = Expression::parse("=\"a\"&1", &Default::default()).unwrap();
         let result =
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
                 .unwrap();
@@ -2340,7 +2340,7 @@ mod tests {
             &ScalarValue::Text(Cow::Owned("a1".to_string()))
         );
 
-        let expression = Expression::parse("=#N/A+1").unwrap();
+        let expression = Expression::parse("=#N/A+1", &Default::default()).unwrap();
         let result =
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
                 .unwrap();
@@ -2349,13 +2349,13 @@ mod tests {
             &ScalarValue::Error(ScalarError::NotAvailable)
         );
 
-        let expression = Expression::parse("=#UNKNOWN!").unwrap();
+        let expression = Expression::parse("=#UNKNOWN!", &Default::default()).unwrap();
         let result =
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
                 .unwrap();
         assert_eq!(result.value(), &ScalarValue::Error(ScalarError::Name));
 
-        let expression = Expression::parse("=TRUE()&FALSE()").unwrap();
+        let expression = Expression::parse("=TRUE()&FALSE()", &Default::default()).unwrap();
         let result =
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
                 .unwrap();
@@ -2367,7 +2367,7 @@ mod tests {
 
     #[test]
     fn rejects_capabilities_and_honors_cancellation() {
-        let expression = Expression::parse("[.A1]").unwrap();
+        let expression = Expression::parse("[.A1]", &Default::default()).unwrap();
         let (_, execution) = context();
         let error =
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
@@ -2379,7 +2379,7 @@ mod tests {
 
         let (source, execution) = context();
         source.cancel();
-        let expression = Expression::parse("1+2").unwrap();
+        let expression = Expression::parse("1+2", &Default::default()).unwrap();
         assert!(matches!(
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default()),
             Err(EvaluationFailure::Cancelled)

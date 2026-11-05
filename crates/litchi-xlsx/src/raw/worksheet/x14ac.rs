@@ -36,7 +36,6 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
 const MAX_XML_DEPTH: usize = 256;
-const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MARKER: &[u8] = b"litchi_x14ac_dyDescent";
 
 #[derive(Debug, Default)]
@@ -711,9 +710,9 @@ fn start(
 }
 
 fn has_markup_compatibility(content: &[u8]) -> bool {
-    content
-        .windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
+    // As preprocessing decides it: a declaration that spells the namespace
+    // with references binds it too (record 0011).
+    litchi_ooxml_common::mce::mentions_namespace(content)
 }
 
 fn has_descent_attribute(content: &[u8]) -> bool {

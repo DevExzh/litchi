@@ -20,6 +20,39 @@ pub enum Dialect {
     GitHubFlavored,
 }
 
+/// A bounded Markdown reader or editor resource dimension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete UTF-8 source bytes retained by a snapshot.
+    SourceBytes,
+    /// Bytes in one physical source line, excluding its line ending.
+    LineBytes,
+    /// Parser events produced while reading a source.
+    Events,
+    /// Top-level semantic blocks retained by a snapshot.
+    Blocks,
+    /// Simultaneous block and inline container nesting.
+    NestingDepth,
+    /// Structural operations staged by one atomic edit.
+    Operations,
+}
+
+impl LimitKind {
+    /// The corresponding [`ReadLimits`] field name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SourceBytes => "max_source_bytes",
+            Self::LineBytes => "max_line_bytes",
+            Self::Events => "max_events",
+            Self::Blocks => "max_blocks",
+            Self::NestingDepth => "max_nesting_depth",
+            Self::Operations => "max_operations",
+        }
+    }
+}
+
 /// Resource limits applied before and during Markdown parsing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReadLimits {
@@ -49,16 +82,16 @@ impl ReadLimits {
     };
 
     pub(crate) fn validate(self) -> Result<(), Error> {
-        for (name, value) in [
-            ("max_source_bytes", self.max_source_bytes),
-            ("max_line_bytes", self.max_line_bytes),
-            ("max_events", self.max_events),
-            ("max_blocks", self.max_blocks),
-            ("max_nesting_depth", self.max_nesting_depth),
-            ("max_operations", self.max_operations),
+        for (kind, value) in [
+            (LimitKind::SourceBytes, self.max_source_bytes),
+            (LimitKind::LineBytes, self.max_line_bytes),
+            (LimitKind::Events, self.max_events),
+            (LimitKind::Blocks, self.max_blocks),
+            (LimitKind::NestingDepth, self.max_nesting_depth),
+            (LimitKind::Operations, self.max_operations),
         ] {
             if value == 0 {
-                return Err(Error::InvalidLimit { name });
+                return Err(Error::InvalidLimit { kind });
             }
         }
         Ok(())
@@ -68,6 +101,56 @@ impl ReadLimits {
 impl Default for ReadLimits {
     fn default() -> Self {
         Self::DEFAULT
+    }
+}
+
+/// Configuration retained by a [`Snapshot`] after it is read.
+///
+/// The defaults are finite and are suitable for ordinary Markdown documents.
+/// Use the consuming setters to select a stricter policy or the GitHub
+/// Flavored grammar before calling [`Snapshot::read_with_options`] (or its
+/// byte-slice counterpart).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[must_use]
+pub struct OpenOptions {
+    dialect: Dialect,
+    read_limits: ReadLimits,
+}
+
+impl OpenOptions {
+    /// Construct options with the CommonMark grammar and safe finite limits.
+    #[must_use = "use the returned options"]
+    pub const fn new() -> Self {
+        Self {
+            dialect: Dialect::CommonMark,
+            read_limits: ReadLimits::DEFAULT,
+        }
+    }
+
+    /// Select the grammar used for parsing.
+    #[must_use = "use the returned options"]
+    pub const fn dialect(mut self, dialect: Dialect) -> Self {
+        self.dialect = dialect;
+        self
+    }
+
+    /// Return the grammar selected for parsing.
+    #[must_use]
+    pub const fn dialect_value(&self) -> Dialect {
+        self.dialect
+    }
+
+    /// Select the finite source and parser limits used for parsing and edits.
+    #[must_use = "use the returned options"]
+    pub const fn read_limits(mut self, limits: ReadLimits) -> Self {
+        self.read_limits = limits;
+        self
+    }
+
+    /// Return the limits retained by an opened snapshot.
+    #[must_use]
+    pub const fn read_limits_value(&self) -> ReadLimits {
+        self.read_limits
     }
 }
 
@@ -449,8 +532,10 @@ impl Snapshot {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::PatchConflict`] for any different source, dialect, or
-    /// read policy. The patch target is fully reparsed before publication.
+    /// Returns [`Error::PatchConflict`] for a different source or dialect.
+    /// Read limits are an admission policy rather than part of content
+    /// identity: the patch target is fully reparsed under this snapshot's
+    /// retained policy before publication.
     pub fn apply(&self, patch: &Patch) -> Result<super::Commit, Error> {
         super::transaction::apply(self, patch)
     }
@@ -476,7 +561,7 @@ impl Snapshot {
     /// Grammar used to interpret this snapshot.
     #[must_use]
     pub fn dialect(&self) -> Dialect {
-        self.state.dialect
+        self.state.options.dialect_value()
     }
 
     /// Start a bounded edit against this immutable snapshot.
@@ -491,7 +576,7 @@ impl Snapshot {
     ///
     /// Returns a typed UTF-8, input, allocation, or resource-limit error.
     pub fn read(source: &str) -> Result<Self, Error> {
-        Self::read_with(source, Dialect::CommonMark, ReadLimits::DEFAULT)
+        Self::read_with_options(source, OpenOptions::default())
     }
 
     /// Read UTF-8 bytes as `CommonMark` with safe default limits.
@@ -505,6 +590,20 @@ impl Snapshot {
         Self::read(utf8_source)
     }
 
+    /// Read UTF-8 bytes with an explicit grammar and resource policy.
+    ///
+    /// The selected options are retained by the resulting snapshot and are
+    /// reused by every edit, patch replay, and HTML rendering operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Utf8`] for a non-UTF-8 byte sequence, plus the errors
+    /// documented by [`Self::read_with_options`].
+    pub fn read_bytes_with_options(source: &[u8], options: OpenOptions) -> Result<Self, Error> {
+        let utf8_source = std::str::from_utf8(source).map_err(Error::Utf8)?;
+        Self::read_with_options(utf8_source, options)
+    }
+
     /// Read an exact source with an explicit grammar and resource policy.
     ///
     /// # Errors
@@ -512,8 +611,19 @@ impl Snapshot {
     /// Returns a typed UTF-8 input, allocation, or resource-limit error. NUL is
     /// refused because `CommonMark` requires it to be replaced with U+FFFD;
     /// silently doing so would violate exact-source semantics.
-    pub fn read_with(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Self, Error> {
-        parse::read(source, dialect, limits)
+    pub fn read_with_options(source: &str, options: OpenOptions) -> Result<Self, Error> {
+        parse::read(source, options)
+    }
+
+    pub(crate) fn read_with_policy(
+        source: &str,
+        dialect: Dialect,
+        limits: ReadLimits,
+    ) -> Result<Self, Error> {
+        Self::read_with_options(
+            source,
+            OpenOptions::default().dialect(dialect).read_limits(limits),
+        )
     }
 
     /// Exact complete UTF-8 Markdown source.
@@ -533,13 +643,17 @@ impl Snapshot {
     /// Returns a typed allocation or event-limit error if the bounded event
     /// adapter cannot be constructed.
     pub fn to_html(&self) -> Result<String, Error> {
-        super::gfm::render_html(&self.state.source, self.state.dialect, self.state.limits)
+        super::gfm::render_html(
+            &self.state.source,
+            self.state.options.dialect_value(),
+            self.state.options.read_limits_value(),
+        )
     }
 
     /// Limits retained for future edits and patch application.
     #[must_use]
     pub fn limits(&self) -> ReadLimits {
-        self.state.limits
+        self.state.options.read_limits_value()
     }
 
     /// Iterate over resolved uses and definitions in deterministic source order.
@@ -714,7 +828,7 @@ impl fmt::Debug for Snapshot {
             .debug_struct("Snapshot")
             .field("source_bytes", &self.state.source.len())
             .field("blocks", &self.state.blocks.len())
-            .field("dialect", &self.state.dialect)
+            .field("dialect", &self.state.options.dialect_value())
             .finish()
     }
 }
@@ -723,7 +837,8 @@ impl Eq for Snapshot {}
 
 impl PartialEq for Snapshot {
     fn eq(&self, other: &Self) -> bool {
-        self.state.dialect == other.state.dialect && self.state.source == other.state.source
+        self.state.options.dialect_value() == other.state.options.dialect_value()
+            && self.state.source == other.state.source
     }
 }
 
@@ -732,10 +847,10 @@ impl PartialEq for Snapshot {
 #[non_exhaustive]
 pub enum Error {
     /// A read-limit field was configured as zero.
-    #[error("Markdown read limit '{name}' must be nonzero")]
+    #[error("Markdown read limit '{}' must be nonzero", .kind.as_str())]
     InvalidLimit {
-        /// Stable field name.
-        name: &'static str,
+        /// Bounded resource dimension.
+        kind: LimitKind,
     },
     /// The complete source is larger than policy permits.
     #[error("Markdown source has {actual} bytes; limit is {limit}")]
@@ -920,8 +1035,7 @@ pub(crate) struct State {
     pub(crate) source: Arc<str>,
     pub(crate) blocks: Box<[BlockRecord]>,
     pub(crate) references: Box<[ReferenceRecord]>,
-    pub(crate) dialect: Dialect,
-    pub(crate) limits: ReadLimits,
+    pub(crate) options: OpenOptions,
 }
 
 fn push_projection_issue(

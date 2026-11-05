@@ -6,7 +6,7 @@ use super::{Commit, Error, Patch, Result};
 
 /// A staged, failure-atomic edit over one source tracked-revision snapshot.
 #[derive(Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     editor: RevisionEditor,
 }
@@ -19,38 +19,26 @@ impl Transaction {
 
     /// Returns the immutable source snapshot used for stale-source checks.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.source
-    }
-
-    /// Alias for [`Self::before`].
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.source
     }
 
     /// Returns the current candidate revisions in source order.
-    pub fn revisions(&self) -> Result<Vec<Revision>> {
+    pub(crate) fn revisions(&self) -> Result<Vec<Revision>> {
         self.editor.revisions().map_err(Error::Invalid)
     }
 
     /// Returns the current candidate revision-author table.
     #[must_use]
-    pub fn authors(&self) -> &[String] {
+    pub(crate) fn authors(&self) -> &[String] {
         self.editor.authors()
-    }
-
-    /// Whether a successful staged operation has changed the candidate.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.editor.is_changed()
     }
 
     /// Materializes the current candidate as a validated snapshot.
     ///
     /// A byte-identical candidate returns the original snapshot, preserving
     /// exact source bytes and avoiding an unnecessary CFB parse and allocation.
-    pub fn snapshot(&self) -> Result<Snapshot> {
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
         if bytes == self.source.bytes() {
             return Ok(self.source.clone());
@@ -64,7 +52,7 @@ impl Transaction {
     }
 
     /// Adds a revision mark to an existing main-story range.
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         start_cp: u32,
         end_cp: u32,
@@ -80,7 +68,7 @@ impl Transaction {
     ///
     /// `cp` must lie before the main story's final paragraph mark (MS-DOC
     /// 2.3.1); see [`RevisionEditor::add_text`].
-    pub fn add_text(
+    pub(crate) fn add_text(
         &mut self,
         cp: u32,
         text: &str,
@@ -96,7 +84,7 @@ impl Transaction {
     ///
     /// Replacing with the already-published metadata is an exact no-op and does
     /// not rebuild the FKP or append a new table block.
-    pub fn replace(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
+    pub(crate) fn replace(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
         let current = self
             .editor
             .revisions()
@@ -110,43 +98,23 @@ impl Transaction {
         self.editor.update(index, metadata).map_err(Error::Invalid)
     }
 
-    /// Alias for [`Self::replace`].
-    pub fn replace_metadata(
-        &mut self,
-        index: usize,
-        metadata: RevisionMetadata,
-    ) -> Result<Revision> {
-        self.replace(index, metadata)
-    }
-
-    /// Alias for [`Self::replace`].
-    pub fn update(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
-        self.replace(index, metadata)
-    }
-
     /// Removes one revision mark while retaining its text/current formatting.
-    pub fn remove(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn remove(&mut self, index: usize) -> Result<Revision> {
         self.editor.remove(index).map_err(Error::Invalid)
     }
 
     /// Accepts one revision using Word redline semantics.
-    pub fn accept(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn accept(&mut self, index: usize) -> Result<Revision> {
         self.editor.accept(index).map_err(Error::Invalid)
     }
 
     /// Rejects one revision using Word redline semantics.
-    pub fn reject(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn reject(&mut self, index: usize) -> Result<Revision> {
         self.editor.reject(index).map_err(Error::Invalid)
     }
 
-    /// Discards the candidate and recovers its immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Commits the candidate as a validated snapshot and reversible patch.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let snapshot = self.snapshot()?;
         let patch = Patch::new(self.source, snapshot.clone());
         Ok(Commit { snapshot, patch })

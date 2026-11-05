@@ -7,7 +7,7 @@
 
 use super::*;
 use crate::package::error::Error;
-use crate::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
+use crate::raw::{Encoder, Error as WireError, Kind, Stage, kind as rt};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -20,7 +20,7 @@ fn wide_string(value: &str) -> Vec<u8> {
 
 fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -108,7 +108,8 @@ fn parses_full_chart_sheet_stream() {
         (rt::FRT_BEGIN, vec![0; 12]),
         (rt::FRT_END, Vec::new()),
     ]);
-    let sheet = parse_chart_sheet_part(&data, "Chart1".to_string(), 0).unwrap();
+    let sheet = parse_chart_sheet_part(&data, "Chart1".to_string(), 0, crate::raw::Limits::DEFAULT)
+        .unwrap();
     assert_eq!(sheet.name, "Chart1");
     assert_eq!(sheet.state, State::Visible);
     assert_eq!(sheet.code_name, "ChartCode");
@@ -165,12 +166,14 @@ fn parses_full_chart_sheet_stream() {
 #[test]
 fn maps_sheet_states() {
     let minimal = chart_sheet_stream(&[]);
-    let hidden = parse_chart_sheet_part(&minimal, "C".to_string(), 1).unwrap();
+    let hidden =
+        parse_chart_sheet_part(&minimal, "C".to_string(), 1, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(hidden.state, State::Hidden);
-    let very_hidden = parse_chart_sheet_part(&minimal, "C".to_string(), 2).unwrap();
+    let very_hidden =
+        parse_chart_sheet_part(&minimal, "C".to_string(), 2, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(very_hidden.state, State::VeryHidden);
     assert!(matches!(
-        parse_chart_sheet_part(&minimal, "C".to_string(), 3),
+        parse_chart_sheet_part(&minimal, "C".to_string(), 3, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
 }
@@ -178,7 +181,8 @@ fn maps_sheet_states() {
 #[test]
 fn parses_minimal_chart_sheet_stream() {
     let data = stream(&[(rt::BEGIN_SHEET, Vec::new()), (rt::END_SHEET, Vec::new())]);
-    let sheet = parse_chart_sheet_part(&data, "Chart1".to_string(), 0).unwrap();
+    let sheet = parse_chart_sheet_part(&data, "Chart1".to_string(), 0, crate::raw::Limits::DEFAULT)
+        .unwrap();
     assert!(sheet.code_name.is_empty());
     assert!(!sheet.published);
     assert_eq!(sheet.tab_color.color_type, ColorType::Automatic);
@@ -197,7 +201,8 @@ fn tab_color_variants() {
         (rt::CS_PROP, indexed),
         (rt::END_SHEET, Vec::new()),
     ]);
-    let sheet = parse_chart_sheet_part(&data, "C".to_string(), 0).unwrap();
+    let sheet =
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(sheet.tab_color.color_type, ColorType::Indexed);
     assert_eq!(sheet.tab_color.index, 0x40);
 
@@ -208,7 +213,8 @@ fn tab_color_variants() {
         (rt::CS_PROP, theme),
         (rt::END_SHEET, Vec::new()),
     ]);
-    let sheet = parse_chart_sheet_part(&data, "C".to_string(), 0).unwrap();
+    let sheet =
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(sheet.tab_color.color_type, ColorType::Theme);
     assert_eq!(sheet.tab_color.index, 0x0B);
 
@@ -220,7 +226,7 @@ fn tab_color_variants() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
 
@@ -232,7 +238,7 @@ fn tab_color_variants() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
 
@@ -244,7 +250,7 @@ fn tab_color_variants() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
 }
@@ -260,7 +266,7 @@ fn rejects_duplicate_singletons() {
         let data = chart_sheet_stream(&[(record_type, payload)]);
         assert!(
             matches!(
-                parse_chart_sheet_part(&data, "C".to_string(), 0),
+                parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
                 Err(Error::Unrecognized { .. })
             ),
             "duplicate 0x{record_type:04X} must be rejected"
@@ -279,7 +285,7 @@ fn rejects_invalid_view_scale() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // 0 means "no zoom level set" and is accepted.
@@ -291,7 +297,8 @@ fn rejects_invalid_view_scale() {
         (rt::END_CS_VIEWS, Vec::new()),
         (rt::END_SHEET, Vec::new()),
     ]);
-    let sheet = parse_chart_sheet_part(&data, "C".to_string(), 0).unwrap();
+    let sheet =
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(sheet.views[0].scale, 0);
 }
 
@@ -305,7 +312,7 @@ fn rejects_invalid_views_collections() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // Unterminated views collection.
@@ -315,7 +322,7 @@ fn rejects_invalid_views_collections() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::UnexpectedEndOfStream(_))
     ));
     // View without its end record.
@@ -327,7 +334,7 @@ fn rejects_invalid_views_collections() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::UnexpectedRecord { .. })
     ));
 }
@@ -343,7 +350,7 @@ fn enforces_iso_protection_pairing() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // ISO record at the end of the stream.
@@ -353,7 +360,7 @@ fn enforces_iso_protection_pairing() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // Following classic record carries a password verifier.
@@ -364,7 +371,7 @@ fn enforces_iso_protection_pairing() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // Following classic record has different flags.
@@ -375,7 +382,7 @@ fn enforces_iso_protection_pairing() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // Excessive spin count is rejected.
@@ -386,7 +393,7 @@ fn enforces_iso_protection_pairing() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
 }
@@ -396,13 +403,13 @@ fn rejects_malformed_streams() {
     // Stream must start with BrtBeginSheet.
     let data = stream(&[(rt::END_SHEET, Vec::new())]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::UnexpectedRecord { .. })
     ));
     // Missing BrtEndSheet.
     let data = stream(&[(rt::BEGIN_SHEET, Vec::new())]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::UnexpectedEndOfStream(_))
     ));
     // Truncated BrtCsProp payload.
@@ -412,7 +419,7 @@ fn rejects_malformed_streams() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Wire(WireError::Truncated {
             stage: Stage::Value,
             ..
@@ -427,7 +434,7 @@ fn rejects_malformed_streams() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Wire(WireError::Trailing {
             context: "BrtCsProp",
             ..
@@ -440,7 +447,7 @@ fn rejects_malformed_streams() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // iCopies outside the permitted range.
@@ -450,14 +457,14 @@ fn rejects_malformed_streams() {
         (rt::END_SHEET, Vec::new()),
     ]);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Unrecognized { .. })
     ));
     // Truncated record stream (record header cut off).
     let mut data = chart_sheet_stream(&[]);
     data.truncate(data.len() - 1);
     assert!(matches!(
-        parse_chart_sheet_part(&data, "C".to_string(), 0),
+        parse_chart_sheet_part(&data, "C".to_string(), 0, crate::raw::Limits::DEFAULT),
         Err(Error::Wire(WireError::Truncated {
             stage: Stage::Length,
             ..

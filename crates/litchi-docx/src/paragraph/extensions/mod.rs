@@ -15,4 +15,6 @@ mod tests;
 
 pub use model::{Extensions, Id, Ids, WORD_2010_NAMESPACE};
 
-pub(crate) use codec::{append_paragraph_attributes, append_row_attributes};
+pub(crate) use codec::{
+    append_paragraph_attributes, append_row_attributes, parse_paragraph_start as start_tag_ids,
+};

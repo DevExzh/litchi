@@ -9,21 +9,22 @@
 
 mod repair_support;
 
-use litchi_rtf::{FitText, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{FitText, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_fittext_runs_with_continuation_and_round_trips() {
-    let document =
-        RtfDocument::parse(r"{\rtf1\ansi plain {\fittext1000 Fit this} {\fittext-1 text} done}")
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi plain {\fittext1000 Fit this} {\fittext-1 text} done}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "plain Fit this text done");
     let runs = document.runs();
     let fit_runs: Vec<_> = runs
@@ -40,7 +41,7 @@ fn parses_fittext_runs_with_continuation_and_round_trips() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\fittext1000"));
     assert!(serialized.contains("\\fittext-1"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     let reparsed_runs = reparsed.runs();
     let reparsed_fit: Vec<_> = reparsed_runs
@@ -61,12 +62,21 @@ fn rejects_malformed_fittext_controls() {
         r"{\rtf1{\fittext1048577 x}}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                rtf,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {rtf}"
         );
     }
     // Zero is a valid (degenerate) width.
-    assert!(RtfDocument::parse(r"{\rtf1{\fittext0 x}}").is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\fittext0 x}}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }
 
 #[test]

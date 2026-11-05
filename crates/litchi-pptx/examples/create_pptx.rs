@@ -2,7 +2,6 @@
 
 use std::{env, error::Error, io};
 
-use litchi_pptx::Package;
 use litchi_pptx::tag::{List, Tag};
 
 fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -13,8 +12,8 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         )
     })?;
 
-    let mut package = Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     slide.set_title("Litchi Office verification");
     slide.add_text_box(
         "Created without a PowerPoint repair prompt",
@@ -23,24 +22,12 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         7_315_200,
         914_400,
     );
-    package.save(&destination)?;
-
-    // Reopening establishes an immutable package snapshot before attaching a
-    // move-owned tag list through the standalone package service.
-    let package = Package::open(&destination)?;
-    let owner = package
-        .presentation()?
-        .slide(0)?
-        .ok_or_else(|| io::Error::other("created presentation has no slide"))?
-        .part()
-        .part()
-        .partname()
-        .clone();
-    let mut graph = package.opc()?.clone();
+    let package = builder.build()?;
     let mut tags = List::new();
     tags.add(Tag::new("LITCHI_VERIFY", "pptx-tag-crud-v1")?)?;
-    let _ = litchi_pptx::tag::put(&mut graph, &owner, tags)?;
-    let mut package = Package::from_opc_package(graph)?;
+    let mut edit = package.edit_tags()?;
+    let _ = edit.set(0_usize, tags)?;
+    let package = edit.commit()?.into_package();
     package.save(destination)?;
     Ok(())
 }

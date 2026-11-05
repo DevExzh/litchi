@@ -6,6 +6,7 @@ use litchi_opc::OpcPackage;
 
 use super::codec::{self, Kind, Owner, Value};
 use super::{PresenceInfo, ThreadingInfo};
+use crate::comments::Limits;
 use crate::{Error, Result};
 
 /// Stable fingerprint used for optimistic source checks.
@@ -19,6 +20,7 @@ pub struct AuthorPresenceSnapshot {
     pub(crate) author_id: u32,
     pub(crate) located: codec::Located,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl AuthorPresenceSnapshot {
@@ -28,17 +30,29 @@ impl AuthorPresenceSnapshot {
     }
 
     /// Parse one complete comment-author part while retaining its exact bytes.
-    pub fn from_xml(source: impl AsRef<[u8]>, author_id: u32) -> Result<Self> {
-        Self::from_xml_owned(source.as_ref().to_vec(), author_id)
+    pub fn from_xml(source: impl AsRef<[u8]>, author_id: u32, limits: Limits) -> Result<Self> {
+        let source = source.as_ref();
+        check_source_size(source, limits)?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(source.len())
+            .map_err(|error| Error::Allocation {
+                resource: "legacy comment collaboration source XML",
+                source: error,
+            })?;
+        owned.extend_from_slice(source);
+        Self::from_xml_owned(owned, author_id, limits)
     }
 
     /// Parse owned source bytes without a second source copy.
-    pub fn from_xml_owned(source: Vec<u8>, author_id: u32) -> Result<Self> {
+    pub fn from_xml_owned(source: Vec<u8>, author_id: u32, limits: Limits) -> Result<Self> {
+        check_source_size(&source, limits)?;
         let source_xml = Arc::new(source);
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(author_id),
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -47,6 +61,7 @@ impl AuthorPresenceSnapshot {
             author_id,
             located,
             revision,
+            limits,
         })
     }
 
@@ -54,11 +69,13 @@ impl AuthorPresenceSnapshot {
         source_part_name: String,
         source_xml: Arc<Vec<u8>>,
         author_id: u32,
+        limits: Limits,
     ) -> Result<Self> {
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(author_id),
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -67,6 +84,7 @@ impl AuthorPresenceSnapshot {
             author_id,
             located,
             revision,
+            limits,
         })
     }
 
@@ -110,8 +128,8 @@ impl AuthorPresenceSnapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> AuthorPresenceTransaction {
-        AuthorPresenceTransaction {
+    pub(crate) fn edit(&self) -> PresenceDraft {
+        PresenceDraft {
             original: self.clone(),
             working: self.value().cloned(),
         }
@@ -123,6 +141,7 @@ impl AuthorPresenceSnapshot {
             && self.author_id == other.author_id
             && self.value() == other.value()
             && self.revision == other.revision
+            && self.limits == other.limits
     }
 
     pub(crate) fn source_arc(&self) -> &Arc<Vec<u8>> {
@@ -132,28 +151,37 @@ impl AuthorPresenceSnapshot {
 
 /// Detached edit of one author presence extension.
 #[derive(Debug, Clone)]
-pub struct AuthorPresenceTransaction {
+pub(crate) struct PresenceDraft {
     original: AuthorPresenceSnapshot,
     working: Option<PresenceInfo>,
 }
 
-impl AuthorPresenceTransaction {
+impl PresenceDraft {
     #[inline]
     #[must_use]
-    pub fn value(&self) -> Option<&PresenceInfo> {
+    pub(crate) fn value(&self) -> Option<&PresenceInfo> {
         self.working.as_ref()
     }
 
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.value() != self.value()
     }
 
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
+    }
+
     /// Set or remove the optional presence extension.
-    pub fn set(&mut self, value: Option<PresenceInfo>) -> Result<bool> {
+    pub(crate) fn set(&mut self, value: Option<PresenceInfo>) -> Result<bool> {
         if let Some(value) = &value {
-            codec::validate_value(Kind::Presence, &Value::Presence(value.clone()))?;
+            codec::validate_value_with_limit(
+                Kind::Presence,
+                &Value::Presence(value.clone()),
+                self.original.limits.max_string_bytes,
+            )?;
         }
         let changed = self.working != value;
         self.working = value;
@@ -161,20 +189,20 @@ impl AuthorPresenceTransaction {
     }
 
     /// Set a concrete inert presence value.
-    pub fn set_presence(&mut self, value: PresenceInfo) -> Result<bool> {
+    pub(crate) fn set_presence(&mut self, value: PresenceInfo) -> Result<bool> {
         self.set(Some(value))
     }
 
     /// Remove the recognized presence extension.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.set(None)
     }
 
     /// Validate and consume into a source-checked reversible patch.
-    pub fn commit(self) -> Result<AuthorPresenceCommit> {
+    pub(crate) fn commit(self) -> Result<PresencePrepared> {
         if !self.is_changed() {
-            let patch = AuthorPresencePatch::new(self.original.clone(), self.original.clone());
-            return Ok(AuthorPresenceCommit {
+            let patch = PresenceChange::new(self.original.clone(), self.original.clone());
+            return Ok(PresencePrepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -185,6 +213,7 @@ impl AuthorPresenceTransaction {
             self.original.source_xml.as_slice(),
             &self.original.located,
             value,
+            self.original.limits,
         )?;
         let source_xml = Arc::new(updated);
         let revision = fingerprint(source_xml.as_slice());
@@ -192,6 +221,7 @@ impl AuthorPresenceTransaction {
             source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(self.original.author_id),
+            self.original.limits,
         )?;
         let snapshot = AuthorPresenceSnapshot {
             source_part_name: self.original.source_part_name.clone(),
@@ -199,12 +229,13 @@ impl AuthorPresenceTransaction {
             author_id: self.original.author_id,
             located,
             revision,
+            limits: self.original.limits,
         };
         if snapshot.value() != self.value() {
             return Err(invalid("presenceInfo source did not round-trip"));
         }
-        let patch = AuthorPresencePatch::new(self.original, snapshot.clone());
-        Ok(AuthorPresenceCommit {
+        let patch = PresenceChange::new(self.original, snapshot.clone());
+        Ok(PresencePrepared {
             snapshot,
             patch,
             changed: true,
@@ -214,75 +245,80 @@ impl AuthorPresenceTransaction {
 
 /// A committed source-preserving author presence edit.
 #[derive(Debug, Clone)]
-pub struct AuthorPresenceCommit {
+pub(crate) struct PresencePrepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: AuthorPresenceSnapshot,
-    patch: AuthorPresencePatch,
+    patch: PresenceChange,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl AuthorPresenceCommit {
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
+impl PresencePrepared {
+    #[cfg(test)]
+    fn is_changed(&self) -> bool {
         self.changed
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &AuthorPresenceSnapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &AuthorPresenceSnapshot {
         &self.snapshot
     }
 
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &AuthorPresencePatch {
+    pub(crate) fn patch(&self) -> &PresenceChange {
         &self.patch
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> AuthorPresencePatch {
-        self.patch
     }
 }
 
 /// A reversible source-checked author presence replacement.
 #[derive(Debug, Clone)]
-pub struct AuthorPresencePatch {
+pub(crate) struct PresenceChange {
     before: AuthorPresenceSnapshot,
     after: AuthorPresenceSnapshot,
 }
 
-impl AuthorPresencePatch {
+impl PresenceChange {
     fn new(before: AuthorPresenceSnapshot, after: AuthorPresenceSnapshot) -> Self {
         Self { before, after }
     }
 
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &AuthorPresenceSnapshot {
+    pub(crate) fn before(&self) -> &AuthorPresenceSnapshot {
         &self.before
     }
 
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &AuthorPresenceSnapshot {
+    pub(crate) fn after(&self) -> &AuthorPresenceSnapshot {
         &self.after
     }
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
-    #[inline]
     #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -290,17 +326,19 @@ impl AuthorPresencePatch {
     }
 
     /// Apply to an exact source buffer.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<AuthorPresenceSnapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut Vec<u8>) -> Result<AuthorPresenceSnapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("author presence source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
         let located = codec::locate(
             self.after.source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(self.after.author_id),
+            self.after.limits,
         )?;
         let result = AuthorPresenceSnapshot {
             source_part_name: self.after.source_part_name.clone(),
@@ -308,6 +346,7 @@ impl AuthorPresencePatch {
             author_id: self.after.author_id,
             located,
             revision: fingerprint(self.after.source_xml.as_slice()),
+            limits: self.after.limits,
         };
         if !result.same_source(&self.after) {
             return Err(invalid(
@@ -316,11 +355,6 @@ impl AuthorPresencePatch {
         }
         *target = self.after.source_xml.as_ref().clone();
         Ok(result)
-    }
-
-    /// Apply atomically to the exact OPC author part.
-    pub fn apply_package(&self, target: &mut OpcPackage) -> Result<AuthorPresenceSnapshot> {
-        super::package::apply_presence_patch(target, self)
     }
 }
 
@@ -334,6 +368,7 @@ pub struct CommentThreadingSnapshot {
     pub(crate) index: u32,
     pub(crate) located: codec::Located,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl CommentThreadingSnapshot {
@@ -348,8 +383,23 @@ impl CommentThreadingSnapshot {
     }
 
     /// Parse one complete comment part while retaining its exact bytes.
-    pub fn from_xml(source: impl AsRef<[u8]>, author_id: u32, index: u32) -> Result<Self> {
-        Self::from_xml_owned(source.as_ref().to_vec(), String::new(), author_id, index)
+    pub fn from_xml(
+        source: impl AsRef<[u8]>,
+        author_id: u32,
+        index: u32,
+        limits: Limits,
+    ) -> Result<Self> {
+        let source = source.as_ref();
+        check_source_size(source, limits)?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(source.len())
+            .map_err(|error| Error::Allocation {
+                resource: "legacy comment collaboration source XML",
+                source: error,
+            })?;
+        owned.extend_from_slice(source);
+        Self::from_xml_owned(owned, String::new(), author_id, index, limits)
     }
 
     /// Parse owned source bytes with an optional source slide name.
@@ -358,12 +408,15 @@ impl CommentThreadingSnapshot {
         slide_part_name: impl Into<String>,
         author_id: u32,
         index: u32,
+        limits: Limits,
     ) -> Result<Self> {
+        check_source_size(&source, limits)?;
         let source_xml = Arc::new(source);
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Threading,
             Owner::Comment { author_id, index },
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -374,6 +427,7 @@ impl CommentThreadingSnapshot {
             index,
             located,
             revision,
+            limits,
         })
     }
 
@@ -383,11 +437,13 @@ impl CommentThreadingSnapshot {
         slide_part_name: String,
         author_id: u32,
         index: u32,
+        limits: Limits,
     ) -> Result<Self> {
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Threading,
             Owner::Comment { author_id, index },
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -398,6 +454,7 @@ impl CommentThreadingSnapshot {
             index,
             located,
             revision,
+            limits,
         })
     }
 
@@ -453,8 +510,8 @@ impl CommentThreadingSnapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> CommentThreadingTransaction {
-        CommentThreadingTransaction {
+    pub(crate) fn edit(&self) -> ThreadingDraft {
+        ThreadingDraft {
             original: self.clone(),
             working: self.value().cloned(),
         }
@@ -468,6 +525,7 @@ impl CommentThreadingSnapshot {
             && self.index == other.index
             && self.value() == other.value()
             && self.revision == other.revision
+            && self.limits == other.limits
     }
 
     pub(crate) fn source_arc(&self) -> &Arc<Vec<u8>> {
@@ -475,30 +533,43 @@ impl CommentThreadingSnapshot {
     }
 }
 
+fn check_source_size(source: &[u8], limits: Limits) -> Result<()> {
+    if source.len() > limits.max_input_bytes {
+        return Err(Error::Limit {
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: source.len(),
+            maximum: limits.max_input_bytes,
+        });
+    }
+    Ok(())
+}
+
 /// Detached edit of one comment threading extension.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingTransaction {
+pub(crate) struct ThreadingDraft {
     original: CommentThreadingSnapshot,
     working: Option<ThreadingInfo>,
 }
 
-impl CommentThreadingTransaction {
+impl ThreadingDraft {
     #[inline]
     #[must_use]
-    pub fn value(&self) -> Option<&ThreadingInfo> {
+    pub(crate) fn value(&self) -> Option<&ThreadingInfo> {
         self.working.as_ref()
     }
 
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.value() != self.value()
     }
 
     /// Set or remove the optional threading extension.
-    pub fn set(&mut self, value: Option<ThreadingInfo>) -> Result<bool> {
+    pub(crate) fn set(&mut self, value: Option<ThreadingInfo>) -> Result<bool> {
         if let Some(value) = &value {
-            codec::validate_value(Kind::Threading, &Value::Threading(value.clone()))?;
+            codec::validate_value_with_limit(
+                Kind::Threading,
+                &Value::Threading(value.clone()),
+                self.original.limits.max_string_bytes,
+            )?;
         }
         let changed = self.working != value;
         self.working = value;
@@ -506,23 +577,22 @@ impl CommentThreadingTransaction {
     }
 
     /// Set concrete inert threading metadata.
-    pub fn set_threading(&mut self, value: ThreadingInfo) -> Result<bool> {
+    pub(crate) fn set_threading(&mut self, value: ThreadingInfo) -> Result<bool> {
         self.set(Some(value))
     }
 
     /// Remove the recognized threading extension.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.set(None)
     }
 
     /// Validate and consume into a source-checked reversible patch.
-    pub fn commit(self) -> Result<CommentThreadingCommit> {
+    pub(crate) fn commit(self) -> Result<ThreadingPrepared> {
         if !self.is_changed() {
-            let patch = CommentThreadingPatch::new(self.original.clone(), self.original.clone());
-            return Ok(CommentThreadingCommit {
+            let patch = ThreadingChange::new(self.original.clone(), self.original.clone());
+            return Ok(ThreadingPrepared {
                 snapshot: self.original,
                 patch,
-                changed: false,
             });
         }
         let value = self.working.clone().map(Value::Threading);
@@ -530,6 +600,7 @@ impl CommentThreadingTransaction {
             self.original.source_xml.as_slice(),
             &self.original.located,
             value,
+            self.original.limits,
         )?;
         let source_xml = Arc::new(updated);
         let revision = fingerprint(source_xml.as_slice());
@@ -540,6 +611,7 @@ impl CommentThreadingTransaction {
                 author_id: self.original.author_id,
                 index: self.original.index,
             },
+            self.original.limits,
         )?;
         let snapshot = CommentThreadingSnapshot {
             source_part_name: self.original.source_part_name.clone(),
@@ -549,90 +621,75 @@ impl CommentThreadingTransaction {
             index: self.original.index,
             located,
             revision,
+            limits: self.original.limits,
         };
         if snapshot.value() != self.value() {
             return Err(invalid("threadingInfo source did not round-trip"));
         }
-        let patch = CommentThreadingPatch::new(self.original, snapshot.clone());
-        Ok(CommentThreadingCommit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        let patch = ThreadingChange::new(self.original, snapshot.clone());
+        Ok(ThreadingPrepared { snapshot, patch })
     }
 }
 
 /// A committed source-preserving comment-threading edit.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingCommit {
+pub(crate) struct ThreadingPrepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: CommentThreadingSnapshot,
-    patch: CommentThreadingPatch,
-    changed: bool,
+    patch: ThreadingChange,
 }
 
-impl CommentThreadingCommit {
+impl ThreadingPrepared {
     #[inline]
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &CommentThreadingSnapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &CommentThreadingSnapshot {
         &self.snapshot
     }
 
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &CommentThreadingPatch {
+    pub(crate) fn patch(&self) -> &ThreadingChange {
         &self.patch
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> CommentThreadingPatch {
-        self.patch
     }
 }
 
 /// A reversible source-checked comment-threading replacement.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingPatch {
+pub(crate) struct ThreadingChange {
     before: CommentThreadingSnapshot,
     after: CommentThreadingSnapshot,
 }
 
-impl CommentThreadingPatch {
+impl ThreadingChange {
     fn new(before: CommentThreadingSnapshot, after: CommentThreadingSnapshot) -> Self {
         Self { before, after }
     }
 
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &CommentThreadingSnapshot {
+    pub(crate) fn before(&self) -> &CommentThreadingSnapshot {
         &self.before
     }
 
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &CommentThreadingSnapshot {
+    pub(crate) fn after(&self) -> &CommentThreadingSnapshot {
         &self.after
     }
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
-    #[inline]
     #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -640,11 +697,12 @@ impl CommentThreadingPatch {
     }
 
     /// Apply to an exact source buffer.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<CommentThreadingSnapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut Vec<u8>) -> Result<CommentThreadingSnapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("comment threading source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
         let located = codec::locate(
@@ -654,6 +712,7 @@ impl CommentThreadingPatch {
                 author_id: self.after.author_id,
                 index: self.after.index,
             },
+            self.after.limits,
         )?;
         let result = CommentThreadingSnapshot {
             source_part_name: self.after.source_part_name.clone(),
@@ -663,6 +722,7 @@ impl CommentThreadingPatch {
             index: self.after.index,
             located,
             revision: fingerprint(self.after.source_xml.as_slice()),
+            limits: self.after.limits,
         };
         if !result.same_source(&self.after) {
             return Err(invalid(
@@ -671,11 +731,6 @@ impl CommentThreadingPatch {
         }
         *target = self.after.source_xml.as_ref().clone();
         Ok(result)
-    }
-
-    /// Apply atomically to the exact OPC comment part.
-    pub fn apply_package(&self, target: &mut OpcPackage) -> Result<CommentThreadingSnapshot> {
-        super::package::apply_threading_patch(target, self)
     }
 }
 

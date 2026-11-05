@@ -9,12 +9,13 @@
 
 mod repair_support;
 
-use litchi_rtf::{ImageType, Picture, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ImageType, Picture, write::Writer};
 use std::borrow::Cow;
 
-fn write(document: &RtfDocument<'_>) -> String {
+fn write(document: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes).write_document(document).unwrap();
+    Writer::new(&mut bytes).write_document(document).unwrap();
     String::from_utf8(bytes).unwrap()
 }
 
@@ -26,7 +27,7 @@ fn bitmap_crop_and_source_header_metadata_round_trip_inertly() {
         r#"\piccropl-1\piccropr2\piccropt3\piccropb-4"#,
         r#"\picbmp\picbpp24\wbmbitspixel8\wbmplanes1\wbmwidthbytes8 00}}}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let picture = &document.pictures()[0];
     assert_eq!(picture.image_type, ImageType::Dib);
     assert!(picture.scaled);
@@ -46,7 +47,7 @@ fn bitmap_crop_and_source_header_metadata_round_trip_inertly() {
     assert!(serialized.contains("\\picscaled"));
     assert!(serialized.contains("\\piccropl-1"));
     assert!(serialized.contains("\\wbmwidthbytes8"));
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.pictures(), document.pictures());
     assert_eq!(
         reparsed.picture_compatibility_records(),
@@ -69,7 +70,10 @@ fn picture_layout_controls_reject_ambiguous_or_unbounded_forms() {
         r"{\rtf1\piccropl1 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted hostile source: {source}"
         );
     }

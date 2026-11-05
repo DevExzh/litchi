@@ -9,7 +9,7 @@ use litchi_core::{
 use serde_json::Value;
 
 use super::{Change, ChangeAction, ChangeKind, Patch};
-use crate::Database;
+use crate::Package;
 
 const FORMAT: &str = "litchi.odb";
 const SOURCE_PRECONDITION: &str = "source_sha256";
@@ -76,7 +76,7 @@ impl DurablePatch {
     /// # Errors
     ///
     /// Returns an error on stale source bytes or invalid target readback.
-    pub fn apply(&self, source: &Database) -> Result<Database> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         let reverse = self.inner.inverse();
         let expected = direction(&reverse)?.artifact;
         if source.as_bytes() != expected {
@@ -136,7 +136,7 @@ impl SealedPatch {
     /// # Errors
     ///
     /// Returns an error on a stale source digest or invalid target readback.
-    pub fn apply(&self, source: &Database) -> Result<Database> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         let selected = direction(&self.inner)?;
         if BlobId::of(source.as_bytes()).as_hex() != selected.source_id {
             return source_mismatch();
@@ -298,14 +298,14 @@ fn validate_direction<Mode>(patch: &CorePatch<Mode>) -> Result<()> {
     Ok(())
 }
 
-fn database_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<Database> {
+fn database_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<Package> {
     let selected = direction(patch)?;
     reopen_artifact(selected.artifact)
 }
 
-fn reopen_artifact(bytes: &[u8]) -> Result<Database> {
-    let database = Database::from_bytes(copy_bytes(bytes)?)?;
-    database.catalog()?;
+fn reopen_artifact(bytes: &[u8]) -> Result<Package> {
+    let database = Package::from_published(copy_bytes(bytes)?)?;
+    database.database.catalog()?;
     Ok(database)
 }
 
@@ -405,7 +405,5 @@ fn invalid_wire_error() -> Error {
 }
 
 fn source_mismatch<T>() -> Result<T> {
-    Err(Error::InvalidFormat(
-        "ODB durable patch source does not match".to_string(),
-    ))
+    Err(Error::PatchConflict)
 }

@@ -15,7 +15,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{table_model_discovery_codec, text_storage_codec};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{
     Package, PackageError, RootReferences, decode_body_storage, root_references_with_limits,
@@ -52,7 +52,7 @@ const MAX_VARINT_BYTES: usize = 10;
 /// transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableLockLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete edited package output bytes.
@@ -87,7 +87,7 @@ pub enum BodyTableLockLimitKind {
     WireWork,
 }
 
-impl fmt::Display for BodyTableLockLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -111,29 +111,21 @@ impl fmt::Display for BodyTableLockLimitKind {
 }
 
 /// Failure from a semantic body-table lock read or immutable transaction.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableLockError {
-    /// The rooted Pages body has no table matching the selector.
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    /// More than one body table has the requested exact name.
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    /// A selector could not be resolved uniquely.
-    #[error("the Pages body-table selector is ambiguous")]
-    AmbiguousSelector,
-    /// The package source cannot publish a preservation-safe changed edit.
-    #[error("the Pages package source does not support exact body-table lock editing")]
-    UnsupportedSource,
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted semantic selection did not resolve to one supported native payload.
     #[error("the selected Pages body table has no unambiguous editable lock payload")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Pages body-table lock {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
-        kind: BodyTableLockLimitKind,
+        kind: LimitKind,
         /// Observed or requested resource amount.
         observed: u64,
         /// Configured maximum.
@@ -153,28 +145,119 @@ pub enum BodyTableLockError {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The rooted Pages body has no table matching the selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// More than one body table has the requested exact name.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// A selector could not be resolved uniquely.
+    #[error("the Pages body-table selector is ambiguous")]
+    AmbiguousSelector,
+    /// The package source cannot publish a preservation-safe changed edit.
+    #[error("the Pages package source does not support exact body-table lock editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 /// A mutable semantic body-table lock state staged against one immutable
 /// package snapshot.
-pub struct BodyTableLockEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     target: BodyTableTarget,
     before: State,
     state: State,
 }
 
-impl fmt::Debug for BodyTableLockEdit<'_> {
+/// Owned selector retained by lazy edit constructors.
+///
+/// Name selectors are copied once at the API boundary so an edit can defer
+/// the rooted body graph walk until its first operation without borrowing the
+/// caller's temporary string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OwnedBodyTableSelector {
+    Name(Box<str>),
+    Position(crate::Position),
+}
+
+impl OwnedBodyTableSelector {
+    pub(crate) fn try_from(
+        package: &Package,
+        selector: BodyTableSelector<'_>,
+    ) -> Result<Self, Error> {
+        match selector {
+            BodyTableSelector::Name(name) => {
+                let mut budget = WireBudget::new(package.state.source.limits())?;
+                budget.admit_selector_name(name.len())?;
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|_| Error::Allocation { amount: name.len() })?;
+                owned.push_str(name);
+                Ok(Self::Name(owned.into_boxed_str()))
+            },
+            BodyTableSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn resolve(&self, package: &Package) -> Result<BodyTableTarget, Error> {
+        let mut budget = WireBudget::new(package.state.source.limits())?;
+        self.resolve_with_budget(package, &mut budget)
+    }
+
+    pub(crate) fn resolve_with_budget(
+        &self,
+        package: &Package,
+        budget: &mut WireBudget,
+    ) -> Result<BodyTableTarget, Error> {
+        match self {
+            Self::Name(name) => {
+                package.resolve_body_table_with_budget(BodyTableSelector::Name(name), budget)
+            },
+            Self::Position(position) => package
+                .resolve_body_table_with_budget(BodyTableSelector::Position(*position), budget),
+        }
+    }
+}
+
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // The source snapshot and target contain native identifiers and raw
         // package details; expose only the semantic lock values.
         formatter
-            .debug_struct("BodyTableLockEdit")
+            .debug_struct("Edit")
             .field("before", &self.before)
             .field("state", &self.state)
             .finish_non_exhaustive()
     }
 }
 
-impl BodyTableLockEdit<'_> {
+impl Edit<'_> {
     /// Return the lock state that would be published by this edit.
     #[must_use]
     pub const fn state(&self) -> State {
@@ -198,15 +281,15 @@ impl BodyTableLockEdit<'_> {
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<BodyTableLockCommit, BodyTableLockError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let source = physical_source(self.source)?;
         let mut budget = WireBudget::new(source.limits())?;
         let source_bytes = source.shared_source();
         let source_fingerprint = fingerprint(source.source_bytes(), &mut budget)?;
         if self.before == self.state {
-            return Ok(BodyTableLockCommit {
-                package: self.source.snapshot(),
-                patch: BodyTableLockPatch {
+            return Ok(Commit {
+                package: self.source.clone(),
+                patch: Patch {
                     source: Arc::clone(&source_bytes),
                     target: source_bytes,
                     source_fingerprint,
@@ -215,11 +298,11 @@ impl BodyTableLockEdit<'_> {
                     before: self.before,
                     after: self.state,
                 },
-                diagnostics: BodyTableLockDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source.source_is_exact() {
-            return Err(BodyTableLockError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let package = rewrite_lock_state(
@@ -231,9 +314,9 @@ impl BodyTableLockEdit<'_> {
         )?;
         let target = physical_source(&package)?.shared_source();
         let target_fingerprint = fingerprint(target.as_ref(), &mut budget)?;
-        Ok(BodyTableLockCommit {
+        Ok(Commit {
             package,
-            patch: BodyTableLockPatch {
+            patch: Patch {
                 source: source_bytes,
                 target,
                 source_fingerprint,
@@ -242,14 +325,14 @@ impl BodyTableLockEdit<'_> {
                 before: self.before,
                 after: self.state,
             },
-            diagnostics: BodyTableLockDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
 
 /// Reversible patch bound to the exact source and target package artifacts.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyTableLockPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -259,10 +342,10 @@ pub struct BodyTableLockPatch {
     after: State,
 }
 
-impl fmt::Debug for BodyTableLockPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableLockPatch")
+            .debug_struct("Patch")
             .field("table_position", &self.proof.table_position)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -270,7 +353,7 @@ impl fmt::Debug for BodyTableLockPatch {
     }
 }
 
-impl BodyTableLockPatch {
+impl Patch {
     /// Return the semantic state required before this patch can apply.
     #[must_use]
     pub const fn before(&self) -> State {
@@ -309,13 +392,13 @@ impl BodyTableLockPatch {
 
 /// Compact evidence describing work performed by one committed transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BodyTableLockDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyTableLockDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -354,13 +437,13 @@ impl BodyTableLockDiagnostics {
 /// Fully reopened immutable result of one body-table lock transaction.
 #[must_use = "a Pages body-table lock commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyTableLockCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableLockPatch,
-    diagnostics: BodyTableLockDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyTableLockCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -373,15 +456,21 @@ impl BodyTableLockCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableLockPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableLockDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -448,7 +537,7 @@ impl Package {
     pub fn body_table_lock<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<State, BodyTableLockError> {
+    ) -> Result<State, Error> {
         let target = self.resolve_body_table(selector.into())?;
         Ok(State::from_locked(target.explicit_locked.unwrap_or(false)))
     }
@@ -457,10 +546,10 @@ impl Package {
     pub fn edit_body_table_lock<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<BodyTableLockEdit<'_>, BodyTableLockError> {
+    ) -> Result<Edit<'_>, Error> {
         let target = self.resolve_body_table(selector.into())?;
         let before = State::from_locked(target.explicit_locked.unwrap_or(false));
-        Ok(BodyTableLockEdit {
+        Ok(Edit {
             source: self,
             target,
             before,
@@ -469,20 +558,17 @@ impl Package {
     }
 
     /// Apply an exact-source-checked reversible body-table lock patch.
-    pub fn apply_body_table_lock(
-        &self,
-        patch: &BodyTableLockPatch,
-    ) -> Result<BodyTableLockCommit, BodyTableLockError> {
+    pub fn apply_body_table_lock(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = physical_source(self)?;
         let mut budget = WireBudget::new(source.limits())?;
         if fingerprint(source.source_bytes(), &mut budget)? != patch.source_fingerprint {
-            return Err(BodyTableLockError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if !bytes_equal_with_budget(source.source_bytes(), patch.source.as_ref(), &mut budget)? {
-            return Err(BodyTableLockError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if body_table_lock_at_target_with_budget(self, &patch.proof, &mut budget)? != patch.before {
-            return Err(BodyTableLockError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             if patch.source_fingerprint != patch.target_fingerprint
@@ -492,36 +578,36 @@ impl Package {
                     &mut budget,
                 )?
             {
-                return Err(BodyTableLockError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
-            return Ok(BodyTableLockCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyTableLockDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source.source_is_exact()
             || fingerprint(patch.target.as_ref(), &mut budget)? != patch.target_fingerprint
         {
-            return Err(BodyTableLockError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
-        let candidate = reopen_shared(Arc::clone(&patch.target), source.limits(), &mut budget)?;
+        let candidate = reopen_shared(Arc::clone(&patch.target), source, &mut budget)?;
         if body_table_lock_at_target_with_budget(&candidate, &patch.proof, &mut budget)?
             != patch.after
         {
-            return Err(BodyTableLockError::Verification);
+            return Err(Error::Verification);
         }
-        Ok(BodyTableLockCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableLockDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 
     pub(crate) fn resolve_body_table(
         &self,
         selector: BodyTableSelector<'_>,
-    ) -> Result<BodyTableTarget, BodyTableLockError> {
+    ) -> Result<BodyTableTarget, Error> {
         let source = physical_source(self)?;
         let mut budget = WireBudget::new(source.limits())?;
         self.resolve_body_table_with_budget(selector, &mut budget)
@@ -531,7 +617,7 @@ impl Package {
         &self,
         selector: BodyTableSelector<'_>,
         budget: &mut WireBudget,
-    ) -> Result<BodyTableTarget, BodyTableLockError> {
+    ) -> Result<BodyTableTarget, Error> {
         let source = physical_source(self)?;
         budget.charge_source_catalog(source)?;
         let targets = native_body_table_targets_with_budget(self, budget)?;
@@ -541,7 +627,7 @@ impl Package {
                 targets
                     .into_iter()
                     .nth(position.get())
-                    .ok_or(BodyTableLockError::TableNotFound)
+                    .ok_or(Error::Refused(Refusal::TableNotFound))
             },
             BodyTableSelector::Name(name) => {
                 let mut first = None;
@@ -552,11 +638,11 @@ impl Package {
                         continue;
                     }
                     if first.replace(target).is_some() {
-                        return Err(BodyTableLockError::AmbiguousTableName);
+                        return Err(Error::Refused(Refusal::AmbiguousTableName));
                     }
                 }
                 let Some(first) = first else {
-                    return Err(BodyTableLockError::TableNotFound);
+                    return Err(Error::Refused(Refusal::TableNotFound));
                 };
                 Ok(first)
             },
@@ -571,14 +657,14 @@ pub(crate) fn validate_body_table_target(
     package: &Package,
     target: &BodyTableTarget,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     validate_selected_ownership(package, target, budget)
 }
 
 pub(crate) fn native_body_table_targets_with_budget(
     package: &Package,
     budget: &mut WireBudget,
-) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+) -> Result<Vec<BodyTableTarget>, Error> {
     native_body_table_targets_with_budget_mode(package, budget, false)
 }
 
@@ -591,7 +677,7 @@ pub(crate) fn native_body_table_targets_with_budget(
 pub(crate) fn body_table_catalog_with_budget(
     package: &Package,
     budget: &mut WireBudget,
-) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+) -> Result<Vec<BodyTableTarget>, Error> {
     native_body_table_targets_with_budget_mode(package, budget, true)
 }
 
@@ -599,7 +685,7 @@ fn native_body_table_targets_with_budget_mode(
     package: &Package,
     budget: &mut WireBudget,
     allow_empty: bool,
-) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+) -> Result<Vec<BodyTableTarget>, Error> {
     let source = physical_source(package)?;
     native_body_table_targets_from_components_with_budget_mode(
         source.components(),
@@ -619,7 +705,7 @@ pub(crate) fn body_table_targets_from_components_with_budget(
     components: &ComponentCatalog,
     limits: Limits,
     budget: &mut WireBudget,
-) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+) -> Result<Vec<BodyTableTarget>, Error> {
     native_body_table_targets_from_components_with_budget_mode(
         components, limits, budget, false, None,
     )
@@ -631,20 +717,20 @@ fn native_body_table_targets_from_components_with_budget_mode(
     budget: &mut WireBudget,
     allow_empty: bool,
     package: Option<&Package>,
-) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+) -> Result<Vec<BodyTableTarget>, Error> {
     let object_index = index_objects(components, budget)?;
     let root_component_index = components
         .iter()
         .position(|component| component.name() == "Index/Document.iwa")
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let root_location = object_index
         .get(&ROOT_OBJECT_IDENTIFIER)
         .copied()
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if root_location.component_index != root_component_index
         || root_location.object.archive_info.identifier != Some(ROOT_OBJECT_IDENTIFIER)
     {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let Some((root_message_index, root_message)) = unique_message_index(
         root_location.object.messages.as_slice(),
@@ -652,7 +738,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         budget,
     )?
     else {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     validate_selected_metadata(root_location.object, root_message_index)?;
     // Root projection and body-storage decoding are part of the same read
@@ -668,7 +754,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         .archive_info
         .message_infos
         .get(root_message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let Some(body_identifier) = body else {
         // A body-less Pages document is a valid empty/rootless source, but a
         // retained field-4 object or data edge is contradictory archive
@@ -678,12 +764,12 @@ fn native_body_table_targets_from_components_with_budget_mode(
             field.path.as_slice() == [ROOT_BODY_FIELD]
                 && (!field.object_references.is_empty() || !field.data_references.is_empty())
         }) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         return if allow_empty {
             Ok(Vec::new())
         } else {
-            Err(BodyTableLockError::TableNotFound)
+            Err(Error::Refused(Refusal::TableNotFound))
         };
     };
     if !message_declares_reference(
@@ -694,12 +780,12 @@ fn native_body_table_targets_from_components_with_budget_mode(
         false,
         budget,
     )? {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let body_location = object_index
         .get(&body_identifier.get())
         .copied()
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let body_message = unique_text_message(body_location.object, body_identifier, budget)?;
     validate_selected_metadata(body_location.object, body_message.0)?;
     let body_payload = body_message.1.data.as_slice();
@@ -750,7 +836,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         .archive_info
         .message_infos
         .get(body_message.0)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let Some(table_field) = unique_field(budget, &body_view, TABLE_BODY_FIELD, 2)? else {
         // A missing payload table is a normal selector miss only when its
         // rooted archive metadata also carries no field-9 attachment edges.
@@ -760,7 +846,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         return if allow_empty {
             Ok(Vec::new())
         } else {
-            Err(BodyTableLockError::TableNotFound)
+            Err(Error::Refused(Refusal::TableNotFound))
         };
     };
     let table_view = budget.parse(table_field.payload(), 1)?;
@@ -769,8 +855,8 @@ fn native_body_table_targets_from_components_with_budget_mode(
         .filter(|field| field.number() == TABLE_ENTRY_FIELD)
         .count();
     if entry_count > MAX_BODY_TABLES {
-        return Err(BodyTableLockError::LimitExceeded {
-            kind: BodyTableLockLimitKind::PayloadItems,
+        return Err(Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(entry_count),
             maximum: usize_as_u64(MAX_BODY_TABLES),
         });
@@ -782,7 +868,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
     let mut entries = Vec::new();
     entries
         .try_reserve_exact(entry_count)
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entry_count,
         })?;
     for field in table_view
@@ -799,7 +885,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         .windows(2)
         .any(|pair| pair[0].character_index == pair[1].character_index)
     {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     // The body archive header is shared by every table attachment. Prove its
     // aggregate reference inventory once, before the per-table graph walk, so
@@ -813,39 +899,39 @@ fn native_body_table_targets_from_components_with_budget_mode(
     budget.charge_payload_items(entries.len())?;
     targets
         .try_reserve(entries.len())
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
     let mut seen_attachments = Vec::new();
     budget.charge_payload_items(entries.len())?;
     seen_attachments
         .try_reserve(entries.len())
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
     let mut seen_drawables = Vec::new();
     budget.charge_payload_items(entries.len())?;
     seen_drawables
         .try_reserve(entries.len())
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
     let mut seen_models = Vec::new();
     budget.charge_payload_items(entries.len())?;
     seen_models
         .try_reserve(entries.len())
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
     if let Some(body_storage) = body_storage.as_ref() {
         validate_body_placeholders_in_text(body_storage.text(), &entries, budget)?;
     } else {
-        let body_validation = body_validation.ok_or(BodyTableLockError::InvalidSource)?;
+        let body_validation = body_validation.ok_or(Error::InvalidSource)?;
         validate_body_placeholders_from_wire(body_payload, &entries, body_validation, budget)?;
     }
     for entry in entries {
         let Some(attachment_location) = object_index.get(&entry.identifier.get()).copied() else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         budget.charge_payload_work(seen_attachments.len())?;
         budget.charge_payload_work(seen_drawables.len().saturating_add(seen_models.len()))?;
@@ -855,7 +941,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
             || entry.identifier.get() == ROOT_OBJECT_IDENTIFIER
             || entry.identifier.get() == body_identifier.get()
         {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_attachments.push(entry.identifier);
         let Some((attachment_message_index, attachment_message)) = unique_message_index(
@@ -864,12 +950,12 @@ fn native_body_table_targets_from_components_with_budget_mode(
             budget,
         )?
         else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         validate_selected_metadata(attachment_location.object, attachment_message_index)?;
         let drawable_identifier = parse_drawable_attachment(budget, &attachment_message.data)?;
         let Some(drawable_location) = object_index.get(&drawable_identifier.get()).copied() else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         budget.charge_payload_work(seen_drawables.len())?;
         budget.charge_payload_work(seen_attachments.len().saturating_add(seen_models.len()))?;
@@ -879,27 +965,27 @@ fn native_body_table_targets_from_components_with_budget_mode(
             || drawable_identifier.get() == ROOT_OBJECT_IDENTIFIER
             || drawable_identifier.get() == body_identifier.get()
         {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_drawables.push(drawable_identifier);
         let Some((message_index, message)) =
             unique_table_info(drawable_location.object.messages.as_slice(), budget)?
         else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         validate_selected_metadata(drawable_location.object, message_index)?;
         let snapshot = decode_table_info(&message.data, budget, body_identifier)?;
         let model_identifier = snapshot.table_model;
         let Some(model_location) = object_index.get(&model_identifier.get()).copied() else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if model_location.object.archive_info.identifier != Some(model_identifier.get()) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((model_message_index, model_message)) =
             unique_table_model(model_location.object.messages.as_slice(), budget)?
         else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         validate_selected_metadata(model_location.object, model_message_index)?;
         if role_identifiers_are_aliased(
@@ -909,7 +995,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
             drawable_identifier.get(),
             model_identifier.get(),
         ) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.charge_payload_work(seen_models.len())?;
         budget.charge_payload_work(seen_attachments.len().saturating_add(seen_drawables.len()))?;
@@ -919,7 +1005,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
             || model_identifier.get() == ROOT_OBJECT_IDENTIFIER
             || model_identifier.get() == body_identifier.get()
         {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_models.push(model_identifier);
         let (table_name, table_rows, table_columns) =
@@ -976,7 +1062,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         return if allow_empty {
             Ok(targets)
         } else {
-            Err(BodyTableLockError::TableNotFound)
+            Err(Error::Refused(Refusal::TableNotFound))
         };
     }
     Ok(targets)
@@ -997,7 +1083,7 @@ fn validate_body_placeholders_in_text(
     text: &str,
     entries: &[BodyTableEntry],
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     let mut entry_index = 0;
     for (character_index, character) in text.encode_utf16().enumerate() {
         budget.charge_payload_work(1)?;
@@ -1006,14 +1092,14 @@ fn validate_body_placeholders_in_text(
             .is_some_and(|entry| entry.character_index == character_index)
         {
             if character != OBJECT_REPLACEMENT_CHARACTER {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             entry_index += 1;
         }
     }
     (entry_index == entries.len())
         .then_some(())
-        .ok_or(BodyTableLockError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Validate and inspect only the borrowed field-3 text projection needed by
@@ -1035,12 +1121,12 @@ fn validate_body_storage_wire(
     payload: &[u8],
     limits: Limits,
     budget: &mut WireBudget,
-) -> Result<BodyWireValidation, BodyTableLockError> {
+) -> Result<BodyWireValidation, Error> {
     let wire_limits = super::storage_rewrite_limits(limits).map_err(|error| match error {
         super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
-        super::StorageWireLimitsError::Wire(_) => BodyTableLockError::InvalidSource,
+        super::StorageWireLimitsError::Wire(_) => Error::InvalidSource,
     })?;
-    let validation = litchi_iwa_text_wire::validate_storage_with_limits(payload, wire_limits)
+    let validation = litchi_iwa_text_wire::validate_storage(payload, wire_limits)
         .map_err(map_body_storage_wire_error)?;
     budget.charge_payload_work(validation.validation_work())?;
     Ok(BodyWireValidation {
@@ -1054,7 +1140,7 @@ fn validate_body_placeholders_from_wire(
     entries: &[BodyTableEntry],
     body: BodyWireValidation,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     if entries.is_empty() {
         return Ok(());
     }
@@ -1062,7 +1148,7 @@ fn validate_body_placeholders_from_wire(
         .validation
         .fragments()
         .checked_mul(size_of::<&str>())
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let recursion_limit = u32::try_from(body.limits.max_nesting()).unwrap_or(u32::MAX);
     let options = text_storage_codec::DecodeOptions::new(
         body.limits.max_message_bytes(),
@@ -1071,9 +1157,9 @@ fn validate_body_placeholders_from_wire(
         recursion_limit,
     );
     let view = text_storage_codec::decode_storage_text(payload, options)
-        .map_err(|_| BodyTableLockError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     if view.len() != body.validation.fragments() {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     let mut entry_index = 0;
@@ -1086,18 +1172,16 @@ fn validate_body_placeholders_from_wire(
             budget.charge_payload_work(1)?;
             if entries[entry_index].character_index == character_index {
                 if character != OBJECT_REPLACEMENT_CHARACTER {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 entry_index += 1;
             }
-            character_index = character_index
-                .checked_add(1)
-                .ok_or(BodyTableLockError::InvalidSource)?;
+            character_index = character_index.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     (entry_index == entries.len())
         .then_some(())
-        .ok_or(BodyTableLockError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 #[cfg(test)]
@@ -1106,32 +1190,32 @@ fn validate_body_placeholders_in_wire(
     entries: &[BodyTableEntry],
     limits: Limits,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     let body = validate_body_storage_wire(payload, limits, budget)?;
     validate_body_placeholders_from_wire(payload, entries, body, budget)
 }
 
-fn map_body_storage_wire_error(error: litchi_iwa_text_wire::RewriteError) -> BodyTableLockError {
+fn map_body_storage_wire_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
     match error {
         litchi_iwa_text_wire::RewriteError::LimitExceeded {
             resource,
             observed,
             limit,
-        } => BodyTableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
-                "message bytes" => BodyTableLockLimitKind::WireBytes,
-                "fields" => BodyTableLockLimitKind::WireFields,
-                "nesting" => BodyTableLockLimitKind::WireNesting,
-                "text fragments" | "table entries" => BodyTableLockLimitKind::PayloadItems,
-                "text bytes" => BodyTableLockLimitKind::PayloadBytes,
-                "object references" => BodyTableLockLimitKind::PayloadReferences,
-                _ => BodyTableLockLimitKind::WireWork,
+                "message bytes" => LimitKind::WireBytes,
+                "fields" => LimitKind::WireFields,
+                "nesting" => LimitKind::WireNesting,
+                "text fragments" | "table entries" => LimitKind::PayloadItems,
+                "text bytes" => LimitKind::PayloadBytes,
+                "object references" => LimitKind::PayloadReferences,
+                _ => LimitKind::WireWork,
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
         litchi_iwa_text_wire::RewriteError::Allocation { amount, .. } => {
-            BodyTableLockError::Allocation { amount }
+            Error::Allocation { amount }
         },
         litchi_iwa_text_wire::RewriteError::InvalidFormat(_)
         | litchi_iwa_text_wire::RewriteError::Projection(_)
@@ -1139,24 +1223,19 @@ fn map_body_storage_wire_error(error: litchi_iwa_text_wire::RewriteError) -> Bod
         | litchi_iwa_text_wire::RewriteError::ReversedRange { .. }
         | litchi_iwa_text_wire::RewriteError::RangeOutOfBounds { .. }
         | litchi_iwa_text_wire::RewriteError::SurrogateSplit { .. }
-        | litchi_iwa_text_wire::RewriteError::ArithmeticOverflow { .. } => {
-            BodyTableLockError::InvalidSource
-        },
-        _ => BodyTableLockError::InvalidSource,
+        | litchi_iwa_text_wire::RewriteError::ArithmeticOverflow { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn parse_body_table_entry(
-    budget: &mut WireBudget,
-    source: &[u8],
-) -> Result<BodyTableEntry, BodyTableLockError> {
+fn parse_body_table_entry(budget: &mut WireBudget, source: &[u8]) -> Result<BodyTableEntry, Error> {
     let view = budget.parse(source, 2)?;
     let index = unique_field(budget, &view, TABLE_ENTRY_CHARACTER_INDEX_FIELD, 0)?
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let character_index = parse_u32(index)? as usize;
     let reference = unique_field(budget, &view, TABLE_ENTRY_OBJECT_FIELD, 2)?;
     let Some(reference) = reference else {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     Ok(BodyTableEntry {
         character_index,
@@ -1164,20 +1243,16 @@ fn parse_body_table_entry(
     })
 }
 
-fn parse_drawable_attachment(
-    budget: &mut WireBudget,
-    source: &[u8],
-) -> Result<NonZeroU64, BodyTableLockError> {
+fn parse_drawable_attachment(budget: &mut WireBudget, source: &[u8]) -> Result<NonZeroU64, Error> {
     let view = budget.parse(source, 2)?;
-    let field =
-        unique_field(budget, &view, DRAWABLE_FIELD, 2)?.ok_or(BodyTableLockError::InvalidSource)?;
+    let field = unique_field(budget, &view, DRAWABLE_FIELD, 2)?.ok_or(Error::InvalidSource)?;
     parse_local_reference(budget, field.payload(), 3)
 }
 
 fn decode_table_model_facts(
     budget: &mut WireBudget,
     source: &[u8],
-) -> Result<(Box<str>, u32, u32), BodyTableLockError> {
+) -> Result<(Box<str>, u32, u32), Error> {
     let limits = budget.wire_limits();
     let options = table_model_discovery_codec::DecodeOptions::new(
         source.len().max(1).min(limits.max_input_bytes()),
@@ -1197,7 +1272,7 @@ fn decode_table_model_facts(
     budget.charge_payload_work(text.len())?;
     owned
         .try_reserve_exact(text.len())
-        .map_err(|_| BodyTableLockError::Allocation { amount: text.len() })?;
+        .map_err(|_| Error::Allocation { amount: text.len() })?;
     owned.push_str(text);
     Ok((
         owned.into_boxed_str(),
@@ -1206,25 +1281,23 @@ fn decode_table_model_facts(
     ))
 }
 
-fn map_table_model_codec_error(
-    error: table_model_discovery_codec::DecodeError,
-) -> BodyTableLockError {
+fn map_table_model_codec_error(error: table_model_discovery_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return BodyTableLockError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => (
-            BodyTableLockLimitKind::WireBytes,
+            LimitKind::WireBytes,
             usize_as_u64(observed),
             usize_as_u64(maximum),
         ),
         table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => (
-            BodyTableLockLimitKind::WireFields,
+            LimitKind::WireFields,
             usize_as_u64(observed),
             usize_as_u64(maximum),
         ),
         table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => (
-            BodyTableLockLimitKind::WireWork,
+            LimitKind::WireWork,
             usize_as_u64(observed),
             usize_as_u64(maximum),
         ),
@@ -1233,18 +1306,18 @@ fn map_table_model_codec_error(
         | table_model_discovery_codec::DecodeLimit::Retained { observed, maximum }
         | table_model_discovery_codec::DecodeLimit::Scratch { observed, maximum }
         | table_model_discovery_codec::DecodeLimit::Output { observed, maximum } => (
-            BodyTableLockLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
             usize_as_u64(observed),
             usize_as_u64(maximum),
         ),
         table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => (
-            BodyTableLockLimitKind::WireNesting,
+            LimitKind::WireNesting,
             u64::from(observed),
             u64::from(maximum),
         ),
-        _ => return BodyTableLockError::InvalidSource,
+        _ => return Error::InvalidSource,
     };
-    BodyTableLockError::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -1255,7 +1328,7 @@ pub(crate) fn parse_local_reference(
     budget: &mut WireBudget,
     source: &[u8],
     depth: usize,
-) -> Result<NonZeroU64, BodyTableLockError> {
+) -> Result<NonZeroU64, Error> {
     budget.charge_payload_references(1)?;
     let view = budget.parse(source, depth)?;
     let mut identifier = None;
@@ -1264,49 +1337,48 @@ pub(crate) fn parse_local_reference(
     for field in view.fields() {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableLockError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         match field.number() {
             1 => {
                 if field.wire_type() != 0 || identifier.is_some() {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = NonZeroU64::new(decode_varint(field.payload())?);
                 if identifier.is_none() {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             2 => {
                 if field.wire_type() != 0 || deprecated_type_seen {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 deprecated_type_seen = true;
                 let _deprecated_type = decode_varint(field.payload())?;
             },
             3 => {
                 if field.wire_type() != 0 || external_seen {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 external_seen = true;
                 if decode_varint(field.payload())? > 0 {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => {},
         }
     }
-    identifier.ok_or(BodyTableLockError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn parse_u32(field: WireFieldView<'_>) -> Result<u32, BodyTableLockError> {
+fn parse_u32(field: WireFieldView<'_>) -> Result<u32, Error> {
     let value = decode_varint(field.payload())?;
-    u32::try_from(value).map_err(|_| BodyTableLockError::InvalidSource)
+    u32::try_from(value).map_err(|_| Error::InvalidSource)
 }
 
-fn decode_varint(source: &[u8]) -> Result<u64, BodyTableLockError> {
-    let (value, length) =
-        decode_varint_from_bytes(source).map_err(|_| BodyTableLockError::InvalidSource)?;
+fn decode_varint(source: &[u8]) -> Result<u64, Error> {
+    let (value, length) = decode_varint_from_bytes(source).map_err(|_| Error::InvalidSource)?;
     if length != source.len() || encoded_len(value) != length {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value)
 }
@@ -1316,45 +1388,45 @@ fn unique_field<'a>(
     view: &'a WireView<'a>,
     number: u32,
     wire_type: u8,
-) -> Result<Option<WireFieldView<'a>>, BodyTableLockError> {
+) -> Result<Option<WireFieldView<'a>>, Error> {
     budget.charge_payload_work(view.len())?;
     let mut result = None;
     for field in view.fields().filter(|field| field.number() == number) {
         validate_field(field, wire_type)?;
         if result.replace(field).is_some() {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(result)
 }
 
-fn validate_field(field: WireFieldView<'_>, wire_type: u8) -> Result<(), BodyTableLockError> {
+fn validate_field(field: WireFieldView<'_>, wire_type: u8) -> Result<(), Error> {
     if field.wire_type() != wire_type {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing()
-        .map_err(|_| BodyTableLockError::InvalidSource)
+        .map_err(|_| Error::InvalidSource)
 }
 
 fn unique_text_message<'a>(
     object: &'a ArchiveObject,
     identifier: NonZeroU64,
     budget: &mut WireBudget,
-) -> Result<(usize, &'a RawMessage), BodyTableLockError> {
+) -> Result<(usize, &'a RawMessage), Error> {
     budget.charge_payload_messages(object.messages.len())?;
     let mut result = None;
     for (index, message) in object.messages.iter().enumerate() {
         budget.charge_payload_work(1)?;
         if matches!(message.type_, 2_001 | 2_022) {
             if result.replace((index, message)).is_some() {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
     result.ok_or_else(|| {
         let _ = identifier;
-        BodyTableLockError::InvalidSource
+        Error::InvalidSource
     })
 }
 
@@ -1362,7 +1434,7 @@ fn unique_message_index<'a>(
     messages: &'a [RawMessage],
     message_type: u32,
     budget: &mut WireBudget,
-) -> Result<Option<(usize, &'a RawMessage)>, BodyTableLockError> {
+) -> Result<Option<(usize, &'a RawMessage)>, Error> {
     budget.charge_payload_messages(messages.len())?;
     let mut result = None;
     for (index, message) in messages.iter().enumerate() {
@@ -1371,7 +1443,7 @@ fn unique_message_index<'a>(
             continue;
         }
         if result.replace((index, message)).is_some() {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(result)
@@ -1380,7 +1452,7 @@ fn unique_message_index<'a>(
 fn unique_table_info<'a>(
     messages: &'a [RawMessage],
     budget: &mut WireBudget,
-) -> Result<Option<(usize, &'a RawMessage)>, BodyTableLockError> {
+) -> Result<Option<(usize, &'a RawMessage)>, Error> {
     budget.charge_payload_messages(messages.len())?;
     let mut result = None;
     for (index, message) in messages.iter().enumerate() {
@@ -1392,7 +1464,7 @@ fn unique_table_info<'a>(
             continue;
         }
         if result.replace((index, message)).is_some() {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(result)
@@ -1401,7 +1473,7 @@ fn unique_table_info<'a>(
 fn unique_table_model<'a>(
     messages: &'a [RawMessage],
     budget: &mut WireBudget,
-) -> Result<Option<(usize, &'a RawMessage)>, BodyTableLockError> {
+) -> Result<Option<(usize, &'a RawMessage)>, Error> {
     budget.charge_payload_messages(messages.len())?;
     let mut result = None;
     for (index, message) in messages.iter().enumerate() {
@@ -1410,7 +1482,7 @@ fn unique_table_model<'a>(
             continue;
         }
         if result.replace((index, message)).is_some() {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(result)
@@ -1440,23 +1512,23 @@ fn decode_table_info(
     source: &[u8],
     budget: &mut WireBudget,
     body_identifier: NonZeroU64,
-) -> Result<TableInfoSnapshot, BodyTableLockError> {
+) -> Result<TableInfoSnapshot, Error> {
     let view = budget.parse(source, 0)?;
-    let super_field = unique_field(budget, &view, TABLE_INFO_SUPER_FIELD, 2)?
-        .ok_or(BodyTableLockError::InvalidSource)?;
-    let model_field = unique_field(budget, &view, TABLE_INFO_MODEL_FIELD, 2)?
-        .ok_or(BodyTableLockError::InvalidSource)?;
+    let super_field =
+        unique_field(budget, &view, TABLE_INFO_SUPER_FIELD, 2)?.ok_or(Error::InvalidSource)?;
+    let model_field =
+        unique_field(budget, &view, TABLE_INFO_MODEL_FIELD, 2)?.ok_or(Error::InvalidSource)?;
     let drawable = budget.parse(super_field.payload(), 1)?;
-    let parent = unique_field(budget, &drawable, DRAWABLE_PARENT_FIELD, 2)?
-        .ok_or(BodyTableLockError::InvalidSource)?;
+    let parent =
+        unique_field(budget, &drawable, DRAWABLE_PARENT_FIELD, 2)?.ok_or(Error::InvalidSource)?;
     if parse_local_reference(budget, parent.payload(), 3)? != body_identifier {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let locked = unique_field(budget, &drawable, DRAWABLE_LOCKED_FIELD, 0)?
         .map(|field| match decode_varint(field.payload())? {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(BodyTableLockError::InvalidSource),
+            _ => Err(Error::InvalidSource),
         })
         .transpose()?;
     let table_model = parse_local_reference(budget, model_field.payload(), 1)?;
@@ -1469,11 +1541,11 @@ fn decode_table_info(
 fn index_objects<'a>(
     components: &'a ComponentCatalog,
     budget: &mut WireBudget,
-) -> Result<HashMap<u64, ObjectLocation<'a>>, BodyTableLockError> {
+) -> Result<HashMap<u64, ObjectLocation<'a>>, Error> {
     let object_count = components.iter().try_fold(0usize, |count, component| {
         count
             .checked_add(component.archive().objects.len())
-            .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })
+            .ok_or(Error::Allocation { amount: usize::MAX })
     })?;
     // Charge the complete object inventory before reserving the index so a
     // small transaction budget cannot be bypassed by a large preallocation.
@@ -1482,7 +1554,7 @@ fn index_objects<'a>(
     let mut index = HashMap::new();
     index
         .try_reserve(object_count)
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
         })?;
     for (component_index, component) in components.iter().enumerate() {
@@ -1503,7 +1575,7 @@ fn index_objects<'a>(
             {
                 // A native reference is not semantically resolvable when the
                 // same identifier is present in more than one component.
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -1518,26 +1590,26 @@ fn body_table_lock_at_target_with_budget(
     package: &Package,
     target: &BodyTableTarget,
     budget: &mut WireBudget,
-) -> Result<State, BodyTableLockError> {
+) -> Result<State, Error> {
     validate_selected_ownership(package, target, budget)?;
     let source = physical_source(package)?;
     let component = source
         .components()
         .get_index(target.component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.object_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.drawable_identifier.get()) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.message_index)
         .filter(|message| message.type_ == target.message_type)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(State::from_locked(
         decode_table_info(&message.data, budget, target.body_identifier)?
             .locked
@@ -1551,25 +1623,26 @@ fn rewrite_lock_state(
     before: State,
     after: State,
     budget: &mut WireBudget,
-) -> Result<Package, BodyTableLockError> {
+) -> Result<Package, Error> {
     let source_catalog = physical_source(source)?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     if State::from_locked(target.explicit_locked.unwrap_or(false)) != before {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_ownership(source, target, budget)?;
     let component = source_catalog
         .components()
         .get_index(target.component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let component_name = component.name();
     let entry = source_catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableLockError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = physical_limits
         .effective_archive_limits()
@@ -1581,38 +1654,33 @@ fn rewrite_lock_state(
     budget.charge_payload_work(entry.data().len())?;
     let expected_stream_length = parsed_archive_source_length(component.archive())?;
     budget.charge_archive_inventory(expected_stream_length, component.archive())?;
-    let stream = SnappyStream::decompress_with_limits(
-        entry.data(),
-        physical_limits.snappy_limits().map_err(map_archive_error)?,
-    )
-    .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     let stream_length = stream.as_bytes().len();
     if stream_length != expected_stream_length {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive, budget)?;
     let object = archive
         .objects
         .get_mut(target.object_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.drawable_identifier.get()) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != target.message_type {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_metadata(object, target.message_index)?;
     let original_message_length = message.data.len();
     let patched_bound =
         table_info_rewrite_bound(original_message_length, target.explicit_locked.is_some()).ok_or(
-            BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::OutputBytes,
+            Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: u64::MAX,
                 maximum: physical_limits.max_input_bytes(),
             },
@@ -1621,43 +1689,38 @@ fn rewrite_lock_state(
         .checked_sub(original_message_length)
         .and_then(|value| value.checked_add(patched_bound))
         .and_then(|value| value.checked_add(16))
-        .ok_or(BodyTableLockError::LimitExceeded {
-            kind: BodyTableLockLimitKind::OutputBytes,
+        .ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_input_bytes(),
         })?;
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| {
-            BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::EntryBytes,
-                observed: u64::MAX,
-                maximum: physical_limits.max_entry_bytes(),
-            }
-        })?;
-    let compressed_bound =
-        snappy_compressed_bound(rewritten_bound).ok_or(BodyTableLockError::LimitExceeded {
-            kind: BodyTableLockLimitKind::OutputBytes,
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
+            kind: LimitKind::EntryBytes,
             observed: u64::MAX,
-            maximum: physical_limits.max_input_bytes(),
+            maximum: physical_limits.max_entry_bytes(),
         })?;
+    let compressed_bound = snappy_compressed_bound(rewritten_bound).ok_or(Error::Limit {
+        kind: LimitKind::OutputBytes,
+        observed: u64::MAX,
+        maximum: physical_limits.max_input_bytes(),
+    })?;
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => {
-            deflate_compressed_bound(compressed_bound).ok_or(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::OutputBytes,
-                observed: u64::MAX,
-                maximum: physical_limits.max_input_bytes(),
-            })?
-        },
-        _ => return Err(BodyTableLockError::UnsupportedSource),
+        8 => deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: u64::MAX,
+            maximum: physical_limits.max_input_bytes(),
+        })?,
+        _ => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     let package_output_bound = source_catalog
         .source_bytes()
         .len()
         .checked_sub(old_compressed_size)
         .and_then(|value| value.checked_add(replacement_compressed_bound))
-        .ok_or(BodyTableLockError::LimitExceeded {
-            kind: BodyTableLockLimitKind::OutputBytes,
+        .ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_input_bytes(),
         })?;
@@ -1688,7 +1751,7 @@ fn rewrite_lock_state(
     .map_err(map_wire_error)?;
     let patched_length = patched.len();
     if patched_length > patched_bound {
-        return Err(BodyTableLockError::Verification);
+        return Err(Error::Verification);
     }
     if State::from_locked(
         decode_table_info(&patched, budget, target.body_identifier)?
@@ -1696,10 +1759,10 @@ fn rewrite_lock_state(
             .unwrap_or(false),
     ) != after
     {
-        return Err(BodyTableLockError::Verification);
+        return Err(Error::Verification);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -1708,17 +1771,15 @@ fn rewrite_lock_state(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if rewritten.len() > rewritten_bound {
-        return Err(BodyTableLockError::Verification);
+        return Err(Error::Verification);
     }
     drop(stream);
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
-        return Err(BodyTableLockError::Verification);
+        return Err(Error::Verification);
     }
     drop(rewritten);
     budget.charge_payload_work(package_output_bound)?;
@@ -1730,13 +1791,13 @@ fn rewrite_lock_state(
         )
         .map_err(map_archive_error)?;
     if output.len() > package_output_bound {
-        return Err(BodyTableLockError::Verification);
+        return Err(Error::Verification);
     }
     drop(compressed);
     let candidate_source: Arc<[u8]> = output.into();
-    let candidate = reopen_shared(candidate_source, physical_limits, budget)?;
+    let candidate = reopen_shared(candidate_source, source_catalog, budget)?;
     if body_table_lock_at_target_with_budget(&candidate, target, budget)? != after {
-        return Err(BodyTableLockError::Verification);
+        return Err(Error::Verification);
     }
     Ok(candidate)
 }
@@ -1804,7 +1865,7 @@ fn validate_selected_ownership(
     package: &Package,
     target: &BodyTableTarget,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     let source = physical_source(package)?;
     validate_selected_ownership_in_components(source.components(), target, budget)
 }
@@ -1813,26 +1874,26 @@ fn validate_selected_ownership_in_components(
     components: &ComponentCatalog,
     target: &BodyTableTarget,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     let component = components
         .get_index(target.component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.object_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.drawable_identifier.get()) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message_info = object
         .archive_info
         .message_infos
         .get(target.message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_selected_metadata(object, target.message_index)?;
     if message_info.type_ != target.message_type {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     message_declares_reference(
         message_info,
@@ -1852,26 +1913,26 @@ fn validate_selected_ownership_in_components(
     )?;
     let attachment_component = components
         .get_index(target.attachment_component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let attachment = attachment_component
         .archive()
         .objects
         .get(target.attachment_object_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if attachment.archive_info.identifier != Some(target.attachment_identifier.get()) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let attachment_message_info = attachment
         .archive_info
         .message_infos
         .get(target.attachment_message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if attachment
         .messages
         .get(target.attachment_message_index)
         .is_none_or(|message| message.type_ != DRAWABLE_ATTACHMENT_MESSAGE_TYPE)
     {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_metadata(attachment, target.attachment_message_index)?;
     if !message_declares_reference(
@@ -1882,27 +1943,27 @@ fn validate_selected_ownership_in_components(
         false,
         budget,
     )? {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let body_component = components
         .get_index(target.body_component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let body = body_component
         .archive()
         .objects
         .get(target.body_object_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if body.archive_info.identifier != Some(target.body_identifier.get()) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_metadata(body, target.body_message_index)?;
     let body_info = body
         .archive_info
         .message_infos
         .get(target.body_message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if body_info.type_ != target.body_message_type {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
 
     // Retain and re-check the terminal model header as part of the selected
@@ -1912,23 +1973,23 @@ fn validate_selected_ownership_in_components(
     // archive header after resolving the drawable graph.
     let model_component = components
         .get_index(target.model_component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let model = model_component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if model.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let model_message = model
         .messages
         .get(target.model_message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if model_message.type_ != target.model_message_type
         || !TABLE_MODEL_MESSAGE_TYPES.contains(&target.model_message_type)
     {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_selected_metadata(model, target.model_message_index)?;
     Ok(())
@@ -1941,7 +2002,7 @@ fn message_declares_reference(
     require_aggregate: bool,
     require_field: bool,
     budget: &mut WireBudget,
-) -> Result<bool, BodyTableLockError> {
+) -> Result<bool, Error> {
     budget.charge_payload_items(message.field_infos.len())?;
     budget.charge_payload_references(message.object_references.len())?;
     budget.charge_payload_references(message.data_references.len())?;
@@ -1952,10 +2013,10 @@ fn message_declares_reference(
         .filter(|candidate| **candidate == identifier)
         .count();
     if aggregate_occurrences > 1 || (require_aggregate && aggregate_occurrences != 1) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if message.data_references.contains(&identifier) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_declarations = 0usize;
     let mut accepted_fields = 0usize;
@@ -1964,7 +2025,7 @@ fn message_declares_reference(
         budget.charge_payload_references(field.data_references.len())?;
         budget.charge_payload_work(field.path.path.len())?;
         if field.data_references.contains(&identifier) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let occurrences = field
             .object_references
@@ -1972,30 +2033,28 @@ fn message_declares_reference(
             .filter(|candidate| **candidate == identifier)
             .count();
         if field.path.as_slice() == accepted_path {
-            accepted_fields = accepted_fields
-                .checked_add(1)
-                .ok_or(BodyTableLockError::InvalidSource)?;
+            accepted_fields = accepted_fields.checked_add(1).ok_or(Error::InvalidSource)?;
             if field.object_references.as_slice() != [identifier]
                 || !field.data_references.is_empty()
                 || aggregate_occurrences != 1
             {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if occurrences != 0 {
             if occurrences != 1 || field.path.as_slice() != accepted_path {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field_declarations = field_declarations
                 .checked_add(1)
-                .ok_or(BodyTableLockError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if field_declarations > 1 {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
     if require_field && accepted_fields != 1 {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(true)
 }
@@ -2010,7 +2069,7 @@ fn validate_body_table_ownership(
     message: &litchi_iwa_core::MessageInfo,
     entries: &[BodyTableEntry],
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     budget.charge_payload_items(message.field_infos.len())?;
     budget.charge_payload_references(message.object_references.len())?;
     budget.charge_payload_references(message.data_references.len())?;
@@ -2025,7 +2084,7 @@ fn validate_body_table_ownership(
     let mut declarations = HashMap::new();
     declarations
         .try_reserve(entries.len())
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: entries.len(),
         })?;
     for entry in entries {
@@ -2033,21 +2092,19 @@ fn validate_body_table_ownership(
             .insert(entry.identifier.get(), (0usize, 0usize))
             .is_some()
         {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for identifier in &message.object_references {
         budget.charge_payload_work(1)?;
         if let Some((aggregate_count, _)) = declarations.get_mut(identifier) {
-            *aggregate_count = aggregate_count
-                .checked_add(1)
-                .ok_or(BodyTableLockError::InvalidSource)?;
+            *aggregate_count = aggregate_count.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     for identifier in &message.data_references {
         budget.charge_payload_work(1)?;
         if declarations.contains_key(identifier) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for field in &message.field_infos {
@@ -2057,29 +2114,27 @@ fn validate_body_table_ownership(
         for identifier in &field.data_references {
             budget.charge_payload_work(1)?;
             if declarations.contains_key(identifier) {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         if field.path.as_slice() == [TABLE_BODY_FIELD] {
             if field.object_references.len() != 1 || !field.data_references.is_empty() {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let identifier = field.object_references[0];
             let Some((_, field_count)) = declarations.get_mut(&identifier) else {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             };
-            *field_count = field_count
-                .checked_add(1)
-                .ok_or(BodyTableLockError::InvalidSource)?;
+            *field_count = field_count.checked_add(1).ok_or(Error::InvalidSource)?;
             if *field_count > 1 {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         }
         for identifier in &field.object_references {
             budget.charge_payload_work(1)?;
             if declarations.contains_key(identifier) {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -2087,7 +2142,7 @@ fn validate_body_table_ownership(
         .values()
         .any(|(aggregate_count, _)| *aggregate_count != 1)
     {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2098,7 +2153,7 @@ fn message_declares_reference_prefix(
     identifier: u64,
     accepted_prefix: &[u32],
     budget: &mut WireBudget,
-) -> Result<bool, BodyTableLockError> {
+) -> Result<bool, Error> {
     budget.charge_payload_items(message.field_infos.len())?;
     budget.charge_payload_references(message.object_references.len())?;
     budget.charge_payload_references(message.data_references.len())?;
@@ -2113,13 +2168,13 @@ fn message_declares_reference_prefix(
             .try_fold(0usize, |capacity, field| {
                 capacity
                     .checked_add(field.object_references.len())
-                    .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })
+                    .ok_or(Error::Allocation { amount: usize::MAX })
             })?;
     let declaration_capacity = message
         .object_references
         .len()
         .checked_add(field_reference_capacity)
-        .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })?;
+        .ok_or(Error::Allocation { amount: usize::MAX })?;
     // Charge the complete nested reference inventory before reserving the
     // aggregate declaration map.  Otherwise a low reference ceiling could
     // be discovered only after this allocation has already taken place.
@@ -2131,7 +2186,7 @@ fn message_declares_reference_prefix(
     budget.charge_payload_work(declaration_capacity)?;
     declarations
         .try_reserve(declaration_capacity)
-        .map_err(|_| BodyTableLockError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: declaration_capacity,
         })?;
     for aggregate_identifier in &message.object_references {
@@ -2139,16 +2194,13 @@ fn message_declares_reference_prefix(
         let counts = declarations
             .entry(*aggregate_identifier)
             .or_insert((0usize, 0usize));
-        counts.1 = counts
-            .1
-            .checked_add(1)
-            .ok_or(BodyTableLockError::InvalidSource)?;
+        counts.1 = counts.1.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     if declarations.get(&identifier).map_or(0, |counts| counts.1) != 1 {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if message.data_references.contains(&identifier) {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_declarations = 0usize;
     for field in &message.field_infos {
@@ -2158,7 +2210,7 @@ fn message_declares_reference_prefix(
                 .get(candidate)
                 .is_some_and(|counts| counts.1 != 0)
         }) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.data_references.is_empty() {
             for field_identifier in &field.object_references {
@@ -2166,10 +2218,7 @@ fn message_declares_reference_prefix(
                 let counts = declarations
                     .entry(*field_identifier)
                     .or_insert((0usize, 0usize));
-                counts.0 = counts
-                    .0
-                    .checked_add(1)
-                    .ok_or(BodyTableLockError::InvalidSource)?;
+                counts.0 = counts.0.checked_add(1).ok_or(Error::InvalidSource)?;
             }
         }
         // The selected body table is owned by the exact table-attachment
@@ -2183,7 +2232,7 @@ fn message_declares_reference_prefix(
             // must not be treated as an optional declaration, and a second
             // record at the accepted path must not be ignored.
             if field.object_references.len() != 1 || !field.data_references.is_empty() {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let field_identifier = field.object_references[0];
             if declarations
@@ -2191,14 +2240,14 @@ fn message_declares_reference_prefix(
                 .map_or(0, |counts| counts.1)
                 != 1
             {
-                return Err(BodyTableLockError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             if field_identifier == identifier {
                 field_declarations = field_declarations
                     .checked_add(1)
-                    .ok_or(BodyTableLockError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 if field_declarations > 1 {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         } else {
@@ -2215,51 +2264,48 @@ fn message_declares_reference_prefix(
                     .map_or(0, |counts| counts.1)
                     != 1
                 {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 budget.charge_payload_work(field_index)?;
                 if field.object_references[..field_index].contains(field_identifier) {
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if *field_identifier == identifier {
                     // The selected attachment must stay rooted at the exact
                     // table-attachment path, even when unrelated aggregate
                     // references are accepted elsewhere in the body.
-                    return Err(BodyTableLockError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         }
     }
     if field_declarations != 1 {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     // Every aggregate reference must have exactly one field-local declaration.
     // The counters above make this final check linear in the reference count.
     for aggregate_identifier in &message.object_references {
         budget.charge_payload_work(1)?;
         let Some((field_count, aggregate_count)) = declarations.get(aggregate_identifier) else {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if *aggregate_count != 1 || *field_count != 1 {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(true)
 }
 
-fn validate_selected_metadata(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), BodyTableLockError> {
+fn validate_selected_metadata(object: &ArchiveObject, message_index: usize) -> Result<(), Error> {
     let message = object
         .messages
         .get(message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message_info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != message_info.type_
         || object.archive_info.should_merge == Some(true)
         || message_info.base_message_index.is_some()
@@ -2268,20 +2314,20 @@ fn validate_selected_metadata(
         || !message_info.fields_to_remove.is_empty()
         || !message_info.diff_read_version.is_empty()
     {
-        return Err(BodyTableLockError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn parsed_archive_source_length(archive: &Archive) -> Result<usize, BodyTableLockError> {
+fn parsed_archive_source_length(archive: &Archive) -> Result<usize, Error> {
     let Some(last) = archive.objects.last() else {
         return Ok(0);
     };
     let length = last
         .data_offset
         .checked_add(last.data_length)
-        .ok_or(BodyTableLockError::InvalidSource)?;
-    usize::try_from(length).map_err(|_| BodyTableLockError::InvalidSource)
+        .ok_or(Error::InvalidSource)?;
+    usize::try_from(length).map_err(|_| Error::InvalidSource)
 }
 
 /// Preflight one sibling body-table payload before its archive decoder is
@@ -2291,20 +2337,20 @@ pub(crate) fn preflight_body_table_component<'a>(
     package: &'a Package,
     target: &BodyTableTarget,
     budget: &mut WireBudget,
-) -> Result<(&'a str, usize), BodyTableLockError> {
+) -> Result<(&'a str, usize), Error> {
     let source = physical_source(package)?;
     budget.charge_source_catalog(source)?;
     let component = source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let entry = source
         .package()
         .iter()
         .find(|entry| entry.name() == component.name())
-        .ok_or(BodyTableLockError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableLockError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget.charge_payload_work(entry.data().len())?;
     let stream_length = parsed_archive_source_length(component.archive())?;
@@ -2316,50 +2362,44 @@ fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
         budget.charge_payload_work(1)?;
-        let offset =
-            usize::try_from(object.header_offset).map_err(|_| BodyTableLockError::InvalidSource)?;
-        let remaining = source
-            .get(offset..)
-            .ok_or(BodyTableLockError::InvalidSource)?;
+        let offset = usize::try_from(object.header_offset).map_err(|_| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
         let (header_bytes, prefix_bytes) =
-            decode_varint_from_bytes(remaining).map_err(|_| BodyTableLockError::InvalidSource)?;
+            decode_varint_from_bytes(remaining).map_err(|_| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_| BodyTableLockError::InvalidSource)?,
-            )
-            .ok_or(BodyTableLockError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(BodyTableLockError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(BodyTableLockError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn physical_source(package: &Package) -> Result<&SourceCatalog, BodyTableLockError> {
+fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
     Ok(&package.state.source)
 }
 
 fn reopen_shared(
     source: Arc<[u8]>,
-    limits: Limits,
+    previous: &SourceCatalog,
     budget: &mut WireBudget,
-) -> Result<Package, BodyTableLockError> {
+) -> Result<Package, Error> {
     budget.charge_input_source(source.as_ref())?;
     budget.charge_payload_work(source.len())?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(source, limits).map_err(map_archive_error)?;
+    let catalog = previous.reopen(source).map_err(map_archive_error)?;
     budget.charge_source_catalog(&catalog)?;
     charge_reopen_work(&catalog, budget)?;
     Package::from_source_catalog(catalog).map_err(map_package_error)
@@ -2372,7 +2412,7 @@ fn reopen_shared(
 pub(crate) fn charge_reopen_work(
     source: &SourceCatalog,
     budget: &mut WireBudget,
-) -> Result<(), BodyTableLockError> {
+) -> Result<(), Error> {
     let components = source.components();
     budget.charge_payload_work(components.len())?;
     for component in components.iter() {
@@ -2411,7 +2451,7 @@ fn bytes_equal_with_budget(
     left: &[u8],
     right: &[u8],
     budget: &mut WireBudget,
-) -> Result<bool, BodyTableLockError> {
+) -> Result<bool, Error> {
     if left.len() != right.len() {
         return Ok(false);
     }
@@ -2419,7 +2459,7 @@ fn bytes_equal_with_budget(
     Ok(left == right)
 }
 
-fn fingerprint(bytes: &[u8], budget: &mut WireBudget) -> Result<u64, BodyTableLockError> {
+fn fingerprint(bytes: &[u8], budget: &mut WireBudget) -> Result<u64, Error> {
     budget.charge_input_source(bytes)?;
     budget.charge_payload_work(bytes.len())?;
     let mut value = 0xcbf2_9ce4_8422_2325_u64;
@@ -2457,7 +2497,7 @@ pub(crate) struct WireBudget {
 }
 
 impl WireBudget {
-    pub(crate) fn new(physical_limits: Limits) -> Result<Self, BodyTableLockError> {
+    pub(crate) fn new(physical_limits: Limits) -> Result<Self, Error> {
         let archive = physical_limits
             .effective_archive_limits()
             .map_err(map_archive_error)?;
@@ -2547,13 +2587,13 @@ impl WireBudget {
         changed_object_index: usize,
         changed_message_index: usize,
         changed_message_bound: usize,
-    ) -> Result<(), BodyTableLockError> {
+    ) -> Result<(), Error> {
         self.charge_input_bytes(candidate_package_bound)?;
         self.charge_entries(source.package().len())?;
         let changed_component = source
             .components()
             .get_index(changed_component_index)
-            .ok_or(BodyTableLockError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for entry in source.package().iter() {
             let entry_bytes = if entry.name() == changed_component.name() {
                 changed_entry_bound
@@ -2572,8 +2612,8 @@ impl WireBudget {
                 .and_then(|value| value.checked_add(entry.metadata().central().name().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().extra().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().comment().len()))
-                .ok_or(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::PackageBytes,
+                .ok_or(Error::Limit {
+                    kind: LimitKind::PackageBytes,
                     observed: u64::MAX,
                     maximum: self.physical_limits.max_input_bytes(),
                 })?;
@@ -2642,17 +2682,17 @@ impl WireBudget {
         work_bytes: usize,
         max_depth: u32,
         references: usize,
-    ) -> Result<(), BodyTableLockError> {
+    ) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.total_fields,
             fields,
             usize_as_u64(self.limits.max_fields()),
-            BodyTableLockLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         self.charge_wire_work(work_bytes)?;
         if usize::try_from(max_depth).unwrap_or(usize::MAX) > self.limits.max_nesting() {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(max_depth),
                 maximum: usize_as_u64(self.limits.max_nesting()),
             });
@@ -2664,18 +2704,16 @@ impl WireBudget {
         counter: &mut usize,
         amount: usize,
         maximum: u64,
-        kind: BodyTableLockLimitKind,
-    ) -> Result<(), BodyTableLockError> {
-        let observed = counter
-            .checked_add(amount)
-            .ok_or(BodyTableLockError::LimitExceeded {
-                kind,
-                observed: u64::MAX,
-                maximum,
-            })?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = counter.checked_add(amount).ok_or(Error::Limit {
+            kind,
+            observed: u64::MAX,
+            maximum,
+        })?;
         let observed_u64 = usize_as_u64(observed);
         if observed_u64 > maximum {
-            return Err(BodyTableLockError::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed_u64,
                 maximum,
@@ -2685,18 +2723,15 @@ impl WireBudget {
         Ok(())
     }
 
-    fn charge_wire_work(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
-        let work =
-            self.total_work
-                .checked_add(amount)
-                .ok_or(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::WireWork,
-                    observed: u64::MAX,
-                    maximum: usize_as_u64(self.limits.max_rewrite_work()),
-                })?;
+    fn charge_wire_work(&mut self, amount: usize) -> Result<(), Error> {
+        let work = self.total_work.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.limits.max_rewrite_work()),
+        })?;
         if work > self.limits.max_rewrite_work() {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: usize_as_u64(work),
                 maximum: usize_as_u64(self.limits.max_rewrite_work()),
             });
@@ -2705,18 +2740,15 @@ impl WireBudget {
         Ok(())
     }
 
-    pub(crate) fn charge_payload_work(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
-        let work =
-            self.payload_work
-                .checked_add(amount)
-                .ok_or(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::WireWork,
-                    observed: u64::MAX,
-                    maximum: usize_as_u64(self.maximum_payload_work),
-                })?;
+    pub(crate) fn charge_payload_work(&mut self, amount: usize) -> Result<(), Error> {
+        let work = self.payload_work.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.maximum_payload_work),
+        })?;
         if work > self.maximum_payload_work {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireWork,
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: usize_as_u64(work),
                 maximum: usize_as_u64(self.maximum_payload_work),
             });
@@ -2726,52 +2758,64 @@ impl WireBudget {
         Ok(())
     }
 
-    pub(crate) fn charge_payload_references(
-        &mut self,
-        amount: usize,
-    ) -> Result<(), BodyTableLockError> {
+    #[cfg(test)]
+    pub(crate) fn exhaust_payload_work_for_test(&mut self) {
+        self.payload_work = self.maximum_payload_work;
+    }
+
+    pub(crate) fn charge_payload_references(&mut self, amount: usize) -> Result<(), Error> {
         self.charge_wire_work(amount)?;
         Self::charge_counter(
             &mut self.payload_references,
             amount,
             usize_as_u64(self.maximum_payload_references),
-            BodyTableLockLimitKind::PayloadReferences,
+            LimitKind::PayloadReferences,
         )
     }
 
-    fn charge_input_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    fn charge_input_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.input_bytes,
             amount,
             self.physical_limits.max_input_bytes(),
-            BodyTableLockLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
-    pub(crate) fn charge_output_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    /// Admit a caller-owned selector name before retaining its bytes.
+    ///
+    /// This is intentionally limited to scalar byte ceilings.  Rooted table
+    /// discovery remains deferred until the edit is first used.
+    pub(crate) fn admit_selector_name(&mut self, amount: usize) -> Result<(), Error> {
+        self.charge_input_bytes(amount)?;
+        self.charge_payload_bytes(amount)?;
+        self.charge_total_payload_bytes(amount)
+    }
+
+    pub(crate) fn charge_output_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.output_bytes,
             amount,
             self.physical_limits.max_input_bytes(),
-            BodyTableLockLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn charge_entries(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    fn charge_entries(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.entries,
             amount,
             usize_as_u64(self.physical_limits.max_entries()),
-            BodyTableLockLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
 
-    fn charge_entry_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    fn charge_entry_bytes(&mut self, amount: usize) -> Result<(), Error> {
         let observed = usize_as_u64(amount);
         let maximum = self.physical_limits.max_entry_bytes();
         if observed > maximum {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::EntryBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::EntryBytes,
                 observed,
                 maximum,
             });
@@ -2779,49 +2823,43 @@ impl WireBudget {
         Ok(())
     }
 
-    fn charge_total_entry_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    fn charge_total_entry_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.total_entry_bytes,
             amount,
             self.physical_limits.max_total_bytes(),
-            BodyTableLockLimitKind::TotalEntryBytes,
+            LimitKind::TotalEntryBytes,
         )
     }
 
-    fn charge_package_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    fn charge_package_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.package_bytes,
             amount,
             self.physical_limits.max_input_bytes(),
-            BodyTableLockLimitKind::PackageBytes,
+            LimitKind::PackageBytes,
         )
     }
 
-    pub(crate) fn charge_payload_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.payload_bytes,
             amount,
             usize_as_u64(self.physical_limits.max_iwa_stream_bytes()),
-            BodyTableLockLimitKind::PayloadBytes,
+            LimitKind::PayloadBytes,
         )
     }
 
-    pub(crate) fn charge_total_payload_bytes(
-        &mut self,
-        amount: usize,
-    ) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_total_payload_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge_counter(
             &mut self.total_payload_bytes,
             amount,
             self.physical_limits.max_total_bytes(),
-            BodyTableLockLimitKind::TotalPayloadBytes,
+            LimitKind::TotalPayloadBytes,
         )
     }
 
-    pub(crate) fn charge_payload_objects(
-        &mut self,
-        amount: usize,
-    ) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_objects(&mut self, amount: usize) -> Result<(), Error> {
         let limits = self
             .physical_limits
             .effective_archive_limits()
@@ -2830,14 +2868,11 @@ impl WireBudget {
             &mut self.payload_objects,
             amount,
             usize_as_u64(limits.max_objects()),
-            BodyTableLockLimitKind::PayloadObjects,
+            LimitKind::PayloadObjects,
         )
     }
 
-    pub(crate) fn charge_payload_messages(
-        &mut self,
-        amount: usize,
-    ) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_messages(&mut self, amount: usize) -> Result<(), Error> {
         let limits = self
             .physical_limits
             .effective_archive_limits()
@@ -2846,11 +2881,11 @@ impl WireBudget {
             &mut self.payload_messages,
             amount,
             usize_as_u64(limits.max_messages()),
-            BodyTableLockLimitKind::PayloadMessages,
+            LimitKind::PayloadMessages,
         )
     }
 
-    pub(crate) fn charge_payload_items(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_items(&mut self, amount: usize) -> Result<(), Error> {
         let limits = self
             .physical_limits
             .effective_archive_limits()
@@ -2859,7 +2894,7 @@ impl WireBudget {
             &mut self.payload_items,
             amount,
             usize_as_u64(limits.max_metadata_items()),
-            BodyTableLockLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
         )
     }
 
@@ -2887,17 +2922,14 @@ impl WireBudget {
         true
     }
 
-    pub(crate) fn charge_input_source(&mut self, bytes: &[u8]) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_input_source(&mut self, bytes: &[u8]) -> Result<(), Error> {
         if self.remember_source_key(bytes) {
             self.charge_input_bytes(bytes.len())?;
         }
         Ok(())
     }
 
-    pub(crate) fn charge_source_catalog(
-        &mut self,
-        source: &SourceCatalog,
-    ) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_source_catalog(&mut self, source: &SourceCatalog) -> Result<(), Error> {
         let source_bytes = source.source_bytes();
         self.charge_input_source(source_bytes)?;
         if !self.remember_catalog_key(source_bytes) {
@@ -2908,8 +2940,8 @@ impl WireBudget {
         for entry in package.iter() {
             let entry_bytes =
                 usize::try_from(entry.metadata().uncompressed_size()).map_err(|_| {
-                    BodyTableLockError::LimitExceeded {
-                        kind: BodyTableLockLimitKind::EntryBytes,
+                    Error::Limit {
+                        kind: LimitKind::EntryBytes,
                         observed: u64::MAX,
                         maximum: self.physical_limits.max_entry_bytes(),
                     }
@@ -2929,8 +2961,8 @@ impl WireBudget {
                 .and_then(|value| value.checked_add(entry.metadata().central().name().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().extra().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().comment().len()))
-                .ok_or(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::PackageBytes,
+                .ok_or(Error::Limit {
+                    kind: LimitKind::PackageBytes,
                     observed: u64::MAX,
                     maximum: self.physical_limits.max_input_bytes(),
                 })?;
@@ -2950,13 +2982,13 @@ impl WireBudget {
     pub(crate) fn charge_component_catalog(
         &mut self,
         components: &ComponentCatalog,
-    ) -> Result<(), BodyTableLockError> {
+    ) -> Result<(), Error> {
         self.charge_payload_work(components.len())?;
         for component in components.iter() {
             let archive_bytes = parsed_archive_source_length(component.archive())?;
             if archive_bytes > self.physical_limits.max_iwa_stream_bytes() {
-                return Err(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::PayloadBytes,
+                return Err(Error::Limit {
+                    kind: LimitKind::PayloadBytes,
                     observed: usize_as_u64(archive_bytes),
                     maximum: usize_as_u64(self.physical_limits.max_iwa_stream_bytes()),
                 });
@@ -2971,28 +3003,29 @@ impl WireBudget {
         &mut self,
         archive_bytes: usize,
         archive: &Archive,
-    ) -> Result<(), BodyTableLockError> {
+    ) -> Result<(), Error> {
         self.charge_payload_bytes(archive_bytes)?;
         self.charge_total_payload_bytes(archive_bytes)?;
         self.charge_payload_objects(archive.objects.len())?;
         let mut message_count = 0usize;
         let mut item_count = 0usize;
         for object in &archive.objects {
-            message_count = message_count.checked_add(object.messages.len()).ok_or(
-                BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::PayloadMessages,
-                    observed: u64::MAX,
-                    maximum: u64::MAX,
-                },
-            )?;
+            message_count =
+                message_count
+                    .checked_add(object.messages.len())
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::PayloadMessages,
+                        observed: u64::MAX,
+                        maximum: u64::MAX,
+                    })?;
             for info in &object.archive_info.message_infos {
                 item_count = item_count
                     .checked_add(1)
                     .and_then(|value| value.checked_add(info.field_infos.len()))
                     .and_then(|value| value.checked_add(info.object_references.len()))
                     .and_then(|value| value.checked_add(info.data_references.len()))
-                    .ok_or(BodyTableLockError::LimitExceeded {
-                        kind: BodyTableLockLimitKind::PayloadItems,
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::PayloadItems,
                         observed: u64::MAX,
                         maximum: u64::MAX,
                     })?;
@@ -3004,27 +3037,25 @@ impl WireBudget {
             .checked_add(archive.objects.len())
             .and_then(|value| value.checked_add(message_count))
             .and_then(|value| value.checked_add(item_count))
-            .ok_or(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireWork,
+            .ok_or(Error::Limit {
+                kind: LimitKind::WireWork,
                 observed: u64::MAX,
                 maximum: usize_as_u64(self.maximum_payload_work),
             })?;
         self.charge_payload_work(work)
     }
 
-    pub(crate) fn charge_sort_work(&mut self, length: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_sort_work(&mut self, length: usize) -> Result<(), Error> {
         let levels = if length <= 1 {
             0
         } else {
             (usize::BITS - (length - 1).leading_zeros()) as usize
         };
-        let amount = length
-            .checked_mul(levels)
-            .ok_or(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireWork,
-                observed: u64::MAX,
-                maximum: usize_as_u64(self.maximum_payload_work),
-            })?;
+        let amount = length.checked_mul(levels).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.maximum_payload_work),
+        })?;
         self.charge_payload_work(amount)
     }
 
@@ -3032,53 +3063,50 @@ impl WireBudget {
         &mut self,
         source: &'a [u8],
         depth: usize,
-    ) -> Result<WireView<'a>, BodyTableLockError> {
+    ) -> Result<WireView<'a>, Error> {
         if depth > self.limits.max_nesting() {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: usize_as_u64(depth),
                 maximum: usize_as_u64(self.limits.max_nesting()),
             });
         }
-        let bytes = self.total_bytes.checked_add(source.len()).ok_or(
-            BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireBytes,
+        let bytes = self
+            .total_bytes
+            .checked_add(source.len())
+            .ok_or(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: u64::MAX,
                 maximum: usize_as_u64(self.limits.max_input_bytes()),
-            },
-        )?;
+            })?;
         if bytes > self.limits.max_input_bytes() {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireBytes,
+            return Err(Error::Limit {
+                kind: LimitKind::WireBytes,
                 observed: usize_as_u64(bytes),
                 maximum: usize_as_u64(self.limits.max_input_bytes()),
             });
         }
-        let view = WireView::parse_with_limits(source, self.limits).map_err(map_wire_error)?;
-        let fields =
-            self.total_fields
-                .checked_add(view.len())
-                .ok_or(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::WireFields,
-                    observed: u64::MAX,
-                    maximum: usize_as_u64(self.limits.max_fields()),
-                })?;
+        let view = WireView::parse(source, self.limits).map_err(map_wire_error)?;
+        let fields = self
+            .total_fields
+            .checked_add(view.len())
+            .ok_or(Error::Limit {
+                kind: LimitKind::WireFields,
+                observed: u64::MAX,
+                maximum: usize_as_u64(self.limits.max_fields()),
+            })?;
         if fields > self.limits.max_fields() {
-            return Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::WireFields,
+            return Err(Error::Limit {
+                kind: LimitKind::WireFields,
                 observed: usize_as_u64(fields),
                 maximum: usize_as_u64(self.limits.max_fields()),
             });
         }
-        let work =
-            source
-                .len()
-                .checked_add(view.len())
-                .ok_or(BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::WireWork,
-                    observed: u64::MAX,
-                    maximum: usize_as_u64(self.limits.max_rewrite_work()),
-                })?;
+        let work = source.len().checked_add(view.len()).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.limits.max_rewrite_work()),
+        })?;
         self.charge_wire_work(work)?;
         self.total_bytes = bytes;
         self.total_fields = fields;
@@ -3086,112 +3114,97 @@ impl WireBudget {
     }
 }
 
-pub(crate) fn map_package_error(error: PackageError) -> BodyTableLockError {
+pub(crate) fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::Allocation { amount } => BodyTableLockError::Allocation { amount },
-        PackageError::PayloadLimit { observed, limit } => BodyTableLockError::LimitExceeded {
-            kind: BodyTableLockLimitKind::PayloadItems,
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => BodyTableLockError::LimitExceeded {
-            kind: BodyTableLockLimitKind::PayloadObjects,
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadObjects,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
         PackageError::Semantic(error) => match error {
             crate::Error::TooManySections { actual, limit }
-            | crate::Error::TooManyBodyStorages { actual, limit } => {
-                BodyTableLockError::LimitExceeded {
-                    kind: BodyTableLockLimitKind::PayloadItems,
-                    observed: usize_as_u64(actual),
-                    maximum: usize_as_u64(limit),
-                }
+            | crate::Error::TooManyBodyStorages { actual, limit } => Error::Limit {
+                kind: LimitKind::PayloadItems,
+                observed: usize_as_u64(actual),
+                maximum: usize_as_u64(limit),
             },
-            crate::Error::TextTooLarge { observed, limit } => BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadBytes,
+            crate::Error::TextTooLarge { observed, limit } => Error::Limit {
+                kind: LimitKind::PayloadBytes,
                 observed: usize_as_u64(observed),
                 maximum: usize_as_u64(limit),
             },
-            crate::Error::InvalidSectionIndex { .. } => BodyTableLockError::InvalidSource,
+            crate::Error::InvalidSectionIndex { .. } => Error::InvalidSource,
         },
-        PackageError::SectionNamesTooLarge { observed, limit } => {
-            BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadBytes,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(limit),
-            }
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(limit),
         },
         PackageError::InvalidFormat(_)
         | PackageError::Io(_)
         | PackageError::Detection(_)
-        | PackageError::NotPages => BodyTableLockError::InvalidSource,
+        | PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => Error::InvalidSource,
     }
 }
 
-pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableLockError {
+pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => BodyTableLockLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => BodyTableLockLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => BodyTableLockLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    BodyTableLockLimitKind::PackageBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PackageBytes,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => BodyTableLockLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    BodyTableLockLimitKind::TotalEntryBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    BodyTableLockLimitKind::PayloadBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    BodyTableLockLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyTableLockError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => BodyTableLockError::UnsupportedSource,
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => BodyTableLockError::InvalidSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyTableLockError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => BodyTableLockLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    BodyTableLockLimitKind::PayloadMessages
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => BodyTableLockLimitKind::PayloadItems,
-                litchi_iwa_core::LimitKind::HeaderNesting => BodyTableLockLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
@@ -3201,51 +3214,42 @@ fn map_core_error(error: litchi_iwa_core::Error) -> BodyTableLockError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    BodyTableLockLimitKind::PayloadBytes
+                    LimitKind::PayloadBytes
                 },
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyTableLockError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => BodyTableLockError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> BodyTableLockError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyTableLockError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => BodyTableLockLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => BodyTableLockLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Fields => BodyTableLockLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => BodyTableLockLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => BodyTableLockLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    BodyTableLockLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyTableLockError::Allocation { amount }
-        },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => BodyTableLockError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3256,7 +3260,7 @@ fn usize_as_u64(value: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_iwa_core::{FieldInfo, FieldPath};
+    use litchi_iwa_core::FieldInfo;
     use litchi_iwa_protos::tswp;
     use prost::Message as _;
 
@@ -3266,14 +3270,29 @@ mod tests {
             .expect("reference field");
 
         let mut drawable = Vec::new();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut drawable, 2, &reference)
-            .expect("drawable parent field");
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut drawable,
+            2,
+            &reference,
+            WireLimits::DEFAULT,
+        )
+        .expect("drawable parent field");
 
         let mut table_info = Vec::new();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut table_info, 1, &drawable)
-            .expect("table-info super field");
-        litchi_iwa_common::wire::append_length_delimited_field(&mut table_info, 2, &reference)
-            .expect("table-info model field");
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut table_info,
+            1,
+            &drawable,
+            WireLimits::DEFAULT,
+        )
+        .expect("table-info super field");
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut table_info,
+            2,
+            &reference,
+            WireLimits::DEFAULT,
+        )
+        .expect("table-info model field");
         table_info
     }
 
@@ -3301,9 +3320,8 @@ mod tests {
         .encode_to_vec();
         let rewrite_limits = super::super::storage_rewrite_limits(Limits::default())
             .unwrap_or_else(|_| panic!("default text-wire limits"));
-        let validation =
-            litchi_iwa_text_wire::validate_storage_with_limits(&payload, rewrite_limits)
-                .expect("oversized trailing run is within the test source ceiling");
+        let validation = litchi_iwa_text_wire::validate_storage(&payload, rewrite_limits)
+            .expect("oversized trailing run is within the test source ceiling");
         let exact_work = validation
             .validation_work()
             .checked_add(1)
@@ -3335,7 +3353,7 @@ mod tests {
 
         assert_eq!(
             validate_body_placeholders_in_wire(&payload, &[entry], Limits::default(), &mut budget,),
-            Err(BodyTableLockError::InvalidSource)
+            Err(Error::InvalidSource)
         );
     }
 
@@ -3378,7 +3396,7 @@ mod tests {
             body_identifier: NonZeroU64::new(0xabad_1dea).expect("identifier"),
             explicit_locked: Some(true),
         };
-        let edit = BodyTableLockEdit {
+        let edit = Edit {
             source: &package,
             target,
             before: State::Unlocked,
@@ -3387,7 +3405,7 @@ mod tests {
 
         assert_eq!(
             format!("{edit:?}"),
-            "BodyTableLockEdit { before: Unlocked, state: Locked, .. }"
+            "Edit { before: Unlocked, state: Locked, .. }"
         );
     }
 
@@ -3401,6 +3419,7 @@ mod tests {
                         type_: 10_000,
                         data: vec![1, 2, 3],
                     }],
+                    Default::default(),
                 )
                 .expect("first object"),
                 ArchiveObject::new(
@@ -3409,12 +3428,13 @@ mod tests {
                         type_: 2_001,
                         data: vec![4, 5, 6, 7],
                     }],
+                    Default::default(),
                 )
                 .expect("second object"),
             ],
         };
-        let source = archive.to_bytes().expect("archive bytes");
-        let parsed = Archive::parse(&source).expect("parsed archive");
+        let source = archive.to_bytes(Default::default()).expect("archive bytes");
+        let parsed = Archive::parse(&source, Default::default()).expect("parsed archive");
         assert_eq!(
             parsed_archive_source_length(&parsed).expect("source extent"),
             source.len()
@@ -3450,24 +3470,9 @@ mod tests {
         let one_work = baseline.total_work;
 
         let dimensions = [
-            (
-                BodyTableLockLimitKind::WireBytes,
-                one_bytes * 2 - 1,
-                1024,
-                1024 * 1024,
-            ),
-            (
-                BodyTableLockLimitKind::WireFields,
-                1024,
-                one_fields * 2 - 1,
-                1024 * 1024,
-            ),
-            (
-                BodyTableLockLimitKind::WireWork,
-                1024,
-                1024,
-                one_work * 2 - 1,
-            ),
+            (LimitKind::WireBytes, one_bytes * 2 - 1, 1024, 1024 * 1024),
+            (LimitKind::WireFields, 1024, one_fields * 2 - 1, 1024 * 1024),
+            (LimitKind::WireWork, 1024, 1024, one_work * 2 - 1),
         ];
 
         for (kind, input_bytes, fields, rewrite_work) in dimensions {
@@ -3476,7 +3481,7 @@ mod tests {
                 .expect("first bounded table-info decode");
             assert!(matches!(
                 decode_table_info(&payload, &mut budget, body_identifier),
-                Err(BodyTableLockError::LimitExceeded { kind: observed, .. }) if observed == kind
+                Err(Error::Limit { kind: observed, .. }) if observed == kind
             ));
         }
     }
@@ -3495,72 +3500,52 @@ mod tests {
     }
 
     fn assert_physical_boundary(
-        kind: BodyTableLockLimitKind,
+        kind: LimitKind,
         maximum: usize,
-        charge: fn(&mut WireBudget, usize) -> Result<(), BodyTableLockError>,
+        charge: fn(&mut WireBudget, usize) -> Result<(), Error>,
     ) {
         let mut budget = WireBudget::new(tiny_physical_limits()).expect("test wire budget");
         charge(&mut budget, maximum).expect("maximum is accepted");
         assert!(matches!(
             charge(&mut budget, 1),
-            Err(BodyTableLockError::LimitExceeded { kind: observed, .. }) if observed == kind
+            Err(Error::Limit { kind: observed, .. }) if observed == kind
         ));
     }
 
     #[test]
     fn physical_budget_boundaries_reject_max_plus_one() {
+        assert_physical_boundary(LimitKind::InputBytes, 16, WireBudget::charge_input_bytes);
+        assert_physical_boundary(LimitKind::OutputBytes, 16, WireBudget::charge_output_bytes);
+        assert_physical_boundary(LimitKind::Entries, 2, WireBudget::charge_entries);
         assert_physical_boundary(
-            BodyTableLockLimitKind::InputBytes,
-            16,
-            WireBudget::charge_input_bytes,
-        );
-        assert_physical_boundary(
-            BodyTableLockLimitKind::OutputBytes,
-            16,
-            WireBudget::charge_output_bytes,
-        );
-        assert_physical_boundary(
-            BodyTableLockLimitKind::Entries,
-            2,
-            WireBudget::charge_entries,
-        );
-        assert_physical_boundary(
-            BodyTableLockLimitKind::TotalEntryBytes,
+            LimitKind::TotalEntryBytes,
             16,
             WireBudget::charge_total_entry_bytes,
         );
         assert_physical_boundary(
-            BodyTableLockLimitKind::PackageBytes,
+            LimitKind::PackageBytes,
             16,
             WireBudget::charge_package_bytes,
         );
+        assert_physical_boundary(LimitKind::PayloadBytes, 8, WireBudget::charge_payload_bytes);
         assert_physical_boundary(
-            BodyTableLockLimitKind::PayloadBytes,
-            8,
-            WireBudget::charge_payload_bytes,
-        );
-        assert_physical_boundary(
-            BodyTableLockLimitKind::TotalPayloadBytes,
+            LimitKind::TotalPayloadBytes,
             16,
             WireBudget::charge_total_payload_bytes,
         );
         assert_physical_boundary(
-            BodyTableLockLimitKind::PayloadObjects,
+            LimitKind::PayloadObjects,
             2,
             WireBudget::charge_payload_objects,
         );
         assert_physical_boundary(
-            BodyTableLockLimitKind::PayloadMessages,
+            LimitKind::PayloadMessages,
             4,
             WireBudget::charge_payload_messages,
         );
+        assert_physical_boundary(LimitKind::PayloadItems, 4, WireBudget::charge_payload_items);
         assert_physical_boundary(
-            BodyTableLockLimitKind::PayloadItems,
-            4,
-            WireBudget::charge_payload_items,
-        );
-        assert_physical_boundary(
-            BodyTableLockLimitKind::PayloadReferences,
+            LimitKind::PayloadReferences,
             8,
             WireBudget::charge_payload_references,
         );
@@ -3577,8 +3562,8 @@ mod tests {
             .expect("a second member at the maximum is accepted");
         assert!(matches!(
             budget.charge_entry_bytes(9),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::EntryBytes,
+            Err(Error::Limit {
+                kind: LimitKind::EntryBytes,
                 observed: 9,
                 maximum: 8,
             })
@@ -3598,8 +3583,7 @@ mod tests {
             limits,
         )
         .expect("multi-member package");
-        let catalog =
-            SourceCatalog::from_bytes_with_limits(&source, limits).expect("source catalog");
+        let catalog = SourceCatalog::from_bytes(&source, limits).expect("source catalog");
         let mut budget = WireBudget::new(limits).expect("test wire budget");
 
         budget
@@ -3620,7 +3604,8 @@ mod tests {
         }
 
         let bound = snappy_compressed_bound(input.len()).expect("checked Snappy bound");
-        let compressed = SnappyStream::compress(&input).expect("Snappy compression");
+        let compressed =
+            SnappyStream::compress(&input, Default::default()).expect("Snappy compression");
 
         assert!(bound > input.len() + 64);
         assert!(compressed.len() <= bound);
@@ -3681,11 +3666,25 @@ mod tests {
 
     #[test]
     fn body_reference_metadata_accepts_unrelated_paths_but_keeps_selected_path_strict() {
-        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
+        let mut message =
+            litchi_iwa_core::MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
         message.object_references = vec![100, 900, 901];
-        let mut selected = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut selected = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         selected.object_references.push(100);
-        let mut sections = FieldInfo::new(FieldPath::new(vec![17]));
+        let mut sections = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         sections.object_references.extend([900, 901]);
         message.field_infos = vec![selected, sections];
 
@@ -3695,7 +3694,8 @@ mod tests {
                 .expect("unrelated aggregate references use their own path")
         );
 
-        message.field_infos[0].path = FieldPath::new(vec![17]);
+        message.field_infos[0].path =
+            litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap();
         let mut strict_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
         assert!(matches!(
             message_declares_reference_prefix(
@@ -3704,16 +3704,28 @@ mod tests {
                 &[TABLE_BODY_FIELD],
                 &mut strict_budget,
             ),
-            Err(BodyTableLockError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
     #[test]
     fn data_reference_scans_are_bounded_before_semantic_checks() {
-        let mut message_data = litchi_iwa_core::MessageInfo::new(2_002, 0);
+        let mut message_data =
+            litchi_iwa_core::MessageInfo::new(2_002, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
         message_data.object_references = vec![100];
         message_data.data_references = vec![100];
-        message_data.field_infos = vec![FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]))];
+        message_data.field_infos = vec![
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_BODY_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+        ];
 
         let mut message_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
         message_budget.maximum_payload_references = 1;
@@ -3726,8 +3738,8 @@ mod tests {
                 false,
                 &mut message_budget,
             ),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadReferences,
+            Err(Error::Limit {
+                kind: LimitKind::PayloadReferences,
                 ..
             })
         ));
@@ -3741,15 +3753,25 @@ mod tests {
                 &[TABLE_BODY_FIELD],
                 &mut prefix_budget,
             ),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadReferences,
+            Err(Error::Limit {
+                kind: LimitKind::PayloadReferences,
                 ..
             })
         ));
 
-        let mut field_data = litchi_iwa_core::MessageInfo::new(2_003, 0);
+        let mut field_data =
+            litchi_iwa_core::MessageInfo::new(2_003, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
         field_data.object_references = vec![100];
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![100];
         field.data_references = vec![100];
         field_data.field_infos = vec![field];
@@ -3765,8 +3787,8 @@ mod tests {
                 true,
                 &mut field_budget,
             ),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadReferences,
+            Err(Error::Limit {
+                kind: LimitKind::PayloadReferences,
                 ..
             })
         ));
@@ -3780,8 +3802,8 @@ mod tests {
                 &[TABLE_BODY_FIELD],
                 &mut field_prefix_budget,
             ),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadReferences,
+            Err(Error::Limit {
+                kind: LimitKind::PayloadReferences,
                 ..
             })
         ));
@@ -3789,8 +3811,18 @@ mod tests {
 
     #[test]
     fn aggregate_reference_budget_is_charged_before_declaration_reserve() {
-        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut message =
+            litchi_iwa_core::MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(100);
         message.field_infos.push(field);
 
@@ -3798,8 +3830,8 @@ mod tests {
         budget.maximum_payload_references = 0;
         assert!(matches!(
             message_declares_reference_prefix(&message, 100, &[TABLE_BODY_FIELD], &mut budget,),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadReferences,
+            Err(Error::Limit {
+                kind: LimitKind::PayloadReferences,
                 ..
             })
         ));
@@ -3811,8 +3843,18 @@ mod tests {
 
     #[test]
     fn empty_body_inventory_charges_references_before_declaration_reserve() {
-        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut message =
+            litchi_iwa_core::MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(100);
         message.object_references.push(100);
         message.field_infos.push(field);
@@ -3821,8 +3863,8 @@ mod tests {
         budget.maximum_payload_references = 0;
         assert!(matches!(
             validate_body_table_ownership(&message, &[], &mut budget),
-            Err(BodyTableLockError::LimitExceeded {
-                kind: BodyTableLockLimitKind::PayloadReferences,
+            Err(Error::Limit {
+                kind: LimitKind::PayloadReferences,
                 ..
             })
         ));
@@ -3881,7 +3923,7 @@ mod tests {
         let source: Arc<[u8]> = Arc::from(&b"source"[..]);
         let different_target: Arc<[u8]> = Arc::from(&b"target"[..]);
 
-        let semantic_only = BodyTableLockPatch {
+        let semantic_only = Patch {
             source: Arc::clone(&source),
             target: different_target,
             source_fingerprint: 7,
@@ -3893,7 +3935,7 @@ mod tests {
         assert!(!semantic_only.is_noop());
 
         let equivalent_target: Arc<[u8]> = Arc::from(&b"source"[..]);
-        let exact = BodyTableLockPatch {
+        let exact = Patch {
             source: Arc::clone(&source),
             target: equivalent_target,
             source_fingerprint: 7,

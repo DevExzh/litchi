@@ -4,7 +4,7 @@
 //! this example validates the standalone shared-string model and publishes the
 //! surrounding worksheet through `Workbook::edit`.
 
-use litchi_xlsx::Workbook;
+use litchi_xlsx::Package;
 use litchi_xlsx::raw::shared_strings::{Run, Table};
 use std::env;
 
@@ -52,9 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             italic: false,
         },
     ])?;
-    let _shared_strings_xml = strings.write_xml()?;
+    let _shared_strings_xml = strings.write_xml(&litchi_xlsx::SourceLimits::default())?;
 
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         sheet.set("A1", "Rich Text Demo")?;
         sheet.set("A3", "Hello, bold and underlined")?;
     }
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output)?;
     println!("Saved {output}; validated rich shared-string index {rich_index}");
     Ok(())

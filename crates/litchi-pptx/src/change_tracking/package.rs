@@ -3,51 +3,61 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 
-use super::{Commit, Patch, Snapshot};
+use super::Snapshot;
+use super::transaction::{Change, Prepared};
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
-pub(crate) fn load(package: &OpcPackage, owner: &PackURI) -> Result<Snapshot> {
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    owner: &PackURI,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
-    Snapshot::from_source(part.partname().clone(), part.blob().to_vec())
+    Snapshot::from_source_with_limits(part.partname().clone(), part.blob().to_vec(), shape_limits)
 }
 
-pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit_with_limits(
+    package: &mut OpcPackage,
+    commit: Prepared,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let (snapshot, patch) = commit.into_parts();
     if patch.after() != snapshot.state() {
         return Err(Error::Invalid(
             "change-tracking commit differs from its candidate snapshot".into(),
         ));
     }
-    apply_patch(package, &patch)
+    apply_patch_with_limits(package, &patch, shape_limits)
 }
 
-pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch_with_limits(
+    package: &mut OpcPackage,
+    patch: &Change,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(&patch.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != patch.source {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_change_tracking_patch",
-            reason: "the selected slide no longer matches the patch source",
-        });
+        return Err(Error::PatchConflict);
     }
-    let snapshot = Snapshot::from_source(patch.owner.clone(), patch.target.clone())?;
+    let snapshot =
+        Snapshot::from_source_with_limits(patch.owner.clone(), patch.target.clone(), shape_limits)?;
     if snapshot.state() != patch.after() {
         return Err(Error::Invalid(
             "change-tracking patch target differs from its semantic result".into(),
         ));
     }
-    if patch.is_changed() {
+    if !patch.is_noop() {
+        refuse_signed_change(package)?;
         let mutable_part = package.get_part_mut(&patch.owner)?;
         crate::parts::validate_content_type(mutable_part, ct::PML_SLIDE)?;
         if mutable_part.blob() != patch.source {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_change_tracking_patch",
-                reason: "the selected slide changed during patch validation",
-            });
+            return Err(Error::PatchConflict);
         }
         mutable_part.set_blob(patch.target.clone());
-        package.unsign();
+        settle_unsigned_change(package)?;
     }
     Ok(snapshot)
 }

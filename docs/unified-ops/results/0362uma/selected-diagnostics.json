@@ -1,0 +1,726 @@
+{
+  "schema": "litchi.selected-gate-diagnostics.v1",
+  "status": "diagnostic-only; required failures remain; not full acceptance",
+  "regenerate": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/record-selected-diagnostics-20261024.py",
+    "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration"
+  ],
+  "generator": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/record-selected-diagnostics-20261024.py",
+    "bytes": 1707,
+    "sha256": "224beb4a2b7706bf6cd135c0ad1325ff0c5eaba292572051e48907c92f4d1b10"
+  },
+  "runs": [
+    {
+      "state": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/state.json",
+        "bytes": 17375,
+        "sha256": "16a6aed6608e8ddc02b8e5690bddc384279e1105505112ddfa4e0f4bc47cb2cc"
+      },
+      "plan": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/plan.json",
+        "bytes": 22494,
+        "sha256": "336820f5d443c322ad34c47317d5d1e1ddf946456af1d999173b6b7a60249cec"
+      },
+      "source": {
+        "commit": "f6fe430a4d19d94aa360c0e9ed03ebd757265225",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "selection": {
+        "only": [
+          "tests-facade",
+          "tests-core",
+          "clippy-leaves",
+          "clippy-ods",
+          "tests-leaves",
+          "tests-ods-full",
+          "clippy-workspace",
+          "tests-workspace-excluding-ods-ops",
+          "cli-tests",
+          "python-bindings",
+          "feature-matrix",
+          "feature-matrix-clippy",
+          "fuzz",
+          "goldens",
+          "golden-clean",
+          "perf-harness-check",
+          "native-resave-check",
+          "api-glossary",
+          "iwork-leaf-api",
+          "tooling-unit",
+          "crate-boundaries",
+          "non-iwork-gate",
+          "bench-matrix",
+          "corpus-dispositions"
+        ],
+        "start_at": null,
+        "indexes": [
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52
+        ],
+        "full_step_count": 53,
+        "partial": true
+      },
+      "policy": {
+        "runner_files": {
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+        },
+        "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+        "offline": true,
+        "locked": true,
+        "memory_max": "20G",
+        "build_jobs": 1,
+        "test_threads": 1,
+        "target_guard_before": 19200000000,
+        "target_guard_after": 20000000000,
+        "free_guard": 12000000000
+      },
+      "completed_rows": [
+        {
+          "index": 26,
+          "name": "tests-facade",
+          "status": "failed",
+          "command": [
+            "python3",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py",
+            "-p",
+            "litchi",
+            "--all-features",
+            "--log-dir",
+            "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests"
+          ],
+          "exit": 1,
+          "seconds": 746.0335547924042,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/26-tests-facade-attempt-1792821876949103158-904403.log",
+          "log_bytes": 51329,
+          "log_sha256": "fa4b9f3bf2f745af60cb6dc7aa906d5578dab6461a497952b864f81948061dc7",
+          "target_bytes_after": 18434139755,
+          "post_exit": {
+            "target_bytes": 18434139755,
+            "samples": [
+              {
+                "at": 1792822622.1809494,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792822622.4531941,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792822622.7202544,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          },
+          "cargo_target_trace": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/26-tests-facade-attempt-1792821876949103158-904403-cargo-targets.tsv",
+            "bytes": 1817,
+            "sha256": "4acf547b8b482db5be9d80b7569f13e7b6b72206429146211a833f6261c38e55"
+          }
+        }
+      ],
+      "chunk_logs": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0000.log",
+          "bytes": 482340,
+          "sha256": "d4a338544d40027aef889c0d5c187ac8638c9d3c025d442ceaf8c40191f5f14e",
+          "test_results": [
+            "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0001.log",
+          "bytes": 486270,
+          "sha256": "25e09354be7516c3901280683c962148c2890114f972bbeba571b8d811522659",
+          "test_results": [
+            "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s",
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s",
+            "test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0002.log",
+          "bytes": 485198,
+          "sha256": "796cf17ea6c98fba811069cb644aa10c9a328ce7205ed758fcb8823c28b2e8b1",
+          "test_results": [
+            "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.16s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0003.log",
+          "bytes": 487126,
+          "sha256": "4c03125c42f135988d14c87957b313d182b8fa10658e2b2a1272977eeea8bf59",
+          "test_results": [
+            "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s",
+            "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s",
+            "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+            "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+            "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0004.log",
+          "bytes": 478804,
+          "sha256": "3b54a3db64a4a911761caaa8dce13dd9dd778f40ee09f434de26c1e8e65d25dc",
+          "test_results": [
+            "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+            "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0005.log",
+          "bytes": 480800,
+          "sha256": "56238138d4f251dfb4c9138ca08a9c6a230394f403a84d225b6eaf9f09c08bc3",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0006.log",
+          "bytes": 480817,
+          "sha256": "58ceff8bef5d4dc3a98700e653f262be6f79037d588ec8a6f8e835901ebb56e0",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0007.log",
+          "bytes": 480885,
+          "sha256": "3591177248a9a269bb1072931fa5c32f48b93af5e9bacb2501d2e7c945817ea0",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0008.log",
+          "bytes": 480852,
+          "sha256": "f8e894572f47efdb20878c6597995361678c8510ec541c0cb3b677ade8c1c450",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0009.log",
+          "bytes": 480884,
+          "sha256": "3e82eb8d41429ba878fbfd4efa26d8bc64a92e9428379b522ddb0f3f0ebf0e11",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0010.log",
+          "bytes": 480897,
+          "sha256": "0ae0351d0c04586410890e4454cac18b329aa8b3de9d014cd5f1e5343528a3e9",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0011.log",
+          "bytes": 480862,
+          "sha256": "4bc5c7cf6c36ac4a37595713b90a278761729d00850609f357666fb50dec767b",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0012.log",
+          "bytes": 480842,
+          "sha256": "6aaba964c9882880229b9557b87c5b262a6331c34fdeb26312f7d9e62aa54b34",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0013.log",
+          "bytes": 480850,
+          "sha256": "4cff3b6fcab8abf5560765fb6a54b3cd2dba400c1bc45af53e1ba655aeab1ca7",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0014.log",
+          "bytes": 480993,
+          "sha256": "c72cfe481690f471f3520ea72e479b31dffb8db208fcab62601df87d30f3e540",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0015.log",
+          "bytes": 480815,
+          "sha256": "f5fc0c9535dc600789d83b469ae6320f0fa4df2ab9328ca7229188be8b46884f",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0016.log",
+          "bytes": 480985,
+          "sha256": "ad74af67a6127d7accf3064b8cf2df16e798677b7f622b56be97c9d28fec648a",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0017.log",
+          "bytes": 481033,
+          "sha256": "f1540a3a03055c99a34c4255d474d2e2d4d34874902c6f2a223bda959a066fcf",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0018.log",
+          "bytes": 480909,
+          "sha256": "361ed36f8c679710dab14294308f61c7c13bd4960a10f9a857d1017ae69a5164",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0019.log",
+          "bytes": 480825,
+          "sha256": "09563edeab818598ff020a85d92859f43614d4d20c832f7bfb4c264909d44c68",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0020.log",
+          "bytes": 478089,
+          "sha256": "a4a04be73a4c14ded6edd0d01c6a01ef2b3061592aa86ff3a9b5ae75d60924ac",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d/facade-tests/0021.log",
+          "bytes": 471461,
+          "sha256": "78e2072da04de37f6f0eaa84de1be0d0a4e420dd8f3aff6d28aae9d3d70c08c9",
+          "test_results": [
+            "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s"
+          ]
+        }
+      ]
+    },
+    {
+      "state": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-static-f6fe430a4d/state.json",
+        "bytes": 11469,
+        "sha256": "4d1b14f4c9b3685edb70814a715fe9d7881eb0b76905f21ab80e5ff7bc6c9d79"
+      },
+      "plan": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-static-f6fe430a4d/plan.json",
+        "bytes": 21848,
+        "sha256": "7c27ee2b0a084899a1ac507a57476ea5dac358cb02e50f5498b60e564f722ead"
+      },
+      "source": {
+        "commit": "f6fe430a4d19d94aa360c0e9ed03ebd757265225",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "selection": {
+        "only": [
+          "iwork-leaf-api",
+          "tooling-unit",
+          "crate-boundaries",
+          "non-iwork-gate",
+          "bench-matrix",
+          "corpus-dispositions"
+        ],
+        "start_at": null,
+        "indexes": [
+          47,
+          48,
+          49,
+          50,
+          51,
+          52
+        ],
+        "full_step_count": 53,
+        "partial": true
+      },
+      "policy": {
+        "runner_files": {
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+        },
+        "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+        "offline": true,
+        "locked": true,
+        "memory_max": "20G",
+        "build_jobs": 1,
+        "test_threads": 1,
+        "target_guard_before": 19200000000,
+        "target_guard_after": 20000000000,
+        "free_guard": 12000000000
+      },
+      "completed_rows": [
+        {
+          "index": 47,
+          "name": "iwork-leaf-api",
+          "status": "passed",
+          "command": [
+            "python3",
+            "-m",
+            "unittest",
+            "tools.test_check_iwork_leaf_public_api"
+          ],
+          "exit": 0,
+          "seconds": 1.7606945037841797,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-static-f6fe430a4d/47-iwork-leaf-api-attempt-1792823098416086088-1051095.log",
+          "log_bytes": 115,
+          "log_sha256": "ebd7850d88cee2a4a37cacd13b1fcd49ec03f632fa0eb34ca89592877f8ceffa",
+          "target_bytes_after": 18434139755,
+          "post_exit": {
+            "target_bytes": 18434139755,
+            "samples": [
+              {
+                "at": 1792823099.9232922,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823100.157055,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823100.4173973,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          },
+          "cargo_target_trace": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-static-f6fe430a4d/47-iwork-leaf-api-attempt-1792823098416086088-1051095-cargo-targets.tsv",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "index": 48,
+          "name": "tooling-unit",
+          "status": "failed",
+          "command": [
+            "python3",
+            "-m",
+            "unittest",
+            "tools.test_check_api_glossary",
+            "tools.test_final_api_inventory",
+            "tools.test_officecli_corpus",
+            "tools.test_officecli_capability_delta",
+            "tools.test_no_3rdparty_references",
+            "tools.test_check_crate_boundaries",
+            "tools.test_non_iwork_gate",
+            "tools.test_unified_bench_matrix",
+            "tools.test_check_iwork_leaf_public_api"
+          ],
+          "exit": 1,
+          "seconds": 44.42427086830139,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-static-f6fe430a4d/48-tooling-unit-attempt-1792823101367159683-1051095.log",
+          "log_bytes": 639790,
+          "log_sha256": "a0d8ffc8283546ce22572e87170a7880cbca32e5cb04b05c018383c920f02835",
+          "target_bytes_after": 18434139755,
+          "post_exit": {
+            "target_bytes": 18434139755,
+            "samples": [
+              {
+                "at": 1792823145.4894648,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823145.7461205,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823146.018471,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          },
+          "cargo_target_trace": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-static-f6fe430a4d/48-tooling-unit-attempt-1792823101367159683-1051095-cargo-targets.tsv",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "chunk_logs": []
+    },
+    {
+      "state": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/state.json",
+        "bytes": 55835,
+        "sha256": "52d2477825a89bad8fb7d60f7fbe4d7bc7de5cc7ac4f4858792fa1831568819c"
+      },
+      "plan": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/plan.json",
+        "bytes": 21730,
+        "sha256": "980da161acfa1c35194e2828c3681eebcf2781a8807c6d68c05c781393ff9a2e"
+      },
+      "source": {
+        "commit": "f6fe430a4d19d94aa360c0e9ed03ebd757265225",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "selection": {
+        "only": [
+          "non-iwork-gate",
+          "corpus-dispositions",
+          "tests-core"
+        ],
+        "start_at": null,
+        "indexes": [
+          50,
+          52,
+          27
+        ],
+        "full_step_count": 53,
+        "partial": true
+      },
+      "policy": {
+        "runner_files": {
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+        },
+        "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+        "offline": true,
+        "locked": true,
+        "memory_max": "20G",
+        "build_jobs": 1,
+        "test_threads": 1,
+        "target_guard_before": 19200000000,
+        "target_guard_after": 20000000000,
+        "free_guard": 12000000000
+      },
+      "completed_rows": [
+        {
+          "index": 27,
+          "name": "tests-core",
+          "status": "passed",
+          "command": [
+            "python3",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py",
+            "-p",
+            "litchi-core",
+            "--all-features",
+            "--log-dir",
+            "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/core-tests"
+          ],
+          "exit": 0,
+          "seconds": 57.88801312446594,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/27-tests-core-attempt-1792823256250747882-1082158.log",
+          "log_bytes": 4539,
+          "log_sha256": "743c3a8dcf5a0e1d4a9942e7e04d8170f0c5bbe80d0f81dc40092f852fee2418",
+          "target_bytes_after": 18446285179,
+          "post_exit": {
+            "target_bytes": 18446285179,
+            "samples": [
+              {
+                "at": 1792823313.3995962,
+                "target_bytes": 18446285179,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823313.6567724,
+                "target_bytes": 18446285179,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823313.9016156,
+                "target_bytes": 18446285179,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          },
+          "cargo_target_trace": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/27-tests-core-attempt-1792823256250747882-1082158-cargo-targets.tsv",
+            "bytes": 400,
+            "sha256": "355b93ea60e7601cabf07f5de2f205ea92e03839dc57bd2066819059fd8d368d"
+          }
+        },
+        {
+          "index": 50,
+          "name": "non-iwork-gate",
+          "status": "passed",
+          "command": [
+            "python3",
+            "tools/non_iwork_gate.py",
+            "verify"
+          ],
+          "exit": 0,
+          "seconds": 14.882899045944214,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/50-non-iwork-gate-attempt-1792823235021413467-1082158.log",
+          "log_bytes": 1924,
+          "log_sha256": "cf201968b1db3731daad39b17f0f5afd4e4ea27e788d0e2212545bc91be5bdef",
+          "target_bytes_after": 18434139755,
+          "post_exit": {
+            "target_bytes": 18434139755,
+            "samples": [
+              {
+                "at": 1792823249.4538515,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823249.7151115,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823249.978802,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          },
+          "cargo_target_trace": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/50-non-iwork-gate-attempt-1792823235021413467-1082158-cargo-targets.tsv",
+            "bytes": 3638,
+            "sha256": "62e6123ac6082a5ab5a1d3f95965c8207c570427638e1c86c898ffcb8c5321f4"
+          }
+        },
+        {
+          "index": 52,
+          "name": "corpus-dispositions",
+          "status": "passed",
+          "command": [
+            "bash",
+            "-c",
+            "python3 tools/officecli_capability_delta.py --check && python3 tools/officecli_corpus.py --check"
+          ],
+          "exit": 0,
+          "seconds": 3.7126882076263428,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/52-corpus-dispositions-attempt-1792823251377289035-1082158.log",
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "target_bytes_after": 18434139755,
+          "post_exit": {
+            "target_bytes": 18434139755,
+            "samples": [
+              {
+                "at": 1792823254.4328628,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823254.6924713,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792823254.955101,
+                "target_bytes": 18434139755,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          },
+          "cargo_target_trace": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/52-corpus-dispositions-attempt-1792823251377289035-1082158-cargo-targets.tsv",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "chunk_logs": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/core-tests/0000.log",
+          "bytes": 72167,
+          "sha256": "d2608060a8a65566f4439fbd04426dadd7fd6bd2ce92f0251f15920d0799e3f6",
+          "test_results": [
+            "test result: ok. 253 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.64s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/core-tests/0001.log",
+          "bytes": 60236,
+          "sha256": "264f8bbfde3e62a97f83c0c5c438ca60ab1d5b9669fdb5384f3cdb1690fd329a",
+          "test_results": [
+            "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+            "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s"
+          ]
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/core-tests/0002.log",
+          "bytes": 57103,
+          "sha256": "85b5f9e98f30ff399f1562c60dce25da9fab4f3c14941f270233214c42b03400",
+          "test_results": []
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-core-f6fe430a4d/core-tests/0003.log",
+          "bytes": 59861,
+          "sha256": "9e3253e8c67c5c7599e23f079f4b871fbf889e1221bf290baf852e573d2b370a",
+          "test_results": [
+            "test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -3,21 +3,23 @@
 //!
 //! Run with:
 //! ```bash
-//! cargo run --example pptx_features_demo
+//! cargo run -p litchi --example pptx_features_demo --features pptx
 //! ```
 
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::comments::{
     Author as CommentAuthor, Comment, Comments, Conformance as CommentConformance,
-    List as CommentList, store_presentation_comments,
+    List as CommentList,
 };
 use litchi_pptx::media_parts::{
     Conformance as MediaConformance, Kind as MediaKind, List as MediaList, Picture, Resource,
-    Transform, store as store_slide_media,
+    Transform,
 };
 use litchi_pptx::presentation::media::{Format as MediaFormat, Kind as AuthoringMediaKind};
-use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
-use litchi_pptx::{Error, MutablePresentation, MutableSlide, Package, Result};
+use litchi_pptx::presentation_properties::metadata::sections::{
+    Limits, List as SectionList, Section,
+};
+use litchi_pptx::{Error, Package, Result};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fs;
@@ -41,9 +43,9 @@ struct MediaAttachment {
 fn main() -> std::result::Result<(), Box<dyn StdError>> {
     println!("Creating PPTX features demonstration...\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     let media = {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_slide_size(SLIDE_WIDTH, SLIDE_HEIGHT);
         build_slides(presentation)?
     };
@@ -52,14 +54,17 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
     println!(
         "Creating {} typed sections ({} XML bytes)...",
         sections.len(),
-        sections.to_xml()?.len()
+        sections.to_xml(Limits::DEFAULT)?.len()
     );
 
-    package.edit_opc(move |opc| {
-        store_comments(opc)?;
-        store_sections(opc, &sections.to_xml()?)?;
-        store_media(opc, media)
-    })?;
+    let mut package = builder.build()?;
+    {
+        package = store_comments(&package)?;
+        let mut opc_edit = package.edit_opc()?;
+        opc_edit.update(move |opc| store_sections(opc, &sections.to_xml(Limits::DEFAULT)?))?;
+        package = opc_edit.commit()?.into_package();
+        package = store_media(&package, media)?;
+    }
 
     let output_path = "pptx_features_demo.pptx";
     package.save(output_path)?;
@@ -73,7 +78,9 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
     Ok(())
 }
 
-fn build_slides(presentation: &mut MutablePresentation) -> Result<Vec<MediaAttachment>> {
+fn build_slides(
+    presentation: &mut litchi_pptx::builder::Presentation,
+) -> Result<Vec<MediaAttachment>> {
     println!("Creating Slide 1: Title Slide");
     let slide = presentation.add_slide()?;
     slide.set_title("PPTX Features Demo");
@@ -257,7 +264,7 @@ fn build_slides(presentation: &mut MutablePresentation) -> Result<Vec<MediaAttac
 }
 
 fn add_text_table(
-    slide: &mut MutableSlide,
+    slide: &mut litchi_pptx::builder::Slide,
     rows: &[&[&str]],
     x: i64,
     y: i64,
@@ -332,15 +339,23 @@ fn read_media(
 
 fn build_sections() -> SectionList {
     let mut sections = SectionList::new();
-    sections.add_section(Section::new("Introduction", "section-1").with_slides([256]));
     sections.add_section(
-        Section::new("Feature Demonstrations", "section-2").with_slides([257, 258, 259, 260, 261]),
+        Section::new("Introduction", "{00000000-0000-4000-8000-000000000001}").with_slides([256]),
     );
-    sections.add_section(Section::new("Summary", "section-3").with_slides([262]));
+    sections.add_section(
+        Section::new(
+            "Feature Demonstrations",
+            "{00000000-0000-4000-8000-000000000002}",
+        )
+        .with_slides([257, 258, 259, 260, 261]),
+    );
+    sections.add_section(
+        Section::new("Summary", "{00000000-0000-4000-8000-000000000003}").with_slides([262]),
+    );
     sections
 }
 
-fn store_comments(opc: &mut OpcPackage) -> Result<()> {
+fn store_comments(package: &Package) -> Result<Package> {
     let mut author = CommentAuthor::new(1, "Litchi Demo", "LD");
     author.last_index = 5;
     let comments = Comments {
@@ -387,10 +402,13 @@ fn store_comments(opc: &mut OpcPackage) -> Result<()> {
             },
         ],
     };
-    store_presentation_comments(opc, &comments, CommentConformance::Transitional)
+    let mut edit = package.edit_comments()?;
+    edit.set(&comments, CommentConformance::Transitional)?;
+    Ok(edit.commit()?.into_package())
 }
 
-fn store_media(opc: &mut OpcPackage, media: Vec<MediaAttachment>) -> Result<()> {
+fn store_media(package: &Package, media: Vec<MediaAttachment>) -> Result<Package> {
+    let mut edit = package.edit_media()?;
     let mut by_slide = BTreeMap::<usize, Vec<MediaAttachment>>::new();
     for attachment in media {
         by_slide
@@ -433,16 +451,14 @@ fn store_media(opc: &mut OpcPackage, media: Vec<MediaAttachment>) -> Result<()> 
             });
             resource_index += 1;
         }
-        let slide_name =
-            PackURI::new(format!("/ppt/slides/slide{slide}.xml")).map_err(Error::Uri)?;
-        store_slide_media(
-            opc,
-            &slide_name,
+        // `slide` is one-based.
+        edit.set(
+            slide - 1,
             &MediaList { pictures },
             MediaConformance::Transitional,
         )?;
     }
-    Ok(())
+    Ok(edit.commit()?.into_package())
 }
 
 fn store_sections(opc: &mut OpcPackage, fragment: &str) -> Result<()> {

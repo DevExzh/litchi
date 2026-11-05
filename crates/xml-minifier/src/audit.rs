@@ -21,7 +21,10 @@ use crate::xml_attributes::BytesStartExt as _;
 use namespaces::{Namespaces, Prefixed};
 
 mod namespaces;
+mod successor;
 mod wellformed;
+
+pub use successor::IndexDepth;
 
 /// Finite resource budgets for one XML document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -554,6 +557,37 @@ pub enum Error {
 }
 
 impl Error {
+    /// Whether a finite audit resource budget was exceeded.
+    ///
+    /// The resource, configured limit, observation and offset remain available
+    /// in [`Self::Limit`]. This predicate lets wrappers classify a borrowed
+    /// audit failure without replacing its typed diagnostic.
+    ///
+    /// ```
+    /// use xml_minifier::audit::{Error, Resource};
+    /// let error = Error::Limit {
+    ///     resource: Resource::TokenBytes,
+    ///     limit: 8,
+    ///     actual: 9,
+    ///     offset: 10,
+    /// };
+    /// assert!(error.is_limit());
+    /// ```
+    pub const fn is_limit(&self) -> bool {
+        matches!(self, Self::Limit { .. })
+    }
+
+    /// Whether reserving an audit buffer failed.
+    ///
+    /// ```
+    /// use xml_minifier::audit::Error;
+    /// assert!(Error::Allocation.is_allocation());
+    /// assert!(!Error::Encoding { valid_up_to: 0 }.is_allocation());
+    /// ```
+    pub const fn is_allocation(&self) -> bool {
+        matches!(self, Self::Allocation)
+    }
+
     fn malformed(offset: usize, detail: impl Into<String>) -> Self {
         Self::Malformed {
             offset,
@@ -1011,6 +1045,19 @@ pub enum ReplacementProof {
         /// Total replacement bytes occupied by the audited windows.
         replacement_bytes: usize,
     },
+    /// Outside a run of sibling content of one element of the original,
+    /// which lies between two content boundaries of the document element or
+    /// of one of its children, the replacement is byte-identical to the
+    /// original; the run may be empty, which is a pure insertion. Only the
+    /// replacement bytes that took the run's place were scanned, in the
+    /// parser state the original's audit recorded at the run's start. See
+    /// [`VerifiedSource::verify_successor`].
+    Splice {
+        /// The replaced run's span in the original; empty for an insertion.
+        original: Range<usize>,
+        /// The replacement bytes that took its place.
+        replacement: Range<usize>,
+    },
     /// The replacement was scanned completely, as [`verify_source`] scans it.
     Complete,
 }
@@ -1321,10 +1368,16 @@ fn spans_cover_differences(original: &[u8], replacement: &[u8], spans: &[Replace
 ///   modification has a different address or length and is not covered.
 ///
 /// A writer that receives bytes it cannot prove this way audits them.
+///
+/// A proof made by [`Self::verify_indexed`] or
+/// [`Self::verify_indexed_replacement`] also keeps the content boundaries its
+/// audit recorded, so [`Self::verify_successor`] can prove an edit of its bytes
+/// by scanning only the edited run.
 #[derive(Clone)]
 pub struct VerifiedSource {
     bytes: std::sync::Arc<Vec<u8>>,
     limits: Limits,
+    boundaries: Option<std::sync::Arc<successor::BoundaryIndex>>,
 }
 
 impl VerifiedSource {
@@ -1336,7 +1389,228 @@ impl VerifiedSource {
     /// Returns the [`Error`] [`verify_source`] reports for `bytes`.
     pub fn verify(bytes: std::sync::Arc<Vec<u8>>, limits: Limits) -> Result<Self, Error> {
         let _report = verify_source(&bytes, limits)?;
-        Ok(Self { bytes, limits })
+        Ok(Self {
+            bytes,
+            limits,
+            boundaries: None,
+        })
+    }
+
+    /// [`Self::verify`], recording the content boundaries
+    /// [`Self::verify_successor`] proves edits from: every offset between two
+    /// tokens at which at most `depth` elements are open, with the parser
+    /// state the audit had reached there.
+    ///
+    /// The verdict and error are exactly [`verify_source`]'s. The boundaries
+    /// cost about 20 bytes each and are bounded (one per 32 input bytes, plus
+    /// a constant, and the namespace bindings in scope by a fixed budget);
+    /// beyond a bound, or for an input of `u32::MAX` bytes or more, none are
+    /// kept, and every successor is audited completely.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Error`] [`verify_source`] reports for `bytes`.
+    pub fn verify_indexed(
+        bytes: std::sync::Arc<Vec<u8>>,
+        limits: Limits,
+        depth: IndexDepth,
+    ) -> Result<Self, Error> {
+        let boundaries = successor::verify_recorded(&bytes, limits, depth)?;
+        Ok(Self {
+            boundaries: boundaries.map(std::sync::Arc::new),
+            bytes,
+            limits,
+        })
+    }
+
+    /// [`Self::verify_replacement`], with the original's proof as
+    /// [`Self::verify_indexed`] makes it, from the same single scan of the
+    /// original: `(original, replacement, how)`.
+    ///
+    /// When no element window proves the replacement, a run between the
+    /// original's recorded boundaries may, as [`Self::verify_successor`]
+    /// would prove it. The verdict and error are exactly those of
+    /// [`verify_source_replacement`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`ReplacementError`] [`verify_source_replacement`]
+    /// reports.
+    pub fn verify_indexed_replacement(
+        original: std::sync::Arc<Vec<u8>>,
+        replacement: std::sync::Arc<Vec<u8>>,
+        limits: Limits,
+        depth: IndexDepth,
+    ) -> Result<(Self, Self, ReplacementProof), ReplacementError> {
+        let mut recorder = successor::BoundaryRecorder::new(original.len(), depth);
+        let (report, window) = if original == replacement {
+            let report = verify_observed(&original, limits, Policy::SOURCE, &mut recorder)
+                .map_err(ReplacementError::Original)?;
+            (report, Some(ReplacementProof::Identical))
+        } else {
+            let prefix = common_prefix_len(&original, &replacement);
+            let suffix = common_suffix_len(&original[prefix..], &replacement[prefix..]);
+            let mut search = WindowSearch::new(
+                &replacement,
+                original.len(),
+                prefix,
+                original.len() - suffix,
+            );
+            search.stopped =
+                (replacement.len() - suffix - prefix).saturating_mul(2) > replacement.len();
+            let report = verify_observed(
+                &original,
+                limits,
+                Policy::SOURCE,
+                &mut successor::Both(&mut search, &mut recorder),
+            )
+            .map_err(ReplacementError::Original)?;
+            let window = search
+                .found
+                .and_then(|window| window.prove(report, &replacement, limits));
+            #[cfg(debug_assertions)]
+            if let Some(proof) = &window {
+                debug_check_window_proof(&replacement, limits, proof);
+            }
+            (report, window)
+        };
+        let base = Self {
+            boundaries: recorder.finish(report).map(std::sync::Arc::new),
+            bytes: original,
+            limits,
+        };
+        let (replacement, how) = base
+            .prove_successor(replacement, limits, window)
+            .map_err(ReplacementError::Replacement)?;
+        Ok((base, replacement, how))
+    }
+
+    /// Audit `replacement`, an edit of these bytes, with [`verify_source`],
+    /// and return its proof with how it was established.
+    ///
+    /// The verdict and error are exactly those of `verify_source(replacement,
+    /// limits)`. When this proof was made under `limits` and keeps the
+    /// boundaries [`Self::verify_indexed`] records, a replacement that
+    /// repeats these bytes outside a run between two boundaries of one
+    /// element — the last at or before its first difference and the first at
+    /// or after the common tail, an empty run for a pure insertion — is
+    /// proved by auditing only the bytes that took the run's place, in the
+    /// state this proof's audit recorded there
+    /// ([`ReplacementProof::Splice`]). They must be balanced and begin and
+    /// end with markup, the run must be at most half the replacement, and the
+    /// aggregate budgets are re-totalled for the whole replacement; anything
+    /// else, and every failure, is decided by the complete audit, so every
+    /// error is [`verify_source`]'s, with its offset. Debug builds confirm
+    /// each such proof with a complete audit.
+    ///
+    /// When this proof keeps boundaries, so does the returned one, at the
+    /// same depth and within the same bounds, so a chain of edits is proved
+    /// edit by edit (record 0317):
+    ///
+    /// * an identical replacement shares these boundaries;
+    /// * a splice derives the replacement's boundaries from these and from
+    ///   the audited window, without scanning anything else; debug builds
+    ///   compare them with the boundaries a recording audit of the
+    ///   replacement makes;
+    /// * a replacement audited completely records its own.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Error`] [`verify_source`] reports for `replacement`.
+    pub fn verify_successor(
+        &self,
+        replacement: std::sync::Arc<Vec<u8>>,
+        limits: Limits,
+    ) -> Result<(Self, ReplacementProof), Error> {
+        let identical = (self.limits == limits && replacement.as_slice() == self.bytes.as_slice())
+            .then_some(ReplacementProof::Identical);
+        self.prove_successor(replacement, limits, identical)
+    }
+
+    /// The successor proof of `replacement`, given a proof already found.
+    fn prove_successor(
+        &self,
+        replacement: std::sync::Arc<Vec<u8>>,
+        limits: Limits,
+        found: Option<ReplacementProof>,
+    ) -> Result<(Self, ReplacementProof), Error> {
+        let index = self.boundaries.as_deref().filter(|_| self.limits == limits);
+        let (proof, boundaries) = match found {
+            Some(ReplacementProof::Identical) => (
+                Some(ReplacementProof::Identical),
+                index.and(self.boundaries.clone()),
+            ),
+            // An element window carries no boundaries of its own; the run
+            // between recorded boundaries that holds the same edit derives
+            // them, at the cost of auditing that run's few bytes again.
+            Some(found) => match index.and_then(|base| {
+                base.prove(&self.bytes, &replacement, limits)
+                    .map(|found| (base, found))
+            }) {
+                Some((_base, (_splice, Some(derived)))) => {
+                    #[cfg(debug_assertions)]
+                    debug_check_successor_proof(
+                        &replacement,
+                        limits,
+                        &_splice,
+                        _base,
+                        Some(&derived),
+                    );
+                    (Some(found), Some(std::sync::Arc::new(derived)))
+                },
+                _ => (Some(found), None),
+            },
+            None => match index.and_then(|base| {
+                base.prove(&self.bytes, &replacement, limits)
+                    .map(|found| (base, found))
+            }) {
+                Some((_base, (proof, derived))) => {
+                    #[cfg(debug_assertions)]
+                    debug_check_successor_proof(
+                        &replacement,
+                        limits,
+                        &proof,
+                        _base,
+                        derived.as_ref(),
+                    );
+                    (Some(proof), derived.map(std::sync::Arc::new))
+                },
+                None => (None, None),
+            },
+        };
+        let (proof, boundaries) = match proof {
+            Some(proof) => (proof, boundaries),
+            None => {
+                let boundaries = match index {
+                    Some(index) => {
+                        successor::verify_recorded(&replacement, limits, index.index_depth())?
+                            .map(std::sync::Arc::new)
+                    },
+                    None => {
+                        let _report = verify_source(&replacement, limits)?;
+                        None
+                    },
+                };
+                (ReplacementProof::Complete, boundaries)
+            },
+        };
+        Ok((
+            Self {
+                bytes: replacement,
+                limits,
+                boundaries,
+            },
+            proof,
+        ))
+    }
+
+    /// How deep this proof's recorded boundaries reach, or `None` when it
+    /// keeps none.
+    #[must_use]
+    pub fn index_depth(&self) -> Option<IndexDepth> {
+        self.boundaries
+            .as_deref()
+            .map(successor::BoundaryIndex::index_depth)
     }
 
     /// Audit `original` and then `replacement` with
@@ -1361,6 +1635,7 @@ impl VerifiedSource {
             Self {
                 bytes: replacement,
                 limits,
+                boundaries: None,
             },
             proof,
         ))
@@ -1393,7 +1668,52 @@ impl fmt::Debug for VerifiedSource {
             .debug_struct("VerifiedSource")
             .field("bytes", &self.bytes.len())
             .field("limits", &self.limits)
+            .field(
+                "boundaries",
+                &self
+                    .boundaries
+                    .as_deref()
+                    .map(successor::BoundaryIndex::len),
+            )
             .finish()
+    }
+}
+
+/// Re-derive a splice proof, and the boundaries derived with it, from a
+/// recording audit of the replacement.
+///
+/// Debug builds run this for every splice proof, so each debug test that
+/// reaches one re-checks the invariant stated at [`scan`] and the derivation
+/// of record 0317. Release builds do not compile it.
+#[cfg(debug_assertions)]
+fn debug_check_successor_proof(
+    replacement: &[u8],
+    limits: Limits,
+    proof: &ReplacementProof,
+    base: &successor::BoundaryIndex,
+    derived: Option<&successor::BoundaryIndex>,
+) {
+    let recorded = successor::verify_recorded(replacement, limits, base.index_depth());
+    let recorded = match recorded {
+        Ok(recorded) => recorded,
+        Err(error) => panic!(
+            "splice proof {proof:?} contradicts the complete source audit of the replacement: \
+             {error:?}"
+        ),
+    };
+    if let (Some(derived), Some(recorded)) = (derived, recorded.as_ref()) {
+        assert!(
+            derived.same_boundaries(recorded),
+            "the boundaries derived for splice {proof:?} differ from those a recording audit of \
+             the replacement makes"
+        );
+    }
+    // The derived index keeps the recording audit's boundary bound.
+    if let (Some(derived), None) = (derived, recorded.as_ref()) {
+        assert!(
+            derived.len() <= replacement.len() / 32 + 64,
+            "a derived index exceeds its bound"
+        );
     }
 }
 
@@ -2071,7 +2391,10 @@ struct Source<'a> {
 /// [`verify_source_replacement`] also runs this loop over a *window*: the
 /// replacement bytes that took one element's place, starting from
 /// [`State::within`] instead of the state a complete scan of the replacement
-/// would have reached there. The two scans agree on every token of the window
+/// would have reached there. [`VerifiedSource::verify_successor`] runs it the
+/// same way over the bytes that took the place of a run of sibling content
+/// between two content boundaries the original's audit recorded, from the
+/// depth and bindings recorded there (`successor`). The two scans agree on every token of the window
 /// only because, under [`Policy::SOURCE`], the checks of a token read nothing
 /// but:
 ///
@@ -2537,12 +2860,15 @@ impl<'r> WindowSearch<'r> {
 }
 
 impl Observer for WindowSearch<'_> {
-    #[inline]
+    #[inline(always)]
     fn listening(&self) -> bool {
         !self.stopped
     }
 
-    #[inline]
+    // Always inlined: the pair audit's token loop is instantiated for this
+    // observer alone and paired with the boundary recorder, and an outlined
+    // call per token costs the pair audit about 1 % (record 0313).
+    #[inline(always)]
     fn accepted(
         &mut self,
         token: Token,
@@ -2950,6 +3276,18 @@ fn audit_window(
     depth: usize,
     namespaces: Namespaces,
 ) -> Option<Counters> {
+    audit_window_observed(bytes, limits, depth, namespaces, &mut ())
+}
+
+/// [`audit_window`], with `observer` also reading every token the window
+/// scan accepts, its offsets relative to the window.
+fn audit_window_observed<O: Observer>(
+    bytes: &[u8],
+    limits: Limits,
+    depth: usize,
+    namespaces: Namespaces,
+    observer: &mut O,
+) -> Option<Counters> {
     if depth == 0 || bytes.first() != Some(&b'<') {
         return None;
     }
@@ -2966,7 +3304,14 @@ fn audit_window(
     };
     let mut state = State::within(depth, namespaces);
     let mut last = LastToken::default();
-    scan(source, limits, Policy::SOURCE, &mut state, &mut last).ok()?;
+    scan(
+        source,
+        limits,
+        Policy::SOURCE,
+        &mut state,
+        &mut successor::Both(&mut last, observer),
+    )
+    .ok()?;
     if state.depth != depth || !last.is_markup_ending_at(bytes.len()) {
         return None;
     }

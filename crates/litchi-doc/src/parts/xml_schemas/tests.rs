@@ -2,6 +2,7 @@ use super::codec::{
     CUSTOM_XFORM, HPLXSDR, MAX_CUSTOM_XFORM_BYTES, STTB_F_EXTEND, parse_custom_xml_transform,
 };
 use super::model::{Collection, Reference};
+use crate::SourceLimits;
 use crate::parts::fib::FileInformationBlock;
 
 const FIB_POINTERS: usize = 145;
@@ -76,7 +77,7 @@ fn fixture() -> (FileInformationBlock, Vec<u8>) {
 #[test]
 fn parses_schema_references() {
     let (fib, table) = fixture();
-    let parsed = Collection::parse(&fib, &table)
+    let parsed = Collection::parse(&fib, &table, &SourceLimits::default())
         .unwrap()
         .expect("schemas present");
     assert_eq!(
@@ -107,7 +108,11 @@ fn parses_schema_references() {
 #[test]
 fn absent_table_yields_none() {
     let fib = FileInformationBlock::parse(&bare_fib()).unwrap();
-    assert!(Collection::parse(&fib, &[]).unwrap().is_none());
+    assert!(
+        Collection::parse(&fib, &[], &SourceLimits::default())
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -116,7 +121,7 @@ fn parses_empty_schema_list() {
     let table = hplxsdr(&[]);
     set_fib_pointer(&mut fib_data, HPLXSDR, 0, table.len() as u32);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
-    let parsed = Collection::parse(&fib, &table)
+    let parsed = Collection::parse(&fib, &table, &SourceLimits::default())
         .unwrap()
         .expect("table present");
     assert!(parsed.schemas().is_empty());
@@ -132,7 +137,7 @@ fn skips_sttb_extra_data() {
     let table = hplxsdr(&[entry]);
     set_fib_pointer(&mut fib_data, HPLXSDR, 0, table.len() as u32);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
-    let parsed = Collection::parse(&fib, &table)
+    let parsed = Collection::parse(&fib, &table, &SourceLimits::default())
         .unwrap()
         .expect("schemas present");
     assert_eq!(parsed.element_name(0, 0), Some("el"));
@@ -145,12 +150,12 @@ fn rejects_malformed_tables() {
     // Negative cXSDR.
     let mut negative = table.clone();
     negative[0..4].copy_from_slice(&(-1i32).to_le_bytes());
-    assert!(Collection::parse(&fib, &negative).is_err());
+    assert!(Collection::parse(&fib, &negative, &SourceLimits::default()).is_err());
 
     // Declared count exceeds what the byte length can hold.
     let mut inflated = table.clone();
     inflated[0..4].copy_from_slice(&3u32.to_le_bytes());
-    assert!(Collection::parse(&fib, &inflated).is_err());
+    assert!(Collection::parse(&fib, &inflated, &SourceLimits::default()).is_err());
 
     // Trailing bytes after the last XSDR.
     let mut trailing = table.clone();
@@ -158,7 +163,7 @@ fn rejects_malformed_tables() {
     let mut fib_data = fib.raw_data().to_vec();
     set_fib_pointer(&mut fib_data, HPLXSDR, 0, trailing.len() as u32);
     let trailing_fib = FileInformationBlock::parse(&fib_data).unwrap();
-    assert!(Collection::parse(&trailing_fib, &trailing).is_err());
+    assert!(Collection::parse(&trailing_fib, &trailing, &SourceLimits::default()).is_err());
 
     // Non-extended STTB for the element table.
     let mut entry = length_prefixed("urn:x");
@@ -167,7 +172,7 @@ fn rejects_malformed_tables() {
     bad_sttb[0..2].copy_from_slice(&1u16.to_le_bytes());
     entry.extend_from_slice(&bad_sttb);
     entry.extend_from_slice(&string_table(&[], 0));
-    assert!(Collection::parse(&fib, &hplxsdr(&[entry])).is_err());
+    assert!(Collection::parse(&fib, &hplxsdr(&[entry]), &SourceLimits::default()).is_err());
 
     // Invalid UTF-16 in the URI (lone surrogate).
     let mut bad_uri = 1u16.to_le_bytes().to_vec();
@@ -175,17 +180,17 @@ fn rejects_malformed_tables() {
     bad_uri.extend_from_slice(&length_prefixed(""));
     bad_uri.extend_from_slice(&string_table(&[], 0));
     bad_uri.extend_from_slice(&string_table(&[], 0));
-    assert!(Collection::parse(&fib, &hplxsdr(&[bad_uri])).is_err());
+    assert!(Collection::parse(&fib, &hplxsdr(&[bad_uri]), &SourceLimits::default()).is_err());
 
     // Truncated table.
     let truncated = &table[..table.len() - 1];
-    assert!(Collection::parse(&fib, truncated).is_err());
+    assert!(Collection::parse(&fib, truncated, &SourceLimits::default()).is_err());
 
     // Pointer extending beyond the table stream.
     let mut fib_data = bare_fib();
     set_fib_pointer(&mut fib_data, HPLXSDR, 0, (table.len() + 1) as u32);
     let out_of_bounds = FileInformationBlock::parse(&fib_data).unwrap();
-    assert!(Collection::parse(&out_of_bounds, &table).is_err());
+    assert!(Collection::parse(&out_of_bounds, &table, &SourceLimits::default()).is_err());
 }
 
 #[test]
@@ -195,7 +200,9 @@ fn parses_custom_xml_transform_path() {
     set_fib_pointer(&mut fib_data, CUSTOM_XFORM, 0, table.len() as u32);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
     assert_eq!(
-        parse_custom_xml_transform(&fib, &table).unwrap().as_deref(),
+        parse_custom_xml_transform(&fib, &table, &SourceLimits::default())
+            .unwrap()
+            .as_deref(),
         Some("C:\\transforms\\save.xsl")
     );
 
@@ -206,7 +213,7 @@ fn parses_custom_xml_transform_path() {
     set_fib_pointer(&mut fib_data, CUSTOM_XFORM, 0, terminated.len() as u32);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
     assert_eq!(
-        parse_custom_xml_transform(&fib, &terminated)
+        parse_custom_xml_transform(&fib, &terminated, &SourceLimits::default())
             .unwrap()
             .as_deref(),
         Some("save.xsl")
@@ -216,7 +223,11 @@ fn parses_custom_xml_transform_path() {
 #[test]
 fn absent_custom_xml_transform_yields_none() {
     let fib = FileInformationBlock::parse(&bare_fib()).unwrap();
-    assert!(parse_custom_xml_transform(&fib, &[]).unwrap().is_none());
+    assert!(
+        parse_custom_xml_transform(&fib, &[], &SourceLimits::default())
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -225,18 +236,52 @@ fn rejects_malformed_custom_xml_transform() {
     let mut fib_data = bare_fib();
     set_fib_pointer(&mut fib_data, CUSTOM_XFORM, 0, 3);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
-    assert!(parse_custom_xml_transform(&fib, &[0; 8]).is_err());
+    assert!(parse_custom_xml_transform(&fib, &[0; 8], &SourceLimits::default()).is_err());
 
     // Length beyond the 4168-byte limit.
     let mut fib_data = bare_fib();
     set_fib_pointer(&mut fib_data, CUSTOM_XFORM, 0, MAX_CUSTOM_XFORM_BYTES + 2);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
-    assert!(parse_custom_xml_transform(&fib, &[0; 8]).is_err());
+    assert!(parse_custom_xml_transform(&fib, &[0; 8], &SourceLimits::default()).is_err());
 
     // Invalid UTF-16.
     let mut fib_data = bare_fib();
     let table = 0xD800u16.to_le_bytes().to_vec();
     set_fib_pointer(&mut fib_data, CUSTOM_XFORM, 0, table.len() as u32);
     let fib = FileInformationBlock::parse(&fib_data).unwrap();
-    assert!(parse_custom_xml_transform(&fib, &table).is_err());
+    assert!(parse_custom_xml_transform(&fib, &table, &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn raw_codecs_report_entry_limit_before_decoding() {
+    let (fib, table) = fixture();
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(table.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Collection::parse(&fib, &table, &limits),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
+
+    let mut fib_data = bare_fib();
+    let transform = utf16("save.xsl");
+    set_fib_pointer(&mut fib_data, CUSTOM_XFORM, 0, transform.len() as u32);
+    let fib = FileInformationBlock::parse(&fib_data).unwrap();
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(transform.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        parse_custom_xml_transform(&fib, &transform, &limits),
+        Err(crate::package::Error::Limit {
+            kind: crate::package::SourceLimitKind::EntryBytes,
+            ..
+        })
+    ));
 }

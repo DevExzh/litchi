@@ -42,6 +42,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         let mut current = Some(obj_list);
 
         while let Some(obj) = current {
+            self.charge_work(1)?;
             match obj.tag {
                 MtefRecordType::Char => {
                     if let Some(char_obj) = obj.obj_ptr.as_any().downcast_ref::<MtefChar>() {
@@ -144,12 +145,18 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
     /// variant. Anything the tables do not name — a letter, a digit, an
     /// unknown command — keeps the spelling as text, as it always did.
     fn convert_char_to_node(&self, char_obj: &MtefChar) -> Result<MathNode<'arena>, MtefError> {
-        let spelling = self.convert_char_to_text(char_obj).map_err(|e| {
-            MtefError::ParseError(format!(
-                "Failed to convert character (typeface={}, char={}): {}",
-                char_obj.typeface, char_obj.character, e
-            ))
-        })?;
+        let spelling = match self.convert_char_to_text(char_obj) {
+            Ok(spelling) => spelling,
+            // Resource-policy failures are part of the raw API contract and
+            // must not be hidden inside a generic parse diagnostic.
+            Err(error @ MtefError::LimitExceeded { .. }) => return Err(error),
+            Err(error) => {
+                return Err(MtefError::ParseError(format!(
+                    "Failed to convert character (typeface={}, char={}): {}",
+                    char_obj.typeface, char_obj.character, error
+                )));
+            },
+        };
 
         // An embellished character has been folded into a LaTeX template such
         // as `\dot{x}`, which no single node represents.
@@ -179,6 +186,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                 && (char_obj.character as u8).is_ascii_alphabetic()
                 && let Some(ch) = char::from_u32(char_obj.character as u32)
             {
+                self.check_string_bytes(function_name.len().saturating_add(ch.len_utf8()))?;
                 function_name.push(ch);
                 skip_count += 1;
                 current = obj.next.as_deref();
@@ -216,6 +224,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                         && char_obj.typeface == TYPEFACE_TEXT
                         && let Some(ch) = char::from_u32(char_obj.character as u32)
                     {
+                        self.check_string_bytes(text_run.len().saturating_add(ch.len_utf8()))?;
                         text_run.push(ch);
                         skip_count += 1;
                         current = obj.next.as_deref();
@@ -239,6 +248,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
 
         // Wrap text in \text{} for LaTeX
+        self.check_string_bytes(text_run.len().saturating_add(7))?;
         let latex_text = format!("\\text{{{}}}", text_run);
         Ok((MathNode::Text(Cow::Owned(latex_text)), skip_count))
     }
@@ -318,16 +328,26 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             };
 
             if let Some(latex_char) = lookup_result {
+                // The lookup table contains LaTeX spellings (for example
+                // `\\alpha `), and this allocation is retained in the AST.
+                // Admit its byte length before materialising the String.
+                self.check_string_bytes(latex_char.len())?;
                 latex_char.to_string()
             } else if charset_atts.use_codepoint {
                 self.convert_codepoint(character, typeface)?.to_string()
             } else {
+                self.check_char_command_bytes(character)?;
                 format!("\\char{}", character)
             }
         } else {
             // Fallback for unknown typefaces
+            self.check_char_command_bytes(character)?;
             format!("\\char{}", character)
         };
+
+        // Keep this check for all paths, including future lookup/codepoint
+        // additions, before embellishments can retain a larger spelling.
+        self.check_string_bytes(base_text.len())?;
 
         // Apply embellishments if present (following rtf2latex2e logic)
         if let Some(embellishments) = &char_obj.embellishment_list {
@@ -365,7 +385,17 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                         template // Whole template if no comma
                     };
 
-                    // Replace %1 with the base character
+                    // Check the exact replacement size before `replace`
+                    // allocates its result.  A template can contain more
+                    // than one placeholder, so checking the source or only
+                    // the final String after allocation is insufficient.
+                    let occurrences = template_part.match_indices("%1").count();
+                    let static_bytes = template_part
+                        .len()
+                        .saturating_sub(occurrences.saturating_mul(2));
+                    let projected_bytes =
+                        static_bytes.saturating_add(occurrences.saturating_mul(base_text.len()));
+                    self.check_string_bytes(projected_bytes)?;
                     let new_text = template_part.replace("%1", base_text);
                     *base_text = new_text;
                 }
@@ -388,26 +418,42 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             // Special handling for ampersand
             if character == 38 {
                 // '&'
+                self.check_string_bytes(2)?;
                 return Ok(Cow::Borrowed("\\&"));
             }
 
             // Special handling for certain typefaces (like bold)
             if typeface == usize::from(TYPEFACE_VECTOR) {
                 // Bold typeface - matches rtf2latex2e logic
+                self.check_string_bytes("\\mathbf{}".len().saturating_add(ch.len_utf8()))?;
                 return Ok(Cow::Owned(format!("\\mathbf{{{}}}", ch)));
             }
 
             // Regular character
+            self.check_string_bytes(ch.len_utf8())?;
             return Ok(Cow::Owned(ch.to_string()));
         }
 
         // For non-ASCII characters, try to convert as Unicode
         if let Some(c) = char::from_u32(character as u32) {
+            self.check_string_bytes(c.len_utf8())?;
             Ok(Cow::Owned(c.to_string()))
         } else {
             // Fallback for unmappable characters
+            self.check_char_command_bytes(character)?;
             Ok(Cow::Owned(format!("\\char{}", character)))
         }
+    }
+
+    /// Check the byte length of a `\\charNNN` fallback before formatting it.
+    fn check_char_command_bytes(&self, character: u16) -> Result<(), MtefError> {
+        let mut value = character;
+        let mut digits = 1usize;
+        while value >= 10 {
+            value /= 10;
+            digits += 1;
+        }
+        self.check_string_bytes("\\char".len().saturating_add(digits))
     }
 
     pub(super) fn convert_template_to_node(
@@ -481,10 +527,11 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
                     };
 
                     // Apply the template
-                    Ok(TemplateParser::parse_template_arguments(
+                    TemplateParser::parse_template_arguments(
                         template_def.template,
                         &args,
-                    ))
+                        self.limits,
+                    )
                 } else {
                     self.unknown_template_content(tmpl_obj)
                 }
@@ -1095,10 +1142,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             } else {
                 smallvec::SmallVec::new()
             };
-            Ok(TemplateParser::parse_template_arguments(
-                template_def.template,
-                &args,
-            ))
+            TemplateParser::parse_template_arguments(template_def.template, &args, self.limits)
         } else {
             Ok(MathNode::Text(Cow::Borrowed("\\arrow")))
         }
@@ -1180,10 +1224,7 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
             } else {
                 smallvec::SmallVec::new()
             };
-            Ok(TemplateParser::parse_template_arguments(
-                template_def.template,
-                &args,
-            ))
+            TemplateParser::parse_template_arguments(template_def.template, &args, self.limits)
         } else {
             Ok(MathNode::Text(Cow::Borrowed("\\brace")))
         }
@@ -1267,5 +1308,98 @@ impl<'arena> super::parser::MtefBinaryParser<'arena> {
         }
 
         Ok((content, brace_text))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mtef::{LimitKind, Limits};
+
+    fn parser_with_limits<'a>(
+        arena: &'a bumpalo::Bump,
+        data: &'a [u8],
+        limits: Limits,
+    ) -> super::super::parser::MtefBinaryParser<'a> {
+        super::super::parser::MtefBinaryParser::new(arena, data, limits)
+            .expect("minimal MTEF header is valid")
+    }
+
+    fn alpha(embellishment_list: Option<Box<MtefEmbell>>) -> MtefChar {
+        MtefChar {
+            nudge_x: 0,
+            nudge_y: 0,
+            atts: 0,
+            typeface: 132,
+            character: 97,
+            bits16: 0,
+            embellishment_list,
+        }
+    }
+
+    fn minimal_header() -> Vec<u8> {
+        let mut data = vec![0u8; 28];
+        data[0] = 0x1c;
+        data[2..6].copy_from_slice(&0x0002_0000u32.to_le_bytes());
+        data.extend_from_slice(&[5, 1, 1, 1, 0, 0, 0]);
+        data
+    }
+
+    #[test]
+    fn mapped_latex_spelling_is_checked_before_string_retention() {
+        let arena = bumpalo::Bump::new();
+        let data = minimal_header();
+        let limits = Limits::new(4096, 32, 256, 256, 1, 4096).unwrap();
+        let parser = parser_with_limits(&arena, &data, limits);
+
+        assert!(matches!(
+            parser.convert_char_to_text(&alpha(None)),
+            Err(MtefError::LimitExceeded {
+                kind: LimitKind::StringBytes,
+                actual: 7,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn embellishment_replacement_is_checked_before_replace_allocates() {
+        let arena = bumpalo::Bump::new();
+        let data = minimal_header();
+        let limits = Limits::new(4096, 32, 256, 256, 7, 4096).unwrap();
+        let parser = parser_with_limits(&arena, &data, limits);
+        let embellishment_list = Some(Box::new(MtefEmbell {
+            nudge_x: 0,
+            nudge_y: 0,
+            embell: 2,
+            next: None,
+        }));
+
+        assert!(matches!(
+            parser.convert_char_to_text(&alpha(embellishment_list)),
+            Err(MtefError::LimitExceeded {
+                kind: LimitKind::StringBytes,
+                actual: 14,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn template_substitution_checks_the_aggregate_spelling() {
+        let args = smallvec::smallvec![smallvec::smallvec![
+            MathNode::Text(std::borrow::Cow::Borrowed("a")),
+            MathNode::Text(std::borrow::Cow::Borrowed("b")),
+        ]];
+        let limits = Limits::new(4096, 32, 256, 256, 1, 4096).unwrap();
+
+        assert!(matches!(
+            TemplateParser::parse_template_arguments("#1[M]", &args, limits),
+            Err(MtefError::LimitExceeded {
+                kind: LimitKind::StringBytes,
+                actual: 2,
+                ..
+            })
+        ));
     }
 }

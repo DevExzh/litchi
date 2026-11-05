@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
+use super::Limits;
 use super::model::{List, Show};
 use super::{package, wire};
 use crate::{Error, Result};
@@ -20,6 +21,7 @@ pub struct Snapshot {
     pub(crate) layout: wire::Layout,
     pub(crate) relationships: Vec<wire::RelationshipState>,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl Snapshot {
@@ -28,17 +30,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        package::load_snapshot(package)
-    }
-
-    /// Alias emphasizing that the result is bound to exact source bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
+    pub fn load(package: &OpcPackage, limits: Limits) -> Result<Self> {
+        package::load_snapshot(package, limits)
     }
 
     pub(crate) fn from_located(
@@ -46,11 +39,14 @@ impl Snapshot {
         presentation_content_type: String,
         source_xml: Arc<Vec<u8>>,
         located: wire::Located,
+        limits: Limits,
     ) -> Result<Self> {
-        if source_xml.len() > wire::MAX_BYTES {
-            return Err(invalid(
-                "custom-show PresentationML source bytes exceed 8 MiB",
-            ));
+        if source_xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: source_xml.len(),
+                maximum: limits.max_input_bytes(),
+            });
         }
         let revision = fingerprint(
             source_xml.as_slice(),
@@ -66,6 +62,7 @@ impl Snapshot {
             layout: located.layout,
             relationships: located.relationships,
             revision,
+            limits,
         })
     }
 
@@ -74,13 +71,6 @@ impl Snapshot {
     #[must_use]
     pub fn list(&self) -> &List {
         &self.list
-    }
-
-    /// Alias for callers using the domain name rather than the wire list name.
-    #[inline]
-    #[must_use]
-    pub fn custom_shows(&self) -> &List {
-        self.list()
     }
 
     /// Return the owning `PresentationML` part name.
@@ -114,8 +104,8 @@ impl Snapshot {
     /// Start an isolated edit over the typed custom-show list.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.list.clone(),
         }
@@ -136,12 +126,12 @@ impl Snapshot {
 
 /// A failure-atomic edit staged against one source snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Draft {
     original: Snapshot,
     working: List,
 }
 
-impl Transaction {
+impl Draft {
     /// Borrow the currently staged typed list.
     #[inline]
     #[must_use]
@@ -149,18 +139,14 @@ impl Transaction {
         &self.working
     }
 
-    /// Alias for list.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &List {
-        self.list()
+    fn has_changes(&self) -> bool {
+        self.original.list.shows != self.working.shows
     }
 
-    /// Return whether the semantic list differs from the source.
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.original.list.shows != self.working.shows
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Replace the complete typed list after validating all slide references.
@@ -197,15 +183,6 @@ impl Transaction {
     /// Returns an error if the operation fails.
     pub fn add(&mut self, show: Show) -> Result<()> {
         self.insert(self.working.shows.len(), show)
-    }
-
-    /// Alias for add.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn push(&mut self, show: Show) -> Result<()> {
-        self.add(show)
     }
 
     /// Create a show using the list's next available ID and return that ID.
@@ -408,10 +385,10 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+    pub(crate) fn commit(self) -> Result<Prepared> {
+        if !self.has_changes() {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -423,8 +400,10 @@ impl Transaction {
             &self.original.layout,
             &self.original.list,
             &self.working,
+            self.original.limits,
         )?;
-        let (list, layout) = wire::decode_rewritten(&source, &self.original.layout)?;
+        let (list, layout) =
+            wire::decode_rewritten(&source, &self.original.layout, self.original.limits)?;
         if list.shows != self.working.shows {
             return Err(invalid(
                 "custom-show serialization changed the typed semantic list",
@@ -439,9 +418,10 @@ impl Transaction {
                 layout,
                 relationships: self.original.relationships.clone(),
             },
+            self.original.limits,
         )?;
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -451,108 +431,114 @@ impl Transaction {
 
 /// A successful custom-show edit and its reversible patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+impl Prepared {
+    #[cfg(test)]
+    fn has_changes(&self) -> bool {
         self.changed
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     #[inline]
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible source-checked replacement of the owning presentation XML.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
-    #[inline]
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
+    /// A change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006) before anything is mutated: remove the signature explicitly
+    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// no-op keeps the signature.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         package::apply_patch(target, self)
     }
 }
 
 fn validate(original: &Snapshot, value: &List) -> Result<()> {
-    wire::validate_list(value, original.layout.slide_id_to_relationship.keys())
+    wire::validate_list(
+        value,
+        original.layout.slide_id_to_relationship.keys(),
+        original.limits,
+    )
 }
 
 fn fingerprint(

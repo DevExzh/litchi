@@ -10,10 +10,14 @@ const ROW_XML: &[u8] = b"<rowBreaks count=\"1\" manualBreakCount=\"1\"><brk id=\
 
 #[test]
 fn package_transaction_round_trips_and_inverts_exactly() {
-    let mut package = Package::create().unwrap();
-    let source = package.page_breaks("Sheet1").unwrap().source_arc().unwrap();
+    let source_package = Package::new().unwrap();
+    let source = source_package
+        .page_breaks("Sheet1")
+        .unwrap()
+        .source_arc()
+        .unwrap();
 
-    let mut edit = package.edit_page_breaks("Sheet1").unwrap();
+    let mut edit = source_package.edit_page_breaks("Sheet1").unwrap();
     assert!(
         edit.set_horizontal(
             Collection::horizontal([Break::new(12, 0, 16_383).unwrap().with_manual(true)]).unwrap()
@@ -25,18 +29,26 @@ fn package_transaction_round_trips_and_inverts_exactly() {
             .unwrap()
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.diagnostics().touched_worksheets(), 1);
+    assert!(commit.diagnostics().changed());
     let patch = commit.patch().clone();
-    let xml = commit.snapshot().source_xml();
+    let xml = patch.after().source_xml();
     assert!(xml.windows(ROW_XML.len()).any(|window| window == ROW_XML));
+    // The source package is unchanged.
+    assert_eq!(
+        source_package.page_breaks("Sheet1").unwrap().page_breaks(),
+        &PageBreaks::new()
+    );
 
+    let package = commit.into_package();
     let bytes = package.to_plain_bytes().unwrap();
-    let reopened = Package::from_bytes(bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let value = reopened.page_breaks(0usize).unwrap();
-    assert_eq!(value.page_breaks(), commit.snapshot().page_breaks());
+    assert_eq!(value.page_breaks(), patch.after().page_breaks());
 
-    package.apply_page_breaks_patch(&patch.inverse()).unwrap();
+    let package = package
+        .apply_page_breaks(&patch.inverse())
+        .unwrap()
+        .into_package();
     let restored = package.page_breaks("Sheet1").unwrap();
     assert_eq!(restored.page_breaks(), &PageBreaks::new());
     assert_eq!(restored.source_xml(), source.as_slice());
@@ -44,18 +56,22 @@ fn package_transaction_round_trips_and_inverts_exactly() {
 
 #[test]
 fn no_op_shares_source_and_stale_patch_is_rejected() {
-    let mut package = Package::create().unwrap();
+    let package = Package::new().unwrap();
     let source = package.page_breaks(0usize).unwrap().source_arc().unwrap();
     let commit = package.edit_page_breaks(0usize).unwrap().commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.diagnostics().touched_worksheets(), 0);
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert!(std::sync::Arc::ptr_eq(
         &source,
-        &commit.snapshot().source_arc().unwrap()
+        &commit
+            .package()
+            .page_breaks(0usize)
+            .unwrap()
+            .source_arc()
+            .unwrap()
     ));
 
-    let mut changed = package.clone();
-    let mut edit = changed.edit_page_breaks(0usize).unwrap();
+    let mut edit = package.edit_page_breaks(0usize).unwrap();
     edit.set_horizontal(Collection::horizontal([Break::new(1, 0, 1).unwrap()]).unwrap())
         .unwrap();
     let patch = edit.commit().unwrap().patch().clone();
@@ -64,17 +80,25 @@ fn no_op_shares_source_and_stale_patch_is_rejected() {
     divergent
         .set_vertical(Collection::vertical([Break::new(1, 0, 1).unwrap()]).unwrap())
         .unwrap();
-    divergent.commit().unwrap();
+    let divergent = divergent.commit().unwrap().into_package();
     assert!(matches!(
-        package.apply_page_breaks_patch(&patch),
+        divergent.apply_page_breaks(&patch),
         Err(Error::PatchConflict { .. })
     ));
+    // The patch still replays onto its own source.
+    assert!(
+        package
+            .apply_page_breaks(&patch)
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
 }
 
 #[test]
 fn worksheet_facade_uses_the_canonical_owner() {
-    let package = Package::create().unwrap();
-    let workbook = package.workbook().unwrap();
+    let package = Package::new().unwrap();
+    let workbook = package.workbook();
     let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
     assert_eq!(sheet.page_breaks().unwrap(), PageBreaks::new());
 }
@@ -86,7 +110,7 @@ fn reads_real_poi_manual_breaks() {
         "/../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx"
     ))
     .unwrap();
-    let workbook = package.workbook().unwrap();
+    let workbook = package.workbook();
     let values = workbook
         .sheets()
         .map(|sheet| {

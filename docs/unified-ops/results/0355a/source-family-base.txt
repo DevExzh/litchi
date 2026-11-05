@@ -1,0 +1,16 @@
+docx-family document paragraph text (edit): median 798075 ns, min 774944 ns, output 2102742 bytes, sha256 c21c6fab6d4c9bdc0c1bd0f60188d3842203063394f98adac71eb1dee34a100d
+docx-family document paragraph text (detached commit): median 781774 ns, min 768594 ns, output 2102742 bytes, sha256 c21c6fab6d4c9bdc0c1bd0f60188d3842203063394f98adac71eb1dee34a100d
+docx-family document variables set: median 1100386 ns, min 1098716 ns, output 2102746 bytes, sha256 a987d5d1a2caaf1e80af15a484f049b82f4e10944636e4eff179abd887e3b5dd
+docx-family section layout columns: median 4786748 ns, min 4754408 ns, output 2102775 bytes, sha256 d7ded2e0fb8ac61034977ad1c97657a6b30753fd361a2a098e268911b8954ab8
+docx-family header story text: median 1101916 ns, min 1100106 ns, output 2102737 bytes, sha256 094d5ff56759ae9c2602ecd700fcf5dfb259bd21c212ea6f345da69206a3f3b6
+docx-family plain paragraph copy: median 4730377 ns, min 4695366 ns, output 2102518 bytes, sha256 48e8f5c7594705e68d4c70d34f65777c0515735dab5254ba23835eaf5160f023
+docx-family tail append one paragraph: median 3544961 ns, min 3513511 ns, output 2102606 bytes, sha256 cd50d24c782e41457ab221ed88f363958ba50e2f22e378c19788970d8f3a50c6
+docx-family story hyperlink redaction: median 4444805 ns, min 4421085 ns, output 2102659 bytes, sha256 816f5d7f191c34578d488f61f9623f924376c5e0c576f83d1f1b779c13c8f807
+docx-family document paragraph text (edit): median 798915 ns, min 786485 ns, output 2102742 bytes, sha256 c21c6fab6d4c9bdc0c1bd0f60188d3842203063394f98adac71eb1dee34a100d
+docx-family document paragraph text (detached commit): median 775605 ns, min 762994 ns, output 2102742 bytes, sha256 c21c6fab6d4c9bdc0c1bd0f60188d3842203063394f98adac71eb1dee34a100d
+docx-family document variables set: median 1101056 ns, min 1098016 ns, output 2102746 bytes, sha256 a987d5d1a2caaf1e80af15a484f049b82f4e10944636e4eff179abd887e3b5dd
+docx-family section layout columns: median 4772938 ns, min 4750818 ns, output 2102775 bytes, sha256 d7ded2e0fb8ac61034977ad1c97657a6b30753fd361a2a098e268911b8954ab8
+docx-family header story text: median 1104916 ns, min 1100026 ns, output 2102737 bytes, sha256 094d5ff56759ae9c2602ecd700fcf5dfb259bd21c212ea6f345da69206a3f3b6
+docx-family plain paragraph copy: median 4743417 ns, min 4706307 ns, output 2102518 bytes, sha256 48e8f5c7594705e68d4c70d34f65777c0515735dab5254ba23835eaf5160f023
+docx-family tail append one paragraph: median 3569521 ns, min 3544330 ns, output 2102606 bytes, sha256 cd50d24c782e41457ab221ed88f363958ba50e2f22e378c19788970d8f3a50c6
+docx-family story hyperlink redaction: median 4431505 ns, min 4403646 ns, output 2102659 bytes, sha256 816f5d7f191c34578d488f61f9623f924376c5e0c576f83d1f1b779c13c8f807

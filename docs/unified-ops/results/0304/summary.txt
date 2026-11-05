@@ -1,0 +1,22 @@
+Record 0304 text-set timing: crates/litchi-ops/examples/text_set_bench.rs
+Build: cargo build --release -p litchi-ops --features odt,pptx,ppt,docx,odp --example text_set_bench
+  after  = branch uo2/text-loss (sha256 2db20fd04b7d2cf7924ba2e248afd2178a4d6761354f014715fdbb4b16489a74)
+  before = the same tree with `git diff feat/unified-ops-api HEAD -- crates/{litchi-odt,litchi-docx,litchi-pptx,litchi-ppt,litchi-odp,litchi-ops}/src` reversed
+           (sha256 2dc46df2a5c2ffd9c290e4ededc99af090307b9ad28bc370db74d0da71b68fee)
+Processes: taskset -c 9, order B A A B B A; then taskset -c 11, order B A A B. Host load 8-11.
+Each process: per scenario 2 warm-ups, 9 samples of 20 calls, median µs per call (unified leg);
+ODT scenarios also time the leaf Edit::set_text + commit in ABBA order.
+
+scenario        before (median of runs)  after   after/before   unified/leaf (after)
+odt_plain       418.4                    438.8   1.034-1.047    1.002-1.008
+odt_frames      1021.5                   1020.8  0.999-1.005    1.001-1.002
+pptx_shape      101.5                    99.6    0.977-0.979
+pptx_paragraph  111.3                    108.4   0.965-0.983
+pptx_cell       150.3                    147.4   0.980-0.981
+ppt_shape       130.6                    133.3   1.012-1.016
+docx_cell       49.8                     50.0    0.997-1.009
+odp_shape       1265.2                   1254.7  0.986-0.992
+
+Callgrind (--toggle-collect=text_set_bench::bench::odt::*, both ODT scenarios, both legs):
+  before 6,018,400,943 Ir, after 6,031,512,650 Ir (+0.22%); the top functions (memset, deflate,
+  inflate, quick-xml attributes) differ by under 0.2% each.

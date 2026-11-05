@@ -15,11 +15,12 @@ const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durabil
 #[test]
 fn every_level_publishes_the_default_save_bytes() {
     let directory = tempfile::tempdir().unwrap();
-    let mut package = Package::new().unwrap();
-    package
-        .document_mut()
+    let mut builder = litchi_docx::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("save durability 0761");
+    let package = builder.build().unwrap();
 
     let reference = directory.path().join("reference.docx");
     package.save(&reference).unwrap();

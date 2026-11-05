@@ -7,40 +7,44 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{DocumentGenerator, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentGenerator, write::Writer};
 use std::borrow::Cow;
 use std::fs;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_unicode_generator_as_inert_provenance_and_round_trips() {
-    let document =
-        RtfDocument::parse(r"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}").unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "Visible");
     assert_eq!(document.generator().unwrap().value, "Acme 你 1.0");
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"{\*\generator Acme \u20320? 1.0;}"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.generator(), document.generator());
 }
 
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document
         .set_generator(DocumentGenerator::new(Cow::Borrowed("Litchi 1.0")).unwrap())
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.generator().unwrap().value, "Litchi 1.0");
     assert_eq!(reparsed.text(), "Body");
 
@@ -60,11 +64,14 @@ fn rejects_duplicate_or_active_generator_destinations() {
         r"{\rtf1{\*\generator\bin2 xx}Body}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 
     let oversized = format!(r"{{\rtf1{{\*\generator {};}}}}", "x".repeat(65_537));
-    assert!(RtfDocument::parse(&oversized).is_err());
+    assert!(Tree::parse(&oversized, litchi_rtf::read::OpenOptions::default()).is_err());
     assert!(DocumentGenerator::new(Cow::Borrowed("\n")).is_err());
 }
 
@@ -94,7 +101,7 @@ fn parses_bundled_libreoffice_generator_fixtures() {
     );
     for (fixture, expected_prefix) in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(
             document

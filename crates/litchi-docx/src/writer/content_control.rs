@@ -1,7 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 /// Content control writer support for DOCX documents.
 ///
 /// Content controls are structured document regions that can contain text, dates,
@@ -17,7 +13,7 @@ pub use crate::content_control::{Checksum, DataBinding, FormattingAllowed};
 /// Content controls provide structured editing regions with validation,
 /// data binding, and user interface enhancements.
 #[derive(Debug, Clone)]
-pub struct MutableContentControl {
+pub struct ContentControl {
     /// Control ID (unique within document)
     id: u32,
     /// Control tag (for programmatic identification)
@@ -66,7 +62,7 @@ pub enum ContentControlType {
     },
 }
 
-impl MutableContentControl {
+impl ContentControl {
     /// Create a new rich text content control.
     ///
     /// # Arguments
@@ -77,7 +73,7 @@ impl MutableContentControl {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// let control = MutableContentControl::rich_text(1, Some("CustomerName"));
+    /// let control = ContentControl::rich_text(1, Some("CustomerName"));
     /// ```
     #[must_use]
     pub fn rich_text(id: u32, tag: Option<&str>) -> Self {
@@ -135,7 +131,7 @@ impl MutableContentControl {
     ///     ("Green".to_string(), "green".to_string()),
     ///     ("Blue".to_string(), "blue".to_string()),
     /// ];
-    /// let control = MutableContentControl::dropdown(1, Some("Color"), items);
+    /// let control = ContentControl::dropdown(1, Some("Color"), items);
     /// ```
     #[must_use]
     pub fn dropdown(id: u32, tag: Option<&str>, items: Vec<(String, String)>) -> Self {
@@ -486,7 +482,7 @@ mod tests {
 
     #[test]
     fn test_rich_text_control() {
-        let control = MutableContentControl::rich_text(1, Some("TestTag"));
+        let control = ContentControl::rich_text(1, Some("TestTag"));
         assert_eq!(control.id(), 1);
         assert_eq!(control.tag(), Some("TestTag"));
         assert!(matches!(
@@ -497,7 +493,7 @@ mod tests {
 
     #[test]
     fn test_plain_text_control() {
-        let control = MutableContentControl::plain_text(2, None);
+        let control = ContentControl::plain_text(2, None);
         assert_eq!(control.id(), 2);
         assert_eq!(control.tag(), None);
         assert!(matches!(
@@ -512,7 +508,7 @@ mod tests {
             ("Option 1".to_string(), "opt1".to_string()),
             ("Option 2".to_string(), "opt2".to_string()),
         ];
-        let control = MutableContentControl::dropdown(3, Some("Dropdown"), items.clone());
+        let control = ContentControl::dropdown(3, Some("Dropdown"), items.clone());
         assert_eq!(control.id(), 3);
 
         if let ContentControlType::DropDownList { items: ctrl_items } = control.control_type() {
@@ -525,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_date_picker_control() {
-        let control = MutableContentControl::date_picker(4, None, "MM/dd/yyyy");
+        let control = ContentControl::date_picker(4, None, "MM/dd/yyyy");
         assert_eq!(control.id(), 4);
 
         if let ContentControlType::DatePicker { format } = control.control_type() {
@@ -537,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_checkbox_control() {
-        let control = MutableContentControl::checkbox(5, Some("Check"), true);
+        let control = ContentControl::checkbox(5, Some("Check"), true);
         assert_eq!(control.id(), 5);
 
         if let ContentControlType::Checkbox { checked } = control.control_type() {
@@ -549,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_xml_generation() {
-        let mut control = MutableContentControl::rich_text(1, Some("MyTag"));
+        let mut control = ContentControl::rich_text(1, Some("MyTag"));
         control.set_title(Some("My Control".to_string()));
 
         let xml = control.to_xml_start().unwrap();
@@ -571,7 +567,7 @@ mod tests {
             (false, false, Some("sdtContentLocked")),
         ];
         for (allow_delete, allow_edit, expected) in cases {
-            let mut control = MutableContentControl::plain_text(1, None);
+            let mut control = ContentControl::plain_text(1, None);
             control.set_allow_delete(allow_delete);
             control.set_allow_edit(allow_edit);
             let xml = control.to_xml_start().unwrap();
@@ -587,11 +583,11 @@ mod tests {
 
     #[test]
     fn generated_checkbox_round_trips_through_reader() {
-        let control = MutableContentControl::checkbox(5, Some("Check & Verify"), true);
+        let control = ContentControl::checkbox(5, Some("Check & Verify"), true);
         let xml = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}{}</w:document>"#,
             control.to_xml_start().unwrap(),
-            MutableContentControl::to_xml_end()
+            ContentControl::to_xml_end()
         );
         let parsed =
             crate::content_control::ContentControl::extract_from_document(xml.as_bytes()).unwrap();
@@ -610,8 +606,7 @@ mod tests {
             .with_prefix_mappings("xmlns:x='urn:example'")
             .unwrap()
             .with_checksum(checksum.clone());
-        let control =
-            MutableContentControl::plain_text(7, Some("bound")).with_data_binding(binding);
+        let control = ContentControl::plain_text(7, Some("bound")).with_data_binding(binding);
 
         let start = control.to_xml_start().unwrap();
         assert!(start.contains(r#"w16sdtdh:storeItemChecksum="TTwrGg==""#));
@@ -625,7 +620,7 @@ mod tests {
         let xml = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}{}</w:document>"#,
             start,
-            MutableContentControl::to_xml_end()
+            ContentControl::to_xml_end()
         );
         let reopened =
             crate::content_control::ContentControl::extract_from_document(xml.as_bytes()).unwrap();
@@ -639,14 +634,14 @@ mod tests {
 
     #[test]
     fn formatting_allowed_is_checked_and_reopens() {
-        let mut invalid = MutableContentControl::plain_text(8, None);
+        let mut invalid = ContentControl::plain_text(8, None);
         assert!(
             invalid
                 .set_formatting_allowed(Some(FormattingAllowed::Allowed))
                 .is_err()
         );
 
-        let mut control = MutableContentControl::plain_text(9, None);
+        let mut control = ContentControl::plain_text(9, None);
         control.set_allow_edit(false);
         control
             .set_formatting_allowed(Some(FormattingAllowed::Allowed))
@@ -660,7 +655,7 @@ mod tests {
         let xml = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}{}</w:document>"#,
             start,
-            MutableContentControl::to_xml_end()
+            ContentControl::to_xml_end()
         );
         let reopened =
             crate::content_control::ContentControl::extract_from_document(xml.as_bytes()).unwrap();
@@ -678,8 +673,7 @@ mod tests {
         let binding = DataBinding::new("/root/value", "{00112233-4455-6677-8899-AABBCCDDEEFF}")
             .unwrap()
             .with_checksum(Checksum::from_bytes([0, 0, 0, 0]));
-        let mut control =
-            MutableContentControl::checkbox(10, None, true).with_data_binding(binding);
+        let mut control = ContentControl::checkbox(10, None, true).with_data_binding(binding);
         control.set_allow_edit(false);
         control
             .set_formatting_allowed(Some(FormattingAllowed::Disallowed))
@@ -702,7 +696,7 @@ mod tests {
 
     #[test]
     fn word_2012_binding_without_checksum_reopens_with_its_flavor() {
-        let control = MutableContentControl::plain_text(11, Some("formatted"))
+        let control = ContentControl::plain_text(11, Some("formatted"))
             .with_word_2012_binding("/root/value", "{00112233-4455-6677-8899-AABBCCDDEEFF}")
             .unwrap();
         let start = control.to_xml_start().unwrap();
@@ -713,7 +707,7 @@ mod tests {
         let xml = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}{}</w:document>"#,
             start,
-            MutableContentControl::to_xml_end()
+            ContentControl::to_xml_end()
         );
         let reopened =
             crate::content_control::ContentControl::extract_from_document(xml.as_bytes()).unwrap();
@@ -730,8 +724,7 @@ mod tests {
             DataBinding::word_2012("/root/value", "{00112233-4455-6677-8899-AABBCCDDEEFF}")
                 .unwrap()
                 .with_checksum(checksum.clone());
-        let control =
-            MutableContentControl::plain_text(12, Some("formatted")).with_data_binding(binding);
+        let control = ContentControl::plain_text(12, Some("formatted")).with_data_binding(binding);
         let start = control.to_xml_start().unwrap();
         assert!(start.contains("<w15:dataBinding"));
         assert!(start.contains(r#"mc:Ignorable="w15 w16sdtdh""#));
@@ -740,7 +733,7 @@ mod tests {
         let xml = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}{}</w:document>"#,
             start,
-            MutableContentControl::to_xml_end()
+            ContentControl::to_xml_end()
         );
         let reopened =
             crate::content_control::ContentControl::extract_from_document(xml.as_bytes()).unwrap();
@@ -757,11 +750,11 @@ mod tests {
 
     #[test]
     fn legacy_placeholder_text_refuses_and_explicit_reference_authors() {
-        let mut legacy = MutableContentControl::plain_text(13, None);
+        let mut legacy = ContentControl::plain_text(13, None);
         legacy.set_placeholder(Some("literal text".to_owned()));
         assert!(legacy.to_xml_start().is_err());
 
-        let explicit = MutableContentControl::plain_text(14, None)
+        let explicit = ContentControl::plain_text(14, None)
             .with_placeholder_doc_part("DefaultPlaceholder_22675703")
             .unwrap();
         assert!(explicit.to_xml_start().unwrap().contains(
@@ -771,10 +764,10 @@ mod tests {
 
     #[test]
     fn writer_rejects_invalid_scalars_dates_and_list_quota() {
-        let invalid = MutableContentControl::plain_text(15, Some("bad\u{1}tag"));
+        let invalid = ContentControl::plain_text(15, Some("bad\u{1}tag"));
         assert!(invalid.to_xml_start().is_err());
 
-        let mut date = MutableContentControl::date_picker(16, None, "yyyy-MM-dd");
+        let mut date = ContentControl::date_picker(16, None, "yyyy-MM-dd");
         date.set_date_value(Some("2026-02-30T04:05:06Z".to_owned()))
             .unwrap();
         assert!(date.to_xml_start().is_err());
@@ -782,7 +775,7 @@ mod tests {
         let items = (0..=Limits::default().max_list_items_per_control)
             .map(|index| (index.to_string(), index.to_string()))
             .collect();
-        let oversized = MutableContentControl::dropdown(17, None, items);
+        let oversized = ContentControl::dropdown(17, None, items);
         assert!(oversized.to_xml_start().is_err());
     }
 }

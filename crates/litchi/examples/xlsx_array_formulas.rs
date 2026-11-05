@@ -11,7 +11,7 @@
 //! - Selecting C2 shows an array/dynamic array formula in the formula bar
 //!   (e.g., `{=A2:A4*B2:B4}` in older Excel, or a spilled formula in newer Excel).
 
-use litchi::xlsx::{Formula, Workbook};
+use litchi::xlsx::{Formula, Package};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Creating XLSX with array formulas: {}", output);
 
     // Create a new workbook and use the default first worksheet.
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
     {
         edit.tab(0)?
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         ws.set("B6", Formula::new("SUM(C2:C4)")?)?;
     }
 
-    edit.commit()?.into_workbook().save(output)?;
+    edit.commit()?.into_package().save(output)?;
 
     println!("Saved array formula example to: {}", output);
     println!("Open it in Excel and:");

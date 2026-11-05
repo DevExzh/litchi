@@ -1,10 +1,40 @@
-use litchi_drawingml::svg_blip::{
-    Attribute, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS, MAX_RELATIONSHIP_ID_BYTES, NAMESPACE,
-    Namespace, NamespaceContext, RELATIONSHIP_NAMESPACE, Reference, RelationshipId, SvgBlip,
-    XML_NAMESPACE, read, read_contextual, write, write_contextual, write_contextual_to,
+use litchi_drawingml::{
+    LimitKind,
+    svg_blip::{
+        Attribute, Limits, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS,
+        MAX_RELATIONSHIP_ID_BYTES, MAX_XML_BYTES, NAMESPACE, Namespace, NamespaceContext,
+        RELATIONSHIP_NAMESPACE, Reference, RelationshipId, SvgBlip, ValueError, XML_NAMESPACE,
+        read as read_with_policy, read_contextual as read_contextual_with_policy,
+        write as write_with_policy, write_contextual as write_contextual_with_policy,
+        write_contextual_to as write_contextual_to_with_policy,
+    },
 };
 
 const SVG_BLIP: &[u8] = br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:future="urn:example:future" r:embed="rIdSvg" future:mode="preserve"><future:payload data="x"/></asvg:svgBlip>"#;
+
+fn read(xml: &[u8]) -> litchi_drawingml::Result<SvgBlip> {
+    read_with_policy(xml, Limits::DEFAULT)
+}
+
+fn write(value: &SvgBlip) -> litchi_drawingml::Result<Vec<u8>> {
+    write_with_policy(value, Limits::DEFAULT)
+}
+
+fn read_contextual(xml: &[u8], context: &NamespaceContext) -> litchi_drawingml::Result<SvgBlip> {
+    read_contextual_with_policy(xml, context, Limits::DEFAULT)
+}
+
+fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> litchi_drawingml::Result<Vec<u8>> {
+    write_contextual_with_policy(value, Limits::new(MAX_XML_BYTES, max_output_bytes))
+}
+
+fn write_contextual_to<W: std::io::Write>(
+    writer: &mut W,
+    value: &SvgBlip,
+    max_output_bytes: usize,
+) -> litchi_drawingml::Result<()> {
+    write_contextual_to_with_policy(writer, value, Limits::new(MAX_XML_BYTES, max_output_bytes))
+}
 
 #[test]
 fn reads_typed_relationship_and_preserves_unknown_markup() {
@@ -38,6 +68,18 @@ fn standalone_reads_keep_source_equality_and_exact_write() {
     assert_eq!(first, second);
     assert_eq!(first.source(), Some(SVG_BLIP));
     assert_eq!(write(&first).unwrap(), SVG_BLIP);
+}
+
+#[test]
+fn unchanged_contextual_write_preserves_raw_source() {
+    let source = format!(r#"<svgBlip xmlns="{NAMESPACE}"/>"#);
+    let value = read_contextual(source.as_bytes(), &NamespaceContext::empty())
+        .expect("contextual SVG blip");
+    assert_eq!(value.source(), None);
+    assert_eq!(
+        write(&value).expect("contextual source write"),
+        source.as_bytes()
+    );
 }
 
 #[test]
@@ -75,6 +117,29 @@ fn rejects_invalid_root_and_relationship_values() {
 }
 
 #[test]
+fn scalar_constructor_bounds_keep_typed_limit_dimensions() {
+    let relationship_id = "r".repeat(MAX_RELATIONSHIP_ID_BYTES + 1);
+    assert!(matches!(
+        RelationshipId::new(&relationship_id),
+        Err(ValueError::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            observed,
+            maximum: MAX_RELATIONSHIP_ID_BYTES,
+        }) if observed == relationship_id.len()
+    ));
+
+    let attribute_value = "x".repeat(litchi_drawingml::svg_blip::MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    assert!(matches!(
+        Attribute::new("future:value", &attribute_value),
+        Err(ValueError::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            observed,
+            maximum: litchi_drawingml::svg_blip::MAX_ATTRIBUTE_VALUE_BYTES,
+        }) if observed == attribute_value.len()
+    ));
+}
+
+#[test]
 fn constructs_empty_svg_blip_with_typed_reference() {
     let reference = Reference::embedded("rId1").expect("relationship ID");
     let value = SvgBlip::new(reference).expect("valid SVG blip");
@@ -85,6 +150,20 @@ fn constructs_empty_svg_blip_with_typed_reference() {
             .windows(b"r:embed=\"rId1\"".len())
             .any(|window| window == b"r:embed=\"rId1\"")
     );
+}
+
+#[test]
+fn canonical_output_reports_the_active_limit() {
+    let value = SvgBlip::new(Reference::embedded("rId1").expect("relationship ID"))
+        .expect("valid SVG blip");
+    assert!(matches!(
+        write_contextual(&value, 1),
+        Err(litchi_drawingml::Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed,
+            maximum: 1,
+        }) if observed > 1
+    ));
 }
 
 #[test]
@@ -370,9 +449,10 @@ fn is_declaration_limit(error: &litchi_drawingml::Error) -> bool {
     matches!(
         error,
         litchi_drawingml::Error::Limit {
-            resource: "SVG blip namespace declarations",
-            limit,
-        } if *limit == MAX_NAMESPACE_DECLARATIONS
+            kind: LimitKind::NamespaceDeclarations,
+            maximum,
+            ..
+        } if *maximum == MAX_NAMESPACE_DECLARATIONS
     )
 }
 

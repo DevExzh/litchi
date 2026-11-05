@@ -11,29 +11,15 @@
 
 pub(crate) mod budget;
 mod codec;
-#[path = "scalar_edit.rs"]
-mod edit;
 mod mirror;
 mod model;
 mod owner;
+#[path = "scalar_edit.rs"]
+pub mod source;
 
 pub use codec::{
-    SourceProperties, SourceView, SourceWritable, insert_item, inspect, inspect_with_limits, parse,
-    parse_with_limits, remove_item, replace_items, replace_scalar, set_scalar, write,
-    write_with_limits,
-};
-pub use edit::{
-    FormControlCommit, FormControlPatch, FormControlSnapshot, FormControlSourceEdit,
-    SourceBackedFormControlEditor,
-};
-#[allow(
-    unused_imports,
-    reason = "ordinary worksheet staging consumes this preflight hook"
-)]
-pub(crate) use edit::{
-    FormControlScalarAction, OrdinaryFormControlOverlay, OwnedSelector,
-    ordinary_form_control_overlays, owned_selector, validate_ordinary_form_control_candidate,
-    validate_ordinary_form_control_selector, validate_scalar_operation_count,
+    SourceProperties, SourceView, SourceWritable, insert_item, inspect, parse, remove_item,
+    replace_items, replace_scalar, write,
 };
 pub(crate) use mirror::{ClientDataSource, MirrorLimits, replace_scalar_pair_with_limits};
 pub use model::{
@@ -42,6 +28,7 @@ pub use model::{
     OpaqueAttribute, OpaqueXml, Properties, ScalarField, ScalarValue, SelectionType, TextHAlign,
     TextVAlign,
 };
+pub(crate) use owner::owner_to_xlsx;
 pub use owner::{
     FormControlCollection, FormControlDiagnostic, FormControlDiagnosticCode, FormControlOwnerError,
     FormControlPartRead, FormControlReadSet, FormControlView, MceProvenance, OwnerLimits,
@@ -49,10 +36,17 @@ pub use owner::{
 };
 pub(crate) use owner::{
     eager_form_controls_for_effective_topology, eager_form_controls_for_sheet_with_limits,
-    read_set_matches_package_except, source_form_controls_for_sheet_with_limits,
+    source_form_controls_for_sheet_with_limits,
 };
-pub(crate) use owner::{
-    eager_form_controls_for_sheet, owner_to_xlsx, source_form_controls_for_sheet,
+pub use source::FormControlSnapshot;
+#[allow(
+    unused_imports,
+    reason = "ordinary worksheet staging consumes this preflight hook"
+)]
+pub(crate) use source::{
+    FormControlScalarAction, OrdinaryFormControlOverlay, OwnedSelector,
+    ordinary_form_control_overlays, owned_selector, validate_ordinary_form_control_candidate,
+    validate_ordinary_form_control_selector, validate_scalar_operation_count,
 };
 
 /// The Office 2010 SpreadsheetML form-control-properties namespace.
@@ -84,6 +78,23 @@ pub const MAX_ATTRIBUTES: usize = 256;
 pub const MAX_OPAQUE_BYTES: usize = 16 * 1024 * 1024;
 /// The maximum aggregate bytes retained by one parsed/detached model.
 pub const MAX_RETAINED_BYTES: usize = MAX_PART_BYTES + MAX_OPAQUE_BYTES;
+
+crate::record::limit_kinds!("form-control", FormControl {
+    PartBytes => "form-control source part bytes",
+    OutputBytes => "form-control generated output bytes",
+    XmlDepth => "form-control XML depth",
+    XmlEvents => "form-control XML events",
+    Items => "form-control items",
+    Attributes => "form-control XML attributes",
+    ItemValueBytes => "form-control item value bytes",
+    FormulaBytes => "form-control formula bytes",
+    OpaqueBytes => "form-control opaque bytes",
+    StringBytes => "form-control string bytes",
+    NamespaceBytes => "form-control namespace bytes",
+    RetainedBytes => "form-control retained bytes",
+    TemporaryBytes => "form-control temporary bytes",
+    ScratchBytes => "form-control scratch bytes",
+});
 
 /// A bounded local policy for this leaf XML codec.
 ///
@@ -247,10 +258,10 @@ pub enum FormControlError {
     #[error("invalid form-control properties: {0}")]
     Invalid(String),
     /// The source or candidate exceeds one of the retained safety ceilings.
-    #[error("form-control properties {resource} exceeds {maximum} (observed {observed})")]
+    #[error("form-control properties {kind} exceeds {maximum} (observed {observed})")]
     Limit {
-        /// Bounded resource name.
-        resource: &'static str,
+        /// The typed bounded dimension.
+        kind: LimitKind,
         /// Observed resource use.
         observed: usize,
         /// Caller/effective maximum.
@@ -274,9 +285,9 @@ pub(crate) fn invalid(message: impl Into<String>) -> FormControlError {
     FormControlError::Invalid(message.into())
 }
 
-pub(crate) fn limit(resource: &'static str, observed: usize, maximum: usize) -> FormControlError {
+pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> FormControlError {
     FormControlError::Limit {
-        resource,
+        kind,
         observed,
         maximum,
     }

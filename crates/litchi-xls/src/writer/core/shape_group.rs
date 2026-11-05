@@ -136,7 +136,7 @@ mod tests {
     use std::panic::catch_unwind;
 
     fn anchor() -> Anchor {
-        Anchor::cells(0, 0, 8, 5, super::super::shape::Behavior::MoveAndSize).unwrap()
+        Anchor::cells(0, 0, 8, 5, crate::AnchorBehavior::Absolute).unwrap()
     }
 
     #[test]

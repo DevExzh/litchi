@@ -1,5 +1,7 @@
 //! Human-readable and checked positional selectors for Numbers objects.
 
+use litchi_core::Position;
+
 /// Selects one sheet by its exact visible name or checked zero-based document
 /// position without allocating for the selector itself.
 #[allow(
@@ -7,11 +9,12 @@
     reason = "The public selector names intentionally identify their selected Numbers object."
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum SheetSelector<'a> {
     /// Select by the exact name shown by Numbers.
     Name(&'a str),
     /// Select by zero-based position in stable document order.
-    Index(usize),
+    Position(Position),
 }
 
 impl<'a> SheetSelector<'a> {
@@ -24,13 +27,13 @@ impl<'a> SheetSelector<'a> {
     /// Creates a checked zero-based sheet selector.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(index)
+        Self::Position(Position::new(index))
     }
 
     /// Creates a selector from a typed zero-based collection position.
     #[must_use]
-    pub const fn position(position: litchi_core::Position) -> Self {
-        Self::index(position.get())
+    pub const fn position(position: Position) -> Self {
+        Self::Position(position)
     }
 
     /// Borrows the selected exact name, if present.
@@ -38,25 +41,16 @@ impl<'a> SheetSelector<'a> {
     pub const fn as_name(self) -> Option<&'a str> {
         match self {
             Self::Name(name) => Some(name),
-            Self::Index(_) => None,
-        }
-    }
-
-    /// Returns the selected zero-based index, if present.
-    #[must_use]
-    pub const fn as_index(self) -> Option<usize> {
-        match self {
-            Self::Name(_) => None,
-            Self::Index(index) => Some(index),
+            Self::Position(_) => None,
         }
     }
 
     /// Returns the selected typed zero-based collection position, if present.
     #[must_use]
-    pub const fn as_position(self) -> Option<litchi_core::Position> {
+    pub const fn as_position(self) -> Option<Position> {
         match self {
             Self::Name(_) => None,
-            Self::Index(index) => Some(litchi_core::Position::new(index)),
+            Self::Position(position) => Some(position),
         }
     }
 }
@@ -79,8 +73,8 @@ impl From<usize> for SheetSelector<'_> {
     }
 }
 
-impl From<litchi_core::Position> for SheetSelector<'_> {
-    fn from(position: litchi_core::Position) -> Self {
+impl From<Position> for SheetSelector<'_> {
+    fn from(position: Position) -> Self {
         Self::position(position)
     }
 }
@@ -100,34 +94,28 @@ impl From<litchi_core::Position> for SheetSelector<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChartSelector {
     /// Select by zero-based source-order position among ordinary charts.
-    Index(usize),
+    Position(Position),
 }
 
 impl ChartSelector {
     /// Creates a checked zero-based chart selector.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(index)
+        Self::Position(Position::new(index))
     }
 
     /// Creates a selector from a typed zero-based collection position.
     #[must_use]
-    pub const fn position(position: litchi_core::Position) -> Self {
-        Self::index(position.get())
-    }
-
-    /// Returns the selected zero-based index.
-    #[must_use]
-    pub const fn as_index(self) -> usize {
-        match self {
-            Self::Index(index) => index,
-        }
+    pub const fn position(position: Position) -> Self {
+        Self::Position(position)
     }
 
     /// Returns the selected typed zero-based collection position.
     #[must_use]
-    pub const fn as_position(self) -> litchi_core::Position {
-        litchi_core::Position::new(self.as_index())
+    pub const fn as_position(self) -> Position {
+        match self {
+            Self::Position(position) => position,
+        }
     }
 }
 
@@ -137,8 +125,8 @@ impl From<usize> for ChartSelector {
     }
 }
 
-impl From<litchi_core::Position> for ChartSelector {
-    fn from(position: litchi_core::Position) -> Self {
+impl From<Position> for ChartSelector {
+    fn from(position: Position) -> Self {
         Self::position(position)
     }
 }
@@ -150,11 +138,12 @@ impl From<litchi_core::Position> for ChartSelector {
     reason = "The public selector names intentionally identify their selected Numbers object."
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum TableSelector<'a> {
     /// Select by the exact name shown by Numbers.
     Name(&'a str),
     /// Select by zero-based position in stable sheet table order.
-    Index(usize),
+    Position(Position),
 }
 
 impl<'a> TableSelector<'a> {
@@ -167,13 +156,13 @@ impl<'a> TableSelector<'a> {
     /// Creates a checked zero-based table selector.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(index)
+        Self::Position(Position::new(index))
     }
 
     /// Creates a selector from a typed zero-based collection position.
     #[must_use]
-    pub const fn position(position: litchi_core::Position) -> Self {
-        Self::index(position.get())
+    pub const fn position(position: Position) -> Self {
+        Self::Position(position)
     }
 
     /// Borrows the selected exact name, if present.
@@ -181,25 +170,16 @@ impl<'a> TableSelector<'a> {
     pub const fn as_name(self) -> Option<&'a str> {
         match self {
             Self::Name(name) => Some(name),
-            Self::Index(_) => None,
-        }
-    }
-
-    /// Returns the selected zero-based index, if present.
-    #[must_use]
-    pub const fn as_index(self) -> Option<usize> {
-        match self {
-            Self::Name(_) => None,
-            Self::Index(index) => Some(index),
+            Self::Position(_) => None,
         }
     }
 
     /// Returns the selected typed zero-based collection position, if present.
     #[must_use]
-    pub const fn as_position(self) -> Option<litchi_core::Position> {
+    pub const fn as_position(self) -> Option<Position> {
         match self {
             Self::Name(_) => None,
-            Self::Index(index) => Some(litchi_core::Position::new(index)),
+            Self::Position(position) => Some(position),
         }
     }
 }
@@ -222,9 +202,98 @@ impl From<usize> for TableSelector<'_> {
     }
 }
 
-impl From<litchi_core::Position> for TableSelector<'_> {
-    fn from(position: litchi_core::Position) -> Self {
+impl From<Position> for TableSelector<'_> {
+    fn from(position: Position) -> Self {
         Self::position(position)
+    }
+}
+
+/// An owned sheet selector retained by a deferred edit entry.
+///
+/// Name selectors are copied once at the API boundary so the edit can defer
+/// package-owned catalog resolution without borrowing a caller-owned string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OwnedSheetSelector {
+    Name(Box<str>),
+    Position(Position),
+}
+
+impl OwnedSheetSelector {
+    pub(crate) fn name_bytes(selector: SheetSelector<'_>) -> Option<usize> {
+        match selector {
+            SheetSelector::Name(name) => Some(name.len()),
+            SheetSelector::Position(_) => None,
+        }
+    }
+
+    pub(crate) fn try_from(
+        selector: SheetSelector<'_>,
+        maximum_name_bytes: usize,
+    ) -> Result<Self, usize> {
+        match selector {
+            SheetSelector::Name(name) => {
+                if name.len() > maximum_name_bytes {
+                    return Err(name.len());
+                }
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|_| name.len())?;
+                owned.push_str(name);
+                Ok(Self::Name(owned.into_boxed_str()))
+            },
+            SheetSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> SheetSelector<'_> {
+        match self {
+            Self::Name(name) => SheetSelector::Name(name.as_ref()),
+            Self::Position(position) => SheetSelector::Position(*position),
+        }
+    }
+}
+
+/// An owned table selector retained by a deferred edit entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OwnedTableSelector {
+    Name(Box<str>),
+    Position(Position),
+}
+
+impl OwnedTableSelector {
+    pub(crate) fn name_bytes(selector: TableSelector<'_>) -> Option<usize> {
+        match selector {
+            TableSelector::Name(name) => Some(name.len()),
+            TableSelector::Position(_) => None,
+        }
+    }
+
+    pub(crate) fn try_from(
+        selector: TableSelector<'_>,
+        maximum_name_bytes: usize,
+    ) -> Result<Self, usize> {
+        match selector {
+            TableSelector::Name(name) => {
+                if name.len() > maximum_name_bytes {
+                    return Err(name.len());
+                }
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|_| name.len())?;
+                owned.push_str(name);
+                Ok(Self::Name(owned.into_boxed_str()))
+            },
+            TableSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> TableSelector<'_> {
+        match self {
+            Self::Name(name) => TableSelector::Name(name.as_ref()),
+            Self::Position(position) => TableSelector::Position(*position),
+        }
     }
 }
 
@@ -238,8 +307,14 @@ mod tests {
             SheetSelector::name("Summary"),
             SheetSelector::Name("Summary")
         );
-        assert_eq!(SheetSelector::index(1), SheetSelector::Index(1));
-        assert_eq!(ChartSelector::index(2), ChartSelector::Index(2));
+        assert_eq!(
+            SheetSelector::index(1),
+            SheetSelector::Position(Position::new(1))
+        );
+        assert_eq!(
+            ChartSelector::index(2),
+            ChartSelector::Position(Position::new(2))
+        );
     }
 
     #[test]
@@ -248,7 +323,10 @@ mod tests {
             TableSelector::name("Revenue"),
             TableSelector::Name("Revenue")
         );
-        assert_eq!(TableSelector::index(2), TableSelector::Index(2));
+        assert_eq!(
+            TableSelector::index(2),
+            TableSelector::Position(Position::new(2))
+        );
     }
 
     #[test]
@@ -258,9 +336,9 @@ mod tests {
         let table: TableSelector<'_> = "Revenue".into();
         let table_index: TableSelector<'_> = 2.into();
         assert_eq!(sheet, SheetSelector::Name("Summary"));
-        assert_eq!(sheet_index, SheetSelector::Index(1));
+        assert_eq!(sheet_index, SheetSelector::Position(Position::new(1)));
         assert_eq!(table, TableSelector::Name("Revenue"));
-        assert_eq!(table_index, TableSelector::Index(2));
+        assert_eq!(table_index, TableSelector::Position(Position::new(2)));
     }
 
     #[test]
@@ -276,16 +354,14 @@ mod tests {
 
     #[test]
     fn selectors_expose_typed_position_and_variant_accessors() {
-        let position = litchi_core::Position::new(3);
+        let position = Position::new(3);
         let sheet = SheetSelector::position(position);
         let table = TableSelector::position(position);
 
-        assert_eq!(sheet, SheetSelector::Index(3));
-        assert_eq!(sheet.as_index(), Some(3));
+        assert_eq!(sheet, SheetSelector::Position(Position::new(3)));
         assert_eq!(sheet.as_position(), Some(position));
         assert_eq!(sheet.as_name(), None);
-        assert_eq!(table, TableSelector::Index(3));
-        assert_eq!(table.as_index(), Some(3));
+        assert_eq!(table, TableSelector::Position(Position::new(3)));
         assert_eq!(table.as_position(), Some(position));
         assert_eq!(table.as_name(), None);
     }
@@ -296,22 +372,38 @@ mod tests {
         let table = TableSelector::name("Revenue");
 
         assert_eq!(sheet.as_name(), Some("Summary"));
-        assert_eq!(sheet.as_index(), None);
         assert_eq!(sheet.as_position(), None);
         assert_eq!(table.as_name(), Some("Revenue"));
-        assert_eq!(table.as_index(), None);
         assert_eq!(table.as_position(), None);
     }
 
     #[test]
     fn core_positions_convert_without_changing_selector_variants() {
-        let position = litchi_core::Position::new(7);
+        let position = Position::new(7);
         let sheet: SheetSelector<'_> = position.into();
         let table: TableSelector<'_> = position.into();
         let chart: ChartSelector = position.into();
 
-        assert_eq!(sheet, SheetSelector::Index(7));
-        assert_eq!(table, TableSelector::Index(7));
-        assert_eq!(chart, ChartSelector::Index(7));
+        assert_eq!(sheet, SheetSelector::Position(Position::new(7)));
+        assert_eq!(table, TableSelector::Position(Position::new(7)));
+        assert_eq!(chart, ChartSelector::Position(Position::new(7)));
+    }
+
+    #[test]
+    fn owned_names_require_admitted_bytes_before_copying() {
+        let sheet = SheetSelector::name("Summary");
+        let table = TableSelector::name("Revenue");
+        assert_eq!(OwnedSheetSelector::name_bytes(sheet), Some(7));
+        assert_eq!(OwnedTableSelector::name_bytes(table), Some(7));
+        assert_eq!(OwnedSheetSelector::try_from(sheet, 6), Err("Summary".len()));
+        assert_eq!(OwnedTableSelector::try_from(table, 6), Err("Revenue".len()));
+        assert!(matches!(
+            OwnedSheetSelector::try_from(sheet, 7),
+            Ok(OwnedSheetSelector::Name(_))
+        ));
+        assert!(matches!(
+            OwnedTableSelector::try_from(table, 7),
+            Ok(OwnedTableSelector::Name(_))
+        ));
     }
 }

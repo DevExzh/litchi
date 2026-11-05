@@ -161,6 +161,13 @@ impl<'a> Paragraph<'a> {
         self.end.saturating_sub(self.start)
     }
 
+    /// UTF-8 byte range of this paragraph within its story text, excluding
+    /// the terminating paragraph break.
+    #[must_use]
+    pub const fn text_range(self) -> core::ops::Range<usize> {
+        self.start..self.end
+    }
+
     /// Whether the paragraph has no retained text or inline line breaks.
     #[must_use]
     pub const fn is_empty(self) -> bool {
@@ -738,6 +745,15 @@ impl<'a> Format<'a> {
     pub const fn direction(self) -> Option<TextDirection> {
         self.raw.direction
     }
+
+    /// Applied character-style handle (`\csN`), if authored.
+    ///
+    /// Resolve the handle against [`crate::Package::styles`] by
+    /// [`crate::style::Style::id`].
+    #[must_use]
+    pub const fn character_style(self) -> Option<u16> {
+        self.raw.character_style
+    }
 }
 
 /// Read-only local paragraph formatting.
@@ -755,6 +771,13 @@ impl<'a> ParagraphFormat<'a> {
     #[must_use]
     pub fn layout(self) -> crate::edit::ParagraphLayout {
         crate::edit::ParagraphLayout::from_raw(self.raw)
+    }
+
+    /// Custom tab stops in declaration order (`\\txN` with its alignment
+    /// and leader controls, record 0328).
+    #[must_use]
+    pub fn tab_stops(self) -> &'a [crate::TabStop] {
+        self.raw.tab_stops.as_slice()
     }
 
     /// Local paragraph alignment.
@@ -803,6 +826,27 @@ impl<'a> ParagraphFormat<'a> {
     #[must_use]
     pub const fn outline_level(self) -> Option<u8> {
         self.raw.outline_level
+    }
+
+    /// Applied paragraph-style handle (`\sN`), if authored.
+    ///
+    /// Resolve the handle against [`crate::Package::styles`] by
+    /// [`crate::style::Style::id`].
+    #[must_use]
+    pub const fn style(self) -> Option<u16> {
+        self.raw.paragraph_style
+    }
+
+    /// Applied list-override index (`\lsN`), if the paragraph is numbered.
+    #[must_use]
+    pub const fn list_override(self) -> Option<i32> {
+        self.raw.list_override
+    }
+
+    /// Zero-based list level (`\ilvlN`), if authored.
+    #[must_use]
+    pub const fn list_level(self) -> Option<u8> {
+        self.raw.list_level
     }
 
     /// Positioned paragraph frame controls, when this paragraph has a frame.

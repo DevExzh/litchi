@@ -1,0 +1,17 @@
+[
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v2/abort.json",
+    "bytes": 276,
+    "sha256": "74445f7495e95d16c49440d31b12dd2e766edcc7bb5cd27f32362dede822ceaf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v2/calibration-before-before.host.json",
+    "bytes": 55598,
+    "sha256": "fe91cf2ab18776258bc6c4b30e746d9cf65590d8f1bf6515e0225a658e55f2f1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v2/measurements.json",
+    "bytes": 2605,
+    "sha256": "f06ffe5c60309bb76bb85b0524c5abce0967c1503c23ff09a3dcef705826a592"
+  }
+]

@@ -13,14 +13,12 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
-use litchi_numbers::CellPosition;
+use litchi_numbers::At;
 use litchi_numbers::cell::data_format::control::{
     CellControl, DisplayFormat, Range, Slider, Stepper,
 };
 use litchi_numbers::cell::data_format::{Checkbox, Number, PopUpMenu, StarRating};
-use litchi_numbers::{
-    Package, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -160,6 +158,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -250,18 +249,20 @@ fn cell_for_control(
     if let Some(scalar) = scalar {
         cell.set_number(scalar)?;
     }
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn empty_cell() -> Vec<u8> {
-    BncCell::minimal().encode()
+    BncCell::minimal()
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap()
 }
 
 fn number_cell(value: f64) -> TestResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_data_format_identifier(1, CellDataFormatKind::NumberOrPercentage, None)?;
     cell.set_number(value)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn pack_row(cells: Vec<Vec<u8>>) -> (Vec<u8>, Vec<u8>) {
@@ -441,7 +442,7 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         });
     }
-    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     if let Some(index) = control_index
         && matches!(mode, FixtureMode::Mixed)
     {
@@ -451,7 +452,12 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
             .get_mut(index)
             .ok_or_else(|| io::Error::other("control message metadata is missing"))?;
         info.object_references = vec![CONTROL_MODEL_ID];
-        let mut field = FieldInfo::new(vec![3, 5]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![3, 5], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![CONTROL_MODEL_ID];
         info.field_infos.push(field);
@@ -544,15 +550,28 @@ fn metadata(mode: FixtureMode) -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xfeed_beef)?;
     Ok(data)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
@@ -590,7 +609,11 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
     info.archive_info.message_infos[0].object_references = vec![TABLE_MODEL_ID];
     let mut model = object(TABLE_MODEL_ID, 6_001, table_model().encode_to_vec())?;
     model.archive_info.message_infos[0].object_references = vec![SIDECAR_ID, TILE_ID];
-    let mut unknown = FieldInfo::new(vec![99, 1]);
+    let mut unknown = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     unknown.data_references = vec![700];
     model.archive_info.message_infos[0]
         .field_infos
@@ -711,7 +734,7 @@ fn split_component_fixture() -> TestResult<Vec<u8>> {
     let format_member = compressed(vec![format_sidecar])?;
     let control_member = compressed(vec![control_sidecar])?;
     let popup_member = compressed(vec![popup])?;
-    let view_member = Catalog::from_bytes(&source)?
+    let view_member = Catalog::from_bytes(&source, Default::default())?
         .iter()
         .find(|entry| entry.name() == VIEW_STATE_MEMBER)
         .ok_or_else(|| io::Error::other("ViewState member is missing"))?
@@ -856,7 +879,7 @@ fn object_with_messages_with_identifier(
                 .ok_or_else(|| io::Error::other("sidecar message is missing"))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mut object = ArchiveObject::new(identifier, messages)?;
+    let mut object = ArchiveObject::new(identifier, messages, Default::default())?;
     object.archive_info = source.archive_info.clone();
     object.archive_info.identifier = Some(identifier);
     object.archive_info.message_infos = indices
@@ -955,21 +978,32 @@ fn split_metadata_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     for component in [document, calculation, tile, format, control, popup, view] {
-        append_length_delimited_field(&mut data, 3, &component)?;
+        append_length_delimited_field(
+            &mut data,
+            3,
+            &component,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xfeed_beef)?;
     Ok(data)
 }
 
 fn member_archive(source: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -978,14 +1012,18 @@ fn rewrite_member(
     member: &str,
     mut rewrite: impl FnMut(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     rewrite(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member,
@@ -1101,7 +1139,7 @@ fn rewrite_control_info(
     source: &[u8],
     mut rewrite: impl FnMut(&mut litchi_iwa_core::MessageInfo) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let split = catalog.iter().any(|entry| entry.name() == CONTROL_MEMBER);
     let (member, object_identifier) = if split {
         (CONTROL_MEMBER, CONTROL_LIST_ID)
@@ -1138,10 +1176,18 @@ fn with_split_popup_control_metadata_corruption(
     corruption: SplitPopupControlMetadataCorruption,
 ) -> TestResult<Vec<u8>> {
     rewrite_control_info(source, |info| {
-        let mut field = FieldInfo::new(match corruption {
-            SplitPopupControlMetadataCorruption::DuplicateField => vec![3, 5],
-            SplitPopupControlMetadataCorruption::WrongPath => vec![3, 6],
-        });
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                match corruption {
+                    SplitPopupControlMetadataCorruption::DuplicateField => vec![3, 5],
+                    SplitPopupControlMetadataCorruption::WrongPath => vec![3, 6],
+                },
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![CONTROL_MODEL_ID];
         match corruption {
@@ -1248,8 +1294,8 @@ fn assert_control_metadata_exact(source: &[u8]) -> TestResult {
 }
 
 fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let other = after
@@ -1436,8 +1482,8 @@ fn assert_split_scalar_locality(source: &[u8], target: &[u8], changed: &[String]
             "split scalar edit did not touch required member {required}"
         );
     }
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [
         DOCUMENT_MEMBER,
         CALCULATION_MEMBER,
@@ -1464,11 +1510,14 @@ fn assert_split_scalar_locality(source: &[u8], target: &[u8], changed: &[String]
 
 fn split_popup_model_ids(source: &[u8]) -> TestResult<Vec<u64>> {
     let mut identifiers = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         identifiers.extend(
             archive
                 .objects
@@ -1482,21 +1531,28 @@ fn split_popup_model_ids(source: &[u8]) -> TestResult<Vec<u64>> {
 
 fn split_max_iwa_stream_bytes(source: &[u8]) -> TestResult<usize> {
     let mut maximum = 0;
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        maximum = maximum.max(SnappyStream::decompress(entry.data())?.as_bytes().len());
+        maximum = maximum.max(
+            SnappyStream::decompress(entry.data(), Default::default())?
+                .as_bytes()
+                .len(),
+        );
     }
     Ok(maximum)
 }
 
 fn split_popup_model_member(source: &[u8], identifier: u64) -> TestResult<&'static str> {
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         if archive.objects.iter().any(|object| {
             object.archive_info.identifier == Some(identifier)
                 && object.messages.iter().any(|message| message.type_ == 6_206)
@@ -1680,8 +1736,8 @@ fn assert_split_popup_locality(
             "split popup reuse unexpectedly rewrote the popup model member",
         );
     }
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [
         DOCUMENT_MEMBER,
         CALCULATION_MEMBER,
@@ -1767,8 +1823,8 @@ fn rewrite_split_list(
 }
 
 fn assert_previews_invalidated(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(before.iter().any(|entry| entry.name() == name));
         assert!(after.iter().all(|entry| entry.name() != name));
@@ -1785,7 +1841,7 @@ fn assert_changed_edit_rejects(source: &[u8], label: &str) -> TestResult {
     let edit = match package.edit_table_cell_control_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => return Ok(()),
         Ok(edit) => edit,
@@ -1808,7 +1864,7 @@ fn assert_read_rejects(source: &[u8], label: &str) -> TestResult {
     match package.table_cell_control_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => Ok(()),
         Ok(value) => Err(io::Error::other(format!(
@@ -1829,7 +1885,7 @@ fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
             .table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )
             .is_err(),
         "hostile split graph read was accepted: {label}"
@@ -1838,7 +1894,7 @@ fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )
         .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
     assert!(result.is_err(), "hostile split graph published: {label}");
@@ -1852,7 +1908,7 @@ fn assert_split_popup_owner_rejects(source: &[u8], label: &str) -> TestResult {
         Ok(package) => package,
     };
     let before = package.exact_bytes();
-    let position = CellPosition::new(4, 0);
+    let position = At::new(4, 0);
     assert!(
         package
             .table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
@@ -1936,7 +1992,12 @@ fn with_corruption(source: &[u8], corruption: Corruption) -> TestResult<Vec<u8>>
             Ok(())
         }),
         Corruption::ControlFieldInfoExtra => rewrite_control_info(source, |info| {
-            let mut field = FieldInfo::new(vec![3, 99]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![3, 99], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references = vec![999];
             info.field_infos.push(field);
@@ -2092,7 +2153,7 @@ fn with_physical_alias(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_physical_alias_for_member(source: &[u8], member: &str, alias: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let aliased = catalog
         .iter()
         .find(|entry| entry.name() == member)
@@ -2366,14 +2427,24 @@ fn with_split_model_reference_corruption(
                 info.object_references.push(FORMAT_LIST_ID);
             },
             SplitModelReferenceCorruption::WrongFormatFieldType => {
-                let mut field = FieldInfo::new(vec![99]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.r#type = Some(FieldType::Value);
                 field.object_references.push(FORMAT_LIST_ID);
                 info.field_infos.push(field);
             },
             SplitModelReferenceCorruption::DuplicateFormatField => {
                 for path in [vec![98], vec![99]] {
-                    let mut field = FieldInfo::new(path);
+                    let mut field = FieldInfo::new(
+                        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default())
+                            .unwrap(),
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap();
                     field.r#type = Some(FieldType::ObjectReference);
                     field.object_references.push(FORMAT_LIST_ID);
                     info.field_infos.push(field);
@@ -2386,7 +2457,7 @@ fn with_split_model_reference_corruption(
 
 fn without_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[METADATA_MEMBER],
             Limits::default(),
@@ -2404,7 +2475,7 @@ fn mixed_controls_read_through_one_typed_facade() -> TestResult {
             package.table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::name("Cell Controls"),
-                CellPosition::new(row as u32, 0),
+                At::new(row as u32, 0),
             )?,
             Some(expected)
         );
@@ -2413,7 +2484,7 @@ fn mixed_controls_read_through_one_typed_facade() -> TestResult {
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 1),
+            At::new(0, 1),
         )?,
         None
     );
@@ -2428,7 +2499,7 @@ fn mixed_control_noop_is_byte_exact_and_does_not_touch_siblings() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::Checkbox(Checkbox))
         .commit()?;
@@ -2451,7 +2522,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2460,7 +2531,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2468,7 +2539,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(CellControl::StarRating(StarRating))
     );
@@ -2476,7 +2547,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 1),
+            At::new(0, 1),
         )?,
         None
     );
@@ -2512,11 +2583,11 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
 fn every_control_kind_can_replace_an_existing_kind() -> TestResult {
     let source = fixture(FixtureMode::Mixed)?;
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-        CellPosition::new(4, 0),
+        At::new(0, 0),
+        At::new(1, 0),
+        At::new(2, 0),
+        At::new(3, 0),
+        At::new(4, 0),
     ];
     for (position, replacement) in positions.into_iter().zip(controls()?) {
         let package = Package::from_bytes(&source)?;
@@ -2553,11 +2624,11 @@ fn empty_cells_seed_all_five_control_kinds_at_arbitrary_columns() -> TestResult 
     let package = Package::from_bytes(&source)?;
     let values = controls()?;
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(0, 1),
-        CellPosition::new(0, 2),
-        CellPosition::new(1, 1),
-        CellPosition::new(1, 2),
+        At::new(0, 0),
+        At::new(0, 1),
+        At::new(0, 2),
+        At::new(1, 1),
+        At::new(1, 2),
     ];
     for (position, value) in positions.into_iter().zip(values) {
         let commit = package
@@ -2593,7 +2664,7 @@ fn numeric_scalar_seeding_preserves_cell_position_and_value_route() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2601,7 +2672,7 @@ fn numeric_scalar_seeding_preserves_cell_position_and_value_route() -> TestResul
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2609,7 +2680,7 @@ fn numeric_scalar_seeding_preserves_cell_position_and_value_route() -> TestResul
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 2),
+            At::new(0, 2),
         )?,
         None
     );
@@ -2627,7 +2698,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(slider.clone())
         .commit()?;
@@ -2635,7 +2706,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         changed.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(CellControl::Checkbox(Checkbox))
     );
@@ -2645,7 +2716,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .reset()
         .commit()?;
@@ -2653,7 +2724,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         reset.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -2662,7 +2733,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .reset()
         .commit()?;
@@ -2687,7 +2758,7 @@ fn clear_and_reset_are_equivalent_automatic_transitions() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .clear()
         .commit()?;
@@ -2695,7 +2766,7 @@ fn clear_and_reset_are_equivalent_automatic_transitions() -> TestResult {
         cleared.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -2708,7 +2779,7 @@ fn clear_and_reset_are_equivalent_automatic_transitions() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(2, 2),
+            At::new(2, 2),
         )?
         .clear()
         .commit()?;
@@ -2799,7 +2870,7 @@ fn missing_metadata_and_unknown_root_fields_are_atomic() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::StarRating(StarRating))
         .commit();
@@ -2819,7 +2890,7 @@ fn explicit_locator_alias_and_reserved_identifier_policies_are_atomic() -> TestR
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2827,7 +2898,7 @@ fn explicit_locator_alias_and_reserved_identifier_policies_are_atomic() -> TestR
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2848,7 +2919,7 @@ fn explicit_locator_alias_and_reserved_identifier_policies_are_atomic() -> TestR
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(2, 2),
+            At::new(2, 2),
         )?
         .set(CellControl::Checkbox(Checkbox))
         .commit();
@@ -2877,7 +2948,7 @@ fn unknown_control_and_metadata_framing_survives_admitted_rewrite() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::StarRating(StarRating))
         .commit()
@@ -2888,7 +2959,7 @@ fn unknown_control_and_metadata_framing_survives_admitted_rewrite() -> TestResul
     let target = commit.package().exact_bytes();
     let payloads = object_messages(&target, DOCUMENT_MEMBER, SIDECAR_ID)?;
     assert!(payloads.iter().any(|(_, payload)| {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map(|view| view.fields().any(|field| field.number() == 90))
             .unwrap_or(false)
     }));
@@ -2904,14 +2975,14 @@ fn selector_conflict_position_and_public_limits_are_typed_and_atomic() -> TestRe
             .table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(99, 2),
+                At::new(99, 2),
             )
             .is_err()
     );
     let edit = package.edit_table_cell_control_format(
         SheetSelector::name("Cell Control Sheet"),
         TableSelector::name("Cell Controls"),
-        CellPosition::new(1, 2),
+        At::new(1, 2),
     )?;
     let commit = edit.set(CellControl::Checkbox(Checkbox)).commit()?;
     assert!(
@@ -2920,25 +2991,36 @@ fn selector_conflict_position_and_public_limits_are_typed_and_atomic() -> TestRe
             .is_err()
     );
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(Limits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -2954,7 +3036,7 @@ fn locked_table_refuses_control_mutation_without_source_changes() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::Checkbox(Checkbox))
         .commit();
@@ -2963,11 +3045,7 @@ fn locked_table_refuses_control_mutation_without_source_changes() -> TestResult 
     Ok(())
 }
 
-fn assert_split_read_noop(
-    source: &[u8],
-    position: CellPosition,
-    expected_before: CellControl,
-) -> TestResult {
+fn assert_split_read_noop(source: &[u8], position: At, expected_before: CellControl) -> TestResult {
     let package = Package::from_bytes(source)?;
     let before = package.exact_bytes();
     let observed = package.table_cell_control_format(
@@ -2996,7 +3074,7 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(controls()?[0].clone())
         .commit()?;
@@ -3004,11 +3082,11 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
     assert_eq!(no_op.package().exact_bytes(), source);
 
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-        CellPosition::new(4, 0),
+        At::new(0, 0),
+        At::new(1, 0),
+        At::new(2, 0),
+        At::new(3, 0),
+        At::new(4, 0),
     ];
     for (position, expected) in positions.into_iter().zip(controls()?) {
         assert_split_read_noop(&source, position, expected)?;
@@ -3020,7 +3098,7 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -3028,7 +3106,7 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(replacement),
     );
@@ -3062,12 +3140,7 @@ fn split_scalar_replacements() -> [CellControl; 4] {
 fn split_scalar_controls_support_cross_kind_cow_inverse_apply_and_locality() -> TestResult {
     let source = split_component_fixture()?;
     assert_split_native_metadata_shape(&source)?;
-    let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-    ];
+    let positions = [At::new(0, 0), At::new(1, 0), At::new(2, 0), At::new(3, 0)];
     for (position, replacement) in positions.into_iter().zip(split_scalar_replacements()) {
         let package = Package::from_bytes(&source)?;
         let before = package.table_cell_control_format(
@@ -3142,7 +3215,7 @@ fn split_scalar_controls_support_cross_kind_cow_inverse_apply_and_locality() -> 
 fn split_scalar_create_reset_culls_entries_and_preserves_inverse() -> TestResult {
     let source = split_component_fixture()?;
     assert_split_native_metadata_shape(&source)?;
-    let position = CellPosition::new(0, 1);
+    let position = At::new(0, 1);
     let package = Package::from_bytes(&source)?;
     assert_eq!(
         package.table_cell_control_format(
@@ -3281,7 +3354,7 @@ fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )
             .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
         assert!(
@@ -3299,7 +3372,7 @@ fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )?
             .set(CellControl::StarRating(StarRating))
             .commit()
@@ -3307,17 +3380,23 @@ fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
     );
     assert_eq!(package.exact_bytes(), before);
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -3332,7 +3411,7 @@ fn split_scalar_clear_is_reversible_and_local() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .clear()
         .commit()?;
@@ -3341,7 +3420,7 @@ fn split_scalar_clear_is_reversible_and_local() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -3406,7 +3485,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(CellControl::PopUpMenu(menu()?)),
     );
@@ -3415,7 +3494,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )
         .and_then(|edit| edit.clear().commit());
     assert!(result.is_err());
@@ -3436,7 +3515,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
 #[test]
 fn split_popup_native_aggregate_only_metadata_mutates_and_reopens() -> TestResult {
     let source = split_native_compatible_popup_fixture()?;
-    let position = CellPosition::new(4, 0);
+    let position = At::new(4, 0);
     let package = Package::from_bytes(&source)?;
     let original = CellControl::PopUpMenu(menu()?);
     assert_eq!(
@@ -3511,18 +3590,19 @@ fn split_popup_native_aggregate_only_metadata_mutates_and_reopens() -> TestResul
 #[test]
 fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> TestResult {
     let source_with_previews = split_component_fixture()?;
-    let source = Catalog::from_bytes(&source_with_previews)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
-        Limits::default(),
-    )?;
+    let source = Catalog::from_bytes(&source_with_previews, Default::default())?
+        .reassemble_with_deletions_to_bytes(
+            &[],
+            &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+            Limits::default(),
+        )?;
     let desired = CellControl::PopUpMenu(serialization_growth_menu()?);
     let unrestricted = Package::from_bytes(&source)?;
     let unrestricted_commit = unrestricted
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(desired.clone())
         .commit()?;
@@ -3538,37 +3618,45 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
         "split candidate IWA stream must grow beyond the source for a stream ceiling test"
     );
 
-    let exact_output_limits = Limits::new(
-        u64::try_from(target.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        target_stream,
-    )?;
+    let exact_output_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(target_stream))
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_output_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_output_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let exact_commit = exact
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(desired.clone())
         .commit()?;
     assert_eq!(exact_commit.package().exact_bytes(), target);
 
-    let output_minus_one_limits = Limits::new(
-        u64::try_from(target.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        target_stream,
-    )?;
+    let output_minus_one_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(target_stream))
+        .and_then(|b| b.build())?;
     let output_limited = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(output_minus_one_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(output_minus_one_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let output_before = output_limited.exact_bytes();
     assert!(
@@ -3576,7 +3664,7 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )?
             .set(desired.clone())
             .commit()
@@ -3585,16 +3673,20 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
     );
     assert_eq!(output_limited.exact_bytes(), output_before);
 
-    let stream_minus_one_limits = Limits::new(
-        u64::try_from(target.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        target_stream.saturating_sub(1),
-    )?;
+    let stream_minus_one_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(target_stream.saturating_sub(1)))
+        .and_then(|b| b.build())?;
     let stream_limited = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(stream_minus_one_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(stream_minus_one_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let stream_before = stream_limited.exact_bytes();
     assert!(
@@ -3602,7 +3694,7 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )?
             .set(desired)
             .commit()
@@ -3618,7 +3710,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
     let source = split_shared_popup_fixture()?;
     let package = Package::from_bytes(&source)?;
     let original = CellControl::PopUpMenu(menu()?);
-    for position in [CellPosition::new(4, 0), CellPosition::new(4, 1)] {
+    for position in [At::new(4, 0), At::new(4, 1)] {
         assert_eq!(
             package.table_cell_control_format(
                 SheetSelector::index(0),
@@ -3632,7 +3724,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(original.clone())
         .commit()?;
@@ -3648,7 +3740,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -3659,7 +3751,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(replacement),
     );
@@ -3667,7 +3759,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 1),
+            At::new(4, 1),
         )?,
         Some(original),
     );
@@ -3734,7 +3826,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
 fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult {
     let source = split_component_fixture()?;
     let package = Package::from_bytes(&source)?;
-    let position = CellPosition::new(0, 1);
+    let position = At::new(0, 1);
     assert_eq!(
         package.table_cell_control_format(
             SheetSelector::index(0),
@@ -3814,7 +3906,7 @@ fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .clear()
         .commit()?;
@@ -3837,7 +3929,7 @@ fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 1),
+            At::new(4, 1),
         )?
         .clear()
         .commit()?;
@@ -3944,7 +4036,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )
             .and_then(|edit| edit.clear().commit());
         assert!(
@@ -3960,7 +4052,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(CellControl::PopUpMenu(menu()?)),
     );
@@ -3969,7 +4061,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )
         .and_then(|edit| edit.clear().commit());
     assert!(result.is_err());
@@ -3986,33 +4078,85 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )
             .and_then(|edit| { edit.set(CellControl::PopUpMenu(desired.clone())).commit() })
             .is_err()
     );
     assert_eq!(package.exact_bytes(), before);
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(Limits::default(), PackageSemanticLimits::new(1, 1, 1, 1)?,),
+            litchi_numbers::OpenOptions::new().semantic_limits(
+                litchi_numbers::SemanticLimits::builder()
+                    .max_objects(1)
+                    .and_then(|b| b.max_sheets(1))
+                    .and_then(|b| b.max_tables(1))
+                    .and_then(|b| b.max_references(1))
+                    .and_then(|b| b.build())?,
+            ),
         )
         .is_err()
     );
+    Ok(())
+}
+
+/// Callgrind probe (record 0379): set each of the five controls on empty
+/// cells and clear the first, serializing each output. Measured before and
+/// after the shared `litchi-iwa-table` engine move with
+/// `--toggle-collect=*table_cell_control::control_probe_routes*`.
+#[inline(never)]
+fn control_probe_routes(source: &[u8]) -> TestResult<usize> {
+    let package = Package::from_bytes(source)?;
+    let positions = [
+        At::new(0, 0),
+        At::new(0, 1),
+        At::new(0, 2),
+        At::new(1, 1),
+        At::new(1, 2),
+    ];
+    let mut total = 0;
+    for (position, value) in positions.into_iter().zip(controls()?) {
+        let commit = package
+            .edit_table_cell_control_format(0usize, 0usize, position)?
+            .set(value)
+            .commit()?;
+        total += commit.package().exact_bytes().len();
+        let cleared = commit
+            .package()
+            .edit_table_cell_control_format(0usize, 0usize, position)?
+            .clear()
+            .commit()?;
+        total += cleared.package().exact_bytes().len();
+    }
+    Ok(total)
+}
+
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn control_cost_probe() -> TestResult {
+    let source = fixture(FixtureMode::Empty)?;
+    assert!(control_probe_routes(&source)? > 0);
     Ok(())
 }

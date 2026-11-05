@@ -12,7 +12,8 @@ impl Document {
     /// Returns [`PackageError::Corrupted`] when the stored DOP range has a
     /// non-standard size or an invalid common `DopBase` field.
     pub fn document_properties(&self) -> Result<Option<&DocumentProperties>> {
-        self.document_properties
+        self.0
+            .document_properties
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| {
@@ -26,7 +27,7 @@ impl Document {
 
     /// Get all standard bookmarks in start-CP order.
     pub fn bookmarks(&self) -> Result<Vec<Bookmark>> {
-        Ok(self.bookmarks_table.bookmarks().to_vec())
+        Ok(self.0.bookmarks_table.bookmarks().to_vec())
     }
 
     /// Strictly access the inert annotation-bookmark tag table
@@ -42,15 +43,18 @@ impl Document {
     pub fn annotation_bookmarks(
         &self,
     ) -> Result<Option<&crate::parts::annotation_bookmarks::Tags>> {
-        match self
-            .annotation_bookmarks
-            .get_or_init(|| match &self.annotation_bookmarks_source {
-                Ok(Some(source)) => crate::parts::annotation_bookmarks::Tags::parse_bytes(source)
-                    .map(Some)
-                    .map_err(|error| error.to_string()),
+        match self.0.annotation_bookmarks.get_or_init(|| {
+            match &self.0.annotation_bookmarks_source {
+                Ok(Some(source)) => crate::parts::annotation_bookmarks::Tags::parse_bytes(
+                    source,
+                    &self.0.source_limits,
+                )
+                .map(Some)
+                .map_err(|error| error.to_string()),
                 Ok(None) => Ok(None),
                 Err(error) => Err(error.clone()),
-            }) {
+            }
+        }) {
             Ok(value) => Ok(value.as_ref()),
             Err(error) => Err(PackageError::Corrupted(format!(
                 "invalid annotation-bookmark metadata: {error}"
@@ -64,14 +68,14 @@ impl Document {
     /// validated ranges, property bags, types, and recognizer states.
     #[must_use]
     pub fn smart_tags(&self) -> Option<&DocumentSmartTags> {
-        self.smart_tags.as_ref()
+        self.0.smart_tags.as_ref()
     }
 
     /// Revision-save identifiers assigned in the document (MS-DOC 2.9.203),
     /// when the document carries a `PLRSID` table.
     #[must_use]
     pub fn rsids(&self) -> Option<&DocumentRsids> {
-        self.rsids.as_ref()
+        self.0.rsids.as_ref()
     }
 
     /// E-mail review threading data parallel to the revision-author table
@@ -81,7 +85,7 @@ impl Document {
     /// message is ever contacted, opened, or rendered.
     #[must_use]
     pub fn rmd_threading(&self) -> Option<&DocumentRmdThreading> {
-        self.rmd_threading.as_ref()
+        self.0.rmd_threading.as_ref()
     }
 
     /// Embedded TrueType font descriptions from the `SttbTtmbd` table
@@ -91,7 +95,7 @@ impl Document {
     /// and is never loaded, installed, or executed.
     #[must_use]
     pub fn embedded_fonts(&self) -> Option<&DocumentEmbeddedFonts> {
-        self.embedded_fonts.as_ref()
+        self.0.embedded_fonts.as_ref()
     }
 
     /// Typed, inert `MsoEnvelopeCLSID` metadata from the table stream
@@ -102,14 +106,14 @@ impl Document {
     /// performed.
     #[must_use]
     pub fn envelope(&self) -> Option<&crate::parts::envelope::Envelope> {
-        self.envelope.as_ref()
+        self.0.envelope.as_ref()
     }
 
     /// `AutoSummary` priority ranges for the main document (MS-DOC 2.8.4),
     /// when the document carries a `PlcfAsumy`.
     #[must_use]
     pub fn auto_summary(&self) -> Option<&DocumentAutoSummary> {
-        self.auto_summary.as_ref()
+        self.0.auto_summary.as_ref()
     }
 
     /// The legacy Word routing-slip lifecycle metadata (`RouteSlip`), when
@@ -119,7 +123,8 @@ impl Document {
     /// protection value is descriptive policy metadata; this read facade does
     /// not authenticate callers or execute mail routing.
     pub fn route_slip(&self) -> Result<Option<&crate::parts::route_slip::Metadata>> {
-        self.route_slip
+        self.0
+            .route_slip
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| {
@@ -134,7 +139,7 @@ impl Document {
     /// authenticated, and no protection policy is enforced.
     #[must_use]
     pub fn protected_ranges(&self) -> Option<&Ranges> {
-        self.protected_ranges.as_ref()
+        self.0.protected_ranges.as_ref()
     }
 
     /// Format consistency-checker marks, when the document carries them
@@ -144,7 +149,7 @@ impl Document {
     /// and why; no formatting is analyzed or modified.
     #[must_use]
     pub fn format_consistency_marks(&self) -> Option<&DocumentFormatConsistencyMarks> {
-        self.format_consistency_marks.as_ref()
+        self.0.format_consistency_marks.as_ref()
     }
 
     /// Word 2003 structured document tag bookmarks, when the document
@@ -154,7 +159,7 @@ impl Document {
     /// rendered.
     #[must_use]
     pub fn structured_tags(&self) -> Option<&DocumentStructuredTags> {
-        self.structured_tags.as_ref()
+        self.0.structured_tags.as_ref()
     }
 
     /// The XML schema definition references of the document (`Hplxsdr`,
@@ -164,7 +169,7 @@ impl Document {
     /// no schema is fetched, resolved, or applied.
     #[must_use]
     pub fn xml_schemas(&self) -> Option<&crate::parts::xml_schemas::Collection> {
-        self.xml_schemas.as_ref()
+        self.0.xml_schemas.as_ref()
     }
 
     /// The custom XML save transform path (`fcCustomXForm`, MS-DOC 2.5.9):
@@ -175,7 +180,7 @@ impl Document {
     /// or applied.
     #[must_use]
     pub fn custom_xml_transform_path(&self) -> Option<&str> {
-        self.custom_xml_transform_path.as_deref()
+        self.0.custom_xml_transform_path.as_deref()
     }
 
     /// The OLE controls recorded in the document (`RgxOcxInfo`, MS-DOC
@@ -185,7 +190,7 @@ impl Document {
     /// control code is executed.
     #[must_use]
     pub fn ole_controls(&self) -> Option<&RgxOcxInfo> {
-        self.ole_controls.as_ref()
+        self.0.ole_controls.as_ref()
     }
 
     /// The mail-merge data-source state of the document (`Pms` plus the ODSO
@@ -196,7 +201,7 @@ impl Document {
     /// executed, and no merge is performed.
     #[must_use]
     pub fn mail_merge(&self) -> Option<&DocumentMailMerge> {
-        self.mail_merge.as_ref()
+        self.0.mail_merge.as_ref()
     }
 
     /// The master-document subdocument directory (`PlcfWKB`) and the
@@ -207,18 +212,22 @@ impl Document {
     /// opened, resolved, or followed, and no subdocument content is loaded.
     #[must_use]
     pub fn subdocuments(&self) -> Option<&Collection> {
-        self.subdocuments.as_ref()
+        self.0.subdocuments.as_ref()
     }
 
     /// The Word 97 mail-merge state (`Pms`), when the document carries one.
     pub fn mail_merge_state(&self) -> Option<&crate::parts::mail_merge::Pms> {
-        self.mail_merge.as_ref().and_then(DocumentMailMerge::state)
+        self.0
+            .mail_merge
+            .as_ref()
+            .and_then(DocumentMailMerge::state)
     }
 
     /// The Word 2002+ ODSO mail-merge properties, when the document carries
     /// mail-merge state. Never used to contact a data source.
     pub fn odso_properties(&self) -> Option<&[crate::parts::mail_merge::OdsoProperty]> {
-        self.mail_merge
+        self.0
+            .mail_merge
             .as_ref()
             .map(DocumentMailMerge::odso_properties)
     }
@@ -226,24 +235,24 @@ impl Document {
     /// Get author names used by tracked revisions and related annotations.
     #[must_use]
     pub fn revision_authors(&self) -> &[String] {
-        self.revision_authors.authors()
+        self.0.revision_authors.authors()
     }
 
     /// Get section property revision marks in document order.
     #[must_use]
     pub fn section_revisions(&self) -> &[crate::revision::SectionRevisionMark] {
-        self.sections.revisions()
+        self.0.sections.revisions()
     }
 
     /// Get sections in main-document character-position order.
     #[must_use]
     pub fn sections(&self) -> &[crate::section::Section] {
-        self.sections.sections()
+        self.0.sections.sections()
     }
 
     /// Find the section containing `cp` using half-open section ranges.
     #[must_use]
     pub fn section_at_cp(&self, cp: u32) -> Option<&crate::section::Section> {
-        self.sections.section_at_cp(cp)
+        self.0.sections.section_at_cp(cp)
     }
 }

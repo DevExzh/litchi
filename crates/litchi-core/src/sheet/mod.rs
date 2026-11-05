@@ -1,6 +1,8 @@
 //! Spreadsheet abstraction traits and value types shared across formats.
+pub mod error;
 pub mod traits;
 pub mod types;
 
-pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
-pub use types::{CellValue, Result};
+pub use error::{Error, LimitKind, Result};
+pub use traits::{Cell, WorkbookTrait, Worksheet};
+pub use types::CellValue;

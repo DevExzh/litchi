@@ -1,6 +1,9 @@
 //! Typed `SpreadsheetML` table models and semantic validation.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
+
+use litchi_sheet::{Cell as Address, Rect};
 
 use crate::error::{Result, invalid};
 use crate::sort::SortState;
@@ -283,6 +286,113 @@ impl Table {
     pub fn column_names(&self) -> Vec<&str> {
         self.columns.iter().map(|c| c.name.as_str()).collect()
     }
+
+    /// The column whose name equals `name` without regard to case, as Excel
+    /// compares table column names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Ambiguous`] when multiple columns match.
+    pub fn column(&self, name: &str) -> Result<Option<&TableColumn>> {
+        let mut found = None;
+        let mut matches = 0;
+        for column in &self.columns {
+            if crate::sheet::equivalent(&column.name, name) {
+                found = Some(column);
+                matches += 1;
+            }
+        }
+        if matches > 1 {
+            return Err(crate::Error::Ambiguous {
+                kind: "table column",
+                matches,
+            });
+        }
+        Ok(found)
+    }
+
+    /// The table's whole range (`ref`), header and totals rows included.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `ref_range` is not one bounded A1 cell or range.
+    pub fn range(&self) -> Result<Rect> {
+        let reference = if self.ref_range.contains('$') {
+            Cow::Owned(self.ref_range.replace('$', ""))
+        } else {
+            Cow::Borrowed(self.ref_range.as_str())
+        };
+        Ok(Rect::from_a1(&reference)?)
+    }
+
+    /// The header rows: the first `headerRowCount` rows of the range (one
+    /// when the count is unset). `None` when the table shows no header row.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid range, or when the header and totals
+    /// rows together exceed the range's height.
+    pub fn header_range(&self) -> Result<Option<Rect>> {
+        let (range, header, _) = self.row_bands()?;
+        if header == 0 {
+            return Ok(None);
+        }
+        row_band(range, 0, header).map(Some)
+    }
+
+    /// The data rows: the range without its header and totals rows. `None`
+    /// when no row is left.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::header_range`].
+    pub fn data_range(&self) -> Result<Option<Rect>> {
+        let (range, header, totals) = self.row_bands()?;
+        let data = range.rows() - header - totals;
+        if data == 0 {
+            return Ok(None);
+        }
+        row_band(range, header, data).map(Some)
+    }
+
+    /// The totals rows: the last `totalsRowCount` rows of the range (none
+    /// when the count is unset). `None` when the table has no totals row.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::header_range`].
+    pub fn totals_range(&self) -> Result<Option<Rect>> {
+        let (range, _, totals) = self.row_bands()?;
+        if totals == 0 {
+            return Ok(None);
+        }
+        row_band(range, range.rows() - totals, totals).map(Some)
+    }
+
+    /// The range with its checked header and totals row counts.
+    fn row_bands(&self) -> Result<(Rect, u32, u32)> {
+        let range = self.range()?;
+        // ECMA-376 §18.5.1.2: `headerRowCount` defaults to 1 and
+        // `totalsRowCount` to 0.
+        let header = self.header_row_count.unwrap_or(1);
+        let totals = self.totals_row_count.unwrap_or(0);
+        let rows = range.rows();
+        if header.checked_add(totals).is_none_or(|edges| edges > rows) {
+            return Err(invalid(format!(
+                "table declares {header} header and {totals} totals rows in a {rows}-row range"
+            )));
+        }
+        Ok((range, header, totals))
+    }
+}
+
+/// `count` whole rows of `range`, starting `offset` rows below its top.
+fn row_band(range: Rect, offset: u32, count: u32) -> Result<Rect> {
+    let start = Address::at(
+        range.start().row().get() + offset,
+        range.start().column().get(),
+    )?;
+    Ok(Rect::new(start, start.row().get() + count, range.end().1)?)
 }
 
 /// Validate a table before it is authored as `SpreadsheetML`.
@@ -352,11 +462,8 @@ pub fn validate_table(table: &Table) -> Result<()> {
             )));
         }
         bounded_nonempty(&column.name, "table column name")?;
-        if !names.insert(column.name.to_ascii_lowercase()) {
-            return Err(invalid(format!(
-                "empty or duplicate table column name '{}'",
-                column.name
-            )));
+        if !names.insert(crate::sheet::key(&column.name)) {
+            return Err(invalid("empty or duplicate table column name"));
         }
         bounded(&column.unique_name, "table column unique name")?;
         bounded(&column.totals_row_label, "table totals row label")?;

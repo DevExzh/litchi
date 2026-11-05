@@ -9,12 +9,14 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsch, tsd, tsp, tswp};
 use litchi_pages::{
-    BodyChartArrangementError, BodyChartSelector, ChartArrangement, Limits, Package,
+    BodyChartSelector, ChartArrangement, Package,
+    chart::arrangement::Error as BodyChartArrangementError,
 };
 use prost::Message as _;
 
@@ -64,8 +66,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -76,7 +82,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -104,7 +114,12 @@ fn chart_payload(
     };
     let mut payload = drawable.encode_to_vec();
     // TSCH.ChartArchive is a proto2 extension of TSCH.ChartDrawableArchive.
-    append_length_delimited_field(&mut payload, 10_000, &chart.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &chart.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     // This future field is deliberately outside the selected Arrange
     // projection and must survive a changed publication byte-for-byte.
     append_varint_field(&mut payload, UNKNOWN_CHART_FIELD, UNKNOWN_CHART_VALUE)?;
@@ -134,13 +149,22 @@ fn chart_object(
             data: payload,
         }]
     };
-    let mut object = ArchiveObject::new(identifier, messages)?;
+    let mut object = ArchiveObject::new(identifier, messages, Default::default())?;
     for info in &mut object.archive_info.message_infos {
         info.object_references.push(parent);
         // Keep unrelated source metadata in the physical object header.  The
         // Arrange projection must never derive ownership from this sentinel.
-        info.field_infos
-            .push(FieldInfo::new(vec![UNKNOWN_METADATA_FIELD]));
+        info.field_infos.push(
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![UNKNOWN_METADATA_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+        );
         info.field_infos.push(field_reference(vec![1, 2], parent));
     }
     Ok(object)
@@ -173,9 +197,17 @@ fn body_object(anchors: [u32; 2]) -> TestResult<ArchiveObject> {
     object.archive_info.message_infos[0]
         .field_infos
         .extend(ATTACHMENT_IDENTIFIERS.map(|identifier| field_reference(vec![9], identifier)));
-    object.archive_info.message_infos[0]
-        .field_infos
-        .push(FieldInfo::new(vec![UNKNOWN_METADATA_FIELD]));
+    object.archive_info.message_infos[0].field_infos.push(
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![UNKNOWN_METADATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    );
     Ok(object)
 }
 
@@ -262,9 +294,17 @@ fn synthetic_package(options: FixtureOptions) -> TestResult<Vec<u8>> {
             .field_infos
             .push(field_reference(vec![20], ZORDER_IDENTIFIER));
     }
-    root_object.archive_info.message_infos[0]
-        .field_infos
-        .push(FieldInfo::new(vec![UNKNOWN_METADATA_FIELD]));
+    root_object.archive_info.message_infos[0].field_infos.push(
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![UNKNOWN_METADATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    );
 
     let mut document_objects = vec![root_object, body_object(options.anchors)?];
     if let Some(order) = options.zorder {
@@ -292,7 +332,8 @@ fn synthetic_package(options: FixtureOptions) -> TestResult<Vec<u8>> {
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let foreign_archive = if foreign_objects.is_empty() {
         None
@@ -301,7 +342,8 @@ fn synthetic_package(options: FixtureOptions) -> TestResult<Vec<u8>> {
             &Archive {
                 objects: foreign_objects,
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?)
     };
 
@@ -334,7 +376,7 @@ fn exact_bytes(package: &Package) -> Vec<u8> {
 }
 
 fn member_bytes(package_bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package_bytes)?;
+    let catalog = Catalog::from_bytes(package_bytes, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -346,7 +388,8 @@ fn member_bytes(package_bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
 fn document_archive(package_bytes: &[u8], member: &str) -> TestResult<Archive> {
     let compressed = member_bytes(package_bytes, member)?;
     Ok(Archive::parse(
-        SnappyStream::decompress(&compressed)?.as_bytes(),
+        SnappyStream::decompress(&compressed, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -390,26 +433,34 @@ fn zorder_payload_from_package(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn has_varint_field(data: &[u8], number: u32, value: u64) -> TestResult<bool> {
-    Ok(WireView::parse(data)?.fields().any(|field| {
-        field.number() == number
-            && field.wire_type() == 0
-            && litchi_iwa_common::decode_varint_from_bytes(field.payload())
-                .is_ok_and(|(decoded, _)| decoded == value)
-    }))
+    Ok(
+        WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .any(|field| {
+                field.number() == number
+                    && field.wire_type() == 0
+                    && litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                        .is_ok_and(|(decoded, _)| decoded == value)
+            }),
+    )
 }
 
 fn rewrite_document_archive(
     source: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -647,7 +698,7 @@ fn changed_chart_reopens_and_stale_or_foreign_patches_conflict() -> TestResult {
     );
 
     let foreign_bytes = {
-        let catalog = Catalog::from_bytes(&source_bytes)?;
+        let catalog = Catalog::from_bytes(&source_bytes, Default::default())?;
         catalog.reassemble_to_bytes(
             &[EntryEdit::new(SENTINEL_MEMBER, b"foreign source")],
             Limits::default(),
@@ -661,7 +712,7 @@ fn changed_chart_reopens_and_stale_or_foreign_patches_conflict() -> TestResult {
     assert_eq!(exact_bytes(&foreign), foreign_bytes);
 
     let tampered_bytes = {
-        let catalog = Catalog::from_bytes(&source_bytes)?;
+        let catalog = Catalog::from_bytes(&source_bytes, Default::default())?;
         catalog.reassemble_to_bytes(
             &[EntryEdit::new(UNRELATED_MEMBER, b"tampered unrelated")],
             Limits::default(),
@@ -733,6 +784,7 @@ fn malformed_zorder_alias_is_rejected_without_publication() -> TestResult {
             &mut message.data,
             1,
             &reference(CHART_IDENTIFIERS[0]).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;
@@ -802,7 +854,13 @@ fn bounded_ingress_refuses_resource_exhaustion_before_chart_edit() -> TestResult
     let source = synthetic_package(FixtureOptions::default())?;
     let archive_limits = litchi_iwa_core::Limits::default().with_objects(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    assert!(Package::from_bytes_with_limits(&source, limits).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits)
+        )
+        .is_err()
+    );
     // The limit operation is read-only; reopening under normal limits still
     // yields the exact fixture and the chart remains editable.
     let package = Package::from_bytes(&source)?;

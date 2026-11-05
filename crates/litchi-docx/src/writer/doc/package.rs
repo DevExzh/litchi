@@ -17,14 +17,14 @@
 use crate::alt::{Chunk, Conformance, scan_with_block_ranges};
 use crate::error::{Error, Result};
 
-use super::super::paragraph::MutableParagraph;
+use super::super::paragraph::Paragraph;
 use super::super::section::SectionProperties;
-use super::super::table::MutableTable;
+use super::super::table::Table;
 use super::super::toc::TableOfContents;
 use litchi_core::xml::ReaderOrigin;
 
 /// The document body containing all content elements.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct DocumentBody {
     /// Content elements (paragraphs, tables, etc.) in document order
     pub(crate) elements: Vec<BodyElement>,
@@ -339,20 +339,20 @@ impl DocumentBody {
                 .to_string(),
         })
     }
-    pub(super) fn add_paragraph(&mut self) -> &mut MutableParagraph {
+    pub(super) fn add_paragraph(&mut self) -> &mut Paragraph {
         let index = self.content_insertion_index();
         self.elements
-            .insert(index, BodyElement::Paragraph(MutableParagraph::new()));
+            .insert(index, BodyElement::Paragraph(Paragraph::new()));
         match self.elements.get_mut(index) {
             Some(BodyElement::Paragraph(p)) => p,
             _ => unreachable!(),
         }
     }
 
-    pub(super) fn add_table(&mut self, rows: usize, cols: usize) -> &mut MutableTable {
+    pub(super) fn add_table(&mut self, rows: usize, cols: usize) -> &mut Table {
         let index = self.content_insertion_index();
         self.elements
-            .insert(index, BodyElement::Table(MutableTable::new(rows, cols)));
+            .insert(index, BodyElement::Table(Table::new(rows, cols)));
         match self.elements.get_mut(index) {
             Some(BodyElement::Table(t)) => t,
             _ => unreachable!(),
@@ -398,10 +398,7 @@ impl DocumentBody {
 
     /// Insert an empty paragraph before the paragraph at paragraph-relative
     /// `index`; returns the element position and the new paragraph.
-    pub(super) fn insert_paragraph(
-        &mut self,
-        index: usize,
-    ) -> Result<(usize, &mut MutableParagraph)> {
+    pub(super) fn insert_paragraph(&mut self, index: usize) -> Result<(usize, &mut Paragraph)> {
         let positions = self.paragraph_positions();
         if index > positions.len() {
             return Err(Error::InvalidFormat(format!(
@@ -413,7 +410,7 @@ impl DocumentBody {
             .copied()
             .unwrap_or_else(|| self.content_insertion_index());
         self.elements
-            .insert(position, BodyElement::Paragraph(MutableParagraph::new()));
+            .insert(position, BodyElement::Paragraph(Paragraph::new()));
         match self.elements.get_mut(position) {
             Some(BodyElement::Paragraph(paragraph)) => Ok((position, paragraph)),
             _ => unreachable!(),
@@ -427,7 +424,7 @@ impl DocumentBody {
         index: usize,
         rows: usize,
         cols: usize,
-    ) -> Result<(usize, &mut MutableTable)> {
+    ) -> Result<(usize, &mut Table)> {
         let positions = self.table_positions();
         if index > positions.len() {
             return Err(Error::InvalidFormat(format!(
@@ -439,7 +436,7 @@ impl DocumentBody {
             .copied()
             .unwrap_or_else(|| self.content_insertion_index());
         self.elements
-            .insert(position, BodyElement::Table(MutableTable::new(rows, cols)));
+            .insert(position, BodyElement::Table(Table::new(rows, cols)));
         match self.elements.get_mut(position) {
             Some(BodyElement::Table(table)) => Ok((position, table)),
             _ => unreachable!(),
@@ -631,7 +628,7 @@ impl DocumentBody {
             .count()
     }
 
-    pub(super) fn paragraph(&mut self, index: usize) -> Option<&mut MutableParagraph> {
+    pub(super) fn paragraph(&mut self, index: usize) -> Option<&mut Paragraph> {
         let mut count = 0;
         for elem in &mut self.elements {
             match elem {
@@ -657,7 +654,7 @@ impl DocumentBody {
         None
     }
 
-    pub(super) fn table(&mut self, index: usize) -> Option<&mut MutableTable> {
+    pub(super) fn table(&mut self, index: usize) -> Option<&mut Table> {
         let mut count = 0;
         for elem in &mut self.elements {
             match elem {
@@ -1330,9 +1327,10 @@ fn push_raw_body_xml(
     clippy::large_enum_variant,
     reason = "writer-internal variants are moved and boxing would add churn"
 )] // writer-internal type; variants are moved, not compared
+#[derive(Clone)]
 pub(crate) enum BodyElement {
-    Paragraph(MutableParagraph),
-    Table(MutableTable),
+    Paragraph(Paragraph),
+    Table(Table),
     PreservedParagraph(String),
     PreservedTable(String),
     PreservedSectionProperties(String),

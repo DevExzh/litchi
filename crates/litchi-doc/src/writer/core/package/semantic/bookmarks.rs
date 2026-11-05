@@ -1,11 +1,11 @@
 use crate::writer::bookmarks::BookmarkEntry;
 use crate::writer::core::{
-    Writer,
+    Builder,
     model::{BookmarkTableData, WriteError},
 };
 use crate::writer::fib::FibBuilder;
 use std::collections::HashMap;
-impl Writer {
+impl Builder {
     pub(in crate::writer::core::package) fn build_bookmark_tables(
         entries: &[BookmarkEntry],
         document_end: u32,

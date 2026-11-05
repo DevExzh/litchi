@@ -378,6 +378,15 @@ impl Formatting {
         self.extended_formats.get(index as usize)
     }
 
+    /// The cell XF a cell record's `ixfe` resolves to, exactly as the
+    /// worksheet projection resolves it: index zero names no format, and an
+    /// out-of-range, reserved or style XF reference resolves to the default
+    /// cell XF the way Excel renders it.
+    #[must_use]
+    pub fn resolved_cell_format(&self, index: u16) -> Option<&ExtendedFormat> {
+        self.cell_format(index)
+    }
+
     #[must_use]
     pub fn effective_extended_format(&self, index: u16) -> Option<EffectiveExtendedFormat<'_>> {
         let direct = self.extended_format(index)?;

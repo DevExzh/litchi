@@ -9,6 +9,6 @@ mod codec;
 mod tests;
 
 pub use codec::{
-    Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-    RtfWriter, WriterOptions,
+    Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS, Options,
+    Writer,
 };

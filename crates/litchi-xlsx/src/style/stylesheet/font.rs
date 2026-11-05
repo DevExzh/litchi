@@ -171,6 +171,16 @@ impl FontColor {
             source_lexical: Some(source_lexical),
         }
     }
+
+    /// Drop source-only lexical markup before a parsed color enters an
+    /// authored edit request. The typed base and tint are retained exactly.
+    pub(crate) fn into_authoring(self) -> Self {
+        Self {
+            kind: self.kind,
+            tint: self.tint,
+            source_lexical: None,
+        }
+    }
 }
 
 /// Font underline style (`ST_UnderlineValues`).

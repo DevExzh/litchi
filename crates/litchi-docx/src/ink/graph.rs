@@ -5,6 +5,7 @@
 //! resource payload guards, and the reversible part additions/removals needed
 //! to publish an inverse without normalising unrelated package members.
 
+use crate::ink::LimitKind;
 use std::collections::HashSet;
 use std::{mem::size_of, sync::Arc};
 
@@ -13,7 +14,7 @@ use litchi_drawingml::ink as shared;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, PackURI,
-    ReadLimits, Relationships, TargetMode,
+    Relationships, TargetMode,
 };
 
 use super::{CONTENT_TYPE, Limits};
@@ -31,29 +32,20 @@ const MAX_RELATIONSHIP_XML_BYTES: usize = 8 * 1024 * 1024;
 
 /// Package graph and exact publication-token binding for stale candidates.
 ///
-/// Names, content types and relationship fields retain semantic ownership.
-/// Content addresses additionally bind lexical XML and relationship-member
-/// presence, including owners untouched by an edit. Part payloads are guarded
-/// separately by the transaction's immutable package state.
+/// The transaction's immutable package owns typed graph metadata. This binding
+/// retains exact lexical XML and relationship-member presence, including owners
+/// untouched by an edit. Matching compares both proofs; part payloads are
+/// guarded separately by the transaction's immutable package state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Binding {
     content_types: BlobId,
-    root: OwnerBinding,
+    root: RelationshipTokenBinding,
     parts: Vec<PartBinding>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct OwnerBinding {
-    owner: PackURI,
-    relationships: Vec<RelationshipBinding>,
-    token: RelationshipTokenBinding,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct PartBinding {
     part: PackURI,
-    content_type: String,
-    relationships: Vec<RelationshipBinding>,
     token: RelationshipTokenBinding,
 }
 
@@ -78,15 +70,12 @@ impl Binding {
         preflight_graph(package, limits)?;
 
         let mut token_bytes = 0usize;
-        let content_types = package.source_content_types()?;
+        let content_types = package.source_content_types(package.read_limits())?;
         charge_token_bytes(&mut token_bytes, content_types.bytes().len(), limits)?;
         let content_types = BlobId::of(content_types.bytes());
         let root_owner = root_uri()?;
-        let root = OwnerBinding {
-            token: capture_token(package, &root_owner, &mut token_bytes, limits)?,
-            owner: root_owner,
-            relationships: capture_relationships(package.rels())?,
-        };
+        let root = capture_token(package, &root_owner, &mut token_bytes, limits)?;
+        validate_relationship_targets(package.rels())?;
         let mut parts = Vec::new();
         parts
             .try_reserve_exact(package.part_count())
@@ -95,10 +84,9 @@ impl Binding {
                 source,
             })?;
         for part in package.iter_parts() {
+            validate_relationship_targets(part.rels())?;
             parts.push(PartBinding {
                 part: part.partname().clone(),
-                content_type: clone_text(part.content_type(), "DOCX Ink graph content types")?,
-                relationships: capture_relationships(part.rels())?,
                 token: capture_token(package, part.partname(), &mut token_bytes, limits)?,
             });
         }
@@ -111,9 +99,51 @@ impl Binding {
     }
 
     /// Compare the complete current graph to this source binding.
-    pub(crate) fn matches(&self, package: &OpcPackage, limits: Limits) -> Result<bool> {
-        Ok(*self == Self::capture(package, limits)?)
+    pub(crate) fn matches(
+        &self,
+        expected: &OpcPackage,
+        package: &OpcPackage,
+        limits: Limits,
+    ) -> Result<bool> {
+        // Admit the entire candidate before reporting a conflict, preserving
+        // resource and malformed-graph errors even when tokens already differ.
+        if *self != Self::capture(package, limits)?
+            || !same_relationship_values(expected.rels(), package.rels())
+        {
+            return Ok(false);
+        }
+        Ok(expected.iter_parts().all(|part| {
+            package
+                .part_metadata(part.partname())
+                .is_some_and(|current| {
+                    // OPC lookup permits case-insensitive fallback; the graph proof
+                    // still requires the exact stored spelling.
+                    current.partname().as_str() == part.partname().as_str()
+                        && current.content_type() == part.content_type()
+                        && same_relationship_values(part.rels(), current.rels())
+                })
+        }))
     }
+}
+
+fn validate_relationship_targets(relationships: &Relationships) -> Result<()> {
+    for relationship in relationships.iter() {
+        if !relationship.is_external() {
+            relationship.target_partname()?;
+        }
+    }
+    Ok(())
+}
+
+fn same_relationship_values(expected: &Relationships, actual: &Relationships) -> bool {
+    expected.len() == actual.len()
+        && expected.iter().all(|relationship| {
+            actual.get(relationship.r_id()).is_some_and(|current| {
+                current.reltype() == relationship.reltype()
+                    && current.target_ref() == relationship.target_ref()
+                    && current.target_mode() == relationship.target_mode()
+            })
+        })
 }
 
 fn capture_token(
@@ -122,7 +152,7 @@ fn capture_token(
     total: &mut usize,
     limits: Limits,
 ) -> Result<RelationshipTokenBinding> {
-    let token = package.source_relationships(owner)?;
+    let token = package.source_relationships(owner, package.read_limits())?;
     charge_token_bytes(total, token.bytes().len(), limits)?;
     Ok(RelationshipTokenBinding {
         bytes: BlobId::of(token.bytes()),
@@ -134,7 +164,7 @@ fn charge_token_bytes(total: &mut usize, amount: usize, limits: Limits) -> Resul
     *total = total.saturating_add(amount);
     if *total > limits.stories.max_topology_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph publication token bytes",
+            kind: LimitKind::GraphPublicationTokenBytes,
             actual: *total,
             maximum: limits.stories.max_topology_bytes,
         });
@@ -193,8 +223,8 @@ impl Delta {
         preflight_graph(package, limits)?;
         let owner_name = canonical_owner(package, owner)?;
         let owner_relationships = owner_relationships(package, &owner_name)?;
-        let owner_before = package.source_relationships(&owner_name)?;
-        let content_types_before = package.source_content_types()?;
+        let owner_before = package.source_relationships(&owner_name, package.read_limits())?;
+        let content_types_before = package.source_content_types(package.read_limits())?;
         let selected_ids = selected_ids(ids, limits)?;
 
         if selected_ids.is_empty() {
@@ -257,7 +287,8 @@ impl Delta {
             check_payload(payload.len(), limits, &mut total_payload)?;
             validate_target_payload(part.content_type(), payload.as_slice())?;
             let relationships = capture_relationships(part.rels())?;
-            let relationship_token = package.source_relationships(part.partname())?;
+            let relationship_token =
+                package.source_relationships(part.partname(), package.read_limits())?;
             let removed = if remaining_incoming == 0 {
                 if !part.rels().is_empty() {
                     return Err(unsupported(
@@ -305,14 +336,14 @@ impl Delta {
         }
         let content_types_after = content_types_before.without_parts(
             &removed_names,
-            ReadLimits::default().max_content_types_bytes(),
+            package.read_limits().max_content_types_bytes(),
         )?;
 
         let mut owner_after = owner_before.clone();
         for id in &selected_ids {
             owner_after = owner_after.without_relationship(id, MAX_RELATIONSHIP_XML_BYTES)?;
         }
-        package.try_replace_relationships(&owner_before, &owner_after)?;
+        package.try_replace_relationships(&owner_before, &owner_after, package.read_limits())?;
         for target in &targets {
             if target.removed.is_some() && !package.remove_part(&target.guard.part) {
                 return Err(Error::Invalid(
@@ -346,7 +377,7 @@ impl Delta {
                 &self.inner.content_types_after,
             )
         };
-        let current_content_types = package.source_content_types()?;
+        let current_content_types = package.source_content_types(package.read_limits())?;
         if current_content_types.bytes() != expected_content.bytes() {
             return Err(Error::Invalid(
                 "DOCX Ink graph content-types source is stale".into(),
@@ -357,7 +388,9 @@ impl Delta {
         } else {
             (&self.inner.owner_before, &self.inner.owner_after)
         };
-        if package.source_relationships(expected_owner.owner())? != *expected_owner {
+        if package.source_relationships(expected_owner.owner(), package.read_limits())?
+            != *expected_owner
+        {
             return Err(Error::Invalid(
                 "DOCX Ink graph relationship source is stale".into(),
             ));
@@ -366,9 +399,17 @@ impl Delta {
 
         if self.reversed {
             self.restore_targets(package)?;
-            package.try_replace_relationships(expected_owner, replacement_owner)?;
+            package.try_replace_relationships(
+                expected_owner,
+                replacement_owner,
+                package.read_limits(),
+            )?;
         } else {
-            package.try_replace_relationships(expected_owner, replacement_owner)?;
+            package.try_replace_relationships(
+                expected_owner,
+                replacement_owner,
+                package.read_limits(),
+            )?;
             for target in &self.inner.targets {
                 if target.removed.is_some() && !package.remove_part(&target.guard.part) {
                     return Err(Error::Invalid(
@@ -378,12 +419,16 @@ impl Delta {
             }
         }
         replace_content_types(package, replacement_content)?;
-        if package.source_relationships(replacement_owner.owner())? != *replacement_owner {
+        if package.source_relationships(replacement_owner.owner(), package.read_limits())?
+            != *replacement_owner
+        {
             return Err(Error::Invalid(
                 "DOCX Ink graph delta result is stale".into(),
             ));
         }
-        if package.source_content_types()?.bytes() != replacement_content.bytes() {
+        if package.source_content_types(package.read_limits())?.bytes()
+            != replacement_content.bytes()
+        {
             return Err(Error::Invalid(
                 "DOCX Ink graph content-types result is stale".into(),
             ));
@@ -473,7 +518,8 @@ impl Delta {
                 || (!std::ptr::eq(part.blob(), target.guard.payload.as_slice())
                     && part.blob() != target.guard.payload.as_slice())
                 || !same_relationships(part.rels(), &target.guard.relationships)
-                || package.source_relationships(part.partname())? != target.guard.relationship_token
+                || package.source_relationships(part.partname(), package.read_limits())?
+                    != target.guard.relationship_token
             {
                 return Err(Error::Invalid(
                     "DOCX Ink target payload or relationship source is stale".into(),
@@ -497,9 +543,14 @@ impl Delta {
                     Arc::clone(&target.guard.payload),
                 )))?;
             }
-            let current = package.source_relationships(&target.guard.part)?;
+            let current =
+                package.source_relationships(&target.guard.part, package.read_limits())?;
             if current != removed.relationship_token {
-                package.try_replace_relationships(&current, &removed.relationship_token)?;
+                package.try_replace_relationships(
+                    &current,
+                    &removed.relationship_token,
+                    package.read_limits(),
+                )?;
             }
         }
         Ok(())
@@ -529,7 +580,7 @@ fn owner_relationships<'a>(package: &'a OpcPackage, owner: &PackURI) -> Result<&
 fn selected_ids(ids: &[String], limits: Limits) -> Result<Vec<String>> {
     if ids.len() > limits.max_relationships {
         return Err(Error::InkLimit {
-            resource: "selected relationships",
+            kind: LimitKind::SelectedRelationships,
             actual: ids.len(),
             maximum: limits.max_relationships,
         });
@@ -633,7 +684,7 @@ fn count_incoming(
         return Ok(());
     };
     incoming[index] = incoming[index].checked_add(1).ok_or(Error::InkLimit {
-        resource: "remaining incoming relationships",
+        kind: LimitKind::RemainingIncomingRelationships,
         actual: usize::MAX,
         maximum: usize::MAX,
     })?;
@@ -667,6 +718,7 @@ fn validate_target_payload(content_type: &str, payload: &[u8]) -> Result<()> {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )?;
     }
     Ok(())
@@ -706,19 +758,19 @@ fn cmp_ascii_case_insensitive(left: &str, right: &str) -> std::cmp::Ordering {
 fn check_payload(length: usize, limits: Limits, total: &mut usize) -> Result<()> {
     if length > limits.max_payload_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph target payload bytes",
+            kind: LimitKind::GraphTargetPayloadBytes,
             actual: length,
             maximum: limits.max_payload_bytes,
         });
     }
     *total = total.checked_add(length).ok_or(Error::InkLimit {
-        resource: "Ink graph target payload bytes",
+        kind: LimitKind::GraphTargetPayloadBytes,
         actual: usize::MAX,
         maximum: limits.max_total_payload_bytes,
     })?;
     if *total > limits.max_total_payload_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph target payload bytes",
+            kind: LimitKind::GraphTargetPayloadBytes,
             actual: *total,
             maximum: limits.max_total_payload_bytes,
         });
@@ -776,7 +828,7 @@ fn preflight_graph(package: &OpcPackage, limits: Limits) -> Result<usize> {
     let part_count = package.part_count();
     if part_count > limits.stories.max_package_parts {
         return Err(Error::InkLimit {
-            resource: "Ink graph package parts",
+            kind: LimitKind::GraphPackageParts,
             actual: part_count,
             maximum: limits.stories.max_package_parts,
         });
@@ -814,13 +866,13 @@ fn measure_owner(
     add_topology(topology, owner.len().saturating_add(8), limits)?;
     for relationship in relationships.iter() {
         *relationship_count = relationship_count.checked_add(1).ok_or(Error::InkLimit {
-            resource: "Ink graph relationships",
+            kind: LimitKind::GraphRelationships,
             actual: usize::MAX,
             maximum: limits.max_relationships,
         })?;
         if *relationship_count > limits.max_relationships {
             return Err(Error::InkLimit {
-                resource: "Ink graph relationships",
+                kind: LimitKind::GraphRelationships,
                 actual: *relationship_count,
                 maximum: limits.max_relationships,
             });
@@ -839,13 +891,13 @@ fn measure_owner(
 
 fn add_topology(total: &mut usize, amount: usize, limits: Limits) -> Result<()> {
     *total = total.checked_add(amount).ok_or(Error::InkLimit {
-        resource: "Ink graph topology bytes",
+        kind: LimitKind::GraphTopologyBytes,
         actual: usize::MAX,
         maximum: limits.stories.max_topology_bytes,
     })?;
     if *total > limits.stories.max_topology_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink graph topology bytes",
+            kind: LimitKind::GraphTopologyBytes,
             actual: *total,
             maximum: limits.stories.max_topology_bytes,
         });
@@ -854,12 +906,12 @@ fn add_topology(total: &mut usize, amount: usize, limits: Limits) -> Result<()> 
 }
 
 fn replace_content_types(package: &mut OpcPackage, replacement: &OwnedContentTypes) -> Result<()> {
-    let current = package.source_content_types()?;
+    let current = package.source_content_types(package.read_limits())?;
     if current.bytes() == replacement.bytes() {
         return Ok(());
     }
     let expected = current.bytes().to_vec();
-    package.try_replace_content_types(&expected, replacement)?;
+    package.try_replace_content_types(&expected, replacement, package.read_limits())?;
     Ok(())
 }
 
@@ -871,9 +923,9 @@ fn add_retained(total: &mut usize, amount: usize) -> Result<()> {
 }
 
 fn unsupported(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "remove_ink",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "remove_ink",
         reason,
-    }
+    )
 }

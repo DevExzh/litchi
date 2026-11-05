@@ -41,7 +41,7 @@ const ROOT_PREVIEW_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "prev
 /// A content-free location associated with a body-table appearance operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableAppearancePath {
+pub enum Path {
     /// The complete Pages package.
     Package,
     /// One rooted table at checked zero-based positions.
@@ -51,7 +51,7 @@ pub enum BodyTableAppearancePath {
 /// A finite resource governed by a body-table appearance operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableAppearanceLimitKind {
+pub enum LimitKind {
     /// Complete source package bytes.
     InputBytes,
     /// Complete candidate package bytes.
@@ -90,7 +90,7 @@ pub enum BodyTableAppearanceLimitKind {
     TransactionWork,
 }
 
-impl fmt::Display for BodyTableAppearanceLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{self:?}")
     }
@@ -99,7 +99,42 @@ impl fmt::Display for BodyTableAppearanceLimitKind {
 /// A content-redacted body-table appearance failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum BodyTableAppearanceError {
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// Rooted ownership or wire framing is invalid.
+    #[error("the Pages body body-table appearance source is invalid at {path:?}")]
+    InvalidSource { path: Path },
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Pages body body-table appearance {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+        path: Path,
+    },
+    /// A bounded allocation failed before publication.
+    #[error(
+        "could not allocate {amount} units for the Pages body body-table appearance transaction"
+    )]
+    Allocation { amount: usize, path: Path },
+    /// Candidate reopening or locality verification failed.
+    #[error("the edited Pages body table appearance failed semantic verification")]
+    Verification,
+    /// A patch was applied to a package other than its exact source.
+    #[error("the body-table appearance patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No body table matched the selector.
     #[error("the Pages body has no table matching the requested selector")]
     TableNotFound,
@@ -111,40 +146,37 @@ pub enum BodyTableAppearanceError {
     AmbiguousSelector,
     /// A changed operation targeted a locked table.
     #[error("the selected Pages body table is locked at {path:?}")]
-    TableLocked { path: BodyTableAppearancePath },
+    TableLocked { path: Path },
     /// A native style dependency is not safe to rewrite in this owner.
     #[error("the selected Pages body table appearance has an unsupported dependency at {path:?}")]
-    UnsupportedDependency { path: BodyTableAppearancePath },
+    UnsupportedDependency { path: Path },
     /// The source is not an exact supported native profile.
     #[error("this Pages source does not support exact body-table appearance editing")]
     UnsupportedSource,
-    /// Rooted ownership or wire framing is invalid.
-    #[error("the Pages body body-table appearance source is invalid at {path:?}")]
-    InvalidSource { path: BodyTableAppearancePath },
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Pages body body-table appearance {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: BodyTableAppearanceLimitKind,
-        observed: u64,
-        maximum: u64,
-        path: BodyTableAppearancePath,
-    },
-    /// A bounded allocation failed before publication.
-    #[error(
-        "could not allocate {amount} units for the Pages body body-table appearance transaction"
-    )]
-    Allocation {
-        amount: usize,
-        path: BodyTableAppearancePath,
-    },
-    /// Candidate reopening or locality verification failed.
-    #[error("the edited Pages body table appearance failed semantic verification")]
-    Verification,
-    /// A patch was applied to a package other than its exact source.
-    #[error("the body-table appearance patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -155,43 +187,82 @@ struct BodyTableAppearanceTarget {
 }
 
 /// Immutable appearance settings staged against one package snapshot.
-pub struct BodyTableAppearanceEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
-    target: BodyTableAppearanceTarget,
-    before: Appearance,
-    appearance: Appearance,
-    budget: TransactionBudget,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<BodyTableAppearanceTarget>,
+    before: Option<Appearance>,
+    appearance: Option<Appearance>,
+    budget: Option<TransactionBudget>,
 }
 
-impl fmt::Debug for BodyTableAppearanceEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableAppearanceEdit")
-            .field("path", &self.path())
+            .debug_struct("Edit")
+            .field("resolved", &self.target.is_some())
             .field("appearance", &self.appearance)
             .finish_non_exhaustive()
     }
 }
 
-impl BodyTableAppearanceEdit<'_> {
-    /// Return the selected table path.
-    #[must_use]
-    pub const fn path(&self) -> BodyTableAppearancePath {
-        BodyTableAppearancePath::Table {
-            table: self.target.native.table_position,
+impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = match self.budget.take() {
+                Some(budget) => budget,
+                None => TransactionBudget::new(self.source)?,
+            };
+            let selector = match &self.selector {
+                table_lock::OwnedBodyTableSelector::Name(name) => BodyTableSelector::Name(name),
+                table_lock::OwnedBodyTableSelector::Position(position) => {
+                    BodyTableSelector::Position(*position)
+                },
+            };
+            let target = match resolve_target_with_budget(self.source, selector, &mut budget, true)
+            {
+                Ok(target) => target,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
+            let before = target.appearance;
+            if self.appearance.is_none() {
+                self.appearance = Some(before);
+            }
+            self.before = Some(before);
+            self.target = Some(target);
+            self.budget = Some(budget);
         }
+        Ok(())
+    }
+
+    /// Return the selected table path.
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.resolve()?;
+        self.target
+            .as_ref()
+            .map(|target| Path::Table {
+                table: target.native.table_position,
+            })
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })
     }
 
     /// Return the staged appearance.
-    #[must_use]
-    pub const fn appearance(&self) -> Appearance {
-        self.appearance
+    pub fn appearance(&mut self) -> Result<Appearance, Error> {
+        self.resolve()?;
+        self.appearance.ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })
     }
 
     /// Replace the staged appearance without touching package bytes.
     #[must_use]
     pub fn set(mut self, appearance: Appearance) -> Self {
-        self.appearance = appearance;
+        self.appearance = Some(appearance);
         self
     }
 
@@ -200,14 +271,15 @@ impl BodyTableAppearanceEdit<'_> {
     /// Exact semantic no-ops reuse the immutable source allocation. Changed
     /// edits revalidate the selected rooted target, enforce ownership and
     /// lock safety, then rewrite and fully reopen the candidate.
-    pub fn commit(self) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
 
 /// A reversible process-local exact-source appearance patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyTableAppearancePatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     target: BodyTableAppearanceTarget,
     before: Appearance,
@@ -217,10 +289,10 @@ pub struct BodyTableAppearancePatch {
     touched_components: usize,
 }
 
-impl fmt::Debug for BodyTableAppearancePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableAppearancePatch")
+            .debug_struct("Patch")
             .field("path", &self.path())
             .field("before", &self.before)
             .field("after", &self.after)
@@ -228,11 +300,11 @@ impl fmt::Debug for BodyTableAppearancePatch {
     }
 }
 
-impl BodyTableAppearancePatch {
+impl Patch {
     /// Return the selected table path.
     #[must_use]
-    pub const fn path(&self) -> BodyTableAppearancePath {
-        BodyTableAppearancePath::Table {
+    pub const fn path(&self) -> Path {
+        Path::Table {
             table: self.target.native.table_position,
         }
     }
@@ -284,14 +356,14 @@ impl BodyTableAppearancePatch {
 
 /// Content-free publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BodyTableAppearanceDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyTableAppearanceDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -338,13 +410,13 @@ impl BodyTableAppearanceDiagnostics {
 /// One fully validated immutable publication.
 #[must_use = "a body-table appearance commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyTableAppearanceCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableAppearancePatch,
-    diagnostics: BodyTableAppearanceDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyTableAppearanceCommit {
+impl Commit {
     /// Borrow the validated package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -357,15 +429,21 @@ impl BodyTableAppearanceCommit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableAppearancePatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow content-free diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableAppearanceDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -375,7 +453,7 @@ impl Package {
     pub fn body_table_appearance<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<Appearance, BodyTableAppearanceError> {
+    ) -> Result<Appearance, Error> {
         let mut budget = TransactionBudget::new(self)?;
         let result = resolve_target_with_budget(self, selector, &mut budget, true);
         Ok(result?.appearance)
@@ -385,66 +463,53 @@ impl Package {
     pub fn edit_body_table_appearance<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<BodyTableAppearanceEdit<'_>, BodyTableAppearanceError> {
-        let mut budget = TransactionBudget::new(self)?;
-        // Stage only after the same strict graph/metadata admission used by
-        // a read. Changed commits repeat this proof because an edit is an
-        // immutable snapshot boundary, not an authority token; exact no-ops
-        // retain this staged immutable proof and skip changed-only work.
-        let target = resolve_target_with_budget(self, selector, &mut budget, true)?;
-        Ok(BodyTableAppearanceEdit {
+    ) -> Result<Edit<'_>, Error> {
+        Ok(Edit {
             source: self,
-            before: target.appearance,
-            appearance: target.appearance,
-            target,
-            budget,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(|error| map_lock_error(error, Path::Package))?,
+            before: None,
+            appearance: None,
+            target: None,
+            budget: None,
         })
     }
 
     /// Apply a reversible exact-source appearance patch.
-    pub fn apply_body_table_appearance(
-        &self,
-        patch: &BodyTableAppearancePatch,
-    ) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> {
+    pub fn apply_body_table_appearance(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = TransactionBudget::new(self)?;
         let source_catalog = physical_source(self)?;
         let source_owner = SharedBytes::from_shared_slice(source_catalog.shared_source());
         if !patch.artifacts.authorizes_owner(&source_owner) {
-            return Err(BodyTableAppearanceError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let selected =
             resolve_at_with_budget(self, patch.target.native.table_position, &mut budget, true)?;
         if selected.appearance != patch.before || selected.native != patch.target.native {
-            return Err(BodyTableAppearanceError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(BodyTableAppearanceCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyTableAppearanceDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source_catalog.source_is_exact() {
-            return Err(BodyTableAppearanceError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let target_owner = patch.artifacts.target_owner();
-        budget.charge_output_bytes(target_owner.len(), BodyTableAppearancePath::Package)?;
-        budget.charge_transaction_work(
-            target_owner.len().saturating_mul(2),
-            BodyTableAppearancePath::Package,
-        )?;
-        budget.preflight_candidate_reopen_bytes(
-            target_owner.as_ref(),
-            BodyTableAppearancePath::Package,
-        )?;
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::<[u8]>::from(target_owner.as_slice()),
-            self.state.source.limits(),
-        )
-        .map_err(|error| map_archive_error(error, BodyTableAppearancePath::Package))?;
-        budget.preflight_candidate_catalog(&candidate_source, BodyTableAppearancePath::Package)?;
-        let candidate = Package::from_source_catalog(candidate_source)
-            .map_err(|_| BodyTableAppearanceError::Verification)?;
+        budget.charge_output_bytes(target_owner.len(), Path::Package)?;
+        budget.charge_transaction_work(target_owner.len().saturating_mul(2), Path::Package)?;
+        budget.preflight_candidate_reopen_bytes(target_owner.as_ref(), Path::Package)?;
+        let candidate_source = self
+            .state
+            .source
+            .reopen(Arc::<[u8]>::from(target_owner.as_slice()))
+            .map_err(|error| map_archive_error(error, Path::Package))?;
+        budget.preflight_candidate_catalog(&candidate_source, Path::Package)?;
+        let candidate =
+            Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
         let after = resolve_at_with_budget(
             &candidate,
             patch.target.native.table_position,
@@ -452,7 +517,7 @@ impl Package {
             true,
         )?;
         if after.appearance != patch.after || after.native != patch.target.native {
-            return Err(BodyTableAppearanceError::Verification);
+            return Err(Error::Verification);
         }
         verify_candidate_locality(
             self,
@@ -462,13 +527,13 @@ impl Package {
             after.style_identifier,
             patch.source_previews,
             patch.target_previews,
-            BodyTableAppearancePath::Package,
+            Path::Package,
             &mut budget,
         )?;
-        Ok(BodyTableAppearanceCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableAppearanceDiagnostics::published(
+            diagnostics: Diagnostics::published(
                 patch.source_previews.saturating_sub(patch.target_previews),
                 patch.touched_components,
             ),
@@ -476,54 +541,65 @@ impl Package {
     }
 }
 
-fn commit_edit(
-    edit: BodyTableAppearanceEdit<'_>,
-) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     // Capture the content-free path before moving the operation ledger out of
     // the edit.  The ledger is deliberately not Clone/Copy: every subsequent
     // check must debit the same transaction rather than a fresh budget.
-    let edit_path = edit.path();
+    let target = edit.target.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let before = edit.before.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let appearance = edit.appearance.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let budget = edit.budget.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let edit_path = Path::Table {
+        table: target.native.table_position,
+    };
     let catalog = physical_source(edit.source)?;
     let source_owner = SharedBytes::from_shared_slice(catalog.shared_source());
-    if edit.before == edit.appearance {
-        return Ok(BodyTableAppearanceCommit {
-            package: edit.source.snapshot(),
-            patch: BodyTableAppearancePatch {
+    if before == appearance {
+        return Ok(Commit {
+            package: edit.source.clone(),
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
-                target: edit.target.clone(),
-                before: edit.before,
-                after: edit.appearance,
+                target: target.clone(),
+                before,
+                after: appearance,
                 source_previews: 0,
                 target_previews: 0,
                 touched_components: 0,
             },
-            diagnostics: BodyTableAppearanceDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(BodyTableAppearanceError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let mut budget = edit.budget;
-    let revalidated = resolve_at_with_budget(
-        edit.source,
-        edit.target.native.table_position,
-        &mut budget,
-        true,
-    )?;
-    if revalidated.appearance != edit.before
-        || revalidated.native != edit.target.native
-        || revalidated.style_identifier != edit.target.style_identifier
+    let mut budget = budget;
+    let revalidated =
+        resolve_at_with_budget(edit.source, target.native.table_position, &mut budget, true)?;
+    if revalidated.appearance != before
+        || revalidated.native != target.native
+        || revalidated.style_identifier != target.style_identifier
     {
-        return Err(BodyTableAppearanceError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     if revalidated.native.explicit_locked == Some(true) {
-        return Err(BodyTableAppearanceError::TableLocked { path: edit_path });
+        return Err(Error::Refused(Refusal::TableLocked { path: edit_path }));
     }
     budget.charge_transaction_work(edit.source.source_bytes().len(), edit_path)?;
-    let target = edit.target.clone();
-    let old_style = target
-        .style_identifier
-        .ok_or(BodyTableAppearanceError::UnsupportedDependency { path: edit_path })?;
+    let target = target.clone();
+    let old_style =
+        target
+            .style_identifier
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency {
+                path: edit_path,
+            }))?;
     let metadata_selector_set = preflight_metadata_for_style(
         edit.source,
         target.native.component_index,
@@ -535,7 +611,7 @@ fn commit_edit(
         edit.source,
         target.clone(),
         old_style,
-        edit.appearance,
+        appearance,
         edit_path,
         &mut budget,
     )?;
@@ -552,12 +628,10 @@ fn commit_edit(
     let previews = root_preview_deletions(catalog, edit_path, &mut budget)?;
     let mut edits = native_edits.edits;
     budget.charge_allocations(1, edit_path)?;
-    edits
-        .try_reserve(1)
-        .map_err(|_| BodyTableAppearanceError::Allocation {
-            amount: edits.len().saturating_add(1),
-            path: edit_path,
-        })?;
+    edits.try_reserve(1).map_err(|_| Error::Allocation {
+        amount: edits.len().saturating_add(1),
+        path: edit_path,
+    })?;
     edits.push(metadata_edit);
     let touched_components = edits
         .iter()
@@ -570,12 +644,12 @@ fn commit_edit(
         .count();
     let mut entry_edits = Vec::new();
     budget.charge_allocations(edits.len().saturating_add(1), edit_path)?;
-    entry_edits.try_reserve_exact(edits.len()).map_err(|_| {
-        BodyTableAppearanceError::Allocation {
+    entry_edits
+        .try_reserve_exact(edits.len())
+        .map_err(|_| Error::Allocation {
             amount: edits.len(),
             path: edit_path,
-        }
-    })?;
+        })?;
     for edit in &edits {
         entry_edits.push(EntryEdit::new(edit.name.as_str(), edit.data.as_slice()));
     }
@@ -590,17 +664,18 @@ fn commit_edit(
         .execute(requirements.exact_limits())
         .map_err(|error| map_archive_error(error, edit_path))?;
     budget.preflight_candidate_reopen_bytes(target_bytes.as_slice(), edit_path)?;
-    let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-        target_bytes.into(),
-        edit.source.state.source.limits(),
-    )
-    .map_err(|error| map_archive_error(error, edit_path))?;
+    let candidate_source = edit
+        .source
+        .state
+        .source
+        .reopen(target_bytes.into())
+        .map_err(|error| map_archive_error(error, edit_path))?;
     budget.preflight_candidate_catalog(&candidate_source, edit_path)?;
-    let package = Package::from_source_catalog(candidate_source)
-        .map_err(|_| BodyTableAppearanceError::Verification)?;
+    let package =
+        Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
     let after = resolve_at_with_budget(&package, target.native.table_position, &mut budget, true)?;
-    if after.appearance != edit.appearance || after.native != target.native {
-        return Err(BodyTableAppearanceError::Verification);
+    if after.appearance != appearance || after.native != target.native {
+        return Err(Error::Verification);
     }
     verify_candidate_locality(
         edit.source,
@@ -615,19 +690,19 @@ fn commit_edit(
     )?;
     let target_catalog = physical_source(&package)?;
     let target_owner = SharedBytes::from_shared_slice(target_catalog.shared_source());
-    let patch = BodyTableAppearancePatch {
+    let patch = Patch {
         artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
         target,
-        before: edit.before,
-        after: edit.appearance,
+        before,
+        after: appearance,
         source_previews: previews.len(),
         target_previews: 0,
         touched_components,
     };
-    Ok(BodyTableAppearanceCommit {
+    Ok(Commit {
         package,
         patch,
-        diagnostics: BodyTableAppearanceDiagnostics::published(previews.len(), touched_components),
+        diagnostics: Diagnostics::published(previews.len(), touched_components),
     })
 }
 
@@ -671,12 +746,12 @@ struct TransactionBudget {
 }
 
 impl TransactionBudget {
-    fn new(source: &Package) -> Result<Self, BodyTableAppearanceError> {
+    fn new(source: &Package) -> Result<Self, Error> {
         let physical = source.state.source.limits();
         let mut wire = table_lock::WireBudget::new(physical)
-            .map_err(|error| map_lock_error(error, BodyTableAppearancePath::Package))?;
+            .map_err(|error| map_lock_error(error, Path::Package))?;
         wire.charge_source_catalog(&source.state.source)
-            .map_err(|error| map_lock_error(error, BodyTableAppearancePath::Package))?;
+            .map_err(|error| map_lock_error(error, Path::Package))?;
         let archive = physical.archive_limits();
         let maximum_wire_bytes = physical.max_iwa_stream_bytes().max(1);
         let maximum_output_bytes = usize::try_from(physical.max_total_bytes())
@@ -776,141 +851,101 @@ impl TransactionBudget {
         .with_max_scratch_bytes(stage_bytes)
     }
 
-    fn charge_fields(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_fields(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_fields,
             self.maximum_fields,
             amount,
-            BodyTableAppearanceLimitKind::WireFields,
+            LimitKind::WireFields,
             path,
         )
     }
 
-    fn charge_work(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_work(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_work,
             self.maximum_work,
             amount,
-            BodyTableAppearanceLimitKind::WireWork,
+            LimitKind::WireWork,
             path,
         )
     }
 
-    fn charge_styles(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_styles(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_styles,
             self.maximum_styles,
             amount,
-            BodyTableAppearanceLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
             path,
         )
     }
 
-    fn charge_components(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_components(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_components,
             self.maximum_components,
             amount,
-            BodyTableAppearanceLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
             path,
         )
     }
 
-    fn charge_references(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_references(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_references,
             self.maximum_references,
             amount,
-            BodyTableAppearanceLimitKind::PayloadReferences,
+            LimitKind::PayloadReferences,
             path,
         )
     }
 
-    fn charge_additions(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_additions(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_additions,
             self.maximum_additions,
             amount,
-            BodyTableAppearanceLimitKind::PayloadItems,
+            LimitKind::PayloadItems,
             path,
         )
     }
 
-    fn charge_allocations(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_allocations(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_allocations,
             self.maximum_allocations,
             amount,
-            BodyTableAppearanceLimitKind::TransactionWork,
+            LimitKind::TransactionWork,
             path,
         )
     }
 
-    fn charge_transaction_work(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_transaction_work(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_transaction_work,
             self.maximum_transaction_work,
             amount,
-            BodyTableAppearanceLimitKind::TransactionWork,
+            LimitKind::TransactionWork,
             path,
         )
     }
 
-    fn charge_output_bytes(
-        &mut self,
-        amount: usize,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_output_bytes(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         charge_budget(
             &mut self.remaining_output_bytes,
             self.maximum_output_bytes,
             amount,
-            BodyTableAppearanceLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
             path,
         )
     }
 
-    fn charge_nesting(
-        &mut self,
-        amount: u32,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn charge_nesting(&mut self, amount: u32, path: Path) -> Result<(), Error> {
         let observed = usize::try_from(amount).unwrap_or(usize::MAX);
         if observed > self.maximum_nesting {
-            return Err(BodyTableAppearanceError::LimitExceeded {
-                kind: BodyTableAppearanceLimitKind::WireNesting,
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::try_from(observed).unwrap_or(u64::MAX),
                 maximum: u64::try_from(self.maximum_nesting).unwrap_or(u64::MAX),
                 path,
@@ -922,11 +957,7 @@ impl TransactionBudget {
     /// Reserve the bytes and logical work needed before a candidate source is
     /// handed to the ZIP/catalog parser.  The parser has its own physical
     /// limits, but it cannot see this operation's aggregate ledger.
-    fn preflight_candidate_reopen_bytes(
-        &mut self,
-        bytes: &[u8],
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn preflight_candidate_reopen_bytes(&mut self, bytes: &[u8], path: Path) -> Result<(), Error> {
         self.charge_transaction_work(bytes.len(), path)?;
         self.wire
             .charge_output_bytes(bytes.len())
@@ -941,8 +972,8 @@ impl TransactionBudget {
     fn preflight_candidate_catalog(
         &mut self,
         catalog: &SourceCatalog,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+        path: Path,
+    ) -> Result<(), Error> {
         let entry_count = catalog.package().iter().count();
         let component_count = catalog.components().len();
         self.charge_transaction_work(catalog.shared_source().len(), path)?;
@@ -962,8 +993,8 @@ impl TransactionBudget {
     fn preflight_reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+        path: Path,
+    ) -> Result<(), Error> {
         self.charge_output_bytes(requirements.output_bytes(), path)?;
         self.charge_allocations(requirements.allocations(), path)?;
         self.charge_transaction_work(requirements.offset_count(), path)?;
@@ -976,11 +1007,7 @@ impl TransactionBudget {
         )
     }
 
-    fn consume_report(
-        &mut self,
-        report: codec::DecodeReport,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+    fn consume_report(&mut self, report: codec::DecodeReport, path: Path) -> Result<(), Error> {
         self.charge_fields(report.fields(), path)?;
         self.charge_work(report.work_bytes(), path)?;
         self.charge_nesting(report.max_depth(), path)?;
@@ -998,8 +1025,8 @@ impl TransactionBudget {
     fn preflight_requirements(
         &mut self,
         requirements: codec::RewriteExecutionRequirements,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+        path: Path,
+    ) -> Result<(), Error> {
         self.charge_fields(requirements.fields(), path)?;
         self.charge_work(requirements.work_bytes(), path)?;
         self.charge_nesting(requirements.max_depth(), path)?;
@@ -1017,8 +1044,8 @@ impl TransactionBudget {
     fn preflight_metadata_requirements(
         &mut self,
         requirements: litchi_iwa_protos::package_metadata_codec::RewriteExecutionRequirements,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+        path: Path,
+    ) -> Result<(), Error> {
         self.charge_fields(requirements.fields(), path)?;
         self.charge_work(requirements.work_bytes(), path)?;
         self.charge_components(requirements.components(), path)?;
@@ -1055,8 +1082,8 @@ impl TransactionBudget {
     fn consume_metadata_report(
         &mut self,
         report: litchi_iwa_protos::package_metadata_codec::RewriteReport,
-        path: BodyTableAppearancePath,
-    ) -> Result<(), BodyTableAppearanceError> {
+        path: Path,
+    ) -> Result<(), Error> {
         self.charge_fields(report.fields(), path)?;
         self.charge_work(report.work_bytes(), path)?;
         self.charge_components(report.components_scanned(), path)?;
@@ -1078,12 +1105,12 @@ fn charge_budget(
     remaining: &mut usize,
     maximum: usize,
     amount: usize,
-    kind: BodyTableAppearanceLimitKind,
-    path: BodyTableAppearancePath,
-) -> Result<(), BodyTableAppearanceError> {
+    kind: LimitKind,
+    path: Path,
+) -> Result<(), Error> {
     if amount > *remaining {
         let observed = maximum.saturating_sub(*remaining).saturating_add(amount);
-        return Err(BodyTableAppearanceError::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1099,9 +1126,9 @@ fn rewrite_native_appearance(
     target: BodyTableAppearanceTarget,
     old_style: u64,
     appearance: Appearance,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(u64, UuidBits, NativeOutput), BodyTableAppearanceError> {
+) -> Result<(u64, UuidBits, NativeOutput), Error> {
     let style_location = resolved_location(source, old_style, path, budget)?;
     let style_payload = style_message_data(source, old_style, path, budget)?;
     let (style, style_report) =
@@ -1111,21 +1138,21 @@ fn rewrite_native_appearance(
     let stylesheet_id = style
         .stylesheet_identifier()
         .filter(|identifier| *identifier != 0)
-        .ok_or(BodyTableAppearanceError::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let stylesheet_location = resolved_location(source, stylesheet_id, path, budget)?;
     let stylesheet_payload = stylesheet_message_data(source, stylesheet_id, path, budget)?;
     if target.native.model_component_index != style_location.0
         || style_location.0 != stylesheet_location.0
     {
-        return Err(BodyTableAppearanceError::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     let new_style = next_style_identifier(source, path, budget)?;
     let uuid = style_uuid(new_style);
     if uuid.lower() == 0 && uuid.upper() == 0 {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
-    let model_payload = model_payload(source, &target.native, budget)
-        .map_err(|_| BodyTableAppearanceError::InvalidSource { path })?;
+    let model_payload =
+        model_payload(source, &target.native, budget).map_err(|_| Error::InvalidSource { path })?;
     let physical = physical_source(source)?;
     let archive_limits = physical
         .limits()
@@ -1135,7 +1162,7 @@ fn rewrite_native_appearance(
     let mut component_indices = Vec::new();
     component_indices
         .try_reserve_exact(3)
-        .map_err(|_| BodyTableAppearanceError::Allocation { amount: 3, path })?;
+        .map_err(|_| Error::Allocation { amount: 3, path })?;
     component_indices.push(target.native.component_index);
     component_indices.push(style_location.0);
     if !component_indices.contains(&stylesheet_location.0) {
@@ -1148,8 +1175,9 @@ fn rewrite_native_appearance(
         .snappy_limits()
         .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|error| map_core_error(error, path))?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(
         component_indices.len().saturating_mul(4).saturating_add(8),
         path,
@@ -1163,7 +1191,7 @@ fn rewrite_native_appearance(
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(component_indices.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_indices.len(),
             path,
         })?;
@@ -1207,7 +1235,7 @@ fn rewrite_native_appearance(
             .source
             .components()
             .get_index(component_index)
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         budget.charge_allocations(1, path)?;
         budget.charge_transaction_work(component.name().len(), path)?;
         let name = component.name().to_owned();
@@ -1215,17 +1243,17 @@ fn rewrite_native_appearance(
             .package()
             .iter()
             .find(|entry| entry.name() == name)
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         if entry.is_opaque() {
-            return Err(BodyTableAppearanceError::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         budget.charge_transaction_work(entry.data().len(), path)?;
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+        let stream = SnappyStream::decompress(entry.data(), snappy_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, path))?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, path))?;
         if component_index == target.native.component_index {
             replace_model_in_archive(
@@ -1264,10 +1292,10 @@ fn rewrite_native_appearance(
             )?;
         }
         let bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let compressed =
-            SnappyStream::compress(&bytes).map_err(|error| map_core_error(error, path))?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
         edits.push(NativeEdit {
             name,
             data: compressed,
@@ -1318,9 +1346,9 @@ fn appearance_overrides(appearance: Appearance) -> codec::AppearanceOverrides {
 
 fn next_style_identifier(
     source: &Package,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<u64, BodyTableAppearanceError> {
+) -> Result<u64, Error> {
     let mut maximum = 0u64;
     for component in source.state.source.components().iter() {
         for object in &component.archive().objects {
@@ -1328,7 +1356,7 @@ fn next_style_identifier(
                 object
                     .archive_info
                     .identifier
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?,
+                    .ok_or(Error::InvalidSource { path })?,
             );
             budget.charge_transaction_work(1, path)?;
         }
@@ -1343,15 +1371,15 @@ fn next_style_identifier(
     .map_err(|error| map_metadata_error(error, path))?;
     budget.consume_metadata_report(inspection.report(), path)?;
     if visitor.unknown {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let identifier = maximum
         .max(inspection.last_object_identifier())
         .max(visitor.maximum)
         .checked_add(1)
         .filter(|identifier| *identifier != 0)
-        .ok_or(BodyTableAppearanceError::LimitExceeded {
-            kind: BodyTableAppearanceLimitKind::PayloadObjects,
+        .ok_or(Error::Limit {
+            kind: LimitKind::PayloadObjects,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
             path,
@@ -1365,7 +1393,7 @@ fn next_style_identifier(
     .map_err(|error| map_metadata_error(error, path))?;
     budget.consume_metadata_report(collision_inspection.report(), path)?;
     if collision.unknown || collision.found {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(identifier)
 }
@@ -1380,9 +1408,9 @@ fn style_uuid(identifier: u64) -> UuidBits {
 fn resolved_location(
     source: &Package,
     identifier: u64,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(usize, usize), BodyTableAppearanceError> {
+) -> Result<(usize, usize), Error> {
     let mut location = None;
     for (component_index, component) in source.state.source.components().iter().enumerate() {
         budget.charge_components(1, path)?;
@@ -1392,19 +1420,19 @@ fn resolved_location(
                 continue;
             }
             if location.replace((component_index, object_index)).is_some() {
-                return Err(BodyTableAppearanceError::InvalidSource { path });
+                return Err(Error::InvalidSource { path });
             }
         }
     }
-    location.ok_or(BodyTableAppearanceError::InvalidSource { path })
+    location.ok_or(Error::InvalidSource { path })
 }
 
 fn stylesheet_message_data<'source>(
     source: &'source Package,
     identifier: u64,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<&'source [u8], BodyTableAppearanceError> {
+) -> Result<&'source [u8], Error> {
     appearance_message_data(source, identifier, STYLESHEET_MESSAGE_TYPE, path, budget)
 }
 
@@ -1412,9 +1440,9 @@ fn appearance_message_data<'source>(
     source: &'source Package,
     identifier: u64,
     expected_type: u32,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<&'source [u8], BodyTableAppearanceError> {
+) -> Result<&'source [u8], Error> {
     let (component_index, object_index) = resolved_location(source, identifier, path, budget)?;
     let object = source
         .state
@@ -1422,9 +1450,9 @@ fn appearance_message_data<'source>(
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     if object.archive_info.identifier != Some(identifier) {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     validate_appearance_message_roles(object, expected_type, path, budget)?;
     let mut messages = object
@@ -1433,65 +1461,54 @@ fn appearance_message_data<'source>(
         .filter(|message| message.type_ == expected_type);
     let message = messages
         .next()
-        .ok_or(BodyTableAppearanceError::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     if messages.next().is_some() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(message.data.as_slice())
 }
 
-fn map_codec_error(
-    error: codec::DecodeError,
-    path: BodyTableAppearancePath,
-) -> BodyTableAppearanceError {
+fn map_codec_error(error: codec::DecodeError, path: Path) -> Error {
     if let Some(amount) = error.allocation_requested() {
-        return BodyTableAppearanceError::Allocation { amount, path };
+        return Error::Allocation { amount, path };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyTableAppearanceError::InvalidSource { path };
+        return Error::InvalidSource { path };
     };
     let (kind, observed, maximum) = match limit {
         codec::DecodeLimit::InputBytes { observed, maximum } => {
-            (BodyTableAppearanceLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
-        codec::DecodeLimit::OutputBytes { observed, maximum } => (
-            BodyTableAppearanceLimitKind::WireOutputBytes,
-            observed,
-            maximum,
-        ),
+        codec::DecodeLimit::OutputBytes { observed, maximum } => {
+            (LimitKind::WireOutputBytes, observed, maximum)
+        },
         codec::DecodeLimit::Fields { observed, maximum } => {
-            (BodyTableAppearanceLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         codec::DecodeLimit::WorkBytes { observed, maximum } => {
-            (BodyTableAppearanceLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return BodyTableAppearanceError::LimitExceeded {
-                kind: BodyTableAppearanceLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
                 path,
             };
         },
-        codec::DecodeLimit::Styles { observed, maximum } => (
-            BodyTableAppearanceLimitKind::PayloadItems,
-            observed,
-            maximum,
-        ),
-        codec::DecodeLimit::Allocations { observed, maximum } => (
-            BodyTableAppearanceLimitKind::TransactionWork,
-            observed,
-            maximum,
-        ),
+        codec::DecodeLimit::Styles { observed, maximum } => {
+            (LimitKind::PayloadItems, observed, maximum)
+        },
+        codec::DecodeLimit::Allocations { observed, maximum } => {
+            (LimitKind::TransactionWork, observed, maximum)
+        },
         codec::DecodeLimit::RetainedBytes { observed, maximum }
-        | codec::DecodeLimit::ScratchBytes { observed, maximum } => (
-            BodyTableAppearanceLimitKind::TransactionWork,
-            observed,
-            maximum,
-        ),
-        _ => return BodyTableAppearanceError::InvalidSource { path },
+        | codec::DecodeLimit::ScratchBytes { observed, maximum } => {
+            (LimitKind::TransactionWork, observed, maximum)
+        },
+        _ => return Error::InvalidSource { path },
     };
-    BodyTableAppearanceError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1595,9 +1612,9 @@ fn normalized_locator(name: &str) -> &str {
 
 fn metadata_route(
     source: &Package,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<Option<MetadataRoute>, BodyTableAppearanceError> {
+) -> Result<Option<MetadataRoute>, Error> {
     let mut route = None;
     for (component_index, component) in source.state.source.components().iter().enumerate() {
         budget.charge_components(1, path)?;
@@ -1623,14 +1640,11 @@ fn metadata_route(
 }
 
 impl MetadataSelectorSet {
-    fn selectors(
-        &self,
-        path: BodyTableAppearancePath,
-    ) -> Result<Vec<ComponentSelector<'_>>, BodyTableAppearanceError> {
+    fn selectors(&self, path: Path) -> Result<Vec<ComponentSelector<'_>>, Error> {
         let mut selectors = Vec::new();
         selectors
             .try_reserve_exact(self.identifiers.len())
-            .map_err(|_| BodyTableAppearanceError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: self.identifiers.len(),
                 path,
             })?;
@@ -1781,22 +1795,19 @@ impl ArchiveReferenceVisitor for GlobalReferenceAuthority<'_> {
 }
 
 impl<'source> SelectorVisitor<'source> {
-    fn new(
-        locators: &'source [&'source str],
-        path: BodyTableAppearancePath,
-    ) -> Result<Self, BodyTableAppearanceError> {
+    fn new(locators: &'source [&'source str], path: Path) -> Result<Self, Error> {
         let mut identifiers = Vec::new();
-        identifiers.try_reserve_exact(locators.len()).map_err(|_| {
-            BodyTableAppearanceError::Allocation {
+        identifiers
+            .try_reserve_exact(locators.len())
+            .map_err(|_| Error::Allocation {
                 amount: locators.len(),
                 path,
-            }
-        })?;
+            })?;
         identifiers.resize(locators.len(), None);
         let mut effective_locators = Vec::new();
         effective_locators
             .try_reserve_exact(locators.len())
-            .map_err(|_| BodyTableAppearanceError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: locators.len(),
                 path,
             })?;
@@ -2028,11 +2039,10 @@ impl PackageMetadataVisitor for RegistrySetVisitor<'_> {
 
 fn metadata_payload<'source>(
     source: &'source Package,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<&'source [u8], BodyTableAppearanceError> {
-    let route = metadata_route(source, path, budget)?
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+) -> Result<&'source [u8], Error> {
+    let route = metadata_route(source, path, budget)?.ok_or(Error::InvalidSource { path })?;
     source
         .state
         .source
@@ -2042,7 +2052,7 @@ fn metadata_payload<'source>(
         .and_then(|object| object.messages.get(route.message_index))
         .filter(|message| message.type_ == METADATA_MESSAGE_TYPE)
         .map(|message| message.data.as_slice())
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })
+        .ok_or(Error::InvalidSource { path })
 }
 
 fn metadata_options(source: &Package, bytes: usize, additions: usize) -> MetadataRewriteOptions {
@@ -2075,9 +2085,9 @@ fn metadata_selectors(
     source: &Package,
     component_indices: &[usize],
     payload: &[u8],
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<MetadataSelectorSet, BodyTableAppearanceError> {
+) -> Result<MetadataSelectorSet, Error> {
     budget.charge_allocations(
         component_indices.len().saturating_mul(3).saturating_add(4),
         path,
@@ -2085,7 +2095,7 @@ fn metadata_selectors(
     let mut locators = Vec::new();
     locators
         .try_reserve_exact(component_indices.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_indices.len(),
             path,
         })?;
@@ -2095,7 +2105,7 @@ fn metadata_selectors(
             .source
             .components()
             .get_index(index)
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         locators.push(normalized_locator(component.name()));
     }
     let locator_refs = locators;
@@ -2108,19 +2118,19 @@ fn metadata_selectors(
     .map_err(|error| map_metadata_error(error, path))?;
     budget.consume_metadata_report(inspection.report(), path)?;
     if visitor.unknown || visitor.duplicate || visitor.identifiers.iter().any(Option::is_none) {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let mut identifiers = Vec::new();
     identifiers
         .try_reserve_exact(visitor.identifiers.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: visitor.identifiers.len(),
             path,
         })?;
     let mut effective_locators = Vec::new();
     effective_locators
         .try_reserve_exact(visitor.identifiers.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: visitor.identifiers.len(),
             path,
         })?;
@@ -2129,8 +2139,8 @@ fn metadata_selectors(
         .into_iter()
         .zip(visitor.effective_locators)
     {
-        identifiers.push(identifier.ok_or(BodyTableAppearanceError::InvalidSource { path })?);
-        effective_locators.push(locator.ok_or(BodyTableAppearanceError::InvalidSource { path })?);
+        identifiers.push(identifier.ok_or(Error::InvalidSource { path })?);
+        effective_locators.push(locator.ok_or(Error::InvalidSource { path })?);
     }
     Ok(MetadataSelectorSet {
         identifiers,
@@ -2145,9 +2155,9 @@ fn validate_parent_external_reference(
     model_selector: ComponentSelector<'_>,
     style_selector: ComponentSelector<'_>,
     old_style: u64,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let mut visitor = ParentReferenceVisitor::new(model_selector, style_selector, old_style);
     let inspection = inspect_package_metadata_with_visitor(
         payload,
@@ -2163,7 +2173,7 @@ fn validate_parent_external_reference(
         || visitor.wrong_weakness
         || visitor.unexpected
     {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
@@ -2172,9 +2182,9 @@ fn validate_style_registry_entries(
     source: &Package,
     payload: &[u8],
     targets: &mut [RegistryTarget],
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let mut visitor = RegistrySetVisitor {
         targets,
         unknown: false,
@@ -2187,7 +2197,7 @@ fn validate_style_registry_entries(
     .map_err(|error| map_metadata_error(error, path))?;
     budget.consume_metadata_report(inspection.report(), path)?;
     if visitor.unknown || visitor.targets.iter().any(|target| !target.valid()) {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
@@ -2199,9 +2209,9 @@ fn validate_metadata_graph_registries(
     model_identifier: u64,
     routed_identifiers: &[u64],
     parent_styles: &[codec::TableStyleNode<'_>],
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let mut component_indices = Vec::new();
     let target_count = routed_identifiers
         .len()
@@ -2210,7 +2220,7 @@ fn validate_metadata_graph_registries(
     budget.charge_allocations(target_count, path)?;
     component_indices
         .try_reserve_exact(target_count)
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: target_count,
             path,
         })?;
@@ -2232,18 +2242,18 @@ fn validate_metadata_graph_registries(
     budget.charge_allocations(target_count, path)?;
     targets
         .try_reserve_exact(target_count)
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: target_count,
             path,
         })?;
     let model_selector_index = component_indices
         .iter()
         .position(|component| *component == model_component)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     targets.push(RegistryTarget::new(
         *selectors
             .get(model_selector_index)
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?,
+            .ok_or(Error::InvalidSource { path })?,
         model_identifier,
         true,
     ));
@@ -2256,11 +2266,11 @@ fn validate_metadata_graph_registries(
         let selector_index = component_indices
             .iter()
             .position(|candidate| *candidate == component)
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         targets.push(RegistryTarget::new(
             *selectors
                 .get(selector_index)
-                .ok_or(BodyTableAppearanceError::InvalidSource { path })?,
+                .ok_or(Error::InvalidSource { path })?,
             identifier,
             true,
         ));
@@ -2268,38 +2278,31 @@ fn validate_metadata_graph_registries(
     validate_style_registry_entries(source, payload, &mut targets, path, budget)
 }
 
-fn map_metadata_error(
-    error: MetadataRewriteError,
-    path: BodyTableAppearancePath,
-) -> BodyTableAppearanceError {
+fn map_metadata_error(error: MetadataRewriteError, path: Path) -> Error {
     if let Some(amount) = error.allocation_request() {
-        return BodyTableAppearanceError::Allocation { amount, path };
+        return Error::Allocation { amount, path };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyTableAppearanceError::InvalidSource { path };
+        return Error::InvalidSource { path };
     };
     let (kind, observed, maximum) = match limit {
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::InputBytes {
             observed,
             maximum,
-        } => (BodyTableAppearanceLimitKind::WireBytes, observed, maximum),
+        } => (LimitKind::WireBytes, observed, maximum),
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::OutputBytes {
             observed,
             maximum,
-        } => (
-            BodyTableAppearanceLimitKind::WireOutputBytes,
-            observed,
-            maximum,
-        ),
+        } => (LimitKind::WireOutputBytes, observed, maximum),
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::Fields { observed, maximum } => {
-            (BodyTableAppearanceLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::Work { observed, maximum } => {
-            (BodyTableAppearanceLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-            return BodyTableAppearanceError::LimitExceeded {
-                kind: BodyTableAppearanceLimitKind::WireNesting,
+            return Error::Limit {
+                kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
                 path,
@@ -2308,30 +2311,18 @@ fn map_metadata_error(
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::Components {
             observed,
             maximum,
-        } => (
-            BodyTableAppearanceLimitKind::PayloadItems,
-            observed,
-            maximum,
-        ),
+        } => (LimitKind::PayloadItems, observed, maximum),
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::References {
             observed,
             maximum,
-        } => (
-            BodyTableAppearanceLimitKind::PayloadReferences,
-            observed,
-            maximum,
-        ),
+        } => (LimitKind::PayloadReferences, observed, maximum),
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::Additions {
             observed,
             maximum,
-        } => (
-            BodyTableAppearanceLimitKind::PayloadItems,
-            observed,
-            maximum,
-        ),
-        _ => return BodyTableAppearanceError::InvalidSource { path },
+        } => (LimitKind::PayloadItems, observed, maximum),
+        _ => return Error::InvalidSource { path },
     };
-    BodyTableAppearanceError::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -2343,9 +2334,9 @@ fn preflight_metadata_for_style(
     source: &Package,
     model_component: usize,
     old_style: u64,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<MetadataSelectorSet, BodyTableAppearanceError> {
+) -> Result<MetadataSelectorSet, Error> {
     let style_component = resolved_location(source, old_style, path, budget)?.0;
     let payload = metadata_payload(source, path, budget)?;
     let one_component = [model_component];
@@ -2361,14 +2352,14 @@ fn preflight_metadata_for_style(
     let model_selector = selectors
         .first()
         .copied()
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let style_selector = if model_component == style_component {
         model_selector
     } else {
         selectors
             .get(1)
             .copied()
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?
     };
     if model_component != style_component {
         validate_parent_external_reference(
@@ -2389,10 +2380,10 @@ fn preflight_metadata_for_style(
     let stylesheet_identifier = style
         .stylesheet_identifier()
         .filter(|identifier| *identifier != 0)
-        .ok_or(BodyTableAppearanceError::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let stylesheet_component = resolved_location(source, stylesheet_identifier, path, budget)?.0;
     if stylesheet_component != style_component {
-        return Err(BodyTableAppearanceError::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     let stylesheet_selector = style_selector;
     let mut registry_targets = [
@@ -2421,9 +2412,9 @@ fn rewrite_metadata_for_style(
     uuid: UuidBits,
     style_component: usize,
     selector_set: MetadataSelectorSet,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<NativeEdit, BodyTableAppearanceError> {
+) -> Result<NativeEdit, Error> {
     let payload = metadata_payload(source, path, budget)?;
     budget.charge_allocations(selector_set.identifiers.len(), path)?;
     let selectors = selector_set.selectors(path)?;
@@ -2431,14 +2422,14 @@ fn rewrite_metadata_for_style(
     let model_selector = selectors
         .first()
         .copied()
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let style_selector = if model_component == style_component {
         model_selector
     } else {
         selectors
             .get(1)
             .copied()
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?
     };
     budget.charge_allocations(4, path)?;
     let uuid_additions = vec![ObjectUuidAddition::new(style_selector, new_style, uuid)];
@@ -2488,34 +2479,38 @@ fn rewrite_metadata_for_style(
 fn rewrite_metadata_entry(
     source: &Package,
     payload: Vec<u8>,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<NativeEdit, BodyTableAppearanceError> {
-    let route = metadata_route(source, path, budget)?
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+) -> Result<NativeEdit, Error> {
+    let route = metadata_route(source, path, budget)?.ok_or(Error::InvalidSource { path })?;
     let physical = physical_source(source)?;
     let entry = physical
         .package()
         .iter()
         .find(|entry| entry.name() == METADATA_ENTRY_NAME)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     if entry.is_opaque() {
-        return Err(BodyTableAppearanceError::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget.charge_transaction_work(entry.data().len(), path)?;
     let archive_limits = physical
         .limits()
         .effective_archive_limits()
         .map_err(|error| map_archive_error(error, path))?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|error| map_core_error(error, path))?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(4, path)?;
     budget.charge_transaction_work(
         maximum_archive_bytes.saturating_add(maximum_compressed_bytes),
         path,
     )?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical
             .limits()
@@ -2523,24 +2518,24 @@ fn rewrite_metadata_entry(
             .map_err(|error| map_archive_error(error, path))?,
     )
     .map_err(|error| map_core_error(error, path))?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|error| map_core_error(error, path))?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|error| map_core_error(error, path))?;
     let object = archive
         .objects
         .get_mut(route.object_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let message = object
         .messages
         .get(route.message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     if message.type_ != METADATA_MESSAGE_TYPE {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -2550,9 +2545,10 @@ fn rewrite_metadata_entry(
         )
         .map_err(|error| map_core_error(error, path))?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|error| map_core_error(error, path))?;
-    let compressed = SnappyStream::compress(&bytes).map_err(|error| map_core_error(error, path))?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
     Ok(NativeEdit {
         name: METADATA_ENTRY_NAME.to_owned(),
         data: compressed,
@@ -2567,9 +2563,9 @@ fn rewrite_metadata_entry(
 fn validate_appearance_message_roles(
     object: &ArchiveObject,
     expected_type: u32,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     budget.charge_transaction_work(object.messages.len(), path)?;
     let mut expected = 0usize;
     for message in &object.messages {
@@ -2585,24 +2581,21 @@ fn validate_appearance_message_roles(
             continue;
         }
         if message.type_ != expected_type {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         expected = expected.saturating_add(1);
     }
     if expected != 1 {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
 
-fn copy_bytes(
-    source: &[u8],
-    path: BodyTableAppearancePath,
-) -> Result<Vec<u8>, BodyTableAppearanceError> {
+fn copy_bytes(source: &[u8], path: Path) -> Result<Vec<u8>, Error> {
     let mut copied = Vec::new();
     copied
         .try_reserve_exact(source.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: source.len(),
             path,
         })?;
@@ -2610,19 +2603,15 @@ fn copy_bytes(
     Ok(copied)
 }
 
-fn copy_identifiers(
-    source: &[u64],
-    additional: usize,
-    path: BodyTableAppearancePath,
-) -> Result<Vec<u64>, BodyTableAppearanceError> {
+fn copy_identifiers(source: &[u64], additional: usize, path: Path) -> Result<Vec<u64>, Error> {
     let capacity = source
         .len()
         .checked_add(additional)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let mut copied = Vec::new();
     copied
         .try_reserve_exact(capacity)
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: capacity,
             path,
         })?;
@@ -2638,12 +2627,12 @@ fn replace_model_in_archive(
     model_type: u32,
     replacement: &[u8],
     limits: litchi_iwa_core::Limits,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(model_identifier)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     validate_appearance_message_roles(object, model_type, path, budget)?;
     let mut indexes = object
         .messages
@@ -2653,22 +2642,21 @@ fn replace_model_in_archive(
     let message_index = indexes
         .next()
         .map(|(index, _)| index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     if indexes.next().is_some() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let nested_references = info.field_infos.iter().try_fold(0usize, |count, field| {
         count
             .checked_add(field.object_references.len())
             .and_then(|value| value.checked_add(field.data_references.len()))
     });
-    let nested_references =
-        nested_references.ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+    let nested_references = nested_references.ok_or(Error::InvalidSource { path })?;
     budget.charge_fields(info.field_infos.len(), path)?;
     budget.charge_references(
         info.object_references
@@ -2695,7 +2683,7 @@ fn replace_model_in_archive(
         != 1
         || before.contains(&new_style)
     {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     // ArchiveInfo transitions retain surviving aggregate references in their
     // source order and publish newly introduced identifiers as a final suffix.
@@ -2703,7 +2691,7 @@ fn replace_model_in_archive(
     let mut after = Vec::new();
     after
         .try_reserve_exact(before.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: before.len(),
             path,
         })?;
@@ -2743,36 +2731,36 @@ fn append_style_object(
     stylesheet: u64,
     payload: &[u8],
     limits: litchi_iwa_core::Limits,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     if archive
         .objects
         .iter()
         .any(|object| object.archive_info.identifier == Some(identifier))
     {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     budget.charge_allocations(payload.len().saturating_add(2), path)?;
     archive
         .objects
         .try_reserve(1)
-        .map_err(|_| BodyTableAppearanceError::Allocation { amount: 1, path })?;
+        .map_err(|_| Error::Allocation { amount: 1, path })?;
     let payload = copy_bytes(payload, path)?;
     let mut messages = Vec::new();
     messages
         .try_reserve_exact(1)
-        .map_err(|_| BodyTableAppearanceError::Allocation { amount: 1, path })?;
+        .map_err(|_| Error::Allocation { amount: 1, path })?;
     messages.push(RawMessage {
         type_: TABLE_STYLE_MESSAGE_TYPE,
         data: payload,
     });
-    let mut object = ArchiveObject::new_with_limits(identifier, messages, limits)
+    let mut object = ArchiveObject::new(identifier, messages, limits)
         .map_err(|error| map_core_error(error, path))?;
     let mut references = Vec::new();
     references
         .try_reserve_exact(2)
-        .map_err(|_| BodyTableAppearanceError::Allocation { amount: 2, path })?;
+        .map_err(|_| Error::Allocation { amount: 2, path })?;
     references.extend([parent, stylesheet]);
     object.archive_info.message_infos[0].object_references = references;
     archive.objects.push(object);
@@ -2785,12 +2773,12 @@ fn replace_stylesheet_in_archive(
     new_style: u64,
     replacement: &[u8],
     limits: litchi_iwa_core::Limits,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(stylesheet_identifier)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     validate_appearance_message_roles(object, STYLESHEET_MESSAGE_TYPE, path, budget)?;
     let mut indexes = object
         .messages
@@ -2800,20 +2788,20 @@ fn replace_stylesheet_in_archive(
     let message_index = indexes
         .next()
         .map(|(index, _)| index)
-        .ok_or(BodyTableAppearanceError::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     if indexes.next().is_some() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     budget.charge_allocations(info.object_references.len().saturating_add(4), path)?;
     budget.charge_transaction_work(replacement.len(), path)?;
     let before = copy_identifiers(&info.object_references, 0, path)?;
     if before.contains(&new_style) {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let mut after = copy_identifiers(&before, 1, path)?;
     after.push(new_style);
@@ -2846,14 +2834,14 @@ fn replace_message_with_reference_transition(
     field_references: Option<(&[u64], &[u64])>,
     required_field_path: bool,
     limits: litchi_iwa_core::Limits,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     budget.charge_fields(info.field_infos.len(), path)?;
     budget.charge_references(before.len().saturating_add(after.len()), path)?;
     budget.charge_allocations(
@@ -2875,53 +2863,53 @@ fn replace_message_with_reference_transition(
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?
         .field_infos;
     let mut field_indices = Vec::new();
-    field_indices.try_reserve_exact(fields.len()).map_err(|_| {
-        BodyTableAppearanceError::Allocation {
+    field_indices
+        .try_reserve_exact(fields.len())
+        .map_err(|_| Error::Allocation {
             amount: fields.len(),
             path,
-        }
-    })?;
+        })?;
     for (index, field) in fields.iter().enumerate() {
         if field.path.as_slice() == field_path {
             field_indices.push(index);
         }
     }
     if field_indices.len() > 1 || (required_field_path && field_indices.len() != 1) {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let mut before_set = HashSet::new();
     before_set
         .try_reserve(before.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: before.len(),
             path,
         })?;
     let mut after_set = HashSet::new();
     after_set
         .try_reserve(after.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: after.len(),
             path,
         })?;
     before_set.extend(before.iter().copied());
     after_set.extend(after.iter().copied());
     if before_set.len() != before.len() || after_set.len() != after.len() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let mut field_before = Vec::new();
     let mut field_after = Vec::new();
     field_before
         .try_reserve_exact(field_indices.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: field_indices.len(),
             path,
         })?;
     field_after
         .try_reserve_exact(field_indices.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: field_indices.len(),
             path,
         })?;
@@ -2936,7 +2924,7 @@ fn replace_message_with_reference_transition(
                 .iter()
                 .any(|identifier| before_set.contains(identifier) != after_set.contains(identifier))
         {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         if field_indices.binary_search(&index).is_err() {
             continue;
@@ -2945,12 +2933,12 @@ fn replace_message_with_reference_transition(
             .r#type
             .is_some_and(|kind| kind != FieldType::ObjectReference)
         {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         let expected_before = field_references.map(|(before, _)| before).unwrap_or(before);
         let expected_after = field_references.map(|(_, after)| after).unwrap_or(after);
         if field.object_references != expected_before {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         field_before.push(copy_identifiers(&field.object_references, 0, path)?);
         field_after.push(copy_identifiers(expected_after, 0, path)?);
@@ -2958,7 +2946,7 @@ fn replace_message_with_reference_transition(
     let mut transitions = Vec::new();
     transitions
         .try_reserve_exact(field_indices.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: field_indices.len(),
             path,
         })?;
@@ -2971,7 +2959,7 @@ fn replace_message_with_reference_transition(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             message,
             ObjectReferenceTransition {
@@ -2990,7 +2978,7 @@ fn resolve_target_with_budget<'table>(
     selector: impl Into<BodyTableSelector<'table>>,
     budget: &mut TransactionBudget,
     require_metadata: bool,
-) -> Result<BodyTableAppearanceTarget, BodyTableAppearanceError> {
+) -> Result<BodyTableAppearanceTarget, Error> {
     // The physical catalog and the semantic resolver must debit the same
     // operation ledger.  `TransactionBudget::new` charges the first source;
     // this call is pointer-deduplicated for that source and also charges a
@@ -2998,15 +2986,12 @@ fn resolve_target_with_budget<'table>(
     budget
         .wire
         .charge_source_catalog(&source.state.source)
-        .map_err(|error| map_lock_error(error, BodyTableAppearancePath::Package))?;
-    budget.charge_transaction_work(
-        source.source_bytes().len(),
-        BodyTableAppearancePath::Package,
-    )?;
+        .map_err(|error| map_lock_error(error, Path::Package))?;
+    budget.charge_transaction_work(source.source_bytes().len(), Path::Package)?;
     let native = source
         .resolve_body_table_with_budget(selector.into(), &mut budget.wire)
-        .map_err(|error| map_lock_error(error, BodyTableAppearancePath::Package))?;
-    let path = BodyTableAppearancePath::Table {
+        .map_err(|error| map_lock_error(error, Path::Package))?;
+    let path = Path::Table {
         table: native.table_position,
     };
     table_lock::validate_body_table_target(source, &native, &mut budget.wire)
@@ -3035,7 +3020,7 @@ fn resolve_at_with_budget(
     table: usize,
     budget: &mut TransactionBudget,
     require_metadata: bool,
-) -> Result<BodyTableAppearanceTarget, BodyTableAppearanceError> {
+) -> Result<BodyTableAppearanceTarget, Error> {
     resolve_target_with_budget(
         source,
         BodyTableSelector::index(table),
@@ -3048,8 +3033,8 @@ fn model_payload<'a>(
     source: &'a Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut TransactionBudget,
-) -> Result<&'a [u8], BodyTableAppearanceError> {
-    let path = BodyTableAppearancePath::Table {
+) -> Result<&'a [u8], Error> {
+    let path = Path::Table {
         table: target.table_position,
     };
     let object = source
@@ -3059,18 +3044,18 @@ fn model_payload<'a>(
         .get_index(target.model_component_index)
         .and_then(|component| component.archive().objects.get(target.model_object_index))
         .filter(|object| object.archive_info.identifier == Some(target.model_identifier.get()))
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     validate_appearance_message_roles(object, target.model_message_type, path, budget)?;
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     Ok(message.data.as_slice())
 }
 
@@ -3080,10 +3065,10 @@ fn resolve_codec_appearance(
     model_component: usize,
     model_identifier: u64,
     model_message_type: u32,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
     require_metadata: bool,
-) -> Result<(Option<u64>, Appearance), BodyTableAppearanceError> {
+) -> Result<(Option<u64>, Appearance), Error> {
     // The model projection itself is part of the one aggregate wire budget.
     // DecodeReport is consumed even when the semantic projection is empty.
     let (model, model_report) =
@@ -3127,7 +3112,7 @@ fn resolve_codec_appearance(
         let network_identifier = preset
             .style_network_identifier()
             .filter(|identifier| *identifier != 0)
-            .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         routed_identifiers[1] = network_identifier;
         routed_identifier_count = 2;
         ensure_unique_physical_identifier(source, network_identifier, path, budget)?;
@@ -3173,7 +3158,7 @@ fn resolve_codec_appearance(
             .iter()
             .any(|node: &codec::TableStyleNode<'_>| node.identifier() == identifier)
         {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         let style_payload = style_message_data(source, identifier, path, budget)?;
         let (style, style_report) = codec::decode_table_style_with_report(
@@ -3185,31 +3170,29 @@ fn resolve_codec_appearance(
         let style_sheet = style
             .stylesheet_identifier()
             .filter(|identifier| *identifier != 0)
-            .ok_or(BodyTableAppearanceError::UnsupportedDependency { path })?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
         if style_sheet == 0 {
-            return Err(BodyTableAppearanceError::UnsupportedDependency { path });
+            return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
         }
         if let Some(previous) = stylesheet {
             if previous != style_sheet {
-                return Err(BodyTableAppearanceError::UnsupportedDependency { path });
+                return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
             }
         } else {
             stylesheet = Some(style_sheet);
         }
         current = style.parent_identifier();
-        nodes
-            .try_reserve(1)
-            .map_err(|_| BodyTableAppearanceError::Allocation {
-                amount: nodes.len().saturating_add(1),
-                path,
-            })?;
+        nodes.try_reserve(1).map_err(|_| Error::Allocation {
+            amount: nodes.len().saturating_add(1),
+            path,
+        })?;
         nodes.push(codec::TableStyleNode::new(identifier, style));
     }
     if current.is_some() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let stylesheet_identifier =
-        stylesheet.ok_or(BodyTableAppearanceError::UnsupportedDependency { path })?;
+        stylesheet.ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     validate_global_style_inbound(
         source,
         style_identifier,
@@ -3223,7 +3206,7 @@ fn resolve_codec_appearance(
     ensure_unique_physical_identifier(source, stylesheet_identifier, path, budget)?;
     let _stylesheet_payload = stylesheet_message_data(source, stylesheet_identifier, path, budget)?;
     if style_location.0 != stylesheet_location.0 {
-        return Err(BodyTableAppearanceError::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     if require_metadata {
         let metadata = metadata_payload(source, path, budget)?;
@@ -3260,9 +3243,9 @@ fn validate_model_archive_metadata(
     model_message_type: u32,
     style_identifier: u64,
     preset_identifier: Option<u64>,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let (component_index, object_index) =
         resolved_location(source, model_identifier, path, budget)?;
     let object = source
@@ -3271,25 +3254,24 @@ fn validate_model_archive_metadata(
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     validate_appearance_message_roles(object, model_message_type, path, budget)?;
     let message_index = object
         .messages
         .iter()
         .position(|message| message.type_ == model_message_type)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let nested_references = info.field_infos.iter().try_fold(0usize, |count, field| {
         count
             .checked_add(field.object_references.len())
             .and_then(|value| value.checked_add(field.data_references.len()))
     });
-    let nested_references =
-        nested_references.ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+    let nested_references = nested_references.ok_or(Error::InvalidSource { path })?;
     budget.charge_fields(info.field_infos.len(), path)?;
     budget.charge_references(
         info.object_references
@@ -3317,16 +3299,16 @@ fn validate_model_archive_metadata(
         expected_len += 1;
     }
     if info.object_references.as_slice() != &expected[..expected_len] {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     if !info.data_references.is_empty() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let mut style_fields = 0usize;
     let mut preset_fields = 0usize;
     for field in &info.field_infos {
         if !field.data_references.is_empty() {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         let is_style_path = field.path.as_slice() == [3];
         let is_preset_path = field.path.as_slice() == [48];
@@ -3341,7 +3323,7 @@ fn validate_model_archive_metadata(
                 .r#type
                 .is_some_and(|kind| kind != FieldType::ObjectReference)
         {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
         if field.object_references.is_empty() && !is_style_path && !is_preset_path {
             continue;
@@ -3353,11 +3335,11 @@ fn validate_model_archive_metadata(
             is_preset_path && field.object_references.as_slice() == [preset_identifier]
         });
         if !valid_style && !valid_preset {
-            return Err(BodyTableAppearanceError::InvalidSource { path });
+            return Err(Error::InvalidSource { path });
         }
     }
     if style_fields > 1 || preset_fields > 1 {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
@@ -3365,9 +3347,9 @@ fn validate_model_archive_metadata(
 fn style_message_data<'source>(
     source: &'source Package,
     identifier: u64,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<&'source [u8], BodyTableAppearanceError> {
+) -> Result<&'source [u8], Error> {
     appearance_message_data(source, identifier, TABLE_STYLE_MESSAGE_TYPE, path, budget)
 }
 
@@ -3376,9 +3358,9 @@ fn validate_global_style_inbound(
     style_identifier: u64,
     selected_model_identifier: u64,
     selected_model_type: u32,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let physical = physical_source(source)?;
     let archive_limits = physical
         .limits()
@@ -3392,13 +3374,13 @@ fn validate_global_style_inbound(
         .try_fold(0usize, |count, component| {
             count.checked_add(component.archive().objects.len())
         })
-        .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     budget.charge_allocations(object_count, path)?;
     budget.charge_transaction_work(object_count, path)?;
     let mut physical_identifiers = HashSet::new();
     physical_identifiers
         .try_reserve(object_count)
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
             path,
         })?;
@@ -3407,9 +3389,9 @@ fn validate_global_style_inbound(
             let identifier = object
                 .archive_info
                 .identifier
-                .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                .ok_or(Error::InvalidSource { path })?;
             if !physical_identifiers.insert(identifier) {
-                return Err(BodyTableAppearanceError::InvalidSource { path });
+                return Err(Error::InvalidSource { path });
             }
         }
     }
@@ -3424,9 +3406,9 @@ fn validate_global_style_inbound(
             let object_identifier = object
                 .archive_info
                 .identifier
-                .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                .ok_or(Error::InvalidSource { path })?;
             if object.messages.len() != object.archive_info.message_infos.len() {
-                return Err(BodyTableAppearanceError::InvalidSource { path });
+                return Err(Error::InvalidSource { path });
             }
             let mut object_fields = 0usize;
             let mut object_references = 0usize;
@@ -3442,30 +3424,30 @@ fn validate_global_style_inbound(
                     .try_fold(0usize, |count, field| {
                         count.checked_add(field.object_references.len())
                     })
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                    .ok_or(Error::InvalidSource { path })?;
                 let nested_data_references = info
                     .field_infos
                     .iter()
                     .try_fold(0usize, |count, field| {
                         count.checked_add(field.data_references.len())
                     })
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                    .ok_or(Error::InvalidSource { path })?;
                 let field_path_items = info
                     .field_infos
                     .iter()
                     .try_fold(0usize, |count, field| {
                         count.checked_add(field.path.path.len())
                     })
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                    .ok_or(Error::InvalidSource { path })?;
                 object_fields = object_fields
                     .checked_add(info.field_infos.len())
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                    .ok_or(Error::InvalidSource { path })?;
                 object_references = object_references
                     .checked_add(info.object_references.len())
                     .and_then(|count| count.checked_add(info.data_references.len()))
                     .and_then(|count| count.checked_add(nested_object_references))
                     .and_then(|count| count.checked_add(nested_data_references))
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                    .ok_or(Error::InvalidSource { path })?;
                 object_work = object_work
                     .checked_add(message.data.len())
                     .and_then(|work| work.checked_add(info.object_references.len()))
@@ -3474,13 +3456,13 @@ fn validate_global_style_inbound(
                     .and_then(|work| work.checked_add(field_path_items))
                     .and_then(|work| work.checked_add(nested_object_references))
                     .and_then(|work| work.checked_add(nested_data_references))
-                    .ok_or(BodyTableAppearanceError::InvalidSource { path })?;
+                    .ok_or(Error::InvalidSource { path })?;
             }
             budget.charge_fields(object_fields, path)?;
             budget.charge_references(object_references, path)?;
             budget.charge_transaction_work(object_work, path)?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut authority,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -3506,7 +3488,7 @@ fn validate_global_style_inbound(
                     continue;
                 }
                 if aggregate_occurrences != 1 || field_occurrences > 1 {
-                    return Err(BodyTableAppearanceError::InvalidSource { path });
+                    return Err(Error::InvalidSource { path });
                 }
                 let selected_model = object_identifier == selected_model_identifier
                     && message.type_ == selected_model_type;
@@ -3518,13 +3500,13 @@ fn validate_global_style_inbound(
                         | STYLESHEET_MESSAGE_TYPE
                 );
                 if !selected_model && !known_style_role {
-                    return Err(BodyTableAppearanceError::UnsupportedDependency { path });
+                    return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
                 }
             }
         }
     }
     if authority.invalid {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
@@ -3532,9 +3514,9 @@ fn validate_global_style_inbound(
 fn ensure_unique_physical_identifier(
     source: &Package,
     identifier: u64,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let mut matches = 0usize;
     for component in source.state.source.components().iter() {
         budget.charge_components(1, path)?;
@@ -3549,20 +3531,20 @@ fn ensure_unique_physical_identifier(
         );
     }
     if matches != 1 {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
 
-fn physical_source(source: &Package) -> Result<&SourceCatalog, BodyTableAppearanceError> {
+fn physical_source(source: &Package) -> Result<&SourceCatalog, Error> {
     Ok(&source.state.source)
 }
 
 fn preview_names(
     catalog: &SourceCatalog,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<Vec<&'static str>, BodyTableAppearanceError> {
+) -> Result<Vec<&'static str>, Error> {
     budget.charge_allocations(ROOT_PREVIEW_NAMES.len(), path)?;
     budget.charge_transaction_work(
         catalog
@@ -3574,7 +3556,7 @@ fn preview_names(
     let mut names = Vec::new();
     names
         .try_reserve_exact(ROOT_PREVIEW_NAMES.len())
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: ROOT_PREVIEW_NAMES.len(),
             path,
         })?;
@@ -3588,12 +3570,12 @@ fn preview_names(
 
 fn root_preview_deletions(
     catalog: &SourceCatalog,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<Vec<&'static str>, BodyTableAppearanceError> {
+) -> Result<Vec<&'static str>, Error> {
     let names = preview_names(catalog, path, budget)?;
     if names.len() != ROOT_PREVIEW_NAMES.len() {
-        return Err(BodyTableAppearanceError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     Ok(names)
 }
@@ -3606,9 +3588,9 @@ fn verify_candidate_locality(
     new_style: Option<u64>,
     source_previews: usize,
     target_previews: usize,
-    path: BodyTableAppearancePath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<(), BodyTableAppearanceError> {
+) -> Result<(), Error> {
     let source_catalog = physical_source(source)?;
     let candidate_catalog = physical_source(candidate)?;
     budget.charge_transaction_work(
@@ -3622,20 +3604,20 @@ fn verify_candidate_locality(
         ROOT_PREVIEW_NAMES.len().saturating_mul(2).saturating_add(8),
         path,
     )?;
-    let source_preview_names = preview_names(source_catalog, path, budget)
-        .map_err(|_| BodyTableAppearanceError::Verification)?;
-    let candidate_preview_names = preview_names(candidate_catalog, path, budget)
-        .map_err(|_| BodyTableAppearanceError::Verification)?;
+    let source_preview_names =
+        preview_names(source_catalog, path, budget).map_err(|_| Error::Verification)?;
+    let candidate_preview_names =
+        preview_names(candidate_catalog, path, budget).map_err(|_| Error::Verification)?;
     if source_preview_names.len() != source_previews
         || candidate_preview_names.len() != target_previews
     {
-        return Err(BodyTableAppearanceError::Verification);
+        return Err(Error::Verification);
     }
 
     let mut component_indices = Vec::new();
     component_indices
         .try_reserve_exact(3)
-        .map_err(|_| BodyTableAppearanceError::Allocation { amount: 3, path })?;
+        .map_err(|_| Error::Allocation { amount: 3, path })?;
     component_indices.push(target.native.component_index);
     if let Some(identifier) = old_style {
         component_indices.push(resolved_location(source, identifier, path, budget)?.0);
@@ -3646,7 +3628,7 @@ fn verify_candidate_locality(
     let mut allowed_names = Vec::new();
     allowed_names
         .try_reserve_exact(component_indices.len().saturating_add(1))
-        .map_err(|_| BodyTableAppearanceError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: component_indices.len().saturating_add(1),
             path,
         })?;
@@ -3664,7 +3646,7 @@ fn verify_candidate_locality(
                     .get_index(component_index)
             })
         else {
-            return Err(BodyTableAppearanceError::Verification);
+            return Err(Error::Verification);
         };
         if !allowed_names
             .iter()
@@ -3704,54 +3686,59 @@ fn verify_candidate_locality(
                         != after.raw_record().compressed_data();
                 let expected = allowed_names.iter().any(|name| name == before.name());
                 if changed != expected {
-                    return Err(BodyTableAppearanceError::Verification);
+                    return Err(Error::Verification);
                 }
             },
             (None, None) => break,
-            _ => return Err(BodyTableAppearanceError::Verification),
+            _ => return Err(Error::Verification),
         }
     }
     Ok(())
 }
 
-fn map_lock_error(
-    error: table_lock::BodyTableLockError,
-    path: BodyTableAppearancePath,
-) -> BodyTableAppearanceError {
-    use table_lock::BodyTableLockError as LockError;
-    use table_lock::BodyTableLockLimitKind as LockLimit;
+fn map_lock_error(error: table_lock::Error, path: Path) -> Error {
+    use table_lock::Error as LockError;
+    use table_lock::LimitKind as LockLimit;
 
     match error {
-        LockError::TableNotFound => BodyTableAppearanceError::TableNotFound,
-        LockError::AmbiguousTableName => BodyTableAppearanceError::AmbiguousTableName,
-        LockError::AmbiguousSelector => BodyTableAppearanceError::AmbiguousSelector,
-        LockError::UnsupportedSource => BodyTableAppearanceError::UnsupportedSource,
-        LockError::InvalidSource => BodyTableAppearanceError::InvalidSource { path },
-        LockError::PatchConflict => BodyTableAppearanceError::PatchConflict,
-        LockError::Verification => BodyTableAppearanceError::Verification,
-        LockError::Allocation { amount } => BodyTableAppearanceError::Allocation { amount, path },
-        LockError::LimitExceeded {
+        LockError::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        LockError::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
+        LockError::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        LockError::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        LockError::InvalidSource => Error::InvalidSource { path },
+        LockError::PatchConflict => Error::PatchConflict,
+        LockError::Verification => Error::Verification,
+        LockError::Allocation { amount } => Error::Allocation { amount, path },
+        LockError::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableAppearanceError::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
-                LockLimit::InputBytes => BodyTableAppearanceLimitKind::InputBytes,
-                LockLimit::OutputBytes => BodyTableAppearanceLimitKind::OutputBytes,
-                LockLimit::Entries => BodyTableAppearanceLimitKind::Entries,
-                LockLimit::EntryBytes => BodyTableAppearanceLimitKind::EntryBytes,
-                LockLimit::TotalEntryBytes => BodyTableAppearanceLimitKind::TotalEntryBytes,
-                LockLimit::PackageBytes => BodyTableAppearanceLimitKind::PackageBytes,
-                LockLimit::PayloadBytes => BodyTableAppearanceLimitKind::PayloadBytes,
-                LockLimit::TotalPayloadBytes => BodyTableAppearanceLimitKind::TotalPayloadBytes,
-                LockLimit::PayloadObjects => BodyTableAppearanceLimitKind::PayloadObjects,
-                LockLimit::PayloadMessages => BodyTableAppearanceLimitKind::PayloadMessages,
-                LockLimit::PayloadItems => BodyTableAppearanceLimitKind::PayloadItems,
-                LockLimit::PayloadReferences => BodyTableAppearanceLimitKind::PayloadReferences,
-                LockLimit::WireBytes => BodyTableAppearanceLimitKind::WireBytes,
-                LockLimit::WireFields => BodyTableAppearanceLimitKind::WireFields,
-                LockLimit::WireNesting => BodyTableAppearanceLimitKind::WireNesting,
-                LockLimit::WireWork => BodyTableAppearanceLimitKind::WireWork,
+                LockLimit::InputBytes => LimitKind::InputBytes,
+                LockLimit::OutputBytes => LimitKind::OutputBytes,
+                LockLimit::Entries => LimitKind::Entries,
+                LockLimit::EntryBytes => LimitKind::EntryBytes,
+                LockLimit::TotalEntryBytes => LimitKind::TotalEntryBytes,
+                LockLimit::PackageBytes => LimitKind::PackageBytes,
+                LockLimit::PayloadBytes => LimitKind::PayloadBytes,
+                LockLimit::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+                LockLimit::PayloadObjects => LimitKind::PayloadObjects,
+                LockLimit::PayloadMessages => LimitKind::PayloadMessages,
+                LockLimit::PayloadItems => LimitKind::PayloadItems,
+                LockLimit::PayloadReferences => LimitKind::PayloadReferences,
+                LockLimit::WireBytes => LimitKind::WireBytes,
+                LockLimit::WireFields => LimitKind::WireFields,
+                LockLimit::WireNesting => LimitKind::WireNesting,
+                LockLimit::WireWork => LimitKind::WireWork,
             },
             observed,
             maximum,
@@ -3760,10 +3747,7 @@ fn map_lock_error(
     }
 }
 
-fn map_archive_error(
-    error: litchi_iwa_archive::Error,
-    path: BodyTableAppearancePath,
-) -> BodyTableAppearanceError {
+fn map_archive_error(error: litchi_iwa_archive::Error, path: Path) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
@@ -3771,50 +3755,31 @@ fn map_archive_error(
             maximum,
         } => {
             let kind = match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    BodyTableAppearanceLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    BodyTableAppearanceLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => BodyTableAppearanceLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    BodyTableAppearanceLimitKind::PackageBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PackageBytes,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => {
-                    BodyTableAppearanceLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    BodyTableAppearanceLimitKind::TotalEntryBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    BodyTableAppearanceLimitKind::PayloadBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    BodyTableAppearanceLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             };
-            BodyTableAppearanceError::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed,
                 maximum,
                 path,
             }
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyTableAppearanceError::Allocation { amount, path }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount, path },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error, path),
-        _ => BodyTableAppearanceError::InvalidSource { path },
+        _ => Error::InvalidSource { path },
     }
 }
 
-fn map_core_error(
-    error: litchi_iwa_core::Error,
-    path: BodyTableAppearancePath,
-) -> BodyTableAppearanceError {
+fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
@@ -3831,35 +3796,64 @@ fn map_core_error(
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    BodyTableAppearanceLimitKind::PayloadBytes
+                    LimitKind::PayloadBytes
                 },
-                litchi_iwa_core::LimitKind::Objects => BodyTableAppearanceLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    BodyTableAppearanceLimitKind::PayloadMessages
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    BodyTableAppearanceLimitKind::PayloadItems
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    BodyTableAppearanceLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
             };
-            BodyTableAppearanceError::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed: u64::try_from(observed).unwrap_or(u64::MAX),
                 maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
                 path,
             }
         },
-        litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyTableAppearanceError::Allocation {
-                amount: requested,
-                path,
-            }
+        litchi_iwa_core::Error::Allocation { requested, .. } => Error::Allocation {
+            amount: requested,
+            path,
         },
-        _ => BodyTableAppearanceError::InvalidSource { path },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::{Error, LimitKind, Package, Refusal};
+    use crate::selector::BodyTableSelector;
+
+    fn fixture() -> Result<Package, Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-table-visible.pages");
+        Ok(Package::open(path)?)
+    }
+
+    #[test]
+    fn deferred_resolution_preserves_transaction_budget_after_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = fixture()?;
+        let mut edit = package.edit_body_table_appearance(BodyTableSelector::index(usize::MAX))?;
+
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Refused(Refusal::TableNotFound))
+        ));
+        let budget = edit
+            .budget
+            .as_mut()
+            .expect("a failed lazy resolution retains its transaction budget");
+        budget.remaining_transaction_work = 0;
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                ..
+            })
+        ));
+        Ok(())
     }
 }

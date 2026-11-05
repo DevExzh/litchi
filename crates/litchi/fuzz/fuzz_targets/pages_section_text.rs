@@ -7,9 +7,10 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    Limits, Package, Position, SectionSelector, SectionTextCommit, SectionTextError, TextPosition,
-    TextSpan,
+    Package, Position, SectionSelector, TextPosition, TextSpan,
+    section::text::Commit as SectionTextCommit, section::text::Error as SectionTextError,
 };
+use litchi_iwa_archive::Limits;
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = 256 * 1024 + 1;
@@ -25,7 +26,10 @@ const PRIVATE_REPLACEMENT: &str = "__litchi_private_pages_section_text_replaceme
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_limits(data, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        data,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => match package.validate() {
             Ok(()) => exercise_package(&package, data),
             Err(error) => observe_error(error),
@@ -62,8 +66,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits())
-            .unwrap_or_else(|error| panic!("native Pages section-text seed must open: {error}"));
+        let package = Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages section-text seed must open: {error}"));
         package.validate().unwrap_or_else(|error| {
             panic!("native Pages section-text seed must validate: {error}")
         });
@@ -86,7 +93,7 @@ fn native_package() -> &'static Package {
 
 fn exercise_package(package: &Package, data: &[u8]) {
     observe_result(package.text());
-    black_box((package.stats(), package.semantic_document()));
+    black_box((package.stats(), package.document_ref()));
 
     let arbitrary_position = usize::from(read_u16(data, 2));
     let arbitrary_name = replacement(data);
@@ -106,7 +113,9 @@ fn exercise_package(package: &Package, data: &[u8]) {
     }
     assert!(matches!(
         package.section_text(SectionSelector::index(package.sections().len())),
-        Err(SectionTextError::PositionNotFound { .. })
+        Err(SectionTextError::Refused(
+            litchi::pages::section::text::Refusal::PositionNotFound { .. }
+        ))
     ));
     observe_result(package.edit_body_text());
 
@@ -269,15 +278,30 @@ fn exercise_staging_errors(package: &Package) {
         return;
     };
     if let Err(error) = edit.insert(TextPosition::ZERO, "private\u{0004}section-break") {
-        assert!(matches!(error, SectionTextError::SectionBreakReplacement));
+        assert!(matches!(
+            error,
+            SectionTextError::Refused(
+                litchi::pages::section::text::Refusal::SectionBreakReplacement
+            )
+        ));
         observe_error(error);
     }
     if let Err(error) = edit.insert(TextPosition::ZERO, "private\u{000e}footnote") {
-        assert!(matches!(error, SectionTextError::FootnoteAnchorReplacement));
+        assert!(matches!(
+            error,
+            SectionTextError::Refused(
+                litchi::pages::section::text::Refusal::FootnoteAnchorReplacement
+            )
+        ));
         observe_error(error);
     }
     if let Err(error) = edit.insert(TextPosition::ZERO, PRIVATE_REPLACEMENT) {
-        assert!(matches!(error, SectionTextError::ObjectMarkerReplacement));
+        assert!(matches!(
+            error,
+            SectionTextError::Refused(
+                litchi::pages::section::text::Refusal::ObjectMarkerReplacement
+            )
+        ));
         observe_redacted_text(error, PRIVATE_REPLACEMENT);
     }
 
@@ -285,14 +309,24 @@ fn exercise_staging_errors(package: &Package) {
     let span = TextSpan::from_utf16_indexes(beyond, beyond)
         .unwrap_or_else(|error| panic!("bounded out-of-range span must construct: {error}"));
     if let Err(error) = edit.delete(span) {
-        assert!(matches!(error, SectionTextError::SpanOutOfBounds { .. }));
+        assert!(matches!(
+            error,
+            SectionTextError::Refused(
+                litchi::pages::section::text::Refusal::SpanOutOfBounds { .. }
+            )
+        ));
         observe_error(error);
     }
 
     if let Some(position) = split_surrogate_position(edit.text())
         && let Err(error) = edit.insert(position, "x")
     {
-        assert!(matches!(error, SectionTextError::SurrogateBoundary { .. }));
+        assert!(matches!(
+            error,
+            SectionTextError::Refused(
+                litchi::pages::section::text::Refusal::SurrogateBoundary { .. }
+            )
+        ));
         observe_error(error);
     }
 
@@ -302,7 +336,12 @@ fn exercise_staging_errors(package: &Package) {
     if staged.insert(TextPosition::ZERO, "").is_ok()
         && let Err(error) = staged.clear()
     {
-        assert!(matches!(error, SectionTextError::OperationAlreadyStaged));
+        assert!(matches!(
+            error,
+            SectionTextError::Refused(
+                litchi::pages::section::text::Refusal::OperationAlreadyStaged
+            )
+        ));
         observe_error(error);
     }
 }
@@ -320,7 +359,10 @@ fn exercise_redacted_malformed_ingress() {
     ];
     for input in malformed {
         let before = input.to_vec();
-        match Package::from_bytes_with_limits(input, fuzz_limits()) {
+        match Package::from_bytes_with_options(
+            input,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        ) {
             Err(error) => {
                 if input == PRIVATE_MALFORMED_INPUT {
                     observe_redacted(error, PRIVATE_MALFORMED_INPUT);
@@ -337,7 +379,10 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_limits(bytes, fuzz_limits()) {
+    match Package::from_bytes_with_options(
+        bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages input must be rejected"),
     }
@@ -413,7 +458,10 @@ fn exercise_resource_limits() {
             defaults.max_iwa_stream_bytes(),
         )
         .unwrap_or_else(|error| unreachable!("valid exact-source profile: {error}"));
-        let package = match Package::from_bytes_with_limits(NATIVE_PAGES, exact_source_limits) {
+        let package = match Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(exact_source_limits),
+        ) {
             Ok(package) => package,
             Err(error) => {
                 observe_error(error);
@@ -432,7 +480,10 @@ fn exercise_resource_limits() {
 
 fn observe_limited_ingress(limits: Limits) {
     let before = NATIVE_PAGES.to_vec();
-    match Package::from_bytes_with_limits(&before, limits) {
+    match Package::from_bytes_with_options(
+        &before,
+        litchi::pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         Ok(package) => {
             // A profile may reject only a later semantic layer; keep that
             // successful branch observable without retaining the package.

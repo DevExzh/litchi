@@ -849,12 +849,12 @@ impl<'a> EmfSvgConverter<'a> {
             return malformed(kind, "point count exceeds configured path limit");
         }
         let points = if short {
-            parse_points_array(&data[20..], count)?
+            parse_points_array(&data[20..], count, &self.limits)?
                 .into_iter()
                 .map(|p| (i32::from(p.x), i32::from(p.y)))
                 .collect::<Vec<_>>()
         } else {
-            parse_pointl_array(&data[20..], count)?
+            parse_pointl_array(&data[20..], count, &self.limits)?
                 .into_iter()
                 .map(|p| (p.x, p.y))
                 .collect::<Vec<_>>()
@@ -931,7 +931,7 @@ impl<'a> EmfSvgConverter<'a> {
         if polygons > self.limits.max_path_points || total > self.limits.max_path_points {
             return malformed(kind, "poly-polygon count exceeds configured path limit");
         }
-        let counts = parse_poly_counts(&data[24..], polygons)?;
+        let counts = parse_poly_counts(&data[24..], polygons, &self.limits)?;
         let sum = counts.iter().try_fold(0usize, |sum, &count| {
             sum.checked_add(usize::try_from(count).ok()?)
         });
@@ -950,6 +950,7 @@ impl<'a> EmfSvgConverter<'a> {
                 data.get(point_offset..)
                     .ok_or_else(|| Error::ParseError("point offset outside payload".into()))?,
                 total,
+                &self.limits,
             )?
             .into_iter()
             .map(|p| (i32::from(p.x), i32::from(p.y)))
@@ -959,6 +960,7 @@ impl<'a> EmfSvgConverter<'a> {
                 data.get(point_offset..)
                     .ok_or_else(|| Error::ParseError("point offset outside payload".into()))?,
                 total,
+                &self.limits,
             )?
             .into_iter()
             .map(|p| (p.x, p.y))
@@ -1014,12 +1016,12 @@ impl<'a> EmfSvgConverter<'a> {
             )
             .ok_or_else(|| Error::ParseError("PolyDraw types exceed payload".into()))?;
         let points = if short {
-            parse_points_array(&data[20..], count)?
+            parse_points_array(&data[20..], count, &self.limits)?
                 .into_iter()
                 .map(|p| (i32::from(p.x), i32::from(p.y)))
                 .collect::<Vec<_>>()
         } else {
-            parse_pointl_array(&data[20..], count)?
+            parse_pointl_array(&data[20..], count, &self.limits)?
                 .into_iter()
                 .map(|p| (p.x, p.y))
                 .collect::<Vec<_>>()
@@ -2340,7 +2342,7 @@ mod tests {
             record(EmrType::MoveToEx, &move_to),
             record(EmrType::LineTo, &line_to),
         ]);
-        let parser = EmfParser::new(&bytes).unwrap();
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
         let svg = EmfSvgConverter::new(&parser).convert().unwrap();
         assert!(svg.starts_with("<svg "));
         assert!(svg.contains("stroke=\"red\""));
@@ -2361,7 +2363,7 @@ mod tests {
             record(EmrType::SetWorldTransform, &transform),
             record(EmrType::StretchDIBits, &stretch_dib_payload()),
         ]);
-        let parser = EmfParser::new(&bytes).unwrap();
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
         let svg = EmfSvgConverter::new(&parser).convert().unwrap();
         assert!(svg.contains("data:image/png;base64,"));
         assert!(svg.contains("transform=\"matrix(0 1 -1 0 7 9)\""));
@@ -2371,7 +2373,7 @@ mod tests {
     #[test]
     fn plg_blt_keeps_affine_destination_parallelogram() {
         let bytes = classic_emf(vec![record(EmrType::PlgBlt, &plg_blt_payload())]);
-        let parser = EmfParser::new(&bytes).unwrap();
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
         let svg = EmfSvgConverter::new(&parser).convert().unwrap();
         assert!(svg.contains("data:image/png;base64,"));
         assert!(svg.contains("transform=\"matrix(20 0 0 30 10 20)\""));
@@ -2384,7 +2386,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/images/emf/wrench.emf"
         ));
-        let parser = EmfParser::new(bytes).unwrap();
+        let parser = EmfParser::new(bytes, &crate::Limits::default()).unwrap();
         let svg = EmfSvgConverter::new(&parser).convert().unwrap();
         assert!(svg.starts_with("<svg "));
         assert!(svg.len() > 100);
@@ -2413,7 +2415,7 @@ mod tests {
             gradient.extend_from_slice(&1_u32.to_le_bytes());
         }
         let bytes = classic_emf(vec![record(EmrType::GradientFill, &gradient)]);
-        let parser = EmfParser::new(&bytes).unwrap();
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
         let limits = crate::Limits {
             max_svg_elements: 1,
             ..crate::Limits::default()
@@ -2456,7 +2458,7 @@ mod tests {
         payload[string_offset..].copy_from_slice(&[b'A', 0]);
 
         let bytes = classic_emf(vec![record(EmrType::PolyTextOutW, &payload)]);
-        let parser = EmfParser::new(&bytes).unwrap();
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
         let limits = crate::Limits {
             max_output_bytes: 1500,
             ..crate::Limits::default()

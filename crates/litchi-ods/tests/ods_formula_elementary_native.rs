@@ -39,7 +39,8 @@ fn selected_libreoffice_numeric_caches_match_the_scalar_profile() {
             .expect("cached decimal")
             .parse()
             .expect("finite number");
-        let expression = Expression::parse(formula).expect("upstream formula parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("upstream formula parses");
         let result =
             evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
                 .expect("bounded upstream scalar evaluates");

@@ -21,7 +21,10 @@ pub(crate) fn replace_direct_empty(
     context: &'static str,
 ) -> Result<Vec<u8>> {
     let layout = scan(xml, local.as_bytes(), successors, context)?;
-    if layout.alternate_content {
+    // The scan recognizes markup-compatibility names on namespace values as
+    // written; a declaration spelled with references binds the namespace for
+    // preprocessing all the same (record 0011).
+    if layout.alternate_content || litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(invalid(format!(
             "{context} projected through markup compatibility cannot be edited"
         )));
@@ -183,4 +186,39 @@ fn mce(namespace: &ResolveResult<'_>) -> bool {
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
     invalid(format!("worksheet property XML error: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::replace_direct_empty;
+
+    const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    /// Record 0011: a branch bound through a declaration that spells the
+    /// namespace with references blocks the edit like a literal one.
+    #[test]
+    fn escaped_markup_compatibility_is_refused() {
+        for namespace in [
+            "http://schemas.openxmlformats.org/markup-compatibility/2006",
+            "http://schemas.openxmlformats.org/markup-compatibility/200&#54;",
+        ] {
+            let xml = format!(
+                r#"<worksheet xmlns="{SML}" xmlns:mc="{namespace}"><sheetData/><mc:AlternateContent><mc:Choice Requires="x"><printOptions gridLines="1"/></mc:Choice></mc:AlternateContent></worksheet>"#
+            );
+            let error = replace_direct_empty(
+                xml.as_bytes(),
+                "printOptions",
+                Some(r#" headings="1""#),
+                &[],
+                "print options",
+            )
+            .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("projected through markup compatibility"),
+                "{namespace}: {error}"
+            );
+        }
+    }
 }

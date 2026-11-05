@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use litchi_core::sheet::Result;
+use crate::error::Result;
 use litchi_opc::{OpcError, OpcPackage, PackURI, Part, TargetMode};
 
 use super::model::{REL, STRICT_REL, XmlMapConformance, XmlMapInfo};
@@ -39,39 +39,10 @@ impl Snapshot {
         })
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Borrow the typed Custom XML Maps value when the workbook owns one.
     #[must_use]
     pub fn info(&self) -> Option<&XmlMapInfo> {
         self.info.as_ref()
-    }
-
-    /// Contextual alias for [`Self::info`].
-    #[must_use]
-    pub fn xml_maps(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Contextual catalog alias for [`Self::info`].
-    #[must_use]
-    pub fn catalog(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Explicit alias for the typed `MapInfo` value.
-    #[must_use]
-    pub fn map_info(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Contextual value alias for [`Self::info`].
-    #[must_use]
-    pub fn value(&self) -> Option<&XmlMapInfo> {
-        self.info()
     }
 
     /// The namespace conformance used by the owned part, or Transitional for
@@ -115,6 +86,7 @@ impl Snapshot {
                 "custom XML maps patch targets a different workbook",
             ));
         }
+        crate::signature_policy::ensure_unsigned(package)?;
 
         let existing = package
             .get_part(&workbook_uri)?
@@ -193,7 +165,6 @@ impl Snapshot {
                     owner.mode == TargetMode::External,
                 );
         }
-        package.unsign();
         Ok(())
     }
 }

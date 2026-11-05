@@ -122,7 +122,7 @@
 //!         sheet.push_row(row)?;
 //!         let sheets = [sheet];
 //!         let resolver = Resolver::new(&sheets, SheetExtent::new(100, 26), execution)?;
-//!         let expression = Expression::parse("=[.A1:.B1]+1")?;
+//!         let expression = Expression::parse("=[.A1:.B1]+1", &Default::default())?;
 //!         let context = Context::new(execution, Position::new("Data", 0, 0))
 //!             .with_mode(Mode::Matrix);
 //!         let limits = Limits::default();

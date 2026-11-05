@@ -2,6 +2,7 @@ use std::io;
 use std::sync::Arc;
 
 use litchi_core::Position;
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{
     decode_varint_from_bytes, encode_varint_into,
@@ -9,7 +10,9 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
-use litchi_keynote::{EditError, Limits, Package, ReadError, SlideSelector, SlideSelectorError};
+use litchi_keynote::{
+    Package, ReadError, SlideSelector, SlideSelectorError, edit::Error as EditError,
+};
 use prost::Message;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -53,13 +56,14 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     let archive = Archive { objects };
-    let bytes = archive.to_bytes()?;
-    Ok(SnappyStream::compress(&bytes)?)
+    let bytes = archive.to_bytes(Default::default())?;
+    Ok(SnappyStream::compress(&bytes, Default::default())?)
 }
 
 fn component_with_unknown_header(
@@ -67,8 +71,8 @@ fn component_with_unknown_header(
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let archive = Archive { objects };
-    let bytes = archive.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = archive.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -102,9 +106,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 #[allow(deprecated, reason = "native schema requires legacy cache fields")]
@@ -122,7 +126,7 @@ fn canonical_node(slide_identifier: u64, is_skipped: bool) -> TestResult<Vec<u8>
 }
 
 fn replace_field_four(source: &[u8], replacement: Option<&[u8]>) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len().saturating_add(3));
     for field in view.fields() {
         if field.number() == 4 {
@@ -211,7 +215,7 @@ fn synthetic_package(
         vec![
             object(1, 1, document.encode_to_vec())?,
             object(2, 2, show.encode_to_vec())?,
-            ArchiveObject::new(FIRST_NODE, first_messages)?,
+            ArchiveObject::new(FIRST_NODE, first_messages, Default::default())?,
             object(5, 4, canonical_node(6, true)?)?,
         ],
         FIRST_NODE,
@@ -234,13 +238,13 @@ fn synthetic_package(
 }
 
 fn node_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("synthetic package has no document member"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     Ok(archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("synthetic package has no requested slide node"))?
@@ -253,20 +257,24 @@ fn node_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn decompressed_document(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("synthetic package has no document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.as_bytes().to_vec())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?
+        .as_bytes()
+        .to_vec())
 }
 
 fn fields_except_skip(data: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(data)?
-        .fields()
-        .filter(|field| field.number() != 4)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() != 4)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 #[test]
@@ -297,13 +305,17 @@ fn semantic_state_and_exact_noop_are_selector_first() -> Result<(), Box<dyn std:
 
     assert!(matches!(
         package.edit().commit(),
-        Err(EditError::NoStagedOperation)
+        Err(EditError::Refused(
+            litchi_keynote::edit::Refusal::NoStagedOperation
+        ))
     ));
     let mut bounded = package.edit();
     bounded.skip_slide(SlideSelector::index(0))?;
     assert!(matches!(
         bounded.include_slide(SlideSelector::index(1)),
-        Err(EditError::OperationAlreadyStaged)
+        Err(EditError::Refused(
+            litchi_keynote::edit::Refusal::OperationAlreadyStaged
+        ))
     ));
     let bounded_commit = bounded.commit()?;
     assert!(bounded_commit.package().show()?.slides()[0].is_skipped());
@@ -320,14 +332,17 @@ fn selector_misses_and_ambiguity_are_typed() -> Result<(), Box<dyn std::error::E
     let mut by_position = package.edit();
     assert!(matches!(
         by_position.skip_slide(SlideSelector::position(Position::new(9))),
-        Err(EditError::SlidePositionNotFound { position }) if position == Position::new(9)
+        Err(EditError::Refused(litchi_keynote::edit::Refusal::SlidePositionNotFound { position })) if position == Position::new(9)
     ));
 
     let mut by_name = package.edit();
     let Err(missing_name) = by_name.skip_slide("Missing") else {
         return Err(io::Error::other("missing name was accepted").into());
     };
-    assert!(matches!(&missing_name, EditError::SlideNameNotFound));
+    assert!(matches!(
+        &missing_name,
+        EditError::Refused(litchi_keynote::edit::Refusal::SlideNameNotFound)
+    ));
     assert!(!missing_name.to_string().contains("Missing"));
 
     let mut ambiguous = package.edit();
@@ -365,13 +380,13 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
         fields_except_skip(&after_node)?,
         fields_except_skip(&before_node)?
     );
-    let unknown_before = WireView::parse(&before_node)?
+    let unknown_before = WireView::parse(&before_node, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 99)
         .ok_or_else(|| io::Error::other("source node has no unknown sentinel"))?
         .raw()
         .to_vec();
-    let unknown_after = WireView::parse(&after_node)?
+    let unknown_after = WireView::parse(&after_node, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 99)
         .ok_or_else(|| io::Error::other("target node has no unknown sentinel"))?
@@ -390,8 +405,8 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
         .collect::<Vec<_>>();
     assert_eq!(changed_iwa_bytes, [(0, 1)]);
 
-    let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(commit.package().exact_bytes())?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let after_catalog = Catalog::from_bytes(commit.package().exact_bytes(), Default::default())?;
     let mut changed = 0;
     for (before, after) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before.name(), after.name());
@@ -509,9 +524,9 @@ fn malformed_required_skip_field_and_payload_ambiguity_are_rejected()
 #[test]
 fn public_transaction_values_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<litchi_keynote::Commit>();
-    assert_send_sync::<litchi_keynote::Patch>();
-    assert_send_sync::<litchi_keynote::Diagnostics>();
+    assert_send_sync::<litchi_keynote::edit::Commit>();
+    assert_send_sync::<litchi_keynote::edit::Patch>();
+    assert_send_sync::<litchi_keynote::edit::Diagnostics>();
     assert_send_sync::<EditError>();
 
     // Keep the exact-source Arc implementation observable to the compiler:

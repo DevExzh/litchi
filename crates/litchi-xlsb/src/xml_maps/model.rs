@@ -80,7 +80,7 @@ impl XPath {
         Self::new_with_limit(value, MAX_XPATH_UNITS)
     }
 
-    pub fn new_with_limits(value: impl Into<String>, limits: Limits) -> Result<Self> {
+    pub fn bounded(value: impl Into<String>, limits: Limits) -> Result<Self> {
         Self::new_with_limit(value, limits.max_xpath_units)
     }
 
@@ -200,11 +200,7 @@ impl MappedTable {
         Ok(value)
     }
 
-    pub fn new_with_limits(
-        table_id: u32,
-        columns: Vec<ColumnBinding>,
-        limits: Limits,
-    ) -> Result<Self> {
+    pub fn bounded(table_id: u32, columns: Vec<ColumnBinding>, limits: Limits) -> Result<Self> {
         let value = Self { table_id, columns };
         validation::mapped_table(&value, limits)?;
         Ok(value)

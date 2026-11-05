@@ -4,7 +4,8 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::{Snapshot, apply_patch, load};
+use super::package::apply_patch;
+use super::{Snapshot, load};
 use crate::presentation::embedded::controls::{
     BINARY_CONTENT_TYPE, BINARY_RELATIONSHIP, CONTROL_RELATIONSHIP, DESCRIPTOR_CONTENT_TYPE, Limits,
 };
@@ -79,7 +80,7 @@ fn exact_noop_preserves_source_and_package_bytes() {
         .to_vec();
     let source = snapshot(&package);
     let commit = source.edit().commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().source_xml(), before.as_slice());
     apply_patch(&mut package, commit.patch()).unwrap();
     assert_eq!(

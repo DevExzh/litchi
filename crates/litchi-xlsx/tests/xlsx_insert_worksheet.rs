@@ -1,13 +1,12 @@
-use litchi_xlsx::Workbook;
-
 #[test]
 fn edit_transaction_appends_a_validated_worksheet() {
-    let workbook = Workbook::create().unwrap();
+    let workbook = litchi_xlsx::Package::new().unwrap();
     let mut edit = workbook.edit().unwrap();
     edit.add("Inserted").unwrap();
     let committed = edit.commit().unwrap();
     let names = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();

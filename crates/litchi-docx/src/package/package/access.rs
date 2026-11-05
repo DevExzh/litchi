@@ -1,7 +1,5 @@
 //! Package graph access, signatures, and transactional low-level edits.
 
-#[cfg(feature = "sign")]
-use super::super::model::PackURI;
 use super::super::model::{
     CustomProps, CustomPropsHost, Error, OpcPackage, Package, Result, Slot, embedded,
     validate_document_main_content_type,
@@ -19,6 +17,21 @@ impl Package {
         self.ensure_story_opc_current(operation)
     }
 
+    /// The semantic read budgets this package keeps (record 0355).
+    #[must_use]
+    pub fn semantic_limits(&self) -> &crate::SemanticLimits {
+        &self.semantic_limits
+    }
+
+    /// The same package under other semantic read budgets. O(1): every part
+    /// is shared.
+    #[must_use]
+    pub fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut next = self.clone();
+        next.semantic_limits = std::sync::Arc::new(limits);
+        next
+    }
+
     /// Get the underlying OPC package.
     ///
     /// This provides access to lower-level package operations.
@@ -26,6 +39,11 @@ impl Package {
     #[must_use]
     pub fn opc_package(&self) -> &OpcPackage {
         &self.opc
+    }
+
+    /// Retain the immutable graph without cloning its part and relationship maps.
+    pub(crate) fn shared_opc_package(&self) -> std::sync::Arc<OpcPackage> {
+        self.opc.shared()
     }
 
     /// Return whether this document contains package signatures.
@@ -64,8 +82,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn sign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.sign(signer)
+    pub fn sign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.sign(signer)?;
+        Ok(next)
     }
 
     /// Add a signature with explicit authoring resource bounds.
@@ -75,11 +95,13 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn sign_with(
-        &mut self,
+        &self,
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
-    ) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.sign_with(signer, limits)
+    ) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.sign_with(signer, limits)?;
+        Ok(next)
     }
 
     /// Atomically replace all signatures with one signature.
@@ -88,8 +110,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn resign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.resign(signer)
+    pub fn resign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.resign(signer)?;
+        Ok(next)
     }
 
     /// Atomically replace signatures with explicit authoring resource bounds.
@@ -99,30 +123,42 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn resign_with(
-        &mut self,
+        &self,
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
-    ) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.resign_with(signer, limits)
+    ) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.resign_with(signer, limits)?;
+        Ok(next)
     }
 
     /// Remove all package signatures.
-    pub fn unsign(&mut self) -> &mut Self {
-        self.opc.unsign();
-        self
+    ///
+    /// This is the explicit authorization ADR 0006 requires: a package-level
+    /// edit never removes a signature itself, so a change to a signed package
+    /// (mail merge, glossary, web settings, fonts, Ribbon, document patches,
+    /// and edited core or custom properties at a managed save) is refused
+    /// until this is called.
+    ///
+    /// Returns the unsigned package; this package keeps its signature.
+    #[must_use]
+    pub fn unsign(&self) -> Self {
+        let mut next = self.clone();
+        next.opc.unsign();
+        next
     }
 
     /// Discover inert embedded-object and embedded-package relationships
     /// using the shared safe default resource limits.
     ///
-    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// Use [`embedded::scan`] with [`Self::opc_package`] when a lower
     /// layer needs explicitly tuned limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
-        Ok(embedded::scan(&self.opc)?)
+        Ok(embedded::scan(&self.opc, &embedded::Limits::default())?)
     }
 
     /// Load the bounded, inert classic-chart graph owned by the main document.
@@ -132,7 +168,43 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let document = self.opc.main_document_part()?.partname().clone();
-        crate::chart::load(&self.opc, &document)
+        crate::chart::package::load_with_limits(
+            &self.opc,
+            &document,
+            &crate::chart::Limits::DEFAULT,
+        )
+    }
+
+    /// The chart part (a `c:chartSpace` or `cx:chartSpace`) the main
+    /// document relates through `relationship_id` — an
+    /// [`InlineChart`](crate::chart::InlineChart)'s — or `None` when the main
+    /// document has no chart relationship of that ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an external chart relationship or a target that
+    /// is not a chart part.
+    pub fn chart_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
+        let main = self.opc.main_document_part()?;
+        let Some(relationship) = main.rels().get(relationship_id) else {
+            return Ok(None);
+        };
+        let Some(content_type) = crate::chart::inline::chart_content_type(relationship.reltype())
+        else {
+            return Ok(None);
+        };
+        if relationship.is_external() {
+            return Err(Error::InvalidFormat(
+                "a chart relationship cannot be external".into(),
+            ));
+        }
+        let part = self.opc.get_part(&relationship.target_partname()?)?;
+        if part.content_type() != content_type {
+            return Err(Error::InvalidFormat(
+                "a chart relationship targets a part that is not a chart".into(),
+            ));
+        }
+        Ok(Some(part.blob().to_vec()))
     }
 
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
@@ -167,16 +239,6 @@ impl Package {
         crate::textbox::load_text_boxes(self.opc.main_document_part()?.blob())
     }
 
-    /// Deterministically store an already coherent classic-chart graph.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn store_chart_graph(&mut self, graph: &crate::chart::Graph) -> Result<()> {
-        let document = self.opc.main_document_part()?.partname().clone();
-        crate::chart::store(&mut self.opc, &document, graph)
-    }
-
     /// Transactionally edit the current plaintext OPC graph.
     ///
     /// The closure receives a structural candidate whose built-in part payloads
@@ -198,7 +260,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+    pub(crate) fn edit_opc_in_place<T>(
+        &mut self,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
         self.edit_opc_candidate("edit_opc", true, edit)
     }
 
@@ -221,41 +286,54 @@ impl Package {
         raw: bool,
         edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
+        self.edit_opc_candidate_known(operation, raw, |opc| Ok((edit(opc)?, None)))
+    }
+
+    /// [`Self::edit_semantic_opc`] for an edit that knows the core-properties
+    /// slot of its candidate and leaves the custom-properties part untouched
+    /// (`Some(slot)`), so publication adopts the slot and keeps the custom
+    /// properties instead of decoding both parts again (record 0377a).
+    pub(crate) fn edit_semantic_opc_known<T>(
+        &mut self,
+        operation: &'static str,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<(T, Option<Slot>)>,
+    ) -> Result<T> {
+        self.edit_opc_candidate_known(operation, false, edit)
+    }
+
+    fn edit_opc_candidate_known<T>(
+        &mut self,
+        operation: &'static str,
+        raw: bool,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<(T, Option<Slot>)>,
+    ) -> Result<T> {
         self.ensure_opc_current(operation)?;
-        #[cfg(feature = "automatic-fonts")]
-        if raw && self.font_embedding.is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "raw OPC editing cannot honor an automatic font policy; use the managed font facade",
-            });
-        }
 
         if !raw && (self.opc.is_signed() || self.opc.requires_signature_edit_policy()) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "changed signed content requires explicit Package::unsign before publication",
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+            ));
         }
         let mut candidate = self.opc.clone();
-        let value = edit(&mut candidate)?;
+        let (value, known) = edit(&mut candidate)?;
         candidate.validate_signature_edit_from(&self.opc)?;
 
         let main_part = candidate
             .main_document_part()
             .map_err(|error| Error::PartNotFound(format!("main document part: {error}")))?;
         validate_document_main_content_type(main_part.content_type())?;
-        let properties = Slot::load(&candidate)?;
-        let custom_props = CustomProps::read_for(&candidate, CustomPropsHost::Word)?;
-
-        self.opc = candidate;
-        self.properties = properties;
-        self.custom_props = custom_props;
-        self.custom_props_dirty = false;
-        self.mutable_doc = None;
-        if raw {
-            self.raw_edit_committed = true;
+        match known {
+            Some(properties) => {
+                self.opc = candidate;
+                self.properties = properties.into();
+            },
+            None => {
+                let properties = Slot::load(&candidate)?;
+                let custom_props = CustomProps::read_for(&candidate, CustomPropsHost::Word)?;
+                self.opc = candidate;
+                self.properties = properties.into();
+                self.custom_props = custom_props.into();
+            },
         }
         Ok(value)
     }

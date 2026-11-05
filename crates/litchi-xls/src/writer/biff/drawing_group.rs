@@ -9,13 +9,13 @@
 use crate::Result;
 use crate::writer::{ShapeGroupChild, ShapeGroupWrite, ShapeKind};
 use litchi_odraw::{
+    builder::{PropertyBuilder, ShapeBuilder},
     prop::Id,
     shape::{Flags, Native},
     write::{
-        Atom as WriteAtom, Container as WriteContainer, PropertyBuilder, ShapeBuilder,
-        atom as write_escher_atom, child_anchor as write_child_anchor,
-        container as write_container, container_header as write_container_header,
-        spgr as write_spgr,
+        Atom as WriteAtom, Container as WriteContainer, atom as write_escher_atom,
+        child_anchor as write_child_anchor, container as write_container,
+        container_header as write_container_header, spgr as write_spgr,
     },
 };
 
@@ -95,6 +95,7 @@ pub(crate) fn group_fragments<'a>(
         0,
         WriteContainer::Spgr,
         crate::utils::truncate_usize_to_u32(total),
+        Default::default(),
     )?;
     first.extend_from_slice(&header);
 
@@ -127,10 +128,10 @@ pub(crate) fn group_fragments<'a>(
 fn group_header_shape(group: &ShapeGroupWrite, shape_id: u32) -> Result<Vec<u8>> {
     let mut children = Vec::with_capacity(104);
     let [left, top, right, bottom] = group.coordinates.fields();
-    write_spgr(&mut children, left, top, right, bottom)?;
+    write_spgr(&mut children, left, top, right, bottom, Default::default())?;
     ShapeBuilder::new(Native::FREEFORM, shape_id)
         .with_flags(Flags::GROUP | Flags::HAVE_ANCHOR)
-        .write(&mut children)?;
+        .write(&mut children, Default::default())?;
     let mut properties = PropertyBuilder::new();
     properties.add_simple(
         PROTECTION_BOOLEAN_PROPERTIES,
@@ -148,11 +149,23 @@ fn group_header_shape(group: &ShapeGroupWrite, shape_id: u32) -> Result<Vec<u8>>
             GROUP_SHAPE_HIDDEN
         },
     );
-    properties.write(&mut children)?;
+    properties.write(&mut children, Default::default())?;
     write_xls_anchor(&mut children, &group.anchor)?;
-    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
+    write_escher_atom(
+        &mut children,
+        0,
+        WriteAtom::ClientData,
+        &[],
+        Default::default(),
+    )?;
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
+    write_container(
+        &mut out,
+        0,
+        WriteContainer::Sp,
+        &children,
+        Default::default(),
+    )?;
     Ok(out)
 }
 
@@ -161,28 +174,48 @@ fn grouped_child_shape(child: &ShapeGroupChild, shape_id: u32) -> Result<(Vec<u8
     let mut children = Vec::with_capacity(112);
     ShapeBuilder::new(Native::from_raw(child.kind.officeart_type()), shape_id)
         .with_flags(Flags::CHILD | Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-        .write(&mut children)?;
-    style_properties(child.locked, child.fill, child.line, child.visible).write(&mut children)?;
+        .write(&mut children, Default::default())?;
+    style_properties(child.locked, child.fill, child.line, child.visible)
+        .write(&mut children, Default::default())?;
     let [left, top, right, bottom] = child.anchor.fields();
-    write_child_anchor(&mut children, left, top, right, bottom)?;
-    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
+    write_child_anchor(&mut children, left, top, right, bottom, Default::default())?;
+    write_escher_atom(
+        &mut children,
+        0,
+        WriteAtom::ClientData,
+        &[],
+        Default::default(),
+    )?;
     let has_textbox = child_has_textbox(child);
     if has_textbox {
-        write_escher_atom(&mut children, 0, WriteAtom::ClientTextbox, &[])?;
+        write_escher_atom(
+            &mut children,
+            0,
+            WriteAtom::ClientTextbox,
+            &[],
+            Default::default(),
+        )?;
     }
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
+    write_container(
+        &mut out,
+        0,
+        WriteContainer::Sp,
+        &children,
+        Default::default(),
+    )?;
     split_client_textbox(out, has_textbox)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::shape::{Anchor, Behavior, Rect};
+    use crate::AnchorBehavior;
+    use crate::writer::shape::{Anchor, Rect};
     use litchi_odraw::RecordKind;
 
     fn anchor() -> Anchor {
-        Anchor::cells(0, 0, 10, 6, Behavior::MoveAndSize).unwrap()
+        Anchor::cells(0, 0, 10, 6, AnchorBehavior::Absolute).unwrap()
     }
 
     fn config(group: &ShapeGroupWrite) -> GroupShapeConfig<'_> {

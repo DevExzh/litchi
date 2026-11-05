@@ -22,7 +22,7 @@
 //! The compound-file repairs the container reader applied while the
 //! workbook's OLE file was opened join the same report as
 //! [`Defect::Container`] entries, ahead of every BIFF-level repair, and the
-//! property-set repairs made while the eager [`crate::Workbook`] open reads
+//! property-set repairs made while the eager [`crate::raw::Reader`] open reads
 //! the standard metadata streams join it as [`Defect::PropertySet`] entries,
 //! after them. (The source-backed owner reads no metadata stream, so its
 //! report never lists a property-set repair.)
@@ -660,6 +660,63 @@ impl SheetDefect {
     }
 }
 
+/// The class of worksheet-record defect the reader repairs the way Excel,
+/// LibreOffice and Apache POI repair it (record 0316).
+///
+/// Repaired and recorded under every [`Leniency`] variant. Each class is a
+/// field `[MS-XLS]` constrains as a producer obligation that Excel itself is
+/// documented to break; the repair reads the record's other fields as
+/// written, and the record bytes are kept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum WorksheetDefect {
+    /// A `WINDOW2` zoom field (`wScaleSLV` or `wScaleNormal`, MS-XLS
+    /// 2.4.346) was neither zero nor within `10..=400`.
+    ///
+    /// Read as the default zoom (`None`). MS-XLS product notes 144 and 145
+    /// say Excel truncates both fields into a byte when saving; LibreOffice
+    /// and POI read any value.
+    ZoomLevel,
+    /// A `Formula` record (MS-XLS 2.4.127) set `fShrFmla` while its `rgce`
+    /// was a complete token stream rather than a `PtgExp`.
+    ///
+    /// Only a formula that is part of a shared formula must begin with
+    /// `PtgExp`; this one carries its own tokens, so the stale flag is
+    /// ignored and the cell reads as an ordinary formula, as POI's
+    /// `FormulaRecordAggregate` documents for files Excel writes. The
+    /// explicit [`crate::CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1`]
+    /// keeps the flag instead and reports
+    /// [`crate::formula_metadata::Defect::SharedFlagWithoutPtgExp`].
+    SharedFormulaFlag,
+}
+
+impl WorksheetDefect {
+    /// The BIFF record type whose payload carried the defect.
+    #[must_use]
+    pub fn record_type(self) -> u16 {
+        match self {
+            WorksheetDefect::ZoomLevel => WINDOW2_RECORD,
+            WorksheetDefect::SharedFormulaFlag => FORMULA_RECORD,
+        }
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            WorksheetDefect::ZoomLevel => "WINDOW2 zoom is neither zero nor within 10..=400",
+            WorksheetDefect::SharedFormulaFlag => {
+                "Formula sets fShrFmla without a leading PtgExp token"
+            },
+        }
+    }
+}
+
+/// `WINDOW2` (MS-XLS 2.4.346).
+const WINDOW2_RECORD: u16 = 0x023E;
+/// `Formula` (MS-XLS 2.4.127).
+const FORMULA_RECORD: u16 = 0x0006;
+
 /// One class of defect repaired while a workbook was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -687,6 +744,8 @@ pub enum Defect {
     SharedString(SharedStringDefect),
     /// A worksheet-name defect repaired by the opt-in [`Leniency`] variant.
     SheetName(SheetNameDefect),
+    /// A worksheet-record defect repaired the way Excel repairs it.
+    Worksheet(WorksheetDefect),
     /// A compound-file (CFB) repair the container reader applied while the
     /// workbook's OLE file was opened; see [`litchi_cfb::Defect`] for the
     /// closed set of container repairs and their substitutions. Applied under
@@ -695,7 +754,7 @@ pub enum Defect {
     /// A property-set repair the metadata reader applied while the
     /// workbook's `\u{5}SummaryInformation` or
     /// `\u{5}DocumentSummaryInformation` stream was read by the eager
-    /// [`crate::Workbook`] open (the source-backed owner reads neither); see
+    /// [`crate::raw::Reader`] open (the source-backed owner reads neither); see
     /// [`litchi_ole_common::leniency::Defect`] for the closed set of
     /// property-set repairs and their substitutions. Applied under every
     /// [`Leniency`] variant.
@@ -719,6 +778,7 @@ impl Defect {
             Defect::Sheet(defect) => Some(defect.record_type()),
             Defect::SharedString(defect) => Some(defect.record_type()),
             Defect::SheetName(defect) => Some(defect.record_type()),
+            Defect::Worksheet(defect) => Some(defect.record_type()),
             Defect::Container(_) | Defect::PropertySet(_) => None,
         }
     }
@@ -734,6 +794,7 @@ impl Defect {
             Defect::Sheet(defect) => defect.description(),
             Defect::SharedString(defect) => defect.description(),
             Defect::SheetName(defect) => defect.description(),
+            Defect::Worksheet(defect) => defect.description(),
             Defect::Container(defect) => defect.repair(),
             Defect::PropertySet(defect) => defect.repair(),
         }
@@ -749,6 +810,12 @@ impl From<FormattingDefect> for Defect {
 impl From<CellFormatDefect> for Defect {
     fn from(defect: CellFormatDefect) -> Self {
         Self::CellFormat(defect)
+    }
+}
+
+impl From<WorksheetDefect> for Defect {
+    fn from(defect: WorksheetDefect) -> Self {
+        Self::Worksheet(defect)
     }
 }
 
@@ -834,7 +901,10 @@ impl ToleratedDefect {
     /// every [`SharedStringDefect`] it is the zero-based shared-string index.
     /// For every [`SheetNameDefect`] and [`SheetDefect`] it is the zero-based workbook sheet index of the
     /// `BoundSheet8` record. For every [`PaletteDefect`] it is the byte
-    /// offset of the `Palette` record within the Workbook stream. For a
+    /// offset of the `Palette` record within the Workbook stream. For
+    /// [`WorksheetDefect::ZoomLevel`] it is the byte offset of the `WINDOW2`
+    /// record within the Workbook stream, and for
+    /// [`WorksheetDefect::SharedFormulaFlag`] the cell's zero-based row. For a
     /// [`Defect::Container`] it is the compound-file context (a directory
     /// SID, sector index, or header field value — see
     /// [`litchi_cfb::ToleratedDefect::context`]). For a
@@ -889,7 +959,10 @@ impl ToleratedDefect {
     /// of `Palette` records seen so far. For [`SheetDefect::ReservedNameFlags`]
     /// it is the `stName` option byte, for [`SheetDefect::Visibility`] the
     /// `hsState` byte, for [`SheetDefect::SheetType`] the `dt` byte, and for
-    /// [`SheetDefect::TrailingBytes`] the number of bytes ignored. For a
+    /// [`SheetDefect::TrailingBytes`] the number of bytes ignored. For
+    /// [`WorksheetDefect::ZoomLevel`] it is the raw zoom field and for
+    /// [`WorksheetDefect::SharedFormulaFlag`] the cell's zero-based column.
+    /// For a
     /// [`Defect::Container`] or [`Defect::PropertySet`] it is always zero;
     /// the substrate's context is the [`Self::ordinal`].
     #[must_use]
@@ -995,7 +1068,7 @@ impl ToleranceReport {
     /// depends on the metadata, and the property-set accessors still report
     /// the failure when the metadata is asked for.
     ///
-    /// The eager [`Workbook`](crate::Workbook) open does this itself. A
+    /// The eager [`Reader`](crate::raw::Reader) open does this itself. A
     /// [`SourceBackedWorkbook`](crate::SourceBackedWorkbook) never reads the
     /// metadata streams, so a caller that reads them alongside it (the
     /// `litchi` facade does) folds their repairs in with this method, for
@@ -1006,7 +1079,7 @@ impl ToleranceReport {
             &[&str],
         ) -> std::result::Result<
             litchi_ole_common::property_set::Stream,
-            litchi_cfb::OleError,
+            litchi_ole_common::Error,
         >,
     ) {
         for name in PROPERTY_SET_STREAMS {

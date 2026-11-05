@@ -17,14 +17,21 @@ fn typed_bubble_settings_round_trip_through_the_public_api() {
     chart.plot_area = PlotArea::new().add_type_group(TypeGroup::Bubble(group));
 
     let mut xml = Vec::new();
-    litchi_drawingml::chart::writer::write(&mut xml, &chart)
-        .expect("typed bubble settings must serialize");
+    litchi_drawingml::chart::writer::write(
+        &mut xml,
+        &chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("typed bubble settings must serialize");
     let xml_text = std::str::from_utf8(&xml).expect("chart XML must be UTF-8");
     assert!(xml_text.contains(r#"<c:bubbleScale val="125"/>"#));
     assert!(xml_text.contains(r#"<c:sizeRepresents val="w"/>"#));
 
-    let parsed =
-        litchi_drawingml::chart::reader::read(xml.as_slice()).expect("serialized chart must parse");
+    let parsed = litchi_drawingml::chart::reader::read(
+        xml.as_slice(),
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("serialized chart must parse");
     let [TypeGroup::Bubble(parsed)] = parsed.plot_area.type_groups.as_slice() else {
         panic!("expected one bubble chart group");
     };
@@ -41,7 +48,13 @@ fn parser_rejects_invalid_bubble_settings() {
         let xml = format!(
             r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:bubbleChart>{setting}</c:bubbleChart></c:plotArea></c:chart></c:chartSpace>"#
         );
-        assert!(litchi_drawingml::chart::reader::read(xml.as_bytes()).is_err());
+        assert!(
+            litchi_drawingml::chart::reader::read(
+                xml.as_bytes(),
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .is_err()
+        );
     }
 }
 
@@ -55,8 +68,12 @@ fn office_compatible_output_keeps_bubble_3d_at_series_level() {
     let mut chart = Chart::new();
     chart.plot_area = PlotArea::new().add_type_group(TypeGroup::Bubble(group));
     let mut xml = Vec::new();
-    litchi_drawingml::chart::writer::write(&mut xml, &chart)
-        .expect("typed bubble chart must serialize");
+    litchi_drawingml::chart::writer::write(
+        &mut xml,
+        &chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("typed bubble chart must serialize");
     let xml = String::from_utf8(xml).expect("chart XML must be UTF-8");
 
     assert_eq!(xml.matches("<c:bubble3D").count(), 1);
@@ -72,8 +89,11 @@ fn office_compatible_output_keeps_bubble_3d_at_series_level() {
         r#"<c:bubble3D val="1"/><c:bubbleScale"#,
         1,
     );
-    let parsed = litchi_drawingml::chart::reader::read(legacy.as_bytes())
-        .expect("standard group-level bubble3D must remain readable");
+    let parsed = litchi_drawingml::chart::reader::read(
+        legacy.as_bytes(),
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("standard group-level bubble3D must remain readable");
     let [TypeGroup::Bubble(parsed)] = parsed.plot_area.type_groups.as_slice() else {
         panic!("expected one bubble chart group");
     };

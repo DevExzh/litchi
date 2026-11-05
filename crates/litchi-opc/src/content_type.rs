@@ -3,7 +3,7 @@
 use crate::constants::namespace;
 use crate::error::{OpcError, Result};
 use crate::leniency::{CDATA_NODE, ContentTypeDefect, TEXT_NODE, ToleranceReport, bounded_name};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::{CONTENT_TYPES_URI, PackURI};
 use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
@@ -86,6 +86,14 @@ impl ContentTypeMap {
         }
     }
 
+    pub(crate) fn contains_fragment_key(&self, default: bool, normalized: &str) -> bool {
+        if default {
+            self.defaults.contains_key(normalized)
+        } else {
+            self.overrides.contains_key(normalized)
+        }
+    }
+
     pub(crate) fn mapping_count(&self) -> usize {
         self.defaults.len().saturating_add(self.overrides.len())
     }
@@ -96,7 +104,7 @@ impl ContentTypeMap {
     /// Used where the bytes were already admitted (and their repairs
     /// recorded) at ingress, or where an edit re-derives a manifest: the
     /// mapping semantics are identical to [`Self::from_xml_reporting`].
-    pub(crate) fn from_xml(xml: &[u8], limits: ReadLimits) -> Result<Self> {
+    pub(crate) fn from_xml(xml: &[u8], limits: SourceLimits) -> Result<Self> {
         Self::from_xml_reporting(xml, limits, &mut ToleranceReport::default())
     }
 
@@ -104,11 +112,11 @@ impl ContentTypeMap {
     /// repair into `report` (see [`crate::leniency`]).
     pub(crate) fn from_xml_reporting(
         xml: &[u8],
-        limits: ReadLimits,
+        limits: SourceLimits,
         report: &mut ToleranceReport,
     ) -> Result<Self> {
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             xml.len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
@@ -130,13 +138,13 @@ impl ContentTypeMap {
         let mut open_mapping: Option<String> = None;
 
         loop {
-            events = checked_increment(events, limits.max_xml_events(), ReadResource::XmlEvents)?;
+            events = checked_increment(events, limits.max_events(), SourceLimitKind::Events)?;
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event()?;
             match event {
                 Event::Start(element) => {
                     let next_depth =
-                        checked_increment(depth, limits.max_xml_depth(), ReadResource::XmlDepth)?;
+                        checked_increment(depth, limits.max_depth(), SourceLimitKind::Depth)?;
                     if skip_from.is_none() {
                         match inspect_element(
                             &mut map,
@@ -405,7 +413,7 @@ fn inspect_element(
     root_seen: &mut bool,
     entry_count: &mut usize,
     open_mapping: Option<&str>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     report: &mut ToleranceReport,
 ) -> Result<Inspected> {
     let in_content_types_namespace = matches!(
@@ -455,7 +463,7 @@ fn inspect_element(
     *entry_count = checked_increment(
         *entry_count,
         limits.max_content_type_mappings(),
-        ReadResource::ContentTypeMappings,
+        SourceLimitKind::ContentTypeMappings,
     )?;
 
     if local_name.as_ref() == b"Default" {
@@ -547,7 +555,7 @@ fn required_attributes(
     decoder: Decoder,
     key_name: &str,
     element_name: &str,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<(String, String, Vec<String>)> {
     let mut key_value = None;
     let mut content_type = None;
@@ -555,7 +563,7 @@ fn required_attributes(
     for attribute_result in element.checked_attributes() {
         let attribute = attribute_result?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             attribute.value.as_ref().len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -565,7 +573,7 @@ fn required_attributes(
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
                 .to_string();
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 value.len() as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -575,7 +583,7 @@ fn required_attributes(
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
                 .to_string();
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 value.len() as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -616,16 +624,16 @@ fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
     OpcError::Allocation { resource, source }
 }
 
-fn checked_increment(current: usize, maximum: usize, resource: ReadResource) -> Result<usize> {
-    let actual = current.checked_add(1).ok_or(OpcError::ReadLimit {
-        resource,
-        actual: u64::MAX,
+fn checked_increment(current: usize, maximum: usize, resource: SourceLimitKind) -> Result<usize> {
+    let actual = current.checked_add(1).ok_or(OpcError::Limit {
+        kind: resource,
+        observed: u64::MAX,
         maximum: maximum as u64,
     })?;
     if actual > maximum {
-        return Err(OpcError::ReadLimit {
-            resource,
-            actual: actual as u64,
+        return Err(OpcError::Limit {
+            kind: resource,
+            observed: actual as u64,
             maximum: maximum as u64,
         });
     }
@@ -677,7 +685,7 @@ mod tests {
             &manifest(r#"<Default ContentType="application/xml"/>"#),
         ] {
             assert!(matches!(
-                ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()),
+                ContentTypeMap::from_xml(xml.as_bytes(), SourceLimits::default()),
                 Err(OpcError::InvalidContentTypesManifest(_))
             ));
         }
@@ -702,9 +710,12 @@ mod tests {
             r#"<Types xmlns="{NS}" xmlns:x="urn:vendor">stray<x:Extension><Default Extension="bin" ContentType="application/x-hidden"/></x:Extension><Default Extension="xml" ContentType="application/xml" x:hint="1" Producer="tool"><x:note>inner</x:note></Default><Override PartName="/a.xml" ContentType="text/xml"><![CDATA[data]]></Override><Unknown/><![CDATA[ ]]></Types>"#
         );
         let mut report = ToleranceReport::default();
-        let map =
-            ContentTypeMap::from_xml_reporting(xml.as_bytes(), ReadLimits::default(), &mut report)
-                .unwrap();
+        let map = ContentTypeMap::from_xml_reporting(
+            xml.as_bytes(),
+            SourceLimits::default(),
+            &mut report,
+        )
+        .unwrap();
         assert_eq!(map.mapping_count(), 2);
         assert!(map.get(&PackURI::new("/b.bin").unwrap()).is_err());
         assert_eq!(
@@ -755,7 +766,7 @@ mod tests {
         // The same manifest read through the reportless entry point yields
         // the same mappings.
         assert_eq!(
-            ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()).unwrap(),
+            ContentTypeMap::from_xml(xml.as_bytes(), SourceLimits::default()).unwrap(),
             map
         );
     }
@@ -772,7 +783,7 @@ mod tests {
             format!(r#"<!DOCTYPE Types><Types xmlns="{NS}"/>"#),
         ] {
             assert!(
-                ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()).is_err(),
+                ContentTypeMap::from_xml(xml.as_bytes(), SourceLimits::default()).is_err(),
                 "{xml}"
             );
         }
@@ -780,14 +791,14 @@ mod tests {
         assert!(matches!(
             ContentTypeMap::from_xml(
                 deep.as_bytes(),
-                ReadLimits::builder()
-                    .max_xml_depth(3)
+                SourceLimits::builder()
+                    .max_depth(3)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::Depth,
                 ..
             })
         ));
@@ -802,9 +813,12 @@ mod tests {
             r#"<Default Extension="xml" ContentType="application/xml; charset=utf-8"/><Default Extension="my file" ContentType="text/plain"/><Override PartName="/a.bin" ContentType="opaque"/>"#,
         );
         let mut report = ToleranceReport::default();
-        let map =
-            ContentTypeMap::from_xml_reporting(xml.as_bytes(), ReadLimits::default(), &mut report)
-                .unwrap();
+        let map = ContentTypeMap::from_xml_reporting(
+            xml.as_bytes(),
+            SourceLimits::default(),
+            &mut report,
+        )
+        .unwrap();
         assert_eq!(
             map.get(&PackURI::new("/doc.xml").unwrap()).unwrap(),
             "application/xml; charset=utf-8"
@@ -838,7 +852,7 @@ mod tests {
             manifest(r#"<Default Extension="a&#1;" ContentType="text/xml"/>"#),
         ] {
             assert!(
-                ContentTypeMap::from_xml(fatal.as_bytes(), ReadLimits::default()).is_err(),
+                ContentTypeMap::from_xml(fatal.as_bytes(), SourceLimits::default()).is_err(),
                 "{fatal}"
             );
         }
@@ -855,7 +869,7 @@ mod tests {
         let mut report = ToleranceReport::default();
         let map = ContentTypeMap::from_xml_reporting(
             duplicates.as_bytes(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             &mut report,
         )
         .unwrap();
@@ -904,7 +918,7 @@ mod tests {
         let xml = manifest(
             r#"<Default Extension="XML" ContentType="application/xml"/><Override PartName="/word/document.XML" ContentType="text/xml"/>"#,
         );
-        let map = ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()).unwrap();
+        let map = ContentTypeMap::from_xml(xml.as_bytes(), SourceLimits::default()).unwrap();
         assert_eq!(
             map.get(&PackURI::new("/custom/data.xml").unwrap()).unwrap(),
             "application/xml"
@@ -921,7 +935,7 @@ mod tests {
         let xml =
             manifest(r#"<Override PartName="word/document.xml" ContentType="application/xml"/>"#);
         assert!(matches!(
-            ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()),
+            ContentTypeMap::from_xml(xml.as_bytes(), SourceLimits::default()),
             Err(OpcError::InvalidPackUri(_))
         ));
     }
@@ -929,14 +943,14 @@ mod tests {
     #[test]
     fn honors_content_type_resource_limits_at_exact_boundaries() {
         let valid = manifest(r#"<Default Extension="xml" ContentType="application/xml"/>"#);
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_content_types_bytes(valid.len())
             .unwrap()
             .max_content_type_mappings(1)
             .unwrap()
-            .max_xml_events(4)
+            .max_events(4)
             .unwrap()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .max_xml_attribute_bytes("application/xml".len())
             .unwrap()
@@ -949,8 +963,8 @@ mod tests {
         let oversized = vec![b' '; valid.len() + 1];
         assert!(matches!(
             ContentTypeMap::from_xml(&oversized, exact),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypesBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));
@@ -961,15 +975,15 @@ mod tests {
         assert!(matches!(
             ContentTypeMap::from_xml(
                 two_mappings.as_bytes(),
-                ReadLimits::builder()
+                SourceLimits::builder()
                     .max_content_type_mappings(1)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -978,14 +992,14 @@ mod tests {
         assert!(matches!(
             ContentTypeMap::from_xml(
                 events.as_bytes(),
-                ReadLimits::builder()
-                    .max_xml_events(4)
+                SourceLimits::builder()
+                    .max_events(4)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::Events,
                 ..
             })
         ));
@@ -994,15 +1008,15 @@ mod tests {
         assert!(matches!(
             ContentTypeMap::from_xml(
                 nested.as_bytes(),
-                ReadLimits::builder()
-                    .max_xml_depth(1)
+                SourceLimits::builder()
+                    .max_depth(1)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::Depth,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -1012,7 +1026,7 @@ mod tests {
         assert!(matches!(
             ContentTypeMap::from_xml(
                 encoded_attribute.as_bytes(),
-                ReadLimits::builder()
+                SourceLimits::builder()
                     .max_xml_attribute_bytes("application/xml".len())
                     .unwrap()
                     .max_relationship_target_bytes("application/xml".len())
@@ -1020,8 +1034,8 @@ mod tests {
                     .build()
                     .unwrap(),
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlAttributeBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlAttributeBytes,
                 ..
             })
         ));

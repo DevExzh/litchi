@@ -1,93 +1,62 @@
-use super::model::Writer;
+use super::model::Builder;
 use super::stream;
-use crate::encryption::encrypt_workbook_for_write;
-use crate::error::Result;
+use crate::encryption::{EncryptionEntropy, encrypt_workbook_for_write};
+use crate::error::{Error, Result};
 use litchi_cfb::writer::OleWriter;
 
-impl Writer {
-    /// Save the XLS file
+impl Builder {
+    /// Build a validated immutable XLS package from the staged workbook.
     ///
-    /// # Arguments
-    ///
-    /// * `path` - Output file path
-    ///
-    /// # Returns
-    ///
-    /// * `Result<(), Error>` - Success or error
-    ///
-    /// # Implementation Status
-    ///
-    /// ✅ Basic structure generation (BOF, EOF, workbook globals)
-    /// ✅ Cell record generation (Number, `LabelSST`, `BoolErr`)
-    /// ✅ Shared string table (SST)
-    /// ✅ Formula tokenization for the supported BIFF8 writer subset
-    /// ❌ Cell formatting (XF records)
-    /// ❌ Column widths / row heights
-    /// ❌ Merged cells
-    /// ❌ Named ranges
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<()> {
-        self.save_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Save the XLS file atomically at a caller-chosen
-    /// [`Durability`](litchi_core::Durability).
-    ///
-    /// [`Self::save`] is this method at `Durability::Full`. Every level
-    /// writes the same bytes through the same sibling temporary file and
-    /// atomic replacement; a weaker level only skips the parent-directory
-    /// sync (`FileOnly`) or both synchronizations (`NoSync`), with the crash
-    /// guarantees `Durability` states.
+    /// An empty builder receives one blank `Sheet1`. Subsequent builds retain
+    /// the staged content and can be published independently. Encrypted builds
+    /// retain their encrypted image; publish that image explicitly with
+    /// [`crate::Package::to_encrypted_bytes`]. Ordinary package publication
+    /// refuses encrypted owners. Office Binary RC4 and CryptoAPI RC4 builds
+    /// also require a one-use [`crate::EncryptionEntropy`] supplied through
+    /// [`Builder::set_encryption_entropy`](crate::Builder::set_encryption_entropy);
+    /// the entropy is consumed even when this method later fails.
     ///
     /// # Errors
-    ///
-    /// Returns an error if validation, encoding, or the atomic replacement
-    /// fails. Only `Durability::Full` can report that the destination was
-    /// replaced but its directory could not be synchronized.
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
-        &mut self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<()> {
-        // Generate the Workbook stream + pivot cache streams
-        let streams = self.generate_workbook_streams()?;
-
-        // Create OLE compound document
+    /// Returns typed authoring, container or strict package-admission failures.
+    pub fn build(&mut self) -> crate::package::Result<crate::Package> {
+        // Take caller-owned RC4 entropy before any default-sheet staging.  A
+        // missing token is therefore a typed preflight error and cannot leave
+        // a visible mutation behind.  Taking it also ensures that all RC4
+        // attempts consume the token, including attempts that fail later in
+        // generation or strict package admission.
+        let encryption_entropy = match self
+            .encryption
+            .as_ref()
+            .map(|encryption| encryption.profile)
+        {
+            Some(crate::EncryptionProfile::OfficeBinaryRc4)
+            | Some(crate::EncryptionProfile::CryptoApiRc4 { .. }) => Some(
+                self.encryption_entropy
+                    .take()
+                    .ok_or(Error::EncryptionEntropyRequired)?,
+            ),
+            _ => None,
+        };
+        let properties = self.property_streams()?;
+        if self.worksheets.is_empty() {
+            self.add_worksheet("Sheet1")?;
+        }
+        let streams = self.generate_workbook_streams(encryption_entropy.as_ref())?;
         let mut ole_writer = OleWriter::new();
         self.populate_compound_document(&mut ole_writer, streams)?;
-
-        // Save to file
-        ole_writer.save_with_durability(path, durability)?;
-
-        Ok(())
-    }
-
-    /// Write to a writer (useful for testing and in-memory generation)
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - Output writer
-    ///
-    /// # Returns
-    ///
-    /// * `Result<(), Error>` - Success or error
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn write_to<W: std::io::Write + std::io::Seek>(&mut self, writer: &mut W) -> Result<()> {
-        // Generate the Workbook stream + pivot cache streams
-        let streams = self.generate_workbook_streams()?;
-
-        // Create OLE compound document
-        let mut ole_writer = OleWriter::new();
-        self.populate_compound_document(&mut ole_writer, streams)?;
-
-        // Write to the provided writer
-        ole_writer.write_to(writer)?;
-
-        Ok(())
+        if let Some(properties) = properties {
+            properties.write_into(&mut ole_writer)?;
+        }
+        let mut output = std::io::Cursor::new(Vec::new());
+        ole_writer.write_to(&mut output)?;
+        let password = self
+            .encryption
+            .as_ref()
+            .map(|encryption| encryption.password.as_str());
+        crate::Package::from_owned_bytes(
+            output.into_inner(),
+            crate::OpenOptions::new().password(password),
+        )
     }
 
     fn populate_compound_document(
@@ -139,7 +108,10 @@ impl Writer {
 
     /// Generate the complete Workbook stream (plus pivot cache streams) with
     /// all BIFF records.
-    fn generate_workbook_streams(&self) -> Result<stream::WorkbookStreams> {
+    fn generate_workbook_streams(
+        &self,
+        encryption_entropy: Option<&EncryptionEntropy>,
+    ) -> Result<stream::WorkbookStreams> {
         if let Some(map_info) = self.xml_map.as_ref() {
             crate::xml_map::validate_info(map_info)?;
         }
@@ -182,7 +154,8 @@ impl Writer {
             .map(crate::toolbar::to_bytes)
             .transpose()?;
         if let Some(encryption) = &self.encryption {
-            streams.workbook = encrypt_workbook_for_write(streams.workbook, encryption)?;
+            streams.workbook =
+                encrypt_workbook_for_write(streams.workbook, encryption, encryption_entropy)?;
         }
         Ok(streams)
     }

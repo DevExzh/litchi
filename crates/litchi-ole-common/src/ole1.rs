@@ -507,18 +507,13 @@ pub struct ObjectRef<'a> {
 }
 
 impl<'a> ObjectRef<'a> {
-    /// Parses a borrowed object under the default limits and strict profile.
-    pub fn parse(bytes: &'a [u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits_and_compatibility(bytes, Limits::default(), Compatibility::Strict)
-    }
-
     /// Parses a borrowed object under explicit limits.
-    pub fn parse_with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self, OleError> {
-        Self::parse_with_limits_and_compatibility(bytes, limits, Compatibility::Strict)
+    pub fn parse(bytes: &'a [u8], limits: Limits) -> Result<Self, OleError> {
+        Self::parse_with_compatibility(bytes, limits, Compatibility::Strict)
     }
 
     /// Parses a borrowed object under explicit limits and compatibility.
-    pub fn parse_with_limits_and_compatibility(
+    pub fn parse_with_compatibility(
         bytes: &'a [u8],
         limits: Limits,
         compatibility: Compatibility,
@@ -686,21 +681,16 @@ pub struct PresentationRef<'a> {
 }
 
 impl<'a> PresentationRef<'a> {
-    /// Parses a standalone presentation object under default strict limits.
-    pub fn parse(bytes: &'a [u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits_and_compatibility(bytes, Limits::default(), Compatibility::Strict)
-    }
-
     /// Parses a standalone presentation object under explicit limits.
-    pub fn parse_with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self, OleError> {
-        Self::parse_with_limits_and_compatibility(bytes, limits, Compatibility::Strict)
+    pub fn parse(bytes: &'a [u8], limits: Limits) -> Result<Self, OleError> {
+        Self::parse_with_compatibility(bytes, limits, Compatibility::Strict)
     }
 
     /// Parses a standalone presentation object under explicit limits and
     /// compatibility.  A FormatID-zero header is valid as a standalone raw
     /// presentation; the empty-presentation compatibility is only needed by
     /// an ObjectHeader parser.
-    pub fn parse_with_limits_and_compatibility(
+    pub fn parse_with_compatibility(
         bytes: &'a [u8],
         limits: Limits,
         compatibility: Compatibility,
@@ -817,18 +807,13 @@ pub struct ObjectSnapshot {
 }
 
 impl ObjectSnapshot {
-    /// Parses and owns one source copy under default limits.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits_and_compatibility(bytes, Limits::default(), Compatibility::Strict)
-    }
-
     /// Parses and owns one source copy under explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
-        Self::parse_with_limits_and_compatibility(bytes, limits, Compatibility::Strict)
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+        Self::parse_with_compatibility(bytes, limits, Compatibility::Strict)
     }
 
     /// Parses and owns one source copy under explicit limits and compatibility.
-    pub fn parse_with_limits_and_compatibility(
+    pub fn parse_with_compatibility(
         bytes: &[u8],
         limits: Limits,
         compatibility: Compatibility,
@@ -869,17 +854,8 @@ impl ObjectSnapshot {
         })
     }
 
-    /// Creates and validates a canonical embedded object.
-    pub fn new_embedded(
-        header: ObjectHeader,
-        native_data: Vec<u8>,
-        presentation: Presentation,
-    ) -> Result<Self, OleError> {
-        Self::new_embedded_with_limits(header, native_data, presentation, Limits::default())
-    }
-
     /// Creates and validates a canonical embedded object under explicit limits.
-    pub fn new_embedded_with_limits(
+    pub fn new_embedded(
         header: ObjectHeader,
         native_data: Vec<u8>,
         presentation: Presentation,
@@ -900,24 +876,8 @@ impl ObjectSnapshot {
         Self::parse_shared(bytes.into(), limits, Compatibility::Strict)
     }
 
-    /// Creates and validates a canonical linked object.
-    pub fn new_linked(
-        header: ObjectHeader,
-        network_name: EncodedString,
-        link_update_option: u32,
-        presentation: Presentation,
-    ) -> Result<Self, OleError> {
-        Self::new_linked_with_limits(
-            header,
-            network_name,
-            link_update_option,
-            presentation,
-            Limits::default(),
-        )
-    }
-
     /// Creates and validates a canonical linked object under explicit limits.
-    pub fn new_linked_with_limits(
+    pub fn new_linked(
         header: ObjectHeader,
         network_name: EncodedString,
         link_update_option: u32,
@@ -1029,15 +989,9 @@ impl ObjectSnapshot {
             current: self.clone(),
         }
     }
-
-    /// Alias for [`Self::edit`].
-    #[must_use]
-    pub fn transaction(&self) -> Edit {
-        self.edit()
-    }
 }
 
-/// A source-backed OLE1 transaction.
+/// A source-backed OLE1 edit. Dropping it discards the staged changes.
 #[derive(Debug, Clone)]
 pub struct Edit {
     source: ObjectSnapshot,
@@ -1051,15 +1005,14 @@ impl Edit {
         &self.source
     }
 
-    /// Returns the currently staged snapshot.
+    /// Returns the currently staged object.
     #[must_use]
-    pub const fn snapshot(&self) -> &ObjectSnapshot {
+    pub const fn staged(&self) -> &ObjectSnapshot {
         &self.current
     }
 
     /// Whether staged bytes differ from the source bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.source.bytes() != self.current.bytes()
     }
 
@@ -1195,19 +1148,9 @@ impl Edit {
 
     /// Publishes the staged candidate and a reversible exact-source patch.
     pub fn commit(self) -> Result<Commit, OleError> {
-        let changed = self.is_changed();
+        let diagnostics = Diagnostics::new(self.has_changes());
         let patch = Patch::new(self.source.clone(), self.current.clone());
-        Ok(Commit {
-            snapshot: self.current,
-            patch,
-            changed,
-        })
-    }
-
-    /// Discards staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> ObjectSnapshot {
-        self.source
+        Ok(Commit::new(self.current, patch, diagnostics))
     }
 
     fn rewrite(&mut self, change: EditChange) -> Result<bool, OleError> {
@@ -1237,51 +1180,12 @@ impl Edit {
     }
 }
 
-/// A successful OLE1 publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: ObjectSnapshot,
-    patch: Patch,
-    changed: bool,
-}
+/// A successful OLE1 publication: the published object, its reversible
+/// exact-source patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<ObjectSnapshot, Patch>;
 
-impl Commit {
-    /// Returns the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &ObjectSnapshot {
-        &self.snapshot
-    }
-
-    /// Returns the reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Whether this publication changed any source bytes.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Consumes the publication into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> ObjectSnapshot {
-        self.snapshot
-    }
-
-    /// Consumes the publication into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits the publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (ObjectSnapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one OLE1 commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A reversible exact-source OLE1 patch.
 #[derive(Debug, Clone)]
@@ -1348,11 +1252,9 @@ impl Patch {
     }
 
     /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &ObjectSnapshot) -> Result<ObjectSnapshot, OleError> {
+    pub fn apply(&self, source: &ObjectSnapshot) -> Result<ObjectSnapshot, crate::Error> {
         if source.revision != self.base || source.bytes() != self.before.bytes() {
-            return Err(OleError::InvalidFormat(
-                "OLE1 patch source does not match its exact base".into(),
-            ));
+            return Err(crate::Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -1384,12 +1286,6 @@ impl Revision {
         self.0
     }
 
-    /// Alias for [`Self::value`].
-    #[must_use]
-    pub const fn fingerprint(self) -> u64 {
-        self.value()
-    }
-
     fn of(bytes: &[u8]) -> Self {
         let mut value = 0xcbf2_9ce4_8422_2325u64;
         for byte in bytes {
@@ -1399,9 +1295,6 @@ impl Revision {
         Self(value)
     }
 }
-
-/// Convenient module-level snapshot alias.
-pub type Snapshot = ObjectSnapshot;
 
 #[derive(Debug, Clone)]
 struct Layout {

@@ -6,7 +6,7 @@
 use litchi_core::{BlobId, HistoryLimits, Position};
 use litchi_odf_common::compact_xml;
 use litchi_odm::{
-    Builder, Master,
+    Builder, Package,
     structure::{IndexKind, Kind},
     transaction::{BodyItemChange, BodyItemSpec, Conflict},
 };
@@ -33,18 +33,21 @@ fn authored_items() -> Vec<BodyItemSpec> {
 
 #[test]
 fn genuine_writer_master_accepts_typed_body_authoring_with_full_patch_lifecycle() {
-    let master = Master::from_bytes(WRITER_ODM.to_vec()).unwrap();
-    let original_count = master.structure().items().len();
+    let master = Package::from_bytes(WRITER_ODM).unwrap();
+    let original_count = master.document().structure().items().len();
     let mut edit = master.edit();
     for item in authored_items() {
         edit.add_body_item(item).unwrap();
     }
     let commit = edit.commit().unwrap();
-    let changed = commit.snapshot();
+    let changed = commit.package();
     assert_eq!(master.as_bytes(), WRITER_ODM);
-    assert_eq!(changed.structure().items().len(), original_count + 5);
     assert_eq!(
-        &changed.structure().items()[original_count..],
+        changed.document().structure().items().len(),
+        original_count + 5
+    );
+    assert_eq!(
+        &changed.document().structure().items()[original_count..],
         &[
             Kind::Paragraph,
             Kind::Heading,
@@ -55,6 +58,7 @@ fn genuine_writer_master_accepts_typed_body_authoring_with_full_patch_lifecycle(
     );
     assert_eq!(
         changed
+            .document()
             .structure()
             .generated_indexes()
             .last()
@@ -62,10 +66,18 @@ fn genuine_writer_master_accepts_typed_body_authoring_with_full_patch_lifecycle(
             .name(),
         Some("Typed Index")
     );
-    compact_xml::validate(changed.content_xml().as_bytes()).unwrap();
-    assert!(Master::from_bytes(changed.as_bytes().to_vec()).is_ok());
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
+    assert!(Package::from_bytes(changed.as_bytes()).is_ok());
     assert_eq!(
-        commit.patch().inverse().apply(changed).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         WRITER_ODM
     );
     assert_eq!(
@@ -89,32 +101,30 @@ fn genuine_writer_master_accepts_typed_body_authoring_with_full_patch_lifecycle(
     let mut title_edit = master.edit();
     title_edit.set_title("Typed body merge").unwrap();
     let title_commit = title_edit.commit().unwrap();
-    let merged = commit
-        .patch()
-        .merge(title_commit.patch())
+    let merged = master
+        .apply(&commit.patch().merge(title_commit.patch()).unwrap())
         .unwrap()
-        .apply(&master)
-        .unwrap();
-    assert_eq!(merged.title(), Some("Typed body merge"));
-    assert_eq!(merged.structure().items().len(), original_count + 5);
+        .into_package();
+    assert_eq!(merged.document().title(), Some("Typed body merge"));
+    assert_eq!(
+        merged.document().structure().items().len(),
+        original_count + 5
+    );
 }
 
 #[test]
 fn body_transfer_retains_source_provenance_and_refuses_unclosed_dependencies() {
-    let writer = Master::from_bytes(WRITER_ODM.to_vec()).unwrap();
-    let original_count = writer.structure().items().len();
+    let writer = Package::from_bytes(WRITER_ODM).unwrap();
+    let original_count = writer.document().structure().items().len();
     let mut add = writer.edit();
     add.add_body_item(BodyItemSpec::paragraph("Portable body item").unwrap())
         .unwrap();
-    let source = add.commit().unwrap().into_snapshot();
+    let source = add.commit().unwrap().into_package();
     let source_before = source.as_bytes().to_vec();
-    let destination = Master::from_bytes(
-        Builder::new()
-            .body_item(BodyItemSpec::paragraph("Destination").unwrap())
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let destination = Builder::new()
+        .body_item(BodyItemSpec::paragraph("Destination").unwrap())
+        .build()
+        .unwrap();
 
     let mut transfer_edit = destination.edit();
     transfer_edit
@@ -133,14 +143,22 @@ fn body_transfer_retains_source_provenance_and_refuses_unclosed_dependencies() {
         .unwrap()
         .clone();
     assert_eq!(source.as_bytes(), source_before);
-    assert_eq!(transfer_commit.snapshot().structure().items().len(), 2);
-    assert!(Master::from_bytes(transfer_commit.snapshot().as_bytes().to_vec()).is_ok());
     assert_eq!(
         transfer_commit
-            .patch()
-            .inverse()
-            .apply(transfer_commit.snapshot())
+            .package()
+            .document()
+            .structure()
+            .items()
+            .len(),
+        2
+    );
+    assert!(Package::from_bytes(transfer_commit.package().as_bytes()).is_ok());
+    assert_eq!(
+        transfer_commit
+            .package()
+            .apply(&transfer_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         destination.as_bytes()
     );
@@ -152,6 +170,7 @@ fn body_transfer_retains_source_provenance_and_refuses_unclosed_dependencies() {
     );
 
     let styled_writer_paragraph = writer
+        .document()
         .structure()
         .items()
         .iter()
@@ -168,7 +187,7 @@ fn body_transfer_retains_source_provenance_and_refuses_unclosed_dependencies() {
 
 #[test]
 fn concurrent_generated_index_identity_creation_is_typed_conflict() {
-    let master = Master::from_bytes(WRITER_ODM.to_vec()).unwrap();
+    let master = Package::from_bytes(WRITER_ODM).unwrap();
     let mut left_edit = master.edit();
     left_edit
         .add_body_item(

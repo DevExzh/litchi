@@ -1,6 +1,7 @@
 use litchi_odc::{
-    AxisSpec, AxisUpdate, Builder, Chart, ChartErrorCategory, ChartPackageKind, ChartStyleProperty,
-    ChartStyleValue, ChartSymbolName, ChartSymbolType, Definition, Limits, chart::Dimension,
+    AxisSpec, AxisUpdate, Builder, ChartErrorCategory, ChartPackageKind, ChartStyleProperty,
+    ChartStyleValue, ChartSymbolName, ChartSymbolType, Definition, OpenOptions, Package,
+    SemanticLimits, chart::Dimension,
 };
 use litchi_odf_common::core::OwnedPackage;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -31,8 +32,9 @@ fn definition() -> Definition {
 }
 
 fn with_pretty_styles(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let reader = ArchiveReader::new(bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.file_names() {
         let payload = if name == "styles.xml" {
             STYLES.replace("><", ">\n<").into_bytes()
@@ -55,17 +57,20 @@ fn template_mime_and_manifest_kind_survive_a_public_edit() -> TestResult<()> {
         .with_package_kind(ChartPackageKind::Template)
         .with_styles_xml(STYLES)
         .build()?;
-    let source = Chart::from_bytes(source_bytes.clone())?;
-    assert_eq!(source.package_kind(), ChartPackageKind::Template);
-    assert_eq!(source.mime_type(), ChartPackageKind::Template.mime_type());
-    assert!(source.is_template());
+    let source = Package::from_bytes(source_bytes.as_bytes())?;
+    assert_eq!(source.chart().package_kind(), ChartPackageKind::Template);
+    assert_eq!(
+        source.chart().mime_type(),
+        ChartPackageKind::Template.mime_type()
+    );
+    assert!(source.chart().is_template());
 
     let mut edit = source.edit();
     edit.update_axis(0, AxisUpdate::named("renamed"))?;
-    let committed = edit.commit()?.into_chart();
-    assert_eq!(committed.package_kind(), ChartPackageKind::Template);
+    let committed = edit.commit()?.into_package();
+    assert_eq!(committed.chart().package_kind(), ChartPackageKind::Template);
     assert_eq!(
-        committed.mime_type(),
+        committed.chart().mime_type(),
         ChartPackageKind::Template.mime_type()
     );
 
@@ -80,7 +85,7 @@ fn template_mime_and_manifest_kind_survive_a_public_edit() -> TestResult<()> {
         package.manifest().get_media_type("content.xml"),
         Some("text/xml")
     );
-    assert_ne!(committed.as_bytes(), source_bytes.as_slice());
+    assert_ne!(committed.as_bytes(), source_bytes.as_bytes());
     Ok(())
 }
 
@@ -90,13 +95,17 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
         .with_definition(definition())
         .with_styles_xml(STYLES)
         .build()?;
-    let source = Chart::from_bytes(with_pretty_styles(&compact)?)?;
+    let source = Package::from_bytes(&with_pretty_styles(compact.as_bytes())?)?;
     assert_eq!(
-        source.chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
+        source
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
         Some(ChartStyleValue::Boolean(false))
     );
     assert_eq!(
-        source.chart_style_property("axisStyle", ChartStyleProperty::SymbolName)?,
+        source
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::SymbolName)?,
         Some(ChartStyleValue::SymbolName(ChartSymbolName::Circle))
     );
 
@@ -131,18 +140,21 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
     )?;
     let commit = edit.commit()?;
     assert_eq!(commit.patch().style_property_changes().len(), 6);
-    let decoded = litchi_odc::Patch::from_bytes(&commit.patch().to_bytes(), source.limits())?;
+    let decoded =
+        litchi_odc::Patch::from_bytes(&commit.patch().to_bytes(), source.chart().options())?;
     let mut decoded_changes = decoded.style_property_changes().to_vec();
     let mut committed_changes = commit.patch().style_property_changes().to_vec();
     decoded_changes.sort_by_key(|change| (change.style_name().to_owned(), change.property()));
     committed_changes.sort_by_key(|change| (change.style_name().to_owned(), change.property()));
     assert_eq!(decoded_changes, committed_changes);
-    let changed = commit.chart();
+    let changed = commit.package();
     assert_eq!(
-        changed.chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
+        changed
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
         Some(ChartStyleValue::Boolean(true))
     );
-    assert!(changed.styles_xml().is_some_and(|styles| {
+    assert!(changed.chart().styles_xml().is_some_and(|styles| {
         styles.contains(">\n<")
             && styles.contains("ext:opaque=\" preserved &amp; lexical \"")
             && styles.contains("<!--keep-comment-->")
@@ -151,7 +163,10 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
             && styles.contains("chart:tick-marks-minor-inner=\"true\"")
     }));
     assert_eq!(
-        commit.patch().inverse().apply(changed)?.as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())?
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -162,8 +177,8 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
         Some(ChartStyleValue::Boolean(false)),
     )?;
     let noop_commit = noop.commit()?;
-    assert!(!noop_commit.changed());
-    assert_eq!(noop_commit.chart().as_bytes(), source.as_bytes());
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().as_bytes(), source.as_bytes());
 
     let mut wrong_type = source.edit();
     assert!(
@@ -194,10 +209,13 @@ fn native_odfdom_chart_fixture_opens_and_keeps_chart_kind() -> TestResult<()> {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/odf/odc-producer-evidence/odfdom-created.odc"
     );
-    let chart = Chart::open(path)?;
-    assert_eq!(chart.package_kind(), ChartPackageKind::Chart);
-    assert_eq!(chart.mime_type(), ChartPackageKind::Chart.mime_type());
-    assert!(chart.content_xml().contains("chart:chart"));
+    let chart = Package::open(path)?;
+    assert_eq!(chart.chart().package_kind(), ChartPackageKind::Chart);
+    assert_eq!(
+        chart.chart().mime_type(),
+        ChartPackageKind::Chart.mime_type()
+    );
+    assert!(chart.chart().content_xml().contains("chart:chart"));
     Ok(())
 }
 
@@ -207,30 +225,31 @@ fn chart_style_types_follow_odf_lexicals_and_retain_prefixes() -> TestResult<()>
         "chart:regression-type=\"linear\"",
         "chart:regression-type=\"linear\" chart:regression-name=\"\" chart:error-margin=\"INF\"",
     );
-    let chart = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(special)
-            .build()?,
-    )?;
+    let chart = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(special)
+        .build()?;
     assert_eq!(
-        chart.chart_style_property("axisStyle", ChartStyleProperty::RegressionName)?,
+        chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::RegressionName)?,
         Some(ChartStyleValue::Text(String::new()))
     );
     assert_eq!(
-        chart.chart_style_property("axisStyle", ChartStyleProperty::ErrorMargin)?,
+        chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::ErrorMargin)?,
         Some(ChartStyleValue::Decimal(f64::INFINITY))
     );
 
     let bad_boolean = STYLES.replace("chart:logarithmic=\"false\"", "chart:logarithmic=\"1\"");
-    let bad_boolean = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(bad_boolean)
-            .build()?,
-    )?;
+    let bad_boolean = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(bad_boolean)
+        .build()?;
     assert!(
         bad_boolean
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)
             .is_err()
     );
@@ -239,14 +258,13 @@ fn chart_style_types_follow_odf_lexicals_and_retain_prefixes() -> TestResult<()>
         "chart:regression-type=\"linear\"",
         "chart:regression-type=\"linear\" chart:regression-max-degree=\"1\"",
     );
-    let bad_degree = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(bad_degree)
-            .build()?,
-    )?;
+    let bad_degree = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(bad_degree)
+        .build()?;
     assert!(
         bad_degree
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::RegressionMaxDegree)
             .is_err()
     );
@@ -254,21 +272,20 @@ fn chart_style_types_follow_odf_lexicals_and_retain_prefixes() -> TestResult<()>
     let prefixed = STYLES
         .replace("xmlns:chart=", "xmlns:c=")
         .replace(" chart:", " c:");
-    let prefixed = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(prefixed)
-            .build()?,
-    )?;
+    let prefixed = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(prefixed)
+        .build()?;
     let mut edit = prefixed.edit();
     edit.update_chart_style_property(
         "axisStyle",
         ChartStyleProperty::TickMarksMinorInner,
         Some(ChartStyleValue::Boolean(true)),
     )?;
-    let changed = edit.commit()?.into_chart();
+    let changed = edit.commit()?.into_package();
     assert!(
         changed
+            .chart()
             .styles_xml()
             .is_some_and(|styles| styles.contains("c:tick-marks-minor-inner=\"true\""))
     );
@@ -277,14 +294,13 @@ fn chart_style_types_follow_odf_lexicals_and_retain_prefixes() -> TestResult<()>
         "chart:symbol-type=\"named-symbol\"",
         "chart:symbol-type=\"automatic\"",
     );
-    let automatic_with_name = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(automatic_with_name)
-            .build()?,
-    )?;
+    let automatic_with_name = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(automatic_with_name)
+        .build()?;
     assert!(
         automatic_with_name
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::SymbolType)
             .is_err()
     );
@@ -293,14 +309,13 @@ fn chart_style_types_follow_odf_lexicals_and_retain_prefixes() -> TestResult<()>
         "chart:symbol-type=\"named-symbol\" chart:symbol-name=\"circle\"",
         "chart:symbol-type=\"image\"",
     );
-    let image_without_element = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(image_without_element)
-            .build()?,
-    )?;
+    let image_without_element = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(image_without_element)
+        .build()?;
     assert!(
         image_without_element
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::SymbolType)
             .is_err()
     );
@@ -318,26 +333,25 @@ fn chart_style_types_follow_odf_lexicals_and_retain_prefixes() -> TestResult<()>
             "ext:opaque=\" preserved &amp; lexical \"/><!--keep-comment--></style:style>",
             "ext:opaque=\" preserved &amp; lexical \"><chart:symbol-image xlink:href=\"Pictures/s.png\"/></style:chart-properties><!--keep-comment--></style:style>",
         );
-    let image_chart = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(image_styles.clone())
-            .build()?,
-    )?;
+    let image_chart = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(image_styles.clone())
+        .build()?;
     assert_eq!(
-        image_chart.chart_style_property("axisStyle", ChartStyleProperty::SymbolType)?,
+        image_chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::SymbolType)?,
         Some(ChartStyleValue::SymbolType(ChartSymbolType::Image))
     );
 
     let image_without_href = image_styles.replace(" xlink:href=\"Pictures/s.png\"", "");
-    let image_without_href = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(image_without_href)
-            .build()?,
-    )?;
+    let image_without_href = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(image_without_href)
+        .build()?;
     assert!(
         image_without_href
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::SymbolType)
             .is_err()
     );
@@ -349,14 +363,14 @@ fn chart_style_names_accept_xml_ncname_combining_marks() -> TestResult<()> {
     let combining_name = "a\u{301}";
     let replacement = format!("style:name=\"{combining_name}\"");
     let styles = STYLES.replace("style:name=\"axisStyle\"", &replacement);
-    let chart = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(styles)
-            .build()?,
-    )?;
+    let chart = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(styles)
+        .build()?;
     assert_eq!(
-        chart.chart_style_property(combining_name, ChartStyleProperty::Logarithmic)?,
+        chart
+            .chart()
+            .chart_style_property(combining_name, ChartStyleProperty::Logarithmic)?,
         Some(ChartStyleValue::Boolean(false))
     );
     let mut edit = chart.edit();
@@ -365,18 +379,16 @@ fn chart_style_names_accept_xml_ncname_combining_marks() -> TestResult<()> {
         ChartStyleProperty::Logarithmic,
         Some(ChartStyleValue::Boolean(true)),
     )?;
-    assert!(edit.commit()?.changed());
+    assert!(edit.commit()?.diagnostics().changed());
     Ok(())
 }
 
 #[test]
 fn disjoint_chart_style_patches_join_and_transfer_by_property() -> TestResult<()> {
-    let source = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(STYLES)
-            .build()?,
-    )?;
+    let source = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(STYLES)
+        .build()?;
 
     let mut left_edit = source.edit();
     left_edit.update_chart_style_property(
@@ -395,16 +407,22 @@ fn disjoint_chart_style_patches_join_and_transfer_by_property() -> TestResult<()
     )?;
     let right_commit = right_edit.commit()?;
     let right_patch = right_commit.patch().clone();
-    let right_chart = right_commit.into_chart();
+    let right_chart = right_commit.into_package();
     let merged = left_patch.join(&right_patch)?;
     assert!(merged.is_merged(), "disjoint typed style writes must join");
-    let merged_chart = merged.patch().expect("merged patch").apply(&source)?;
+    let merged_chart = source
+        .apply(merged.patch().expect("merged patch"))?
+        .into_package();
     assert_eq!(
-        merged_chart.chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
+        merged_chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
         Some(ChartStyleValue::Boolean(true))
     );
     assert_eq!(
-        merged_chart.chart_style_property("axisStyle", ChartStyleProperty::TickMarksMajorInner)?,
+        merged_chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::TickMarksMajorInner)?,
         Some(ChartStyleValue::Boolean(false))
     );
 
@@ -413,16 +431,18 @@ fn disjoint_chart_style_patches_join_and_transfer_by_property() -> TestResult<()
         transferred.is_merged(),
         "disjoint typed style writes must transfer"
     );
-    let transferred_chart = transferred
-        .patch()
-        .expect("transferred patch")
-        .apply(&right_chart)?;
+    let transferred_chart = right_chart
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
     assert_eq!(
-        transferred_chart.chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
+        transferred_chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
         Some(ChartStyleValue::Boolean(true))
     );
     assert_eq!(
         transferred_chart
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::TickMarksMajorInner)?,
         Some(ChartStyleValue::Boolean(false))
     );
@@ -435,14 +455,21 @@ fn typed_style_publication_rejects_output_above_content_limit_before_rebuild() -
         " ext:opaque=",
         &format!(" ext:padding=\"{}\" ext:opaque=", "x".repeat(2_048)),
     );
-    let bytes = Builder::new()
+    let unconstrained = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(padded_styles.clone())
+        .build()?;
+    let content_limit = unconstrained.chart().styles_xml().map_or(0, str::len);
+    let limits = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_content_bytes(u64::try_from(content_limit)?)?
+            .build()?,
+    );
+    let bounded = Builder::new()
+        .with_options(limits)
         .with_definition(definition())
         .with_styles_xml(padded_styles)
         .build()?;
-    let unconstrained = Chart::from_bytes(bytes.clone())?;
-    let content_limit = unconstrained.styles_xml().map_or(0, str::len);
-    let limits = Limits::new().with_content_bytes(content_limit)?;
-    let bounded = Chart::from_bytes_with_limits(bytes, limits)?;
     let mut edit = bounded.edit();
     edit.update_chart_style_property(
         "axisStyle",
@@ -455,12 +482,10 @@ fn typed_style_publication_rejects_output_above_content_limit_before_rebuild() -
 
 #[test]
 fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestResult<()> {
-    let source = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(STYLES)
-            .build()?,
-    )?;
+    let source = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(STYLES)
+        .build()?;
 
     let mut first_edit = source.edit();
     first_edit.update_chart_style_property(
@@ -475,7 +500,7 @@ fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestR
     )?;
     let first = first_edit.commit()?;
     let first_patch = first.patch().clone();
-    let first_chart = first.into_chart();
+    let first_chart = first.into_package();
 
     let mut second_edit = first_chart.edit();
     second_edit.update_chart_style_property(
@@ -513,21 +538,23 @@ fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestR
 
     let transferred = composed.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let transferred_chart = transferred
-        .patch()
-        .expect("transferred patch")
-        .apply(&source)?;
+    let transferred_chart = source
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
     assert_eq!(
-        transferred_chart.chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
+        transferred_chart
+            .chart()
+            .chart_style_property("axisStyle", ChartStyleProperty::Logarithmic)?,
         Some(ChartStyleValue::Boolean(false))
     );
     assert_eq!(
         transferred_chart
+            .chart()
             .chart_style_property("axisStyle", ChartStyleProperty::TickMarksMajorInner)?,
         Some(ChartStyleValue::Boolean(false))
     );
 
-    let durable = litchi_odc::Patch::from_bytes(&composed.to_bytes(), source.limits())?;
+    let durable = litchi_odc::Patch::from_bytes(&composed.to_bytes(), source.chart().options())?;
     assert_eq!(
         durable.style_property_changes(),
         composed.style_property_changes()
@@ -539,12 +566,10 @@ fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestR
 
 #[test]
 fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> TestResult<()> {
-    let source = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(STYLES)
-            .build()?,
-    )?;
+    let source = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(STYLES)
+        .build()?;
     let added_styles = STYLES.replace(
         "</office:styles>",
         "<style:style style:name=\"addedStyle\" style:family=\"chart\"><style:chart-properties chart:logarithmic=\"true\"/></style:style></office:styles>",
@@ -552,7 +577,8 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     let mut style_edit = source.edit();
     style_edit.set_styles_xml(added_styles.clone());
     let style_commit = style_edit.commit()?;
-    let durable = litchi_odc::Patch::from_bytes(&style_commit.patch().to_bytes(), source.limits())?;
+    let durable =
+        litchi_odc::Patch::from_bytes(&style_commit.patch().to_bytes(), source.chart().options())?;
     assert!(
         durable
             .style_property_changes()
@@ -562,21 +588,29 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
 
     let transferred = durable.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let transferred_chart = transferred
-        .patch()
-        .expect("transferred patch")
-        .apply(&source)?;
-    assert_eq!(transferred_chart.styles_xml(), Some(added_styles.as_str()));
+    let transferred_chart = source
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
+    assert_eq!(
+        transferred_chart.chart().styles_xml(),
+        Some(added_styles.as_str())
+    );
 
     let mut right_edit = source.edit();
     right_edit.update_axis(0, AxisUpdate::named("joined"))?;
     let right = right_edit.commit()?;
     let joined = durable.join(right.patch())?;
     assert!(joined.is_merged());
-    let joined_chart = joined.patch().expect("joined patch").apply(&source)?;
-    assert_eq!(joined_chart.styles_xml(), Some(added_styles.as_str()));
+    let joined_chart = source
+        .apply(joined.patch().expect("joined patch"))?
+        .into_package();
+    assert_eq!(
+        joined_chart.chart().styles_xml(),
+        Some(added_styles.as_str())
+    );
     assert_eq!(
         joined_chart
+            .chart()
             .plot_area()
             .and_then(|plot| plot.axes().next())
             .and_then(|axis| axis.name()),
@@ -588,19 +622,18 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     invalid_edit.set_styles_xml(invalid_styles);
     let invalid_commit = invalid_edit.commit()?;
     assert!(
-        litchi_odc::Patch::from_bytes(&invalid_commit.patch().to_bytes(), source.limits()).is_err()
+        litchi_odc::Patch::from_bytes(&invalid_commit.patch().to_bytes(), source.chart().options())
+            .is_err()
     );
     Ok(())
 }
 
 #[test]
 fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<()> {
-    let source = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(STYLES)
-            .build()?,
-    )?;
+    let source = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(STYLES)
+        .build()?;
     let image_styles = STYLES
         .replace(
             "xmlns:ext=\"urn:example:unknown\"",
@@ -617,7 +650,8 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
     let mut edit = source.edit();
     edit.set_styles_xml(image_styles.clone());
     let committed = edit.commit()?;
-    let durable = litchi_odc::Patch::from_bytes(&committed.patch().to_bytes(), source.limits())?;
+    let durable =
+        litchi_odc::Patch::from_bytes(&committed.patch().to_bytes(), source.chart().options())?;
     assert!(
         durable
             .style_property_changes()
@@ -627,21 +661,29 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
 
     let transferred = durable.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let transferred_chart = transferred
-        .patch()
-        .expect("transferred patch")
-        .apply(&source)?;
-    assert_eq!(transferred_chart.styles_xml(), Some(image_styles.as_str()));
+    let transferred_chart = source
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
+    assert_eq!(
+        transferred_chart.chart().styles_xml(),
+        Some(image_styles.as_str())
+    );
 
     let mut right_edit = source.edit();
     right_edit.update_axis(0, AxisUpdate::named("joined"))?;
     let right = right_edit.commit()?;
     let joined = durable.join(right.patch())?;
     assert!(joined.is_merged());
-    let joined_chart = joined.patch().expect("joined patch").apply(&source)?;
-    assert_eq!(joined_chart.styles_xml(), Some(image_styles.as_str()));
+    let joined_chart = source
+        .apply(joined.patch().expect("joined patch"))?
+        .into_package();
+    assert_eq!(
+        joined_chart.chart().styles_xml(),
+        Some(image_styles.as_str())
+    );
     assert_eq!(
         joined_chart
+            .chart()
             .plot_area()
             .and_then(|plot| plot.axes().next())
             .and_then(|axis| axis.name()),
@@ -652,12 +694,10 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
 
 #[test]
 fn typed_transfer_missing_chart_properties_reports_conflict_before_staging() -> TestResult<()> {
-    let source = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(STYLES)
-            .build()?,
-    )?;
+    let source = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(STYLES)
+        .build()?;
     let mut left_edit = source.edit();
     left_edit.update_chart_style_property(
         "axisStyle",
@@ -673,12 +713,10 @@ fn typed_transfer_missing_chart_properties_reports_conflict_before_staging() -> 
         "ext:opaque=\" preserved &amp; lexical \"/>"
     );
     let destination_styles = STYLES.replace(properties, "");
-    let destination = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(destination_styles)
-            .build()?,
-    )?;
+    let destination = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(destination_styles)
+        .build()?;
     let transferred = left.patch().transfer_to(&destination)?;
     assert!(!transferred.is_merged());
     assert_eq!(
@@ -694,12 +732,10 @@ fn typed_transfer_missing_chart_properties_reports_conflict_before_staging() -> 
 
 #[test]
 fn composed_whole_style_then_typed_style_uses_final_whole_part() -> TestResult<()> {
-    let source = Chart::from_bytes(
-        Builder::new()
-            .with_definition(definition())
-            .with_styles_xml(STYLES)
-            .build()?,
-    )?;
+    let source = Builder::new()
+        .with_definition(definition())
+        .with_styles_xml(STYLES)
+        .build()?;
     let structural_styles = STYLES
         .replace("chart:logarithmic=\"false\"", "chart:logarithmic=\"true\"")
         .replace(
@@ -710,7 +746,7 @@ fn composed_whole_style_then_typed_style_uses_final_whole_part() -> TestResult<(
     structural_edit.set_styles_xml(structural_styles);
     let structural = structural_edit.commit()?;
     let structural_patch = structural.patch().clone();
-    let structural_chart = structural.into_chart();
+    let structural_chart = structural.into_package();
     let mut typed_edit = structural_chart.edit();
     typed_edit.update_chart_style_property(
         "axisStyle",
@@ -721,10 +757,10 @@ fn composed_whole_style_then_typed_style_uses_final_whole_part() -> TestResult<(
     let composed = structural_patch.compose(typed.patch())?;
     let transferred = composed.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let chart = transferred
-        .patch()
-        .expect("transferred patch")
-        .apply(&source)?;
-    assert_eq!(chart.styles_xml(), typed.chart().styles_xml());
+    let chart = source.apply(transferred.patch().expect("transferred patch"))?;
+    assert_eq!(
+        chart.into_package().chart().styles_xml(),
+        typed.package().chart().styles_xml()
+    );
     Ok(())
 }

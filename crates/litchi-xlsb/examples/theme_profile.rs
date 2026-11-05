@@ -19,7 +19,7 @@
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_drawingml::theme::{Color, Palette, Slot, Theme, codec};
 use litchi_xlsb::theme;
-use litchi_xlsb::{SourceBackedWorkbook, Workbook};
+use litchi_xlsb::{Package, SourceBackedWorkbook, Workbook};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::env;
 use std::error::Error;
@@ -650,7 +650,12 @@ fn run_transaction_sample(fixture: &Fixture, case: Case) -> Result<Sample> {
 }
 
 fn observe(theme: &Theme) -> Result<ThemeObservation> {
-    let encoded = codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
+    let encoded = codec::encode_part(
+        &theme.name,
+        &theme.colors,
+        &theme.fonts,
+        codec::Limits::DEFAULT,
+    )?;
     Ok(ThemeObservation {
         semantic_digest: digest_bytes(0xcbf29ce484222325, &encoded),
         metadata_digest: metadata_digest(theme),
@@ -799,11 +804,14 @@ mod coder_api {
 
     /// Typed Theme no-op transaction and exact source-preservation gate.
     pub(super) fn typed_noop(bytes: &[u8]) -> Result<TransactionResult> {
-        let mut workbook = Workbook::new(Cursor::new(bytes.to_vec()))?;
-        let before = workbook.theme()?.ok_or("workbook has no Theme part")?;
-        let transaction = workbook.edit_theme()?;
+        let package = Package::from_bytes(bytes)?;
+        let before = package.theme()?.ok_or("workbook has no Theme part")?;
+        let transaction = package.edit_theme()?;
         let commit = transaction.commit()?;
-        let after = workbook.apply_theme(&commit)?;
+        let after = commit
+            .package()
+            .theme()?
+            .ok_or("workbook lost its Theme part")?;
         let observation = observe(after.theme())?;
         let source_digest = digest_bytes(0xcbf29ce484222325, after.source_xml());
         Ok(TransactionResult {
@@ -812,25 +820,33 @@ mod coder_api {
             reads: ReadCounters::default(),
             preservation_ok: after.source_xml() == before.source_xml(),
             inverse_ok: true,
-            change_ok: !commit.changed(),
+            change_ok: !commit.diagnostics().changed(),
         })
     }
 
     pub(super) fn typed_change_inverse(bytes: &[u8]) -> Result<TransactionResult> {
-        let mut workbook = Workbook::new(Cursor::new(bytes.to_vec()))?;
-        let before = workbook.theme()?.ok_or("workbook has no Theme part")?;
+        let package = Package::from_bytes(bytes)?;
+        let before = package.theme()?.ok_or("workbook has no Theme part")?;
         let original_theme = before.theme().clone();
-        let mut transaction = workbook.edit_theme()?;
+        let mut transaction = package.edit_theme()?;
         let changed = change_theme(&original_theme)?;
-        let staged_changed = transaction.replace(changed)?;
+        let staged_changed = transaction.set_theme(changed)?;
         let commit = transaction.commit()?;
-        if !staged_changed || !commit.changed() {
+        if !staged_changed || !commit.diagnostics().changed() {
             return Err("typed Theme change unexpectedly produced a no-op commit".into());
         }
-        let changed_snapshot = workbook.apply_theme(&commit)?;
+        let changed_snapshot = commit
+            .package()
+            .theme()?
+            .ok_or("changed workbook has no Theme part")?;
         let changed_observation = observe(changed_snapshot.theme())?;
         let inverse = commit.patch().inverse();
-        let restored = workbook.apply_theme_patch(&inverse)?;
+        let restored = commit
+            .package()
+            .apply_theme(&inverse)?
+            .into_package()
+            .theme()?
+            .ok_or("restored workbook has no Theme part")?;
         let restored_theme_xml = restored.source_xml();
         let source_digest = digest_bytes(0xcbf29ce484222325, restored_theme_xml);
         Ok(TransactionResult {

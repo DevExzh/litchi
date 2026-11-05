@@ -3,6 +3,7 @@
 use super::codec::{self, Package};
 use super::model::{Limits, Objects};
 use super::target::Targets;
+use crate::{Error, LimitKind};
 use litchi_cfb::{OleError, OleFile};
 use std::io::{Read, Seek};
 
@@ -16,14 +17,14 @@ pub fn discover<R: Read + Seek>(
     ole: &mut OleFile<R>,
     targets: &Targets,
     limits: Limits,
-) -> Result<Objects, OleError> {
+) -> Result<Objects, Error> {
     limits.validate()?;
     if targets.len() > limits.max_objects {
-        return Err(OleError::InvalidFormat(format!(
-            "object target count {} exceeds limit {}",
-            targets.len(),
-            limits.max_objects
-        )));
+        return Err(Error::Limit {
+            kind: LimitKind::Objects,
+            observed: targets.len() as u64,
+            maximum: limits.max_objects as u64,
+        });
     }
     codec::open(ole, limits.max_package_directory_entries())?;
     let mut objects = Vec::new();
@@ -34,9 +35,11 @@ pub fn discover<R: Read + Seek>(
             .checked_add(object.compound().len() as u64)
             .ok_or_else(|| OleError::InvalidFormat("object total size overflow".into()))?;
         if total > limits.max_total_size {
-            return Err(OleError::InvalidFormat(
-                "object total size exceeds limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::TotalBytes,
+                observed: total,
+                maximum: limits.max_total_size,
+            });
         }
         objects.push(object);
     }
@@ -47,14 +50,14 @@ pub(crate) fn from_package(
     package: &Package,
     targets: &Targets,
     limits: Limits,
-) -> Result<Objects, OleError> {
+) -> Result<Objects, Error> {
     limits.validate()?;
     if targets.len() > limits.max_objects {
-        return Err(OleError::InvalidFormat(format!(
-            "object target count {} exceeds limit {}",
-            targets.len(),
-            limits.max_objects
-        )));
+        return Err(Error::Limit {
+            kind: LimitKind::Objects,
+            observed: targets.len() as u64,
+            maximum: limits.max_objects as u64,
+        });
     }
     let mut objects = Vec::new();
     let mut total = 0u64;
@@ -64,9 +67,11 @@ pub(crate) fn from_package(
             .checked_add(object.compound().len() as u64)
             .ok_or_else(|| OleError::InvalidFormat("object total size overflow".into()))?;
         if total > limits.max_total_size {
-            return Err(OleError::InvalidFormat(
-                "object total size exceeds limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::TotalBytes,
+                observed: total,
+                maximum: limits.max_total_size,
+            });
         }
         objects.push(object);
     }

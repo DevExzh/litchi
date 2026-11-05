@@ -12,7 +12,8 @@ use super::{
 };
 use litchi_opc::OpcPackage;
 use litchi_pptx::opened::{Limits, Patch};
-use litchi_pptx::{Error, Package, SlideRemovalPatch, SlideRemovalRefusal};
+use litchi_pptx::slide_removal::Patch as SlideRemovalPatch;
+use litchi_pptx::{Error, Package, SlideRemovalRefusal};
 use serde::Serialize;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use std::error::Error as StdError;
@@ -108,18 +109,18 @@ fn reserve_exact<T>(
 }
 
 fn build_plain_archive(slide_count: usize, prefix: &str) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slide_count {
         let slide = presentation.add_slide()?;
         slide.set_title(&format!("{prefix}-title-{index}"));
         slide.add_text_box(&format!("{prefix}-body-{index}"), 36, 36, 540, 72);
     }
-    Ok(package.to_bytes()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn package_slide_names(bytes: &[u8]) -> Result<Vec<String>, Box<dyn StdError>> {
-    let package = Package::from_vec(bytes.to_vec())?;
+    let package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let mut names = Vec::new();
     reserve_exact(
@@ -137,21 +138,23 @@ fn package_slide_names(bytes: &[u8]) -> Result<Vec<String>, Box<dyn StdError>> {
 }
 
 fn remove_bytes(bytes: &[u8], position: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let mut package = Package::from_vec(bytes.to_vec())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let plan = snapshot.plan_slide_removal(position)?;
-    package.apply_slide_removal_plan(&plan)?;
+    let mut edit = package.edit()?;
+    edit.stage_slide_removal(&plan)?;
+    package = edit.commit()?.into_package();
     Ok(package.to_bytes()?)
 }
 
 fn move_bytes(bytes: &[u8], from: usize, to: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let mut package = Package::from_vec(bytes.to_vec())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
-    let changed = transaction.move_slide(from, to)?;
+    let changed = transaction.move_slide(from, litchi_core::Position::new(to))?;
     let commit = transaction.commit()?;
     if changed {
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
     }
     Ok(package.to_bytes()?)
 }
@@ -164,8 +167,9 @@ fn rewrite_member<F>(
 where
     F: FnOnce(&[u8]) -> Result<Vec<u8>, Box<dyn StdError>>,
 {
-    let archive = ArchiveReader::new(bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewrite = Some(rewrite);
     for name in archive.file_names() {
         let member = archive.read(name)?;
@@ -182,8 +186,9 @@ where
 }
 
 fn add_unknown_member(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let archive = ArchiveReader::new(bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer.write_stored(name, &archive.read(name)?)?;
     }
@@ -230,7 +235,7 @@ fn add_external_dependency(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
 }
 
 fn expected_manifest(archive: &[u8]) -> Result<CorpusManifest, Box<dyn StdError>> {
-    let opc = OpcPackage::from_bytes(archive)?;
+    let opc = OpcPackage::from_bytes(archive, litchi_opc::SourceLimits::default())?;
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -252,7 +257,12 @@ fn expected_manifest(archive: &[u8]) -> Result<CorpusManifest, Box<dyn StdError>
         payload_kind: "dependency-free-plain-slide-text",
         compression: "deflate",
         entry_count: opc.part_count(),
-        archive_member_count: ArchiveReader::new(archive)?.file_names().count(),
+        archive_member_count: ArchiveReader::new(
+            archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        .count(),
         entry_bytes,
         uncompressed_payload_bytes,
         archive_bytes: archive.len(),
@@ -414,7 +424,9 @@ fn apply_boundary_to_package(
         Operation::Remove => {
             let snapshot = package.opened_presentation()?;
             let plan = snapshot.plan_slide_removal(position)?;
-            package.apply_slide_removal_plan(&plan)?;
+            let mut edit = package.edit()?;
+            edit.stage_slide_removal(&plan)?;
+            *package = edit.commit()?.into_package();
         },
         Operation::Move => {
             let (from, to) = MOVE_PAIRS
@@ -423,8 +435,8 @@ fn apply_boundary_to_package(
                 .ok_or("PPTX boundary move operation index is outside the fixed pair set")?;
             let snapshot = package.opened_presentation()?;
             let mut transaction = snapshot.edit();
-            transaction.move_slide(from, to)?;
-            package.apply_opened_presentation_commit(transaction.commit()?)?;
+            transaction.move_slide(from, litchi_core::Position::new(to))?;
+            *package = transaction.commit()?.into_package();
         },
     }
     Ok(())
@@ -436,7 +448,7 @@ fn verify_partial_zero_sinks(
     position: usize,
     expected_output: &[u8],
 ) -> Result<(bool, bool), Box<dyn StdError>> {
-    let mut package = Package::from_vec(source.to_vec())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(source.to_vec()))?;
     apply_boundary_to_package(&mut package, operation, position)?;
     let fail_after = u64::try_from(expected_output.len() / 2)
         .map_err(|_error| "PPTX boundary partial sink length exceeds u64")?
@@ -445,7 +457,7 @@ fn verify_partial_zero_sinks(
         accepted: 0,
         fail_after,
     };
-    let partial_result = package.opc()?.to_stream(&mut partial);
+    let partial_result = package.opc()?.write_to(&mut partial);
     let partial_verified = partial_result.is_err()
         && partial.accepted > 0
         && partial.accepted < u64::try_from(expected_output.len())?;
@@ -453,7 +465,7 @@ fn verify_partial_zero_sinks(
         accepted: 0,
         fail_after: 0,
     };
-    let zero_result = package.opc()?.to_stream(&mut zero);
+    let zero_result = package.opc()?.write_to(&mut zero);
     let zero_verified = zero_result.is_err() && zero.accepted == 0;
     Ok((partial_verified, zero_verified))
 }
@@ -461,33 +473,39 @@ fn verify_partial_zero_sinks(
 fn mutate_order(package: &mut Package) -> Result<(), Box<dyn StdError>> {
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
-    transaction.move_slide(0, 1)?;
-    package.apply_opened_presentation_commit(transaction.commit()?)?;
+    transaction.move_slide(0, litchi_core::Position::new(1))?;
+    *package = transaction.commit()?.into_package();
     Ok(())
 }
 
 fn verify_remove_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<dyn StdError>> {
-    let source_package = Package::from_vec(corpus.archive.clone())?;
+    let source_package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let plan = source_package
         .opened_presentation()?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)?;
-    let forward = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
-    let inverse = SlideRemovalPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
-    let mut applied = Package::from_vec(corpus.archive.clone())?;
-    applied.apply_slide_removal_patch(&forward)?;
+    let forward = SlideRemovalPatch::from_bytes(
+        &plan.patch().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let inverse = SlideRemovalPatch::from_bytes(
+        &plan.patch().inverse().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
+    applied = applied.apply_slide_removal(&forward)?.into_package();
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = output_names(&applied_bytes)?.len() == SLIDE_COUNT - 1;
-    let mut restored = Package::from_vec(applied_bytes)?;
-    restored.apply_slide_removal_patch(&inverse)?;
+    let mut restored = Package::from_reader(std::io::Cursor::new(applied_bytes))?;
+    restored = restored.apply_slide_removal(&inverse)?.into_package();
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = package_slide_names(&restored_bytes)? == corpus.slide_names
         && super::raw_zip_members(&restored_bytes)? == super::raw_zip_members(&corpus.archive)?;
 
-    let mut stale = Package::from_vec(corpus.archive.clone())?;
+    let mut stale = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     mutate_order(&mut stale)?;
-    let stale_verified = stale.apply_slide_removal_patch(&forward).is_err();
-    let mut foreign = Package::from_vec(corpus.foreign_archive.clone())?;
-    let foreign_verified = foreign.apply_slide_removal_patch(&forward).is_err();
+    let stale_verified = stale.apply_slide_removal(&forward).is_err();
+    let foreign = Package::from_reader(std::io::Cursor::new(corpus.foreign_archive.clone()))?;
+    let foreign_verified = foreign.apply_slide_removal(&forward).is_err();
     Ok((
         forward_verified,
         inverse_verified,
@@ -497,28 +515,37 @@ fn verify_remove_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Bo
 }
 
 fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<dyn StdError>> {
-    let package = Package::from_vec(corpus.archive.clone())?;
+    let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
-    transaction.move_slide(REPRESENTATIVE_MOVE.0, REPRESENTATIVE_MOVE.1)?;
+    transaction.move_slide(
+        REPRESENTATIVE_MOVE.0,
+        litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
+    )?;
     let commit = transaction.commit()?;
-    let forward = Patch::from_bytes(&commit.patch().to_bytes()?)?;
-    let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
-    let mut applied = Package::from_vec(corpus.archive.clone())?;
-    applied.apply_opened_presentation_patch(&forward)?;
+    let forward = Patch::from_bytes(
+        &commit.patch().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let inverse = Patch::from_bytes(
+        &forward.inverse().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
+    applied = applied.apply(&forward)?.into_package();
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = verify_semantic_output(&applied_bytes, Operation::Move, 0, corpus)?
         && verify_untouched_raw_members(&corpus.archive, &applied_bytes, Operation::Move, None)?;
-    let mut restored = Package::from_vec(applied_bytes)?;
-    restored.apply_opened_presentation_patch(&inverse)?;
+    let mut restored = Package::from_reader(std::io::Cursor::new(applied_bytes))?;
+    restored = restored.apply(&inverse)?.into_package();
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = restored_bytes == corpus.archive;
 
-    let mut stale = Package::from_vec(corpus.archive.clone())?;
+    let mut stale = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     mutate_order(&mut stale)?;
-    let stale_verified = stale.apply_opened_presentation_patch(&forward).is_err();
-    let mut foreign = Package::from_vec(corpus.foreign_archive.clone())?;
-    let foreign_verified = foreign.apply_opened_presentation_patch(&forward).is_err();
+    let stale_verified = stale.apply(&forward).is_err();
+    let foreign = Package::from_reader(std::io::Cursor::new(corpus.foreign_archive.clone()))?;
+    let foreign_verified = foreign.apply(&forward).is_err();
     Ok((
         forward_verified,
         inverse_verified,
@@ -530,7 +557,7 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
 fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>> {
     let source = corpus.dependency_archive.as_slice();
     let source_before = source.to_vec();
-    let mut package = Package::from_vec(source_before.clone())?;
+    let package = Package::from_reader(std::io::Cursor::new(source_before.clone()))?;
     let snapshot = package.opened_presentation()?;
     let source_revision = snapshot.revision();
     let before_names = snapshot
@@ -542,19 +569,18 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
     let refusal = transaction.remove_slide(DEPENDENCY_SLIDE_POSITION);
     let typed_refusal = matches!(
         refusal,
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::UnsupportedRelationship,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::UnsupportedRelationship.kind()
     );
     let staging_names = transaction
-        .slides()
+        .slides()?
         .iter()
         .map(|slide| slide.name().to_owned())
         .collect::<Vec<_>>();
-    let staging_unchanged =
-        !transaction.is_changed() && transaction.source().revision() == source_revision;
-    let rolled_back = transaction.rollback();
+    let staging_unchanged = !transaction.clone().commit()?.diagnostics().changed()
+        && transaction.source()?.revision() == source_revision;
+    let rolled_back = transaction.source()?.clone();
+    drop(transaction);
     let rollback_names = rolled_back
         .slides()
         .iter()
@@ -572,55 +598,55 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
 fn verify_refusal_gates(
     corpus: &Corpus,
 ) -> Result<(bool, bool, bool, bool, bool, bool), Box<dyn StdError>> {
-    let one_slide = Package::from_vec(build_plain_archive(1, "sole")?)?;
+    let one_slide = Package::from_reader(std::io::Cursor::new(build_plain_archive(1, "sole")?))?;
     let one_slide_verified = matches!(
         one_slide.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::FinalSlide,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::FinalSlide.kind()
     );
 
-    let unknown = Package::from_vec(add_unknown_member(&corpus.archive)?)?;
+    let unknown = Package::from_reader(std::io::Cursor::new(add_unknown_member(&corpus.archive)?))?;
     let unknown_verified = matches!(
         unknown.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::UnknownPhysicalMember,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::UnknownPhysicalMember.kind()
     );
 
     let dependency_verified = verify_dependency_refusal(corpus)?;
 
-    let mce = Package::from_vec(add_mce_marker(&corpus.archive)?)?;
+    let mce = Package::from_reader(std::io::Cursor::new(add_mce_marker(&corpus.archive)?))?;
     let mce_verified = matches!(
         mce.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::MarkupCompatibility,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::MarkupCompatibility.kind()
     );
 
-    let signed = Package::from_vec(add_signature_marker(&corpus.archive)?)?;
+    let signed =
+        Package::from_reader(std::io::Cursor::new(add_signature_marker(&corpus.archive)?))?;
     let signed_verified = matches!(
         signed.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::SignedPackage,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::SignedPackage.kind()
     );
 
     let limits =
         Limits::new(64, 1, 1_024, 1, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
-    let remove_limited = Package::from_vec(corpus.archive.clone())?
-        .opened_presentation_with_limits(limits)?
+    let remove_limited = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)
         .is_err();
     let move_limited = {
-        let package = Package::from_vec(corpus.archive.clone())?;
-        let snapshot = package.opened_presentation_with_limits(limits)?;
+        let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
+        let snapshot = package.opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )?;
         let mut transaction = snapshot.edit();
-        transaction.move_slide(REPRESENTATIVE_MOVE.0, REPRESENTATIVE_MOVE.1)?;
+        transaction.move_slide(
+            REPRESENTATIVE_MOVE.0,
+            litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
+        )?;
         transaction.commit().is_err()
     };
     Ok((
@@ -636,7 +662,7 @@ fn verify_refusal_gates(
 fn verify_boundary_semantics(corpus: &Corpus) -> Result<(bool, bool), Box<dyn StdError>> {
     let mut remove_verified = true;
     for (output, position) in corpus.remove_outputs.iter().zip(REMOVE_POSITIONS) {
-        let package = Package::from_vec(output.clone())?;
+        let package = Package::from_reader(std::io::Cursor::new(output.clone()))?;
         let snapshot = package.opened_presentation()?;
         let expected = corpus
             .slide_names
@@ -710,7 +736,7 @@ fn verify_untimed_gates(corpus: &Corpus) -> Result<(), Box<dyn StdError>> {
 }
 
 fn selected_slide_name(corpus: &Corpus, position: usize) -> Result<String, Box<dyn StdError>> {
-    let package = Package::from_vec(corpus.archive.clone())?;
+    let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let snapshot = package.opened_presentation()?;
     let slide = snapshot
         .slides()
@@ -812,7 +838,7 @@ pub(super) fn run(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("PPTX boundary sink budget overflows u64")?;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut package = Package::from_vec(corpus.archive.clone())?;
+        let mut package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let snapshot = package.opened_presentation()?;
         let mut transaction = (operation == Operation::Move).then(|| snapshot.edit());
 
@@ -823,7 +849,10 @@ pub(super) fn run(
             transaction
                 .as_mut()
                 .ok_or("PPTX move transaction disappeared before planning")?
-                .move_slide(REPRESENTATIVE_MOVE.0, REPRESENTATIVE_MOVE.1)?;
+                .move_slide(
+                    REPRESENTATIVE_MOVE.0,
+                    litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
+                )?;
             None
         };
         let plan_duration = started.elapsed();
@@ -831,18 +860,20 @@ pub(super) fn run(
         let started = Instant::now();
         match operation {
             Operation::Remove => {
-                package.apply_slide_removal_plan(
+                let mut edit = package.edit()?;
+                edit.stage_slide_removal(
                     removal_plan
                         .as_ref()
                         .ok_or("PPTX removal plan disappeared before commit")?,
                 )?;
+                package = edit.commit()?.into_package();
             },
             Operation::Move => {
                 let commit = transaction
                     .take()
                     .ok_or("PPTX move transaction disappeared before commit")?
                     .commit()?;
-                package.apply_opened_presentation_commit(commit)?;
+                package = commit.into_package();
             },
         }
         let commit_duration = started.elapsed();
@@ -850,13 +881,13 @@ pub(super) fn run(
         let mut sink = CountingSink::bounded(maximum, MAX_WRITE);
         sink.reserve_budget()?;
         let started = Instant::now();
-        package.opc()?.to_stream(&mut sink)?;
+        package.opc()?.write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         let sink_summary = sink.summary();
         let output = sink.bytes;
 
         let started = Instant::now();
-        let reopened = Package::from_vec(output.clone())?;
+        let reopened = Package::from_reader(std::io::Cursor::new(output.clone()))?;
         let reopened_snapshot = reopened.opened_presentation()?;
         let reopened_names = reopened_snapshot
             .slides()

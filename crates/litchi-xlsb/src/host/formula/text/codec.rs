@@ -58,7 +58,7 @@ impl<'a> Compiler<'a> {
             CompileExpr::Array { rows, cols, values } => {
                 if matches!(encoding, FormulaEncoding::Shared { .. }) {
                     return Err(Error::InvalidFormula(
-                        "shared formulas cannot contain PtgArray".to_string(),
+                        "shared formulas cannot contain PtgArray",
                     ));
                 }
                 output.push(0x40); // PtgArray, VALUE class
@@ -135,7 +135,9 @@ impl<'a> Compiler<'a> {
                 output.extend_from_slice(&index.to_le_bytes());
             },
             CompileExpr::TableReference(reference) => {
-                let (token, payload) = reference.to_extended_binary()?;
+                // The text compiler has no opened owner; it emits under the
+                // documented default authoring profile.
+                let (token, payload) = reference.to_extended_binary(crate::raw::Limits::DEFAULT)?;
                 output.extend_from_slice(&token);
                 extra.extend_from_slice(&payload);
             },
@@ -295,19 +297,20 @@ fn patch_skip_to_end(output: &mut [u8], position: usize) -> Result<()> {
     let remaining = output
         .len()
         .checked_sub(position + 4)
-        .ok_or_else(|| Error::InvalidFormula("PtgAttrGoTo position exceeds formula".to_string()))?;
+        .ok_or(Error::InvalidFormula(
+            "PtgAttrGoTo position exceeds formula",
+        ))?;
     let offset = remaining
         .checked_sub(1)
-        .ok_or_else(|| Error::InvalidFormula("PtgAttrGoTo has no following token".to_string()))?;
+        .ok_or(Error::InvalidFormula("PtgAttrGoTo has no following token"))?;
     patch_attribute_offset(output, position, offset)
 }
 
-fn patch_u16(output: &mut [u8], position: usize, value: usize, context: &str) -> Result<()> {
-    let value = u16::try_from(value)
-        .map_err(|_| Error::InvalidFormula(format!("{context} exceeds 65,535 bytes")))?;
+fn patch_u16(output: &mut [u8], position: usize, value: usize, _context: &str) -> Result<()> {
+    let value = u16::try_from(value).map_err(|_| Error::InvalidFormula("exceeds 65,535 bytes"))?;
     let target = output
         .get_mut(position..position + 2)
-        .ok_or_else(|| Error::InvalidFormula(format!("{context} position is outside formula")))?;
+        .ok_or(Error::InvalidFormula("position is outside formula"))?;
     target.copy_from_slice(&value.to_le_bytes());
     Ok(())
 }

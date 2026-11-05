@@ -42,6 +42,44 @@ pub const MAX_AUDIO_BYTES: usize = 512 * 1024 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The existing soundtrack graph cannot be edited without risking data.
+    #[error("the Keynote soundtrack item graph cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error(
+        "Keynote soundtrack-item {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded transaction allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote soundtrack-item transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Candidate readback did not reproduce the requested item state.
+    #[error("the edited Keynote soundtrack items failed verification")]
+    Verification,
+    /// The exact-source patch was applied to a different package snapshot.
+    #[error("the Keynote soundtrack-item patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source package has no physical representation that can be changed.
     #[error("this Keynote source does not support physical soundtrack-item edits")]
     UnsupportedSource,
@@ -74,9 +112,6 @@ pub enum Error {
     /// Commit was requested without a staged item operation.
     #[error("no soundtrack-item operation is staged")]
     NoStagedOperation,
-    /// The existing soundtrack graph cannot be edited without risking data.
-    #[error("the Keynote soundtrack item graph cannot be edited safely")]
-    InvalidSource,
     /// The new filename is empty.
     #[error("soundtrack audio filename cannot be empty")]
     EmptyFilename,
@@ -108,30 +143,39 @@ pub enum Error {
     /// The payload does not have a recognized audio signature.
     #[error("soundtrack audio payload has no recognized audio signature")]
     UnsupportedAudioData,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error(
-        "Keynote soundtrack-item {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded transaction allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote soundtrack-item transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Candidate readback did not reproduce the requested item state.
-    #[error("the edited Keynote soundtrack items failed verification")]
-    Verification,
-    /// The exact-source patch was applied to a different package snapshot.
-    #[error("the Keynote soundtrack-item patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::ItemHandleConflict { .. }
+            | Self::UnsupportedAudioFilename { .. }
+            | Self::UnsupportedAudioData { .. } => RefusalKind::UnsupportedContent,
+            Self::SoundtrackNotFound { .. } | Self::SourcePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::InsertionOutOfRange { .. }
+            | Self::EmptyFilename { .. }
+            | Self::InvalidFilename { .. }
+            | Self::FilenameTooLong { .. }
+            | Self::EmptyAudio { .. }
+            | Self::AudioTooLarge { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A finite resource governed by a soundtrack-item transaction.
@@ -613,7 +657,7 @@ impl<'a> Edit<'a> {
 
     fn stage(&mut self, operation: StagedOperation) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         self.operation = Some(operation);
         Ok(self)
@@ -638,10 +682,10 @@ impl<'a> Edit<'a> {
             return Ok(());
         };
         if position.get() > item_count {
-            return Err(Error::InsertionOutOfRange {
+            return Err(Error::Refused(Refusal::InsertionOutOfRange {
                 position,
                 item_count,
-            });
+            }));
         }
         Ok(())
     }
@@ -655,7 +699,7 @@ impl<'a> Edit<'a> {
             ItemSelector::Handle(handle) => handle.position(),
         };
         if position.get() >= item_count {
-            return Err(Error::SourcePositionNotFound { position });
+            return Err(Error::Refused(Refusal::SourcePositionNotFound { position }));
         }
         Ok(())
     }
@@ -802,6 +846,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -817,14 +867,14 @@ impl Commit {
 
 fn validate_filename(filename: &str) -> Result<(), Error> {
     if filename.is_empty() {
-        return Err(Error::EmptyFilename);
+        return Err(Error::Refused(Refusal::EmptyFilename));
     }
     let length = filename.len();
     if length > MAX_FILENAME_BYTES {
-        return Err(Error::FilenameTooLong {
+        return Err(Error::Refused(Refusal::FilenameTooLong {
             observed: length,
             maximum: MAX_FILENAME_BYTES,
-        });
+        }));
     }
     if filename
         .bytes()
@@ -832,32 +882,32 @@ fn validate_filename(filename: &str) -> Result<(), Error> {
         || filename == "."
         || filename == ".."
     {
-        return Err(Error::InvalidFilename);
+        return Err(Error::Refused(Refusal::InvalidFilename));
     }
     let Some(dot) = filename.rfind('.') else {
-        return Err(Error::UnsupportedAudioFilename);
+        return Err(Error::Refused(Refusal::UnsupportedAudioFilename));
     };
     if dot == 0 || dot + 1 == filename.len() {
-        return Err(Error::UnsupportedAudioFilename);
+        return Err(Error::Refused(Refusal::UnsupportedAudioFilename));
     }
     if MediaType::from_extension(&filename[dot + 1..]) != MediaType::Audio {
-        return Err(Error::UnsupportedAudioFilename);
+        return Err(Error::Refused(Refusal::UnsupportedAudioFilename));
     }
     Ok(())
 }
 
 fn validate_payload(data: &[u8]) -> Result<(), Error> {
     if data.is_empty() {
-        return Err(Error::EmptyAudio);
+        return Err(Error::Refused(Refusal::EmptyAudio));
     }
     if data.len() > MAX_AUDIO_BYTES {
-        return Err(Error::AudioTooLarge {
+        return Err(Error::Refused(Refusal::AudioTooLarge {
             observed: data.len(),
             maximum: MAX_AUDIO_BYTES,
-        });
+        }));
     }
     if MediaType::from_bytes(data) != MediaType::Audio {
-        return Err(Error::UnsupportedAudioData);
+        return Err(Error::Refused(Refusal::UnsupportedAudioData));
     }
     Ok(())
 }
@@ -883,19 +933,19 @@ mod tests {
     fn source_rejects_path_traversal_and_non_audio_values() {
         assert_eq!(
             AudioSource::from_bytes("../theme.mp3", b"ID3\x04\0\0"),
-            Err(Error::InvalidFilename)
+            Err(Error::Refused(Refusal::InvalidFilename))
         );
         assert_eq!(
             AudioSource::from_bytes("theme.bin", b"ID3\x04\0\0"),
-            Err(Error::UnsupportedAudioFilename)
+            Err(Error::Refused(Refusal::UnsupportedAudioFilename))
         );
         assert_eq!(
             AudioSource::from_bytes("theme.mp3", b"not audio"),
-            Err(Error::UnsupportedAudioData)
+            Err(Error::Refused(Refusal::UnsupportedAudioData))
         );
         assert_eq!(
             AudioSource::from_bytes("theme.mp3", &[]),
-            Err(Error::EmptyAudio)
+            Err(Error::Refused(Refusal::EmptyAudio))
         );
     }
 

@@ -137,7 +137,7 @@ fn expected(value: &JsonValue) -> Observed {
 }
 
 fn evaluate(source: &str, execution: &ExecutionContext) -> Result<Observed, EvaluationFailure> {
-    let expression = Expression::parse(source).unwrap_or_else(|error| {
+    let expression = Expression::parse(source, &Default::default()).unwrap_or_else(|error| {
         panic!("{source:?} from independent inspection oracle should parse: {error}")
     });
     // The scalar evaluator intentionally has no Array result representation.

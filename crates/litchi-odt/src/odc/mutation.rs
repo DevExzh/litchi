@@ -84,7 +84,7 @@ impl Document {
             .find(|series| series.xml_id() == Some(xml_id))
     }
 
-    pub fn add_axis(&mut self, axis: &AxisSpec) -> Result<usize> {
+    pub(crate) fn add_axis(&mut self, axis: &AxisSpec) -> Result<usize> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let updated = insert_into_plot(
@@ -98,7 +98,7 @@ impl Document {
         Ok(index)
     }
 
-    pub fn replace_axis(&mut self, index: usize, axis: &AxisSpec) -> Result<()> {
+    pub(crate) fn replace_axis(&mut self, index: usize, axis: &AxisSpec) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let span = &scan
@@ -114,7 +114,7 @@ impl Document {
         )?)
     }
 
-    pub fn update_axis(&mut self, index: usize, update: &AxisUpdate) -> Result<()> {
+    pub(crate) fn update_axis(&mut self, index: usize, update: &AxisUpdate) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let entry = scan
@@ -138,7 +138,7 @@ impl Document {
         self.commit_chart_xml(splice(&xml, entry.span.start, end, &merged)?)
     }
 
-    pub fn remove_axis(&mut self, index: usize) -> Result<()> {
+    pub(crate) fn remove_axis(&mut self, index: usize) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let span = &scan
@@ -149,7 +149,7 @@ impl Document {
         self.commit_chart_xml(splice(&xml, span.start, span.end, "")?)
     }
 
-    pub fn reorder_axis(&mut self, from: usize, to: usize) -> Result<()> {
+    pub(crate) fn reorder_axis(&mut self, from: usize, to: usize) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let left = &scan
@@ -165,7 +165,7 @@ impl Document {
         self.commit_chart_xml(swap(&xml, left, right)?)
     }
 
-    pub fn add_series(&mut self, series: &SeriesSpec) -> Result<usize> {
+    pub(crate) fn add_series(&mut self, series: &SeriesSpec) -> Result<usize> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let updated = insert_into_plot(
@@ -179,7 +179,7 @@ impl Document {
         Ok(index)
     }
 
-    pub fn replace_series(&mut self, index: usize, series: &SeriesSpec) -> Result<()> {
+    pub(crate) fn replace_series(&mut self, index: usize, series: &SeriesSpec) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let span = &scan
@@ -195,7 +195,7 @@ impl Document {
         )?)
     }
 
-    pub fn update_series(&mut self, index: usize, update: &SeriesUpdate) -> Result<()> {
+    pub(crate) fn update_series(&mut self, index: usize, update: &SeriesUpdate) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let entry = scan
@@ -249,7 +249,7 @@ impl Document {
         self.commit_chart_xml(splice(&xml, entry.span.start, end, &merged)?)
     }
 
-    pub fn remove_series(&mut self, index: usize) -> Result<()> {
+    pub(crate) fn remove_series(&mut self, index: usize) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let span = &scan
@@ -260,7 +260,7 @@ impl Document {
         self.commit_chart_xml(splice(&xml, span.start, span.end, "")?)
     }
 
-    pub fn reorder_series(&mut self, from: usize, to: usize) -> Result<()> {
+    pub(crate) fn reorder_series(&mut self, from: usize, to: usize) -> Result<()> {
         let xml = self.package.content_xml()?;
         let scan = scan_plot(&xml)?;
         let left = &scan
@@ -277,7 +277,7 @@ impl Document {
     }
 
     fn commit_chart_xml(&mut self, xml: String) -> Result<()> {
-        let parsed = read(&xml)?;
+        let parsed = read(&xml, self.package.xml_limits_value())?;
         scan_plot(&xml)?;
         self.package.replace_content_xml(xml)?;
         self.chart = parsed;

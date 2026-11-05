@@ -14,8 +14,8 @@ use litchi_xlsx::form_control::{
     CONTROL_PROPERTIES_CONTENT_TYPE, CONTROL_PROPERTIES_RELATIONSHIP_TYPE, Checked, DropStyle,
     EditValidation, FORM_CONTROL_NAMESPACE, FormControlError, FormControlFormula, Item, ItemList,
     KnownOrUnknown, Limits, MAX_RETAINED_BYTES, ObjectType, OpaqueXml, Properties, ScalarField,
-    ScalarValue, SelectionType, TextHAlign, TextVAlign, insert_item, inspect, inspect_with_limits,
-    parse, parse_with_limits, remove_item, replace_items, replace_scalar, write, write_with_limits,
+    ScalarValue, SelectionType, TextHAlign, TextVAlign, insert_item, inspect, parse, remove_item,
+    replace_items, replace_scalar, write,
 };
 use serde_json::Value;
 use soapberry_zip::office::ArchiveReader;
@@ -47,16 +47,19 @@ fn known_token<T: std::fmt::Display>(value: Option<&KnownOrUnknown<T>>) -> Optio
 }
 
 fn assert_invalid(xml: &[u8], label: &str) {
-    assert!(parse(xml).is_err(), "{label} unexpectedly parsed");
+    assert!(
+        parse(xml, &Limits::default()).is_err(),
+        "{label} unexpectedly parsed"
+    );
 }
 
 fn minimum_parse_retained_limit(source: &[u8]) -> usize {
     let mut low = 0usize;
     let mut high = MAX_RETAINED_BYTES;
-    assert!(parse_with_limits(source, &Limits::new().with_max_retained_bytes(high)).is_ok());
+    assert!(parse(source, &Limits::new().with_max_retained_bytes(high)).is_ok());
     while low < high {
         let middle = low + (high - low) / 2;
-        if parse_with_limits(source, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
+        if parse(source, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
             high = middle;
         } else {
             low = middle + 1;
@@ -68,10 +71,10 @@ fn minimum_parse_retained_limit(source: &[u8]) -> usize {
 fn minimum_write_retained_limit(properties: &Properties) -> usize {
     let mut low = 0usize;
     let mut high = MAX_RETAINED_BYTES;
-    assert!(write_with_limits(properties, &Limits::new().with_max_retained_bytes(high)).is_ok());
+    assert!(write(properties, &Limits::new().with_max_retained_bytes(high)).is_ok());
     while low < high {
         let middle = low + (high - low) / 2;
-        if write_with_limits(properties, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
+        if write(properties, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
             high = middle;
         } else {
             low = middle + 1;
@@ -83,6 +86,7 @@ fn minimum_write_retained_limit(properties: &Properties) -> usize {
 fn assert_retained_limit<T>(result: litchi_xlsx::form_control::Result<T>, maximum: usize) {
     match result {
         Err(FormControlError::Limit {
+            kind: litchi_xlsx::form_control::LimitKind::RetainedBytes,
             maximum: observed_maximum,
             ..
         }) => assert_eq!(observed_maximum, maximum),
@@ -126,7 +130,8 @@ fn native_corpus_parts_read_and_write_as_exact_no_ops() {
             "retained fixture hash {retained_path} (source {package_path})"
         );
         assert_eq!(package.len(), fixture["bytes"].as_u64().unwrap() as usize);
-        let archive = ArchiveReader::new(&package).unwrap();
+        let archive =
+            ArchiveReader::new(&package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let parts = fixture["form_control_parts"].as_array().unwrap();
         for part in parts {
             part_count += 1;
@@ -151,9 +156,9 @@ fn native_corpus_parts_read_and_write_as_exact_no_ops() {
                 );
             }
 
-            let properties = parse(&source).unwrap();
+            let properties = parse(&source, &Limits::default()).unwrap();
             assert_eq!(
-                write(&properties).unwrap(),
+                write(&properties, &Limits::default()).unwrap(),
                 source,
                 "native no-op {package_path}!{member}"
             );
@@ -192,7 +197,7 @@ fn native_corpus_parts_read_and_write_as_exact_no_ops() {
                     Some(ScalarValue::Boolean(false)),
                 )
                 .unwrap();
-                let reopened = parse(&changed).unwrap();
+                let reopened = parse(&changed, &Limits::default()).unwrap();
                 assert_eq!(
                     reopened.fmla_link().map(FormControlFormula::as_str),
                     Some("#REF!")
@@ -211,8 +216,8 @@ fn native_corpus_parts_read_and_write_as_exact_no_ops() {
 #[test]
 fn empty_properties_keep_presence_states_and_effective_defaults() {
     let source = empty_root();
-    let properties = parse(&source).unwrap();
-    assert_eq!(write(&properties).unwrap(), source);
+    let properties = parse(&source, &Limits::default()).unwrap();
+    assert_eq!(write(&properties, &Limits::default()).unwrap(), source);
     assert!(properties.object_type().is_none());
     assert!(properties.checked().is_none());
     assert!(properties.colored().is_none());
@@ -288,7 +293,7 @@ fn all_thirty_one_scalars_retain_typed_presence_and_lexical_values() {
             widthMin="6" editVal="formula" multiLine="true" verticalBar="1"
             passwordEdit="false"/>"##
     );
-    let properties = parse(source.as_bytes()).unwrap();
+    let properties = parse(source.as_bytes(), &Limits::default()).unwrap();
 
     assert_eq!(
         known_token(properties.object_type()),
@@ -538,14 +543,14 @@ fn booleans_ranges_and_unknown_enum_tokens_are_bounded() {
     ];
     for attribute in bool_attributes {
         for value in ["0", "false", "1", "true"] {
-            parse(&root_with_attribute(attribute, value)).unwrap();
+            parse(&root_with_attribute(attribute, value), &Limits::default()).unwrap();
         }
         assert_invalid(&root_with_attribute(attribute, "yes"), "invalid boolean");
     }
 
     for attribute in ["dropLines", "inc", "max", "min", "page"] {
-        parse(&root_with_attribute(attribute, "0")).unwrap();
-        parse(&root_with_attribute(attribute, "30000")).unwrap();
+        parse(&root_with_attribute(attribute, "0"), &Limits::default()).unwrap();
+        parse(&root_with_attribute(attribute, "30000"), &Limits::default()).unwrap();
         assert_invalid(
             &root_with_attribute(attribute, "30001"),
             "out-of-range unsigned value",
@@ -554,16 +559,20 @@ fn booleans_ranges_and_unknown_enum_tokens_are_bounded() {
             &root_with_attribute(attribute, "4294967296"),
             "overflowing unsigned value",
         );
-        parse(&root_with_attribute(attribute, "  8 \n ")).unwrap();
+        parse(
+            &root_with_attribute(attribute, "  8 \n "),
+            &Limits::default(),
+        )
+        .unwrap();
     }
 
     let unknown = root_with_attribute("objectType", "FutureControl");
-    let properties = parse(&unknown).unwrap();
+    let properties = parse(&unknown, &Limits::default()).unwrap();
     assert_eq!(
         known_token(properties.object_type()),
         Some("FutureControl".into())
     );
-    assert_eq!(write(&properties).unwrap(), unknown);
+    assert_eq!(write(&properties, &Limits::default()).unwrap(), unknown);
     let changed = replace_scalar(
         &unknown,
         ScalarField::LockText,
@@ -576,9 +585,17 @@ fn booleans_ranges_and_unknown_enum_tokens_are_bounded() {
             .any(|window| { window == b"objectType=\"FutureControl\"" })
     );
 
-    let alignment = parse(&root_with_attribute("textHAlign", " left ")).unwrap();
+    let alignment = parse(
+        &root_with_attribute("textHAlign", " left "),
+        &Limits::default(),
+    )
+    .unwrap();
     assert_eq!(known_token(alignment.text_h_align()), Some(" left ".into()));
-    let multi_sel = parse(&root_with_attribute("multiSel", " 1,  3 ")).unwrap();
+    let multi_sel = parse(
+        &root_with_attribute("multiSel", " 1,  3 "),
+        &Limits::default(),
+    )
+    .unwrap();
     assert_eq!(multi_sel.multi_sel(), Some(" 1,  3 "));
 }
 
@@ -602,14 +619,17 @@ fn x14_expanded_names_and_item_string_values_are_exactly_preserved() {
 "#
     );
     let source = source.into_bytes();
-    let view = inspect(&source).unwrap();
+    let view = inspect(&source, &Limits::default()).unwrap();
     assert_eq!(view.source(), source.as_slice());
     assert!(
         view.properties().source_bytes().is_none(),
         "borrowed inspect must not retain a complete owned source copy"
     );
-    assert_eq!(write(view.properties()).unwrap(), source);
-    let properties = parse(&source).unwrap();
+    assert_eq!(
+        write(view.properties(), &Limits::default()).unwrap(),
+        source
+    );
+    let properties = parse(&source, &Limits::default()).unwrap();
     assert_eq!(
         properties.object_type().and_then(KnownOrUnknown::known),
         Some(&ObjectType::List)
@@ -620,7 +640,7 @@ fn x14_expanded_names_and_item_string_values_are_exactly_preserved() {
         properties.item_list().unwrap().items()[0].value(),
         "  first & \n second  "
     );
-    assert_eq!(properties.item_list().unwrap().items()[1].val(), "second");
+    assert_eq!(properties.item_list().unwrap().items()[1].value(), "second");
     assert_eq!(
         properties.fmla_link().map(FormControlFormula::as_str),
         Some("  Sheet1!$A$1  ")
@@ -631,7 +651,7 @@ fn x14_expanded_names_and_item_string_values_are_exactly_preserved() {
         b"<x14:extLst><!-- item extension --><c:ext uri=\"urn:item\"><u:payload><![CDATA[item <payload>]]></u:payload></c:ext></x14:extLst>");
     assert_eq!(properties.root_extension_list().unwrap().xml(),
         b"<x14:extLst><!-- root extension --><c:ext><u:payload><![CDATA[root <payload>]]></u:payload></c:ext><x14:ext uri=\"urn:foreign\"/></x14:extLst>");
-    assert_eq!(write(&properties).unwrap(), source);
+    assert_eq!(write(&properties, &Limits::default()).unwrap(), source);
 
     let changed = replace_scalar(
         &source,
@@ -676,7 +696,12 @@ fn x14_expanded_names_and_item_string_values_are_exactly_preserved() {
             .any(|window| { window == b"x14:foreign=\"keep\"" })
     );
     assert_eq!(
-        parse(&changed).unwrap().item_list().unwrap().items()[0].value(),
+        parse(&changed, &Limits::default())
+            .unwrap()
+            .item_list()
+            .unwrap()
+            .items()[0]
+            .value(),
         "  first & \n second  "
     );
 }
@@ -686,8 +711,8 @@ fn opaque_empty_descendants_count_toward_exact_depth_cap() {
     let source = root_with_body(&format!(
         r#"<extLst><c:ext xmlns:c="{CORE_NAMESPACE}"><u:outer xmlns:u="urn:opaque"><u:inner/></u:outer></c:ext></extLst>"#
     ));
-    parse_with_limits(&source, &Limits::new().with_max_depth(5)).unwrap();
-    assert!(parse_with_limits(&source, &Limits::new().with_max_depth(4)).is_err());
+    parse(&source, &Limits::new().with_max_depth(5)).unwrap();
+    assert!(parse(&source, &Limits::new().with_max_depth(4)).is_err());
 }
 
 #[test]
@@ -702,7 +727,7 @@ fn detached_rewrite_materializes_shadowed_default_namespaces_for_opaque_descenda
 </x14:formControlPr>"#
     )
     .into_bytes();
-    let mut properties = parse(&source).unwrap();
+    let mut properties = parse(&source, &Limits::default()).unwrap();
     let root_extension = properties.root_extension_list().unwrap();
     assert!(
         root_extension
@@ -719,8 +744,8 @@ fn detached_rewrite_materializes_shadowed_default_namespaces_for_opaque_descenda
     );
 
     properties.set_no_three_d(Some(true));
-    let output = write(&properties).unwrap();
-    let reopened = parse(&output).unwrap();
+    let output = write(&properties, &Limits::default()).unwrap();
+    let reopened = parse(&output, &Limits::default()).unwrap();
     let output_text = String::from_utf8_lossy(&output);
     assert!(
         output_text.contains(r#"xmlns="urn:root-default""#),
@@ -749,7 +774,7 @@ fn missing_or_foreign_extension_uri_stays_opaque_and_unknown_item_markup_is_not_
 </itemLst>
 <extLst><c:ext xmlns:c="{CORE_NAMESPACE}"><u:payload xmlns:u="urn:payload"><![CDATA[root]]></u:payload></c:ext><x14:ext xmlns:x14="{FORM_CONTROL_NAMESPACE}" uri="foreign"/></extLst>"#
     ));
-    let properties = parse(&source).unwrap();
+    let properties = parse(&source, &Limits::default()).unwrap();
     assert_eq!(properties.item_list().unwrap().items()[0].value(), "one");
     assert!(properties.item_list().unwrap().items()[0].has_opaque_markup());
     assert_eq!(properties.item_list().unwrap().extension_list().unwrap().xml(),
@@ -765,7 +790,7 @@ fn missing_or_foreign_extension_uri_stays_opaque_and_unknown_item_markup_is_not_
             .windows(b"<x14:ext".len())
             .any(|window| window == b"<x14:ext")
     );
-    assert_eq!(write(&properties).unwrap(), source);
+    assert_eq!(write(&properties, &Limits::default()).unwrap(), source);
 
     let changed = replace_scalar(
         &source,
@@ -812,7 +837,7 @@ fn item_replacements_insert_and_remove_preserve_both_extension_lists() {
         ],
     )
     .unwrap();
-    let properties = parse(&replaced).unwrap();
+    let properties = parse(&replaced, &Limits::default()).unwrap();
     let items = properties.item_list().unwrap().items();
     assert_eq!(
         items.iter().map(Item::value).collect::<Vec<_>>(),
@@ -831,12 +856,22 @@ fn item_replacements_insert_and_remove_preserve_both_extension_lists() {
 
     let inserted = insert_item(&source, 1, Item::new("middle").unwrap()).unwrap();
     assert_eq!(
-        parse(&inserted).unwrap().item_list().unwrap().items()[1].value(),
+        parse(&inserted, &Limits::default())
+            .unwrap()
+            .item_list()
+            .unwrap()
+            .items()[1]
+            .value(),
         "middle"
     );
     let removed = remove_item(&inserted, 1).unwrap();
     assert_eq!(
-        parse(&removed).unwrap().item_list().unwrap().items().len(),
+        parse(&removed, &Limits::default())
+            .unwrap()
+            .item_list()
+            .unwrap()
+            .items()
+            .len(),
         2
     );
     assert!(remove_item(&source, 2).is_err());
@@ -893,7 +928,14 @@ fn item_val_is_required_unqualified_string_and_invalid_grammar_is_rejected() {
         String::from_utf8(empty_root()).unwrap()
     )
     .into_bytes();
-    assert_eq!(write(parse(&standalone).unwrap()).unwrap(), standalone);
+    assert_eq!(
+        write(
+            parse(&standalone, &Limits::default()).unwrap(),
+            &Limits::default()
+        )
+        .unwrap(),
+        standalone
+    );
     let embedded = format!(
         "<wrapper>{}</wrapper>",
         String::from_utf8(empty_root()).unwrap()
@@ -906,9 +948,9 @@ fn detached_writer_materializes_x14_namespace_for_opaque_extensions() {
     let source = format!(
         r#"<x14:formControlPr xmlns:x14="{FORM_CONTROL_NAMESPACE}" xmlns:c="{CORE_NAMESPACE}" objectType="Button"><x14:extLst><c:ext uri="urn:opaque"><u:payload xmlns:u="urn:u"><![CDATA[x]]></u:payload></c:ext></x14:extLst></x14:formControlPr>"#
     );
-    let mut properties = parse(source.as_bytes()).unwrap();
+    let mut properties = parse(source.as_bytes(), &Limits::default()).unwrap();
     properties.set_lock_text(Some(true));
-    let output = write(&properties).unwrap();
+    let output = write(&properties, &Limits::default()).unwrap();
     let output_text = String::from_utf8(output.clone()).unwrap();
     assert!(output_text.starts_with(&format!(
         r#"<formControlPr xmlns="{FORM_CONTROL_NAMESPACE}""#
@@ -916,27 +958,28 @@ fn detached_writer_materializes_x14_namespace_for_opaque_extensions() {
     assert!(output_text.contains(&format!(r#"xmlns:x14="{FORM_CONTROL_NAMESPACE}""#)));
     assert!(output_text.contains(&format!(r#"xmlns:c="{CORE_NAMESPACE}""#)));
     assert!(output_text.contains("<![CDATA[x]]>"));
-    assert_eq!(parse(&output).unwrap().lock_text(), Some(true));
+    assert_eq!(
+        parse(&output, &Limits::default()).unwrap().lock_text(),
+        Some(true)
+    );
 }
 
 #[test]
 fn limits_fail_at_one_byte_or_event_under_each_local_ceiling() {
     let empty = empty_root();
-    assert!(
-        parse_with_limits(&empty, &Limits::new().with_max_part_bytes(empty.len() - 1)).is_err()
-    );
-    parse_with_limits(&empty, &Limits::new().with_max_part_bytes(empty.len())).unwrap();
+    assert!(parse(&empty, &Limits::new().with_max_part_bytes(empty.len() - 1)).is_err());
+    parse(&empty, &Limits::new().with_max_part_bytes(empty.len())).unwrap();
 
-    let output = write(Properties::new()).unwrap();
+    let output = write(Properties::new(), &Limits::default()).unwrap();
     assert!(
-        write_with_limits(
+        write(
             Properties::new(),
             &Limits::new().with_max_output_bytes(output.len() - 1)
         )
         .is_err()
     );
     assert_eq!(
-        write_with_limits(
+        write(
             Properties::new(),
             &Limits::new().with_max_output_bytes(output.len())
         )
@@ -945,40 +988,40 @@ fn limits_fail_at_one_byte_or_event_under_each_local_ceiling() {
     );
 
     // An empty root emits exactly one XML event and one EOF event.
-    assert!(parse_with_limits(&empty, &Limits::new().with_max_events(1)).is_err());
-    parse_with_limits(&empty, &Limits::new().with_max_events(2)).unwrap();
-    assert!(parse_with_limits(&empty, &Limits::new().with_max_depth(0)).is_err());
-    parse_with_limits(&empty, &Limits::new().with_max_depth(1)).unwrap();
+    assert!(parse(&empty, &Limits::new().with_max_events(1)).is_err());
+    parse(&empty, &Limits::new().with_max_events(2)).unwrap();
+    assert!(parse(&empty, &Limits::new().with_max_depth(0)).is_err());
+    parse(&empty, &Limits::new().with_max_depth(1)).unwrap();
 
     let one_item = root_with_body("<itemLst><item val=\"abc\"/></itemLst>");
-    assert!(parse_with_limits(&one_item, &Limits::new().with_max_items(0)).is_err());
-    parse_with_limits(&one_item, &Limits::new().with_max_items(1)).unwrap();
-    assert!(parse_with_limits(&one_item, &Limits::new().with_max_item_value_bytes(2)).is_err());
-    parse_with_limits(&one_item, &Limits::new().with_max_item_value_bytes(3)).unwrap();
-    assert!(parse_with_limits(&one_item, &Limits::new().with_max_depth(2)).is_err());
-    parse_with_limits(&one_item, &Limits::new().with_max_depth(3)).unwrap();
+    assert!(parse(&one_item, &Limits::new().with_max_items(0)).is_err());
+    parse(&one_item, &Limits::new().with_max_items(1)).unwrap();
+    assert!(parse(&one_item, &Limits::new().with_max_item_value_bytes(2)).is_err());
+    parse(&one_item, &Limits::new().with_max_item_value_bytes(3)).unwrap();
+    assert!(parse(&one_item, &Limits::new().with_max_depth(2)).is_err());
+    parse(&one_item, &Limits::new().with_max_depth(3)).unwrap();
 
     let one_attribute = empty_root();
-    assert!(parse_with_limits(&one_attribute, &Limits::new().with_max_attributes(0)).is_err());
-    parse_with_limits(&one_attribute, &Limits::new().with_max_attributes(1)).unwrap();
+    assert!(parse(&one_attribute, &Limits::new().with_max_attributes(0)).is_err());
+    parse(&one_attribute, &Limits::new().with_max_attributes(1)).unwrap();
 
     let opaque = root_with_body(&format!(
         r#"<extLst><c:ext xmlns:c="{CORE_NAMESPACE}" uri="urn:opaque"><u:p xmlns:u="urn:p">payload larger than the namespace URI</u:p></c:ext></extLst>"#
     ));
-    let opaque_len = parse(&opaque)
+    let opaque_len = parse(&opaque, &Limits::default())
         .unwrap()
         .root_extension_list()
         .unwrap()
         .xml()
         .len();
     assert!(
-        parse_with_limits(
+        parse(
             &opaque,
             &Limits::new().with_max_opaque_bytes(opaque_len - 1)
         )
         .is_err()
     );
-    parse_with_limits(&opaque, &Limits::new().with_max_opaque_bytes(opaque_len)).unwrap();
+    parse(&opaque, &Limits::new().with_max_opaque_bytes(opaque_len)).unwrap();
 }
 
 #[test]
@@ -988,8 +1031,11 @@ fn scalar_attribute_insertion_reserves_the_full_candidate() {
     let expected = replace_scalar(&source, ScalarField::LockText, Some(value.clone())).unwrap();
     assert!(expected.len() > source.len());
 
-    let exact =
-        inspect_with_limits(&source, Limits::new().with_max_output_bytes(expected.len())).unwrap();
+    let exact = inspect(
+        &source,
+        &Limits::new().with_max_output_bytes(expected.len()),
+    )
+    .unwrap();
     assert_eq!(
         exact
             .replace_scalar(ScalarField::LockText, Some(value.clone()))
@@ -997,9 +1043,9 @@ fn scalar_attribute_insertion_reserves_the_full_candidate() {
         expected
     );
 
-    let under = inspect_with_limits(
+    let under = inspect(
         &source,
-        Limits::new().with_max_output_bytes(expected.len() - 1),
+        &Limits::new().with_max_output_bytes(expected.len() - 1),
     )
     .unwrap();
     assert!(
@@ -1015,10 +1061,10 @@ fn formula_multisel_and_generated_output_limits_have_exact_boundaries() {
         r#"<formControlPr xmlns="{FORM_CONTROL_NAMESPACE}" objectType="List" fmlaLink="Sheet1!$A$1" seltype="multi" multiSel="1, 3"/>"#
     )
     .into_bytes();
-    let view = inspect(&source).unwrap();
+    let view = inspect(&source, &Limits::default()).unwrap();
     let source_len = source.len();
     assert_eq!(
-        write_with_limits(
+        write(
             view.properties(),
             &Limits::new().with_max_output_bytes(source_len)
         )
@@ -1026,20 +1072,20 @@ fn formula_multisel_and_generated_output_limits_have_exact_boundaries() {
         source
     );
     assert!(
-        write_with_limits(
+        write(
             view.properties(),
             &Limits::new().with_max_output_bytes(source_len - 1)
         )
         .is_err()
     );
 
-    let mut properties = parse(&source).unwrap();
+    let mut properties = parse(&source, &Limits::default()).unwrap();
     properties.set_no_three_d(Some(true));
-    let output = write(&properties).unwrap();
+    let output = write(&properties, &Limits::default()).unwrap();
     assert!(String::from_utf8_lossy(&output).contains("Sheet1!$A$1"));
     assert!(String::from_utf8_lossy(&output).contains("multiSel=\"1, 3\""));
     assert_eq!(
-        write_with_limits(
+        write(
             &properties,
             &Limits::new().with_max_output_bytes(output.len())
         )
@@ -1047,7 +1093,7 @@ fn formula_multisel_and_generated_output_limits_have_exact_boundaries() {
         output
     );
     assert!(
-        write_with_limits(
+        write(
             &properties,
             &Limits::new().with_max_output_bytes(output.len() - 1)
         )
@@ -1064,30 +1110,30 @@ fn retained_source_and_opaque_bytes_are_precharged_once_at_boundary() {
     // budget for this source-backed opaque extension.
     let parse_required = minimum_parse_retained_limit(&source);
     assert!(parse_required > 0);
-    parse_with_limits(
+    parse(
         &source,
         &Limits::new().with_max_retained_bytes(parse_required),
     )
     .unwrap();
     assert_retained_limit(
-        parse_with_limits(
+        parse(
             &source,
             &Limits::new().with_max_retained_bytes(parse_required - 1),
         ),
         parse_required - 1,
     );
 
-    let mut dirty = parse(&source).unwrap();
+    let mut dirty = parse(&source, &Limits::default()).unwrap();
     dirty.set_just_last_x(Some(true));
     let dirty_required = minimum_write_retained_limit(&dirty);
     assert_eq!(dirty_required, parse_required);
-    write_with_limits(
+    write(
         &dirty,
         &Limits::new().with_max_retained_bytes(parse_required),
     )
     .unwrap();
     assert_retained_limit(
-        write_with_limits(
+        write(
             &dirty,
             &Limits::new().with_max_retained_bytes(parse_required - 1),
         ),
@@ -1099,13 +1145,13 @@ fn retained_source_and_opaque_bytes_are_precharged_once_at_boundary() {
     detached.set_root_extension_list(Some(OpaqueXml::new(fragment.clone()).unwrap()));
     let detached_required = minimum_write_retained_limit(&detached);
     assert!(detached_required > 0);
-    write_with_limits(
+    write(
         &detached,
         &Limits::new().with_max_retained_bytes(detached_required),
     )
     .unwrap();
     assert_retained_limit(
-        write_with_limits(
+        write(
             &detached,
             &Limits::new().with_max_retained_bytes(detached_required - 1),
         ),
@@ -1122,9 +1168,14 @@ fn xml10_character_boundaries_cover_items_scalar_strings_and_formulas() {
     let mut properties = Properties::new();
     properties.set_object_type(Some(ObjectType::List));
     properties.set_item_list(Some(item_list)).unwrap();
-    let output = write(&properties).unwrap();
+    let output = write(&properties, &Limits::default()).unwrap();
     assert_eq!(
-        parse(&output).unwrap().item_list().unwrap().items()[0].value(),
+        parse(&output, &Limits::default())
+            .unwrap()
+            .item_list()
+            .unwrap()
+            .items()[0]
+            .value(),
         item_value
     );
 
@@ -1132,17 +1183,24 @@ fn xml10_character_boundaries_cover_items_scalar_strings_and_formulas() {
     let scalar_source =
         format!(r#"<formControlPr xmlns="{FORM_CONTROL_NAMESPACE}" textHAlign="{scalar_value}"/>"#)
             .into_bytes();
-    let scalar_properties = parse(&scalar_source).unwrap();
+    let scalar_properties = parse(&scalar_source, &Limits::default()).unwrap();
     assert_eq!(
         known_token(scalar_properties.text_h_align()),
         Some(scalar_value.clone())
     );
-    assert_eq!(write(&scalar_properties).unwrap(), scalar_source);
+    assert_eq!(
+        write(&scalar_properties, &Limits::default()).unwrap(),
+        scalar_source
+    );
     let mut scalar_changed = scalar_properties.clone();
     scalar_changed.set_just_last_x(Some(true));
-    let detached_scalar = write(&scalar_changed).unwrap();
+    let detached_scalar = write(&scalar_changed, &Limits::default()).unwrap();
     assert_eq!(
-        known_token(parse(&detached_scalar).unwrap().text_h_align()),
+        known_token(
+            parse(&detached_scalar, &Limits::default())
+                .unwrap()
+                .text_h_align()
+        ),
         Some(scalar_value.clone())
     );
 
@@ -1150,14 +1208,17 @@ fn xml10_character_boundaries_cover_items_scalar_strings_and_formulas() {
     let formula_source =
         format!(r#"<formControlPr xmlns="{FORM_CONTROL_NAMESPACE}" fmlaLink="{formula_value}"/>"#)
             .into_bytes();
-    let formula_properties = parse(&formula_source).unwrap();
+    let formula_properties = parse(&formula_source, &Limits::default()).unwrap();
     assert_eq!(
         formula_properties
             .fmla_link()
             .map(FormControlFormula::as_str),
         Some(formula_value.as_str())
     );
-    assert_eq!(write(&formula_properties).unwrap(), formula_source);
+    assert_eq!(
+        write(&formula_properties, &Limits::default()).unwrap(),
+        formula_source
+    );
     assert!(
         FormControlFormula::new(formula_value).is_err(),
         "formula grammar may reject DEL independently of XML character validity"
@@ -1179,7 +1240,7 @@ fn xml10_character_boundaries_cover_items_scalar_strings_and_formulas() {
             r#"<formControlPr xmlns="{FORM_CONTROL_NAMESPACE}" textHAlign="left{character}"/>"#
         );
         assert!(
-            parse(scalar.as_bytes()).is_err(),
+            parse(scalar.as_bytes(), &Limits::default()).is_err(),
             "scalar string accepted XML-invalid U+{:04X}",
             character as u32
         );
@@ -1187,7 +1248,7 @@ fn xml10_character_boundaries_cover_items_scalar_strings_and_formulas() {
             r#"<formControlPr xmlns="{FORM_CONTROL_NAMESPACE}" fmlaLink="A1{character}"/>"#
         );
         assert!(
-            parse(formula.as_bytes()).is_err(),
+            parse(formula.as_bytes(), &Limits::default()).is_err(),
             "formula source accepted XML-invalid U+{:04X}",
             character as u32
         );
@@ -1206,7 +1267,11 @@ fn typed_formula_setters_do_not_introduce_ref_errors() {
     )
     .unwrap();
     assert_eq!(
-        parse(&changed).unwrap().fmla_link().unwrap().as_str(),
+        parse(&changed, &Limits::default())
+            .unwrap()
+            .fmla_link()
+            .unwrap()
+            .as_str(),
         "#REF!"
     );
 
@@ -1218,7 +1283,11 @@ fn typed_formula_setters_do_not_introduce_ref_errors() {
     )
     .unwrap();
     assert_eq!(
-        parse(&output).unwrap().fmla_link().unwrap().as_str(),
+        parse(&output, &Limits::default())
+            .unwrap()
+            .fmla_link()
+            .unwrap()
+            .as_str(),
         "Sheet1!$A$1"
     );
 }

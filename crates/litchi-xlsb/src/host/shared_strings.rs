@@ -18,7 +18,7 @@
 
 use crate::package::error::{Error, Result};
 use crate::package::records::decode_string_with;
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use litchi_core::binary;
 
 /// A font change within an XLSB shared string.
@@ -134,12 +134,13 @@ pub struct SharedString {
 }
 
 impl SharedString {
-    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(data: &[u8], raw_limits: crate::raw::Limits) -> Result<Self> {
         Self::parse_with(
             data,
             &mut crate::leniency::Tolerance::refusing(),
             crate::raw::kind::SST_ITEM,
             0,
+            raw_limits,
         )
     }
 
@@ -150,6 +151,7 @@ impl SharedString {
         tolerance: &mut crate::leniency::Tolerance<'_>,
         record_type: crate::raw::Kind,
         location: u32,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::InvalidLength {
@@ -159,12 +161,13 @@ impl SharedString {
         }
         let rich = data[0] & 1 != 0;
         let extended = data[0] & 2 != 0;
-        let (text, consumed) = decode_string_with(&data[1..], tolerance, record_type, location)?;
+        let (text, consumed) =
+            decode_string_with(&data[1..], tolerance, record_type, location, raw_limits)?;
         let text_len = text.encode_utf16().count();
         if text_len > 0x7FFF {
             return Err(Error::Unrecognized {
-                typ: "RichStr text length".to_string(),
-                val: text_len.to_string(),
+                typ: "RichStr text length",
+                val: "unexpected value",
             });
         }
         let mut offset = 1 + consumed;
@@ -173,10 +176,10 @@ impl SharedString {
             let count = Self::read_count(data, &mut offset, "StrRun")?;
             let byte_count = count
                 .checked_mul(4)
-                .ok_or_else(|| Error::Encoding("StrRun byte count overflow".to_string()))?;
+                .ok_or(Error::Encoding("StrRun byte count overflow"))?;
             let end = offset
                 .checked_add(byte_count)
-                .ok_or_else(|| Error::Encoding("StrRun offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("StrRun offset overflow"))?;
             if end > data.len() {
                 return Err(Error::InvalidLength {
                     expected: end,
@@ -191,8 +194,8 @@ impl SharedString {
                     || previous.is_some_and(|value| character_index <= value)
                 {
                     return Err(Error::Unrecognized {
-                        typ: "StrRun ich".to_string(),
-                        val: character_index.to_string(),
+                        typ: "StrRun ich",
+                        val: "unexpected value",
                     });
                 }
                 previous = Some(character_index);
@@ -205,20 +208,25 @@ impl SharedString {
         }
 
         let phonetic = if extended {
-            let (phonetic_text, consumed) =
-                decode_string_with(&data[offset..], tolerance, record_type, location)?;
+            let (phonetic_text, consumed) = decode_string_with(
+                &data[offset..],
+                tolerance,
+                record_type,
+                location,
+                raw_limits,
+            )?;
             offset += consumed;
             let phonetic_len = phonetic_text.encode_utf16().count();
             let count = Self::read_count(data, &mut offset, "PhRun")?;
             let byte_count = count
                 .checked_mul(6)
-                .ok_or_else(|| Error::Encoding("PhRun byte count overflow".to_string()))?;
+                .ok_or(Error::Encoding("PhRun byte count overflow"))?;
             let runs_end = offset
                 .checked_add(byte_count)
-                .ok_or_else(|| Error::Encoding("PhRun offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("PhRun offset overflow"))?;
             let end = runs_end
                 .checked_add(4)
-                .ok_or_else(|| Error::Encoding("phonetic settings offset overflow".to_string()))?;
+                .ok_or(Error::Encoding("phonetic settings offset overflow"))?;
             if end > data.len() {
                 return Err(Error::InvalidLength {
                     expected: end,
@@ -234,7 +242,7 @@ impl SharedString {
                 let base_character_count = binary::read_u16_le_at(chunk, 4)?;
                 let base_end = usize::from(base_character_index)
                     .checked_add(usize::from(base_character_count))
-                    .ok_or_else(|| Error::Encoding("PhRun range overflow".to_string()))?;
+                    .ok_or(Error::Encoding("PhRun range overflow"))?;
                 if usize::from(phonetic_character_index) >= phonetic_len
                     || usize::from(base_character_index) >= text_len
                     || base_end > text_len
@@ -243,8 +251,8 @@ impl SharedString {
                         .is_some_and(|value| usize::from(base_character_index) < value)
                 {
                     return Err(Error::Unrecognized {
-                        typ: "PhRun index".to_string(),
-                        val: format!("{phonetic_character_index}/{base_character_index}"),
+                        typ: "PhRun index",
+                        val: "/",
                     });
                 }
                 previous_phonetic = Some(phonetic_character_index);
@@ -270,8 +278,8 @@ impl SharedString {
         };
         if offset != data.len() {
             return Err(Error::Unrecognized {
-                typ: "RichStr".to_string(),
-                val: format!("{} trailing bytes", data.len() - offset),
+                typ: "RichStr",
+                val: "trailing bytes",
             });
         }
         Ok(Self {
@@ -281,8 +289,9 @@ impl SharedString {
         })
     }
 
-    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
+    pub(crate) fn encode(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         self.validate()?;
+        limits.validate()?;
         let mut data = Vec::new();
         let mut flags = 0_u8;
         if !self.runs.is_empty() {
@@ -292,11 +301,10 @@ impl SharedString {
             flags |= 2;
         }
         data.push(flags);
-        Writer::new(&mut data).write_wide_string(&self.text)?;
+        Encoder::new(&mut data, limits).write_wide_string(&self.text)?;
         if !self.runs.is_empty() {
-            let count = u32::try_from(self.runs.len()).map_err(|_| {
-                Error::Encoding("shared-string formatting-run count overflow".to_string())
-            })?;
+            let count = u32::try_from(self.runs.len())
+                .map_err(|_| Error::Encoding("shared-string formatting-run count overflow"))?;
             data.extend_from_slice(&count.to_le_bytes());
             for run in &self.runs {
                 data.extend_from_slice(&run.character_index.to_le_bytes());
@@ -304,10 +312,9 @@ impl SharedString {
             }
         }
         if let Some(phonetic) = &self.phonetic {
-            Writer::new(&mut data).write_wide_string(&phonetic.text)?;
-            let count = u32::try_from(phonetic.runs.len()).map_err(|_| {
-                Error::Encoding("shared-string phonetic-run count overflow".to_string())
-            })?;
+            Encoder::new(&mut data, limits).write_wide_string(&phonetic.text)?;
+            let count = u32::try_from(phonetic.runs.len())
+                .map_err(|_| Error::Encoding("shared-string phonetic-run count overflow"))?;
             data.extend_from_slice(&count.to_le_bytes());
             for run in &phonetic.runs {
                 data.extend_from_slice(&run.phonetic_character_index.to_le_bytes());
@@ -325,14 +332,14 @@ impl SharedString {
         let text_len = self.text.encode_utf16().count();
         if text_len > 0x7FFF {
             return Err(Error::Unrecognized {
-                typ: "RichStr text length".to_string(),
-                val: text_len.to_string(),
+                typ: "RichStr text length",
+                val: "unexpected value",
             });
         }
         if self.runs.len() > 0x7FFF {
             return Err(Error::Unrecognized {
-                typ: "StrRun count".to_string(),
-                val: self.runs.len().to_string(),
+                typ: "StrRun count",
+                val: "unexpected value",
             });
         }
         let mut previous = None;
@@ -341,8 +348,8 @@ impl SharedString {
                 || previous.is_some_and(|value| run.character_index <= value)
             {
                 return Err(Error::Unrecognized {
-                    typ: "StrRun ich".to_string(),
-                    val: run.character_index.to_string(),
+                    typ: "StrRun ich",
+                    val: "unexpected value",
                 });
             }
             previous = Some(run.character_index);
@@ -357,8 +364,8 @@ impl SharedString {
         let phonetic_len = phonetic.text.encode_utf16().count();
         if phonetic_len > 0x7FFF || phonetic.runs.len() > 0x7FFF {
             return Err(Error::Unrecognized {
-                typ: "PhRun count/text".to_string(),
-                val: format!("{}/{}", phonetic.runs.len(), phonetic_len),
+                typ: "PhRun count/text",
+                val: "/",
             });
         }
         let mut previous_phonetic = None;
@@ -366,7 +373,7 @@ impl SharedString {
         for run in &phonetic.runs {
             let base_end = usize::from(run.base_character_index)
                 .checked_add(usize::from(run.base_character_count))
-                .ok_or_else(|| Error::Encoding("PhRun range overflow".to_string()))?;
+                .ok_or(Error::Encoding("PhRun range overflow"))?;
             if usize::from(run.phonetic_character_index) >= phonetic_len
                 || usize::from(run.base_character_index) >= text_len
                 || base_end > text_len
@@ -375,11 +382,8 @@ impl SharedString {
                     .is_some_and(|value| usize::from(run.base_character_index) < value)
             {
                 return Err(Error::Unrecognized {
-                    typ: "PhRun index".to_string(),
-                    val: format!(
-                        "{}/{}",
-                        run.phonetic_character_index, run.base_character_index
-                    ),
+                    typ: "PhRun index",
+                    val: "/",
                 });
             }
             previous_phonetic = Some(run.phonetic_character_index);
@@ -388,26 +392,23 @@ impl SharedString {
         Ok(())
     }
 
-    fn read_count(data: &[u8], offset: &mut usize, context: &str) -> Result<usize> {
+    fn read_count(data: &[u8], offset: &mut usize, _context: &str) -> Result<usize> {
         let end = offset
             .checked_add(4)
-            .ok_or_else(|| Error::Encoding(format!("{context} count offset overflow")))?;
+            .ok_or(Error::Encoding("count offset overflow"))?;
         if end > data.len() {
             return Err(Error::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
         }
-        let count = usize::try_from(binary::read_u32_le_at(data, *offset)?).map_err(|error| {
-            Error::Encoding(format!(
-                "{context} count does not fit this platform: {error}"
-            ))
-        })?;
+        let count = usize::try_from(binary::read_u32_le_at(data, *offset)?)
+            .map_err(|_error| Error::Encoding("count does not fit this platform"))?;
         *offset = end;
         if count > 0x7FFF {
             return Err(Error::Unrecognized {
-                typ: format!("{context} count"),
-                val: count.to_string(),
+                typ: "count",
+                val: "unexpected value",
             });
         }
         Ok(count)
@@ -431,7 +432,7 @@ mod tests {
         data.extend_from_slice(&[0, 0, 0, 0, 2, 0]);
         data.extend_from_slice(&[3, 0, 6, 0]);
 
-        let value = SharedString::parse(&data).unwrap();
+        let value = SharedString::parse(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(value.text, "AB");
         assert_eq!(value.runs.len(), 2);
         assert_eq!(value.runs[1].font_id, 2);
@@ -467,7 +468,10 @@ mod tests {
                 alignment: PhoneticAlignment::Distributed,
             }),
         };
-        let encoded = value.encode().unwrap();
-        assert_eq!(SharedString::parse(&encoded).unwrap(), value);
+        let encoded = value.encode(crate::raw::Limits::DEFAULT).unwrap();
+        assert_eq!(
+            SharedString::parse(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+            value
+        );
     }
 }

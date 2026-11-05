@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn test_add_table() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx = writer.add_table(2, 3).unwrap();
     assert_eq!(idx, 0);
     assert_eq!(writer.tables[0].rows.len(), 2);
@@ -11,7 +11,7 @@ fn test_add_table() {
 
 #[test]
 fn test_set_table_cell() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx = writer.add_table(2, 2).unwrap();
     writer.set_table_cell_text(idx, 0, 0, "Cell").unwrap();
     assert_eq!(
@@ -22,7 +22,7 @@ fn test_set_table_cell() {
 
 #[test]
 fn test_set_table_cell_multiple() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx = writer.add_table(2, 2).unwrap();
     writer.set_table_cell_text(idx, 0, 0, "A").unwrap();
     writer.set_table_cell_text(idx, 0, 1, "B").unwrap();

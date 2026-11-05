@@ -1,18 +1,19 @@
 //! Concise entry point for checked `OfficeArt` record traversal.
 
-use crate::{Children, Container, Record, RecordKind, Result};
+use crate::{Children, Container, Limits, Record, RecordKind, Result};
 
 /// A zero-copy parser over one `OfficeArt` drawing stream.
 #[derive(Debug, Clone, Copy)]
 pub struct Parser<'data> {
     data: &'data [u8],
+    limits: Limits,
 }
 
 impl<'data> Parser<'data> {
     /// Borrows an `OfficeArt` drawing stream.
     #[must_use]
-    pub const fn new(data: &'data [u8]) -> Self {
-        Self { data }
+    pub const fn new(data: &'data [u8], limits: Limits) -> Self {
+        Self { data, limits }
     }
 
     /// Returns the original drawing bytes.
@@ -36,7 +37,7 @@ impl<'data> Parser<'data> {
         if self.data.is_empty() {
             return Ok(None);
         }
-        let (record, consumed) = Record::parse(self.data, 0)?;
+        let (record, consumed) = Record::parse(self.data, 0, self.limits)?;
         if consumed != self.data.len() {
             return Err(crate::Error::TrailingData { offset: consumed });
         }
@@ -50,7 +51,7 @@ impl<'data> Parser<'data> {
     /// Lazily parses the top-level record sequence.
     #[must_use]
     pub const fn records(&self) -> Children<'data> {
-        Children::new(self.data)
+        Children::new(self.data, self.limits)
     }
 
     /// Collects every shape container below the root container.
@@ -59,10 +60,10 @@ impl<'data> Parser<'data> {
     ///
     /// Returns an error from `Parser::root` if the stream is malformed, or from
     /// `Container::find_recursive` if a descendant record is malformed or the
-    /// default traversal limits are exceeded.
-    pub fn shapes(&self) -> Result<Vec<Record<'data>>> {
+    /// caller traversal limits are exceeded.
+    pub fn shapes(&self, limits: Limits) -> Result<Vec<Record<'data>>> {
         match self.root()? {
-            Some(root) => root.find_recursive(RecordKind::SpContainer),
+            Some(root) => root.find_recursive(RecordKind::SpContainer, limits),
             None => Ok(Vec::new()),
         }
     }
@@ -73,18 +74,12 @@ impl<'data> Parser<'data> {
     ///
     /// Returns an error from `Parser::root` if the stream is malformed, or from
     /// `Container::find_recursive` if a descendant record is malformed or the
-    /// default traversal limits are exceeded.
-    pub fn textboxes(&self) -> Result<Vec<Record<'data>>> {
+    /// caller traversal limits are exceeded.
+    pub fn textboxes(&self, limits: Limits) -> Result<Vec<Record<'data>>> {
         match self.root()? {
-            Some(root) => root.find_recursive(RecordKind::ClientTextbox),
+            Some(root) => root.find_recursive(RecordKind::ClientTextbox, limits),
             None => Ok(Vec::new()),
         }
-    }
-}
-
-impl<'data> From<&'data [u8]> for Parser<'data> {
-    fn from(data: &'data [u8]) -> Self {
-        Self::new(data)
     }
 }
 
@@ -100,7 +95,7 @@ mod tests {
     #[test]
     fn parses_a_root_container() {
         let bytes = [0x0F, 0x00, 0x02, 0xF0, 0, 0, 0, 0];
-        let parser = Parser::new(&bytes);
+        let parser = Parser::new(&bytes, Limits::default());
         let root = parser.root().expect("valid stream").expect("container");
 
         assert_eq!(root.record().kind(), RecordKind::DgContainer);
@@ -108,7 +103,7 @@ mod tests {
 
     #[test]
     fn malformed_root_is_an_error() {
-        let parser = Parser::new(&[0x0F, 0x00, 0x02]);
+        let parser = Parser::new(&[0x0F, 0x00, 0x02], Limits::default());
 
         assert!(matches!(
             parser.root(),
@@ -123,9 +118,9 @@ mod tests {
         ];
 
         assert!(matches!(
-            Parser::new(&bytes).root(),
+            Parser::new(&bytes, Limits::default()).root(),
             Err(crate::Error::TrailingData { offset: 8 })
         ));
-        assert_eq!(Parser::new(&bytes).records().count(), 2);
+        assert_eq!(Parser::new(&bytes, Limits::default()).records().count(), 2);
     }
 }

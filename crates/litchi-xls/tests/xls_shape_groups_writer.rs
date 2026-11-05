@@ -2,18 +2,19 @@ use std::io::Cursor;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use litchi_odraw::shape::Kind;
+use litchi_xls::AnchorBehavior;
 use litchi_xls::shapes::extract_shapes_from_workbook;
-use litchi_xls::writer::shape::{Anchor, Behavior, Point, Rect};
+use litchi_xls::writer::shape::{Anchor, Point, Rect};
 use litchi_xls::writer::{
-    ShapeColor, ShapeFill, ShapeGroupChild, ShapeGroupWrite, ShapeKind, ShapeLine, ShapeText,
-    ShapeWrite, Writer,
+    Builder, ShapeColor, ShapeFill, ShapeGroupChild, ShapeGroupWrite, ShapeKind, ShapeLine,
+    ShapeText, ShapeWrite,
 };
 
 fn anchor() -> Anchor {
     Anchor::new(
         Point::new(1, 1).unwrap().offset(20, 10).unwrap(),
         Point::new(9, 6).unwrap().offset(200, 900).unwrap(),
-        Behavior::MoveAndSize,
+        AnchorBehavior::Absolute,
     )
     .unwrap()
 }
@@ -34,7 +35,9 @@ fn group_with_children() -> ShapeGroupWrite {
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 
@@ -53,15 +56,15 @@ fn records(stream: &[u8]) -> Vec<(u16, Vec<u8>)> {
     records
 }
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     workbook_stream(output.into_inner())
 }
 
 #[test]
 fn grouped_shapes_emit_exact_record_order_and_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Groups").unwrap();
 
     let standalone = ShapeWrite::new(ShapeKind::Rectangle, anchor());
@@ -189,7 +192,7 @@ fn grouped_shapes_emit_exact_record_order_and_round_trip() {
 
 #[test]
 fn group_object_ids_are_collision_free_across_primitives_and_groups() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Ids").unwrap();
 
     let mut group = group_with_children();
@@ -228,7 +231,7 @@ fn group_object_ids_are_collision_free_across_primitives_and_groups() {
 
 #[test]
 fn automatic_group_ids_skip_ids_requested_by_later_children() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Requested").unwrap();
     let mut group = group_with_children();
     group.children[0].object_id = Some(1);
@@ -245,7 +248,7 @@ fn automatic_group_ids_skip_ids_requested_by_later_children() {
 
 #[test]
 fn group_mutations_reject_malformed_input_and_are_atomic() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
 
     // Structurally invalid groups never partially register.

@@ -12,8 +12,8 @@ use super::super::model::{OpaqueRunContent, Run, RunContent, XmlRef};
 use super::text::extract_word_text;
 use super::xml::{is_fragment_word_name, word_attribute_value};
 
-const MAX_RUN_CONTENT_DEPTH: usize = 128;
-const MAX_RUN_CONTENT_NODES: usize = 1_000_000;
+pub(super) const MAX_RUN_CONTENT_DEPTH: usize = 128;
+pub(super) const MAX_RUN_CONTENT_NODES: usize = 1_000_000;
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -49,6 +49,16 @@ impl Run {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml);
+        for (prefix, namespace) in self.inherited_namespaces()?.iter() {
+            let prefix = prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            );
+            reader
+                .resolver_mut()
+                .add(prefix, quick_xml::name::Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited run namespace".into()))?;
+        }
         let origin = ReaderOrigin::of(xml);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut run_depth = None;
@@ -99,12 +109,14 @@ impl Run {
                                 "run fragment contains multiple roots".into(),
                             ));
                         }
-                        fragment_prefix = Some(
-                            element
-                                .name()
-                                .prefix()
-                                .map(|prefix| prefix.into_inner().to_vec()),
-                        );
+                        if !matches!(namespace, quick_xml::name::ResolveResult::Bound(_)) {
+                            fragment_prefix = Some(
+                                element
+                                    .name()
+                                    .prefix()
+                                    .map(|prefix| prefix.into_inner().to_vec()),
+                            );
+                        }
                         if is_fragment_word_name(&namespace, element.name(), b"r", &fragment_prefix)
                         {
                             run_depth = Some(depth);
@@ -129,18 +141,25 @@ impl Run {
                     let child_depth = depth.checked_add(1).ok_or_else(|| {
                         Error::InvalidFormat("Word run nesting is too deep".into())
                     })?;
+                    if child_depth > MAX_RUN_CONTENT_DEPTH {
+                        return Err(Error::InvalidFormat(format!(
+                            "Word run nesting exceeds the {MAX_RUN_CONTENT_DEPTH} depth limit"
+                        )));
+                    }
                     if child_depth == 1 && element.local_name().as_ref() == b"r" {
                         if saw_run {
                             return Err(Error::InvalidFormat(
                                 "run fragment contains multiple roots".into(),
                             ));
                         }
-                        fragment_prefix = Some(
-                            element
-                                .name()
-                                .prefix()
-                                .map(|prefix| prefix.into_inner().to_vec()),
-                        );
+                        if !matches!(namespace, quick_xml::name::ResolveResult::Bound(_)) {
+                            fragment_prefix = Some(
+                                element
+                                    .name()
+                                    .prefix()
+                                    .map(|prefix| prefix.into_inner().to_vec()),
+                            );
+                        }
                         if is_fragment_word_name(&namespace, element.name(), b"r", &fragment_prefix)
                         {
                             saw_run = true;
@@ -160,6 +179,7 @@ impl Run {
                             event_start,
                             event_end,
                             &fragment_prefix,
+                            reader.resolver(),
                         )?;
                     }
                 },
@@ -174,6 +194,7 @@ impl Run {
                             start,
                             event_end,
                             &fragment_prefix,
+                            reader.resolver(),
                         )?;
                         capture = None;
                     }
@@ -251,6 +272,7 @@ fn push_content(
     start: usize,
     end: usize,
     fragment_prefix: &Option<Option<Vec<u8>>>,
+    resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<()> {
     let relative_start = u32::try_from(start).map_err(|_conversion_error| {
         Error::InvalidFormat("Word run-child offset exceeds u32".into())
@@ -267,15 +289,24 @@ fn push_content(
         .ok_or_else(|| Error::InvalidFormat("Word run-child range is outside source".into()))?;
     let raw = range.bytes();
 
+    if matches!(
+        kind,
+        Kind::Tab
+            | Kind::CarriageReturn
+            | Kind::NoBreakHyphen
+            | Kind::SoftHyphen
+            | Kind::FootnoteMark
+            | Kind::EndnoteMark
+    ) {
+        scalar_element(raw)?;
+    }
+
     match kind {
         Kind::Text => contents.push(RunContent::Text(extract_word_text(raw)?)),
         Kind::Tab => contents.push(RunContent::Tab),
         Kind::Break => {
-            let breaks = Run::new(raw.to_vec()).breaks()?;
-            let run_break = breaks
-                .first()
-                .copied()
-                .ok_or_else(|| Error::InvalidFormat("Word break fragment has no break".into()))?;
+            let (element, decoder) = scalar_element(raw)?;
+            let run_break = super::run::parse_break(&element, decoder, resolver, fragment_prefix)?;
             contents.push(RunContent::Break(run_break));
         },
         Kind::CarriageReturn => contents.push(RunContent::CarriageReturn),
@@ -300,9 +331,14 @@ fn push_content(
         Kind::FootnoteReference => contents.push(RunContent::FootnoteReference(note_id(
             raw,
             fragment_prefix,
+            resolver,
         )?)),
         Kind::EndnoteReference => {
-            contents.push(RunContent::EndnoteReference(note_id(raw, fragment_prefix)?));
+            contents.push(RunContent::EndnoteReference(note_id(
+                raw,
+                fragment_prefix,
+                resolver,
+            )?));
         },
         Kind::FootnoteMark => contents.push(RunContent::FootnoteMark),
         Kind::EndnoteMark => contents.push(RunContent::EndnoteMark),
@@ -316,45 +352,54 @@ fn push_content(
     clippy::ref_option,
     reason = "three states distinguish unobserved, unprefixed, and prefixed XML fragments"
 )]
-fn note_id(raw: &[u8], fragment_prefix: &Option<Option<Vec<u8>>>) -> Result<u32> {
-    let mut reader = NsReader::from_reader(raw);
+fn note_id(
+    raw: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<u32> {
+    let (element, decoder) = scalar_element(raw)?;
+    let value = word_attribute_value(&element, b"id", decoder, resolver, fragment_prefix)?
+        .ok_or_else(|| Error::InvalidFormat("Word note reference is missing w:id".into()))?;
+    value.parse::<u32>().map_err(|_| {
+        Error::InvalidFormat("Word note reference id is not a non-negative u32".into())
+    })
+}
+
+/// Empty schema elements may use paired tags, whitespace and inert comments,
+/// but never nested elements or authored payload that the typed value would lose.
+fn scalar_element(
+    raw: &[u8],
+) -> Result<(
+    quick_xml::events::BytesStart<'_>,
+    quick_xml::encoding::Decoder,
+)> {
+    let mut reader = quick_xml::Reader::from_reader(raw);
+    let (element, mut closed) = match reader
+        .read_event()
+        .map_err(|error| Error::Xml(error.to_string()))?
+    {
+        Event::Start(element) => (element, false),
+        Event::Empty(element) => (element, true),
+        _ => {
+            return Err(Error::InvalidFormat(
+                "Word scalar child has no element".into(),
+            ));
+        },
+    };
     loop {
-        let event = reader
+        match reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
-            .into_owned();
-        let resolver = reader.resolver();
-        match event {
-            Event::Start(element) | Event::Empty(element) => {
-                let value = word_attribute_value(
-                    &element,
-                    b"id",
-                    reader.decoder(),
-                    resolver,
-                    fragment_prefix,
-                )?
-                .ok_or_else(|| {
-                    Error::InvalidFormat("Word note reference is missing w:id".into())
-                })?;
-                return value.parse::<u32>().map_err(|_parse_error| {
-                    Error::InvalidFormat(format!(
-                        "Word note reference id '{value}' is not a non-negative u32"
-                    ))
-                });
-            },
-            Event::Eof => {
+        {
+            Event::End(_) if !closed => closed = true,
+            Event::Eof if closed => return Ok((element, reader.decoder())),
+            Event::Comment(_) | Event::PI(_) => {},
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            _ => {
                 return Err(Error::InvalidFormat(
-                    "Word note reference has no element".into(),
+                    "Word scalar child contains unexpected content".into(),
                 ));
             },
-            Event::End(_)
-            | Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
         }
     }
 }

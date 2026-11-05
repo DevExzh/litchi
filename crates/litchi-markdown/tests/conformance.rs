@@ -4,7 +4,9 @@
 //! They are organized by normative syntax family but do not claim provenance
 //! from, or verbatim identity with, any external/network corpus.
 
-use litchi_markdown::reader::{BlockKind, Dialect, Error, InlineKind, ReadLimits, Snapshot};
+use litchi_markdown::reader::{
+    BlockKind, Dialect, Error, InlineKind, OpenOptions, ReadLimits, Snapshot,
+};
 
 const COMMONMARK_BLOCKS: &[(&str, BlockKind)] = &[
     ("plain", BlockKind::Paragraph),
@@ -104,7 +106,7 @@ fn authored_inline_goldens_retain_delimiter_ranges() -> Result<(), Error> {
             .any(|inline| inline.kind() == expected && &source[inline.range()] == inline.source());
         assert!(found, "missing {expected:?} in {source:?}");
     }
-    let gfm = Snapshot::read_with(
+    let gfm = read_with_policy(
         "~~gone~~ [^note]\n\n[^note]: retained",
         Dialect::GitHubFlavored,
         ReadLimits::DEFAULT,
@@ -149,11 +151,18 @@ fn generated_cross_product_corpus_is_stable_and_bounded() -> Result<(), Error> {
 }
 
 fn assert_one_block(source: &str, dialect: Dialect, expected: BlockKind) -> Result<(), Error> {
-    let first = Snapshot::read_with(source, dialect, ReadLimits::DEFAULT)?;
-    let second = Snapshot::read_with(source, dialect, ReadLimits::DEFAULT)?;
+    let first = read_with_policy(source, dialect, ReadLimits::DEFAULT)?;
+    let second = read_with_policy(source, dialect, ReadLimits::DEFAULT)?;
     assert_eq!(first, second);
     assert_eq!(first.source(), source);
     assert_eq!(first.blocks().len(), 1, "{source:?}");
     assert_eq!(first.block(0).map(|block| block.kind()), Some(expected));
     Ok(())
+}
+
+fn read_with_policy(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
+    Snapshot::read_with_options(
+        source,
+        OpenOptions::default().dialect(dialect).read_limits(limits),
+    )
 }

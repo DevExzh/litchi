@@ -3,6 +3,12 @@
 //! Typed connection models live in the model module, bounded XML conversion in the codec
 //! module, and workbook relationship integration in the package module. External targets
 //! remain inert data and are never dereferenced.
+//!
+//! [`crate::Package::edit_connections`] starts an [`Edit`] of the workbook's
+//! connection catalog; [`Edit::commit`] returns a [`Commit`] holding the new
+//! package, the exact [`Patch`] and the [`Diagnostics`], and
+//! [`crate::Package::apply_connections`] replays a patch. The source package
+//! never changes.
 
 mod codec;
 pub(crate) mod embedded_data;
@@ -10,35 +16,20 @@ mod model;
 mod namespace;
 mod package;
 
-/// Source snapshots for the contextual connections owner.
-pub mod snapshot {
-    pub use super::package::Snapshot;
-}
-
-/// Reversible source-checked connection patches.
-pub mod patch {
-    pub use super::package::{Commit, Patch};
-}
-
-/// Failure-atomic semantic transactions over the workbook connection owner.
-pub mod transaction {
-    pub use super::package::Transaction;
-}
-
 /// Typed and package-level validation for inert connection metadata.
 pub mod validation {
-    use litchi_opc::OpcPackage;
+    use litchi_opc::{OpcPackage, SourceLimits};
 
     use super::model::Connections;
     use super::package;
-    use litchi_core::sheet::Result;
+    use crate::error::Result;
 
-    pub fn connections(value: &Connections) -> Result<()> {
-        value.to_xml(false).map(|_| ())
+    pub fn connections(value: &Connections, limits: &SourceLimits) -> Result<()> {
+        value.to_xml(false, limits).map(|_| ())
     }
 
-    pub fn graph(package: &OpcPackage) -> Result<Option<Connections>> {
-        package::validate_graph(package)
+    pub fn graph(package: &OpcPackage, limits: &SourceLimits) -> Result<Option<Connections>> {
+        package::validate_graph(package, limits)
     }
 }
 
@@ -46,11 +37,16 @@ pub mod validation {
 mod tests;
 
 pub use model::*;
+#[cfg(test)]
+pub(crate) use package::Transaction;
 pub use package::{
-    Commit, Patch, Snapshot, Transaction, load_from_package, remove_from_package, store_in_package,
-    store_in_package_with_query_table_validator, validate_graph,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot, load_from_package, validate_graph,
 };
 
-fn invalid(v: impl Into<String>) -> Box<dyn std::error::Error + Send + Sync> {
-    std::io::Error::new(std::io::ErrorKind::InvalidData, v.into()).into()
+fn invalid(v: impl Into<String>) -> Error {
+    crate::error::invalid(v.into())
+}
+
+pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

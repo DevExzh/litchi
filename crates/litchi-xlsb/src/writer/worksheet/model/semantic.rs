@@ -63,7 +63,7 @@ pub struct SheetProtection {
 
 /// Mutable XLSB worksheet supporting CRUD operations
 #[derive(Debug, Clone)]
-pub struct MutableWorksheet {
+pub struct Worksheet {
     pub(crate) name: String,
     pub(crate) cells: BTreeMap<(u32, u32), CellData>,
     pub(crate) max_row: u32,
@@ -108,7 +108,7 @@ pub struct MutableWorksheet {
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
     pub(crate) pivot_table_views: Vec<crate::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
-    pub(crate) charts: Vec<crate::chart::Chart>,
+    pub(crate) charts: Vec<crate::builder::chart::Chart>,
     /// Typed image parts anchored in the same Drawings part.
     pub(crate) images: Vec<crate::writer::Image>,
     /// Cached sum of encoded image bytes for constant-time safety checks.
@@ -122,22 +122,22 @@ pub struct MutableWorksheet {
     /// Relationship ID allocated for the sheet's Drawings part.
     pub(crate) drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
-    /// table order. Populated during `WorkbookWriter::save`.
+    /// table order. Populated during `Builder::build`.
     pub(crate) table_rel_ids: Vec<String>,
 }
 
-impl MutableWorksheet {
+impl Worksheet {
     /// Create a new empty worksheet
     ///
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let sheet = MutableWorksheet::new("Sheet1");
+    /// let sheet = Worksheet::new("Sheet1");
     /// ```
     pub fn new<S: Into<String>>(name: S) -> Self {
-        MutableWorksheet {
+        Worksheet {
             name: name.into(),
             cells: BTreeMap::new(),
             max_row: 0,
@@ -189,9 +189,9 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Hello");
     /// sheet.set_cell(0, 1, 42.0);
     /// sheet.set_cell(1, 0, true);
@@ -270,6 +270,13 @@ impl MutableWorksheet {
             Err(error) if formula_requires_context_free_authoring(&error) => {
                 crate::package::formula::text::Compiler::compile("0")?
             },
+            Err(Error::UnsupportedFeature(_)) => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "set_array_formula",
+                    "the formula uses a construct outside the XLSB writer vocabulary",
+                ));
+            },
             Err(error) => return Err(error),
         };
         let group = Group {
@@ -304,6 +311,13 @@ impl MutableWorksheet {
             Err(error) if formula_requires_context_free_authoring(&error) => {
                 crate::package::formula::text::Compiler::compile_shared("0", row_first, col_first)?
             },
+            Err(Error::UnsupportedFeature(_)) => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "set_shared_formula",
+                    "the formula uses a construct outside the XLSB writer vocabulary",
+                ));
+            },
             Err(error) => return Err(error),
         };
         let group = Group {
@@ -326,10 +340,10 @@ impl MutableWorksheet {
     pub fn set_formula_group_binary(&mut self, group: Group) -> Result<()> {
         // Validate both the range and parsed-formula framing before mutating
         // the worksheet.
-        let _ = group.to_record_data()?;
+        let _ = group.to_record_data(crate::raw::Limits::DEFAULT)?;
         if group.formula.exp_cell()?.is_some() {
             return Err(Error::InvalidFormula(
-                "array/shared formula definition cannot contain PtgExp".to_string(),
+                "array/shared formula definition cannot contain PtgExp",
             ));
         }
         self.install_formula_group(group, None)
@@ -363,14 +377,18 @@ impl MutableWorksheet {
                 let style = self.cells.get(&(row, col)).map_or(0, |cell| cell.style);
                 let decoded = || -> Result<String> {
                     let tokens = match group.kind {
-                        GroupKind::Array => {
-                            Parser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()?
-                        },
+                        GroupKind::Array => Parser::with_extra(
+                            &group.formula.rgce,
+                            &group.formula.rgcb,
+                            crate::raw::Limits::DEFAULT,
+                        )
+                        .parse()?,
                         GroupKind::Shared => Parser::with_base_cell_and_extra(
                             &group.formula.rgce,
                             &group.formula.rgcb,
                             row,
                             col,
+                            crate::raw::Limits::DEFAULT,
                         )
                         .parse()?,
                     };
@@ -477,9 +495,9 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Hello");
     /// sheet.delete_cell(0, 0);
     /// assert!(sheet.get_cell(0, 0).is_none());
@@ -626,28 +644,40 @@ impl MutableWorksheet {
             (false, true) => Position::BottomLeft,
             (false, false) => unreachable!("zero freeze panes return early"),
         };
-        let top_left = Cell::at(freeze_rows, freeze_cols).map_err(|error| Error::Unrecognized {
-            typ: "worksheet view".to_string(),
-            val: error.to_string(),
+        let top_left = Cell::at(freeze_rows, freeze_cols).map_err(|_error| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::InvalidValue,
+                "build_xlsb",
+                "the worksheet view freeze position is outside the XLSB range",
+            )
         })?;
         let horizontal = (freeze_cols > 0)
             .then(|| Split::new(f64::from(freeze_cols)))
             .transpose()
-            .map_err(|error| Error::Unrecognized {
-                typ: "worksheet view".to_string(),
-                val: error.to_string(),
+            .map_err(|_error| {
+                Error::refused(
+                    litchi_core::edit::RefusalKind::InvalidValue,
+                    "build_xlsb",
+                    "the worksheet view horizontal split is invalid",
+                )
             })?;
         let vertical = (freeze_rows > 0)
             .then(|| Split::new(f64::from(freeze_rows)))
             .transpose()
-            .map_err(|error| Error::Unrecognized {
-                typ: "worksheet view".to_string(),
-                val: error.to_string(),
+            .map_err(|_error| {
+                Error::refused(
+                    litchi_core::edit::RefusalKind::InvalidValue,
+                    "build_xlsb",
+                    "the worksheet view vertical split is invalid",
+                )
             })?;
         let selection = Selection::new(position, top_left, 0, vec![Rect::single(top_left)])
-            .map_err(|error| Error::Unrecognized {
-                typ: "worksheet view".to_string(),
-                val: error.to_string(),
+            .map_err(|_error| {
+                Error::refused(
+                    litchi_core::edit::RefusalKind::InvalidValue,
+                    "build_xlsb",
+                    "the worksheet view selection is invalid",
+                )
             })?;
 
         let view = self.view.get_or_insert_with(View::default);
@@ -675,10 +705,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::merged_cells::MergedCell;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.add_merged_cell(MergedCell::new(0, 1, 0, 1)); // Merge A1:B2
     /// ```
     pub fn add_merged_cell(&mut self, merged: MergedCell) {
@@ -690,10 +720,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::hyperlinks::Hyperlink;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string())
     ///     .with_tooltip("Visit website".to_string());
     /// sheet.add_hyperlink(link);
@@ -707,10 +737,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::comments::Record;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let comment = Record::new(0, 0, "John".to_string(), "Important note".to_string());
     /// sheet.add_comment(comment);
     /// ```
@@ -747,32 +777,26 @@ impl MutableWorksheet {
         const MAX_TABLES_PER_SHEET: usize = 4_096;
         if self.tables.len() >= MAX_TABLES_PER_SHEET {
             return Err(Error::InvalidFormula(
-                "worksheet table count exceeds the safety limit".to_string(),
+                "worksheet table count exceeds the safety limit",
             ));
         }
         if table.display_name.as_deref().is_none_or(str::is_empty) {
             return Err(Error::InvalidFormula(
-                "structured table requires a display name".to_string(),
+                "structured table requires a display name",
             ));
         }
         let range = &table.range;
         if range.first_row > range.last_row || range.first_column > range.last_column {
-            return Err(Error::InvalidFormula(
-                "structured table range is inverted".to_string(),
-            ));
+            return Err(Error::InvalidFormula("structured table range is inverted"));
         }
         let width = u64::from(range.last_column) - u64::from(range.first_column) + 1;
         if !table.columns.is_empty() && table.columns.len() as u64 != width {
-            return Err(Error::InvalidFormula(format!(
-                "structured table declares {} columns for a range {width} wide",
-                table.columns.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "structured table declares columns for a range wide",
+            ));
         }
         if self.tables.iter().any(|existing| existing.id == table.id) {
-            return Err(Error::InvalidFormula(format!(
-                "duplicate structured table id {}",
-                table.id
-            )));
+            return Err(Error::InvalidFormula("duplicate structured table id"));
         }
         self.tables.push(table);
         Ok(())
@@ -794,10 +818,9 @@ impl MutableWorksheet {
             .iter()
             .any(|existing| existing.table_id() == mapping.table_id())
         {
-            return Err(Error::InvalidFormula(format!(
-                "XML list ID {} is already used by a single-cell mapping",
-                mapping.table_id()
-            )));
+            return Err(Error::InvalidFormula(
+                "XML list ID is already used by a single-cell mapping",
+            ));
         }
         if let Some(index) = self
             .mapped_tables
@@ -846,10 +869,9 @@ impl MutableWorksheet {
             .iter()
             .any(|existing| existing.table_id() == mapping.table_id())
         {
-            return Err(Error::InvalidFormula(format!(
-                "XML list ID {} is already used by a mapped table",
-                mapping.table_id()
-            )));
+            return Err(Error::InvalidFormula(
+                "XML list ID is already used by a mapped table",
+            ));
         }
         if let Some(index) = self
             .single_cell_mappings
@@ -916,7 +938,7 @@ impl MutableWorksheet {
     pub fn add_pivot_table_view(&mut self, view: crate::pivot_view::Part) -> Result<()> {
         if self.pivot_table_views.len() >= 4_096 {
             return Err(Error::InvalidFormula(
-                "worksheet PivotTable count exceeds the safety limit".to_string(),
+                "worksheet PivotTable count exceeds the safety limit",
             ));
         }
         if self
@@ -924,11 +946,9 @@ impl MutableWorksheet {
             .iter()
             .any(|existing| crate::package::formula::excel_name_eq(existing.name(), view.name()))
         {
-            return Err(Error::InvalidFormula(format!(
-                "duplicate PivotTable view name {:?} on worksheet {:?}",
-                view.name(),
-                self.name
-            )));
+            return Err(Error::InvalidFormula(
+                "duplicate PivotTable view name on worksheet",
+            ));
         }
         self.pivot_table_views.push(view);
         Ok(())
@@ -960,10 +980,10 @@ impl MutableWorksheet {
     /// relationship in the binary `BrtDrawing` record. Pivot charts are
     /// resolved against PivotTable views attached to this workbook at save
     /// time.
-    pub fn add_chart(&mut self, chart: crate::chart::Chart) -> Result<()> {
+    pub fn add_chart(&mut self, chart: crate::builder::chart::Chart) -> Result<()> {
         if self.charts.len() >= crate::package::drawing_write::MAX_CHARTS_PER_SHEET {
             return Err(Error::InvalidFormula(
-                "worksheet chart count exceeds the safety limit".to_string(),
+                "worksheet chart count exceeds the safety limit",
             ));
         }
         crate::package::drawing_write::validate_chart(&chart)?;
@@ -972,17 +992,16 @@ impl MutableWorksheet {
     }
 
     /// Typed DrawingML charts in drawing order.
-    pub fn charts(&self) -> &[crate::chart::Chart] {
+    pub fn charts(&self) -> &[crate::builder::chart::Chart] {
         &self.charts
     }
 
     /// Remove one chart by drawing order.
-    pub fn remove_chart(&mut self, index: usize) -> Result<crate::chart::Chart> {
+    pub fn remove_chart(&mut self, index: usize) -> Result<crate::builder::chart::Chart> {
         if index >= self.charts.len() {
-            return Err(Error::InvalidFormula(format!(
-                "chart index {index} is out of bounds for {} charts",
-                self.charts.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "chart index is out of bounds for charts",
+            ));
         }
         let removed = self.charts.remove(index);
         self.clear_drawing_rel_id_if_empty();
@@ -999,7 +1018,7 @@ impl MutableWorksheet {
     pub fn add_image(&mut self, image: crate::writer::Image) -> Result<()> {
         if self.images.len() >= crate::package::drawing_image::MAX_XLSB_WORKSHEET_IMAGES {
             return Err(Error::InvalidFormula(
-                "worksheet image count exceeds the safety limit".to_string(),
+                "worksheet image count exceeds the safety limit",
             ));
         }
         image.validate()?;
@@ -1029,10 +1048,9 @@ impl MutableWorksheet {
     /// Remove one embedded image by drawing order.
     pub fn remove_image(&mut self, index: usize) -> Result<crate::writer::Image> {
         if index >= self.images.len() {
-            return Err(Error::InvalidFormula(format!(
-                "image index {index} is out of bounds for {} images",
-                self.images.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "image index is out of bounds for images",
+            ));
         }
         let removed = self.images.remove(index);
         self.image_bytes -= removed.data().len();
@@ -1053,9 +1071,7 @@ impl MutableWorksheet {
 
     /// Add a standard DrawingML shape or text box.
     pub fn add_shape(&mut self, shape: crate::writer::ShapeSpec) -> Result<()> {
-        shape
-            .validate(self.drawing_shape_count())
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        shape.validate(self.drawing_shape_count())?;
         self.shapes.push(shape);
         Ok(())
     }
@@ -1081,10 +1097,9 @@ impl MutableWorksheet {
     /// Remove one top-level shape.
     pub fn remove_shape(&mut self, index: usize) -> Result<crate::writer::ShapeSpec> {
         if index >= self.shapes.len() {
-            return Err(Error::InvalidFormula(format!(
-                "shape index {index} is out of bounds for {} shapes",
-                self.shapes.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "shape index is out of bounds for shapes",
+            ));
         }
         let removed = self.shapes.remove(index);
         self.clear_drawing_rel_id_if_empty();
@@ -1093,9 +1108,7 @@ impl MutableWorksheet {
 
     /// Add a nested DrawingML shape group.
     pub fn add_group(&mut self, group: crate::writer::GroupSpec) -> Result<()> {
-        group
-            .validate(self.drawing_shape_count())
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        group.validate(self.drawing_shape_count())?;
         self.groups.push(group);
         Ok(())
     }
@@ -1108,10 +1121,9 @@ impl MutableWorksheet {
     /// Remove one top-level shape group.
     pub fn remove_group(&mut self, index: usize) -> Result<crate::writer::GroupSpec> {
         if index >= self.groups.len() {
-            return Err(Error::InvalidFormula(format!(
-                "group index {index} is out of bounds for {} groups",
-                self.groups.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "group index is out of bounds for groups",
+            ));
         }
         let removed = self.groups.remove(index);
         self.clear_drawing_rel_id_if_empty();
@@ -1120,9 +1132,7 @@ impl MutableWorksheet {
 
     /// Add a DrawingML connection shape.
     pub fn add_connection(&mut self, connection: crate::writer::ConnectionShapeSpec) -> Result<()> {
-        connection
-            .validate(self.drawing_shape_count())
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        connection.validate(self.drawing_shape_count())?;
         self.connections.push(connection);
         Ok(())
     }
@@ -1138,10 +1148,9 @@ impl MutableWorksheet {
         index: usize,
     ) -> Result<crate::writer::ConnectionShapeSpec> {
         if index >= self.connections.len() {
-            return Err(Error::InvalidFormula(format!(
-                "connection index {index} is out of bounds for {} connection shapes",
-                self.connections.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "connection index is out of bounds for connection shapes",
+            ));
         }
         let removed = self.connections.remove(index);
         self.clear_drawing_rel_id_if_empty();
@@ -1169,10 +1178,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::package::data_validation::Validation;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let mut dv = Validation::new(3, "A1:A10".to_string()); // list
     /// dv.formula1 = Some("Yes,No".to_string());
     /// sheet.add_data_validation(dv);
@@ -1201,12 +1210,12 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use crate::conditional_formatting::{
     ///     Formatting, Rule, RuleType,
     /// };
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let mut cf = Formatting::new(vec!["A1:A10".to_string()]);
     /// let rule = Rule::new(RuleType::CellIs, 1);
     /// cf.add_rule(rule);
@@ -1226,19 +1235,21 @@ impl MutableWorksheet {
     pub fn set_web_extension_bindings(&mut self, bindings: Vec<Binding>) -> Result<()> {
         let mut app_refs = HashSet::with_capacity(bindings.len());
         for binding in &bindings {
-            binding.to_payload()?;
+            binding.to_payload(crate::raw::Limits::DEFAULT)?;
             if !app_refs.insert(binding.application_reference.as_str()) {
-                return Err(Error::Unrecognized {
-                    typ: "WEBEXTENSIONS".to_string(),
-                    val: "duplicate binding appRef".to_string(),
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::InvalidValue,
+                    "build_xlsb",
+                    "web-extension application references must be unique",
+                ));
             }
         }
         if bindings.len() > 65_536 {
-            return Err(Error::Unrecognized {
-                typ: "WEBEXTENSIONS".to_string(),
-                val: "binding count exceeds 65,536".to_string(),
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::InvalidValue,
+                "build_xlsb",
+                "the web-extension binding count exceeds the XLSB range",
+            ));
         }
         self.web_extension_bindings = bindings;
         Ok(())
@@ -1259,21 +1270,21 @@ impl MutableWorksheet {
     /// Formula tokens are structurally checked here and are proved against the
     /// finalized workbook name/XTI context before any worksheet is serialized.
     pub fn set_sparkline_groups(&mut self, groups: crate::sparkline::Groups) -> Result<&mut Self> {
-        self.set_sparkline_groups_with_limits(groups, crate::sparkline::Limits::DEFAULT)
+        self.set_sparkline_groups_bounded(groups, crate::sparkline::Limits::DEFAULT)
     }
 
     /// Replace the complete sparkline collection under an explicit policy.
     ///
     /// Validation is completed before either the collection or its policy is
     /// published, so every failure leaves the worksheet unchanged.
-    pub fn set_sparkline_groups_with_limits(
+    pub(crate) fn set_sparkline_groups_bounded(
         &mut self,
         groups: crate::sparkline::Groups,
         limits: crate::sparkline::Limits,
     ) -> Result<&mut Self> {
-        groups.validate(limits).map_err(|error| {
-            Error::InvalidFormula(format!("invalid authored sparkline groups: {error}"))
-        })?;
+        groups
+            .validate(limits)
+            .map_err(|_error| Error::InvalidFormula("invalid authored sparkline groups"))?;
         self.sparkline_groups = Some(groups);
         self.sparkline_limits = limits;
         Ok(self)
@@ -1305,9 +1316,9 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Row 0");
     /// sheet.set_cell(1, 0, "Row 1");
     /// sheet.set_cell(2, 0, "Row 2");

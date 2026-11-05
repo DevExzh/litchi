@@ -6,7 +6,7 @@
 //! retain their shape, anchor, and package semantics and consume this owner
 //! for the shared `a:xfrm` subtree.
 //!
-//! The detached [`Snapshot`] retains the exact source bytes for no-op reads
+//! The detached [`Package`] retains the exact source bytes for no-op reads
 //! and edits. A changed transaction emits only the modeled, validated
 //! transform grammar; unsupported children or attributes are rejected instead
 //! of being silently discarded.
@@ -19,6 +19,8 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use crate::Error;
+pub use codec::Limits;
 pub use model::{Angle, Point, Size, Transform};
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, LimitKind, Package, Patch};
 pub use validation::validate;

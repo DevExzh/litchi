@@ -5,7 +5,7 @@
 //! validation; this module owns only the value and the pure coordinate
 //! transformations shared by Numbers, Pages, and Keynote.
 
-use super::coordinate::CellPosition;
+use super::coordinate::At;
 use std::fmt;
 use std::num::NonZeroU32;
 
@@ -29,6 +29,7 @@ impl fmt::Display for Axis {
 
 /// Failure while constructing or transforming a merged-cell region.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The row span is zero.
     ZeroRows,
@@ -73,7 +74,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Region {
-    start: CellPosition,
+    start: At,
     row_count: NonZeroU32,
     column_count: NonZeroU32,
 }
@@ -97,7 +98,7 @@ impl Region {
             .checked_add(column_span.get() - 1)
             .ok_or(Error::CoordinateOverflow { axis: Axis::Column })?;
         Ok(Self {
-            start: CellPosition::new(row, column),
+            start: At::new(row, column),
             row_count: row_span,
             column_count: column_span,
         })
@@ -105,14 +106,14 @@ impl Region {
 
     /// Returns the inclusive start coordinate.
     #[must_use]
-    pub const fn start(self) -> CellPosition {
+    pub const fn start(self) -> At {
         self.start
     }
 
     /// Returns the inclusive end coordinate.
     #[must_use]
-    pub const fn end(self) -> CellPosition {
-        CellPosition::new(self.end_row(), self.end_column())
+    pub const fn end(self) -> At {
+        At::new(self.end_row(), self.end_column())
     }
 
     /// Returns the zero-based first row.
@@ -173,7 +174,7 @@ impl Region {
 
     /// Returns whether a compact coordinate is inside the region.
     #[must_use]
-    pub const fn contains_position(self, position: CellPosition) -> bool {
+    pub const fn contains_position(self, position: At) -> bool {
         self.contains(position.row(), position.column())
     }
 
@@ -200,14 +201,14 @@ pub enum Deletion {
 /// physically deleted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AnchorRelocation {
-    source: CellPosition,
-    destination: CellPosition,
+    source: At,
+    destination: At,
 }
 
 impl AnchorRelocation {
     /// Creates an anchor relocation between two compact coordinates.
     #[must_use]
-    pub const fn new(source: CellPosition, destination: CellPosition) -> Self {
+    pub const fn new(source: At, destination: At) -> Self {
         Self {
             source,
             destination,
@@ -216,13 +217,13 @@ impl AnchorRelocation {
 
     /// Returns the source cell whose value and references must be retained.
     #[must_use]
-    pub const fn source(self) -> CellPosition {
+    pub const fn source(self) -> At {
         self.source
     }
 
     /// Returns the surviving destination cell.
     #[must_use]
-    pub const fn destination(self) -> CellPosition {
+    pub const fn destination(self) -> At {
         self.destination
     }
 }
@@ -332,10 +333,10 @@ pub fn anchor_relocation_after_deletion(
     let next = start
         .checked_add(1)
         .ok_or(Error::CoordinateOverflow { axis })?;
-    let source = CellPosition::new(region.row(), region.column());
+    let source = At::new(region.row(), region.column());
     let destination = match axis {
-        Axis::Row => CellPosition::new(next, region.column()),
-        Axis::Column => CellPosition::new(region.row(), next),
+        Axis::Row => At::new(next, region.column()),
+        Axis::Column => At::new(region.row(), next),
     };
     Ok(Some(AnchorRelocation::new(source, destination)))
 }
@@ -346,7 +347,7 @@ mod tests {
         AnchorRelocation, Axis, Deletion, Error, Region, after_deletion, after_insertion,
         anchor_relocation_after_deletion,
     };
-    use crate::table::coordinate::CellPosition;
+    use crate::table::coordinate::At;
     use std::mem::size_of;
 
     #[test]
@@ -363,7 +364,7 @@ mod tests {
         let region = Region::new(2, 3, 2, 3).unwrap();
         assert_eq!((region.end_row(), region.end_column()), (3, 5));
         assert!(region.contains(3, 5));
-        assert!(region.contains_position(CellPosition::new(2, 3)));
+        assert!(region.contains_position(At::new(2, 3)));
         assert!(region.overlaps(Region::new(3, 5, 2, 1).unwrap()));
         assert!(!region.overlaps(Region::new(4, 3, 1, 2).unwrap()));
     }
@@ -371,7 +372,7 @@ mod tests {
     #[test]
     fn maximum_coordinates_preserve_closed_geometry() {
         let last_row = Region::new(u32::MAX, 7, 1, 2).unwrap();
-        assert_eq!(last_row.end(), CellPosition::new(u32::MAX, 8));
+        assert_eq!(last_row.end(), At::new(u32::MAX, 8));
         assert_eq!(last_row.end_row(), u32::MAX);
         assert_eq!(last_row.end_column(), 8);
         assert!(last_row.contains(u32::MAX, 8));
@@ -379,7 +380,7 @@ mod tests {
         assert!(last_row.overlaps(Region::new(u32::MAX - 1, 7, 2, 2).unwrap()));
 
         let last_column = Region::new(7, u32::MAX, 2, 1).unwrap();
-        assert_eq!(last_column.end(), CellPosition::new(8, u32::MAX));
+        assert_eq!(last_column.end(), At::new(8, u32::MAX));
         assert_eq!(last_column.end_row(), 8);
         assert_eq!(last_column.end_column(), u32::MAX);
         assert!(last_column.contains(8, u32::MAX));
@@ -482,17 +483,11 @@ mod tests {
         let region = Region::new(3, 4, 2, 3).unwrap();
         assert_eq!(
             anchor_relocation_after_deletion(region, Axis::Row, 3).unwrap(),
-            Some(AnchorRelocation::new(
-                CellPosition::new(3, 4),
-                CellPosition::new(4, 4),
-            ))
+            Some(AnchorRelocation::new(At::new(3, 4), At::new(4, 4),))
         );
         assert_eq!(
             anchor_relocation_after_deletion(region, Axis::Column, 4).unwrap(),
-            Some(AnchorRelocation::new(
-                CellPosition::new(3, 4),
-                CellPosition::new(3, 5),
-            ))
+            Some(AnchorRelocation::new(At::new(3, 4), At::new(3, 5),))
         );
         assert_eq!(
             anchor_relocation_after_deletion(region, Axis::Row, 4).unwrap(),

@@ -7,6 +7,7 @@
 //! fragment without taking ownership of an OPC package.
 
 mod codec;
+mod limit;
 mod model;
 mod transaction;
 mod validation;
@@ -14,8 +15,9 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use limit::Limits;
 pub use model::{Ligatures, NumForm, NumSpacing, OnOff, OpenType, StyleSet, StyleSetId};
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::Snapshot;
 
 /// Rewrite a complete run fragment through the private codec boundary.
 pub(crate) fn rewrite(xml: &[u8], value: &OpenType) -> crate::Result<Vec<u8>> {

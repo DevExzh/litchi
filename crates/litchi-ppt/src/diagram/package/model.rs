@@ -61,13 +61,13 @@ pub struct SlideSnapshot {
 }
 
 impl SlideSnapshot {
-    /// Parse one complete `SlideContainer` with default resource bounds.
+    /// Parse one complete `SlideContainer` under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes.as_ref().to_vec(), SlideLimits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &SlideLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes.as_ref().to_vec(), *limits)
     }
 
     /// Capture one complete slide without requiring a caller-side copy.
@@ -75,17 +75,8 @@ impl SlideSnapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, SlideLimits::default())
-    }
-
-    /// Parse one complete `SlideContainer` under explicit resource bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: SlideLimits) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes.as_ref().to_vec(), limits)
+    pub fn from_bytes(bytes: Vec<u8>, limits: &SlideLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Capture one complete slide under explicit resource bounds.
@@ -93,7 +84,7 @@ impl SlideSnapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SlideLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: SlideLimits) -> Result<Self> {
         super::validation::validate_limits(limits)?;
         if bytes.len() > limits.max_slide_bytes {
             return Err(crate::package::Error::InvalidFormat(
@@ -184,7 +175,7 @@ impl SlideSnapshot {
 
     /// Start an isolated edit over this exact slide source.
     #[must_use]
-    pub fn edit(&self) -> super::transaction::SlideEditor {
+    pub(crate) fn edit(&self) -> super::transaction::SlideEditor {
         super::transaction::SlideEditor::open(self.clone())
     }
 }

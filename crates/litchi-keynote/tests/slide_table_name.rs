@@ -14,12 +14,19 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableName, SlideTableNameCommit,
-    SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
-    SlideTableNamePatch, SlideTableNamePath, SlideTableNameValueError, TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits, TableSelector,
+    slide::table::name::Error as SlideTableNameValueError,
+    slide::table::name::Name as SlideTableName,
+    slide::table::name::transaction::Commit as SlideTableNameCommit,
+    slide::table::name::transaction::Diagnostics as SlideTableNameDiagnostics,
+    slide::table::name::transaction::Edit as SlideTableNameEdit,
+    slide::table::name::transaction::Error as SlideTableNameError,
+    slide::table::name::transaction::LimitKind as SlideTableNameLimitKind,
+    slide::table::name::transaction::Patch as SlideTableNamePatch,
+    slide::table::name::transaction::Path as SlideTableNamePath,
 };
 use prost::Message as _;
 
@@ -75,8 +82,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -87,7 +98,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -214,8 +229,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     );
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -240,7 +265,12 @@ fn bucket_payload(headers: &[(u32, f32)], with_unknowns: bool) -> TestResult<Vec
     append_varint_field(&mut payload, 1, 1)?;
     for &(index, size) in headers {
         let header = bucket_header(index, size, with_unknowns)?;
-        append_length_delimited_field(&mut payload, 2, &header)?;
+        append_length_delimited_field(
+            &mut payload,
+            2,
+            &header,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_unknowns {
         append_varint_field(&mut payload, UNKNOWN_BUCKET_FIELD, UNKNOWN_BUCKET_VALUE)?;
@@ -398,13 +428,15 @@ fn synthetic_package(locked: bool, with_unknowns: bool) -> TestResult<Vec<u8>> {
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -415,7 +447,8 @@ fn synthetic_package(locked: bool, with_unknowns: bool) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -438,7 +471,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing member {member}")))?
@@ -447,14 +480,15 @@ fn member_bytes(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
 }
 
 fn has_member(package: &[u8], member: &str) -> TestResult<bool> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .any(|entry| entry.name() == member))
 }
 
 fn archive(package: &[u8], member: &str) -> TestResult<Archive> {
     Ok(Archive::parse(
-        SnappyStream::decompress(&member_bytes(package, member)?)?.as_bytes(),
+        SnappyStream::decompress(&member_bytes(package, member)?, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -463,10 +497,11 @@ fn rewrite_member_archive(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut selected = archive(package, member)?;
     mutate(&mut selected)?;
-    let replacement = SnappyStream::compress(&selected.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&selected.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(member, &replacement)], Limits::default())?)
 }
 
@@ -522,6 +557,7 @@ fn replace_model_payload(package: &[u8], identifier: u64, payload: Vec<u8>) -> T
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -794,6 +830,7 @@ fn append_metadata_unknown(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: METADATA_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -814,10 +851,16 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
         matches!(
             read,
             Err(SlideTableNameError::InvalidSource)
-                | Err(SlideTableNameError::UnsupportedSource)
-                | Err(SlideTableNameError::UnsupportedDependency)
-                | Err(SlideTableNameError::UnsupportedTopology)
-                | Err(SlideTableNameError::LimitExceeded { .. })
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedDependency
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedTopology
+                ))
+                | Err(SlideTableNameError::Limit { .. })
         ),
         "malformed name read was unexpectedly accepted: {read:?}"
     );
@@ -825,10 +868,16 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
         matches!(
             edit,
             Err(SlideTableNameError::InvalidSource)
-                | Err(SlideTableNameError::UnsupportedSource)
-                | Err(SlideTableNameError::UnsupportedDependency)
-                | Err(SlideTableNameError::UnsupportedTopology)
-                | Err(SlideTableNameError::LimitExceeded { .. })
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedDependency
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedTopology
+                ))
+                | Err(SlideTableNameError::Limit { .. })
         ),
         "malformed name edit was unexpectedly accepted: {edit:?}"
     );
@@ -877,15 +926,21 @@ fn positional_selectors_read_names_through_interleaved_z_order() -> TestResult {
     );
     assert!(matches!(
         package.slide_table_name("Missing", 0usize),
-        Err(SlideTableNameError::SlideNameNotFound)
+        Err(SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_table_name("Tables", 2usize),
-        Err(SlideTableNameError::TablePositionNotFound { .. })
+        Err(SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::TablePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_table_name("", 0usize),
-        Err(SlideTableNameError::EmptySlideName)
+        Err(SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::EmptySlideName
+        ))
     ));
     Ok(())
 }
@@ -940,11 +995,13 @@ fn exact_no_op_is_source_bound_and_apply_is_idempotent() -> TestResult {
 }
 
 fn non_name_fields(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() != 8)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() != 8)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn contains_raw(payload: &[u8], raw: &[u8]) -> bool {
@@ -1065,7 +1122,7 @@ fn stale_patch_conflict_is_source_bound() -> TestResult {
         .edit_slide_table_name("Tables", 0usize)?
         .set_name("Candidate")?
         .commit()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let tampered_source = catalog.reassemble_to_bytes(
         &[EntryEdit::new(SENTINEL_MEMBER, b"tampered")],
         Limits::default(),
@@ -1097,7 +1154,12 @@ fn locked_table_allows_no_op_but_rejects_changed_name() -> TestResult {
         .expect("valid replacement name")
         .commit()
         .expect_err("locked table must reject changed name");
-    assert!(matches!(error, SlideTableNameError::Locked));
+    assert!(matches!(
+        error,
+        SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::Locked
+        )
+    ));
     assert_eq!(exact_bytes(&package)?, before);
 
     let unlocked = package
@@ -1130,7 +1192,7 @@ fn malformed_field8_wire_is_rejected_without_mutation() -> TestResult {
     }
 
     let payload = model_member_payload(&source, MODELS[0])?;
-    let without_name = WireView::parse(&payload)?
+    let without_name = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() != 8)
         .flat_map(|field| field.raw().iter().copied())
@@ -1502,37 +1564,34 @@ fn name_value_validation_accepts_unicode_and_rejects_invalid_values() -> TestRes
 #[test]
 fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
     let source = synthetic_package(false, false)?;
-    let input_limit = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        128,
-        4 * 1024 * 1024,
-        8 * 1024 * 1024,
-        8 * 1024 * 1024,
-    )?;
-    assert!(Package::from_bytes_with_limits(&source, input_limit).is_err());
+    let input_limit = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(128)?
+        .max_entry_bytes(4 * 1024 * 1024)?
+        .max_aggregate_bytes(8 * 1024 * 1024)?
+        .max_component_bytes(8 * 1024 * 1024)?
+        .build()?;
+    assert!(
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(input_limit))
+            .is_err()
+    );
 
     let mut found_semantic_limit = false;
     for references in 1..=128 {
-        let semantic = SemanticLimits::new(
-            1_000_000,
-            65_536,
-            references,
-            1_000_000,
-            1_000_000,
-            64 * 1024 * 1024,
-        )?;
-        let Ok(restricted) = Package::from_bytes_with_options(
-            &source,
-            ReadOptions::new(Limits::default(), semantic),
-        ) else {
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let Ok(restricted) =
+            Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))
+        else {
             continue;
         };
         let before = exact_bytes(&restricted)?;
         let read = restricted.slide_table_name("Tables", 0usize);
-        if matches!(read, Err(SlideTableNameError::LimitExceeded { .. })) {
+        if matches!(read, Err(SlideTableNameError::Limit { .. })) {
             assert!(matches!(
                 restricted.edit_slide_table_name("Tables", 0usize),
-                Err(SlideTableNameError::LimitExceeded { .. })
+                Err(SlideTableNameError::Limit { .. })
             ));
             assert_eq!(exact_bytes(&restricted)?, before);
             found_semantic_limit = true;
@@ -1546,11 +1605,13 @@ fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
 
     let exact_fields = (1..=4_096)
         .find_map(|fields| {
-            let archive = litchi_iwa_core::Limits::default()
-                .with_header_fields(fields)
+            let limits = SourceLimits::builder()
+                .max_header_fields(fields)
+                .and_then(|limits| limits.build())
                 .ok()?;
-            let limits = Limits::default().with_archive_limits(archive).ok()?;
-            let package = Package::from_bytes_with_limits(&source, limits).ok()?;
+            let package =
+                Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+                    .ok()?;
             package
                 .slide_table_name("Tables", 0usize)
                 .is_ok()
@@ -1558,13 +1619,16 @@ fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
         })
         .ok_or_else(|| io::Error::other("no finite header-field boundary found"))?;
     assert!(exact_fields > 1);
-    let archive = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
-    let limits = Limits::default().with_archive_limits(archive)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    let limits = SourceLimits::builder()
+        .max_header_fields(exact_fields - 1)?
+        .build()?;
+    if let Ok(package) =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+    {
         let before = exact_bytes(&package)?;
         assert!(matches!(
             package.slide_table_name("Tables", 0usize),
-            Err(SlideTableNameError::LimitExceeded { .. })
+            Err(SlideTableNameError::Limit { .. })
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }

@@ -1,0 +1,163 @@
+//! Exact-source transactions for charts anchored in the Pages body.
+
+pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
+pub use litchi_iwa_common::chart::data::ChartData;
+pub use litchi_iwa_common::chart::metadata::ChartMetadata;
+pub use litchi_iwa_style::chart_font::ChartFont;
+pub use litchi_iwa_text::character::TextPointSize;
+
+/// Exact-source transactions for one body chart's arrangement.
+pub mod arrangement {
+    pub use crate::package::body_chart_arrangement::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
+/// Chart lifecycle of a body chart: the native kind and series direction
+/// (record 0416); `Package::body_chart_geometry` reads its frame.
+pub mod lifecycle {
+    pub use crate::package::body_chart_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::Direction;
+    pub use litchi_iwa_common::chart::kind::Kind;
+}
+
+/// Exact-source transactions for one body chart's data grid.
+pub mod data {
+    pub use crate::package::body_chart_data::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
+/// Typed failures of the body-chart metadata reader.
+pub mod metadata {
+    pub use crate::package::body_chart_metadata::{Error, LimitKind};
+}
+
+/// Exact-source caption transactions of one rooted body chart (the label
+/// below it): [`crate::Package::edit_body_chart_caption`]. The errors,
+/// refusals and diagnostics are the drawable caption family's.
+pub mod caption {
+    pub use crate::package::body_chart_caption::{Commit, Edit, Patch};
+    pub use crate::package::body_drawable_caption::{Diagnostics, Error, LimitKind, Refusal};
+}
+
+/// Exact-source visible title transactions of one rooted body chart:
+/// [`crate::Package::edit_body_chart_title`].
+pub mod title {
+    pub use crate::package::body_chart_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
+/// Exact-source category/value axis-title transactions of one rooted body
+/// chart: [`crate::Package::edit_body_chart_axis_title`].
+pub mod axis_title {
+    pub use crate::package::body_chart_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::axis::Axis;
+}
+
+/// Exact-source chart-wide font identity and point-size transactions of one
+/// rooted body chart: [`crate::Package::edit_body_chart_font`] and
+/// [`crate::Package::edit_body_chart_font_size`].
+pub mod font {
+    pub use crate::package::body_chart_font::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_style::chart_font::ChartFont;
+    pub use litchi_iwa_text::character::TextPointSize;
+}
+
+/// Exact-source per-series transactions of one rooted body chart (one value
+/// per series): [`crate::Package::edit_body_chart_series`].
+pub mod series {
+    pub use crate::package::body_chart_series::{AutoFit, ValueLabelLocation};
+    pub use crate::package::body_chart_series::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
+    };
+    pub use litchi_iwa_common::chart::error_bar;
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+    pub use litchi_iwa_common::chart::pie::{
+        LabelDistance, LabelVisibility, LeaderLineVisibility, WedgeExplosion,
+    };
+    pub use litchi_iwa_common::chart::series::{
+        ConnectionLine, MovingAveragePeriod, PolynomialOrder, Stroke, StrokePattern, Symbol,
+        SymbolFamily, SymbolFill, SymbolShape, SymbolSize, Trendline, TrendlineType,
+    };
+    pub use litchi_iwa_common::chart::series_labels::Visibility;
+    pub use litchi_iwa_common::color::Rgba;
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient, ImageTechnique};
+}
+
+/// Exact-source chart-level style transactions of one rooted body chart on
+/// the shared chart style engine: [`crate::Package::edit_body_chart_style`].
+pub mod style {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_style::StyleEdit as Edit;
+    pub use crate::package::body_chart_style::style::{
+        Commit, Drop, ImageTechnique, Lighting3d, Patch, Property, PropertyKind, RadarGridShape,
+        RadarSeriesStyle, Rgba, Shadow,
+    };
+    pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
+    pub use litchi_iwa_common::chart3d;
+}
+
+/// Exact-source axis-style transactions of one rooted body chart's primary
+/// value or category axis: [`crate::Package::edit_body_chart_axis`].
+pub mod axis {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_style::AxisEdit as Edit;
+    pub use crate::package::body_chart_style::axis::{
+        Commit, GridlineStroke, Patch, Property, PropertyKind,
+    };
+    pub use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
+    pub use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
+    pub use litchi_iwa_common::chart::axis::style::Visibility;
+    pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+    pub use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+}
+
+/// Exact-source reference-line transactions of one chart's primary value
+/// axis on the shared reference-line graph:
+/// [`crate::Package::edit_body_chart_reference_lines`].
+pub mod reference_lines {
+    pub use crate::package::body_chart_reference_lines::ReferenceLinesEdit as Edit;
+    pub use crate::package::body_chart_reference_lines::reference_lines::{
+        Commit, Kind, Line, Patch, Unknown, Value,
+    };
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+}
+
+/// Exact-source transactions of the bounds, step counts and scale of one
+/// chart's primary value axis, edited as one aggregate:
+/// [`crate::Package::edit_body_chart_value_axis_settings`].
+pub mod value_axis {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_value_axis::ValueAxisEdit as Edit;
+    pub use crate::package::body_chart_value_axis::value_axis::{
+        Bound, Bounds, Commit, MajorStepCount, MinorStepCount, Patch, Scale, Steps,
+        ValueAxisSettings,
+    };
+}
+
+/// Exact-source legend fill, border and shadow transactions of one chart
+/// on the shared legend-style variation graph:
+/// [`crate::Package::edit_body_chart_legend_style`].
+pub mod legend_style {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_style::LegendStyleEdit as Edit;
+    pub use crate::package::body_chart_style::legend_style::{
+        Commit, LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Patch,
+        Property, PropertyKind,
+    };
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
+    pub use litchi_iwa_common::shape::shadow::Drop;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_text::character::TextPointSize;
+    pub use litchi_iwa_text::font::Font;
+}

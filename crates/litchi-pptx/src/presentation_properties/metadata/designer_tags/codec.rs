@@ -81,7 +81,11 @@ struct NamespaceDeclaration {
 
 pub(crate) fn locate(xml: &[u8], slide_id: u32, limits: Limits) -> Result<Located> {
     if xml.len() > limits.xml_bytes() {
-        return Err(limit("Designer-tag owner XML bytes", limits.xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.xml_bytes(),
+        ));
     }
     if !(256..2_147_483_648).contains(&slide_id) {
         return Err(invalid("slide ID is outside ST_SlideId"));
@@ -361,11 +365,19 @@ fn parse_nodes(xml: &[u8], limits: Limits) -> Result<Vec<Node>> {
         let namespace = namespace_kind(namespace);
         let event = event.into_owned();
         if !matches!(event, Event::Eof) {
-            events = events
-                .checked_add(1)
-                .ok_or_else(|| limit("Designer-tag owner XML events", limits.xml_nodes()))?;
+            events = events.checked_add(1).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlEvents,
+                    usize::MAX,
+                    limits.xml_nodes(),
+                )
+            })?;
             if events > limits.xml_nodes() {
-                return Err(limit("Designer-tag owner XML events", limits.xml_nodes()));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlEvents,
+                    events,
+                    limits.xml_nodes(),
+                ));
             }
         }
         let empty = matches!(&event, Event::Empty(_));
@@ -376,7 +388,11 @@ fn parse_nodes(xml: &[u8], limits: Limits) -> Result<Vec<Node>> {
                     return Err(invalid("presentation XML contains trailing elements"));
                 }
                 if stack.len() >= limits.xml_depth() {
-                    return Err(limit("Designer-tag owner XML depth", limits.xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.xml_depth(),
+                    ));
                 }
                 nodes.try_reserve(1).map_err(|source| Error::Allocation {
                     resource: "Designer-tag owner XML nodes",
@@ -412,7 +428,13 @@ fn parse_nodes(xml: &[u8], limits: Limits) -> Result<Vec<Node>> {
                         .element
                         .child_elements
                         .checked_add(1)
-                        .ok_or_else(|| limit("Designer-tag owner XML nodes", limits.xml_nodes()))?;
+                        .ok_or_else(|| {
+                            limit(
+                                crate::error::CodecLimitKind::XmlNodes,
+                                usize::MAX,
+                                limits.xml_nodes(),
+                            )
+                        })?;
                 }
                 if !empty {
                     stack.try_reserve(1).map_err(|source| Error::Allocation {
@@ -506,23 +528,29 @@ fn attributes(
             || attribute.value.len() > limits.attribute_bytes()
         {
             return Err(limit(
-                "Designer-tag owner XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.key.as_ref().len().max(attribute.value.len()),
                 limits.attribute_bytes(),
             ));
         }
         let key = attribute.key.as_ref();
         let namespace = key == b"xmlns" || key.starts_with(b"xmlns:");
         if !namespace {
-            non_namespace = non_namespace
-                .checked_add(1)
-                .ok_or_else(|| limit("Designer-tag owner XML attributes", limits.xml_nodes()))?;
+            non_namespace = non_namespace.checked_add(1).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributes,
+                    usize::MAX,
+                    usize::MAX,
+                )
+            })?;
         }
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.attribute_bytes() {
             return Err(limit(
-                "Designer-tag owner XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                value.len(),
                 limits.attribute_bytes(),
             ));
         }
@@ -652,7 +680,8 @@ fn designer_namespace_proof(
         proof.extend_from_slice(prefix);
         if proof.len() > limits.xml_bytes() {
             return Err(limit(
-                "Designer-tag namespace proof bytes",
+                crate::error::CodecLimitKind::ProofBytes,
+                proof.len(),
                 limits.xml_bytes(),
             ));
         }
@@ -718,12 +747,13 @@ fn collapse_empty(source: &[u8], element: &Element, limits: Limits) -> Result<Ve
         .ok_or_else(|| invalid("Designer-tag start-tag range is invalid"))?;
     let mut replacement = Vec::new();
     replacement
-        .try_reserve_exact(
-            start_tag
-                .len()
-                .checked_add(1)
-                .ok_or_else(|| limit("Designer-tag output bytes", limits.xml_bytes()))?,
-        )
+        .try_reserve_exact(start_tag.len().checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                limits.xml_bytes(),
+            )
+        })?)
         .map_err(|source| Error::Allocation {
             resource: "Designer-tag empty-element collapse",
             source,
@@ -736,7 +766,11 @@ fn collapse_empty(source: &[u8], element: &Element, limits: Limits) -> Result<Ve
 fn replace(source: &[u8], range: Range<usize>, value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     let result = replace_unbounded(source, range, value)?;
     if result.len() > limits.xml_bytes() {
-        return Err(limit("Designer-tag output XML bytes", limits.xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            result.len(),
+            limits.xml_bytes(),
+        ));
     }
     Ok(result)
 }
@@ -753,7 +787,13 @@ fn replace_unbounded(source: &[u8], range: Range<usize>, value: &[u8]) -> Result
         .len()
         .checked_sub(range.end - range.start)
         .and_then(|length| length.checked_add(value.len()))
-        .ok_or_else(|| limit("Designer-tag output XML bytes", usize::MAX))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })?;
     let mut result = Vec::new();
     result
         .try_reserve_exact(length)
@@ -770,7 +810,8 @@ fn replace_unbounded(source: &[u8], range: Range<usize>, value: &[u8]) -> Result
 fn copy_name(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     if value.is_empty() || value.len() > limits.attribute_bytes() {
         return Err(limit(
-            "Designer-tag owner XML name bytes",
+            crate::error::CodecLimitKind::NameBytes,
+            value.len(),
             limits.attribute_bytes(),
         ));
     }
@@ -805,14 +846,17 @@ impl Output {
     }
 
     fn push(&mut self, value: &[u8]) -> Result<()> {
-        let length = self
-            .bytes
-            .len()
-            .checked_add(value.len())
-            .ok_or_else(|| limit("Designer-tag output XML bytes", self.limits.xml_bytes()))?;
+        let length = self.bytes.len().checked_add(value.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                self.limits.xml_bytes(),
+            )
+        })?;
         if length > self.limits.xml_bytes() {
             return Err(limit(
-                "Designer-tag output XML bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                length,
                 self.limits.xml_bytes(),
             ));
         }
@@ -831,8 +875,12 @@ impl Output {
     }
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn invalid(message: impl Into<String>) -> Error {

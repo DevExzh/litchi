@@ -32,7 +32,7 @@ fn package(mimetype: &str, family: &str, rdf: &[(&str, &[u8])], signed: bool) ->
     let content = format!(
         "<?xml version=\"1.0\"?><office:document-content xmlns:office=\"{OFFICE}\" xmlns:text=\"{TEXT}\" xmlns:table=\"{TABLE}\" xmlns:draw=\"{DRAW}\"><office:body>{body}</office:body></office:document-content>"
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())
@@ -101,21 +101,21 @@ fn literal(subject: &str, predicate: &str, value: &str) -> Triple {
 }
 
 fn apply_edit(
-    document: &mut odt::Document,
+    document: &mut odt::Package,
     edit: odt::transaction::Edit,
 ) -> odt::transaction::Commit {
     let commit = edit.commit().unwrap();
-    *document = commit.snapshot().document().unwrap();
+    *document = commit.package().clone();
     commit
 }
 
 #[test]
 fn generated_graph_triple_crud_manifest_and_atomic_refs() {
     let signed =
-        odt::Document::from_bytes(package(constants::ODF_TEXT, "text", &[], true)).unwrap();
+        odt::Package::from_bytes(&package(constants::ODF_TEXT, "text", &[], true)).unwrap();
     let first = literal("#anchor", "https://example.invalid/schema#label", "first");
     let signed_before = signed.to_bytes().unwrap();
-    let mut signed_edit = signed.edit().unwrap();
+    let mut signed_edit = signed.edit();
     signed_edit
         .add_rdf_graph(None, std::slice::from_ref(&first))
         .unwrap();
@@ -123,13 +123,13 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
     assert_eq!(signed.to_bytes().unwrap(), signed_before);
 
     let mut document =
-        odt::Document::from_bytes(package(constants::ODF_TEXT, "text", &[], false)).unwrap();
+        odt::Package::from_bytes(&package(constants::ODF_TEXT, "text", &[], false)).unwrap();
     let second = Triple {
         subject: Subject::Iri("#anchor".to_string()),
         predicate: "https://example.invalid/schema#related".to_string(),
         object: Object::Iri("https://example.invalid/resource".to_string()),
     };
-    let mut graph_edit = document.edit().unwrap();
+    let mut graph_edit = document.edit();
     graph_edit
         .add_rdf_graph(None, &[first.clone(), second.clone()])
         .unwrap();
@@ -139,7 +139,7 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
         _ => unreachable!(),
     };
     assert_eq!(path, "Metadata/metadata_1.rdf");
-    let graph = &document.rdf_graphs().unwrap()[0];
+    let graph = &document.document().unwrap().rdf_graphs().unwrap()[0];
     assert_eq!(graph.triples.len(), 2);
     assert_eq!(graph.triples[0], first);
 
@@ -151,25 +151,25 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
     assert!(!archive.has_file("META-INF/documentsignatures.xml").unwrap());
 
     let third = literal("#anchor", "https://example.invalid/schema#label", "third");
-    let mut triple_edit = document.edit().unwrap();
+    let mut triple_edit = document.edit();
     triple_edit.add_rdf_triple(&path, &third).unwrap();
     let triple_commit = apply_edit(&mut document, triple_edit);
     assert_eq!(triple_commit.results(), &[OperationResult::Index(2)]);
-    let mut move_edit = document.edit().unwrap();
+    let mut move_edit = document.edit();
     move_edit
         .move_rdf_triple_to(&path, Position::new(2), Position::new(0))
         .unwrap();
     apply_edit(&mut document, move_edit);
     assert!(
-        matches!(&document.rdf_graphs().unwrap()[0].triples[0].object, Object::Literal { value, .. } if value == "third")
+        matches!(&document.document().unwrap().rdf_graphs().unwrap()[0].triples[0].object, Object::Literal { value, .. } if value == "third")
     );
     let replacement = literal("#anchor", "https://example.invalid/schema#label", "changed");
-    let mut replacement_edit = document.edit().unwrap();
+    let mut replacement_edit = document.edit();
     replacement_edit
         .replace_rdf_triple(&path, 0, &replacement)
         .unwrap();
     apply_edit(&mut document, replacement_edit);
-    let mut removal_edit = document.edit().unwrap();
+    let mut removal_edit = document.edit();
     removal_edit
         .remove_rdf_triple_at(&path, Position::new(1))
         .unwrap();
@@ -177,11 +177,11 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
 
     let before = document.to_bytes().unwrap();
     let dangling = literal("#missing", "https://example.invalid/schema#label", "bad");
-    let mut dangling_edit = document.edit().unwrap();
+    let mut dangling_edit = document.edit();
     dangling_edit.add_rdf_triple(&path, &dangling).unwrap();
     assert!(dangling_edit.commit().is_err());
     assert_eq!(document.to_bytes().unwrap(), before);
-    let mut escape_edit = document.edit().unwrap();
+    let mut escape_edit = document.edit();
     escape_edit
         .add_rdf_graph(Some("../escape.rdf"), &[])
         .unwrap();
@@ -192,8 +192,8 @@ fn generated_graph_triple_crud_manifest_and_atomic_refs() {
 #[test]
 fn shared_graph_references_block_dangling_removal() {
     let mut document =
-        odt::Document::from_bytes(package(constants::ODF_TEXT, "text", &[], false)).unwrap();
-    let mut target_edit = document.edit().unwrap();
+        odt::Package::from_bytes(&package(constants::ODF_TEXT, "text", &[], false)).unwrap();
+    let mut target_edit = document.edit();
     target_edit
         .add_rdf_graph(Some("Metadata/target.rdf"), &[])
         .unwrap();
@@ -207,7 +207,7 @@ fn shared_graph_references_block_dangling_removal() {
         predicate: "http://docs.oasis-open.org/ns/office/1.2/meta/pkg#hasPart".to_string(),
         object: Object::Iri(target.clone()),
     };
-    let mut owner_edit = document.edit().unwrap();
+    let mut owner_edit = document.edit();
     owner_edit
         .add_rdf_graph(Some("manifest.rdf"), &[reference])
         .unwrap();
@@ -217,17 +217,24 @@ fn shared_graph_references_block_dangling_removal() {
         _ => unreachable!(),
     };
     let before = document.to_bytes().unwrap();
-    let mut blocked_removal_edit = document.edit().unwrap();
+    let mut blocked_removal_edit = document.edit();
     blocked_removal_edit.remove_rdf_graph(&target).unwrap();
     assert!(blocked_removal_edit.commit().is_err());
     assert_eq!(document.to_bytes().unwrap(), before);
-    let mut owner_removal_edit = document.edit().unwrap();
+    let mut owner_removal_edit = document.edit();
     owner_removal_edit.remove_rdf_graph(&owner).unwrap();
     apply_edit(&mut document, owner_removal_edit);
-    let mut target_removal_edit = document.edit().unwrap();
+    let mut target_removal_edit = document.edit();
     target_removal_edit.remove_rdf_graph(&target).unwrap();
     apply_edit(&mut document, target_removal_edit);
-    assert!(document.rdf_graphs().unwrap().is_empty());
+    assert!(
+        document
+            .document()
+            .unwrap()
+            .rdf_graphs()
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -237,14 +244,14 @@ fn libreoffice_rdf_and_malformed_xml_discovery() {
         "/../../test-data/libreoffice-core/extras/source/autotext/lang/szl/standard/FN/manifest.rdf"
     ))
     .unwrap();
-    let document = odt::Document::from_bytes(package_with_unchecked_rdf(
+    let document = odt::Package::from_bytes(&package_with_unchecked_rdf(
         constants::ODF_TEXT,
         "text",
         "manifest.rdf",
         &fixture,
     ))
     .unwrap();
-    let graph = &document.rdf_graphs().unwrap()[0];
+    let graph = &document.document().unwrap().rdf_graphs().unwrap()[0];
     assert!(!graph.triples.is_empty());
     assert!(
         graph
@@ -254,14 +261,14 @@ fn libreoffice_rdf_and_malformed_xml_discovery() {
     );
 
     let hostile = br#"<?xml version="1.0"?><!DOCTYPE rdf:RDF [<!ENTITY x "bad">]><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>"#;
-    let malformed = odt::Document::from_bytes(package_with_unchecked_rdf(
+    let malformed = odt::Package::from_bytes(&package_with_unchecked_rdf(
         constants::ODF_TEXT,
         "text",
         "manifest.rdf",
         hostile,
     ))
     .unwrap();
-    assert!(malformed.rdf_graphs().is_err());
+    assert!(malformed.document().unwrap().rdf_graphs().is_err());
 }
 
 #[test]
@@ -275,29 +282,37 @@ fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
             language: None,
         },
     };
-    let mut sheet = ods::facade::Spreadsheet::from_bytes(package(
-        constants::ODF_SPREADSHEET,
-        "spreadsheet",
-        &[],
-        false,
-    ))
-    .unwrap();
+    let mut sheet = ods::builder::Workbook::from_workbook(
+        ods::Package::from_bytes(&package(
+            constants::ODF_SPREADSHEET,
+            "spreadsheet",
+            &[],
+            false,
+        ))
+        .unwrap()
+        .workbook()
+        .unwrap(),
+    );
     sheet
         .add_rdf_graph(Some("manifest.rdf"), std::slice::from_ref(&triple))
         .unwrap();
-    assert_eq!(sheet.rdf_graphs().unwrap()[0].triples[0], triple);
+    assert_eq!(sheet.workbook().rdf_graphs().unwrap()[0].triples[0], triple);
     sheet.replace_rdf_graph("manifest.rdf", &[]).unwrap();
-    assert!(sheet.rdf_graphs().unwrap()[0].triples.is_empty());
+    assert!(sheet.workbook().rdf_graphs().unwrap()[0].triples.is_empty());
 
-    let mut slides = odp::facade::Presentation::from_bytes(package(
+    let slides = odp::Package::from_bytes(&package(
         constants::ODF_PRESENTATION,
         "presentation",
         &[],
         false,
     ))
     .unwrap();
-    slides
-        .add_rdf_graph(None, std::slice::from_ref(&triple))
+    let mut edit = slides.edit().unwrap();
+    edit.add_rdf_graph(None, std::slice::from_ref(&triple))
         .unwrap();
-    assert_eq!(slides.rdf_graphs().unwrap()[0].triples[0], triple);
+    let slides = edit.commit().unwrap().into_package();
+    assert_eq!(
+        slides.presentation().unwrap().rdf_graphs().unwrap()[0].triples[0],
+        triple
+    );
 }

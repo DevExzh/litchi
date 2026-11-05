@@ -7,7 +7,7 @@
 //! - concrete DOC and PPT packages map their storage topology onto those views.
 //!
 //! ```no_run
-//! # fn main() -> Result<(), litchi::Error> {
+//! # fn main() -> Result<(), litchi::common::Error> {
 //! #[cfg(feature = "doc")]
 //! {
 //!     use litchi::images::{Convert, Options, doc};
@@ -51,7 +51,7 @@ fn office_art(error: litchi_odraw::Error) -> Error {
 /// closed before this function returns. Native image data is not decoded.
 #[cfg(feature = "ppt")]
 pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
-    let mut package = litchi_ppt::Package::open(path).map_err(Error::from)?;
+    let package = litchi_ppt::Package::open(path).map_err(Error::from)?;
     let presentation = package.presentation().map_err(Error::from)?;
     presentation
         .images()
@@ -67,8 +67,8 @@ pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 /// closed before this function returns. Native image data is not decoded.
 #[cfg(feature = "doc")]
 pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
-    let mut package = litchi_doc::Package::open(path).map_err(Error::from)?;
-    let document = package.document().map_err(Error::from)?;
+    let package = litchi_doc::Package::open(path).map_err(Error::from)?;
+    let document = package.document();
     let mut seen = std::collections::HashSet::new();
     let mut images = Vec::new();
 
@@ -92,11 +92,11 @@ pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 }
 
 /// Discovers borrowed images in an OfficeArt record sequence.
-pub fn scan(data: &[u8]) -> Result<Vec<File<'_>>> {
-    art::scan(data).map_err(office_art)
+pub fn scan(data: &[u8], limits: art::Limits) -> Result<Vec<File<'_>>> {
+    art::scan(data, limits).map_err(office_art)
 }
 
 /// Finds the unique borrowed BStore in an OfficeArt drawing sequence.
-pub fn store(data: &[u8]) -> Result<Option<art::Store<'_>>> {
-    art::store(data).map_err(office_art)
+pub fn store(data: &[u8], limits: art::Limits) -> Result<Option<art::Store<'_>>> {
+    art::store(data, limits).map_err(office_art)
 }

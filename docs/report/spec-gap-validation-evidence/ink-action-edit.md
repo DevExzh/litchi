@@ -12,13 +12,14 @@ property/data child drafts to construct a new value. `finish()` produces a
 `Prepared` value after bounded readback.
 
 For an existing fragment, call `actions::read_profile(bytes)`, construct
-`Edit::new(profile)` (or `Edit::with_limits`), and select source actions with
-`ActionSelector`. Stage scalar or structural operations, then call `finish()`
-to obtain a `Commit`. The commit retains the prepared result and a
-source-checked `Patch`; `patch().inverse()` reverses it against the exact
-forward result. Selectors refer to the captured source, not shifting indexes
-after each staged insertion. Equivalent selectors coalesce scalar updates;
-sequential setters within one edit retain their final value.
+`Edit::new(profile, Limits::default())` (or another explicit `Limits` value),
+and select source actions with `ActionSelector`. Stage scalar or structural
+operations, then call `finish()` to obtain a `Commit`. The commit publishes
+the prepared package through `package()`, with a source-checked `Patch` and
+content-free `diagnostics()`; `patch().inverse()` reverses it against the
+exact forward result. Selectors refer to the captured source, not shifting
+indexes after each staged insertion. Equivalent selectors coalesce scalar
+updates; sequential setters within one edit retain their final value.
 
 An unchanged edit replays its exact source. Changed output preserves untouched
 source spans, including comments, namespace spelling, and opaque InkML bytes.

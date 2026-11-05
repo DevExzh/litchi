@@ -9,24 +9,24 @@
 
 mod repair_support;
 
-use litchi_rtf::{
-    DocumentDrawingGrid, DrawingGridLineInterval, DrawingGridSpacing, RtfDocument, RtfWriter,
-};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentDrawingGrid, DrawingGridLineInterval, DrawingGridSpacing, write::Writer};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_a_complete_producer_style_grid() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\dgmargin\dghspace180\dgvspace180\dghorigin1440"#,
-        r#"\dgvorigin1440\dghshow1\dgvshow1 Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\dgmargin\dghspace180\dgvspace180\dghorigin1440"#,
+            r#"\dgvorigin1440\dghshow1\dgvshow1 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(
         *document.drawing_grid(),
@@ -46,7 +46,7 @@ fn parses_a_complete_producer_style_grid() {
 
 #[test]
 fn omission_is_distinct_from_all_effective_defaults() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let grid = document.drawing_grid();
     assert!(grid.is_empty());
     assert_eq!(grid.effective_horizontal_spacing().get(), 120);
@@ -70,7 +70,8 @@ fn omission_is_distinct_from_all_effective_defaults() {
 
 #[test]
 fn typed_api_round_trips_boundaries_flags_and_canonical_order() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_drawing_grid(DocumentDrawingGrid {
         follows_margins: true,
         snap_to_grid: true,
@@ -96,7 +97,7 @@ fn typed_api_round_trips_boundaries_flags_and_canonical_order() {
     for pair in controls.windows(2) {
         assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
     }
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.drawing_grid(), document.drawing_grid());
     assert_eq!(reparsed.text(), "Body");
 
@@ -109,13 +110,16 @@ fn typed_api_round_trips_boundaries_flags_and_canonical_order() {
 
 #[test]
 fn coexists_with_rendering_and_processing_properties_without_side_effects() {
-    let document = RtfDocument::parse(concat!(
-        r#"{\rtf1\dgvshow2\jcompress\grfdocevents0\dgmargin"#,
-        r#"\dghspace120\horzdoc\dgsnap\fracwidth Body}"#,
-    ))
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\dgvshow2\jcompress\grfdocevents0\dgmargin"#,
+            r#"\dghspace120\horzdoc\dgsnap\fracwidth Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.drawing_grid(), document.drawing_grid());
     assert_eq!(reparsed.rendering_settings(), document.rendering_settings());
     assert_eq!(
@@ -160,7 +164,10 @@ fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
         r"{\rtf1\dgvshow1\dgvshow2 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }
@@ -184,7 +191,7 @@ fn rejects_every_starred_grouped_and_late_grid_control() {
             format!(r"{{\rtf1 Body{control}}}"),
         ] {
             assert!(
-                RtfDocument::parse(&source).is_err(),
+                Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
                 "accepted malformed {source}"
             );
         }

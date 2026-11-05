@@ -612,7 +612,7 @@ fn validate_oracle(corpus: &PptxStreamingCorpus, bytes: &[u8]) -> BenchResult<()
 /// graph semantics; this independent pass makes the physical payload gate
 /// explicit for every fixed and per-slide member.
 fn reopen_every_physical_member(bytes: &[u8], expected: usize) -> BenchResult<()> {
-    let package = PhysPkgReader::new(bytes)?;
+    let package = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())?;
     let names = package.member_names()?;
     if names.len() != expected {
         return Err(format!(
@@ -1016,9 +1016,11 @@ mod tests {
             },
         )
         .expect("control archive");
-        let source = PhysPkgReader::new(&archive).expect("source package");
+        let source = PhysPkgReader::new(&archive, litchi_opc::SourceLimits::default())
+            .expect("source package");
         let static_payload = source.read_member("ppt/presProps.xml").unwrap();
-        let mut rewritten = StreamingArchiveWriter::new();
+        let mut rewritten =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in source.member_names().unwrap() {
             let payload = source.read_member(&name).unwrap();
             rewritten.write_stored(&name, &payload).unwrap();

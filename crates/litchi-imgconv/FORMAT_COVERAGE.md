@@ -1,8 +1,7 @@
 # Metafile coverage and fidelity policy
 
 This crate classifies every record identifier defined by the Microsoft
-`[MS-EMF]`, `[MS-WMF]`, and `[MS-EMFPLUS]` specifications vendored under
-`3rdparty/specs`. A recognized record is never discarded merely because a
+`[MS-EMF]`, `[MS-WMF]`, and `[MS-EMFPLUS]` Open Specifications. A recognized record is never discarded merely because a
 match arm is missing.
 
 The output policy is deliberately stricter than best-effort metafile viewers:

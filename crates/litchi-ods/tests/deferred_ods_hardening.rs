@@ -1,4 +1,4 @@
-use litchi_ods::FlatSpreadsheet;
+use litchi_ods::flat::Workbook as FlatSpreadsheet;
 
 const ODS_SEED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" office:mimetype="application/vnd.oasis.opendocument.spreadsheet"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell office:value-type="float" office:value="7" table:formula="of:=1+6"><text:p>7</text:p><office:annotation><text:p>note</text:p></office:annotation></table:table-cell><table:table-cell table:number-columns-repeated="3" office:value-type="string"><text:p>x</text:p></table:table-cell></table:table-row><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>tail</text:p></table:table-cell></table:table-row><calcext:conditional-formats><calcext:conditional-format calcext:target-range-address="Data.A1:Data.D1"><calcext:condition calcext:apply-style-name="Good" calcext:value="cell-content()&gt;5" calcext:base-cell-address="Data.A1"/><calcext:color-scale><calcext:color-scale-entry calcext:value="0" calcext:type="minimum" calcext:color="#ff0000"/><calcext:color-scale-entry calcext:value="1" calcext:type="maximum" calcext:color="#00ff00"/></calcext:color-scale></calcext:conditional-format></calcext:conditional-formats><calcext:sparkline-groups><calcext:sparkline-group calcext:type="line" calcext:markers="true"><calcext:sparklines><calcext:sparkline calcext:cell-address="Data.E1" calcext:data-range="Data.A1:Data.D1"/></calcext:sparklines></calcext:sparkline-group></calcext:sparkline-groups></table:table><table:named-expressions><table:named-range table:name="Total" table:base-cell-address="$Data.$A$1" table:cell-range-address="$Data.$A$1:$Data.$D$1"/></table:named-expressions></office:spreadsheet></office:body></office:document>"##;
 
@@ -7,14 +7,14 @@ fn table(inner: &str) -> Vec<u8> {
 }
 
 fn exercise(bytes: Vec<u8>) -> Option<litchi_core::Error> {
-    match FlatSpreadsheet::from_bytes(bytes) {
+    match FlatSpreadsheet::from_bytes(&bytes) {
         Ok(flat) => {
             let _ = flat.sheets();
             let _ = flat.dde();
             let _ = flat.scenarios();
             None
         },
-        Err(error) => Some(error),
+        Err(error) => Some(error.into()),
     }
 }
 

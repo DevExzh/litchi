@@ -31,6 +31,7 @@ use crate::soundtrack::items::{
     Patch, StagedOperation,
 };
 
+use super::snappy_failure::SnappyFailure;
 use super::soundtrack_physical::{
     self, Budget, PACKAGE_METADATA_MESSAGE_TYPE, SOUNDTRACK_MEDIA_FIELD, Selection, SelectionPolicy,
 };
@@ -122,16 +123,16 @@ fn metadata_facts(
         .limits()
         .snappy_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let stream =
+        SnappyStream::decompress(entry.data(), snappy_limits).map_err(|_| Error::InvalidSource)?;
     let archive_limits = package
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let mut payload = None;
     for object in &archive.objects {
@@ -296,7 +297,9 @@ fn source_view<'a>(
     };
     let catalog = soundtrack_physical::physical_source(package).map_err(map_physical_error)?;
     if !catalog.source_is_exact() && require_metadata {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::soundtrack::items::Refusal::UnsupportedSource,
+        ));
     }
     let expected_locator = selection
         .soundtrack_component
@@ -436,13 +439,17 @@ fn package_lineage(package: &Package) -> [u8; SHA1_BYTES] {
 
 fn map_physical_error(error: soundtrack_physical::Error) -> Error {
     match error {
-        soundtrack_physical::Error::UnsupportedSource => Error::UnsupportedSource,
-        soundtrack_physical::Error::SoundtrackNotFound => Error::SoundtrackNotFound,
+        soundtrack_physical::Error::UnsupportedSource => {
+            Error::Refused(crate::soundtrack::items::Refusal::UnsupportedSource)
+        },
+        soundtrack_physical::Error::SoundtrackNotFound => {
+            Error::Refused(crate::soundtrack::items::Refusal::SoundtrackNotFound)
+        },
         soundtrack_physical::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 soundtrack_physical::LimitKind::InputBytes => {
                     crate::soundtrack::items::LimitKind::InputBytes
@@ -492,10 +499,12 @@ fn operation_position(
         StagedOperation::Add(_) => Ok(Position::from(before.len())),
         StagedOperation::Insert { position, .. } => {
             if position.get() > before.len() {
-                return Err(Error::InsertionOutOfRange {
-                    position: *position,
-                    item_count: before.len(),
-                });
+                return Err(Error::Refused(
+                    crate::soundtrack::items::Refusal::InsertionOutOfRange {
+                        position: *position,
+                        item_count: before.len(),
+                    },
+                ));
             }
             Ok(*position)
         },
@@ -518,7 +527,9 @@ fn resolve_selector(selector: ItemSelector, before: &[ResolvedItem]) -> Result<P
                     .map(|item| item.semantic.handle().position())
                     .is_none()
             {
-                return Err(Error::ItemHandleConflict);
+                return Err(Error::Refused(
+                    crate::soundtrack::items::Refusal::ItemHandleConflict,
+                ));
             }
             // The caller's lineage is checked by the edit commit below.  This
             // branch only resolves the captured semantic occurrence.
@@ -527,7 +538,9 @@ fn resolve_selector(selector: ItemSelector, before: &[ResolvedItem]) -> Result<P
         },
     };
     if position.get() >= before.len() {
-        return Err(Error::SourcePositionNotFound { position });
+        return Err(Error::Refused(
+            crate::soundtrack::items::Refusal::SourcePositionNotFound { position },
+        ));
     }
     Ok(position)
 }
@@ -714,7 +727,7 @@ fn rewrite_soundtrack_payload(
     new_identifier: Option<u64>,
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let new_ref_len = new_identifier.map_or(0, |identifier| {
         encoded_len(u64::from(SOUNDTRACK_MEDIA_FIELD << 3) | 2)
             + encoded_len(
@@ -731,7 +744,7 @@ fn rewrite_soundtrack_payload(
         .checked_add(new_ref_len)
         .ok_or(Error::InvalidSource)?;
     if output_len > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: crate::soundtrack::items::LimitKind::OutputBytes,
             observed: output_len as u64,
             maximum: limits.max_output_bytes() as u64,
@@ -775,7 +788,7 @@ fn rewrite_soundtrack_payload(
         encode_reference_field(&mut output, new_identifier.ok_or(Error::InvalidSource)?);
     }
     if output.len() > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: crate::soundtrack::items::LimitKind::OutputBytes,
             observed: output.len() as u64,
             maximum: limits.max_output_bytes() as u64,
@@ -797,7 +810,7 @@ fn rewrite_metadata_payload(
     if entry.is_opaque() {
         return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .limits()
@@ -809,10 +822,14 @@ fn rewrite_metadata_payload(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let snappy_limits = package
+        .limits()
+        .snappy_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let mut selected = None;
     for (object_index, object) in archive.objects.iter().enumerate() {
@@ -837,7 +854,7 @@ fn rewrite_metadata_payload(
         .get_mut(object_index)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -847,9 +864,9 @@ fn rewrite_metadata_payload(
         )
         .map_err(|_| Error::InvalidSource)?;
     let serialized = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    SnappyStream::compress(&serialized).map_err(|_| Error::InvalidSource)
+    SnappyStream::compress(&serialized, snappy_limits).map_err(map_snappy_error)
 }
 
 fn rewrite_package(
@@ -859,7 +876,9 @@ fn rewrite_package(
 ) -> Result<(Package, Box<[Item]>), Error> {
     let catalog = soundtrack_physical::physical_source(source).map_err(map_physical_error)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::soundtrack::items::Refusal::UnsupportedSource,
+        ));
     }
     let operation_kind = operation.kind();
     let position = operation_position(operation, &view.items)?;
@@ -919,7 +938,11 @@ fn rewrite_package(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let stream = SnappyStream::decompress(
         archive_entry.data(),
         source
             .limits()
@@ -927,10 +950,10 @@ fn rewrite_package(
             .map_err(|_| Error::InvalidSource)?,
     )
     .map_err(|_| Error::InvalidSource)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let object = archive
         .object_mut(view.selection.soundtrack_identifier)
@@ -954,23 +977,22 @@ fn rewrite_package(
         data: rewritten_payload,
     };
     match matching_fields.as_slice() {
-        [field_index] => object
-            .replace_message_transitioning_data_references_preserving_header_with_limits(
-                view.selection.soundtrack_message_index,
-                replacement,
-                DataReferenceTransition {
-                    aggregate_before: &before_ids,
-                    aggregate_after: &after_ids,
-                    fields: &[FieldDataReferenceTransition {
-                        field_info_index: *field_index,
-                        expected_path: &[SOUNDTRACK_MEDIA_FIELD],
-                        before: &before_ids,
-                        after: &after_ids,
-                    }],
-                },
-                archive_limits,
-            ),
-        [] => object.replace_message_transitioning_data_references_preserving_header_with_limits(
+        [field_index] => object.replace_message_transitioning_data_references_preserving_header(
+            view.selection.soundtrack_message_index,
+            replacement,
+            DataReferenceTransition {
+                aggregate_before: &before_ids,
+                aggregate_after: &after_ids,
+                fields: &[FieldDataReferenceTransition {
+                    field_info_index: *field_index,
+                    expected_path: &[SOUNDTRACK_MEDIA_FIELD],
+                    before: &before_ids,
+                    after: &after_ids,
+                }],
+            },
+            archive_limits,
+        ),
+        [] => object.replace_message_transitioning_data_references_preserving_header(
             view.selection.soundtrack_message_index,
             replacement,
             DataReferenceTransition {
@@ -984,10 +1006,10 @@ fn rewrite_package(
     }
     .map_err(|_| Error::InvalidSource)?;
     let serialized_soundtrack = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let compressed_soundtrack =
-        SnappyStream::compress(&serialized_soundtrack).map_err(|_| Error::InvalidSource)?;
+        SnappyStream::compress(&serialized_soundtrack, snappy_limits).map_err(map_snappy_error)?;
 
     let mut data_additions = Vec::new();
     let mut owner_additions = Vec::new();
@@ -1225,8 +1247,12 @@ fn physical_source_bytes(package: &Package) -> Result<Arc<[u8]>, Error> {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => {
             Ok(catalog.shared_source())
         },
-        PhysicalSource::Package(_) => Err(Error::UnsupportedSource),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) => Err(Error::Refused(
+            crate::soundtrack::items::Refusal::UnsupportedSource,
+        )),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(
+            crate::soundtrack::items::Refusal::UnsupportedSource,
+        )),
     }
 }
 
@@ -1244,7 +1270,9 @@ impl Package {
     /// Begin one immutable soundtrack-item lifecycle edit.
     pub fn edit_soundtrack_items(&self) -> Result<Edit<'_>, Error> {
         let Some(view) = source_view(self, true)? else {
-            return Err(Error::SoundtrackNotFound);
+            return Err(Error::Refused(
+                crate::soundtrack::items::Refusal::SoundtrackNotFound,
+            ));
         };
         Ok(Edit::new_with_item_count(self, Some(view.items.len())))
     }
@@ -1289,9 +1317,13 @@ impl Package {
 impl Edit<'_> {
     /// Validate, publish, and reopen the staged one-operation transaction.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Error::NoStagedOperation)?;
+        let operation = self.operation.ok_or(Error::Refused(
+            crate::soundtrack::items::Refusal::NoStagedOperation,
+        ))?;
         let Some(view) = source_view(self.source, true)? else {
-            return Err(Error::SoundtrackNotFound);
+            return Err(Error::Refused(
+                crate::soundtrack::items::Refusal::SoundtrackNotFound,
+            ));
         };
         if let StagedOperation::Replace {
             selector,
@@ -1300,20 +1332,23 @@ impl Edit<'_> {
             && let ItemSelector::Handle(handle) = selector
             && handle.lineage != package_lineage(self.source)
         {
-            return Err(Error::ItemHandleConflict);
+            return Err(Error::Refused(
+                crate::soundtrack::items::Refusal::ItemHandleConflict,
+            ));
         }
         if let StagedOperation::Remove { selector } = &operation
             && let ItemSelector::Handle(handle) = selector
             && handle.lineage != package_lineage(self.source)
         {
-            return Err(Error::ItemHandleConflict);
+            return Err(Error::Refused(
+                crate::soundtrack::items::Refusal::ItemHandleConflict,
+            ));
         }
         let position = operation_position(&operation, &view.items)?;
         if let StagedOperation::Replace { source, .. } = &operation {
-            let current = view
-                .items
-                .get(position.get())
-                .ok_or(Error::SourcePositionNotFound { position })?;
+            let current = view.items.get(position.get()).ok_or(Error::Refused(
+                crate::soundtrack::items::Refusal::SourcePositionNotFound { position },
+            ))?;
             let catalog =
                 soundtrack_physical::physical_source(self.source).map_err(map_physical_error)?;
             let data_name = format!("{DATA_PREFIX}{}", current.current_name);
@@ -1372,5 +1407,29 @@ impl Edit<'_> {
                 Diagnostics::published(2)
             },
         })
+    }
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+fn map_snappy_error(error: litchi_iwa_core::Error) -> Error {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => Error::Limit {
+            kind: crate::soundtrack::items::LimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => Error::Limit {
+            kind: crate::soundtrack::items::LimitKind::WireBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Work { observed, maximum } => Error::Limit {
+            kind: crate::soundtrack::items::LimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Allocation { requested } => Error::Allocation { amount: requested },
+        SnappyFailure::Invalid => Error::InvalidSource,
     }
 }

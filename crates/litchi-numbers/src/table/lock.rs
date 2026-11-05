@@ -7,6 +7,11 @@
 /// The canonical interactive editing state of an iWork table.
 pub use litchi_iwa_common::table::lock::State;
 
+/// Selector-first exact-source table-lock transactions:
+/// [`crate::Package::edit_table_lock`] stages a lock state and
+/// [`crate::Package::apply_table_lock`] replays a patch.
+pub use crate::package::table_lock::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal};
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;

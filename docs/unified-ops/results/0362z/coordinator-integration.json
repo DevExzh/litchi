@@ -1,0 +1,110 @@
+{
+  "base": "bf529cb322",
+  "incoming": "135a7b6e635c4ac679b19897e49ea416cc78efa3",
+  "initial_checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-features",
+        "--test",
+        "drawing_svg_lifecycle"
+      ],
+      "exit": 0,
+      "seconds": 95.44291850796435,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-assembly-v1/check-0.log",
+      "bytes": 3913,
+      "sha256": "ddeea0018a701b13ab6f3e1dfbca2d9a54d6c43288ad4127783d27e0704f66fa"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 87.67308453598525,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-assembly-v1/check-1.log",
+      "bytes": 8624,
+      "sha256": "e0189b4a98591df91eddd80db49d3cd4dfdc75493d92bfe0071d611b9ef40086"
+    }
+  ],
+  "repaired_checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-features",
+        "--test",
+        "drawing_svg_lifecycle"
+      ],
+      "exit": 0,
+      "seconds": 28.232178342994303,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-assembly-v2/check-0.log",
+      "bytes": 2240,
+      "sha256": "e41cce3f0900b8a83eaac079739cb0ece1dd6f9f704ed8807e25886b43b93730"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-docx",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 42.25214655289892,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-assembly-v2/check-1.log",
+      "bytes": 185,
+      "sha256": "95a5608dad2141520ef72c4c274a4bf5c5c1fc19b47d981119d87bbd0fcf5391"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-gates.py"
+      ],
+      "exit": 0,
+      "seconds": 444.4896716660587,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-assembly-v2/check-2.log",
+      "bytes": 5749,
+      "sha256": "0e5532aaee5f0282617140f2056e683e8db6b2c234782c842de8b11bb9669c35"
+    }
+  ],
+  "separate_feature_captures": [
+    {
+      "profile": "docx-minimal",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-docx-minimal.json",
+      "bytes": 76572233,
+      "sha256": "71041887473703cab6979084a951327a1ce37f82d6c969535c4e5d9d1d87a1b4"
+    },
+    {
+      "profile": "docx-full",
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/svg-docx-full.json",
+      "bytes": 78286333,
+      "sha256": "e7495ef0eff24c8dc0745f43d9baef691472e034d18802781f4f43a75692623f"
+    }
+  ],
+  "status": "Focused integration, all-target/all-feature Clippy, and independent minimal/full API profiles pass; final workspace/runtime/performance acceptance remains open."
+}

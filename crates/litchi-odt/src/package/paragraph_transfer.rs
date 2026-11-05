@@ -16,9 +16,10 @@
 use crate::{
     constants::ODF_CONTENT,
     protection::Policy,
-    transaction::{Edit, EnvelopeKind, Position, Snapshot},
+    transaction::{Edit, EnvelopeKind, Package, Position},
 };
 use litchi_core::{BlobId, Error, Result};
+use litchi_odf_common::Error as OdfError;
 use litchi_odf_common::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
 use litchi_odf_common::package::{
     MAX_CONTENT_REPLACEMENT_BYTES, raw_identical_members, replace_content_xml_spliced,
@@ -50,7 +51,7 @@ const MCE_NS: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2
 /// or after target bytes have changed, is refused before publication.
 #[derive(Clone)]
 pub struct ParagraphTransferPlan {
-    pub(crate) donor: Snapshot,
+    pub(crate) donor: Package,
     pub(crate) donor_fingerprint: String,
     pub(crate) destination_fingerprint: String,
     pub(crate) source_positions: Vec<usize>,
@@ -104,24 +105,29 @@ impl ParagraphTransferPlan {
 
     /// Returns the immutable donor snapshot retained by this plan.
     #[must_use]
-    pub const fn donor(&self) -> &Snapshot {
+    pub const fn donor(&self) -> &Package {
         &self.donor
     }
 
     /// Applies this plan to an edit whose source is the exact planned target.
-    pub fn apply(&self, edit: &mut Edit) -> Result<()> {
+    pub fn apply(&self, edit: &mut Edit) -> std::result::Result<(), OdfError> {
         edit.stage_plain_paragraph_transfer(self).map(|_| ())
     }
 
-    pub(crate) fn validate_integrity(&self, destination: &Snapshot) -> Result<()> {
+    pub(crate) fn validate_integrity(
+        &self,
+        destination: &Package,
+    ) -> std::result::Result<(), OdfError> {
         if BlobId::of(self.donor.as_bytes()).as_hex() != self.donor_fingerprint {
-            return Err(Error::InvalidFormat(
-                "ODT paragraph transfer donor changed after planning".to_string(),
+            return Err(OdfError::patch_conflict(
+                "odt.paragraph_transfer",
+                "the donor changed after planning",
             ));
         }
         if BlobId::of(destination.as_bytes()).as_hex() != self.destination_fingerprint {
-            return Err(Error::InvalidFormat(
-                "ODT paragraph transfer destination is stale or foreign".to_string(),
+            return Err(OdfError::patch_conflict(
+                "odt.paragraph_transfer",
+                "the destination is stale or foreign",
             ));
         }
         validate_positions_and_fragments(
@@ -161,8 +167,8 @@ pub(crate) struct PlainParagraphTransferOperation {
 
 /// Plan one direct paragraph transfer.
 pub(crate) fn plan_one(
-    destination: &Snapshot,
-    donor: &Snapshot,
+    destination: &Package,
+    donor: &Package,
     source: Position,
     target: Position,
 ) -> Result<ParagraphTransferPlan> {
@@ -171,8 +177,8 @@ pub(crate) fn plan_one(
 
 /// Plan a bounded ordered batch of direct paragraph transfers.
 pub(crate) fn plan_many(
-    destination: &Snapshot,
-    donor: &Snapshot,
+    destination: &Package,
+    donor: &Package,
     sources: &[Position],
     target: Position,
 ) -> Result<ParagraphTransferPlan> {
@@ -274,9 +280,9 @@ pub(crate) fn plan_many(
 
 /// Apply one already-authenticated transaction operation to the target.
 pub(crate) fn apply_operation(
-    destination: &Snapshot,
+    destination: &Package,
     operation: &PlainParagraphTransferOperation,
-) -> Result<Snapshot> {
+) -> Result<Package> {
     validate_envelope(destination, "destination")?;
     if BlobId::of(destination.as_bytes()).as_hex() != operation.destination_fingerprint {
         return Err(Error::InvalidFormat(
@@ -314,7 +320,7 @@ pub(crate) fn apply_operation(
     publication.replace(proof, authored)?;
     let target_bytes =
         replace_content_xml_spliced(document.transaction_package(), &replacement, publication)?;
-    let target = Snapshot::from_bytes(target_bytes)?;
+    let target = Package::from_vec_with_xml_limits(target_bytes, destination.xml_limits_value())?;
     let target_document = target.document()?;
     require_raw_untouched_members(
         document.transaction_package(),
@@ -355,24 +361,30 @@ pub(crate) fn validate_operation_for_durable(
     )
 }
 
-fn validate_envelope(snapshot: &Snapshot, role: &str) -> Result<()> {
+fn validate_envelope(snapshot: &Package, _role: &str) -> Result<()> {
     match snapshot.envelope_kind()? {
         EnvelopeKind::Plain => {},
         EnvelopeKind::Signed => {
-            return Err(Error::Unsupported(format!(
-                "ODT paragraph transfer refuses signed {role} packages"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "odt.package.paragraph_transfer",
+                "ODT paragraph transfer refuses signed packages",
             )));
         },
         EnvelopeKind::Encrypted => {
-            return Err(Error::Unsupported(format!(
-                "ODT paragraph transfer refuses encrypted {role} packages"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.package.paragraph_transfer",
+                "ODT paragraph transfer refuses encrypted packages",
             )));
         },
     }
     let document = snapshot.document()?;
     if document.protection()? != Policy::default() {
-        return Err(Error::Unsupported(format!(
-            "ODT paragraph transfer refuses protected {role} documents"
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odt.package.paragraph_transfer",
+            "ODT paragraph transfer refuses protected documents",
         )));
     }
     if document
@@ -380,14 +392,18 @@ fn validate_envelope(snapshot: &Snapshot, role: &str) -> Result<()> {
         .is_some_and(|scripts| !scripts.scripts.is_empty() || !scripts.event_listeners.is_empty())
         || !document.script_resources()?.is_empty()
     {
-        return Err(Error::Unsupported(format!(
-            "ODT paragraph transfer refuses scripted {role} documents"
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.package.paragraph_transfer",
+            "ODT paragraph transfer refuses scripted documents",
         )));
     }
     let declarations = document.variable_declarations()?;
     if !declarations.dde_connections.is_empty() || !declarations.dde_connection_uses.is_empty() {
-        return Err(Error::Unsupported(format!(
-            "ODT paragraph transfer refuses DDE-bearing {role} documents"
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.package.paragraph_transfer",
+            "ODT paragraph transfer refuses DDE-bearing documents",
         )));
     }
     Ok(())
@@ -994,8 +1010,10 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(what: &str) -> Result<T> {
-    Err(Error::Unsupported(format!(
-        "ODT paragraph transfer refuses {what}"
+fn unsupported<T>(_what: &str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odt.package.paragraph_transfer",
+        "ODT paragraph transfer refuses this source",
     )))
 }

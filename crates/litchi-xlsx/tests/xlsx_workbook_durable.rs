@@ -6,22 +6,21 @@
 use litchi_xlsx::page_breaks::{Break, Collection, PageBreaks};
 use litchi_xlsx::{
     Cell, DurablePatch, Error, Formula, History, HistoryLimits, LocalStyle, MergeChoice,
-    MergeLimits, Package, Value, Workbook,
+    MergeLimits, Package, Value,
 };
 
-fn two_sheet_workbook() -> Workbook {
-    let mut package = Package::create().unwrap();
+fn two_sheet_workbook() -> Package {
+    let package = Package::new().unwrap();
     let mut breaks = package.edit_page_breaks("Sheet1").unwrap();
     breaks
         .set_horizontal(
             Collection::horizontal([Break::new(12, 0, 16_383).unwrap().with_manual(true)]).unwrap(),
         )
         .unwrap();
-    breaks.commit().unwrap();
-    let workbook = package.into_workbook().unwrap();
+    let workbook = breaks.commit().unwrap().into_package();
     let mut edit = workbook.edit().unwrap();
     edit.add("Target").unwrap();
-    edit.commit().unwrap().into_workbook()
+    edit.commit().unwrap().into_package()
 }
 
 #[test]
@@ -41,10 +40,10 @@ fn durable_json_is_deterministic_stale_checked_reversible_and_reopenable() {
 
     let parsed = DurablePatch::from_deterministic_json(&first).unwrap();
     let applied = parsed.apply(&base).unwrap();
-    let reopened = Workbook::from_bytes(applied.to_plain_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&applied.to_plain_bytes().unwrap()).unwrap();
     assert!(matches!(
         reopened
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .unwrap()
             .unwrap()
             .cell("A1")
@@ -67,7 +66,7 @@ fn durable_json_is_deterministic_stale_checked_reversible_and_reopenable() {
         .unwrap()
         .set("B2", "stale")
         .unwrap();
-    let divergent_book = divergent_edit.commit().unwrap().into_workbook();
+    let divergent_book = divergent_edit.commit().unwrap().into_package();
     assert!(matches!(
         parsed.apply(&divergent_book),
         Err(Error::PatchConflict { .. })
@@ -139,9 +138,10 @@ fn three_way_planning_keeps_disjoint_work_and_requires_conflict_resolution() {
         .unwrap();
     assert_eq!(plan.automatic_len(), 2);
     assert!(plan.conflicts().is_empty());
-    let merged = plan.finish().unwrap().commit().unwrap().into_workbook();
+    let merged = plan.finish().unwrap().commit().unwrap().into_package();
     assert!(
         merged
+            .workbook_ref()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -152,6 +152,7 @@ fn three_way_planning_keeps_disjoint_work_and_requires_conflict_resolution() {
     );
     assert!(
         merged
+            .workbook_ref()
             .sheet("Target")
             .unwrap()
             .unwrap()
@@ -185,10 +186,10 @@ fn three_way_planning_keeps_disjoint_work_and_requires_conflict_resolution() {
         .unwrap()
         .commit()
         .unwrap()
-        .into_workbook();
+        .into_package();
     assert!(matches!(
         chosen
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .unwrap()
             .unwrap()
             .cell("D4")
@@ -203,6 +204,7 @@ fn three_way_planning_keeps_disjoint_work_and_requires_conflict_resolution() {
 fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
     let base = two_sheet_workbook();
     let source = base
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -210,9 +212,10 @@ fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
         .unwrap();
     let mut copy = base.edit().unwrap();
     assert!(copy.copy_page_breaks("Sheet1", "Target").unwrap().is_some());
-    let copied = copy.commit().unwrap().into_workbook();
+    let copied = copy.commit().unwrap().into_package();
     assert_eq!(
         copied
+            .workbook_ref()
             .sheet("Target")
             .unwrap()
             .unwrap()
@@ -228,9 +231,10 @@ fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
             .unwrap()
             .is_some()
     );
-    let moved_book = move_edit.commit().unwrap().into_workbook();
+    let moved_book = move_edit.commit().unwrap().into_package();
     assert_eq!(
         moved_book
+            .workbook_ref()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -240,6 +244,7 @@ fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
     );
     assert_eq!(
         moved_book
+            .workbook_ref()
             .sheet("Target")
             .unwrap()
             .unwrap()
@@ -248,9 +253,10 @@ fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
         PageBreaks::new()
     );
 
-    let reopened = Workbook::from_bytes(moved_book.to_plain_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&moved_book.to_plain_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
+            .workbook_ref()
             .sheet("Target")
             .unwrap()
             .unwrap()
@@ -263,7 +269,7 @@ fn page_break_copy_and_move_are_atomic_dependency_checked_transfers() {
 #[test]
 fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
     let base = two_sheet_workbook();
-    let style = base.styles().unwrap().base().unwrap();
+    let style = base.workbook_ref().styles().unwrap().base().unwrap();
     let mut prepare = base.edit().unwrap();
     let mut source = prepare.sheet("Sheet1").unwrap().unwrap();
     source
@@ -275,7 +281,7 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
         .unwrap()
         .style("A2", &style)
         .unwrap();
-    let prepared = prepare.commit().unwrap().into_workbook();
+    let prepared = prepare.commit().unwrap().into_package();
 
     let mut copy = prepared.edit().unwrap();
     assert!(
@@ -289,7 +295,7 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
     assert_eq!(durable_json, durable.to_deterministic_json().unwrap());
     let parsed = DurablePatch::from_deterministic_json(&durable_json).unwrap();
     let copied = parsed.apply(&prepared).unwrap();
-    let target = copied.sheet("Target").unwrap().unwrap();
+    let target = copied.workbook_ref().sheet("Target").unwrap().unwrap();
     assert!(matches!(
         target.cell("B2").unwrap().stored().unwrap(),
         Cell::Formula(formula)
@@ -304,10 +310,10 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
         Some(LocalStyle::Shared(_))
     ));
 
-    let reopened = Workbook::from_bytes(copied.to_plain_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&copied.to_plain_bytes().unwrap()).unwrap();
     assert!(matches!(
         reopened
-            .sheet("Target")
+            .workbook_ref().sheet("Target")
             .unwrap()
             .unwrap()
             .cell("B2")
@@ -338,9 +344,10 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
             .unwrap()
             .is_some()
     );
-    let moved = move_edit.commit().unwrap().into_workbook();
+    let moved = move_edit.commit().unwrap().into_package();
     assert!(
         moved
+            .workbook_ref()
             .sheet("Target")
             .unwrap()
             .unwrap()
@@ -351,7 +358,7 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
     );
     assert!(matches!(
         moved
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .unwrap()
             .unwrap()
             .cell("D4")
@@ -360,10 +367,10 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
             .unwrap(),
         Cell::Formula(formula) if formula.text() == "E4*2"
     ));
-    let reopened_move = Workbook::from_bytes(moved.to_plain_bytes().unwrap()).unwrap();
+    let reopened_move = Package::from_bytes(&moved.to_plain_bytes().unwrap()).unwrap();
     assert!(matches!(
         reopened_move
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .unwrap()
             .unwrap()
             .cell("D4")
@@ -377,8 +384,8 @@ fn cell_copy_and_move_close_formula_text_and_style_dependencies() {
     overlap
         .move_cells("Sheet1", "A1:A2", "Sheet1", "A2")
         .unwrap();
-    let overlapped = overlap.commit().unwrap().into_workbook();
-    let sheet = overlapped.sheet("Sheet1").unwrap().unwrap();
+    let overlapped = overlap.commit().unwrap().into_package();
+    let sheet = overlapped.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     assert!(sheet.cell("A1").unwrap().stored().is_none());
     assert!(matches!(
         sheet.cell("A2").unwrap().stored().unwrap(),
@@ -400,7 +407,7 @@ fn cell_transfer_participates_in_non_applying_three_way_plans() {
         .unwrap()
         .set("A1", Formula::new("B1+1").unwrap())
         .unwrap();
-    let prepared = prepare.commit().unwrap().into_workbook();
+    let prepared = prepare.commit().unwrap().into_package();
     let limits = MergeLimits::new(2, 64, 128, 64);
 
     let mut left = prepared.edit().unwrap();
@@ -414,10 +421,10 @@ fn cell_transfer_participates_in_non_applying_three_way_plans() {
         .unwrap();
     let plan = left.plan_three_way(right, limits).unwrap();
     assert!(plan.conflicts().is_empty());
-    let merged = plan.finish().unwrap().commit().unwrap().into_workbook();
+    let merged = plan.finish().unwrap().commit().unwrap().into_package();
     assert!(matches!(
         merged
-            .sheet("Target")
+            .workbook_ref().sheet("Target")
             .unwrap()
             .unwrap()
             .cell("B2")
@@ -457,9 +464,9 @@ fn cell_transfer_is_bounded_and_malformed_package_bytes_stay_test_only() {
     );
 
     let truncated_zip = b"PK\x03\x04\0\0\0".to_vec();
-    assert!(Workbook::from_bytes(truncated_zip).is_err());
+    assert!(Package::from_bytes(&truncated_zip).is_err());
 
-    let array_book = Workbook::open(concat!(
+    let array_book = Package::open(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx"
     ))
@@ -470,13 +477,14 @@ fn cell_transfer_is_bounded_and_malformed_package_bytes_stay_test_only() {
 
 #[test]
 fn real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package() {
-    let base = Workbook::open(concat!(
+    let base = Package::open(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx"
     ))
     .unwrap();
     let before = base.to_plain_bytes().unwrap();
     let names = base
+        .workbook_ref()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
@@ -484,6 +492,7 @@ fn real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package() {
         .iter()
         .find(|name| {
             let value = base
+                .workbook_ref()
                 .sheet(name.as_str())
                 .unwrap()
                 .unwrap()
@@ -500,15 +509,17 @@ fn real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package() {
     let commit = edit.commit().unwrap();
     let durable = commit.patch().durable().unwrap();
     let changed = durable.apply(&base).unwrap();
-    let reopened = Workbook::from_bytes(changed.to_plain_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&changed.to_plain_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
+            .workbook_ref()
             .sheet(target.as_str())
             .unwrap()
             .unwrap()
             .page_breaks()
             .unwrap(),
-        base.sheet(source.as_str())
+        base.workbook_ref()
+            .sheet(source.as_str())
             .unwrap()
             .unwrap()
             .page_breaks()
@@ -538,9 +549,15 @@ fn real_poi_and_libreoffice_formulas_copy_and_fully_reopen() {
         ),
     ];
     for (path, source, expected, shared_text) in cases {
-        let base = Workbook::open(path).unwrap();
+        let base = Package::open(path).unwrap();
         let before = base.to_plain_bytes().unwrap();
-        let sheet_name = base.sheet(0usize).unwrap().unwrap().name().to_owned();
+        let sheet_name = base
+            .workbook_ref()
+            .sheet(0usize)
+            .unwrap()
+            .unwrap()
+            .name()
+            .to_owned();
         let mut edit = base.edit().unwrap();
         edit.copy_cells(sheet_name.as_str(), source, sheet_name.as_str(), "Z1000")
             .unwrap();
@@ -550,10 +567,10 @@ fn real_poi_and_libreoffice_formulas_copy_and_fully_reopen() {
         }
         let durable = edit.commit().unwrap().patch().durable().unwrap();
         let changed = durable.apply(&base).unwrap();
-        let reopened = Workbook::from_bytes(changed.to_plain_bytes().unwrap()).unwrap();
+        let reopened = Package::from_bytes(&changed.to_plain_bytes().unwrap()).unwrap();
         assert!(matches!(
             reopened
-                .sheet(sheet_name.as_str())
+                .workbook_ref().sheet(sheet_name.as_str())
                 .unwrap()
                 .unwrap()
                 .cell("Z1000")
@@ -564,7 +581,11 @@ fn real_poi_and_libreoffice_formulas_copy_and_fully_reopen() {
                 if formula.text() == expected && formula.cached().is_none()
         ));
         if let Some((_, target, expected)) = shared_text {
-            let sheet = reopened.sheet(sheet_name.as_str()).unwrap().unwrap();
+            let sheet = reopened
+                .workbook_ref()
+                .sheet(sheet_name.as_str())
+                .unwrap()
+                .unwrap();
             assert!(matches!(
                 sheet.cell(target).unwrap().stored().unwrap(),
                 Cell::Value(Value::Text(text)) if text.as_str() == expected

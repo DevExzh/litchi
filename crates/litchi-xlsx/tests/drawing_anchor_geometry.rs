@@ -9,6 +9,7 @@
 
 use std::fmt::Write as _;
 
+use litchi_xlsx::SourceLimits;
 use litchi_xlsx::drawing::{DrawingAnchor, EditAs, Object, UnknownKind, parse};
 use litchi_xlsx::shapes::Emu;
 
@@ -119,7 +120,7 @@ fn is_picture(object: &Object) -> bool {
 }
 
 fn only_pictures(xml: &str) -> litchi_xlsx::drawing::Drawing {
-    parse(xml)
+    parse(xml, &SourceLimits::default())
         .expect("drawing must parse")
         .expect("drawing root must be recognized")
 }
@@ -357,7 +358,7 @@ fn rejects_missing_duplicate_and_out_of_order_geometry() {
         ),
     ] {
         assert!(
-            parse(&malformed).is_err(),
+            parse(&malformed, &SourceLimits::default()).is_err(),
             "accepted malformed drawing: {malformed}"
         );
     }
@@ -400,7 +401,7 @@ fn rejects_invalid_edit_as_and_schema_bounds() {
         nbsp_marker,
     ] {
         assert!(
-            parse(&malformed).is_err(),
+            parse(&malformed, &SourceLimits::default()).is_err(),
             "accepted invalid drawing: {malformed}"
         );
     }
@@ -412,7 +413,7 @@ fn applies_drawing_size_and_marker_text_limits_before_projection() {
     let marker_limit = valid_picture_with_anchor(&format!(
         r#"<x:twoCellAnchor><x:from><x:col>{oversized_marker}</x:col><x:colOff>0</x:colOff><x:row>0</x:row><x:rowOff>0</x:rowOff></x:from><x:to><x:col>1</x:col><x:colOff>0</x:colOff><x:row>1</x:row><x:rowOff>0</x:rowOff></x:to><x:pic><x:blipFill><d:blip rel:embed="rId"/></x:blipFill></x:pic><x:clientData/></x:twoCellAnchor>"#
     ));
-    assert!(parse(&marker_limit).is_err());
+    assert!(parse(&marker_limit, &SourceLimits::default()).is_err());
 
     let huge_comment = "x".repeat(32 * 1024 * 1024);
     let oversized_source = format!(
@@ -421,7 +422,7 @@ fn applies_drawing_size_and_marker_text_limits_before_projection() {
         A = A,
         R = R,
     );
-    assert!(parse(&oversized_source).is_err());
+    assert!(parse(&oversized_source, &SourceLimits::default()).is_err());
 }
 
 #[test]
@@ -445,13 +446,13 @@ fn rejects_mce_output_that_exceeds_the_drawing_budget_after_expansion() {
         )
     };
     // One hoisted declaration fits, so the shape itself is admitted.
-    assert!(parse(&source(1)).is_ok());
+    assert!(parse(&source(1), &SourceLimits::default()).is_ok());
     let expanded = source(48);
     assert!(expanded.len() < 32 * 1024 * 1024);
     assert!(matches!(
-        parse(&expanded),
+        parse(&expanded, &SourceLimits::default()),
         Err(litchi_xlsx::Error::MarkupCompatibility(
-            litchi_ooxml_common::mce::Error::LimitExceeded(resource)
-        )) if resource == "output bytes"
+            litchi_ooxml_common::mce::Error::LimitExceeded { kind, .. }
+        )) if kind == litchi_ooxml_common::mce::LimitKind::OutputBytes
     ));
 }

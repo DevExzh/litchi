@@ -71,8 +71,8 @@ fn ordinary_open_is_lazy_and_noop_shares_exact_source() {
     assert_eq!(snapshot.elements().expect("elements").len(), 3);
 
     let commit = snapshot.edit().commit().expect("exact no-op");
-    assert!(!commit.changed());
-    assert!(Arc::ptr_eq(&commit.snapshot().source_shared(), &source));
+    assert!(!commit.diagnostics().changed());
+    assert!(Arc::ptr_eq(&commit.package().source_shared(), &source));
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn physical_paths_use_cfb_unicode_name_matching_and_reject_reserved_characters()
     for invalid_name in ["bad\0name", "bad/name", "bad\\name", "bad:name", "bad!name"] {
         let mut editor = source.edit();
         assert!(editor.set_stream(&[invalid_name], Vec::new()).is_err());
-        assert!(!editor.is_changed());
+        assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     }
 }
 
@@ -118,11 +118,11 @@ fn owned_input_limit_is_checked_before_arc_conversion() {
     );
     assert!(matches!(
         result,
-        Err(litchi_cfb::OleError::LimitExceeded {
+        Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "non-simple Property Set input bytes",
             observed: 32,
             maximum: 1,
-        })
+        }))
     ));
 }
 
@@ -143,10 +143,10 @@ fn copied_path_budget_rejects_a_wide_directory_before_catalog_retention() {
     );
     assert!(matches!(
         result,
-        Err(litchi_cfb::OleError::LimitExceeded {
+        Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "non-simple Property Set copied path bytes",
             ..
-        })
+        }))
     ));
 }
 
@@ -161,7 +161,7 @@ fn output_limit_accepts_exact_rendered_size_and_rejects_one_byte_less() {
         .set_stream(&["prop2"], b"changed".to_vec())
         .expect("baseline edit");
     let baseline = baseline_editor.commit().expect("baseline commit");
-    let exact_output = baseline.snapshot().source_shared().len() as u64;
+    let exact_output = baseline.package().source_shared().len() as u64;
 
     let exact_source = Snapshot::open(
         source.source_shared().as_ref().to_vec(),
@@ -177,7 +177,7 @@ fn output_limit_accepts_exact_rendered_size_and_rejects_one_byte_less() {
         .expect("exact-limit edit");
     let exact_commit = exact_editor.commit().expect("exact-limit commit");
     assert_eq!(
-        exact_commit.snapshot().source_shared().len() as u64,
+        exact_commit.package().source_shared().len() as u64,
         exact_output
     );
 
@@ -195,10 +195,10 @@ fn output_limit_accepts_exact_rendered_size_and_rejects_one_byte_less() {
         .expect("under-limit edit");
     assert!(matches!(
         under_editor.commit(),
-        Err(litchi_cfb::OleError::LimitExceeded {
+        Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "non-simple Property Set output bytes",
             ..
-        })
+        }))
     ));
 }
 
@@ -224,7 +224,7 @@ fn output_layout_preflight_covers_empty_mini_and_regular_stream_boundaries() {
             .replace_contents(contents_without_indirect_reference(&source))
             .expect("changed CONTENTS");
         let baseline = baseline_editor.commit().expect("baseline publication");
-        let emitted = baseline.snapshot().source_shared();
+        let emitted = baseline.package().source_shared();
         let exact_output = emitted.len() as u64;
         assert!(exact_output > 1);
 
@@ -257,9 +257,9 @@ fn output_layout_preflight_covers_empty_mini_and_regular_stream_boundaries() {
             .replace_contents(contents_without_indirect_reference(&exact_source))
             .expect("exact-cap CONTENTS");
         let exact = exact_editor.commit().expect("exact-cap publication");
-        assert_eq!(exact.snapshot().source_shared().len() as u64, exact_output);
+        assert_eq!(exact.package().source_shared().len() as u64, exact_output);
         let exact_reopened =
-            Snapshot::open_shared(exact.snapshot().source_shared(), Limits::default())
+            Snapshot::open_shared(exact.package().source_shared(), Limits::default())
                 .expect("reopen exact-cap CFB");
         assert_eq!(
             exact_reopened
@@ -287,15 +287,17 @@ fn output_layout_preflight_covers_empty_mini_and_regular_stream_boundaries() {
             .expect("staged under-cap contents")
             .to_bytes()
             .expect("staged under-cap bytes");
-        let result = under_editor.snapshot();
+        let result = under_editor
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package);
         assert!(matches!(
             result,
-            Err(litchi_cfb::OleError::LimitExceeded {
+            Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
                 resource: "non-simple Property Set output bytes",
                 ..
-            })
+            }))
         ));
-        assert!(under_editor.is_changed());
         assert_eq!(
             under_editor
                 .contents()
@@ -320,11 +322,11 @@ fn rejected_physical_edits_do_not_materialize_or_disturb_a_staged_edit() {
 
     let mut fresh = source.edit();
     assert!(fresh.add_storage(&["prop2"], None).is_err());
-    assert!(!fresh.is_changed());
+    assert!(!fresh.clone().commit().unwrap().diagnostics().changed());
     assert!(fresh.remove_element(&["missing"]).is_err());
-    assert!(!fresh.is_changed());
+    assert!(!fresh.clone().commit().unwrap().diagnostics().changed());
     assert!(fresh.set_stream(&["Empty"], b"bad".to_vec()).is_err());
-    assert!(!fresh.is_changed());
+    assert!(!fresh.clone().commit().unwrap().diagnostics().changed());
 
     let contents_size = source
         .element(&["CONTENTS"])
@@ -342,7 +344,14 @@ fn rejected_physical_edits_do_not_materialize_or_disturb_a_staged_edit() {
     let mut limited_editor = limited.edit();
     let too_large = vec![0; usize::try_from(contents_size).unwrap() + 1];
     assert!(limited_editor.set_stream(&["prop2"], too_large).is_err());
-    assert!(!limited_editor.is_changed());
+    assert!(
+        !limited_editor
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
 
     let mut staged = source.edit();
     staged
@@ -356,7 +365,7 @@ fn rejected_physical_edits_do_not_materialize_or_disturb_a_staged_edit() {
     assert!(staged.add_storage(&["prop2"], None).is_err());
     assert!(staged.remove_element(&["missing"]).is_err());
     assert!(staged.set_stream(&["Empty"], b"bad".to_vec()).is_err());
-    assert!(staged.is_changed());
+    assert!(staged.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         staged
             .contents()
@@ -441,7 +450,7 @@ fn storage_variant_keeps_empty_storage_and_reversible_source() {
         )
         .expect("same typed property");
     let commit = editor.commit().expect("semantic no-op");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
 }
 
 #[test]
@@ -548,19 +557,19 @@ fn changed_stream_preserves_empty_storage_and_inverse() {
         .set_stream(&["prop2"], b"changed".to_vec())
         .expect("stream edit");
     let commit = editor.commit().expect("commit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .stream(&["prop2"])
             .expect("stream")
             .expect("present")
             .as_ref(),
         b"changed"
     );
-    assert!(commit.snapshot().contents().is_ok());
+    assert!(commit.package().contents().is_ok());
     let empty = commit
-        .snapshot()
+        .package()
         .element(&["Empty"])
         .expect("element")
         .expect("present");
@@ -569,7 +578,7 @@ fn changed_stream_preserves_empty_storage_and_inverse() {
     assert_eq!(metadata.state_bits(), 7);
     assert_eq!(metadata.creation_time(), 11);
     assert_eq!(metadata.modified_time(), 13);
-    let reverted = commit.patch().revert(commit.snapshot()).expect("inverse");
+    let reverted = commit.patch().revert(commit.package()).expect("inverse");
     assert_eq!(reverted.source_shared().as_ref(), source.as_ref());
     assert!(Arc::ptr_eq(&reverted.source_shared(), &source));
 }
@@ -656,14 +665,14 @@ fn physical_and_typed_crud_commit_atomically() {
     let commit = editor.commit().expect("storage commit");
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .element(&["prop3"])
             .expect("element")
             .expect("present")
             .kind(),
         Some(super::ElementKind::Storage)
     );
-    let mut editor = commit.snapshot().edit();
+    let mut editor = commit.package().edit();
     let removed = editor
         .remove_property(format_id, 3)
         .expect("remove property")
@@ -673,7 +682,7 @@ fn physical_and_typed_crud_commit_atomically() {
     let reverted = editor.commit().expect("remove commit");
     assert!(
         reverted
-            .snapshot()
+            .package()
             .element(&["prop3"])
             .expect("element")
             .is_none()

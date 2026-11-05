@@ -3,10 +3,6 @@
     reason = "OOXML unit conversion intentionally uses floating-point output"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -40,28 +36,29 @@ const MAX_SHAPE_ID_LENGTH: usize = 255;
 
 /// A mutable embedded OLE/package object being authored in a document.
 ///
-/// Built with [`MutableOleObject::new`], then embedded via
-/// [`crate::writer::MutableDocument::add_ole_object`], which assigns the
+/// Built with [`OleObject::new`], then embedded via
+/// [`crate::builder::Document::add_ole_object`], which assigns the
 /// VML shape identity and validates uniqueness. The payload bytes are stored
 /// verbatim and never interpreted.
 ///
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::{MutableOleObject, Package};
+/// use litchi_docx::Builder;
+/// use litchi_docx::builder::OleObject;
 ///
-/// let mut package = Package::new()?;
-/// let object = MutableOleObject::new("Package", b"opaque bytes".to_vec())?;
-/// package.document_mut()?.add_ole_object(object)?;
-/// package.save("out.docx")?;
+/// let mut builder = Builder::new()?;
+/// let object = OleObject::new("Package", b"opaque bytes".to_vec())?;
+/// builder.document()?.add_ole_object(object)?;
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
-pub struct MutableOleObject {
+#[derive(Debug, Clone)]
+pub struct OleObject {
     /// COM `ProgID` of the embedded object (e.g. `Package`, `Excel.Sheet.12`).
     pub(crate) prog_id: String,
     /// VML shape ID (`v:shape@id` / `o:OLEObject@ShapeID`); assigned by
-    /// `MutableDocument::add_ole_object` when left empty.
+    /// `Document::add_ole_object` when left empty.
     pub(crate) shape_id: String,
     /// OLE object ID (`o:OLEObject@ObjectID`); assigned alongside the shape ID.
     pub(crate) object_id: u32,
@@ -78,7 +75,7 @@ pub struct MutableOleObject {
     pub(crate) anchor_id: Option<AnchorId>,
 }
 
-impl MutableOleObject {
+impl OleObject {
     /// Create an embedded object with a `ProgID` and verbatim payload bytes.
     ///
     /// The shape defaults to one square inch; resize with
@@ -178,7 +175,7 @@ impl MutableOleObject {
     /// Set an explicit VML shape ID instead of accepting the allocated one.
     ///
     /// The ID must be unique within the document;
-    /// [`crate::writer::MutableDocument::add_ole_object`] rejects
+    /// [`crate::builder::Document::add_ole_object`] rejects
     /// collisions with existing shapes.
     ///
     /// # Errors
@@ -223,8 +220,7 @@ impl MutableOleObject {
     ) -> Result<()> {
         if self.shape_id.is_empty() {
             return Err(Error::InvalidFormat(
-                "OLE object has no shape ID; add it via MutableDocument::add_ole_object"
-                    .to_string(),
+                "OLE object has no shape ID; add it via Document::add_ole_object".to_string(),
             ));
         }
         let ole_rid = ole_rid.map_or_else(
@@ -311,18 +307,18 @@ mod tests {
 
     #[test]
     fn validates_prog_ids() {
-        assert!(MutableOleObject::new("Package", vec![1]).is_ok());
-        assert!(MutableOleObject::new("Excel.Sheet.12", vec![1]).is_ok());
-        assert!(MutableOleObject::new("", vec![1]).is_err());
-        assert!(MutableOleObject::new("1Package", vec![1]).is_err());
-        assert!(MutableOleObject::new("Has Space", vec![1]).is_err());
-        assert!(MutableOleObject::new("X".repeat(40), vec![1]).is_err());
+        assert!(OleObject::new("Package", vec![1]).is_ok());
+        assert!(OleObject::new("Excel.Sheet.12", vec![1]).is_ok());
+        assert!(OleObject::new("", vec![1]).is_err());
+        assert!(OleObject::new("1Package", vec![1]).is_err());
+        assert!(OleObject::new("Has Space", vec![1]).is_err());
+        assert!(OleObject::new("X".repeat(40), vec![1]).is_err());
     }
 
     #[test]
     fn rejects_oversized_payloads_and_bad_shape_ids() {
-        assert!(MutableOleObject::new("Package", vec![0; MAX_OLE_PAYLOAD_BYTES + 1]).is_err());
-        let mut object = MutableOleObject::new("Package", vec![1]).unwrap();
+        assert!(OleObject::new("Package", vec![0; MAX_OLE_PAYLOAD_BYTES + 1]).is_err());
+        let mut object = OleObject::new("Package", vec![1]).unwrap();
         assert!(object.set_shape_id("_x0000_i1025").is_ok());
         assert!(object.set_shape_id("bad id").is_err());
         assert!(object.set_shape_id("").is_err());
@@ -332,7 +328,7 @@ mod tests {
 
     #[test]
     fn serializes_object_element_with_relationships() {
-        let mut object = MutableOleObject::new("Package", b"payload".to_vec()).unwrap();
+        let mut object = OleObject::new("Package", b"payload".to_vec()).unwrap();
         object.shape_id = "_x0000_i1025".to_string();
         object.object_id = 1025;
         let mut xml = String::new();
@@ -348,7 +344,7 @@ mod tests {
 
     #[test]
     fn authors_checked_legacy_object_anchor_id() {
-        let mut object = MutableOleObject::new("Package", b"payload".to_vec()).unwrap();
+        let mut object = OleObject::new("Package", b"payload".to_vec()).unwrap();
         object.shape_id = "_x0000_i1025".to_string();
         object.object_id = 1025;
         let anchor_id = AnchorId::new(0x2a).unwrap();
@@ -375,7 +371,7 @@ mod tests {
     #[test]
     fn serializes_preview_and_placeholders() {
         const PNG_HEADER: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-        let mut object = MutableOleObject::new("Package", b"payload".to_vec()).unwrap();
+        let mut object = OleObject::new("Package", b"payload".to_vec()).unwrap();
         object.set_preview(PNG_HEADER.to_vec()).unwrap();
         object.shape_id = "_x0000_i1026".to_string();
         object.object_id = 1026;
@@ -394,7 +390,7 @@ mod tests {
 
     #[test]
     fn rejects_serialization_without_shape_id() {
-        let object = MutableOleObject::new("Package", b"payload".to_vec()).unwrap();
+        let object = OleObject::new("Package", b"payload".to_vec()).unwrap();
         assert!(object.to_xml(&mut String::new(), None, None).is_err());
     }
 
@@ -405,18 +401,15 @@ mod tests {
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let payload: Vec<u8> = (0u8..=255).collect();
-        let mut package = Package::new().unwrap();
-        package
-            .document_mut()
+        let mut builder = crate::Builder::new().unwrap();
+        builder
+            .document()
             .unwrap()
             .add_paragraph_with_text("host paragraph");
-        let object = MutableOleObject::new("Package", payload.clone()).unwrap();
-        let object = package
-            .document_mut()
-            .unwrap()
-            .add_ole_object(object)
-            .unwrap();
+        let object = OleObject::new("Package", payload.clone()).unwrap();
+        let object = builder.document().unwrap().add_ole_object(object).unwrap();
         assert_eq!(object.shape_id(), "_x0000_i1025");
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -445,21 +438,22 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
-            let first = MutableOleObject::new("Package", b"first".to_vec()).unwrap();
+            let document = builder.document().unwrap();
+            let first = OleObject::new("Package", b"first".to_vec()).unwrap();
             let first = document.add_ole_object(first).unwrap();
             assert_eq!(first.shape_id(), "_x0000_i1025");
-            let second = MutableOleObject::new("Word.Document.12", b"second".to_vec()).unwrap();
+            let second = OleObject::new("Word.Document.12", b"second".to_vec()).unwrap();
             let second = document.add_ole_object(second).unwrap();
             assert_eq!(second.shape_id(), "_x0000_i1026");
 
             // An explicit shape ID colliding with an assigned one is rejected.
-            let mut duplicate = MutableOleObject::new("Package", b"dup".to_vec()).unwrap();
+            let mut duplicate = OleObject::new("Package", b"dup".to_vec()).unwrap();
             duplicate.set_shape_id("_x0000_i1025").unwrap();
             assert!(document.add_ole_object(duplicate).is_err());
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -485,17 +479,17 @@ mod tests {
     #[test]
     fn coexists_with_text_boxes_and_images() {
         use crate::textbox::TextBoxAnchor;
-        use crate::{MutableTextBox, Package};
+        use crate::{Package, builder::TextBox};
         use tempfile::NamedTempFile;
 
         const PNG_HEADER: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = builder.document().unwrap();
 
-            let mut text_box = MutableTextBox::new("Companion Box", 914_400, 457200).unwrap();
+            let mut text_box = TextBox::new("Companion Box", 914_400, 457200).unwrap();
             text_box.add_run("box story").unwrap();
             document.add_text_box(text_box);
 
@@ -504,10 +498,11 @@ mod tests {
                 .add_picture_from_bytes(PNG_HEADER.to_vec(), Some(914_400), Some(914_400))
                 .unwrap();
 
-            let mut object = MutableOleObject::new("Package", b"coexist payload".to_vec()).unwrap();
+            let mut object = OleObject::new("Package", b"coexist payload".to_vec()).unwrap();
             object.set_preview(PNG_HEADER.to_vec()).unwrap();
             document.add_ole_object(object).unwrap();
         }
+        let package = builder.build().unwrap();
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();

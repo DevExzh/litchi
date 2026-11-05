@@ -1,11 +1,23 @@
 //! Concise family entry points.
 
-use litchi_core::{Error, HistoryLimits, Metadata, PatchError, Position, Result};
+use litchi_core::{Error, HistoryLimits, Metadata, PatchError, Position, Result as CoreResult};
 use litchi_odf_common::compact_xml;
 use std::fmt;
 use std::{path::Path, sync::Arc};
 
 pub use crate::authoring::{Builder, ResourceMember};
+pub use litchi_core::edit::Diagnostics;
+
+/// A committed text-web package: the published package, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
+
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
+
+macro_rules! family_invalid {
+    ($error:expr) => {
+        litchi_odf_common::Error::from($error)
+    };
+}
 
 const MAX_PARAGRAPH_BYTES: usize = 16 * 1024 * 1024;
 const MAX_STRUCTURAL_STAGED_BYTES: usize = 16 * 1024 * 1024;
@@ -23,8 +35,8 @@ pub struct TextBody {
 
 impl TextBody {
     /// Office annotations in source order. Their content is inert.
-    pub fn annotations(&self) -> Result<&[crate::annotation::Annotation]> {
-        self.package.annotations()
+    pub fn annotations(&self) -> FamilyResult<&[crate::annotation::Annotation]> {
+        Ok(self.package.annotations()?)
     }
 
     /// Bookmarks in source-close order.
@@ -34,18 +46,18 @@ impl TextBody {
     }
 
     /// Tracked-change regions and markers in source order.
-    pub fn changes(&self) -> Result<&[crate::change::Change]> {
-        self.package.changes()
+    pub fn changes(&self) -> FamilyResult<&[crate::change::Change]> {
+        Ok(self.package.changes()?)
     }
 
     /// The optional `text:tracked-changes` declaration, independent of marks.
-    pub fn change_tracking(&self) -> Result<Option<&crate::change::ChangeTracking>> {
-        self.package.change_tracking()
+    pub fn change_tracking(&self) -> FamilyResult<Option<&crate::change::ChangeTracking>> {
+        Ok(self.package.change_tracking()?)
     }
 
     /// Drawing frames and text boxes in source order.
-    pub fn frames(&self) -> Result<&[crate::frame::Frame]> {
-        self.package.frames()
+    pub fn frames(&self) -> FamilyResult<&[crate::frame::Frame]> {
+        Ok(self.package.frames()?)
     }
 
     /// Lists in source-close order. Nested lists carry their explicit level.
@@ -67,17 +79,17 @@ impl TextBody {
     }
 
     /// Generated indexes and their inert cached bodies.
-    pub fn indexes(&self) -> Result<&[crate::index::Index]> {
-        self.package.indexes()
+    pub fn indexes(&self) -> FamilyResult<&[crate::index::Index]> {
+        Ok(self.package.indexes()?)
     }
 
     /// Footnotes and endnotes in source order.
-    pub fn notes(&self) -> Result<&[crate::note::Note]> {
-        self.package.notes()
+    pub fn notes(&self) -> FamilyResult<&[crate::note::Note]> {
+        Ok(self.package.notes()?)
     }
 
     /// Footnotes in source order.
-    pub fn footnotes(&self) -> Result<impl Iterator<Item = &crate::note::Note> + '_> {
+    pub fn footnotes(&self) -> FamilyResult<impl Iterator<Item = &crate::note::Note> + '_> {
         Ok(self
             .package
             .notes()?
@@ -86,7 +98,7 @@ impl TextBody {
     }
 
     /// Endnotes in source order.
-    pub fn endnotes(&self) -> Result<impl Iterator<Item = &crate::note::Note> + '_> {
+    pub fn endnotes(&self) -> FamilyResult<impl Iterator<Item = &crate::note::Note> + '_> {
         Ok(self
             .package
             .notes()?
@@ -120,18 +132,18 @@ impl TextBody {
     }
 
     /// Ruby base/pronunciation pairs in source order.
-    pub fn rubies(&self) -> Result<&[crate::ruby::Ruby]> {
-        self.package.rubies()
+    pub fn rubies(&self) -> FamilyResult<&[crate::ruby::Ruby]> {
+        Ok(self.package.rubies()?)
     }
 
     /// Text sections in source order.
-    pub fn sections(&self) -> Result<&[crate::section::Section]> {
-        self.package.sections()
+    pub fn sections(&self) -> FamilyResult<&[crate::section::Section]> {
+        Ok(self.package.sections()?)
     }
 
     /// Tables in source order. Repetitions remain compact counts.
-    pub fn tables(&self) -> Result<&[crate::table::Table]> {
-        self.package.tables()
+    pub fn tables(&self) -> FamilyResult<&[crate::table::Table]> {
+        Ok(self.package.tables()?)
     }
 }
 
@@ -186,29 +198,87 @@ impl Block<'_> {
     }
 }
 
-/// Immutable document snapshot.
+/// The immutable OTH (`OpenDocument` HTML template) package owner.
+///
+/// Cheap to clone (one `Arc` bump). Every state verb lives here: open,
+/// create, [`Package::edit`], [`Package::apply`] and publication. Reads go
+/// through the read-only [`Document`] projection ([`Package::document`]).
 #[derive(Clone)]
-pub struct Template {
+pub struct Package {
     package: crate::package::Snapshot,
 }
 
-impl Template {
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.package.owned_package()
+    }
+
+    /// Creates the minimal valid OTH package: an empty text-web body.
+    ///
+    /// Deterministic: no clock or randomness is consulted, so two calls
+    /// produce identical bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only if the fresh package fails its own readback.
+    pub fn new() -> Result<Self, litchi_odf_common::Error> {
+        Builder::new().build()
+    }
+
     /// Opens a web-template package from a file path.
     ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or is not a valid package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(|package| Self { package })
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, litchi_odf_common::Error> {
+        Self::open_with_options(path, litchi_odf_common::OpenOptions::default())
     }
 
-    /// Opens a web-template package from in-memory bytes.
+    /// Opens a web-template package from a file path under caller-selected
+    /// source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] when a selected limit is
+    /// exceeded, and another error if the package is invalid.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::open_with_options(path, options).map(|package| Self { package })
+    }
+
+    /// Opens a web-template package from in-memory bytes (copied once).
     ///
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid package.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_bytes_with_options(bytes, litchi_odf_common::OpenOptions::default())
+    }
+
+    /// Opens a web-template package from in-memory bytes under
+    /// caller-selected source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_bytes_with_options(bytes.to_vec(), options)
+            .map(|package| Self { package })
     }
 
     /// Opens a web-template package from shared in-memory bytes without
@@ -217,38 +287,148 @@ impl Template {
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid package.
-    pub fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
-        crate::package::Snapshot::from_shared_bytes(bytes).map(|package| Self { package })
+    pub fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self, litchi_odf_common::Error> {
+        Ok(crate::package::Snapshot::from_shared_bytes(bytes).map(|package| Self { package })?)
     }
 
-    /// Returns the `content.xml` document.
-    #[must_use]
-    pub fn content_xml(&self) -> &str {
-        self.package.content_xml()
+    /// Reads a web-template package from a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream fails or is not a valid package.
+    pub fn from_reader(reader: impl std::io::Read) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_reader_with_options(reader, litchi_odf_common::OpenOptions::default())
     }
 
-    /// Returns the `styles.xml` document, if present.
-    #[must_use]
-    pub fn styles_xml(&self) -> Option<&str> {
-        self.package.styles_xml()
+    /// Reads a web-template package from a stream under caller-selected
+    /// source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_reader_with_options(reader, options)
+            .map(|package| Self { package })
     }
 
-    /// Returns the document metadata, if present.
-    #[must_use]
-    pub fn metadata(&self) -> Option<&Metadata> {
-        self.package.metadata()
+    /// Adopts the archive smart detection already indexed, without a second
+    /// ZIP index. The source limits were applied when it was prepared.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnexpectedFormat` when detection classified another format,
+    /// and another error if the package is not a valid web template.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        Self::from_prepared_package_with_options(prepared, litchi_odf_common::OpenOptions::new())
     }
 
-    /// Returns the exact `meta.xml` source, if present.
-    #[must_use]
-    pub fn meta_xml(&self) -> Option<&str> {
-        self.package.meta_xml()
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// The source limits were applied when the archive was prepared; its
+    /// existing index and source allocation are reused.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self, litchi_odf_common::Error> {
+        if prepared.format() != litchi_core::detection::FileFormat::Oth {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        crate::package::Snapshot::from_owned_package_with_options(prepared.into_package(), options)
+            .map(|package| Self { package })
     }
 
-    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    pub(crate) const fn from_snapshot(package: crate::package::Snapshot) -> Self {
+        Self { package }
+    }
+
+    /// The read-only semantic projection of this package.
     #[must_use]
-    pub fn styles(&self) -> &[crate::style::Style] {
-        self.package.styles()
+    pub fn document(&self) -> Document {
+        Document {
+            package: self.clone(),
+        }
+    }
+
+    /// Everything a tolerant read repaired while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.package.tolerance_report()
+    }
+
+    /// Replay a patch onto this exact package; the commit publishes the
+    /// patch's target package with the patch and its change flag.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::PatchConflict`] when this package
+    /// is not the patch's source.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, litchi_odf_common::Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(litchi_odf_common::Error::patch_conflict(
+                "oth.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::new(
+            patch.apply(self)?,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
+    }
+
+    /// Atomically saves the package bytes to `path` (sibling temporary file
+    /// and rename, fully synced).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the destination cannot be published; an
+    /// existing destination then keeps its bytes.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), litchi_odf_common::Error> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically saves the package bytes to `path` with an explicit
+    /// durability.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<(), litchi_odf_common::Error> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Returns a copy of the package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Infallible today; the `CoreResult` keeps the ODF owner surface uniform.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, litchi_odf_common::Error> {
+        Ok(self.as_bytes().to_vec())
+    }
+
+    /// Writes the package bytes into `sink`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sink fails.
+    pub fn write_to(&self, mut sink: impl std::io::Write) -> Result<(), litchi_odf_common::Error> {
+        sink.write_all(self.as_bytes()).map_err(Error::from)?;
+        Ok(())
     }
 
     /// Returns the raw package bytes.
@@ -257,25 +437,43 @@ impl Template {
         self.package.as_bytes()
     }
 
+    /// Returns the `content.xml` document.
+    #[must_use]
+    pub(crate) fn content_xml(&self) -> &str {
+        self.package.content_xml()
+    }
+
+    /// Returns the `styles.xml` document, if present.
+    #[must_use]
+    pub(crate) fn styles_xml(&self) -> Option<&str> {
+        self.package.styles_xml()
+    }
+
+    /// Returns the document metadata, if present.
+    #[must_use]
+    pub(crate) fn metadata(&self) -> Option<&Metadata> {
+        self.package.metadata()
+    }
+
+    /// Returns the exact `meta.xml` source, if present.
+    #[must_use]
+    pub(crate) fn meta_xml(&self) -> Option<&str> {
+        self.package.meta_xml()
+    }
+
+    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    #[must_use]
+    pub(crate) fn styles(&self) -> &[crate::style::Style] {
+        self.package.styles()
+    }
+
     /// Lists the file entries stored in the package.
     ///
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be enumerated.
-    pub fn files(&self) -> Result<Vec<String>> {
+    pub(crate) fn files(&self) -> CoreResult<Vec<String>> {
         self.package.files()
-    }
-
-    /// Returns the stable XML validation capability contract.
-    #[must_use]
-    pub const fn validation_capabilities(&self) -> ValidationCapabilities {
-        ValidationCapabilities::oth()
-    }
-
-    /// Returns the stable security lifecycle capability contract.
-    #[must_use]
-    pub const fn security_capabilities(&self) -> SecurityCapabilities {
-        SecurityCapabilities::oth()
     }
 
     /// Inventories inert active-content surfaces and enforces an explicit policy.
@@ -283,7 +481,7 @@ impl Template {
     /// # Errors
     ///
     /// Returns an error if package enumeration fails or a denied surface is present.
-    pub fn check_security(&self, policy: SecurityPolicy) -> Result<SecurityReport> {
+    pub(crate) fn check_security(&self, policy: SecurityPolicy) -> CoreResult<SecurityReport> {
         let files = self.files()?;
         let report = SecurityReport {
             embedded_objects: self
@@ -333,7 +531,7 @@ impl Template {
     /// The ordinary paragraph projection is prepared at open time. Additional
     /// body structures remain lazy and parse once when a typed accessor is
     /// called, sharing the successful cache with subsequent clones.
-    pub fn text_body(&self) -> Result<TextBody> {
+    pub(crate) fn text_body(&self) -> CoreResult<TextBody> {
         Ok(TextBody {
             package: self.package.clone(),
         })
@@ -351,7 +549,7 @@ impl Template {
         source: &Self,
         selector: TransferSelector,
         policy: TransferPolicy,
-    ) -> Result<TransferPlan> {
+    ) -> FamilyResult<TransferPlan> {
         source.check_security(policy.security)?;
         self.check_security(policy.security)?;
         if let TransferSelector::Resource(position) = selector {
@@ -417,11 +615,96 @@ impl Template {
             structure_lifecycle_changes: Vec::new(),
         }
     }
+}
 
-    /// Consumes the snapshot and returns the raw package bytes.
+/// The read-only semantic projection of an OTH [`Package`].
+///
+/// Cheap to clone; it shares the owner's immutable state and has no state
+/// verbs (open, edit and publication live on [`Package`]).
+#[derive(Clone)]
+pub struct Document {
+    package: Package,
+}
+
+impl fmt::Debug for Document {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Document").finish_non_exhaustive()
+    }
+}
+
+impl Document {
+    /// Returns the `content.xml` document.
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
+    pub fn content_xml(&self) -> &str {
+        self.package.content_xml()
+    }
+
+    /// Returns the `styles.xml` document, if present.
+    #[must_use]
+    pub fn styles_xml(&self) -> Option<&str> {
+        self.package.styles_xml()
+    }
+
+    /// Returns the document metadata, if present.
+    #[must_use]
+    pub fn metadata(&self) -> Option<&Metadata> {
+        self.package.metadata()
+    }
+
+    /// Returns the exact `meta.xml` source, if present.
+    #[must_use]
+    pub fn meta_xml(&self) -> Option<&str> {
+        self.package.meta_xml()
+    }
+
+    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    #[must_use]
+    pub fn styles(&self) -> &[crate::style::Style] {
+        self.package.styles()
+    }
+
+    /// Lists the file entries stored in the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package entries cannot be enumerated.
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        Ok(self.package.files()?)
+    }
+
+    /// Returns the stable XML validation capability contract.
+    #[must_use]
+    pub const fn validation_capabilities(&self) -> ValidationCapabilities {
+        ValidationCapabilities::oth()
+    }
+
+    /// Returns the stable security lifecycle capability contract.
+    #[must_use]
+    pub const fn security_capabilities(&self) -> SecurityCapabilities {
+        SecurityCapabilities::oth()
+    }
+
+    /// Inventories inert active-content surfaces and enforces an explicit policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if package enumeration fails or a denied surface is present.
+    pub fn check_security(&self, policy: SecurityPolicy) -> FamilyResult<SecurityReport> {
+        Ok(self.package.check_security(policy)?)
+    }
+
+    /// Projects inert paragraph character data from the validated text body.
+    ///
+    /// Fields, links, scripts, forms, resources, and embedded objects are not
+    /// evaluated, followed, activated, or otherwise executed.
+    ///
+    /// # Errors
+    ///
+    /// The ordinary paragraph projection is prepared at open time. Additional
+    /// body structures remain lazy and parse once when a typed accessor is
+    /// called, sharing the successful cache with subsequent clones.
+    pub fn text_body(&self) -> FamilyResult<TextBody> {
+        Ok(self.package.text_body()?)
     }
 }
 
@@ -615,7 +898,7 @@ impl Default for TransferPolicy {
 /// A validated, non-mutating cross-template publication plan.
 pub struct TransferPlan {
     block: Option<crate::ContentBlock>,
-    destination: Template,
+    destination: Package,
     fragment: Option<String>,
     imported_styles: Vec<crate::style::Style>,
     payloads: Vec<ResourcePayloadChange>,
@@ -634,7 +917,7 @@ impl TransferPlan {
     /// # Errors
     ///
     /// Returns an error if style or block publication fails semantic readback.
-    pub fn publish(self) -> Result<Commit> {
+    pub fn publish(self) -> FamilyResult<Commit> {
         let mut edit = self.destination.edit();
         for payload in self.payloads {
             edit.stage_payload(payload.path, payload.media_type, payload.after)?;
@@ -657,7 +940,7 @@ impl TransferPlan {
             styles.extend(self.imported_styles);
             edit.set_styles(&styles)?;
         }
-        edit.commit()
+        Ok(edit.commit_inner()?)
     }
 }
 
@@ -833,7 +1116,7 @@ impl PartChange {
     }
 }
 
-/// A source-bound web-template text transaction.
+/// A source-bound web-template text edit.
 pub struct Edit<'a> {
     appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
@@ -845,7 +1128,7 @@ pub struct Edit<'a> {
     metadata: PartChange,
     payload_changes: Vec<ResourcePayloadChange>,
     resource_changes: Vec<ResourceChange>,
-    source: &'a Template,
+    source: &'a Package,
     styles: PartChange,
     structure_changes: Vec<StructureChange>,
     structure_lifecycle_changes: Vec<StructureLifecycleChange>,
@@ -860,13 +1143,13 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an allocation error if the bounded staging collection cannot grow.
-    pub fn append_block(&mut self, block: impl Into<crate::ContentBlock>) -> Result<()> {
-        self.appended
-            .try_reserve(1)
-            .map_err(|source| Error::Allocation {
+    pub fn append_block(&mut self, block: impl Into<crate::ContentBlock>) -> FamilyResult<()> {
+        self.appended.try_reserve(1).map_err(|source| {
+            family_invalid!(Error::Allocation {
                 resource: "OTH appended blocks",
                 source,
-            })?;
+            })
+        })?;
         self.appended.push(block.into());
         Ok(())
     }
@@ -877,14 +1160,18 @@ impl Edit<'_> {
     /// The selector is source-order among sections.  Rich or multi-block
     /// sections are readable but refuse this narrow text-splice owner so
     /// unknown children and namespace declarations remain source-authoritative.
-    pub fn set_section_text(&mut self, section: Position, text: impl Into<String>) -> Result<()> {
-        self.stage_structure(StructureSelector::Section(section), text.into())
+    pub fn set_section_text(
+        &mut self,
+        section: Position,
+        text: impl Into<String>,
+    ) -> FamilyResult<()> {
+        Ok(self.stage_structure(StructureSelector::Section(section), text.into())?)
     }
 
     /// Replaces the one plain paragraph or heading body admitted inside a
     /// selected `text:note-body`.
-    pub fn set_note_body(&mut self, note: Position, text: impl Into<String>) -> Result<()> {
-        self.stage_structure(StructureSelector::Note(note), text.into())
+    pub fn set_note_body(&mut self, note: Position, text: impl Into<String>) -> FamilyResult<()> {
+        Ok(self.stage_structure(StructureSelector::Note(note), text.into())?)
     }
 
     /// Replaces the one plain paragraph or heading body admitted inside a
@@ -893,8 +1180,8 @@ impl Edit<'_> {
         &mut self,
         annotation: Position,
         text: impl Into<String>,
-    ) -> Result<()> {
-        self.stage_structure(StructureSelector::Annotation(annotation), text.into())
+    ) -> FamilyResult<()> {
+        Ok(self.stage_structure(StructureSelector::Annotation(annotation), text.into())?)
     }
 
     /// Appends a named section containing one plain paragraph.
@@ -906,11 +1193,11 @@ impl Edit<'_> {
         &mut self,
         name: impl Into<String>,
         text: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let name = checked_structure_identity(name.into(), "section name")?;
         let text = checked_structure_text(text.into())?;
         let fragment = authored_section(&name, &text)?;
-        self.stage_structure_insert(StructureKind::Section, name, fragment)
+        Ok(self.stage_structure_insert(StructureKind::Section, name, fragment)?)
     }
 
     /// Appends a note with a stable `text:id`, citation, and one plain body
@@ -921,22 +1208,22 @@ impl Edit<'_> {
         class: crate::note::NoteClass,
         citation: impl Into<String>,
         body: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let id = checked_structure_identity(id.into(), "note id")?;
         let class = match class {
             crate::note::NoteClass::Footnote => "footnote".to_owned(),
             crate::note::NoteClass::Endnote => "endnote".to_owned(),
             _ => {
-                return Err(Error::InvalidFormat(
+                return Err(family_invalid!(Error::InvalidFormat(
                     "OTH fresh notes require the typed footnote or endnote class".to_string(),
-                ));
+                )));
             },
         };
         let class = checked_structure_identity(class, "note class")?;
         let citation = checked_structure_text(citation.into())?;
         let body = checked_structure_text(body.into())?;
         let fragment = authored_note(&id, &class, &citation, &body)?;
-        self.stage_structure_insert(StructureKind::Note, id, fragment)
+        Ok(self.stage_structure_insert(StructureKind::Note, id, fragment)?)
     }
 
     /// Appends an annotation identified by `office:name` with one plain
@@ -945,11 +1232,11 @@ impl Edit<'_> {
         &mut self,
         name: impl Into<String>,
         text: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let name = checked_structure_identity(name.into(), "annotation name")?;
         let text = checked_structure_text(text.into())?;
         let fragment = authored_annotation(&name, &text)?;
-        self.stage_structure_insert(StructureKind::Annotation, name, fragment)
+        Ok(self.stage_structure_insert(StructureKind::Annotation, name, fragment)?)
     }
 
     /// Appends a one-column, one-row plain string table.
@@ -960,26 +1247,26 @@ impl Edit<'_> {
         &mut self,
         name: impl Into<String>,
         cell_text: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let name = checked_structure_identity(name.into(), "table name")?;
         let cell_text = checked_structure_text(cell_text.into())?;
         let fragment = authored_table(&name, &cell_text)?;
-        self.stage_structure_insert(StructureKind::Table, name, fragment)
+        Ok(self.stage_structure_insert(StructureKind::Table, name, fragment)?)
     }
 
     /// Removes one existing named section after dependency checks.
-    pub fn remove_section(&mut self, section: Position) -> Result<()> {
-        self.stage_structure_remove(StructureSelector::Section(section))
+    pub fn remove_section(&mut self, section: Position) -> FamilyResult<()> {
+        Ok(self.stage_structure_remove(StructureSelector::Section(section))?)
     }
 
     /// Removes one existing note after dependency checks.
-    pub fn remove_note(&mut self, note: Position) -> Result<()> {
-        self.stage_structure_remove(StructureSelector::Note(note))
+    pub fn remove_note(&mut self, note: Position) -> FamilyResult<()> {
+        Ok(self.stage_structure_remove(StructureSelector::Note(note))?)
     }
 
     /// Removes one existing annotation after dependency checks.
-    pub fn remove_annotation(&mut self, annotation: Position) -> Result<()> {
-        self.stage_structure_remove(StructureSelector::Annotation(annotation))
+    pub fn remove_annotation(&mut self, annotation: Position) -> FamilyResult<()> {
+        Ok(self.stage_structure_remove(StructureSelector::Annotation(annotation))?)
     }
 
     fn stage_structure_insert(
@@ -987,7 +1274,7 @@ impl Edit<'_> {
         kind: StructureKind,
         identity: String,
         fragment: String,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         if crate::codec::structure_sites(self.source.content_xml())?
             .iter()
             .any(|site| {
@@ -1031,7 +1318,7 @@ impl Edit<'_> {
         Ok(())
     }
 
-    fn stage_structure_remove(&mut self, selector: StructureSelector) -> Result<()> {
+    fn stage_structure_remove(&mut self, selector: StructureSelector) -> CoreResult<()> {
         let site = find_structure_site(self.source, selector)?;
         let identity = site.identity.clone().ok_or_else(|| {
             Error::InvalidFormat(
@@ -1106,7 +1393,7 @@ impl Edit<'_> {
         Ok(())
     }
 
-    fn ensure_structure_staging_capacity(&self, additional: usize) -> Result<()> {
+    fn ensure_structure_staging_capacity(&self, additional: usize) -> CoreResult<()> {
         let current = self
             .structure_changes
             .iter()
@@ -1139,7 +1426,7 @@ impl Edit<'_> {
         Ok(())
     }
 
-    fn stage_structure(&mut self, selector: StructureSelector, after: String) -> Result<()> {
+    fn stage_structure(&mut self, selector: StructureSelector, after: String) -> CoreResult<()> {
         if after.len() > MAX_PARAGRAPH_BYTES {
             return Err(Error::InvalidFormat(
                 "OTH structural replacement text exceeds the limit".to_string(),
@@ -1264,15 +1551,15 @@ impl Edit<'_> {
         &mut self,
         paragraph: Position,
         text: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         if self
             .inline_changes
             .iter()
             .any(|change| change.block == InlineBlock::Paragraph(paragraph))
         {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH paragraph text edit overlaps a staged rich inline edit".to_string(),
-            ));
+            )));
         }
         if self.list_changes.iter().any(|change| {
             change
@@ -1280,15 +1567,15 @@ impl Edit<'_> {
                 .as_ref()
                 .is_some_and(|list| list_contains_paragraph(list, paragraph))
         }) {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH paragraph edit overlaps a staged list structural edit".to_string(),
-            ));
+            )));
         }
         let after = text.into();
         if after.len() > MAX_PARAGRAPH_BYTES {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH replacement paragraph text exceeds the limit".to_string(),
-            ));
+            )));
         }
         let before = self
             .source
@@ -1310,9 +1597,9 @@ impl Edit<'_> {
             .replacement_site(paragraph.get())
             .is_none()
         {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH paragraph is not one losslessly replaceable XML text span".to_string(),
-            ));
+            )));
         }
         if let Some(change) = self
             .changes
@@ -1321,12 +1608,12 @@ impl Edit<'_> {
         {
             change.after = after;
         } else {
-            self.changes
-                .try_reserve(1)
-                .map_err(|source| Error::Allocation {
+            self.changes.try_reserve(1).map_err(|source| {
+                family_invalid!(Error::Allocation {
                     resource: "OTH staged paragraph changes",
                     source,
-                })?;
+                })
+            })?;
             self.changes.push(ParagraphChange {
                 paragraph,
                 before,
@@ -1342,21 +1629,25 @@ impl Edit<'_> {
     ///
     /// Returns an error for an invalid selector, oversized value, or heading
     /// whose nested markup cannot be rewritten losslessly.
-    pub fn set_heading_text(&mut self, heading: Position, text: impl Into<String>) -> Result<()> {
+    pub fn set_heading_text(
+        &mut self,
+        heading: Position,
+        text: impl Into<String>,
+    ) -> FamilyResult<()> {
         if self
             .inline_changes
             .iter()
             .any(|change| change.block == InlineBlock::Heading(heading))
         {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH heading text edit overlaps a staged rich inline edit".to_string(),
-            ));
+            )));
         }
         let after = text.into();
         if after.len() > MAX_PARAGRAPH_BYTES {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH replacement heading text exceeds the limit".to_string(),
-            ));
+            )));
         }
         let before = self
             .source
@@ -1379,9 +1670,9 @@ impl Edit<'_> {
             .heading_replacement_site(heading.get())
             .is_none()
         {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH heading is not one losslessly replaceable XML text span".to_string(),
-            ));
+            )));
         }
         if let Some(change) = self
             .heading_changes
@@ -1390,12 +1681,12 @@ impl Edit<'_> {
         {
             change.after = after;
         } else {
-            self.heading_changes
-                .try_reserve(1)
-                .map_err(|source| Error::Allocation {
+            self.heading_changes.try_reserve(1).map_err(|source| {
+                family_invalid!(Error::Allocation {
                     resource: "OTH staged heading changes",
                     source,
-                })?;
+                })
+            })?;
             self.heading_changes.push(HeadingChange {
                 heading,
                 before,
@@ -1418,8 +1709,8 @@ impl Edit<'_> {
         &mut self,
         paragraph: Position,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
-        self.stage_inline(InlineBlock::Paragraph(paragraph), content)
+    ) -> FamilyResult<()> {
+        Ok(self.stage_inline(InlineBlock::Paragraph(paragraph), content)?)
     }
 
     /// Replaces a heading's complete inline content with typed rich items.
@@ -1432,8 +1723,8 @@ impl Edit<'_> {
         &mut self,
         heading: Position,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
-        self.stage_inline(InlineBlock::Heading(heading), content)
+    ) -> FamilyResult<()> {
+        Ok(self.stage_inline(InlineBlock::Heading(heading), content)?)
     }
 
     /// Prepends typed rich content without rewriting existing paragraph markup.
@@ -1449,12 +1740,12 @@ impl Edit<'_> {
         &mut self,
         paragraph: Position,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
-        self.stage_inline_boundary(
+    ) -> FamilyResult<()> {
+        Ok(self.stage_inline_boundary(
             InlineBlock::Paragraph(paragraph),
             content,
             InlinePlacement::Prepend,
-        )
+        )?)
     }
 
     /// Appends typed rich content without rewriting existing paragraph markup.
@@ -1467,12 +1758,12 @@ impl Edit<'_> {
         &mut self,
         paragraph: Position,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
-        self.stage_inline_boundary(
+    ) -> FamilyResult<()> {
+        Ok(self.stage_inline_boundary(
             InlineBlock::Paragraph(paragraph),
             content,
             InlinePlacement::Append,
-        )
+        )?)
     }
 
     /// Prepends typed rich content without rewriting existing heading markup.
@@ -1485,12 +1776,12 @@ impl Edit<'_> {
         &mut self,
         heading: Position,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
-        self.stage_inline_boundary(
+    ) -> FamilyResult<()> {
+        Ok(self.stage_inline_boundary(
             InlineBlock::Heading(heading),
             content,
             InlinePlacement::Prepend,
-        )
+        )?)
     }
 
     /// Appends typed rich content without rewriting existing heading markup.
@@ -1503,19 +1794,19 @@ impl Edit<'_> {
         &mut self,
         heading: Position,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
-        self.stage_inline_boundary(
+    ) -> FamilyResult<()> {
+        Ok(self.stage_inline_boundary(
             InlineBlock::Heading(heading),
             content,
             InlinePlacement::Append,
-        )
+        )?)
     }
 
     fn stage_inline(
         &mut self,
         block: InlineBlock,
         content: &[crate::inline::Content],
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let (site, before_text) = match block {
             InlineBlock::Paragraph(position) => {
                 if self
@@ -1648,7 +1939,7 @@ impl Edit<'_> {
         block: InlineBlock,
         content: &[crate::inline::Content],
         placement: InlinePlacement,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let (site, source_text) = self.inline_boundary_source(block)?;
         let source_xml = self
             .source
@@ -1755,7 +2046,7 @@ impl Edit<'_> {
     fn inline_boundary_source(
         &self,
         block: InlineBlock,
-    ) -> Result<(&crate::codec::ReplacementSite, &str)> {
+    ) -> CoreResult<(&crate::codec::ReplacementSite, &str)> {
         match block {
             InlineBlock::Paragraph(position) => {
                 if self
@@ -1833,8 +2124,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or an overlapping nested list.
-    pub fn set_list(&mut self, list: Position, replacement: crate::list::List) -> Result<()> {
-        self.stage_list(list, Some(replacement))
+    pub fn set_list(&mut self, list: Position, replacement: crate::list::List) -> FamilyResult<()> {
+        Ok(self.stage_list(list, Some(replacement))?)
     }
 
     /// Removes one isolated list.
@@ -1842,8 +2133,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or an overlapping nested list.
-    pub fn remove_list(&mut self, list: Position) -> Result<()> {
-        self.stage_list(list, None)
+    pub fn remove_list(&mut self, list: Position) -> FamilyResult<()> {
+        Ok(self.stage_list(list, None)?)
     }
 
     /// Replaces document metadata through a compact typed `meta.xml` projection.
@@ -1851,7 +2142,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error if the metadata cannot be rendered within XML limits.
-    pub fn set_metadata(&mut self, metadata: &Metadata) -> Result<()> {
+    pub fn set_metadata(&mut self, metadata: &Metadata) -> FamilyResult<()> {
         let xml = crate::authoring::render_metadata(metadata)?;
         self.metadata = if self.source.meta_xml() == Some(xml.as_str()) {
             PartChange::Keep
@@ -1875,7 +2166,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error if the style catalog cannot be rendered compactly.
-    pub fn set_styles(&mut self, styles: &[crate::style::Style]) -> Result<()> {
+    pub fn set_styles(&mut self, styles: &[crate::style::Style]) -> FamilyResult<()> {
         let xml = crate::authoring::render_styles(styles)?;
         self.styles = if self.source.styles_xml() == Some(xml.as_str()) {
             PartChange::Keep
@@ -1902,7 +2193,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when a control kind is not safely authorable XML.
-    pub fn set_forms(&mut self, forms: &[crate::form::Form]) -> Result<()> {
+    pub fn set_forms(&mut self, forms: &[crate::form::Form]) -> FamilyResult<()> {
         let before = self.source.package.forms();
         if before == forms {
             self.forms_change = None;
@@ -1937,8 +2228,8 @@ impl Edit<'_> {
         &mut self,
         resource: Position,
         replacement: crate::resource::Resource,
-    ) -> Result<()> {
-        self.stage_resource(resource, Some(replacement), false)
+    ) -> FamilyResult<()> {
+        Ok(self.stage_resource(resource, Some(replacement), false)?)
     }
 
     /// Removes one inert resource or object reference while preserving payload bytes.
@@ -1946,8 +2237,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or source span.
-    pub fn remove_resource(&mut self, resource: Position) -> Result<()> {
-        self.stage_resource(resource, None, false)
+    pub fn remove_resource(&mut self, resource: Position) -> FamilyResult<()> {
+        Ok(self.stage_resource(resource, None, false)?)
     }
 
     /// Appends one inert reference whose embedded payload already exists, or
@@ -1956,7 +2247,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when an embedded dependency is absent.
-    pub fn append_resource(&mut self, resource: crate::resource::Resource) -> Result<()> {
+    pub fn append_resource(&mut self, resource: crate::resource::Resource) -> FamilyResult<()> {
         if resource.is_embedded() {
             let path = embedded_path(resource.href())?;
             let prefix = format!("{path}/");
@@ -1969,9 +2260,9 @@ impl Edit<'_> {
                 .iter()
                 .any(|member| member == path || member.starts_with(&prefix));
             if !staged && !packaged {
-                return Err(Error::InvalidFormat(
+                return Err(family_invalid!(Error::InvalidFormat(
                     "OTH appended embedded resource payload is absent".to_string(),
-                ));
+                )));
             }
         }
         let position = self.source.package.resources().len().saturating_add(
@@ -1980,7 +2271,7 @@ impl Edit<'_> {
                 .filter(|change| change.before.is_none())
                 .count(),
         );
-        self.stage_resource(Position::new(position), Some(resource), true)
+        Ok(self.stage_resource(Position::new(position), Some(resource), true)?)
     }
 
     /// Creates an embedded payload and appends its inert reference atomically.
@@ -1993,7 +2284,7 @@ impl Edit<'_> {
         resource: crate::resource::Resource,
         media_type: impl Into<String>,
         bytes: Vec<u8>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let path = embedded_path(resource.href())?.to_owned();
         self.stage_payload(path, media_type.into(), Some(bytes))?;
         self.append_resource(resource)
@@ -2009,7 +2300,7 @@ impl Edit<'_> {
         resource: Position,
         media_type: impl Into<String>,
         bytes: Vec<u8>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let reference = self.resource_after(resource)?;
         let path = embedded_path(reference.href())?.to_owned();
         let prefix = format!("{path}/");
@@ -2024,11 +2315,11 @@ impl Edit<'_> {
                     .iter()
                     .any(|change| change.path.starts_with(&prefix) && change.after.is_some()));
         if is_directory {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH directory-backed object payload requires member mutation".to_string(),
-            ));
+            )));
         }
-        self.stage_payload(path, media_type.into(), Some(bytes))
+        Ok(self.stage_payload(path, media_type.into(), Some(bytes))?)
     }
 
     /// Replaces or creates one member below a directory-backed embedded object.
@@ -2043,15 +2334,15 @@ impl Edit<'_> {
         member: &str,
         media_type: impl Into<String>,
         bytes: Vec<u8>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let reference = self.resource_after(resource)?;
         if reference.kind() == crate::resource::Kind::Image {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH image payloads do not have nested members".to_string(),
-            ));
+            )));
         }
         let path = resource_member_path(reference, member)?;
-        self.stage_payload(path, media_type.into(), Some(bytes))
+        Ok(self.stage_payload(path, media_type.into(), Some(bytes))?)
     }
 
     /// Removes the payload referenced by one embedded resource.
@@ -2059,7 +2350,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector, external reference, or unsafe path.
-    pub fn remove_resource_payload(&mut self, resource: Position) -> Result<()> {
+    pub fn remove_resource_payload(&mut self, resource: Position) -> FamilyResult<()> {
         let reference = self.resource_after(resource)?;
         let root = embedded_path(reference.href())?.to_owned();
         let prefix = format!("{root}/");
@@ -2076,7 +2367,7 @@ impl Edit<'_> {
                     .unwrap_or_else(|| "application/octet-stream".to_string());
                 Ok((path, media_type))
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<CoreResult<Vec<_>>>()?;
         for change in &self.payload_changes {
             if change.after.is_some()
                 && (change.path == root || change.path.starts_with(&prefix))
@@ -2088,9 +2379,9 @@ impl Edit<'_> {
             }
         }
         if members.is_empty() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH embedded resource payload is absent".to_string(),
-            ));
+            )));
         }
         for (path, media_type) in members {
             self.stage_payload(path, media_type, None)?;
@@ -2108,12 +2399,12 @@ impl Edit<'_> {
         &mut self,
         resource: Position,
         member: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let reference = self.resource_after(resource)?;
         if reference.kind() == crate::resource::Kind::Image {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH image payloads do not have nested members".to_string(),
-            ));
+            )));
         }
         let path = resource_member_path(reference, member)?;
         let staged = self
@@ -2121,19 +2412,19 @@ impl Edit<'_> {
             .iter()
             .any(|change| change.path == path && change.after.is_some());
         if !staged && self.source.package.member(&path)?.is_none() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH embedded object payload member is absent".to_string(),
-            ));
+            )));
         }
         let media_type = self
             .source
             .package
             .member_media_type(&path)?
             .unwrap_or_else(|| "application/octet-stream".to_string());
-        self.stage_payload(path, media_type, None)
+        Ok(self.stage_payload(path, media_type, None)?)
     }
 
-    fn resource_after(&self, resource: Position) -> Result<&crate::resource::Resource> {
+    fn resource_after(&self, resource: Position) -> CoreResult<&crate::resource::Resource> {
         if let Some(change) = self
             .resource_changes
             .iter()
@@ -2157,7 +2448,7 @@ impl Edit<'_> {
         resource: Position,
         after: Option<crate::resource::Resource>,
         insertion: bool,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let before = (!insertion)
             .then(|| self.source.package.resources().get(resource.get()).cloned())
             .flatten();
@@ -2227,7 +2518,7 @@ impl Edit<'_> {
         path: String,
         media_type: String,
         after: Option<Vec<u8>>,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         if media_type.is_empty() {
             return Err(Error::InvalidFormat(
                 "OTH resource media type cannot be empty".to_string(),
@@ -2262,7 +2553,7 @@ impl Edit<'_> {
         Ok(())
     }
 
-    fn stage_list(&mut self, list: Position, after: Option<crate::list::List>) -> Result<()> {
+    fn stage_list(&mut self, list: Position, after: Option<crate::list::List>) -> CoreResult<()> {
         let before = self
             .source
             .package
@@ -2330,7 +2621,11 @@ impl Edit<'_> {
     ///
     /// Returns an error if the source cannot be losslessly rewritten or the
     /// fully reopened candidate fails semantic readback.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> Result<Commit, litchi_odf_common::Error> {
+        Ok(self.commit_inner()?)
+    }
+
+    fn commit_inner(self) -> CoreResult<Commit> {
         if self.changes.is_empty()
             && self.durable_fragment.is_none()
             && self.forms_change.is_none()
@@ -2345,7 +2640,7 @@ impl Edit<'_> {
             && self.structure_lifecycle_changes.is_empty()
             && self.appended.is_empty()
         {
-            return Ok(Commit::unchanged(self.source.clone()));
+            return Ok(unchanged_commit(self.source.clone()));
         }
         let content = crate::codec::compact_for_publication(&replace_texts(
             self.source,
@@ -2360,7 +2655,7 @@ impl Edit<'_> {
             &self.structure_changes,
             &self.structure_lifecycle_changes,
         )?)?;
-        let snapshot = Template {
+        let snapshot = Package {
             package: self.source.package.rebuild_with_parts(
                 &content,
                 &self.metadata,
@@ -2372,27 +2667,25 @@ impl Edit<'_> {
         let durable_fragment = published_durable_fragment(&self, &snapshot)?;
         let structure_changes = published_structure_changes(&self, &snapshot)?;
         let structure_lifecycle_changes = published_structure_lifecycle_changes(&self, &snapshot)?;
-        Ok(Commit {
-            snapshot: snapshot.clone(),
-            patch: Patch {
-                source: self.source.clone(),
-                target: snapshot,
-                appended: self.appended,
-                changes: self.changes,
-                durable_fragment,
-                forms_change: self.forms_change,
-                heading_changes: self.heading_changes,
-                inline_changes: self.inline_changes,
-                list_changes: self.list_changes,
-                metadata: self.metadata,
-                payload_changes: self.payload_changes,
-                resource_changes: self.resource_changes,
-                styles: self.styles,
-                structure_changes,
-                structure_lifecycle_changes,
-            },
-            changed: true,
-        })
+        let package = snapshot.clone();
+        let patch = Patch {
+            source: self.source.clone(),
+            target: snapshot,
+            appended: self.appended,
+            changes: self.changes,
+            durable_fragment,
+            forms_change: self.forms_change,
+            heading_changes: self.heading_changes,
+            inline_changes: self.inline_changes,
+            list_changes: self.list_changes,
+            metadata: self.metadata,
+            payload_changes: self.payload_changes,
+            resource_changes: self.resource_changes,
+            styles: self.styles,
+            structure_changes,
+            structure_lifecycle_changes,
+        };
+        Ok(Commit::new(package, patch, Diagnostics::CHANGED))
     }
 }
 
@@ -2406,7 +2699,7 @@ impl<'a> Edit<'a> {
     /// # Errors
     ///
     /// Returns the rejected transaction with a typed source or overlap reason.
-    pub fn join(&mut self, other: Self) -> std::result::Result<&mut Self, JoinError<'a>> {
+    pub fn join(&mut self, other: Self) -> Result<&mut Self, JoinError<'a>> {
         let failure = if !self.source.package.is_same(&other.source.package) {
             Some(JoinFailure::DifferentSnapshot)
         } else if (!self.appended.is_empty()
@@ -2904,61 +3197,25 @@ impl ParagraphChange {
     }
 }
 
-/// A committed immutable template and its exact-source patch.
-pub struct Commit {
-    snapshot: Template,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    fn unchanged(snapshot: Template) -> Self {
-        Self {
-            patch: Patch {
-                appended: Vec::new(),
-                changes: Vec::new(),
-                durable_fragment: None,
-                forms_change: None,
-                heading_changes: Vec::new(),
-                inline_changes: Vec::new(),
-                list_changes: Vec::new(),
-                metadata: PartChange::Keep,
-                payload_changes: Vec::new(),
-                resource_changes: Vec::new(),
-                source: snapshot.clone(),
-                styles: PartChange::Keep,
-                structure_changes: Vec::new(),
-                structure_lifecycle_changes: Vec::new(),
-                target: snapshot.clone(),
-            },
-            snapshot,
-            changed: false,
-        }
-    }
-
-    /// Whether the committed package differs from its source snapshot.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Returns the committed immutable template snapshot.
-    #[must_use]
-    pub fn template(&self) -> &Template {
-        &self.snapshot
-    }
-
-    /// Returns the source-checked reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit and returns the published template.
-    #[must_use]
-    pub fn into_template(self) -> Template {
-        self.snapshot
-    }
+fn unchanged_commit(snapshot: Package) -> Commit {
+    let patch = Patch {
+        appended: Vec::new(),
+        changes: Vec::new(),
+        durable_fragment: None,
+        forms_change: None,
+        heading_changes: Vec::new(),
+        inline_changes: Vec::new(),
+        list_changes: Vec::new(),
+        metadata: PartChange::Keep,
+        payload_changes: Vec::new(),
+        resource_changes: Vec::new(),
+        source: snapshot.clone(),
+        styles: PartChange::Keep,
+        structure_changes: Vec::new(),
+        structure_lifecycle_changes: Vec::new(),
+        target: snapshot.clone(),
+    };
+    Commit::new(snapshot, patch, Diagnostics::UNCHANGED)
 }
 
 /// A source-checked reversible OTH text and structural patch.
@@ -2974,11 +3231,11 @@ pub struct Patch {
     metadata: PartChange,
     payload_changes: Vec<ResourcePayloadChange>,
     resource_changes: Vec<ResourceChange>,
-    source: Template,
+    source: Package,
     styles: PartChange,
     structure_changes: Vec<StructureChange>,
     structure_lifecycle_changes: Vec<StructureLifecycleChange>,
-    target: Template,
+    target: Package,
 }
 
 impl Patch {
@@ -2987,11 +3244,11 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error unless both patches authorize the exact supplied base.
-    pub fn plan_three_way(base: &Template, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> FamilyResult<MergePlan> {
         if !left.is_applicable_to(base) || !right.is_applicable_to(base) {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH three-way patch base does not match".to_string(),
-            ));
+            )));
         }
         let mut conflicts = Vec::new();
         for change in &left.changes {
@@ -3140,16 +3397,19 @@ impl Patch {
     }
     /// Returns whether this patch authorizes the supplied exact source bytes.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Template) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
+    /// Whether the patch changes nothing (its source and target bytes are
+    /// identical).
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
     /// Applies this patch only to its exact immutable source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied source differs byte-for-byte.
-    pub fn apply(&self, source: &Template) -> Result<Template> {
+    pub(crate) fn apply(&self, source: &Package) -> CoreResult<Package> {
         if !self.is_applicable_to(source) {
             return Err(Error::InvalidFormat(
                 "OTH patch source does not match its expected snapshot".to_string(),
@@ -3269,7 +3529,7 @@ impl Patch {
     ///
     /// Returns an error if a size cannot be represented or the finite envelope
     /// limit would be exceeded.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> FamilyResult<Vec<u8>> {
         let appended_xml = match &self.durable_fragment {
             Some(fragment) => fragment.clone(),
             None => crate::authoring::render_fragment(&self.appended)?,
@@ -3284,9 +3544,11 @@ impl Patch {
                     .saturating_add(appended_xml.len())
                     .saturating_add(128),
             )
-            .map_err(|source| Error::Allocation {
-                resource: "OTH durable patch",
-                source,
+            .map_err(|source| {
+                family_invalid!(Error::Allocation {
+                    resource: "OTH durable patch",
+                    source,
+                })
             })?;
         output.extend_from_slice(PATCH_MAGIC);
         push_wire_bytes(&mut output, self.source.as_bytes())?;
@@ -3379,9 +3641,9 @@ impl Patch {
         push_wire_part_change(&mut output, &self.metadata)?;
         push_wire_part_change(&mut output, &self.styles)?;
         if output.len() > MAX_DURABLE_PATCH_BYTES {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH durable patch exceeds the byte limit".to_string(),
-            ));
+            )));
         }
         Ok(output)
     }
@@ -3392,11 +3654,11 @@ impl Patch {
     ///
     /// Returns an error for malformed, over-limit, stale-semantic, or invalid
     /// embedded source/target packages.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> FamilyResult<Self> {
         if bytes.len() > MAX_DURABLE_PATCH_BYTES {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "invalid or oversized OTH durable patch".to_string(),
-            ));
+            )));
         }
         let (mut cursor, version) = if bytes.starts_with(PATCH_MAGIC) {
             (PATCH_MAGIC.len(), 5_u8)
@@ -3407,12 +3669,12 @@ impl Patch {
         } else if bytes.starts_with(LEGACY_PATCH_MAGIC_V2) {
             (LEGACY_PATCH_MAGIC_V2.len(), 2_u8)
         } else {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "invalid or oversized OTH durable patch".to_string(),
-            ));
+            )));
         };
-        let source = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
-        let target = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
+        let source = Package::from_bytes(read_wire_bytes(bytes, &mut cursor)?)?;
+        let target = Package::from_bytes(read_wire_bytes(bytes, &mut cursor)?)?;
         let appended_xml = read_wire_string(bytes, &mut cursor)?;
         let appended_list_count = if appended_xml.is_empty() {
             0
@@ -3446,14 +3708,14 @@ impl Patch {
         validate_part_change(&metadata, source.meta_xml(), target.meta_xml(), "metadata")?;
         validate_part_change(&styles, source.styles_xml(), target.styles_xml(), "styles")?;
         if cursor != bytes.len() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH durable patch has trailing bytes".to_string(),
-            ));
+            )));
         }
         if !appended_xml.is_empty() && !target.content_xml().contains(&appended_xml) {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH durable patch append failed target readback".to_string(),
-            ));
+            )));
         }
         Ok(Self {
             appended: Vec::new(),
@@ -3612,7 +3874,7 @@ pub enum MergeConflict {
 
 /// Non-mutating three-way composition plan.
 pub struct MergePlan {
-    base: Template,
+    base: Package,
     conflicts: Vec<MergeConflict>,
     left: Patch,
     right: Patch,
@@ -3630,11 +3892,11 @@ impl MergePlan {
     /// # Errors
     ///
     /// Returns an error while conflicts remain or publication/readback fails.
-    pub fn publish(&self) -> Result<Template> {
+    pub fn publish(&self) -> FamilyResult<Package> {
         if !self.conflicts.is_empty() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(Error::InvalidFormat(
                 "OTH three-way plan has unresolved conflicts".to_string(),
-            ));
+            )));
         }
         let mut paragraph_changes = self.left.changes.clone();
         paragraph_changes.extend(self.right.changes.clone());
@@ -3687,7 +3949,7 @@ impl MergePlan {
         } else {
             &self.left.styles
         };
-        let candidate = Template {
+        let candidate = Package {
             package: self.base.package.rebuild_with_parts(
                 &content,
                 metadata,
@@ -3703,9 +3965,9 @@ impl MergePlan {
                 .map(crate::paragraph::Paragraph::text)
                 != Some(change.after.as_str())
             {
-                return Err(Error::InvalidFormat(
+                return Err(family_invalid!(Error::InvalidFormat(
                     "OTH merged paragraph failed readback".to_string(),
-                ));
+                )));
             }
         }
         for change in heading_changes {
@@ -3716,9 +3978,9 @@ impl MergePlan {
                 .map(crate::heading::Heading::text)
                 != Some(change.after.as_str())
             {
-                return Err(Error::InvalidFormat(
+                return Err(family_invalid!(Error::InvalidFormat(
                     "OTH merged heading failed readback".to_string(),
-                ));
+                )));
             }
         }
         validate_inline_readback(&inline_changes, &candidate)?;
@@ -3735,9 +3997,9 @@ impl MergePlan {
                 Error::InvalidFormat("OTH merged replacement list disappeared".to_string())
             })?;
             if !lists_semantically_equal(actual, expected) {
-                return Err(Error::InvalidFormat(
+                return Err(family_invalid!(Error::InvalidFormat(
                     "OTH merged replacement list failed semantic readback".to_string(),
-                ));
+                )));
             }
         }
         Ok(candidate)
@@ -3746,13 +4008,13 @@ impl MergePlan {
 
 /// Explicit bounded undo/redo history for immutable OTH snapshots.
 pub struct History {
-    inner: litchi_core::History<Template>,
+    inner: litchi_core::History<Package>,
 }
 
 impl History {
     /// Starts history at one immutable template.
     #[must_use]
-    pub fn new(current: Template, limits: HistoryLimits) -> Self {
+    pub fn new(current: Package, limits: HistoryLimits) -> Self {
         Self {
             inner: litchi_core::History::new(current, limits),
         }
@@ -3760,7 +4022,7 @@ impl History {
 
     /// Current immutable snapshot.
     #[must_use]
-    pub const fn current(&self) -> &Template {
+    pub const fn current(&self) -> &Package {
         self.inner.current()
     }
 
@@ -3769,9 +4031,9 @@ impl History {
     /// # Errors
     ///
     /// Returns a history budget error without changing the selected snapshot.
-    pub fn record(&mut self, commit: Commit) -> std::result::Result<Vec<Template>, PatchError> {
-        let weight = u64::try_from(commit.template().as_bytes().len()).unwrap_or(u64::MAX);
-        self.inner.record(commit.into_template(), weight)
+    pub fn record(&mut self, commit: Commit) -> Result<Vec<Package>, PatchError> {
+        let weight = u64::try_from(commit.package().as_bytes().len()).unwrap_or(u64::MAX);
+        self.inner.record(commit.into_package(), weight)
     }
 
     /// Selects the previous retained snapshot.
@@ -3798,9 +4060,9 @@ impl History {
 }
 
 fn transfer_block(
-    source: &Template,
+    source: &Package,
     selector: TransferSelector,
-) -> Result<(crate::ContentBlock, crate::codec::ReplacementSite)> {
+) -> CoreResult<(crate::ContentBlock, crate::codec::ReplacementSite)> {
     match selector {
         TransferSelector::Heading(position) => {
             let heading = source
@@ -3872,10 +4134,10 @@ fn transfer_block(
 }
 
 fn transfer_resource_payloads(
-    source: &Template,
-    destination: &Template,
+    source: &Package,
+    destination: &Package,
     resource: &crate::resource::Resource,
-) -> Result<Vec<ResourcePayloadChange>> {
+) -> CoreResult<Vec<ResourcePayloadChange>> {
     if !resource.is_embedded() {
         return Ok(Vec::new());
     }
@@ -3925,10 +4187,10 @@ fn transfer_resource_payloads(
 }
 
 fn transfer_site_payloads(
-    source: &Template,
-    destination: &Template,
+    source: &Package,
+    destination: &Package,
     site: &crate::codec::ReplacementSite,
-) -> Result<Vec<ResourcePayloadChange>> {
+) -> CoreResult<Vec<ResourcePayloadChange>> {
     let mut changes = Vec::new();
     for (index, candidate) in source.package.resource_sites().iter().enumerate() {
         if candidate.range.start < site.range.start || candidate.range.end > site.range.end {
@@ -4009,7 +4271,7 @@ fn resolve_transfer_styles(
     destination: &[crate::style::Style],
     roots: &[String],
     include_styles: bool,
-) -> Result<Vec<crate::style::Style>> {
+) -> CoreResult<Vec<crate::style::Style>> {
     let mut pending = roots.to_vec();
     let mut visited = Vec::<String>::new();
     let mut imported = Vec::new();
@@ -4145,7 +4407,7 @@ fn collect_inline_merge_conflicts(
     }
 }
 
-fn validate_inline_readback(changes: &[InlineChange], snapshot: &Template) -> Result<()> {
+fn validate_inline_readback(changes: &[InlineChange], snapshot: &Package) -> CoreResult<()> {
     for change in changes {
         validate_one_inline_change(change, snapshot, true)?;
     }
@@ -4154,8 +4416,8 @@ fn validate_inline_readback(changes: &[InlineChange], snapshot: &Template) -> Re
 
 fn validate_forms_readback(
     optional_change: Option<&FormsChange>,
-    snapshot: &Template,
-) -> Result<()> {
+    snapshot: &Package,
+) -> CoreResult<()> {
     if let Some(forms_change) = optional_change {
         validate_forms_source(forms_change, snapshot, true)?;
     }
@@ -4165,8 +4427,8 @@ fn validate_forms_readback(
 fn validate_resource_readback(
     references: &[ResourceChange],
     payloads: &[ResourcePayloadChange],
-    snapshot: &Template,
-) -> Result<()> {
+    snapshot: &Package,
+) -> CoreResult<()> {
     validate_resource_references(references, snapshot, true)?;
     for change in payloads {
         if snapshot.package.member(&change.path)? != change.after {
@@ -4189,7 +4451,7 @@ fn validate_resource_readback(
     Ok(())
 }
 
-fn validate_embedded_dependencies(snapshot: &Template) -> Result<()> {
+fn validate_embedded_dependencies(snapshot: &Package) -> CoreResult<()> {
     let files = snapshot.files()?;
     for resource in snapshot
         .package
@@ -4211,7 +4473,7 @@ fn validate_embedded_dependencies(snapshot: &Template) -> Result<()> {
     Ok(())
 }
 
-fn embedded_path(href: &str) -> Result<&str> {
+fn embedded_path(href: &str) -> CoreResult<&str> {
     let path = href.strip_prefix("./").unwrap_or(href);
     if path.is_empty()
         || path.starts_with('/')
@@ -4228,7 +4490,7 @@ fn embedded_path(href: &str) -> Result<&str> {
     Ok(path)
 }
 
-fn resource_member_path(resource: &crate::resource::Resource, member: &str) -> Result<String> {
+fn resource_member_path(resource: &crate::resource::Resource, member: &str) -> CoreResult<String> {
     let root = embedded_path(resource.href())?;
     let member_path = embedded_path(member)?;
     Ok(format!("{root}/{member_path}"))
@@ -4273,7 +4535,7 @@ fn normalize_list_level(list: &crate::list::List, level: usize) -> crate::list::
     crate::list::List::projected(items, level, list.style_name().map(str::to_owned))
 }
 
-fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
+fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Package) -> CoreResult<()> {
     for change in &edit.changes {
         let actual = snapshot
             .package
@@ -4410,7 +4672,7 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
     Ok(())
 }
 
-fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Template) -> Result<Option<String>> {
+fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Package) -> CoreResult<Option<String>> {
     if edit.durable_fragment.is_none() {
         return Ok(None);
     }
@@ -4443,8 +4705,8 @@ fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Template) -> Result<Op
 
 fn published_structure_changes(
     edit: &Edit<'_>,
-    snapshot: &Template,
-) -> Result<Vec<StructureChange>> {
+    snapshot: &Package,
+) -> CoreResult<Vec<StructureChange>> {
     let mut changes = Vec::new();
     changes
         .try_reserve_exact(edit.structure_changes.len())
@@ -4503,10 +4765,10 @@ fn published_structure_changes(
 }
 
 fn find_structure_site_by_identity(
-    template: &Template,
+    template: &Package,
     kind: StructureKind,
     identity: &str,
-) -> Result<crate::codec::StructureSite> {
+) -> CoreResult<crate::codec::StructureSite> {
     let mut matches = crate::codec::structure_sites(template.content_xml())?
         .into_iter()
         .filter(|site| site.kind.to_public() == kind && site.identity.as_deref() == Some(identity));
@@ -4525,8 +4787,8 @@ fn find_structure_site_by_identity(
 
 fn published_structure_lifecycle_changes(
     edit: &Edit<'_>,
-    snapshot: &Template,
-) -> Result<Vec<StructureLifecycleChange>> {
+    snapshot: &Package,
+) -> CoreResult<Vec<StructureLifecycleChange>> {
     let mut changes = Vec::new();
     changes
         .try_reserve_exact(edit.structure_lifecycle_changes.len())
@@ -4618,8 +4880,8 @@ fn published_structure_lifecycle_changes(
 fn validate_structure_readback(
     changes: &[StructureChange],
     lifecycle: &[StructureLifecycleChange],
-    snapshot: &Template,
-) -> Result<()> {
+    snapshot: &Package,
+) -> CoreResult<()> {
     for change in changes {
         let site = find_structure_target_site(
             snapshot,
@@ -4641,8 +4903,8 @@ fn validate_structure_readback(
 
 fn validate_structure_lifecycle_readback(
     changes: &[StructureLifecycleChange],
-    snapshot: &Template,
-) -> Result<()> {
+    snapshot: &Package,
+) -> CoreResult<()> {
     for change in changes {
         let found = find_structure_site_by_identity(snapshot, change.kind, &change.identity);
         match (change.is_insertion(), found) {
@@ -4669,7 +4931,7 @@ fn validate_structure_lifecycle_readback(
     Ok(())
 }
 
-fn list_target_index(changes: &[ListChange], change: &ListChange) -> Result<usize> {
+fn list_target_index(changes: &[ListChange], change: &ListChange) -> CoreResult<usize> {
     let mut target = change.list.get();
     for candidate in changes
         .iter()
@@ -4683,7 +4945,7 @@ fn list_target_index(changes: &[ListChange], change: &ListChange) -> Result<usiz
     Ok(target)
 }
 
-fn shift_list_index(index: usize, change: &ListChange) -> Result<usize> {
+fn shift_list_index(index: usize, change: &ListChange) -> CoreResult<usize> {
     let before = change.before.as_ref().map_or(0, list_tree_count);
     let after = change.after.as_ref().map_or(0, list_tree_count);
     if after >= before {
@@ -4735,9 +4997,9 @@ fn replacement_sites_overlap(
 }
 
 fn find_structure_site(
-    template: &Template,
+    template: &Package,
     selector: StructureSelector,
-) -> Result<crate::codec::StructureSite> {
+) -> CoreResult<crate::codec::StructureSite> {
     let kind = match selector {
         StructureSelector::Section(_) => crate::codec::EditableStructureKind::Section,
         StructureSelector::Note(_) => crate::codec::EditableStructureKind::Note,
@@ -4754,7 +5016,7 @@ fn find_structure_site(
 fn structure_target_position(
     selector: StructureSelector,
     lifecycle: &[StructureLifecycleChange],
-) -> Result<Position> {
+) -> CoreResult<Position> {
     let mut position = selector.position().get();
     for _change in lifecycle.iter().filter(|change| {
         change.kind == selector.kind()
@@ -4769,11 +5031,11 @@ fn structure_target_position(
 }
 
 fn find_structure_target_site(
-    template: &Template,
+    template: &Package,
     selector: StructureSelector,
     identity: Option<&str>,
     lifecycle: &[StructureLifecycleChange],
-) -> Result<crate::codec::StructureSite> {
+) -> CoreResult<crate::codec::StructureSite> {
     if let Some(identity) = identity {
         return find_structure_site_by_identity(template, selector.kind(), identity);
     }
@@ -4786,7 +5048,7 @@ fn find_structure_target_site(
     )
 }
 
-fn structure_change_staged_bytes(change: &StructureChange) -> Result<usize> {
+fn structure_change_staged_bytes(change: &StructureChange) -> CoreResult<usize> {
     change
         .identity
         .as_ref()
@@ -4797,7 +5059,7 @@ fn structure_change_staged_bytes(change: &StructureChange) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat("OTH structural staging size overflow".to_string()))
 }
 
-fn lifecycle_change_staged_bytes(change: &StructureLifecycleChange) -> Result<usize> {
+fn lifecycle_change_staged_bytes(change: &StructureLifecycleChange) -> CoreResult<usize> {
     change
         .identity
         .len()
@@ -4823,7 +5085,7 @@ fn structure_changes_overlap(left: &StructureChange, right: &StructureChange) ->
     }
 }
 
-fn checked_structure_identity(value: String, label: &str) -> Result<String> {
+fn checked_structure_identity(value: String, label: &str) -> CoreResult<String> {
     if value.is_empty() || value.len() > MAX_PARAGRAPH_BYTES {
         return Err(Error::InvalidFormat(format!(
             "OTH {label} is empty or exceeds the size limit"
@@ -4837,7 +5099,7 @@ fn checked_structure_identity(value: String, label: &str) -> Result<String> {
     Ok(value)
 }
 
-fn checked_structure_text(value: String) -> Result<String> {
+fn checked_structure_text(value: String) -> CoreResult<String> {
     if value.len() > MAX_PARAGRAPH_BYTES || value.chars().any(char::is_control) {
         return Err(Error::InvalidFormat(
             "OTH structural text is empty or exceeds the size limit".to_string(),
@@ -4850,7 +5112,7 @@ fn escaped_xml(value: &str) -> String {
     quick_xml::escape::escape(value).into_owned()
 }
 
-fn validate_authored_structure_fragment(fragment: &str) -> Result<String> {
+fn validate_authored_structure_fragment(fragment: &str) -> CoreResult<String> {
     let wrapped = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"><office:body><office:text>{fragment}</office:text></office:body></office:document-content>"
     );
@@ -4858,7 +5120,7 @@ fn validate_authored_structure_fragment(fragment: &str) -> Result<String> {
     Ok(fragment.to_owned())
 }
 
-fn authored_section(name: &str, text: &str) -> Result<String> {
+fn authored_section(name: &str, text: &str) -> CoreResult<String> {
     validate_authored_structure_fragment(&format!(
         "<text:section xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" text:name=\"{}\"><text:p>{}</text:p></text:section>",
         escaped_xml(name),
@@ -4866,7 +5128,7 @@ fn authored_section(name: &str, text: &str) -> Result<String> {
     ))
 }
 
-fn authored_note(id: &str, class: &str, citation: &str, body: &str) -> Result<String> {
+fn authored_note(id: &str, class: &str, citation: &str, body: &str) -> CoreResult<String> {
     validate_authored_structure_fragment(&format!(
         "<text:note xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" text:id=\"{}\" text:note-class=\"{}\"><text:note-citation>{}</text:note-citation><text:note-body><text:p>{}</text:p></text:note-body></text:note>",
         escaped_xml(id),
@@ -4876,7 +5138,7 @@ fn authored_note(id: &str, class: &str, citation: &str, body: &str) -> Result<St
     ))
 }
 
-fn authored_annotation(name: &str, text: &str) -> Result<String> {
+fn authored_annotation(name: &str, text: &str) -> CoreResult<String> {
     validate_authored_structure_fragment(&format!(
         "<office:annotation xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" office:name=\"{}\"><text:p>{}</text:p></office:annotation>",
         escaped_xml(name),
@@ -4884,7 +5146,7 @@ fn authored_annotation(name: &str, text: &str) -> Result<String> {
     ))
 }
 
-fn authored_table(name: &str, text: &str) -> Result<String> {
+fn authored_table(name: &str, text: &str) -> CoreResult<String> {
     validate_authored_structure_fragment(&format!(
         "<table:table xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" table:name=\"{}\"><table:table-column/><table:table-row><table:table-cell office:value-type=\"string\"><text:p>{}</text:p></table:table-cell></table:table-row></table:table>",
         escaped_xml(name),
@@ -4893,10 +5155,10 @@ fn authored_table(name: &str, text: &str) -> Result<String> {
 }
 
 fn ensure_structure_reference_closure(
-    template: &Template,
+    template: &Package,
     site: &crate::codec::StructureSite,
     identity: &str,
-) -> Result<()> {
+) -> CoreResult<()> {
     if crate::codec::has_semantic_reference(template.content_xml(), site.full.clone(), identity)? {
         return Err(Error::InvalidFormat(
             "OTH structural removal would leave an unresolved external reference".to_string(),
@@ -4905,7 +5167,7 @@ fn ensure_structure_reference_closure(
     Ok(())
 }
 
-fn list_changes_overlap(template: &Template, left: &ListChange, right: &ListChange) -> bool {
+fn list_changes_overlap(template: &Package, left: &ListChange, right: &ListChange) -> bool {
     match (
         template.package.list_site(left.list.get()),
         template.package.list_site(right.list.get()),
@@ -4915,14 +5177,14 @@ fn list_changes_overlap(template: &Template, left: &ListChange, right: &ListChan
     }
 }
 
-fn push_wire_usize(output: &mut Vec<u8>, value: usize) -> Result<()> {
+fn push_wire_usize(output: &mut Vec<u8>, value: usize) -> CoreResult<()> {
     let wire_value = u64::try_from(value)
         .map_err(|error| Error::InvalidFormat(format!("OTH patch value is too large: {error}")))?;
     output.extend_from_slice(&wire_value.to_le_bytes());
     Ok(())
 }
 
-fn push_wire_bytes(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
+fn push_wire_bytes(output: &mut Vec<u8>, value: &[u8]) -> CoreResult<()> {
     push_wire_usize(output, value.len())?;
     if output.len().saturating_add(value.len()) > MAX_DURABLE_PATCH_BYTES {
         return Err(Error::InvalidFormat(
@@ -4933,7 +5195,10 @@ fn push_wire_bytes(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn push_wire_list(output: &mut Vec<u8>, optional_list: Option<&crate::list::List>) -> Result<()> {
+fn push_wire_list(
+    output: &mut Vec<u8>,
+    optional_list: Option<&crate::list::List>,
+) -> CoreResult<()> {
     match optional_list {
         None => push_wire_usize(output, 0),
         Some(value) => {
@@ -4946,7 +5211,7 @@ fn push_wire_list(output: &mut Vec<u8>, optional_list: Option<&crate::list::List
     }
 }
 
-fn push_wire_part_change(output: &mut Vec<u8>, change: &PartChange) -> Result<()> {
+fn push_wire_part_change(output: &mut Vec<u8>, change: &PartChange) -> CoreResult<()> {
     match change {
         PartChange::Keep => push_wire_usize(output, 0),
         PartChange::Remove => push_wire_usize(output, 1),
@@ -4957,7 +5222,7 @@ fn push_wire_part_change(output: &mut Vec<u8>, change: &PartChange) -> Result<()
     }
 }
 
-fn push_wire_optional_bytes(output: &mut Vec<u8>, value: Option<&[u8]>) -> Result<()> {
+fn push_wire_optional_bytes(output: &mut Vec<u8>, value: Option<&[u8]>) -> CoreResult<()> {
     match value {
         None => push_wire_usize(output, 0),
         Some(bytes) => {
@@ -4970,7 +5235,7 @@ fn push_wire_optional_bytes(output: &mut Vec<u8>, value: Option<&[u8]>) -> Resul
 fn push_wire_resource(
     output: &mut Vec<u8>,
     resource: Option<&crate::resource::Resource>,
-) -> Result<()> {
+) -> CoreResult<()> {
     let Some(resource_entry) = resource else {
         return push_wire_usize(output, 0);
     };
@@ -4986,7 +5251,7 @@ fn push_wire_resource(
     push_wire_bytes(output, resource_entry.href().as_bytes())
 }
 
-fn read_wire_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
+fn read_wire_usize(bytes: &[u8], cursor: &mut usize) -> CoreResult<usize> {
     let end = cursor
         .checked_add(8)
         .ok_or_else(|| Error::InvalidFormat("OTH patch cursor overflow".to_string()))?;
@@ -5000,7 +5265,7 @@ fn read_wire_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
         .map_err(|error| Error::InvalidFormat(format!("OTH patch integer overflow: {error}")))
 }
 
-fn read_wire_bytes<'a>(bytes: &'a [u8], cursor: &mut usize) -> Result<&'a [u8]> {
+fn read_wire_bytes<'a>(bytes: &'a [u8], cursor: &mut usize) -> CoreResult<&'a [u8]> {
     let length = read_wire_usize(bytes, cursor)?;
     let end = cursor
         .checked_add(length)
@@ -5012,12 +5277,12 @@ fn read_wire_bytes<'a>(bytes: &'a [u8], cursor: &mut usize) -> Result<&'a [u8]> 
     Ok(value)
 }
 
-fn read_wire_string(bytes: &[u8], cursor: &mut usize) -> Result<String> {
+fn read_wire_string(bytes: &[u8], cursor: &mut usize) -> CoreResult<String> {
     String::from_utf8(read_wire_bytes(bytes, cursor)?.to_vec())
         .map_err(|error| Error::InvalidFormat(format!("invalid OTH patch UTF-8: {error}")))
 }
 
-fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> Result<Option<crate::list::List>> {
+fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> CoreResult<Option<crate::list::List>> {
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(None),
         1 => {
@@ -5052,7 +5317,7 @@ fn read_wire_list(bytes: &[u8], cursor: &mut usize) -> Result<Option<crate::list
     }
 }
 
-fn read_wire_part_change(bytes: &[u8], cursor: &mut usize) -> Result<PartChange> {
+fn read_wire_part_change(bytes: &[u8], cursor: &mut usize) -> CoreResult<PartChange> {
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(PartChange::Keep),
         1 => Ok(PartChange::Remove),
@@ -5063,7 +5328,7 @@ fn read_wire_part_change(bytes: &[u8], cursor: &mut usize) -> Result<PartChange>
     }
 }
 
-fn read_wire_optional_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Option<Vec<u8>>> {
+fn read_wire_optional_bytes(bytes: &[u8], cursor: &mut usize) -> CoreResult<Option<Vec<u8>>> {
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(None),
         1 => Ok(Some(read_wire_bytes(bytes, cursor)?.to_vec())),
@@ -5076,7 +5341,7 @@ fn read_wire_optional_bytes(bytes: &[u8], cursor: &mut usize) -> Result<Option<V
 fn read_wire_resource(
     bytes: &[u8],
     cursor: &mut usize,
-) -> Result<Option<crate::resource::Resource>> {
+) -> CoreResult<Option<crate::resource::Resource>> {
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(None),
         1 => {
@@ -5106,9 +5371,9 @@ fn read_wire_resource(
 fn read_paragraph_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Vec<ParagraphChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Vec<ParagraphChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > source.package.paragraphs().len() || count > target.package.paragraphs().len() {
         return Err(Error::InvalidFormat(
@@ -5153,9 +5418,9 @@ fn read_paragraph_changes(
 fn read_heading_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Vec<HeadingChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Vec<HeadingChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > source.package.headings().len() || count > target.package.headings().len() {
         return Err(Error::InvalidFormat(
@@ -5200,9 +5465,9 @@ fn read_heading_changes(
 fn read_inline_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Vec<InlineChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Vec<InlineChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     let maximum = source
         .package
@@ -5257,9 +5522,9 @@ fn read_inline_changes(
 
 fn validate_one_inline_change(
     change: &InlineChange,
-    template: &Template,
+    template: &Package,
     after: bool,
-) -> Result<()> {
+) -> CoreResult<()> {
     let (optional_site, text) = match change.block {
         InlineBlock::Paragraph(position) => (
             template.package.paragraph_content_site(position.get()),
@@ -5306,9 +5571,9 @@ fn validate_one_inline_change(
 fn read_forms_change(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Option<FormsChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Option<FormsChange>> {
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(None),
         1 => {
@@ -5328,7 +5593,7 @@ fn read_forms_change(
     }
 }
 
-fn validate_forms_source(change: &FormsChange, template: &Template, after: bool) -> Result<()> {
+fn validate_forms_source(change: &FormsChange, template: &Package, after: bool) -> CoreResult<()> {
     let actual_xml = match template.package.forms_site() {
         Some(site) => template
             .content_xml()
@@ -5352,9 +5617,9 @@ fn validate_forms_source(change: &FormsChange, template: &Template, after: bool)
 fn read_resource_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Vec<ResourceChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Vec<ResourceChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count
         > source
@@ -5405,9 +5670,9 @@ fn read_resource_changes(
 fn read_payload_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Vec<ResourcePayloadChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Vec<ResourcePayloadChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     let mut changes = Vec::new();
     changes
@@ -5462,9 +5727,9 @@ fn read_payload_changes(
 
 fn validate_resource_references(
     changes: &[ResourceChange],
-    template: &Template,
+    template: &Package,
     after: bool,
-) -> Result<()> {
+) -> CoreResult<()> {
     let removed = changes
         .iter()
         .filter(|change| change.before.is_some() && change.after.is_none())
@@ -5553,10 +5818,10 @@ fn resource_target_index(changes: &[ResourceChange], change: &ResourceChange) ->
 fn read_list_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
     appended_list_count: usize,
-) -> Result<Vec<ListChange>> {
+) -> CoreResult<Vec<ListChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count
         > source
@@ -5664,10 +5929,10 @@ fn read_list_changes(
 fn read_structure_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
     version: u8,
-) -> Result<Vec<StructureChange>> {
+) -> CoreResult<Vec<StructureChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > 1_000_000 {
         return Err(Error::InvalidFormat(
@@ -5802,9 +6067,9 @@ fn read_structure_changes(
 fn read_structure_lifecycle_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
-) -> Result<Vec<StructureLifecycleChange>> {
+    source: &Package,
+    target: &Package,
+) -> CoreResult<Vec<StructureLifecycleChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > 1_000_000 {
         return Err(Error::InvalidFormat(
@@ -5933,7 +6198,7 @@ fn validate_part_change(
     before: Option<&str>,
     after: Option<&str>,
     label: &str,
-) -> Result<()> {
+) -> CoreResult<()> {
     let valid = match change {
         PartChange::Keep => before == after,
         PartChange::Remove => after.is_none(),
@@ -5949,7 +6214,7 @@ fn validate_part_change(
 }
 
 fn replace_texts(
-    source: &Template,
+    source: &Package,
     changes: &[ParagraphChange],
     heading_changes: &[HeadingChange],
     inline_changes: &[InlineChange],
@@ -5960,7 +6225,7 @@ fn replace_texts(
     durable_fragment: Option<&str>,
     structure_changes: &[StructureChange],
     structure_lifecycle_changes: &[StructureLifecycleChange],
-) -> Result<String> {
+) -> CoreResult<String> {
     let has_append = !appended.is_empty()
         || durable_fragment.is_some_and(|value| !value.is_empty())
         || structure_lifecycle_changes

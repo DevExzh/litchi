@@ -24,6 +24,7 @@ pub enum TimeField {
 
 /// Validation failures for media playback values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The supplied volume was NaN or infinite.
     #[error("media volume must be finite")]

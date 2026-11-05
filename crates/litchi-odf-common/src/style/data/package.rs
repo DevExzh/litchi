@@ -1,14 +1,13 @@
 //! Lossless XML mutation and neutral package accessors.
 
 use super::{
-    Frame, Kind, MAX_XML_BYTES, NUMBER, OFFICE, Part, Result, STYLE, Section, Style, Styles,
-    Version, bad, byte_offset, collect_attributes, decode, direct_style_section, event_start,
-    frame_section, invalid, namespace_uri, parse_data_styles_xml, read_document_version,
-    validate_name,
+    Frame, Kind, NUMBER, OFFICE, Part, STYLE, Section, Style, Styles, Version, bad, byte_offset,
+    collect_attributes, decode, direct_style_section, event_start, frame_section, invalid,
+    namespace_uri, parse_data_styles_xml, read_document_version, validate_name,
 };
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
-use quick_xml::reader::NsReader;
 
 #[derive(Clone)]
 struct XmlSpan {
@@ -32,10 +31,14 @@ struct ContainerSpan {
 ///
 /// Returns an error when the XML is malformed, lacks the requested container,
 /// or the replacement style is not valid for the document version.
-pub fn set_data_style_xml(xml: &str, style: &Style) -> Result<String> {
-    let version = document_version(xml)?;
+pub fn set_data_style_xml(
+    xml: &str,
+    style: &Style,
+    limits: XmlStreamLimits,
+) -> Result<String, crate::Error> {
+    let version = document_version(xml, limits)?;
     let fragment = style.to_xml_fragment(version)?;
-    let (target, container_candidate) = find_style_span(xml, style.section, &style.name)?;
+    let (target, container_candidate) = find_style_span(xml, style.section, &style.name, limits)?;
     if let Some(span) = target {
         return Ok(format!(
             "{}{}{}",
@@ -72,9 +75,14 @@ pub fn set_data_style_xml(xml: &str, style: &Style) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error when the XML is malformed or the named style is absent.
-pub fn remove_data_style_xml(xml: &str, section: Section, name: &str) -> Result<String> {
+pub fn remove_data_style_xml(
+    xml: &str,
+    section: Section,
+    name: &str,
+    limits: XmlStreamLimits,
+) -> Result<String, crate::Error> {
     validate_name(name, "style:name")?;
-    let (target_candidate, _) = find_style_span(xml, section, name)?;
+    let (target_candidate, _) = find_style_span(xml, section, name, limits)?;
     let target_span = target_candidate.ok_or_else(|| bad("target data style does not exist"))?;
     Ok(format!(
         "{}{}",
@@ -89,12 +97,16 @@ pub fn remove_data_style_xml(xml: &str, section: Section, name: &str) -> Result<
 ///
 /// Returns an error when either supplied XML part is malformed or violates the
 /// data-style grammar.
-pub fn parse_package(styles_xml: Option<&str>, content_xml: &str) -> Result<Styles> {
+pub fn parse_package(
+    styles_xml: Option<&str>,
+    content_xml: &str,
+    limits: XmlStreamLimits,
+) -> Result<Styles, crate::Error> {
     let mut output = Styles::default();
     if let Some(styles) = styles_xml {
-        output.append(parse_data_styles_xml(styles, Part::Styles)?)?;
+        output.append(parse_data_styles_xml(styles, Part::Styles, limits)?)?;
     }
-    output.append(parse_data_styles_xml(content_xml, Part::Content)?)?;
+    output.append(parse_data_styles_xml(content_xml, Part::Content, limits)?)?;
     Ok(output)
 }
 
@@ -104,29 +116,23 @@ pub fn parse_package(styles_xml: Option<&str>, content_xml: &str) -> Result<Styl
 ///
 /// Returns an error when the XML is malformed or violates the data-style
 /// grammar.
-pub fn parse_flat(xml: &str) -> Result<Styles> {
-    parse_data_styles_xml(xml, Part::Flat)
+pub fn parse_flat(xml: &str, limits: XmlStreamLimits) -> Result<Styles, crate::Error> {
+    parse_data_styles_xml(xml, Part::Flat, limits)
 }
 
-fn document_version(xml: &str) -> Result<Version> {
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("data-style XML exceeds 64 MiB");
-    }
-    let mut reader = NsReader::from_str(xml);
+fn document_version(xml: &str, limits: XmlStreamLimits) -> Result<Version, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut xml_version = XmlVersion::Implicit1_0;
     loop {
-        match reader
-            .read_event_into(&mut buffer)
-            .map_err(|error| bad(format!("invalid data-style XML: {error}")))?
-        {
+        match reader.read_resolved_event_into(&mut buffer)?.1 {
             Event::Decl(ref declaration) => {
                 xml_version = declaration
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
             Event::Start(ref element) | Event::Empty(ref element) => {
-                return read_document_version(&reader, element, xml_version);
+                return Ok(read_document_version(&reader, element, xml_version)?);
             },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTDs and processing instructions are prohibited");
@@ -146,11 +152,9 @@ fn find_style_span(
     xml: &str,
     wanted_section: Section,
     wanted_name: &str,
-) -> Result<(Option<XmlSpan>, Option<ContainerSpan>)> {
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("data-style XML exceeds 64 MiB");
-    }
-    let mut reader = NsReader::from_str(xml);
+    limits: XmlStreamLimits,
+) -> Result<(Option<XmlSpan>, Option<ContainerSpan>), crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut frames = Vec::<Frame>::new();
@@ -159,9 +163,7 @@ fn find_style_span(
     let mut container = None;
     let mut container_depth = None;
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| bad(format!("invalid data-style XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         match event {
             Event::Start(ref element) => {
                 let namespace = namespace_uri(&resolved)?;

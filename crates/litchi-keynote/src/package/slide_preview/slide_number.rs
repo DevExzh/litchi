@@ -41,7 +41,7 @@ fn set_slide_number_inner(
     report: &mut InvalidationReport,
 ) -> Result<bool, InvalidationError> {
     charge_report_archive_structure(object, false, wire_limits, report)?;
-    object.validate_with_limits(archive_limits)?;
+    object.validate(archive_limits)?;
     charge_report_message_selection(object, wire_limits, report)?;
     let message_index = selected_message_index(object)?;
     report.charge_work(1, wire_limits)?;
@@ -97,7 +97,7 @@ fn set_slide_number_inner(
     if data.len() != output_length {
         return Err(InvalidationError::InvalidSource);
     }
-    object.replace_message_preserving_header_with_limits(
+    object.replace_message_preserving_header(
         message_index,
         RawMessage {
             type_: SLIDE_NODE_MESSAGE_TYPE,

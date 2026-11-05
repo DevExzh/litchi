@@ -1,0 +1,25 @@
+// Bounded wire projection for the shared iWork theme wrapper.
+//
+// The source-preserving theme codec owns every repeated field, extension
+// payload, unknown field, and rewrite span.  Buffa is used only for the
+// singular wrapper/base envelope and the optional theme identifier, so this
+// sidecar cannot turn an input-width theme catalog into generated repeated
+// storage.
+syntax = "proto2";
+
+package LitchiIwaThemeProjection;
+
+message ThemeWrapper {
+  required bytes super = 1;
+}
+
+message ThemeArchive {
+  optional bytes legacy_stylesheet = 1;
+  optional string theme_identifier = 3;
+  optional bytes document_stylesheet = 4;
+  optional bytes drawing_presets = 100;
+  optional bytes text_presets = 110;
+  optional bytes chart_presets = 120;
+  optional bytes table_presets = 200;
+  optional bytes application_presets = 210;
+}

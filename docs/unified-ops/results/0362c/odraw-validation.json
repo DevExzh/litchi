@@ -1,0 +1,316 @@
+{
+  "baseline_commit": "45a5f9e9d14314f4605cfebd4efa748be66f851c",
+  "candidate": "commit containing this record; exact ODraw source digests in ABBA receipt",
+  "validation": {
+    "consumer_command": "cargo test --locked -p litchi-odraw -p litchi-imgconv -p litchi-doc -p litchi-ppt -p litchi-xls --all-targets --all-features",
+    "suites": 232,
+    "passed": 5141,
+    "failed": 0,
+    "ignored": 6,
+    "all_targets_all_features_clippy": "passed",
+    "locked_perf_baseline_all_targets": "passed",
+    "glossary": "odraw: 4 banned names, 7 immutable projections",
+    "tool_tests": 36,
+    "fmt": "passed",
+    "boundaries": "passed",
+    "bench_matrix": "passed",
+    "inventory_remaining_rows": 3,
+    "scope_note": "The complete five-crate consumer suite ran before the final local-cursor and pre-decode limit-intersection repair. Final-source ODraw/image-conversion suites and host shape tests reran below; all-target/all-feature Clippy and the complete harness compiled the final source. The subsequent immutable-entry admission reuse passed all82 ODraw tests and the five-crate all-target/all-feature Clippy check; its only later source change corrected a rustdoc comment.",
+    "final_source_tests": {
+      "final-odraw-imgconv-tests.log": {
+        "command": "cargo test --locked -p litchi-odraw -p litchi-imgconv --all-targets --all-features",
+        "suites": 6,
+        "passed": 282,
+        "failed": 0,
+        "ignored": 0
+      },
+      "final-host-shape-tests.log": {
+        "command": "cargo test --locked -p litchi-doc -p litchi-ppt -p litchi-xls --lib --all-features shape",
+        "suites": 3,
+        "passed": 245,
+        "failed": 0,
+        "ignored": 0
+      },
+      "final-doctests.log": {
+        "command": "cargo test --locked -p litchi-odraw -p litchi-imgconv --doc --all-features",
+        "suites": 2,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 1
+      }
+    },
+    "admission_reuse_followup": {
+      "command": "cargo test --locked -p litchi-odraw --all-targets --all-features",
+      "passed": 82,
+      "failed": 0,
+      "all_consumer_clippy": "passed",
+      "review": "independent read-only review found Entry::parse is the sole constructor and validates the full instance before publication"
+    },
+    "final_checks": {
+      "fmt": "passed",
+      "glossary": "odraw:4bans,7immutableowners",
+      "inventory_remaining_rows": 3,
+      "tool_tests": 36,
+      "bench_matrix": "passed"
+    }
+  },
+  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limits",
+  "logs": {
+    "consumer-tests.log": {
+      "bytes": 448642,
+      "sha256": "ff270fdafa3fc8fbc1d17c2b71a41d36c344538fe0ea4112eeb5287833d387e4"
+    },
+    "clippy.log": {
+      "bytes": 2064,
+      "sha256": "4420679b01ac5a562a9b48d2e832eb46aa5c9cf239a678f207cb0c14a096d1ae"
+    },
+    "harness.log": {
+      "bytes": 998,
+      "sha256": "03b9eb8b8ecb7a5fd10f43294c88f94de7355fd64c0d3422ba465ee220f48063"
+    },
+    "glossary.log": {
+      "bytes": 475,
+      "sha256": "b17f0ac11e571c609e868a79c618e4c77d2c2a2f9a3906bb12e0699324eda40f"
+    },
+    "tool-tests.log": {
+      "bytes": 541,
+      "sha256": "b57b50bc711d9c18374ecdf9c7c1c0cc850ef188dddb7694a61248962c9e14fb"
+    },
+    "fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "boundaries.log": {
+      "bytes": 565,
+      "sha256": "b26d84df60995a6e6f079399e51488bf87aa446cda93f6a1a01f5f00ab5c38db"
+    },
+    "matrix.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory.log": {
+      "bytes": 443,
+      "sha256": "0c4963e450585231745b53c120943c20fe4616fa936760a9acec84c0d87d0223"
+    },
+    "final-fmt-fix.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-odraw-imgconv-tests.log": {
+      "bytes": 23377,
+      "sha256": "6d6d3cebde77594a78043575f0f537956732cd3df610abe6dbc37d0ca5a68acd"
+    },
+    "final-host-shape-tests.log": {
+      "bytes": 22934,
+      "sha256": "57c1520b589ff5408b95a1b7a42f82d6e4ef8f5628b56316da71c4f74ce85150"
+    },
+    "final-clippy.log": {
+      "bytes": 3341,
+      "sha256": "7e904bee5a4a059f98074b771fb849f5e96020bc41ee7d76268eb84f8ac8789a"
+    },
+    "final-harness.log": {
+      "bytes": 776,
+      "sha256": "ebf3bad6c2c2a6913815aa2311ee9898c89f9c3c877cfd8d02d0ad1efea07701"
+    },
+    "final-glossary.log": {
+      "bytes": 540,
+      "sha256": "de3f4cb0eafe175e9244c3fffae266fcbcf06f20ef54314a9fc9664537d3cf6b"
+    },
+    "final-inventory.log": {
+      "bytes": 443,
+      "sha256": "0c4963e450585231745b53c120943c20fe4616fa936760a9acec84c0d87d0223"
+    },
+    "final-doctests.log": {
+      "bytes": 1261,
+      "sha256": "dc4fb7c66e59b4c8cea42c2430a524af587370bc8fb9ccf07813ff101620bc1d"
+    },
+    "final-probe-build.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "admission-tests.log": {
+      "bytes": 6437,
+      "sha256": "d29293d8ad07904bdff0c15704f9eaa82091e3966a5277166ac5184cfccfb1e2"
+    },
+    "admission-clippy.log": {
+      "bytes": 578,
+      "sha256": "366b7cac8dceb1e0ffa5c94595ea853dbbc88a618df18b58ffc410eb032b3b88"
+    },
+    "admission-fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "admission-probe-build.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "callgrind-before.log": {
+      "bytes": 638,
+      "sha256": "441a8b51126ee44ace15df52bfa0d21d7b213775caf08efc8af18f46c682f4f6"
+    },
+    "callgrind-after.log": {
+      "bytes": 637,
+      "sha256": "18332e84e5b2e2d1f05c01462949a41d442e920a2cf9bd3b8668e30169235ba2"
+    },
+    "callgrind-before.out": {
+      "bytes": 96275,
+      "sha256": "c5e52be08cd6013a01b6d111a5da07fcec1dbf26cccca832745238e97e7cf990"
+    },
+    "callgrind-after.out": {
+      "bytes": 96261,
+      "sha256": "bb3d7760d93023ab6efa12a831888717e8c2627e229512197ecf56698c2c8e86"
+    },
+    "final-quiet-process-audit.json": {
+      "bytes": 151,
+      "sha256": "d33eb1d5f36ad6f425c34e17db4d864cf75b391941b1bc509e6d81cfa7fab0f8"
+    },
+    "final-abba.log": {
+      "bytes": 911,
+      "sha256": "10e8dc2c7ef3e102b30bdaef6e17c5de1f3c9bee54012a3f61edb618acbaa765"
+    },
+    "accepted-probe-build.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "accepted-quiet-process-audit.json": {
+      "bytes": 151,
+      "sha256": "9d753649fae0ae77c9cb6a0fec76f2ecee45d4859fdd3926c586783ab2842426"
+    },
+    "accepted-abba.log": {
+      "bytes": 907,
+      "sha256": "85aab200ca768b034c28c519cdec3eb6fa71279884aeb302ca05e773b6c70d1b"
+    },
+    "focused-abba.log": {
+      "bytes": 779,
+      "sha256": "745f170ebb6c385ae0ef876c7d7f7639d9c6197afee44e22ff31c3c910a91357"
+    },
+    "callgrind-shape-before.log": {
+      "bytes": 648,
+      "sha256": "6ec30a485feaf82d6d20bfa6691dd22333efdde5859389e0d6f4b4b518aabbe0"
+    },
+    "callgrind-shape-after.log": {
+      "bytes": 647,
+      "sha256": "a99a63d40fedc966dda0b7bbd81e57f1c0031be2c440082125837ccffedc0923"
+    },
+    "callgrind-shape-before.out": {
+      "bytes": 97168,
+      "sha256": "651baf152a9944947300450b0848d4d2ef5837d6b1936d7aaabfc692dfdffc24"
+    },
+    "callgrind-shape-after.out": {
+      "bytes": 97500,
+      "sha256": "50526ac6b45d7c7b8cdd49eb051cc278e299c76a83f8a0767c81b5f6011527b9"
+    },
+    "accepted-fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "accepted-glossary.log": {
+      "bytes": 540,
+      "sha256": "eceb5abefebc4813f9ea1cf49f29c72f7ed976d49aa553b068feea1131e40182"
+    },
+    "accepted-inventory.log": {
+      "bytes": 443,
+      "sha256": "0c4963e450585231745b53c120943c20fe4616fa936760a9acec84c0d87d0223"
+    },
+    "accepted-tool-tests.log": {
+      "bytes": 541,
+      "sha256": "95bc8062f8314ee00e16eb7c6566b18ead3787b9c544d819323a1e310c654ae8"
+    },
+    "accepted-matrix.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "remaining_required": [
+    "ODraw prop::picture Commit Snapshot publication and owner/triad migration",
+    "ODraw framing/iterator admission, image-file limits/owned reparse policy, typed errors and builder namespace",
+    "retained host OpenOptions/EditOptions policy",
+    "remaining 0362b constructors, W4/W4b/W8 integration and full workspace gate"
+  ],
+  "delayed_instruction_check": {
+    "tool": "valgrind-3.26.0",
+    "command": "valgrind --tool=callgrind --callgrind-out-file=<output> <before|after>/target/release/odraw-limits-probe delayed 100000",
+    "before_instructions": 98316772,
+    "after_instructions": 98316792,
+    "interpretation": "20 instructions total difference over 100000 operations; no measurable per-operation instruction increase. These instrumented times are not native timing evidence."
+  },
+  "performance": {
+    "commands": [
+      "python3 docs/unified-ops/results/0362c/odraw-limits-probe.py build <external-output>",
+      "python3 docs/unified-ops/results/0362c/odraw-limits-probe.py run <external-output> --target-ms 1000 --blocks 3",
+      "python3 docs/unified-ops/results/0362c/odraw-limits-probe.py run <external-output> --target-ms 1000 --blocks 9 --route delayed --route shape-record"
+    ],
+    "final_receipts": [
+      "abba.json",
+      "focused-abba.json"
+    ],
+    "all_final_blocks": [
+      {
+        "route": "blip-small",
+        "blocks": 3,
+        "median_after_before": 1.0044742897456242,
+        "min": 0.9356849588869595,
+        "max": 1.0045645432202257,
+        "first_three_median": 1.0044742897456242,
+        "focused_nine_median": null
+      },
+      {
+        "route": "blip-large",
+        "blocks": 3,
+        "median_after_before": 0.999238753944189,
+        "min": 0.9992003921499031,
+        "max": 1.0208782073667608,
+        "first_three_median": 0.999238753944189,
+        "focused_nine_median": null
+      },
+      {
+        "route": "delayed",
+        "blocks": 12,
+        "median_after_before": 1.008891764711052,
+        "min": 0.9545273589906916,
+        "max": 1.0612988035318942,
+        "first_three_median": 1.019121281506348,
+        "focused_nine_median": 0.9986622479157562
+      },
+      {
+        "route": "shape-parse",
+        "blocks": 3,
+        "median_after_before": 0.9901589534841604,
+        "min": 0.9897757261016858,
+        "max": 1.0060852816718933,
+        "first_three_median": 0.9901589534841604,
+        "focused_nine_median": null
+      },
+      {
+        "route": "shape-record",
+        "blocks": 12,
+        "median_after_before": 0.9949162010903558,
+        "min": 0.8769991732901407,
+        "max": 1.0456743913311464,
+        "first_three_median": 1.0294146140225051,
+        "focused_nine_median": 0.9917209086627542
+      },
+      {
+        "route": "recursive",
+        "blocks": 3,
+        "median_after_before": 0.9648673439479122,
+        "min": 0.9410691176623923,
+        "max": 0.9656867584071891,
+        "first_three_median": 0.9648673439479122,
+        "focused_nine_median": null
+      }
+    ],
+    "initial_candidates": [
+      "initial-abba.json",
+      "longer-abba.json",
+      "cursor-repair-abba.json"
+    ],
+    "excluded_run": "An attempted longer initial run was stopped immediately after detecting a competing W4 rebuild; it exited143, produced no completed receipt, and contributes no accepted samples. The subsequent longer-abba.json ran under acknowledged hold and a clear process audit.",
+    "interpretation": "Recursive traversal improves in every final block. The focused follow-up does not reproduce the earlier delayed/shape-record increases; all12 final blocks are summarized, without dropping any sample. Final delayed instructions are effectively identical to baseline. No performance exception is created; these are focused generated-record measurements, not the final workspace gate."
+  },
+  "shape_instruction_check": {
+    "command": "valgrind --tool=callgrind --callgrind-out-file=<output> <before|after>/target/release/odraw-limits-probe shape-record 100000",
+    "before_instructions": 101917258,
+    "after_instructions": 100717148
+  }
+}

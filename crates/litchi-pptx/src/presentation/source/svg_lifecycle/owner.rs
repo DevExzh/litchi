@@ -147,30 +147,41 @@ impl Namespaces {
         let mut declarations = 0usize;
         for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
-            attributes = attributes
-                .checked_add(1)
-                .ok_or_else(|| limit("XML attributes", MAX_ATTRIBUTE_COUNT))?;
+            attributes = attributes.checked_add(1).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributes,
+                    usize::MAX,
+                    MAX_ATTRIBUTE_COUNT,
+                )
+            })?;
             if attributes > MAX_ATTRIBUTE_COUNT {
-                return Err(limit("XML attributes", MAX_ATTRIBUTE_COUNT));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributes,
+                    attributes,
+                    MAX_ATTRIBUTE_COUNT,
+                ));
             }
             validate_qname(attribute.key.as_ref(), "attribute")?;
             validate_raw_attribute(attribute.value.as_ref())?;
             if let Some(prefix) = attribute.key.as_namespace_binding() {
                 declarations = declarations.checked_add(1).ok_or_else(|| {
                     limit(
-                        "namespace declarations",
+                        crate::error::CodecLimitKind::NamespaceBindings,
+                        usize::MAX,
                         MAX_NAMESPACE_DECLARATIONS_PER_ELEMENT,
                     )
                 })?;
                 if declarations > MAX_NAMESPACE_DECLARATIONS_PER_ELEMENT {
                     return Err(limit(
-                        "namespace declarations per element",
+                        crate::error::CodecLimitKind::NamespaceBindings,
+                        declarations,
                         MAX_NAMESPACE_DECLARATIONS_PER_ELEMENT,
                     ));
                 }
                 if attribute.value.len() > MAX_NAMESPACE_LEXICAL_BYTES {
                     return Err(limit(
-                        "namespace declaration lexical bytes",
+                        crate::error::CodecLimitKind::NamespaceBytes,
+                        attribute.value.len(),
                         MAX_NAMESPACE_LEXICAL_BYTES,
                     ));
                 }
@@ -181,13 +192,17 @@ impl Namespaces {
                 validate_namespace_binding(prefix, uri.as_bytes())?;
             }
         }
-        let active = self
-            .active
-            .checked_add(declarations)
-            .ok_or_else(|| limit("active namespace bindings", MAX_ACTIVE_NAMESPACE_BINDINGS))?;
+        let active = self.active.checked_add(declarations).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::NamespaceBindings,
+                usize::MAX,
+                MAX_ACTIVE_NAMESPACE_BINDINGS,
+            )
+        })?;
         if active > MAX_ACTIVE_NAMESPACE_BINDINGS {
             return Err(limit(
-                "active namespace bindings",
+                crate::error::CodecLimitKind::NamespaceBindings,
+                active,
                 MAX_ACTIVE_NAMESPACE_BINDINGS,
             ));
         }
@@ -270,10 +285,13 @@ impl Namespaces {
             parent: Some(Arc::clone(&self.context)),
             declarations: local_declarations,
         });
-        self.active = self
-            .active
-            .checked_add(declarations)
-            .ok_or_else(|| limit("active namespace bindings", MAX_ACTIVE_NAMESPACE_BINDINGS))?;
+        self.active = self.active.checked_add(declarations).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::NamespaceBindings,
+                usize::MAX,
+                MAX_ACTIVE_NAMESPACE_BINDINGS,
+            )
+        })?;
         Ok(())
     }
 
@@ -345,10 +363,17 @@ fn namespace_context_bindings(context: &NamespaceContext) -> Result<Vec<(Vec<u8>
     while let Some(current) = cursor {
         declaration_count = declaration_count
             .checked_add(current.declarations.len())
-            .ok_or_else(|| limit("active namespace bindings", MAX_ACTIVE_NAMESPACE_BINDINGS))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::NamespaceBindings,
+                    usize::MAX,
+                    MAX_ACTIVE_NAMESPACE_BINDINGS,
+                )
+            })?;
         if declaration_count > MAX_ACTIVE_NAMESPACE_BINDINGS {
             return Err(limit(
-                "active namespace bindings",
+                crate::error::CodecLimitKind::NamespaceBindings,
+                declaration_count,
                 MAX_ACTIVE_NAMESPACE_BINDINGS,
             ));
         }
@@ -455,7 +480,8 @@ fn namespace_context_additions_len(
 ) -> Result<()> {
     if fragment.len() as u64 > max_output_bytes {
         return Err(limit(
-            "SVG namespace-complete fragment bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            fragment.len(),
             usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
         ));
     }
@@ -466,10 +492,17 @@ fn namespace_context_additions_len(
     while let Some(current) = cursor {
         declaration_count = declaration_count
             .checked_add(current.declarations.len())
-            .ok_or_else(|| limit("active namespace bindings", MAX_ACTIVE_NAMESPACE_BINDINGS))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::NamespaceBindings,
+                    usize::MAX,
+                    MAX_ACTIVE_NAMESPACE_BINDINGS,
+                )
+            })?;
         if declaration_count > MAX_ACTIVE_NAMESPACE_BINDINGS {
             return Err(limit(
-                "active namespace bindings",
+                crate::error::CodecLimitKind::NamespaceBindings,
+                declaration_count,
                 MAX_ACTIVE_NAMESPACE_BINDINGS,
             ));
         }
@@ -519,7 +552,8 @@ fn namespace_context_additions_len(
         .ok_or_else(|| invalid("namespace-complete picture size overflows"))?;
     if output_len as u64 > max_output_bytes {
         return Err(limit(
-            "SVG namespace-complete fragment bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            output_len,
             usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
         ));
     }
@@ -545,7 +579,11 @@ pub(super) fn locate(xml: &[u8], image_position: usize) -> Result<PictureLayout>
 /// image.
 pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("SVG owner slide XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
 
     let mut reader = Reader::from_reader(xml);
@@ -579,13 +617,20 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
         }
         match event {
             Event::Start(element) => {
-                nodes = add_count(nodes, MAX_XML_NODES, "SVG owner XML nodes")?;
-                let depth = frames
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("SVG owner XML depth", MAX_XML_DEPTH))?;
+                nodes = add_count(nodes, MAX_XML_NODES, crate::error::CodecLimitKind::XmlNodes)?;
+                let depth = frames.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("SVG owner XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if root_closed {
                     return Err(invalid("slide XML contains a second root element"));
@@ -628,16 +673,18 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                         .iter()
                         .any(|frame| matches!(frame.kind, Kind::ShapeTree | Kind::Group))
                 {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture ownership inside an MCE branch is ambiguous",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture ownership inside an MCE branch is ambiguous",
+                    ));
                 }
                 if kind == Kind::Mce && selected_context && !opaque_ancestor {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture markup compatibility is unsupported by the SVG owner",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture markup compatibility is unsupported by the SVG owner",
+                    ));
                 }
                 if selected_context
                     && frames
@@ -762,13 +809,20 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                 prolog = false;
             },
             Event::Empty(element) => {
-                nodes = add_count(nodes, MAX_XML_NODES, "SVG owner XML nodes")?;
-                let depth = frames
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("SVG owner XML depth", MAX_XML_DEPTH))?;
+                nodes = add_count(nodes, MAX_XML_NODES, crate::error::CodecLimitKind::XmlNodes)?;
+                let depth = frames.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("SVG owner XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if root_closed {
                     return Err(invalid("slide XML contains a second root element"));
@@ -811,16 +865,18 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                         .iter()
                         .any(|frame| matches!(frame.kind, Kind::ShapeTree | Kind::Group))
                 {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture ownership inside an MCE branch is ambiguous",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture ownership inside an MCE branch is ambiguous",
+                    ));
                 }
                 if kind == Kind::Mce && selected_context && !opaque_ancestor {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture markup compatibility is unsupported by the SVG owner",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture markup compatibility is unsupported by the SVG owner",
+                    ));
                 }
                 if selected_context
                     && frames
@@ -1111,8 +1167,9 @@ pub(super) fn namespace_complete_element_fragment(
     let max_output_bytes = max_output_bytes.min(MAX_XML_BYTES as u64);
     if fragment.len() as u64 > max_output_bytes {
         return Err(Error::Limit {
-            resource: "SVG namespace-complete fragment bytes",
-            limit: usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: fragment.len(),
+            maximum: usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
         });
     }
     if inherited_namespaces.is_empty() {
@@ -1202,8 +1259,11 @@ pub(super) fn namespace_complete_element_fragment(
                     .ok_or_else(|| invalid("namespace-complete picture size overflows"))?;
                 if output_len as u64 > max_output_bytes {
                     return Err(Error::Limit {
-                        resource: "SVG namespace-complete fragment bytes",
-                        limit: usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlBytes,
+                        ),
+                        observed: output_len,
+                        maximum: usize::try_from(max_output_bytes).unwrap_or(usize::MAX),
                     });
                 }
                 let mut output = Vec::new();
@@ -1476,8 +1536,19 @@ fn validate_namespace_binding(
         quick_xml::name::PrefixDeclaration::Default => &[][..],
         quick_xml::name::PrefixDeclaration::Named(prefix) => prefix,
     };
-    if prefix.len() > MAX_NAME_BYTES || uri.len() > MAX_NAME_BYTES {
-        return Err(limit("namespace prefix or URI bytes", MAX_NAME_BYTES));
+    if prefix.len() > MAX_NAME_BYTES {
+        return Err(limit(
+            crate::error::CodecLimitKind::NamespacePrefixes,
+            prefix.len(),
+            MAX_NAME_BYTES,
+        ));
+    }
+    if uri.len() > MAX_NAME_BYTES {
+        return Err(limit(
+            crate::error::CodecLimitKind::NamespaceBytes,
+            uri.len(),
+            MAX_NAME_BYTES,
+        ));
     }
     if prefix.is_empty() {
         if uri == XML_NAMESPACE || uri == XMLNS_NAMESPACE {
@@ -1520,7 +1591,12 @@ fn validate_qname(bytes: &[u8], kind: &str) -> Result<()> {
         .any(|component| component.len() > MAX_NAME_BYTES)
     {
         return Err(limit(
-            "XML namespace prefix or local name bytes",
+            crate::error::CodecLimitKind::NameBytes,
+            bytes
+                .split(|byte| *byte == b':')
+                .map(|component| component.len())
+                .max()
+                .unwrap_or(0),
             MAX_NAME_BYTES,
         ));
     }
@@ -1614,7 +1690,11 @@ fn qname_prefix(name: &[u8]) -> Result<Vec<u8>> {
         .position(|byte| *byte == b':')
         .map_or(&[][..], |index| &name[..index]);
     if prefix.len() > MAX_NAME_BYTES {
-        return Err(limit("XML namespace prefix bytes", MAX_NAME_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::NamespacePrefixes,
+            prefix.len(),
+            MAX_NAME_BYTES,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -1627,12 +1707,16 @@ fn qname_prefix(name: &[u8]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn add_count(value: usize, limit_value: usize, resource: &'static str) -> Result<usize> {
+fn add_count(
+    value: usize,
+    limit_value: usize,
+    kind: crate::error::CodecLimitKind,
+) -> Result<usize> {
     let value = value
         .checked_add(1)
-        .ok_or_else(|| limit(resource, limit_value))?;
+        .ok_or_else(|| limit(kind, usize::MAX, limit_value))?;
     if value > limit_value {
-        Err(limit(resource, limit_value))
+        Err(limit(kind, value, limit_value))
     } else {
         Ok(value)
     }
@@ -1652,8 +1736,12 @@ fn invalid(message: &str) -> Error {
     Error::Invalid(format!("source-backed SVG owner: {message}"))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]

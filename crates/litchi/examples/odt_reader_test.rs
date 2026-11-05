@@ -11,7 +11,7 @@
 #[cfg(feature = "odf")]
 use litchi::Result;
 #[cfg(feature = "odf")]
-use litchi::odt::Document;
+use litchi::odt::Package;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -20,7 +20,7 @@ fn main() -> Result<()> {
     // Open the test ODT file
     let test_file = "test.odt";
     println!("📖 Opening file: {}", test_file);
-    let doc = Document::open(test_file)?;
+    let doc = Package::open(test_file)?.document()?;
     println!("✅ File opened successfully\n");
 
     // Test 1: Extract all text content

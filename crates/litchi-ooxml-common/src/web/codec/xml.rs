@@ -7,6 +7,7 @@ use super::super::{
 use super::super::{Event, Reader, XmlVersion};
 use super::semantic::{enforce_count_with, escape_attr, invalid, limit, parse_bool};
 use crate::mce::process_markup_compatibility;
+use crate::web::LimitKind;
 use crate::xml::attributes::BytesStartExt as _;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -20,16 +21,16 @@ pub(in crate::web) fn effective_namespaces(
     namespaces
         .try_reserve(scope.binding_count)
         .map_err(|_error| Error::Limit {
-            resource: "retained web extension namespace entries",
-            max: scope.binding_count,
-            actual: scope.binding_count,
+            kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceEntries),
+            maximum: scope.binding_count,
+            observed: scope.binding_count,
         })?;
     let mut seen = HashSet::new();
     seen.try_reserve(scope.binding_count)
         .map_err(|_error| Error::Limit {
-            resource: "retained web extension namespace entries",
-            max: scope.binding_count,
-            actual: scope.binding_count,
+            kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceEntries),
+            maximum: scope.binding_count,
+            observed: scope.binding_count,
         })?;
     let mut current = Some(scope);
     while let Some(value) = current {
@@ -60,9 +61,9 @@ pub(in crate::web) fn retained_namespace_bytes(
                 .checked_add(prefix.len())
                 .and_then(|value| value.checked_add("=\"".len()))
                 .ok_or(Error::Limit {
-                    resource: "retained web extension namespace bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceBytes),
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?
         };
         let value = escaped_attr_bytes(namespace)?;
@@ -71,9 +72,9 @@ pub(in crate::web) fn retained_namespace_bytes(
             .and_then(|total| total.checked_add(value))
             .and_then(|total| total.checked_add(1))
             .ok_or(Error::Limit {
-                resource: "retained web extension namespace bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceBytes),
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
     }
     Ok(total)
@@ -90,9 +91,9 @@ pub(in crate::web) fn escaped_attr_bytes(value: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         total.checked_add(bytes).ok_or(Error::Limit {
-            resource: "retained web extension namespace bytes",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceBytes),
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
     })
 }
@@ -203,6 +204,7 @@ pub(in crate::web) struct NodeFrame {
 #[derive(Debug, Default)]
 pub(in crate::web) struct XmlBuildState {
     pub(in crate::web) root: Option<Node>,
+    pub(in crate::web) root_namespaces: Option<Arc<NamespaceScope>>,
     pub(in crate::web) stack: Vec<NodeFrame>,
     pub(in crate::web) string_bytes: usize,
     pub(in crate::web) nodes: usize,
@@ -211,6 +213,7 @@ pub(in crate::web) struct XmlBuildState {
 #[derive(Debug)]
 pub(in crate::web) struct XmlDocument {
     pub(in crate::web) root: Option<Node>,
+    root_namespaces: Option<Arc<NamespaceScope>>,
     pub(in crate::web) xml: Vec<u8>,
     pub(in crate::web) string_bytes: usize,
 }
@@ -220,6 +223,15 @@ impl XmlDocument {
         self.root
             .as_ref()
             .ok_or_else(|| Error::Invalid("missing XML root".into()))
+    }
+
+    pub(in crate::web) fn root_declares_namespace(&self, namespace: &str) -> bool {
+        self.root_namespaces.as_ref().is_some_and(|scope| {
+            scope
+                .local
+                .values()
+                .any(|value| value.as_str() == namespace)
+        })
     }
 
     #[cfg(test)]
@@ -269,22 +281,18 @@ impl XmlDocument {
         namespaces.sort_unstable_by(|left, right| left.0.cmp(right.0));
         let extra = retained_namespace_bytes(&namespaces, &fragment.declared_prefixes)?;
         let capacity = raw.len().checked_add(extra).ok_or(Error::Limit {
-            resource: "retained web extension fragment bytes",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::RetainedFragmentBytes),
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         if capacity > limits.xml_bytes {
-            return limit(
-                "retained web extension fragment bytes",
-                limits.xml_bytes,
-                capacity,
-            );
+            return limit(LimitKind::RetainedFragmentBytes, limits.xml_bytes, capacity);
         }
         let mut out = String::new();
         out.try_reserve(capacity).map_err(|_error| Error::Limit {
-            resource: "retained web extension fragment bytes",
-            max: capacity,
-            actual: capacity,
+            kind: crate::LimitKind::Web(LimitKind::RetainedFragmentBytes),
+            maximum: capacity,
+            observed: capacity,
         })?;
         out.push_str(&raw[..insert_at]);
         for (prefix, namespace) in namespaces {
@@ -355,7 +363,7 @@ pub(in crate::web) fn parse_mce_xml(
     limits: &Limits,
 ) -> Result<XmlDocument> {
     if xml.len() > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, xml.len());
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, xml.len());
     }
     let mut capabilities = crate::mce::Capabilities::ooxml_baseline();
     for namespace in namespaces {
@@ -377,14 +385,14 @@ pub(in crate::web) fn parse_mce_xml(
 pub(in crate::web) fn parse_xml(xml: &[u8]) -> Result<XmlDocument> {
     let limits = Limits::standard();
     if xml.len() > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, xml.len());
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, xml.len());
     }
     parse_xml_owned(xml.to_vec(), &limits)
 }
 
 pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<XmlDocument> {
     if xml.len() > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, xml.len());
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, xml.len());
     }
     let mut reader = Reader::from_reader(xml.as_slice());
     // Raw fragments are byte ranges of `xml`, whose leading byte-order mark
@@ -489,7 +497,7 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
     }
     if state.string_bytes > limits.string_bytes {
         return limit(
-            "web extension decoded string bytes",
+            LimitKind::DecodedStringBytes,
             limits.string_bytes,
             state.string_bytes,
         );
@@ -497,6 +505,7 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
     drop(reader);
     Ok(XmlDocument {
         root: state.root,
+        root_namespaces: state.root_namespaces,
         xml,
         string_bytes: state.string_bytes,
     })
@@ -549,7 +558,7 @@ pub(in crate::web) fn push_element(
 ) -> Result<()> {
     if state.stack.len() >= limits.depth {
         return limit(
-            "web extension XML depth",
+            LimitKind::XmlDepth,
             limits.depth,
             state.stack.len().saturating_add(1),
         );
@@ -559,7 +568,7 @@ pub(in crate::web) fn push_element(
         .checked_add(1)
         .ok_or_else(|| Error::Invalid("web extension node count overflow".into()))?;
     if state.nodes > limits.nodes {
-        return limit("web extension XML nodes", limits.nodes, state.nodes);
+        return limit(LimitKind::XmlNodes, limits.nodes, state.nodes);
     }
     let parent_namespaces = state
         .stack
@@ -581,13 +590,13 @@ pub(in crate::web) fn push_element(
             .string_bytes
             .checked_add(name.len().saturating_add(value.len()))
             .ok_or(Error::Limit {
-                resource: "web extension decoded string bytes",
-                max: limits.string_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
+                maximum: limits.string_bytes,
+                observed: usize::MAX,
             })?;
         if state.string_bytes > limits.string_bytes {
             return limit(
-                "web extension decoded string bytes",
+                LimitKind::DecodedStringBytes,
                 limits.string_bytes,
                 state.string_bytes,
             );
@@ -624,9 +633,9 @@ pub(in crate::web) fn push_element(
         .binding_count
         .checked_add(new_bindings)
         .ok_or(Error::Limit {
-            resource: "web extension XML namespace bindings",
-            max: 4096,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::XmlNamespaceBindings),
+            maximum: 4096,
+            observed: usize::MAX,
         })?;
     if binding_count > 4096 {
         return invalid("web extension XML namespace bindings exceed 4096".into());
@@ -640,6 +649,9 @@ pub(in crate::web) fn push_element(
             binding_count,
         })
     };
+    if state.root.is_none() && state.stack.is_empty() {
+        state.root_namespaces = Some(Arc::clone(&namespaces));
+    }
     let element_name = element.name();
     let raw_name = std::str::from_utf8(element_name.as_ref())
         .map_err(|error| Error::Xml(error.to_string()))?;
@@ -656,13 +668,13 @@ pub(in crate::web) fn push_element(
         .string_bytes
         .checked_add(namespace.len().saturating_add(local_name.len()))
         .ok_or(Error::Limit {
-            resource: "web extension decoded string bytes",
-            max: limits.string_bytes,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
+            maximum: limits.string_bytes,
+            observed: usize::MAX,
         })?;
     if state.string_bytes > limits.string_bytes {
         return limit(
-            "web extension decoded string bytes",
+            LimitKind::DecodedStringBytes,
             limits.string_bytes,
             state.string_bytes,
         );
@@ -699,9 +711,9 @@ pub(in crate::web) fn push_element(
             retained_namespace_bytes(&inherited, &declared_prefixes)?,
             |total, prefix| {
                 total.checked_add(prefix.len()).ok_or(Error::Limit {
-                    resource: "web extension decoded string bytes",
-                    max: limits.string_bytes,
-                    actual: usize::MAX,
+                    kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
+                    maximum: limits.string_bytes,
+                    observed: usize::MAX,
                 })
             },
         )?;
@@ -710,13 +722,13 @@ pub(in crate::web) fn push_element(
                 .string_bytes
                 .checked_add(retained_bytes)
                 .ok_or(Error::Limit {
-                    resource: "web extension decoded string bytes",
-                    max: limits.string_bytes,
-                    actual: usize::MAX,
+                    kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
+                    maximum: limits.string_bytes,
+                    observed: usize::MAX,
                 })?;
         if state.string_bytes > limits.string_bytes {
             return limit(
-                "web extension decoded string bytes",
+                LimitKind::DecodedStringBytes,
                 limits.string_bytes,
                 state.string_bytes,
             );
@@ -759,7 +771,11 @@ pub(in crate::web) fn push_element(
             .direct_extension_count
             .checked_add(1)
             .ok_or_else(|| Error::Invalid("extLst count overflow".into()))?;
-        enforce_count_with("OfficeArt extension", parent.direct_extension_count, limits)?;
+        enforce_count_with(
+            LimitKind::OfficeArtExtensionItems,
+            parent.direct_extension_count,
+            limits,
+        )?;
     }
     let extension_depth = if capture_fragment {
         Some(0)

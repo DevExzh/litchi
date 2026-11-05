@@ -52,6 +52,7 @@ impl fmt::Display for AxisIndex {
 
 /// Validation failures for a hidden-axis collection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The same row or column was supplied more than once.
     #[error("hidden table axes contain duplicate position {axis}")]

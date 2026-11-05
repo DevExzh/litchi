@@ -31,9 +31,10 @@ fn omitted_master_preserve_flag_defaults_to_false() {
 }
 
 fn package_with_master_xml(master_xml: &[u8]) -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let package_bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
+    let mut opc =
+        OpcPackage::from_bytes(&package_bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
     opc.get_part_mut(&part_name)
         .unwrap()

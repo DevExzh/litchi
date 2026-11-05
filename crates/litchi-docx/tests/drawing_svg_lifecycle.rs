@@ -11,10 +11,9 @@ use litchi_core::{
     SourceVersion,
 };
 use litchi_docx::drawing::{DrawingPlacement, SourceDrawing};
-use litchi_docx::source_backed::{
-    self, PictureSelector, StorySelector, SvgInput, SvgPictureOwnerState,
-};
-use litchi_docx::{Package, ReadLimits};
+use litchi_docx::source_backed::svg::{Input, OwnerState, PictureSelector};
+use litchi_docx::source_backed::{self, story_text::Selector as StorySelector};
+use litchi_docx::{Package, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -38,11 +37,11 @@ const IMAGE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/r
 
 const INLINE_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
+    "/../../test-data/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
 );
 const FLOATING_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
+    "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
 );
 
 const PNG: &[u8] = &[
@@ -235,7 +234,10 @@ fn relationship_bytes(bytes: &[u8], owner: &str) -> Vec<u8> {
     let package = Package::from_reader(Cursor::new(bytes)).expect("open DOCX relationships");
     package
         .opc_package()
-        .source_relationships(&PackURI::new(owner).expect("relationship owner URI"))
+        .source_relationships(
+            &PackURI::new(owner).expect("relationship owner URI"),
+            SourceLimits::default(),
+        )
         .expect("relationship source bytes")
         .bytes()
         .to_vec()
@@ -245,7 +247,7 @@ fn content_types_bytes(bytes: &[u8]) -> Vec<u8> {
     let package = Package::from_reader(Cursor::new(bytes)).expect("open DOCX content types");
     package
         .opc_package()
-        .source_content_types()
+        .source_content_types(SourceLimits::default())
         .expect("content-types source bytes")
         .bytes()
         .to_vec()
@@ -483,7 +485,8 @@ fn lexical_stale_fixture() -> (Vec<u8>, Vec<u8>) {
     .into_bytes();
 
     let build = |content_types: &[u8], document_relationships: &[u8]| {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("[Content_Types].xml", content_types)
             .unwrap();
@@ -542,10 +545,15 @@ fn managed_package(
         0,
     )
     .expect("valid managed execution limits");
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(source),
-        ReadLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget.clone(),
+                cancellation,
+                execution_limits,
+            )),
     )
     .expect("open managed source-backed package");
     (budget, package)
@@ -618,7 +626,7 @@ fn native_inline_and_floating_views_expose_graph_and_placement() {
         assert_eq!(view.raster_relationship_id(), "rId4");
         assert_eq!(view.raster_part_uri().as_str(), raster_part);
         assert_eq!(view.raster_content_type(), ct::PNG);
-        assert_eq!(view.owner_state(), SvgPictureOwnerState::Embedded);
+        assert_eq!(view.owner_state(), OwnerState::Embedded);
         let svg = view.svg().expect("native SVG view");
         assert_eq!(svg.relationship_id(), "rId5");
         assert_eq!(svg.part_uri().as_str(), "/word/media/image2.svg");
@@ -649,33 +657,38 @@ fn detach_native_svg_publishes_and_reopens_without_touching_raster_or_anchor() {
         let source = read_fixture(path);
         let raster_before = part_bytes(&source, "/word/media/image1.png");
         let package = open(&source);
+        let selector = PictureSelector::new(0, 0);
         let mut edit = package
-            .edit_svg_attachment(PictureSelector::new(0, 0))
+            .edit_svg([selector])
             .expect("select native SVG picture");
-        let before = edit.source();
+        let before = edit.source().unwrap().picture(selector).unwrap();
         assert_eq!(before.svg().unwrap().relationship_id(), "rId5");
-        assert!(edit.detach_svg().expect("detach native SVG"));
+        assert!(edit.detach_svg(selector).expect("detach native SVG"));
         let commit = edit.commit().expect("commit native detach");
-        assert!(commit.is_changed());
+        assert!(!commit.patch().is_noop());
         assert_eq!(commit.diagnostics().operations(), 1);
         assert_eq!(commit.diagnostics().selected_pictures(), 1);
         assert!(commit.diagnostics().changed());
+        let detached = &commit.package().svg_pictures(StorySelector::Main).unwrap()[0];
+        assert!(detached.svg().is_none());
         let inverse = commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
-            .expect("exact inverse snapshot");
-        assert_eq!(inverse.story_xml(), before.story_xml());
-        assert_eq!(inverse.svg().unwrap().relationship_id(), "rId5");
+            .package()
+            .apply_svg(&commit.patch().inverse())
+            .expect("exact inverse package");
+        let restored = &inverse.package().svg_pictures(StorySelector::Main).unwrap()[0];
+        assert_eq!(restored.svg().unwrap().relationship_id(), "rId5");
+        let mut restored_bytes = Vec::new();
+        inverse.package().write_to(&mut restored_bytes).unwrap();
+        assert_eq!(restored_bytes, source);
 
         let mut published = Vec::new();
-        let detached = package
-            .publish_svg_attachment_commit_to_stream(&mut published, &commit)
+        commit
+            .package()
+            .write_to(&mut published)
             .expect("publish native detach");
-        assert!(detached.svg().is_none());
         let reopened = open(&published);
         let view = &reopened.svg_pictures(StorySelector::Main).unwrap()[0];
-        assert_eq!(view.owner_state(), SvgPictureOwnerState::None);
+        assert_eq!(view.owner_state(), OwnerState::None);
         assert!(view.svg().is_none());
         assert_eq!(view.raster_relationship_id(), "rId4");
         assert_eq!(
@@ -710,43 +723,60 @@ fn borrowed_attach_adds_graph_closure_and_reopens_with_raster_preserved() {
         let source = raster_only_fixture(placement, "attach");
         let package = open(&source);
         let view = &package.svg_pictures(StorySelector::Main).unwrap()[0];
-        assert_eq!(view.owner_state(), SvgPictureOwnerState::None);
+        assert_eq!(view.owner_state(), OwnerState::None);
         assert!(view.svg().is_none());
 
-        let mut edit = package
-            .edit_svg_attachment(PictureSelector::new(0, 0))
-            .unwrap();
-        let before = edit.source();
-        assert!(edit.attach_svg(SvgInput::borrowed(payload)).unwrap());
+        let selector = PictureSelector::new(0, 0);
+        let mut edit = package.edit_svg([selector]).unwrap();
+        let before = edit.source().unwrap();
+        assert!(edit.attach_svg(selector, Input::borrowed(payload)).unwrap());
         let commit = edit.commit().expect("commit borrowed attach");
-        assert!(commit.is_changed());
+        assert!(!commit.patch().is_noop());
         assert_eq!(commit.diagnostics().operation_count(), 1);
         assert_eq!(commit.diagnostics().selected_picture_count(), 1);
         assert!(commit.diagnostics().changed());
+        let target_snapshot = commit
+            .package()
+            .edit_svg([selector])
+            .unwrap()
+            .source()
+            .unwrap()
+            .clone();
         assert!(
-            commit
-                .snapshot()
+            target_snapshot
                 .story_xml()
+                .unwrap()
                 .windows(b"rIdSvg".len())
                 .any(|window| window == b"rIdSvg")
         );
-        assert_eq!(commit.snapshot().svg().unwrap().bytes(), payload);
-        let inverse = commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
-            .expect("inverse attach snapshot");
+        let target = target_snapshot.picture(selector).unwrap();
+        assert_eq!(target.svg().unwrap().bytes(), payload);
+        let inverse_commit = commit
+            .package()
+            .apply_svg(&commit.patch().inverse())
+            .expect("inverse attach package");
+        let inverse = inverse_commit
+            .package()
+            .edit_svg([selector])
+            .unwrap()
+            .source()
+            .unwrap()
+            .clone();
         assert_eq!(inverse.story_xml(), before.story_xml());
-        assert!(inverse.svg().is_none());
+        assert!(inverse.picture(selector).unwrap().svg().is_none());
 
         let mut published = Vec::new();
-        let target = package
-            .publish_svg_attachment_commit_to_stream(&mut published, &commit)
+        let committed = package
+            .apply_svg(commit.patch())
+            .expect("commit borrowed attach to a package");
+        assert_eq!(committed.diagnostics().operation_count(), 1);
+        committed
+            .package()
+            .write_to(&mut published)
             .expect("publish borrowed attach");
-        assert_eq!(target.svg().unwrap().bytes(), payload);
         let reopened = open(&published);
         let view = &reopened.svg_pictures(StorySelector::Main).unwrap()[0];
-        assert_eq!(view.owner_state(), SvgPictureOwnerState::Embedded);
+        assert_eq!(view.owner_state(), OwnerState::Embedded);
         let svg = view.svg().unwrap();
         assert_eq!(svg.relationship_id(), "rIdSvg");
         assert_eq!(svg.part_uri().as_str(), "/word/media/image.svg");
@@ -775,9 +805,9 @@ fn borrowed_attach_adds_graph_closure_and_reopens_with_raster_preserved() {
 #[test]
 fn lifecycle_commit_diagnostics_retain_noop_scope() {
     let single_package = open(&raster_only_fixture("inline", "diagnostics-single-noop"));
-    let single_edit = single_package.edit_svg_attachment(0).unwrap();
+    let single_edit = single_package.edit_svg([0usize]).unwrap();
     let single_commit = single_edit.commit().expect("commit single no-op");
-    assert!(!single_commit.is_changed());
+    assert!(single_commit.patch().is_noop());
     assert_eq!(single_commit.diagnostics().operations(), 0);
     assert_eq!(single_commit.diagnostics().selected_pictures(), 1);
     assert!(!single_commit.diagnostics().changed());
@@ -790,11 +820,9 @@ fn lifecycle_commit_diagnostics_retain_noop_scope() {
     let batch_source =
         package_with_document(document(&pictures, "diagnostics-batch-noop"), None, false);
     let batch_package = open(&batch_source);
-    let batch_edit = batch_package
-        .edit_svg_attachments([0usize, 1usize])
-        .unwrap();
+    let batch_edit = batch_package.edit_svg([0usize, 1usize]).unwrap();
     let batch_commit = batch_edit.commit().expect("commit batch no-op");
-    assert!(!batch_commit.is_changed());
+    assert!(batch_commit.patch().is_noop());
     assert_eq!(batch_commit.diagnostics().operation_count(), 0);
     assert_eq!(batch_commit.diagnostics().selected_picture_count(), 2);
     assert!(!batch_commit.diagnostics().changed());
@@ -808,16 +836,17 @@ fn strict_core_keeps_strict_raster_edge_and_transitional_svg_child() {
     ));
     let package = open(&source);
     let view = &package.svg_pictures(StorySelector::Main).unwrap()[0];
-    assert_eq!(view.owner_state(), SvgPictureOwnerState::None);
+    assert_eq!(view.owner_state(), OwnerState::None);
     assert_eq!(view.raster_relationship_id(), "rIdRaster");
 
     let payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path/></svg>"#;
-    let mut edit = package.edit_svg_attachment(0).unwrap();
-    edit.attach_svg(SvgInput::borrowed(payload)).unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    edit.attach_svg(0usize, Input::borrowed(payload)).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_svg_attachment_commit_to_stream(&mut output, &commit)
+        .apply_svg(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
     let document = part_bytes(&output, "/word/document.xml");
@@ -847,7 +876,7 @@ fn strict_core_keeps_strict_raster_edge_and_transitional_svg_child() {
         rt::STRICT_IMAGE
     );
     let view = &open(&output).svg_pictures(StorySelector::Main).unwrap()[0];
-    assert_eq!(view.owner_state(), SvgPictureOwnerState::Embedded);
+    assert_eq!(view.owner_state(), OwnerState::Embedded);
     assert_eq!(view.svg().unwrap().bytes(), payload);
 }
 
@@ -864,15 +893,12 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
     let source_root_relationships = relationship_bytes(&source, "/");
     let source_content_types = content_types_bytes(&source);
     let package = open(&source);
-    let mut edit = package.edit_svg_attachments([0usize, 1usize]).unwrap();
-    let before = edit.source().clone();
+    let mut edit = package.edit_svg([0usize, 1usize]).unwrap();
+    let before = edit.source().unwrap();
     let first_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="one"/></svg>"#;
     let second_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="two"/></svg>"#;
-    assert!(
-        edit.attach_svg(0, SvgInput::borrowed(first_payload))
-            .unwrap()
-    );
-    let projected_after_first = edit.projected();
+    assert!(edit.attach_svg(0, Input::borrowed(first_payload)).unwrap());
+    let projected_after_first = edit.projected().unwrap();
     assert_eq!(
         projected_after_first
             .picture(0)
@@ -890,20 +916,15 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
             .is_none(),
         "a first operation must not leak into another selected picture"
     );
-    let projected_before_rejected_operation = edit.projected().story_xml().unwrap().to_vec();
-    assert!(
-        edit.attach_svg(0, SvgInput::borrowed(second_payload))
-            .is_err()
-    );
+    let projected_before_rejected_operation =
+        edit.projected().unwrap().story_xml().unwrap().to_vec();
+    assert!(edit.attach_svg(0, Input::borrowed(second_payload)).is_err());
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_before_rejected_operation.as_slice()
     );
-    assert!(
-        edit.attach_svg(1, SvgInput::borrowed(second_payload))
-            .unwrap()
-    );
-    let projected_after_second = edit.projected();
+    assert!(edit.attach_svg(1, Input::borrowed(second_payload)).unwrap());
+    let projected_after_second = edit.projected().unwrap();
     assert_eq!(
         projected_after_second
             .picture(0)
@@ -923,15 +944,21 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
         second_payload
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(!commit.patch().is_noop());
     assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(commit.diagnostics().selected_pictures(), 2);
     assert!(commit.diagnostics().changed());
-    let inverse = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
-        .expect("exact inverse batch snapshot");
+    let inverse_commit = commit
+        .package()
+        .apply_svg(&commit.patch().inverse())
+        .expect("exact inverse batch package");
+    let inverse = inverse_commit
+        .package()
+        .edit_svg([0usize, 1usize])
+        .unwrap()
+        .source()
+        .unwrap()
+        .clone();
     assert_eq!(inverse.story_xml(), before.story_xml());
     assert!(inverse.picture(0).unwrap().svg().is_none());
     assert!(inverse.picture(1).unwrap().svg().is_none());
@@ -943,16 +970,13 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
     );
     let foreign_source =
         package_with_document(document(&foreign_pictures, "batch-foreign"), None, false);
-    let foreign = open(&foreign_source)
-        .edit_svg_attachments([0usize, 1usize])
-        .unwrap()
-        .source()
-        .clone();
-    assert!(commit.patch().apply(&foreign).is_err());
+    let foreign_package = open(&foreign_source);
+    assert!(foreign_package.apply_svg(commit.patch()).is_err());
 
     let mut output = Vec::new();
     package
-        .publish_svg_attachment_batch_commit_to_stream(&mut output, &commit)
+        .apply_svg(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let views = open(&output).svg_pictures(StorySelector::Main).unwrap();
     assert_eq!(views.len(), 2);
@@ -968,15 +992,14 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
     );
 
     let reopened_attach = open(&output);
-    let mut inverse_edit = reopened_attach
-        .edit_svg_attachments([0usize, 1usize])
-        .unwrap();
+    let mut inverse_edit = reopened_attach.edit_svg([0usize, 1usize]).unwrap();
     assert!(inverse_edit.detach_svg(0).unwrap());
     assert!(inverse_edit.detach_svg(1).unwrap());
     let inverse_commit = inverse_edit.commit().unwrap();
     let mut inverse_output = Vec::new();
     reopened_attach
-        .publish_svg_attachment_batch_commit_to_stream(&mut inverse_output, &inverse_commit)
+        .apply_svg(inverse_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut inverse_output))
         .unwrap();
     assert_eq!(
         relationship_bytes(&inverse_output, "/word/document.xml"),
@@ -1014,22 +1037,27 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
         true,
     );
     let shared_package = open(&shared_source);
-    let mut shared_edit = shared_package
-        .edit_svg_attachments([0usize, 1usize])
-        .unwrap();
-    let shared_before = shared_edit.source().clone();
+    let mut shared_edit = shared_package.edit_svg([0usize, 1usize]).unwrap();
+    let shared_before = shared_edit.source().unwrap();
     assert!(shared_edit.detach_svg(0).unwrap());
     assert!(shared_edit.detach_svg(1).unwrap());
     let shared_commit = shared_edit.commit().unwrap();
-    let shared_inverse = shared_commit
-        .patch()
-        .inverse()
-        .apply(shared_commit.snapshot())
-        .expect("exact inverse shared batch snapshot");
+    let shared_inverse_commit = shared_commit
+        .package()
+        .apply_svg(&shared_commit.patch().inverse())
+        .expect("exact inverse shared batch package");
+    let shared_inverse = shared_inverse_commit
+        .package()
+        .edit_svg([0usize, 1usize])
+        .unwrap()
+        .source()
+        .unwrap()
+        .clone();
     assert_eq!(shared_inverse.story_xml(), shared_before.story_xml());
     let mut shared_output = Vec::new();
     shared_package
-        .publish_svg_attachment_batch_commit_to_stream(&mut shared_output, &shared_commit)
+        .apply_svg(shared_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut shared_output))
         .unwrap();
     let shared_views = open(&shared_output)
         .svg_pictures(StorySelector::Main)
@@ -1058,20 +1086,19 @@ fn attach_preserves_unknown_extension_and_rejects_stale_snapshot() {
     let package = open(&source);
     assert_eq!(
         package.svg_pictures(StorySelector::Main).unwrap()[0].owner_state(),
-        SvgPictureOwnerState::Opaque
+        OwnerState::Opaque
     );
-    let mut edit = package.edit_svg_attachment(0).unwrap();
-    edit.attach_svg(payload.as_slice()).unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    edit.attach_svg(0usize, payload.as_slice()).unwrap();
     let commit = edit.commit().unwrap();
-    let foreign = open(&raster_only_fixture("inline", "foreign"))
-        .edit_svg_attachment(0)
-        .unwrap()
-        .source();
-    assert!(commit.patch().apply(&foreign).is_err());
+    let foreign_package = open(&raster_only_fixture("inline", "foreign"));
+    assert!(foreign_package.apply_svg(commit.patch()).is_err());
+    assert!(foreign_package.apply_svg(commit.patch()).is_err());
 
     let mut published = Vec::new();
     package
-        .publish_svg_attachment_commit_to_stream(&mut published, &commit)
+        .apply_svg(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut published))
         .unwrap();
     let document = part_bytes(&published, "/word/document.xml");
     for expected in [
@@ -1088,7 +1115,7 @@ fn attach_preserves_unknown_extension_and_rejects_stale_snapshot() {
         );
     }
     let view = &open(&published).svg_pictures(StorySelector::Main).unwrap()[0];
-    assert_eq!(view.owner_state(), SvgPictureOwnerState::Embedded);
+    assert_eq!(view.owner_state(), OwnerState::Embedded);
     assert_eq!(view.svg().unwrap().bytes(), payload);
 }
 
@@ -1107,8 +1134,9 @@ fn linked_raster_picture_is_refused_by_svg_lifecycle_edits() {
         .svg_pictures(StorySelector::Main)
         .expect("linked raster remains inspectable");
     assert_eq!(views.len(), 1);
-    assert_eq!(views[0].owner_state(), SvgPictureOwnerState::Refused);
-    assert!(package.edit_svg_attachment(0).is_err());
+    assert_eq!(views[0].owner_state(), OwnerState::Refused);
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    assert!(edit.detach_svg(0usize).is_err());
 }
 
 #[test]
@@ -1125,30 +1153,32 @@ fn shared_svg_and_package_root_incoming_edge_survive_until_final_detach() {
     assert!(
         views
             .iter()
-            .all(|view| view.owner_state() == SvgPictureOwnerState::Embedded)
+            .all(|view| view.owner_state() == OwnerState::Embedded)
     );
 
-    let mut first_edit = package.edit_svg_attachment(0).unwrap();
-    assert!(first_edit.detach_svg().unwrap());
+    let mut first_edit = package.edit_svg([0usize]).unwrap();
+    assert!(first_edit.detach_svg(0usize).unwrap());
     let first_commit = first_edit.commit().unwrap();
     let mut first_output = Vec::new();
     package
-        .publish_svg_attachment_commit_to_stream(&mut first_output, &first_commit)
+        .apply_svg(first_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut first_output))
         .unwrap();
     let first_reopened = open(&first_output);
     let first_views = first_reopened.svg_pictures(StorySelector::Main).unwrap();
-    assert_eq!(first_views[0].owner_state(), SvgPictureOwnerState::None);
-    assert_eq!(first_views[1].owner_state(), SvgPictureOwnerState::Embedded);
+    assert_eq!(first_views[0].owner_state(), OwnerState::None);
+    assert_eq!(first_views[1].owner_state(), OwnerState::Embedded);
     assert!(has_part(&first_output, "/word/media/image2.svg"));
     assert!(main_part_relationship(&first_output, "rIdSvg").is_some());
     assert!(root_has_target(&first_output, "/word/media/image2.svg"));
 
-    let mut second_edit = first_reopened.edit_svg_attachment(1).unwrap();
-    assert!(second_edit.detach_svg().unwrap());
+    let mut second_edit = first_reopened.edit_svg([1usize]).unwrap();
+    assert!(second_edit.detach_svg(1usize).unwrap());
     let second_commit = second_edit.commit().unwrap();
     let mut second_output = Vec::new();
     first_reopened
-        .publish_svg_attachment_commit_to_stream(&mut second_output, &second_commit)
+        .apply_svg(second_commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut second_output))
         .unwrap();
     let second_views = open(&second_output)
         .svg_pictures(StorySelector::Main)
@@ -1176,12 +1206,13 @@ fn case_variant_package_incoming_edge_keeps_detached_svg_leaf() {
         Some("word/media/IMAGE2.SVG"),
     );
     let package = open(&source);
-    let mut edit = package.edit_svg_attachment(0).unwrap();
-    assert!(edit.detach_svg().unwrap());
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    assert!(edit.detach_svg(0usize).unwrap());
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_svg_attachment_commit_to_stream(&mut output, &commit)
+        .apply_svg(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
     assert!(has_part(&output, "/word/media/image2.svg"));
@@ -1196,27 +1227,33 @@ fn case_variant_package_incoming_edge_keeps_detached_svg_leaf() {
 #[test]
 fn lifecycle_read_and_attach_honor_input_and_story_output_limits() {
     let native = read_fixture(INLINE_FIXTURE);
-    let input_limits = ReadLimits::builder()
+    let input_limits = SourceLimits::builder()
         .max_input_bytes((native.len() - 1) as u64)
         .unwrap()
         .build()
         .unwrap();
     assert!(
-        source_backed::Package::from_reader_with_limits(Cursor::new(native), input_limits).is_err()
+        source_backed::Package::from_reader_with_options(
+            Cursor::new(native),
+            litchi_docx::OpenOptions::default().source_limits(input_limits)
+        )
+        .is_err()
     );
 
     let source = raster_only_fixture("inline", "limits");
     let document_len = part_bytes(&source, "/word/document.xml").len();
-    let output_limits = ReadLimits::builder()
+    let output_limits = SourceLimits::builder()
         .max_part_bytes(document_len as u64)
         .unwrap()
         .build()
         .unwrap();
-    let package =
-        source_backed::Package::from_reader_with_limits(Cursor::new(source), output_limits)
-            .unwrap();
-    let mut edit = package.edit_svg_attachment(0).unwrap();
-    assert!(edit.attach_svg(b"payload".as_slice()).is_err());
+    let package = source_backed::Package::from_reader_with_options(
+        Cursor::new(source),
+        litchi_docx::OpenOptions::default().source_limits(output_limits),
+    )
+    .unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    assert!(edit.attach_svg(0usize, b"payload".as_slice()).is_err());
 }
 
 #[test]
@@ -1227,9 +1264,9 @@ fn lifecycle_commit_refuses_source_revision_changed_after_staging() {
     let package = source_backed::Package::from_read_at(Arc::new(source))
         .expect("open mutable-version source");
     let mut edit = package
-        .edit_svg_attachment(0)
+        .edit_svg([0usize])
         .expect("select source-version picture");
-    edit.attach_svg(b"<svg/>".as_slice())
+    edit.attach_svg(0usize, b"<svg/>".as_slice())
         .expect("stage source-version attachment");
 
     source_handle.bump_revision();
@@ -1259,8 +1296,8 @@ fn lifecycle_commit_refuses_lexical_relationship_and_content_type_source_change(
     let source_handle = source.clone();
     let package =
         source_backed::Package::from_read_at(Arc::new(source)).expect("open lexical stale source");
-    let mut edit = package.edit_svg_attachment(0).unwrap();
-    edit.attach_svg(b"<svg/>".as_slice()).unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    edit.attach_svg(0usize, b"<svg/>".as_slice()).unwrap();
 
     source_handle.replace_and_bump(altered);
     assert!(
@@ -1276,13 +1313,17 @@ fn lifecycle_low_total_part_limit_refuses_before_raster_retention() {
     let source = ObservedSource::new(source_bytes.clone()).with_media_ranges(selected_range, 0..0);
     let source_handle = source.clone();
     let total = total_part_bytes(&source_bytes);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_total_part_bytes(total.saturating_sub(1))
         .unwrap()
         .build()
         .unwrap();
     assert!(
-        source_backed::Package::from_read_at_with_limits(Arc::new(source), limits).is_err(),
+        source_backed::Package::from_read_at_with_options(
+            Arc::new(source),
+            litchi_docx::OpenOptions::default().source_limits(limits)
+        )
+        .is_err(),
         "a low total-part profile must refuse before retaining media"
     );
     assert_eq!(
@@ -1302,7 +1343,7 @@ fn lifecycle_low_managed_memory_refuses_before_raster_retention() {
     let (budget, package) = managed_package(source, document_len + PNG.len() as u64 - 1, u64::MAX);
 
     assert!(
-        package.edit_svg_attachment(0).is_err(),
+        package.edit_svg([0usize]).unwrap().commit().is_err(),
         "managed memory exhaustion must reject before retaining the raster"
     );
     assert_eq!(source_handle.selected_reads(), 0);
@@ -1319,7 +1360,7 @@ fn lifecycle_low_managed_work_refuses_before_raster_read() {
     let (budget, package) = managed_package(source, u64::MAX, document_len + PNG.len() as u64 - 1);
 
     assert!(
-        package.edit_svg_attachment(0).is_err(),
+        package.edit_svg([0usize]).unwrap().commit().is_err(),
         "the cumulative managed work limit must reject before raster read"
     );
     assert_eq!(source_handle.selected_reads(), 0);
@@ -1334,10 +1375,13 @@ fn managed_attach_publish_reopen_physical_inverse_preserves_exact_source() {
     let payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="managed-inverse"/></svg>"#;
 
     let mut edit = package
-        .edit_svg_attachment(PictureSelector::new(0, 0))
+        .edit_svg([PictureSelector::new(0, 0)])
         .expect("select managed source picture");
     let before_attach = budget.used(Resource::Memory);
-    assert!(edit.attach_svg(SvgInput::borrowed(payload)).unwrap());
+    assert!(
+        edit.attach_svg(PictureSelector::new(0, 0), Input::borrowed(payload))
+            .unwrap()
+    );
     let after_attach = budget.used(Resource::Memory);
     assert!(
         after_attach >= before_attach + payload.len() as u64,
@@ -1346,23 +1390,40 @@ fn managed_attach_publish_reopen_physical_inverse_preserves_exact_source() {
 
     let commit = edit.commit().expect("commit managed SVG attach");
     let before_semantic_inverse = budget.used(Resource::Memory);
-    let inverse_snapshot = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
+    let inverse_commit = commit
+        .package()
+        .apply_svg(&commit.patch().inverse())
         .expect("semantic inverse remains valid with a retained reservation");
-    assert!(inverse_snapshot.svg().is_none());
+    let inverse_snapshot = inverse_commit
+        .package()
+        .edit_svg([PictureSelector::new(0, 0)])
+        .unwrap()
+        .source()
+        .unwrap()
+        .clone();
+    assert!(
+        inverse_snapshot
+            .picture(PictureSelector::new(0, 0))
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     drop(inverse_snapshot);
     assert_eq!(
         budget.used(Resource::Memory),
         before_semantic_inverse,
         "semantic inverse inspection must not release the staged reservation"
     );
+    drop(inverse_commit);
 
     let mut published = Vec::new();
     let publication = package
-        .publish_svg_attachment_commit_with_publication_to_stream(&mut published, &commit)
-        .expect("publish managed SVG attach with physical inverse authorization");
+        .apply_svg(commit.patch())
+        .expect("commit managed SVG attach to a package");
+    publication
+        .package()
+        .write_to(&mut published)
+        .expect("publish managed SVG attach");
     assert!(
         budget.used(Resource::Memory) >= payload.len() as u64,
         "the publication must retain the staged payload reservation after the source package is consumed"
@@ -1373,9 +1434,20 @@ fn managed_attach_publish_reopen_physical_inverse_preserves_exact_source() {
         managed_package(ObservedSource::new(published.clone()), u64::MAX, u64::MAX);
     let mut restored = Vec::new();
     let restored_snapshot = reopened
-        .publish_svg_attachment_inverse_to_stream(&mut restored, &publication)
+        .apply_svg(&publication.patch().inverse())
+        .and_then(|committed| {
+            committed.package().write_to(&mut restored)?;
+            Ok(committed)
+        })
         .expect("reopened published package must authorize physical inverse");
-    assert!(restored_snapshot.svg().is_none());
+    assert!(
+        restored_snapshot
+            .package()
+            .svg_pictures(StorySelector::Main)
+            .unwrap()[0]
+            .svg()
+            .is_none()
+    );
     assert_eq!(
         restored, source_bytes,
         "physical inverse must restore exact ZIP bytes"
@@ -1405,14 +1477,29 @@ fn lifecycle_single_picture_selection_does_not_read_unrelated_media() {
     let package =
         source_backed::Package::from_read_at(Arc::new(source)).expect("open two-raster source");
 
-    // The source-backed selector captures one inventory entry lazily; its
-    // selected raster is read for authoring while the other media payload
-    // remains cold.
+    // Selecting pictures only retains selectors. The source-backed record
+    // inventory (and its selected raster) is read by the first projection or
+    // mutation, while the other media payload remains cold.
     let edit = package
-        .edit_svg_attachment(0)
+        .edit_svg([0usize])
         .expect("select only the first picture");
     assert_eq!(
-        edit.source().raster_part_uri().as_str(),
+        source_handle.selected_reads(),
+        0,
+        "the cold SVG constructor must not read selected media"
+    );
+    assert_eq!(
+        source_handle.unrelated_reads(),
+        0,
+        "the cold SVG constructor must not read unrelated media"
+    );
+    assert_eq!(
+        edit.source()
+            .unwrap()
+            .picture(0usize)
+            .unwrap()
+            .raster_part_uri()
+            .as_str(),
         "/word/media/image1.png"
     );
     assert!(
@@ -1424,6 +1511,40 @@ fn lifecycle_single_picture_selection_does_not_read_unrelated_media() {
         0,
         "selecting one picture must not read the other picture's media payload"
     );
+}
+
+#[test]
+fn deferred_svg_owner_constructor_does_not_materialize_pending_output() {
+    let source_bytes = two_raster_fixture("deferred-svg-constructor");
+    let selected_range = payload_range(&source_bytes, "word/media/image1.png");
+    let unrelated_range = payload_range(&source_bytes, "word/media/image2.png");
+    let source =
+        ObservedSource::new(source_bytes).with_media_ranges(selected_range, unrelated_range);
+    let source_handle = source.clone();
+    let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    edit.attach_svg(
+        0usize,
+        Input::borrowed(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let selected_reads = source_handle.selected_reads();
+    let unrelated_reads = source_handle.unrelated_reads();
+    assert_eq!(
+        unrelated_reads, 0,
+        "the first commit did not need the other raster"
+    );
+
+    // The committed package owns a deferred output.  Merely selecting the
+    // next SVG edit must retain its policy without streaming that output.
+    let deferred_edit = commit
+        .package()
+        .edit_svg([0usize])
+        .expect("a deferred owner retains the SVG selector policy");
+    assert_eq!(source_handle.selected_reads(), selected_reads);
+    assert_eq!(source_handle.unrelated_reads(), unrelated_reads);
+    drop(deferred_edit);
 }
 
 #[test]
@@ -1465,10 +1586,7 @@ fn source_picture_inventory_reads_svg_only_on_explicit_data_request() {
     let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
     let pictures = package.svg_picture_sources(StorySelector::Main).unwrap();
     assert_eq!(pictures.len(), 1);
-    assert!(matches!(
-        pictures[0].owner_state(),
-        SvgPictureOwnerState::Embedded
-    ));
+    assert!(matches!(pictures[0].owner_state(), OwnerState::Embedded));
     assert_eq!(observed.selected_reads(), 0);
     assert_eq!(observed.unrelated_reads(), 0);
     assert_eq!(pictures[0].svg().unwrap().data().unwrap().as_bytes(), svg);
@@ -1487,19 +1605,21 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
     let source = package_with_two_rasters(document(&pictures, "reverse-order"));
     let package = open(&source);
     let mut edit = package
-        .edit_svg_attachments([1usize, 0usize])
+        .edit_svg([1usize, 0usize])
         .expect("select pictures in reverse source order");
     let first_payload =
         br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="reverse-first"/></svg>"#;
     let second_payload =
         br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="reverse-second"/></svg>"#;
 
-    assert!(
-        edit.attach_svg(1, SvgInput::borrowed(first_payload))
-            .unwrap()
-    );
-    let projected_after_first = edit.projected().story_xml().unwrap().to_vec();
-    let scanned_first = SourceDrawing::scan(&projected_after_first).unwrap();
+    assert!(edit.attach_svg(1, Input::borrowed(first_payload)).unwrap());
+    let projected_after_first = edit.projected().unwrap().story_xml().unwrap().to_vec();
+    let scanned_first = SourceDrawing::scan(
+        &projected_after_first,
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert_eq!(scanned_first.pictures().len(), 2);
     assert!(
         scanned_first
@@ -1518,10 +1638,23 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .is_some()
     );
     assert_eq!(
-        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(1)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         first_payload
     );
-    assert!(edit.projected().picture(0).unwrap().svg().is_none());
+    assert!(
+        edit.projected()
+            .unwrap()
+            .picture(0)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     assert_eq!(
         projected_after_first
             .windows(opaque.len())
@@ -1532,22 +1665,19 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
     );
 
     assert!(
-        edit.attach_svg(1, SvgInput::borrowed(second_payload))
-            .is_err(),
+        edit.attach_svg(1, Input::borrowed(second_payload)).is_err(),
         "a picture may be staged at most once in one batch"
     );
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_after_first.as_slice(),
         "a rejected same-picture operation must leave the projection unchanged"
     );
 
-    assert!(
-        edit.attach_svg(0, SvgInput::borrowed(second_payload))
-            .unwrap()
-    );
-    let projected_final = edit.projected().story_xml().unwrap().to_vec();
-    let scanned_final = SourceDrawing::scan(&projected_final).unwrap();
+    assert!(edit.attach_svg(0, Input::borrowed(second_payload)).unwrap());
+    let projected_final = edit.projected().unwrap().story_xml().unwrap().to_vec();
+    let scanned_final =
+        SourceDrawing::scan(&projected_final, Default::default(), Default::default()).unwrap();
     assert_eq!(scanned_final.pictures().len(), 2);
     assert!(
         scanned_final
@@ -1556,11 +1686,23 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .all(|picture| picture.svg_owner().owner().is_some())
     );
     assert_eq!(
-        edit.projected().picture(0).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(0)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         second_payload
     );
     assert_eq!(
-        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(1)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         first_payload
     );
     assert_eq!(
@@ -1576,14 +1718,22 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
     assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(commit.diagnostics().selected_pictures(), 2);
     assert_eq!(
-        commit.snapshot().story_xml().unwrap(),
+        commit
+            .package()
+            .edit_svg([0usize, 1usize])
+            .unwrap()
+            .source()
+            .unwrap()
+            .story_xml()
+            .unwrap(),
         projected_final.as_slice(),
         "commit must retain the exact projection produced after each staged step"
     );
 
     let mut output = Vec::new();
     package
-        .publish_svg_attachment_batch_commit_to_stream(&mut output, &commit)
+        .apply_svg(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .expect("publish reverse-order batch");
     assert_eq!(part_bytes(&output, "/word/document.xml"), projected_final);
     let views = open(&output).svg_pictures(StorySelector::Main).unwrap();
@@ -1608,36 +1758,49 @@ fn batch_failed_aggregate_admission_leaves_projection_unchanged() {
         picture("anchor", "2", "rIdRaster1", opaque),
     );
     let source = package_with_two_rasters(document(&pictures, "aggregate-failure"));
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_total_relationships(4)
         .unwrap()
         .build()
         .unwrap();
-    let package = source_backed::Package::from_reader_with_limits(Cursor::new(source), limits)
-        .expect("open source within aggregate relationship limit");
-    let mut edit = package.edit_svg_attachments([1usize, 0usize]).unwrap();
+    let package = source_backed::Package::from_reader_with_options(
+        Cursor::new(source),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .expect("open source within aggregate relationship limit");
+    let mut edit = package.edit_svg([1usize, 0usize]).unwrap();
     let first_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="admitted"/></svg>"#;
     let rejected_payload =
         br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="rejected"/></svg>"#;
 
+    assert!(edit.attach_svg(1, Input::borrowed(first_payload)).unwrap());
+    let projected_before_rejection = edit.projected().unwrap().story_xml().unwrap().to_vec();
     assert!(
-        edit.attach_svg(1, SvgInput::borrowed(first_payload))
-            .unwrap()
-    );
-    let projected_before_rejection = edit.projected().story_xml().unwrap().to_vec();
-    assert!(
-        edit.attach_svg(0, SvgInput::borrowed(rejected_payload))
+        edit.attach_svg(0, Input::borrowed(rejected_payload))
             .is_err(),
         "aggregate admission must reject the second attachment"
     );
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_before_rejection.as_slice(),
         "failed aggregate admission must leave the existing projection unchanged"
     );
-    assert!(edit.projected().picture(0).unwrap().svg().is_none());
+    assert!(
+        edit.projected()
+            .unwrap()
+            .picture(0)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     assert_eq!(
-        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(1)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         first_payload
     );
     assert!(
@@ -1664,28 +1827,28 @@ fn batch_source_stale_between_operations_refuses_commit() {
     let source = MutableArchiveSource::new(source_bytes.clone());
     let source_handle = source.clone();
     let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
-    let mut edit = package.edit_svg_attachments([1usize, 0usize]).unwrap();
+    let mut edit = package.edit_svg([1usize, 0usize]).unwrap();
     assert!(
         edit.attach_svg(
             1,
-            SvgInput::borrowed(
+            Input::borrowed(
                 br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="before-stale"/></svg>"#
             )
         )
         .unwrap()
     );
-    let projected_before_stale = edit.projected().story_xml().unwrap().to_vec();
+    let projected_before_stale = edit.projected().unwrap().story_xml().unwrap().to_vec();
 
     source_handle.replace_and_bump(source_bytes);
     let second_result = edit.attach_svg(
         0,
-        SvgInput::borrowed(
+        Input::borrowed(
             br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="after-stale"/></svg>"#,
         ),
     );
     assert!(second_result.is_err());
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_before_stale.as_slice(),
         "an immediately rejected stale operation must preserve the prior projection"
     );
@@ -1701,7 +1864,7 @@ fn unchanged_batch_refuses_commit_after_source_revision_changes() {
     let source = MutableArchiveSource::new(source_bytes.clone());
     let source_handle = source.clone();
     let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
-    let edit = package.edit_svg_attachments([0usize]).unwrap();
+    let edit = package.edit_svg([0usize]).unwrap();
     source_handle.replace_and_bump(source_bytes);
     assert!(edit.commit().is_err());
 }

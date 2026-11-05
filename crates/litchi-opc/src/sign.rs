@@ -560,7 +560,7 @@ impl ResolverShape {
 
 /// Discovers and verifies every signature with an explicit policy.
 pub(crate) fn signatures(package: &OpcPackage, policy: &Policy) -> Result<Vec<Report>> {
-    let graph = Graph::read(package, policy.limits())?;
+    let graph = Graph::read(package, policy.limits_value())?;
     verify_graph(package, &graph, policy)
 }
 
@@ -568,7 +568,7 @@ fn verify_graph(package: &OpcPackage, graph: &Graph, policy: &Policy) -> Result<
     if graph.signatures.is_empty() {
         return Ok(Vec::new());
     }
-    let resolver = PackageResolver::new(package, policy.limits())?;
+    let resolver = PackageResolver::new(package, policy.limits_value())?;
     let mut reports = Vec::new();
     reports
         .try_reserve(graph.signatures.len())
@@ -601,7 +601,7 @@ fn verify_graph(package: &OpcPackage, graph: &Graph, policy: &Policy) -> Result<
 pub(crate) fn sign(package: &mut OpcPackage, signer: &Signer, limits: &Limits) -> Result<PackURI> {
     let graph = Graph::read(package, limits)?;
     if !graph.signatures.is_empty() {
-        let policy = Policy::strict().with_limits(limits.clone());
+        let policy = Policy::strict().limits(limits.clone());
         for report in verify_graph(package, &graph, &policy)? {
             if report.details.integrity() != Status::Valid
                 || report.details.signature() != Status::Valid
@@ -1151,6 +1151,7 @@ mod tests {
     use p256::ecdsa::SigningKey;
 
     use super::*;
+    use crate::SourceLimits;
 
     const POI_DOCX: &[u8] =
         include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.docx");
@@ -1197,7 +1198,8 @@ mod tests {
     }
 
     fn fixture(bytes: &[u8], count: usize) {
-        let package = OpcPackage::from_bytes(bytes).expect("fixture opens");
+        let package =
+            OpcPackage::from_bytes(bytes, SourceLimits::default()).expect("fixture opens");
         let reports = package
             .signatures_with(&Policy::compatible())
             .expect("fixture verifies");
@@ -1225,7 +1227,8 @@ mod tests {
 
     #[test]
     fn safe_default_rejects_fixture_sha1() {
-        let package = OpcPackage::from_bytes(POI_DOCX).expect("fixture opens");
+        let package =
+            OpcPackage::from_bytes(POI_DOCX, SourceLimits::default()).expect("fixture opens");
         assert!(matches!(
             package.signatures(),
             Err(Error::Signature(litchi_sign::Error::Sha1))
@@ -1345,7 +1348,7 @@ mod tests {
             .expect("second signature relationship");
 
         let one_signature = Limits::standard().signatures(1).expect("limits");
-        let policy = Policy::compatible().with_limits(one_signature.clone());
+        let policy = Policy::compatible().limits(one_signature.clone());
         assert!(matches!(
             signatures.signatures_with(&policy),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
@@ -1387,7 +1390,7 @@ mod tests {
         }
 
         let one_certificate = Limits::standard().certificates(1).expect("limits");
-        let certificate_policy = Policy::compatible().with_limits(one_certificate);
+        let certificate_policy = Policy::compatible().limits(one_certificate);
         assert!(matches!(
             certificates.signatures_with(&certificate_policy),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
@@ -1397,7 +1400,7 @@ mod tests {
         let three_certificate_bytes = Limits::standard()
             .total_certificate_bytes(3)
             .expect("limits");
-        let byte_policy = Policy::compatible().with_limits(three_certificate_bytes);
+        let byte_policy = Policy::compatible().limits(three_certificate_bytes);
         assert!(matches!(
             certificates.signatures_with(&byte_policy),
             Err(Error::Signature(litchi_sign::Error::Limit(message)))
@@ -1468,7 +1471,8 @@ mod tests {
 
     #[test]
     fn verifies_certificate_from_a_related_der_part() {
-        let mut package = OpcPackage::from_bytes(POI_DOCX).expect("fixture opens");
+        let mut package =
+            OpcPackage::from_bytes(POI_DOCX, SourceLimits::default()).expect("fixture opens");
         let initial = package
             .signatures_with(&Policy::compatible())
             .expect("initial verification");
@@ -1560,8 +1564,9 @@ mod tests {
         let mut package = package();
         package.sign(&signer(7)).expect("sign");
         let mut output = std::io::Cursor::new(Vec::new());
-        package.to_stream(&mut output).expect("serialize");
-        let reopened = OpcPackage::from_bytes(output.get_ref()).expect("reopen");
+        package.write_to(&mut output).expect("serialize");
+        let reopened =
+            OpcPackage::from_bytes(output.get_ref(), SourceLimits::default()).expect("reopen");
         let reports = reopened.signatures().expect("verify");
         assert_eq!(reports.len(), 1);
         assert_eq!(reports[0].integrity(), Status::Valid);

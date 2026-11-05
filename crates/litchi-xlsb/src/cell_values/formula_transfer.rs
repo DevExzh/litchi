@@ -55,9 +55,13 @@ pub(super) fn remap(
         .formula_context
         .for_sheet(target.catalog_position_for_worksheet(target_sheet)?);
     let mut tokens = formula.tokens().to_vec();
-    let parsed = Parser::with_extra(formula.tokens(), formula.ancillary())
-        .parse_spanned()
-        .map_err(formula_error)?;
+    let parsed = Parser::with_extra(
+        formula.tokens(),
+        formula.ancillary(),
+        source.raw_limits_value(),
+    )
+    .parse_spanned()
+    .map_err(formula_error)?;
 
     for (token, span) in parsed {
         match token {
@@ -124,10 +128,12 @@ pub(super) fn remap(
                     return Err(dependency_error("PivotTable name", &source_name));
                 }
             },
-            Token::Unknown(kind) => {
-                return Err(Error::UnsupportedFeature(format!(
-                    "formula transfer cannot prove dependencies for unknown Ptg 0x{kind:02X}"
-                )));
+            Token::Unknown(_kind) => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "formula transfer cannot prove dependencies for unknown Ptg",
+                ));
             },
             Token::Number(_)
             | Token::String(_)
@@ -151,18 +157,23 @@ pub(super) fn remap(
         }
     }
 
-    CellFormula::new(formula.flags(), tokens, formula.ancillary().to_vec())
+    CellFormula::new(
+        formula.flags(),
+        tokens,
+        formula.ancillary().to_vec(),
+        target.raw_limits_value(),
+    )
 }
 
 fn map_name(source: &Workbook, target: &Workbook, index: u32) -> Result<u32> {
     let source_index = usize::try_from(index)
         .ok()
         .and_then(|value| value.checked_sub(1))
-        .ok_or_else(|| Error::InvalidFormula("PtgName index is zero".to_string()))?;
+        .ok_or(Error::InvalidFormula("PtgName index is zero"))?;
     let source_names = defined_names(source)?;
     let identity = source_names
         .get(source_index)
-        .ok_or_else(|| Error::InvalidFormula(format!("source PtgName index {index} is absent")))?;
+        .ok_or(Error::InvalidFormula("source PtgName index is absent"))?;
     let candidates = defined_names(target)?
         .iter()
         .enumerate()
@@ -171,7 +182,7 @@ fn map_name(source: &Workbook, target: &Workbook, index: u32) -> Result<u32> {
             u32::try_from(candidate)
                 .ok()
                 .and_then(|value| value.checked_add(1))
-                .ok_or_else(|| Error::InvalidFormula("target name index overflow".to_string()))
+                .ok_or(Error::InvalidFormula("target name index overflow"))
         })
         .collect::<Result<Vec<_>>>()?;
     choose(candidates, None, "defined name", &identity.name)
@@ -181,13 +192,13 @@ fn defined_names(workbook: &Workbook) -> Result<Vec<NameIdentity>> {
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&workbook_uri)?.blob();
     let mut names = Vec::new();
-    for item in Records::new(source) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::NAME {
             continue;
         }
-        let definition = crate::named_ranges::parse(record.payload())
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        let definition = crate::named_ranges::parse(record.payload(), raw_limits)?;
         let scope = definition
             .sheet_id
             .map(|sheet| {
@@ -195,12 +206,9 @@ fn defined_names(workbook: &Workbook) -> Result<Vec<NameIdentity>> {
                     .ok()
                     .and_then(|sheet| workbook.formula_context.worksheet_names.get(sheet))
                     .cloned()
-                    .ok_or_else(|| {
-                        Error::InvalidFormula(format!(
-                            "defined name {:?} has an invalid sheet scope {sheet}",
-                            definition.name
-                        ))
-                    })
+                    .ok_or(Error::InvalidFormula(
+                        "defined name has an invalid sheet scope",
+                    ))
             })
             .transpose()?;
         names.push(NameIdentity {
@@ -229,7 +237,7 @@ fn map_xti(source: &Context, target: &Context, index: u16) -> Result<u16> {
     let mut candidates = Vec::new();
     for candidate in 0..target.external_sheets.len() {
         let candidate = u16::try_from(candidate)
-            .map_err(|_| Error::InvalidFormula("target XTI index overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("target XTI index overflow"))?;
         if xti_identity(target, candidate).is_ok_and(|value| xti_identity_eq(&value, &identity)) {
             candidates.push(candidate);
         }
@@ -246,22 +254,15 @@ fn xti_identity(context: &Context, index: u16) -> Result<XtiIdentity> {
     let xti = context
         .external_sheets
         .get(usize::from(index))
-        .ok_or_else(|| Error::InvalidFormula(format!("XTI index {index} is absent")))?;
+        .ok_or(Error::InvalidFormula("XTI index is absent"))?;
     let link = usize::try_from(xti.external_link)
         .ok()
         .and_then(|index| context.supporting_links.get(index))
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!(
-                "XTI index {index} has no supporting link {}",
-                xti.external_link
-            ))
-        })?;
+        .ok_or(Error::InvalidFormula("XTI index has no supporting link"))?;
     match link {
         SupportingLink::SameSheet => {
             if xti.first_sheet != -2 || xti.last_sheet != -2 {
-                return Err(Error::InvalidFormula(format!(
-                    "same-sheet XTI {index} does not use -2/-2"
-                )));
+                return Err(Error::InvalidFormula("same-sheet XTI does not use -2/-2"));
             }
             Ok(XtiIdentity::SameSheet)
         },
@@ -270,24 +271,22 @@ fn xti_identity(context: &Context, index: u16) -> Result<XtiIdentity> {
                 .ok()
                 .and_then(|sheet| context.worksheet_names.get(sheet))
                 .cloned()
-                .ok_or_else(|| {
-                    Error::InvalidFormula(format!("XTI {index} first worksheet is invalid"))
-                })?;
+                .ok_or(Error::InvalidFormula("XTI first worksheet is invalid"))?;
             let last = usize::try_from(xti.last_sheet)
                 .ok()
                 .and_then(|sheet| context.worksheet_names.get(sheet))
                 .cloned()
-                .ok_or_else(|| {
-                    Error::InvalidFormula(format!("XTI {index} last worksheet is invalid"))
-                })?;
+                .ok_or(Error::InvalidFormula("XTI last worksheet is invalid"))?;
             Ok(XtiIdentity::Internal { first, last })
         },
         SupportingLink::ExternalWorkbook(_) => Ok(XtiIdentity::External(
             Resolution::sheet_prefix(context, index).map_err(formula_error)?,
         )),
-        SupportingLink::AddIn => Err(Error::UnsupportedFeature(format!(
-            "formula XTI {index} refers to an add-in"
-        ))),
+        SupportingLink::AddIn => Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "formula XTI refers to an add",
+        )),
     }
 }
 
@@ -333,11 +332,10 @@ fn map_external_name(
     let mut candidates = Vec::new();
     for candidate_xti in 0..target.external_sheets.len() {
         let candidate_xti = u16::try_from(candidate_xti)
-            .map_err(|_| Error::InvalidFormula("target external XTI overflow".to_string()))?;
+            .map_err(|_| Error::InvalidFormula("target external XTI overflow"))?;
         for candidate_name in 1..=maximum_names {
-            let candidate_name = u32::try_from(candidate_name).map_err(|_| {
-                Error::InvalidFormula("target external-name index overflow".to_string())
-            })?;
+            let candidate_name = u32::try_from(candidate_name)
+                .map_err(|_| Error::InvalidFormula("target external-name index overflow"))?;
             if Resolution::external_name(target, candidate_xti, candidate_name)
                 .is_ok_and(|value| value.eq_ignore_ascii_case(&identity))
             {
@@ -358,7 +356,7 @@ fn map_table(
     if reference.external.is_some() {
         for candidate_xti in 0..target.external_sheets.len() {
             let candidate_xti = u16::try_from(candidate_xti)
-                .map_err(|_| Error::InvalidFormula("target table XTI overflow".to_string()))?;
+                .map_err(|_| Error::InvalidFormula("target table XTI overflow"))?;
             let mut candidate = reference.clone();
             candidate.sheet_index = candidate_xti;
             if Resolution::table_reference(target, &candidate)
@@ -371,7 +369,7 @@ fn map_table(
         for table in target.tables.iter() {
             for candidate_xti in 0..target.external_sheets.len() {
                 let candidate_xti = u16::try_from(candidate_xti)
-                    .map_err(|_| Error::InvalidFormula("target table XTI overflow".to_string()))?;
+                    .map_err(|_| Error::InvalidFormula("target table XTI overflow"))?;
                 let mut candidate = reference.clone();
                 candidate.sheet_index = candidate_xti;
                 candidate.list_index = Some(table.table_id());
@@ -407,19 +405,18 @@ fn choose<T: Clone + PartialEq>(
         .next()
         .ok_or_else(|| dependency_error(kind, identity))?;
     if candidates.next().is_some() {
-        return Err(Error::UnsupportedFeature(format!(
-            "formula {kind} dependency {identity:?} is ambiguous in the target workbook"
-        )));
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "formula dependency is ambiguous in the target workbook",
+        ));
     }
     Ok(first)
 }
 
-fn require_span(span: &std::ops::Range<usize>, expected: usize, kind: &str) -> Result<()> {
+fn require_span(span: &std::ops::Range<usize>, expected: usize, _kind: &str) -> Result<()> {
     if span.end.saturating_sub(span.start) != expected {
-        return Err(Error::InvalidFormula(format!(
-            "{kind} dependency span has {} bytes, expected {expected}",
-            span.end.saturating_sub(span.start)
-        )));
+        return Err(Error::InvalidFormula("dependency span has bytes"));
     }
     Ok(())
 }
@@ -430,9 +427,9 @@ fn write_u16(bytes: &mut [u8], offset: usize, value: u16) -> Result<()> {
     })?;
     bytes
         .get_mut(offset..end)
-        .ok_or_else(|| {
-            Error::InvalidFormula("formula dependency u16 is out of bounds".to_string())
-        })?
+        .ok_or(Error::InvalidFormula(
+            "formula dependency u16 is out of bounds",
+        ))?
         .copy_from_slice(&value.to_le_bytes());
     Ok(())
 }
@@ -443,19 +440,21 @@ fn write_u32(bytes: &mut [u8], offset: usize, value: u32) -> Result<()> {
     })?;
     bytes
         .get_mut(offset..end)
-        .ok_or_else(|| {
-            Error::InvalidFormula("formula dependency u32 is out of bounds".to_string())
-        })?
+        .ok_or(Error::InvalidFormula(
+            "formula dependency u32 is out of bounds",
+        ))?
         .copy_from_slice(&value.to_le_bytes());
     Ok(())
 }
 
-fn dependency_error(kind: &str, identity: &str) -> Error {
-    Error::UnsupportedFeature(format!(
-        "formula {kind} dependency {identity:?} has no equivalent target resource"
-    ))
+fn dependency_error(_kind: &str, _identity: &str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit",
+        "formula dependency has no equivalent target resource",
+    )
 }
 
-fn formula_error(error: crate::formula::Error) -> Error {
-    Error::InvalidFormula(error.to_string())
+fn formula_error(_error: crate::formula::Error) -> Error {
+    Error::InvalidFormula("the formula is not valid")
 }

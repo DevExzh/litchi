@@ -4,12 +4,12 @@
 //! authoring, typed background/transition codecs, package round-tripping, and
 //! borrowed presentation/slide/shape/text inspection.
 
+use litchi_pptx::Package;
 use litchi_pptx::backgrounds::{GradientStop, PatternType, SlideBackground};
 use litchi_pptx::shape::Shape;
 use litchi_pptx::transition::{
     Axis, InOut, Kind, Ms, Shape as TransitionShape, Side, Speed, Transition,
 };
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -87,17 +87,22 @@ fn test_typed_models() -> Result<(), Box<dyn StdError>> {
         Transition::new(Kind::Zoom(InOut::In)),
     ];
     for transition in transitions {
-        let xml = litchi_pptx::transition::write(&transition)?;
-        let parsed = litchi_pptx::transition::read(xml.as_bytes())?.expect("transition");
+        let xml =
+            litchi_pptx::transition::write(&transition, litchi_pptx::transition::Limits::DEFAULT)?;
+        let parsed = litchi_pptx::transition::read(
+            xml.as_bytes(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )?
+        .expect("transition");
         assert!(parsed.same_semantics(&transition));
     }
     Ok(())
 }
 
 fn test_package_round_trip(path: &str) -> Result<(), Box<dyn StdError>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         add_feature_slides(presentation)?;
 
@@ -108,6 +113,7 @@ fn test_package_round_trip(path: &str) -> Result<(), Box<dyn StdError>> {
         assert_eq!(presentation.slide_height(), 5_143_500);
         assert!(presentation.is_modified());
     }
+    let package = builder.build()?;
     package.save(path)?;
 
     let reopened = Package::open(path)?;
@@ -117,7 +123,9 @@ fn test_package_round_trip(path: &str) -> Result<(), Box<dyn StdError>> {
     Ok(())
 }
 
-fn add_feature_slides(presentation: &mut MutablePresentation) -> Result<(), Box<dyn StdError>> {
+fn add_feature_slides(
+    presentation: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn StdError>> {
     let slide = presentation.add_slide()?;
     slide.set_title("PPTX Feature Test Suite");
     slide.set_background(SlideBackground::solid("1F4E78"));

@@ -1,6 +1,6 @@
 //! BIFF8 `ShrFmla` payload codec.
 
-use crate::{Error, Result};
+use crate::{Error, Result, SourceLimits};
 
 use super::model::{Cell, Range};
 use super::validation::{FIXED_PAYLOAD_SIZE, MAX_RECORD_PAYLOAD, invalid};
@@ -15,11 +15,22 @@ pub struct Record {
     pub tokens: Vec<u8>,
 }
 
-/// Parse one complete `ShrFmla` payload.
+/// Parse one complete `ShrFmla` payload under the caller's source profile.
+///
+/// The payload is variable-sized because the parsed formula token stream is
+/// retained. `limits` is therefore required even though the BIFF8 format also
+/// supplies the hard 8,224-byte record ceiling.
 /// # Errors
 ///
 /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-pub fn parse(data: &[u8]) -> Result<Record> {
+pub fn parse(data: &[u8], limits: &SourceLimits) -> Result<Record> {
+    if data.len() > limits.max_entry_bytes() {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::EntryBytes,
+            observed: u64::try_from(data.len()).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limits.max_entry_bytes()).unwrap_or(u64::MAX),
+        });
+    }
     if data.len() < FIXED_PAYLOAD_SIZE {
         return Err(Error::InvalidLength {
             expected: FIXED_PAYLOAD_SIZE,

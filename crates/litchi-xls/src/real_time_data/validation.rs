@@ -1,6 +1,7 @@
 //! BIFF8 framing and bounded source-preserving replacement helpers.
 
 use crate::{Error, Result};
+use litchi_core::edit::RefusalKind;
 
 /// The byte length of a BIFF record header (`rt` plus `cb`), in bytes.
 pub(super) const RECORD_HEADER_LEN: usize = 4;
@@ -28,17 +29,21 @@ impl RecordSpan {
 /// Scan one complete BIFF8 record stream without interpreting its records.
 pub(super) fn scan_records(bytes: &[u8]) -> Result<Vec<RecordSpan>> {
     if bytes.len() > MAX_STREAM_BYTES {
-        return Err(Error::UnsafeEdit(format!(
-            "RealTimeData stream exceeds the {MAX_STREAM_BYTES}-byte resource bound"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit real-time data",
+            "the RealTimeData stream exceeds its byte bound",
+        ));
     }
 
     let mut records = Vec::new();
     let mut offset = 0usize;
     while offset < bytes.len() {
         if records.len() >= MAX_RECORDS {
-            return Err(Error::UnsafeEdit(
-                "RealTimeData stream record count exceeds the resource bound".to_string(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData stream record count exceeds the resource bound",
             ));
         }
         let header_end = offset
@@ -92,8 +97,10 @@ pub(super) fn replace_range(
     replacement: &[u8],
 ) -> Result<Vec<u8>> {
     if start > end || end > bytes.len() {
-        return Err(Error::UnsafeEdit(
-            "RealTimeData replacement range is outside the source stream".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit real-time data",
+            "RealTimeData replacement range is outside the source stream",
         ));
     }
     let retained = bytes
@@ -104,9 +111,11 @@ pub(super) fn replace_range(
         .checked_add(replacement.len())
         .ok_or(Error::Allocation("sizing RealTimeData replacement"))?;
     if output_len > MAX_STREAM_BYTES {
-        return Err(Error::UnsafeEdit(format!(
-            "edited RealTimeData stream exceeds the {MAX_STREAM_BYTES}-byte resource bound"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit real-time data",
+            "the edited RealTimeData stream exceeds its byte bound",
+        ));
     }
 
     let mut output = Vec::new();
@@ -132,8 +141,10 @@ pub(super) fn frame_logical_payload(
         ));
     }
     if payload.len() > crate::real_time_data::codec::MAX_LOGICAL_PAYLOAD_BYTES {
-        return Err(Error::UnsafeEdit(
-            "RealTimeData logical payload exceeds its resource bound".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit real-time data",
+            "RealTimeData logical payload exceeds its resource bound",
         ));
     }
 
@@ -158,7 +169,11 @@ pub(super) fn frame_logical_payload(
             continue_frt_record_type
         };
         let payload_len = u16::try_from(chunk.len()).map_err(|_error| {
-            Error::UnsafeEdit("RealTimeData record payload length exceeds u16".to_string())
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData record payload length exceeds u16",
+            )
         })?;
         output.extend_from_slice(&record_type.to_le_bytes());
         output.extend_from_slice(&payload_len.to_le_bytes());

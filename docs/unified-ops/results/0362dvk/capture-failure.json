@@ -1,0 +1,92 @@
+{
+  "finished": "2026-10-24T14:53:49.183581+00:00",
+  "identity": {
+    "capture_env": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "LC_ALL": "C",
+      "LITCHI_CAPPED": "",
+      "LITCHI_MEM_MAX": "20G",
+      "RUSTC_BOOTSTRAP": "1",
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "RUSTUP_TOOLCHAIN": "",
+      "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/tmp"
+    },
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cargo_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+    "cargo_path": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "cargo_shim": {
+      "litchi_capped_unset": true,
+      "memory_max": "20G",
+      "memory_max_bytes": 21474836480,
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "sha256": "1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8",
+      "systemd_run_path": "/usr/bin/systemd-run"
+    },
+    "command": [
+      "cargo",
+      "rustdoc",
+      "--package",
+      "litchi-drawingml",
+      "--lib",
+      "--all-features",
+      "--offline",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/target",
+      "--",
+      "-Zunstable-options",
+      "--output-format",
+      "json",
+      "--document-hidden-items"
+    ],
+    "lib_name": "litchi_drawingml",
+    "manifest": "crates/litchi-drawingml/Cargo.toml",
+    "manifest_sha256": "22d5aba613de0f1322b9ae7efa4cc333e6d95d1bffaddb2487c2c107101995fe",
+    "package": "litchi-drawingml",
+    "rust_toolchain_sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "rustc_path": "/home/zhuhe/.cargo/bin/rustc",
+    "schema": 1,
+    "source_commit": "29f072f19c53503395164fcb3a618c44fc22cf75"
+  },
+  "resource": {
+    "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/logs/litchi_drawingml.time.log",
+    "memory_cap": "20G",
+    "memory_cap_bytes": 21474836480,
+    "peak_rss_bytes": 649797632,
+    "peak_rss_kib": 634568,
+    "tool": "/usr/bin/time -v"
+  },
+  "returncode": 101,
+  "schema": 1,
+  "started": "2026-10-24T14:53:34.889904+00:00",
+  "status": "failed",
+  "stderr": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/logs/litchi_drawingml.stderr.log",
+  "stdout": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/logs/litchi_drawingml.stdout.log",
+  "target_post_bytes": 1509922247,
+  "target_pre_bytes": 1454524881,
+  "external_artifacts": {
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/receipts/litchi_drawingml.json": {
+      "bytes": 2918,
+      "sha256": "2ae93ef43f716ec016961375fe77a3de1f64c9fb180cdb4d56a563061401d40a"
+    },
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/logs/litchi_drawingml.stderr.log": {
+      "bytes": 2695,
+      "sha256": "b05adad7788ad1478087524d42ccac7d7d57623c25050126e68b21eec9829a28"
+    },
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/logs/litchi_drawingml.time.log": {
+      "bytes": 1012,
+      "sha256": "e3e563dd80fc81dc22a7b6378e21a15dac1d31a2b834e7ef3ad3b62606fd4ad9"
+    },
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/output/run.json": {
+      "bytes": 1929,
+      "sha256": "32b1b7f929b57c227956403ea745f0ef94e94a6ee1d2041fac14123f63350784"
+    }
+  }
+}

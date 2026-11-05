@@ -5,12 +5,18 @@
 )]
 
 use super::*;
-use litchi_cfb::{OleFile, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile};
+use litchi_cfb::{
+    OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,
+    SharedOleFileLimits,
+};
 use std::io::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 fn package() -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 3, 2, 4.5).unwrap();
     writer.write_number(sheet, 4, 0, 1.0).unwrap();
@@ -21,17 +27,24 @@ fn package() -> Vec<u8> {
     writer.write_boolean(sheet, 7, 0, true).unwrap();
     writer.write_formula(sheet, 8, 0, "1+1").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package =
-        PackageEditor::open(output.into_inner(), Targets::default(), Limits::default()).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let mut package = ObjectPackage::open_with_options(
+        output.into_inner(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(Limits::default()),
+    )
+    .unwrap()
+    .edit()
+    .unwrap();
     package
         .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
         .unwrap();
-    package.finish().unwrap()
+    crate::scoped::object_editor_bytes(&package).unwrap()
 }
 
 fn protected_package(worksheet: bool) -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 3, 2, 4.5).unwrap();
     if worksheet {
@@ -42,16 +55,17 @@ fn protected_package(worksheet: bool) -> Vec<u8> {
         writer.protect_workbook(Some("book"), true, false);
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
     let source = package();
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
-    let parsed = Records::new(&workbook);
+    let parsed =
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits");
     for record in parsed {
         let record = record.unwrap();
         records.push((record.kind().get(), record.payload().to_vec()));
@@ -147,13 +161,52 @@ fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
     (output.into_inner(), reference)
 }
 
-fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Reference) {
-    let (source, reference) = fixed_numeric_family_package(storage);
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+fn mul_blank_family_package() -> (Vec<u8>, Reference) {
+    let (source, reference) = fixed_numeric_family_package(Storage::MulRk);
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut replaced = false;
-    for record in Records::new(&workbook) {
+    for record in
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
+        let record = record.unwrap();
+        let mut kind = record.kind().get();
+        let mut payload = record.payload().to_vec();
+        if kind == MUL_RK {
+            assert_eq!(payload.len(), 18);
+            let mut blank = Vec::with_capacity(10);
+            blank.extend_from_slice(&payload[0..4]);
+            blank.extend_from_slice(&payload[4..6]);
+            blank.extend_from_slice(&payload[10..12]);
+            blank.extend_from_slice(&payload[16..18]);
+            kind = MUL_BLANK;
+            payload = blank;
+            replaced = true;
+        }
+        rebuilt.extend_from_slice(&kind.to_le_bytes());
+        rebuilt.extend_from_slice(&(u16::try_from(payload.len()).unwrap()).to_le_bytes());
+        rebuilt.extend_from_slice(&payload);
+    }
+    assert!(replaced);
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &rebuilt).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), reference)
+}
+
+fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Reference) {
+    let (source, reference) = fixed_numeric_family_package(storage);
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut rebuilt = Vec::new();
+    let mut replaced = false;
+    for record in
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = record.unwrap();
         let kind = record.kind().get();
         let mut payload = record.payload().to_vec();
@@ -188,21 +241,21 @@ fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Refe
 }
 
 fn formula_free_package() -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Plain").unwrap();
     writer.write_number(sheet, 1, 0, 1.0).unwrap();
     writer.write_number(sheet, 3, 1, 2.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn formula_package(formula: &str) -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Formula").unwrap();
     writer.write_formula(sheet, 0, 0, formula).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -213,11 +266,13 @@ const ANCILLARY_MEMORY_EXTRA: [u8; 10] = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0];
 
 fn ancillary_formula_package() -> Vec<u8> {
     let source = formula_package("1+1");
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut patched = false;
-    for record in Records::new(&workbook) {
+    for record in
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = record.unwrap();
         let kind = record.kind().get();
         let mut payload = record.payload().to_vec();
@@ -246,16 +301,17 @@ fn ancillary_formula_package() -> Vec<u8> {
 }
 
 fn positioned_formula_package(formula: &str, row: u32, column: u16) -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Formula").unwrap();
     writer.write_formula(sheet, row, column, formula).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn signed_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -270,7 +326,8 @@ fn signed_package() -> Vec<u8> {
 }
 
 fn macro_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -293,7 +350,8 @@ fn macro_package() -> Vec<u8> {
 }
 
 fn empty_macro_storage_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -306,7 +364,8 @@ fn empty_macro_storage_package() -> Vec<u8> {
 }
 
 fn topology_with_clsids_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -326,10 +385,11 @@ fn topology_with_clsids_package() -> Vec<u8> {
 fn directory_signature(
     bytes: &[u8],
 ) -> Vec<(u32, String, u8, String, u32, u32, u32, u32, u64, bool)> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).unwrap();
-    let shared = SharedOleFile::open_owned(
+    let snapshot = Snapshot::from_bytes(bytes.to_vec(), Limits::default()).unwrap();
+    let shared = SharedOleFile::open_owned_vec(
         Arc::clone(&snapshot.inner.bytes),
         snapshot.inner.source_version,
+        SharedOleFileLimits::default(),
     )
     .unwrap();
     shared
@@ -352,15 +412,27 @@ fn directory_signature(
 }
 
 fn stream(bytes: &[u8], name: &str) -> Vec<u8> {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .open_stream(&[name])
         .unwrap()
 }
 
+fn retained_edit_limits(bytes: &[u8]) -> (Limits, OleFileLimits) {
+    let workbook_bytes = u64::try_from(stream(bytes, "Workbook").len()).unwrap();
+    let package_bytes = u64::try_from(bytes.len()).unwrap();
+    let limits = Limits {
+        max_stream_size: workbook_bytes,
+        max_total_size: package_bytes,
+        ..Limits::default()
+    };
+    let cfb_limits = OleFileLimits::new(package_bytes).unwrap();
+    (limits, cfb_limits)
+}
+
 #[test]
 fn edits_only_one_number_field_and_round_trips_patch() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let worksheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
     assert_eq!(worksheet.position(), 0);
@@ -372,19 +444,19 @@ fn edits_only_one_number_field_and_round_trips_patch() {
     let commit = edit.commit().unwrap();
     assert!(Arc::ptr_eq(
         &source.inner.shared_strings,
-        &commit.snapshot().inner.shared_strings
+        &commit.package().inner.shared_strings
     ));
     assert!(Arc::ptr_eq(
         &source.inner.shared_string_properties,
-        &commit.snapshot().inner.shared_string_properties
+        &commit.package().inner.shared_string_properties
     ));
     assert!(Arc::ptr_eq(
         &source.inner.xf_records,
-        &commit.snapshot().inner.xf_records
+        &commit.package().inner.xf_records
     ));
     assert_eq!(commit.diagnostics().changed_number_fields(), 1);
     assert_eq!(commit.diagnostics().touched_streams(), 1);
-    let after_workbook = commit.snapshot().workbook_stream();
+    let after_workbook = commit.package().workbook_stream();
     assert_eq!(before_workbook.len(), after_workbook.len());
     assert_eq!(
         before_workbook
@@ -395,7 +467,7 @@ fn edits_only_one_number_field_and_round_trips_patch() {
         2
     );
     assert_eq!(stream(source.bytes(), "Opaque"), b"untouched");
-    assert_eq!(stream(commit.snapshot().bytes(), "Opaque"), b"untouched");
+    assert_eq!(stream(commit.package().bytes(), "Opaque"), b"untouched");
     assert_eq!(
         source
             .worksheet("Sheet1".into())
@@ -426,8 +498,132 @@ fn edits_only_one_number_field_and_round_trips_patch() {
 }
 
 #[test]
+fn retained_limits_survive_noop_changed_and_inverse_publication() {
+    let bytes = package();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let source = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
+
+    let noop = source.edit().commit().unwrap();
+    assert!(Arc::ptr_eq(
+        &source.inner.bytes,
+        &noop.package().inner.bytes
+    ));
+    assert_eq!(noop.package().inner.limits, limits);
+    assert_eq!(noop.package().inner.cfb_limits, cfb_limits);
+
+    let reference = Reference::new(3, 2).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().inner.limits, limits);
+    assert_eq!(commit.package().inner.cfb_limits, cfb_limits);
+
+    let applied = commit.patch().apply(&source).unwrap();
+    assert_eq!(applied.inner.limits, limits);
+    assert_eq!(applied.inner.cfb_limits, cfb_limits);
+    let reverted = commit.patch().inverse().apply(&applied).unwrap();
+    assert_eq!(reverted.bytes(), source.bytes());
+    assert_eq!(reverted.inner.limits, limits);
+    assert_eq!(reverted.inner.cfb_limits, cfb_limits);
+}
+
+#[test]
+fn retained_patch_bytes_charge_artifacts_and_semantic_data() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let mut edit = source.edit();
+    edit.set_value(
+        "Sheet1".into(),
+        Reference::new(6, 0).unwrap(),
+        Value::Text("retained semantic payload λ".to_owned()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch();
+
+    assert!(patch.semantic().retained_bytes() > 0);
+    assert!(patch.retained_bytes() >= patch.before().len() + patch.after().len());
+
+    let inverse = patch.inverse();
+    assert!(inverse.retained_bytes() >= inverse.before().len() + inverse.after().len());
+}
+
+#[test]
+fn retained_limits_survive_source_backed_and_plan_publication() {
+    let bytes = package();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let source = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    assert_eq!(commit.source().inner.limits, limits);
+    assert_eq!(commit.package().inner.limits, limits);
+    assert_eq!(commit.source().inner.cfb_limits, cfb_limits);
+    assert_eq!(commit.package().inner.cfb_limits, cfb_limits);
+
+    let mut plan_edit = source.edit();
+    plan_edit
+        .set_number("Sheet1".into(), reference, 9.25)
+        .unwrap();
+    let plan = plan_edit.commit_source_backed_plan().unwrap();
+    assert_eq!(plan.source().inner.limits, limits);
+    assert_eq!(plan.source().inner.cfb_limits, cfb_limits);
+}
+
+#[test]
+fn retained_stream_limit_rejects_a_growing_candidate() {
+    let bytes = package();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let source = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
+    let before = source.bytes().to_vec();
+
+    let mut edit = source.edit();
+    edit.rename_sheet("Sheet1".into(), "Renamed").unwrap();
+    let error = edit.commit().unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Object(litchi_ole_common::Error::Limit {
+            kind: litchi_ole_common::LimitKind::StreamBytes, observed, maximum,
+        }) if observed > maximum && maximum == limits.max_stream_size
+    ));
+    assert_eq!(source.bytes(), before.as_slice());
+}
+
+#[test]
+fn broad_patch_cannot_widen_a_narrow_same_bytes_destination() {
+    let bytes = package();
+    let broad = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let narrow = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
+    let before = narrow.bytes().to_vec();
+
+    let mut edit = broad.edit();
+    edit.rename_sheet("Sheet1".into(), "Renamed").unwrap();
+    let broad_commit = edit.commit().unwrap();
+    let error = broad_commit.patch().apply(&narrow).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Object(litchi_ole_common::Error::Limit {
+            kind: litchi_ole_common::LimitKind::StreamBytes, observed, maximum,
+        }) if observed > maximum && maximum == limits.max_stream_size
+    ));
+    assert_eq!(narrow.bytes(), before.as_slice());
+    assert_eq!(narrow.inner.limits, limits);
+    assert_eq!(narrow.inner.cfb_limits, cfb_limits);
+    let mut history = narrow.history(HistoryLimits::new(2, 1024 * 1024));
+    assert!(
+        matches!(broad_commit.record_in(&mut history), Err(Error::PatchConflict { reason, .. })
+        if reason.contains("source profiles"))
+    );
+    assert_eq!(history.current().bytes(), narrow.bytes());
+    assert_eq!(history.current().inner.limits, limits);
+    assert_eq!(history.current().inner.cfb_limits, cfb_limits);
+}
+
+#[test]
 fn source_backed_number_publication_preserves_the_artifact_contract() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let mut edit = source.edit();
     edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
@@ -444,7 +640,7 @@ fn source_backed_number_publication_preserves_the_artifact_contract() {
     );
     assert_eq!(
         commit.diagnostics().target_version(),
-        commit.snapshot().source_version()
+        commit.package().source_version()
     );
     assert_ne!(
         commit.diagnostics().source_fingerprint(),
@@ -453,7 +649,7 @@ fn source_backed_number_publication_preserves_the_artifact_contract() {
 
     let mut output = Vec::new();
     let report = commit.write_to(&mut output).unwrap();
-    assert_eq!(output, commit.snapshot().bytes());
+    assert_eq!(output, commit.package().bytes());
     assert_eq!(
         report.target_fingerprint(),
         commit.diagnostics().target_fingerprint()
@@ -461,7 +657,7 @@ fn source_backed_number_publication_preserves_the_artifact_contract() {
     assert_eq!(stream(&output, "Opaque"), b"untouched");
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -473,7 +669,7 @@ fn source_backed_number_publication_preserves_the_artifact_contract() {
     );
 
     let applied = commit.patch().apply(&source).unwrap();
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    assert_eq!(applied.bytes(), commit.package().bytes());
     assert_eq!(
         commit.patch().inverse().apply(&applied).unwrap().bytes(),
         source.bytes()
@@ -493,7 +689,7 @@ fn source_backed_numeric_plan_validates_without_retaining_target_snapshot() {
         } else {
             fixed_numeric_family_package(storage)
         };
-        let source = Snapshot::from_bytes(bytes).unwrap();
+        let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
         let mut edit = source.edit();
         edit.set_numeric("Sheet1".into(), reference, replacement)
             .unwrap();
@@ -511,7 +707,7 @@ fn source_backed_numeric_plan_validates_without_retaining_target_snapshot() {
         let mut output = Vec::new();
         plan.write_to(&mut output).unwrap();
         assert_eq!(stream(&output, "Opaque"), b"untouched");
-        let reopened = Snapshot::from_bytes(output).unwrap();
+        let reopened = Snapshot::from_bytes(output, Limits::default()).unwrap();
         let cell = reopened
             .worksheet("Sheet1".into())
             .unwrap()
@@ -528,7 +724,7 @@ fn source_backed_numeric_plan_validates_without_retaining_target_snapshot() {
 fn source_backed_numeric_diagnostics_report_owned_shapes_after_candidate() {
     let reference = Reference::new(3, 2).unwrap();
 
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut ordinary_edit = source.edit();
     ordinary_edit
         .set_number("Sheet1".into(), reference, 9.25)
@@ -562,7 +758,7 @@ fn source_backed_numeric_diagnostics_report_owned_shapes_after_candidate() {
     assert_eq!(ordinary_shape.atomic_save_emission_scans, 1);
     assert_eq!(ordinary_shape.atomic_save_pre_rename_scans, 0);
 
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut plan_edit = source.edit();
     plan_edit
         .set_number("Sheet1".into(), reference, 9.25)
@@ -596,7 +792,7 @@ fn source_backed_numeric_diagnostics_report_owned_shapes_after_candidate() {
 
 #[test]
 fn source_backed_numeric_plan_preserves_complete_directory_topology_and_clsids() {
-    let source = Snapshot::from_bytes(topology_with_clsids_package()).unwrap();
+    let source = Snapshot::from_bytes(topology_with_clsids_package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let before = directory_signature(source.bytes());
     let mut edit = source.edit();
@@ -607,7 +803,7 @@ fn source_backed_numeric_plan_preserves_complete_directory_topology_and_clsids()
     plan.write_to(&mut output).unwrap();
     assert_eq!(directory_signature(&output), before);
     assert_eq!(
-        OleFile::open(Cursor::new(&output))
+        OleFile::open(Cursor::new(&output), litchi_cfb::OleFileLimits::default())
             .unwrap()
             .open_stream(&["Metadata", "Payload"])
             .unwrap(),
@@ -617,7 +813,7 @@ fn source_backed_numeric_plan_preserves_complete_directory_topology_and_clsids()
 
 #[test]
 fn source_backed_numeric_plan_rejects_stale_and_foreign_change_metadata() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
 
     let mut stale_reference = source.edit();
@@ -646,7 +842,7 @@ fn source_backed_numeric_plan_rejects_stale_and_foreign_change_metadata() {
 fn source_backed_numeric_plan_handles_noncanonical_noop_and_sink_failure() {
     let raw = ((1.0_f64.to_bits() >> 32) as u32) & 0xffff_fffc;
     let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
-    let source = Snapshot::from_bytes(bytes).unwrap();
+    let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
     let mut noop_edit = source.edit();
     noop_edit
         .set_numeric("Sheet1".into(), reference, 1.0)
@@ -681,19 +877,19 @@ fn source_backed_numeric_plan_handles_noncanonical_noop_and_sink_failure() {
 
 #[test]
 fn source_backed_numeric_plan_refuses_structural_macro_and_signed_inputs() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut structural = source.edit();
     structural.insert_rows("Sheet1".into(), 1, 1).unwrap();
     assert!(structural.commit_source_backed_plan().is_err());
 
-    let source = Snapshot::from_bytes(macro_package()).unwrap();
+    let source = Snapshot::from_bytes(macro_package(), Limits::default()).unwrap();
     let mut macro_edit = source.edit();
     macro_edit
         .set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
         .unwrap();
     assert!(macro_edit.commit_source_backed_plan().is_err());
 
-    let source = Snapshot::from_bytes(empty_macro_storage_package()).unwrap();
+    let source = Snapshot::from_bytes(empty_macro_storage_package(), Limits::default()).unwrap();
     let mut empty_macro_edit = source.edit();
     empty_macro_edit
         .set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
@@ -708,13 +904,13 @@ fn source_backed_numeric_plan_refuses_structural_macro_and_signed_inputs() {
 
     // Signed packages are rejected during Snapshot opening, so this also
     // guards the plan path from accepting a marker through a different entry.
-    assert!(Snapshot::from_bytes(signed_package()).is_err());
+    assert!(Snapshot::from_bytes(signed_package(), Limits::default()).is_err());
 }
 
 #[test]
 fn source_backed_numeric_plan_consumes_cached_source_policy_facts() {
     for fact in 0..3 {
-        let mut source = Snapshot::from_bytes(package()).unwrap();
+        let mut source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
         assert!(source.inner.source_policy.public_worksheet_coverage);
         assert_eq!(
             source.inner.source_policy.protection,
@@ -741,7 +937,7 @@ fn source_backed_numeric_plan_consumes_cached_source_policy_facts() {
 #[test]
 fn source_backed_numeric_publication_consumes_cached_source_policy_facts() {
     for fact in 0..3 {
-        let mut source = Snapshot::from_bytes(package()).unwrap();
+        let mut source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
         assert!(source.inner.source_policy.public_worksheet_coverage);
         assert_eq!(
             source.inner.source_policy.protection,
@@ -775,7 +971,7 @@ fn source_backed_numeric_publication_and_plan_refuse_sources_identically() {
         macro_package(),
         empty_macro_storage_package(),
     ] {
-        let source = Snapshot::from_bytes(bytes).unwrap();
+        let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
         let reference = Reference::new(3, 2).unwrap();
 
         let mut publication = source.edit();
@@ -797,14 +993,14 @@ fn source_backed_numeric_publication_preserves_protection_refusal_reasons() {
     for (worksheet, expected) in [
         (
             false,
-            "Unsafe edit refused: protected or shared workbooks are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected or shared workbooks are not eligible for source-backed numeric edits",
         ),
         (
             true,
-            "Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected worksheets are not eligible for source-backed numeric edits",
         ),
     ] {
-        let source = Snapshot::from_bytes(protected_package(worksheet)).unwrap();
+        let source = Snapshot::from_bytes(protected_package(worksheet), Limits::default()).unwrap();
         let mut edit = source.edit();
         edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 4.5)
             .unwrap();
@@ -820,14 +1016,14 @@ fn source_backed_numeric_plan_preserves_protection_refusal_reasons() {
     for (worksheet, expected) in [
         (
             false,
-            "Unsafe edit refused: protected or shared workbooks are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected or shared workbooks are not eligible for source-backed numeric edits",
         ),
         (
             true,
-            "Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected worksheets are not eligible for source-backed numeric edits",
         ),
     ] {
-        let source = Snapshot::from_bytes(protected_package(worksheet)).unwrap();
+        let source = Snapshot::from_bytes(protected_package(worksheet), Limits::default()).unwrap();
         assert_ne!(
             source.inner.source_policy.protection,
             SourceProtectionPolicy::Unprotected
@@ -844,16 +1040,16 @@ fn source_backed_numeric_plan_preserves_protection_refusal_reasons() {
 
 #[test]
 fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let mut edit = source.edit();
     edit.set_number("Sheet1".into(), reference, 4.5).unwrap();
     let commit = edit.commit_source_backed().unwrap();
 
     assert!(commit.is_noop());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert!(std::ptr::eq(
-        commit.snapshot().bytes().as_ptr(),
+        commit.package().bytes().as_ptr(),
         source.bytes().as_ptr()
     ));
     assert_eq!(
@@ -869,8 +1065,29 @@ fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
 }
 
 #[test]
+fn retag_source_version_reuses_unique_inner_and_copies_shared_inner() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let unique_inner = Arc::as_ptr(&source.inner);
+    let unique_version = SourceVersion::new(0x554e_4951, 1);
+    let retagged = source.retag_source_version(unique_version);
+    assert_eq!(Arc::as_ptr(&retagged.inner), unique_inner);
+    assert_eq!(retagged.source_version(), unique_version);
+
+    let shared = retagged.clone();
+    let shared_inner = Arc::as_ptr(&retagged.inner);
+    let copied_version = SourceVersion::new(0x5348_4152, 1);
+    let copied = retagged.retag_source_version(copied_version);
+    assert_ne!(Arc::as_ptr(&copied.inner), shared_inner);
+    assert_eq!(copied.source_version(), copied_version);
+    assert_eq!(shared.source_version(), unique_version);
+    assert_eq!(copied.bytes(), shared.bytes());
+    assert_eq!(copied.inner.limits, shared.inner.limits);
+    assert_eq!(copied.inner.cfb_limits, shared.inner.cfb_limits);
+}
+
+#[test]
 fn source_backed_numeric_refuses_non_numeric_and_structural_operations() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
 
     let mut text = source.edit();
     text.set_value(
@@ -890,7 +1107,7 @@ fn source_backed_numeric_refuses_non_numeric_and_structural_operations() {
 fn source_backed_rk_and_mulrk_publication_retain_their_families() {
     for (storage, replacement) in [(Storage::Rk, 8.0), (Storage::MulRk, 6.0)] {
         let (bytes, reference) = fixed_numeric_family_package(storage);
-        let source = Snapshot::from_bytes(bytes).unwrap();
+        let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
         assert_eq!(
             source
                 .worksheet("Sheet1".into())
@@ -909,7 +1126,7 @@ fn source_backed_rk_and_mulrk_publication_retain_their_families() {
         assert_eq!(commit.diagnostics().replacement_bytes(), 4);
         assert_eq!(commit.diagnostics().splice_count(), 1);
         let cell = commit
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -918,12 +1135,12 @@ fn source_backed_rk_and_mulrk_publication_retain_their_families() {
             .unwrap();
         assert_eq!(cell.storage(), storage);
         assert_eq!(cell.value(), &Value::Number(replacement));
-        assert_eq!(stream(commit.snapshot().bytes(), "Opaque"), b"untouched");
+        assert_eq!(stream(commit.package().bytes(), "Opaque"), b"untouched");
         assert_eq!(
             commit
                 .patch()
                 .inverse()
-                .apply(commit.snapshot())
+                .apply(commit.package())
                 .unwrap()
                 .bytes(),
             source.bytes()
@@ -959,7 +1176,7 @@ fn source_backed_rk_accepts_signed_integer_boundaries_and_noncanonical_source_by
 
     for (raw, source_value, replacement) in cases {
         let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
-        let source = Snapshot::from_bytes(bytes).unwrap();
+        let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
         let sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
         assert_eq!(
             sheet.cell(reference).unwrap().unwrap().value(),
@@ -984,7 +1201,7 @@ fn source_backed_rk_accepts_signed_integer_boundaries_and_noncanonical_source_by
             .unwrap();
         let commit = edit.commit_source_backed().unwrap();
         let target_cell = commit
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -992,12 +1209,12 @@ fn source_backed_rk_accepts_signed_integer_boundaries_and_noncanonical_source_by
             .unwrap()
             .unwrap();
         assert_eq!(target_cell.value(), &Value::Number(replacement));
-        let target_entry = &commit.snapshot().inner.sheets[0].entries[entry_index];
+        let target_entry = &commit.package().inner.sheets[0].entries[entry_index];
         let target_start = target_entry.value_offset.unwrap();
         let expected_replacement = encode_rk(replacement).unwrap();
         assert_eq!(
             u32::from_le_bytes(
-                commit.snapshot().inner.workbook_stream[target_start..target_start + 4]
+                commit.package().inner.workbook_stream[target_start..target_start + 4]
                     .try_into()
                     .unwrap()
             ),
@@ -1008,7 +1225,7 @@ fn source_backed_rk_accepts_signed_integer_boundaries_and_noncanonical_source_by
             commit
                 .patch()
                 .inverse()
-                .apply(commit.snapshot())
+                .apply(commit.package())
                 .unwrap()
                 .bytes(),
             source.bytes()
@@ -1056,7 +1273,7 @@ fn source_backed_scaled_rk_rounds_only_exact_decodes() {
     ];
     for (raw, source_value, replacement) in cases {
         let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
-        let source = Snapshot::from_bytes(bytes).unwrap();
+        let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
         assert_eq!(
             source
                 .worksheet("Sheet1".into())
@@ -1074,7 +1291,7 @@ fn source_backed_scaled_rk_rounds_only_exact_decodes() {
         let commit = edit.commit_source_backed().unwrap();
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .worksheet("Sheet1".into())
                 .unwrap()
                 .unwrap()
@@ -1088,7 +1305,7 @@ fn source_backed_scaled_rk_rounds_only_exact_decodes() {
             commit
                 .patch()
                 .inverse()
-                .apply(commit.snapshot())
+                .apply(commit.package())
                 .unwrap()
                 .bytes(),
             source.bytes()
@@ -1107,7 +1324,7 @@ fn source_backed_mulrk_accepts_signed_integer_fields_and_inverse() {
         u32::from(first_reference.column()) + 1,
     )
     .unwrap();
-    let source = Snapshot::from_bytes(bytes).unwrap();
+    let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
     let sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
     assert_eq!(
         sheet.cell(first_reference).unwrap().unwrap().value(),
@@ -1126,7 +1343,7 @@ fn source_backed_mulrk_accepts_signed_integer_fields_and_inverse() {
     let commit = edit.commit_source_backed().unwrap();
     assert_eq!(commit.diagnostics().splice_count(), 2);
     let target = commit
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap();
@@ -1142,7 +1359,7 @@ fn source_backed_mulrk_accepts_signed_integer_fields_and_inverse() {
         commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .bytes(),
         source.bytes()
@@ -1153,16 +1370,16 @@ fn source_backed_mulrk_accepts_signed_integer_fields_and_inverse() {
 fn source_backed_noncanonical_rk_noop_keeps_exact_source_identity() {
     let raw = ((1.0_f64.to_bits() >> 32) as u32) & 0xffff_fffc;
     let (bytes, reference) = raw_rk_family_package(Storage::Rk, &[raw]);
-    let source = Snapshot::from_bytes(bytes).unwrap();
+    let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_numeric("Sheet1".into(), reference, 1.0).unwrap();
     let commit = edit.commit_source_backed().unwrap();
     assert!(commit.is_noop());
     assert!(std::ptr::eq(
-        commit.snapshot().bytes().as_ptr(),
+        commit.package().bytes().as_ptr(),
         source.bytes().as_ptr()
     ));
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert_eq!(commit.package().bytes(), source.bytes());
     assert_eq!(commit.diagnostics().splice_count(), 0);
 }
 
@@ -1170,6 +1387,7 @@ fn source_backed_noncanonical_rk_noop_keeps_exact_source_identity() {
 fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
     let source = Snapshot::from_bytes(
         include_bytes!("../../../../test-data/poi/test-data/spreadsheet/54016.xls").to_vec(),
+        Limits::default(),
     )
     .unwrap();
     let (sheet, reference, replacement) = source
@@ -1192,10 +1410,15 @@ fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
         })
         .expect("POI 54016 fixture has an RK/MulRk cell with an RK replacement");
     let mut edit = source.edit();
-    edit.set_numeric(Selector::Position(sheet), reference, replacement)
-        .unwrap();
+    edit.set_numeric(
+        Selector::Position(Position::new(sheet)),
+        reference,
+        replacement,
+    )
+    .unwrap();
     let commit = edit.commit_source_backed().unwrap();
-    let reopened = Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened =
+        Snapshot::from_bytes(commit.package().bytes().to_vec(), Limits::default()).unwrap();
     let cell = reopened
         .worksheets()
         .nth(sheet)
@@ -1208,7 +1431,7 @@ fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
         commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .bytes(),
         source.bytes()
@@ -1217,7 +1440,7 @@ fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
 
 #[test]
 fn source_backed_numeric_sink_reports_partial_output() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
         .unwrap();
@@ -1233,17 +1456,20 @@ fn source_backed_numeric_sink_reports_partial_output() {
 
 #[test]
 fn source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
         .unwrap();
     let commit = edit.commit_source_backed().unwrap();
-    let expected = commit.snapshot().bytes().to_vec();
+    let expected = commit.package().bytes().to_vec();
 
     let mut direct = Vec::new();
     let report = commit.write_to(&mut direct).unwrap();
     assert_eq!(direct, expected);
-    assert_eq!(report.bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(
+        report.output_bytes(),
+        u64::try_from(expected.len()).unwrap()
+    );
     assert_eq!(
         report.source_fingerprint(),
         commit.diagnostics().source_fingerprint()
@@ -1279,7 +1505,7 @@ fn source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts()
     let destination = directory.join("workbook.xls");
     std::fs::write(&destination, b"old destination").unwrap();
     let saved = commit.save(&destination).unwrap();
-    assert_eq!(saved.bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(saved.output_bytes(), u64::try_from(expected.len()).unwrap());
     assert_eq!(std::fs::read(&destination).unwrap(), expected);
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     std::fs::remove_file(destination).unwrap();
@@ -1338,7 +1564,7 @@ impl Write for PrefixFailingSink {
 fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
     use litchi_core::sheet::Cell as _;
 
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let first_reference = Reference::new(3, 2).unwrap();
     let second_reference = Reference::new(4, 1).unwrap();
     let mut first = source.edit();
@@ -1346,7 +1572,7 @@ fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
         .set_number("Sheet1".into(), first_reference, 9.25)
         .unwrap();
     let first = first.commit().unwrap();
-    let mut second = first.snapshot().edit();
+    let mut second = first.package().edit();
     second
         .set_number("Sheet1".into(), second_reference, 7.5)
         .unwrap();
@@ -1354,13 +1580,13 @@ fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
 
     assert!(Arc::ptr_eq(
         &source.inner.shared_strings,
-        &second.snapshot().inner.shared_strings
+        &second.package().inner.shared_strings
     ));
     assert!(Arc::ptr_eq(
         &source.inner.xf_records,
-        &second.snapshot().inner.xf_records
+        &second.package().inner.xf_records
     ));
-    let workbook = Workbook::new(Cursor::new(second.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(second.package().bytes())).unwrap();
     let metadata = workbook.sheet(0).unwrap();
     let worksheet = workbook
         .xls_worksheet(metadata.parsed_worksheet_index().unwrap())
@@ -1373,19 +1599,19 @@ fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
         worksheet.get_cell(4, 1).unwrap().value().as_float(),
         Some(7.5)
     );
-    assert_eq!(stream(second.snapshot().bytes(), "Opaque"), b"untouched");
+    assert_eq!(stream(second.package().bytes(), "Opaque"), b"untouched");
 }
 
 #[test]
 fn number_commit_shares_untouched_worksheet_inventories() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let first = writer.add_worksheet("First").unwrap();
     writer.write_number(first, 0, 0, 1.0).unwrap();
     let second = writer.add_worksheet("Second").unwrap();
     writer.write_number(second, 0, 0, 2.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let source = Snapshot::from_bytes(output.into_inner()).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let source = Snapshot::from_bytes(output.into_inner(), Limits::default()).unwrap();
 
     let mut edit = source.edit();
     edit.set_number("First".into(), Reference::new(0, 0).unwrap(), 3.0)
@@ -1394,17 +1620,17 @@ fn number_commit_shares_untouched_worksheet_inventories() {
 
     assert!(!Arc::ptr_eq(
         &source.inner.sheets[0].entries,
-        &commit.snapshot().inner.sheets[0].entries
+        &commit.package().inner.sheets[0].entries
     ));
     assert!(Arc::ptr_eq(
         &source.inner.sheets[1].entries,
-        &commit.snapshot().inner.sheets[1].entries
+        &commit.package().inner.sheets[1].entries
     ));
 }
 
 #[test]
 fn inventory_carry_refuses_bytes_outside_changed_numeric_field() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let sheet = source.resolve_sheet("Sheet1".into()).unwrap().unwrap();
     let entry = unique_entry_index(&source.inner.sheets[sheet].entries, reference)
@@ -1434,7 +1660,7 @@ fn inventory_carry_refuses_bytes_outside_changed_numeric_field() {
 
 #[test]
 fn rejected_and_noop_edits_are_failure_atomic() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let mut edit = source.edit();
     assert!(
@@ -1457,9 +1683,29 @@ fn rejected_and_noop_edits_are_failure_atomic() {
     edit.set_number("sHeEt1".into(), reference, 0.0).unwrap();
     edit.set_number("Sheet1".into(), reference, 4.5).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
-    assert_eq!(commit.diagnostics(), Diagnostics::default());
+    let diagnostics = commit.diagnostics();
+    assert!(!diagnostics.changed());
+    let (snapshot, patch) = commit.into_parts();
+    assert!(patch.is_noop());
+    assert!(patch.semantic().is_noop());
+    assert_eq!(snapshot.bytes(), source.bytes());
+    assert_eq!(diagnostics, Diagnostics::default());
+}
+
+#[test]
+fn snapshot_and_patch_share_artifact_vectors() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let (target, patch) = commit.into_parts();
+
+    assert!(Arc::ptr_eq(&source.inner.bytes, &patch.before));
+    assert!(Arc::ptr_eq(&target.inner.bytes, &patch.after));
+    assert_eq!(patch.before(), source.bytes());
+    assert_eq!(patch.after(), target.bytes());
+    assert_eq!(patch.inverse().before(), target.bytes());
 }
 
 #[test]
@@ -1473,12 +1719,12 @@ fn references_enforce_the_biff8_grid() {
 
 #[test]
 fn signed_packages_are_refused_before_editing() {
-    assert!(Snapshot::from_bytes(signed_package()).is_err());
+    assert!(Snapshot::from_bytes(signed_package(), Limits::default()).is_err());
 }
 
 #[test]
 fn macro_packages_are_refused_by_source_backed_numeric_publication() {
-    let source = Snapshot::from_bytes(macro_package()).unwrap();
+    let source = Snapshot::from_bytes(macro_package(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
         .unwrap();
@@ -1493,7 +1739,7 @@ fn macro_packages_are_refused_by_source_backed_numeric_publication() {
 
 #[test]
 fn edits_boolean_text_and_formula_cache() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
     assert_eq!(
         sheet
@@ -1546,9 +1792,10 @@ fn edits_boolean_text_and_formula_cache() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().changed_cells(), 4);
     let sheet = commit
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap();
@@ -1588,9 +1835,9 @@ fn edits_boolean_text_and_formula_cache() {
 
 #[test]
 fn formula_string_cache_resizes_and_semantically_inverts() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(8, 0).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .set_value(
             "Sheet1".into(),
@@ -1601,7 +1848,7 @@ fn formula_string_cache_resizes_and_semantically_inverts() {
     let commit = transaction.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -1613,10 +1860,10 @@ fn formula_string_cache_resizes_and_semantically_inverts() {
     );
     let wire = commit.patch().semantic().to_deterministic_json().unwrap();
     let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
-    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
+    let restored = durable.inverse().apply(commit.package()).unwrap();
     assert_eq!(
         restored
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -1630,8 +1877,8 @@ fn formula_string_cache_resizes_and_semantically_inverts() {
 
 #[test]
 fn formula_cache_transfer_requires_identical_tokens() {
-    let source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
-    let mut transaction = source.transaction();
+    let source = Snapshot::from_bytes(formula_package("1+1"), Limits::default()).unwrap();
+    let mut transaction = source.edit();
     transaction
         .set_value(
             "Formula".into(),
@@ -1640,7 +1887,7 @@ fn formula_cache_transfer_requires_identical_tokens() {
         )
         .unwrap();
     let patch = transaction.commit().unwrap().patch().semantic().clone();
-    let divergent = Snapshot::from_bytes(formula_package("2+0")).unwrap();
+    let divergent = Snapshot::from_bytes(formula_package("2+0"), Limits::default()).unwrap();
     let transfer = patch.plan_transfer(&divergent);
     assert!(!transfer.is_executable());
     assert!(patch.apply(&divergent).is_err());
@@ -1648,7 +1895,7 @@ fn formula_cache_transfer_requires_identical_tokens() {
 
 #[test]
 fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
-    let source = Snapshot::from_bytes(ancillary_formula_package()).unwrap();
+    let source = Snapshot::from_bytes(ancillary_formula_package(), Limits::default()).unwrap();
     let reference = Reference::new(0, 0).unwrap();
     let entry = unique_entry(&source.inner.sheets[0].entries, reference)
         .unwrap()
@@ -1662,7 +1909,7 @@ fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
         &ANCILLARY_MEMORY_TOKENS,
     )
     .expect_err("canonical resource matching must refuse source-bound RgbExtra");
-    assert!(matches!(error, Error::UnsafeEdit(message) if message.contains("RgbExtra")));
+    assert!(matches!(error, Error::Refused(refusal) if refusal.reason().contains("RgbExtra")));
     assert_eq!(source.bytes(), before.as_slice());
 }
 
@@ -1671,9 +1918,9 @@ fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
 /// refused before anything is staged.
 #[test]
 fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() {
-    let source = Snapshot::from_bytes(formula_free_package()).unwrap();
+    let source = Snapshot::from_bytes(formula_free_package(), Limits::default()).unwrap();
     let reference = Reference::new(1, 1).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     for literal in ["a".repeat(256), format!("{}😀", "a".repeat(254))] {
         let error = transaction
             .insert_formula("Plain".into(), reference, &format!("\"{literal}\""))
@@ -1696,7 +1943,7 @@ fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() 
         .insert_formula("Plain".into(), reference, &format!("\"{literal}\""))
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let workbook = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(commit.package().bytes())).unwrap();
     let tokens = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -1714,12 +1961,12 @@ fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() 
 
 #[test]
 fn authored_formulas_join_reopen_and_durably_invert() {
-    let source = Snapshot::from_bytes(formula_free_package()).unwrap();
+    let source = Snapshot::from_bytes(formula_free_package(), Limits::default()).unwrap();
     let first = Reference::new(1, 1).unwrap();
     let second = Reference::new(3, 2).unwrap();
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.insert_formula("Plain".into(), first, "A2+1").unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .insert_formula("Plain".into(), second, "B4*2")
         .unwrap();
@@ -1728,7 +1975,7 @@ fn authored_formulas_join_reopen_and_durably_invert() {
     for reference in [first, second] {
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .worksheet("Plain".into())
                 .unwrap()
                 .unwrap()
@@ -1739,18 +1986,18 @@ fn authored_formulas_join_reopen_and_durably_invert() {
             &Value::FormulaCache(FormulaCache::Empty)
         );
     }
-    Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    Reader::new(Cursor::new(commit.package().bytes())).unwrap();
     let wire = commit.patch().semantic().to_deterministic_json().unwrap();
     let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
     let replay = durable.apply(&source).unwrap();
-    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
-    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
-    assert_eq!(restored.snapshot().bytes(), source.bytes());
+    assert_eq!(replay.package().bytes(), commit.package().bytes());
+    let restored = durable.inverse().apply(commit.package()).unwrap();
+    assert_eq!(restored.package().bytes(), source.bytes());
 }
 
 #[test]
 fn new_sst_and_xf_resources_round_trip_with_cells() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let base_style = source
         .worksheet("Sheet1".into())
         .unwrap()
@@ -1759,7 +2006,7 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .unwrap()
         .unwrap()
         .style();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     let mut xf_payload = source.inner.xf_records[usize::from(base_style.get())].clone();
     xf_payload[6] ^= 0x08;
     let authored_style = transaction.author_style(&xf_payload).unwrap();
@@ -1783,7 +2030,7 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .unwrap();
     let commit = transaction.commit().unwrap();
     let sheet = commit
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap();
@@ -1799,10 +2046,10 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .patch()
         .semantic()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .unwrap();
     let restored = restored
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap();
@@ -1811,8 +2058,51 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
 }
 
 #[test]
+fn semantic_inverse_reinterns_a_pruned_removed_text_cell() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let reference = Reference::new(6, 1).unwrap();
+    let mut transaction = source.edit();
+    transaction.remove_cell("Sheet1".into(), reference).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(
+        commit
+            .package()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        !commit
+            .package()
+            .inner
+            .shared_strings
+            .iter()
+            .any(|text| text == "beta")
+    );
+
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.package())
+        .unwrap();
+    let cell = restored
+        .package()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cell.value(), &Value::Text("beta".to_string()));
+}
+
+#[test]
 fn rich_sst_resource_round_trips_and_semantically_inverts() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let font_index = binary::read_u16_le_at(&source.inner.xf_records[0], 0).unwrap();
     let runs = vec![crate::records::SharedStringFormatRun {
         character_index: 0,
@@ -1821,7 +2111,7 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
     let reference = Reference::new(6, 3).unwrap();
     let reused_reference = Reference::new(7, 3).unwrap();
     let text = "λ".repeat(5_000);
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .insert_rich_text_cell("Sheet1".into(), reference, text.clone(), runs.clone())
         .unwrap();
@@ -1836,7 +2126,7 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
     let commit = transaction.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -1848,7 +2138,7 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -1860,7 +2150,7 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
     );
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .inner
             .shared_strings
             .iter()
@@ -1869,14 +2159,14 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
         1
     );
     let index = commit
-        .snapshot()
+        .package()
         .inner
         .shared_strings
         .iter()
         .position(|candidate| candidate == &text)
         .unwrap();
     assert_eq!(
-        commit.snapshot().inner.shared_string_properties[index]
+        commit.package().inner.shared_string_properties[index]
             .as_deref()
             .unwrap()
             .formatting_runs,
@@ -1886,9 +2176,9 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
         .patch()
         .semantic()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .unwrap();
-    let restored_bytes = restored.snapshot().bytes();
+    let restored_bytes = restored.package().bytes();
     let source_bytes = source.bytes();
     assert_eq!(restored_bytes.len(), source_bytes.len());
     let first_difference = restored_bytes
@@ -1900,7 +2190,7 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
 
 #[test]
 fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(6, 0).unwrap();
     let mut to_number = source.edit();
     to_number
@@ -1908,7 +2198,7 @@ fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
         .unwrap();
     let number = to_number.commit().unwrap();
     let cell = number
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap()
@@ -1918,13 +2208,13 @@ fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
     assert_eq!(cell.storage(), Storage::Rk);
     assert_eq!(cell.value(), &Value::Number(42.0));
 
-    let mut to_text = number.snapshot().edit();
+    let mut to_text = number.package().edit();
     to_text
         .set_value("Sheet1".into(), reference, Value::Text("beta".to_string()))
         .unwrap();
     let text = to_text.commit().unwrap();
     let cell = text
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap()
@@ -1936,10 +2226,260 @@ fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
 }
 
 #[test]
+fn structural_scalar_replacements_keep_style_and_inverse() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let reference = Reference::new(4, 0).unwrap();
+    let style = source
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap()
+        .style();
+    let cases = [
+        (
+            Value::Text("structural text".to_string()),
+            Value::Text("structural text".to_string()),
+        ),
+        (Value::Boolean(false), Value::Boolean(false)),
+        (Value::Blank, Value::Blank),
+    ];
+
+    for (replacement, expected) in cases {
+        let mut edit = source.edit();
+        edit.set_value("Sheet1".into(), reference, replacement)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let cell = commit
+            .package()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(cell.style(), style);
+        assert_eq!(cell.value(), &expected);
+        let restored = commit.patch().inverse().apply(commit.package()).unwrap();
+        assert_eq!(restored.bytes(), source.bytes());
+        let restored_semantic = commit
+            .patch()
+            .semantic()
+            .inverse()
+            .apply(commit.package())
+            .unwrap();
+        let restored_cell = restored_semantic
+            .package()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(restored_cell.style(), style);
+        assert_eq!(restored_cell.value(), &Value::Number(1.0));
+    }
+}
+
+#[test]
+fn structural_scalar_replacement_splits_packed_numeric_cells() {
+    let (bytes, reference) = fixed_numeric_family_package(Storage::MulRk);
+    let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
+    let neighbor = Reference::new(
+        u32::from(reference.row()),
+        u32::from(reference.column()).saturating_add(1),
+    )
+    .unwrap();
+    let mut edit = source.edit();
+    edit.set_value(
+        "Sheet1".into(),
+        reference,
+        Value::Text("packed replacement".to_string()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let sheet = commit
+        .package()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    let replaced = sheet.cell(reference).unwrap().unwrap();
+    assert_eq!(replaced.storage(), Storage::LabelSst);
+    assert_eq!(
+        replaced.value(),
+        &Value::Text("packed replacement".to_string())
+    );
+    let remaining = sheet.cell(neighbor).unwrap().unwrap();
+    assert_eq!(remaining.storage(), Storage::Rk);
+    assert!(matches!(remaining.value(), Value::Number(_)));
+    let restored = commit.patch().inverse().apply(commit.package()).unwrap();
+    assert_eq!(restored.bytes(), source.bytes());
+}
+
+#[test]
+fn packed_removal_supports_multiple_members_and_semantic_inverse() {
+    let (bytes, first) = fixed_numeric_family_package(Storage::MulRk);
+    let second = Reference::new(
+        u32::from(first.row()),
+        u32::from(first.column()).saturating_add(1),
+    )
+    .unwrap();
+    let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
+    let mut edit = source.edit();
+    edit.remove_cell("Sheet1".into(), first).unwrap();
+    edit.remove_cell("Sheet1".into(), second).unwrap();
+    let commit = edit.commit().unwrap();
+    let sheet = commit
+        .package()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert!(sheet.cell(first).unwrap().is_none());
+    assert!(sheet.cell(second).unwrap().is_none());
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.package())
+            .unwrap()
+            .bytes(),
+        source.bytes()
+    );
+    let semantic = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.package())
+        .unwrap();
+    let restored = semantic
+        .package()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        restored.cell(first).unwrap().unwrap().value(),
+        Value::Number(_)
+    ));
+    assert!(matches!(
+        restored.cell(second).unwrap().unwrap().value(),
+        Value::Number(_)
+    ));
+}
+
+#[test]
+fn mulblank_members_are_indexed_and_removed_without_dropping_neighbors() {
+    let (bytes, first) = mul_blank_family_package();
+    let second = Reference::new(
+        u32::from(first.row()),
+        u32::from(first.column()).saturating_add(1),
+    )
+    .unwrap();
+    let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
+    let source_sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
+    assert_eq!(
+        source_sheet.cell(first).unwrap().unwrap().storage(),
+        Storage::Blank
+    );
+    assert_eq!(
+        source_sheet.cell(second).unwrap().unwrap().storage(),
+        Storage::Blank
+    );
+    let first_style = source_sheet.cell(first).unwrap().unwrap().style();
+    let second_style = source_sheet.cell(second).unwrap().unwrap().style();
+
+    let mut edit = source.edit();
+    edit.remove_cell("Sheet1".into(), first).unwrap();
+    let commit = edit.commit().unwrap();
+    let remaining = commit
+        .package()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(second)
+        .unwrap()
+        .unwrap();
+    assert!(
+        commit
+            .package()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(first)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(remaining.storage(), Storage::Blank);
+    assert_eq!(remaining.style(), second_style);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.package())
+            .unwrap()
+            .bytes(),
+        source.bytes()
+    );
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.package())
+        .unwrap();
+    let restored_sheet = restored
+        .package()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        restored_sheet.cell(first).unwrap().unwrap().style(),
+        first_style
+    );
+    assert_eq!(
+        restored_sheet.cell(second).unwrap().unwrap().style(),
+        second_style
+    );
+}
+
+#[test]
+fn failed_scalar_replacement_does_not_retain_a_staged_sst_resource() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let reference = Reference::new(4, 0).unwrap();
+    let style = source
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap()
+        .style();
+    let mut edit = source.edit();
+    edit.set_style("Sheet1".into(), reference, style).unwrap();
+    assert!(
+        edit.set_value(
+            "Sheet1".into(),
+            reference,
+            Value::Text("staged-only".to_string()),
+        )
+        .is_err()
+    );
+    assert!(edit.resource_changes.is_empty());
+    assert_eq!(edit.structural_changes.len(), 1);
+
+    let mut expected = source.edit();
+    expected
+        .set_style("Sheet1".into(), reference, style)
+        .unwrap();
+    let expected = expected.commit().unwrap();
+    let actual = edit.commit().unwrap();
+    assert_eq!(actual.package().bytes(), expected.package().bytes());
+}
+
+#[test]
 fn durable_semantic_patch_round_trips_and_checks_preconditions() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(7, 0).unwrap();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_value("Sheet1".into(), reference, Value::Boolean(false))
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1947,12 +2487,12 @@ fn durable_semantic_patch_round_trips_and_checks_preconditions() {
     let parsed = SemanticPatch::from_deterministic_json(&json).unwrap();
     assert_eq!(parsed.to_deterministic_json().unwrap(), json);
     let replay = parsed.apply(&source).unwrap();
-    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
-    assert!(parsed.apply(commit.snapshot()).is_err());
-    let restored = parsed.inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(replay.package().bytes(), commit.package().bytes());
+    assert!(parsed.apply(commit.package()).is_err());
+    let restored = parsed.inverse().apply(commit.package()).unwrap();
     assert_eq!(
         restored
-            .snapshot()
+            .package()
             .worksheet("Sheet1".into())
             .unwrap()
             .unwrap()
@@ -1966,15 +2506,15 @@ fn durable_semantic_patch_round_trips_and_checks_preconditions() {
 
 #[test]
 fn joins_disjoint_work_and_reports_cell_conflicts() {
-    let source = Snapshot::from_bytes(package()).unwrap();
-    let mut left = source.transaction();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let mut left = source.edit();
     left.set_value(
         "Sheet1".into(),
         Reference::new(7, 0).unwrap(),
         Value::Boolean(false),
     )
     .unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .set_value(
             "Sheet1".into(),
@@ -1985,14 +2525,14 @@ fn joins_disjoint_work_and_reports_cell_conflicts() {
     left.join(right).unwrap();
     assert_eq!(left.commit().unwrap().diagnostics().changed_cells(), 2);
 
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.set_value(
         "Sheet1".into(),
         Reference::new(7, 0).unwrap(),
         Value::Boolean(false),
     )
     .unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .set_value(
             "Sheet1".into(),
@@ -2010,10 +2550,47 @@ fn joins_disjoint_work_and_reports_cell_conflicts() {
 }
 
 #[test]
+fn joins_refuse_equal_bytes_with_different_retained_limits_in_both_orders() {
+    let bytes = package();
+    let broad = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let narrow = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+
+    let mut left = broad.edit();
+    left.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let mut incoming = narrow.edit();
+    incoming
+        .set_number("Sheet1".into(), reference, 10.25)
+        .unwrap();
+    assert!(matches!(
+        left.join(incoming),
+        Err(JoinError::DifferentLimits)
+    ));
+    let unchanged_after_failed_join = left.commit().unwrap();
+    assert_eq!(unchanged_after_failed_join.diagnostics().changed_cells(), 1);
+
+    let mut unchanged_left = narrow.edit();
+    let mut broad_incoming = broad.edit();
+    broad_incoming
+        .set_number("Sheet1".into(), reference, 11.25)
+        .unwrap();
+    assert!(matches!(
+        unchanged_left.join(broad_incoming),
+        Err(JoinError::DifferentLimits)
+    ));
+    let unchanged_commit = unchanged_left.commit().unwrap();
+    assert!(!unchanged_commit.diagnostics().changed());
+    assert!(unchanged_commit.patch().is_noop());
+    assert_eq!(unchanged_commit.package().inner.limits, limits);
+    assert_eq!(unchanged_commit.package().inner.cfb_limits, cfb_limits);
+}
+
+#[test]
 fn bounded_history_undoes_and_redoes_immutable_snapshots() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut history = source.history(HistoryLimits::new(2, u64::MAX));
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 99.0)
         .unwrap();
     edit.commit().unwrap().record_in(&mut history).unwrap();
@@ -2037,7 +2614,7 @@ fn bounded_history_undoes_and_redoes_immutable_snapshots() {
 
 #[test]
 fn structural_cell_style_and_sheet_name_round_trip_semantically() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 3).unwrap();
     let style = source
         .worksheet("Sheet1".into())
@@ -2047,7 +2624,7 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
         .unwrap()
         .unwrap()
         .style();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .insert_cell_with_style("Sheet1".into(), reference, Value::Number(27.5), style)
         .unwrap();
@@ -2055,8 +2632,9 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
         .rename_sheet("Sheet1".into(), "Renamed")
         .unwrap();
     let commit = transaction.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     let cell = commit
-        .snapshot()
+        .package()
         .worksheet("Renamed".into())
         .unwrap()
         .unwrap()
@@ -2069,10 +2647,10 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
     let json = commit.patch().semantic().to_deterministic_json().unwrap();
     let durable = SemanticPatch::from_deterministic_json(&json).unwrap();
     let replay = durable.apply(&source).unwrap();
-    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
-    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(replay.package().bytes(), commit.package().bytes());
+    let restored = durable.inverse().apply(commit.package()).unwrap();
     let restored_sheet = restored
-        .snapshot()
+        .package()
         .worksheet("Sheet1".into())
         .unwrap()
         .unwrap();
@@ -2081,15 +2659,15 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
 
 #[test]
 fn structural_join_three_way_and_transfer_are_deterministic() {
-    let source = Snapshot::from_bytes(package()).unwrap();
-    let mut left = source.transaction();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let mut left = source.edit();
     left.insert_cell(
         "Sheet1".into(),
         Reference::new(3, 3).unwrap(),
         Value::Number(10.0),
     )
     .unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .insert_cell(
             "Sheet1".into(),
@@ -2100,7 +2678,7 @@ fn structural_join_three_way_and_transfer_are_deterministic() {
     left.join(right).unwrap();
     assert_eq!(left.commit().unwrap().diagnostics().changed_cells(), 2);
 
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.set_value(
         "Sheet1".into(),
         Reference::new(7, 0).unwrap(),
@@ -2108,7 +2686,7 @@ fn structural_join_three_way_and_transfer_are_deterministic() {
     )
     .unwrap();
     let left = left.commit().unwrap().patch().semantic().clone();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .set_value(
             "Sheet1".into(),
@@ -2128,12 +2706,12 @@ fn structural_join_three_way_and_transfer_are_deterministic() {
 
 #[test]
 fn dependency_safe_row_insertion_reopens_and_inverts() {
-    let source = Snapshot::from_bytes(formula_free_package()).unwrap();
-    let mut transaction = source.transaction();
+    let source = Snapshot::from_bytes(formula_free_package(), Limits::default()).unwrap();
+    let mut transaction = source.edit();
     transaction.insert_rows("Plain".into(), 2, 2).unwrap();
     let commit = transaction.commit().unwrap();
     let moved = commit
-        .snapshot()
+        .package()
         .worksheet("Plain".into())
         .unwrap()
         .unwrap()
@@ -2142,10 +2720,10 @@ fn dependency_safe_row_insertion_reopens_and_inverts() {
         .unwrap();
     assert_eq!(moved.value(), &Value::Number(2.0));
     let inverse = commit.patch().semantic().inverse();
-    let restored = inverse.apply(commit.snapshot()).unwrap();
+    let restored = inverse.apply(commit.package()).unwrap();
     assert_eq!(
         restored
-            .snapshot()
+            .package()
             .worksheet("Plain".into())
             .unwrap()
             .unwrap()
@@ -2159,13 +2737,13 @@ fn dependency_safe_row_insertion_reopens_and_inverts() {
 
 #[test]
 fn reference_free_formula_shifts_reopen_and_invert_exactly() {
-    let source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
-    let mut transaction = source.transaction();
+    let source = Snapshot::from_bytes(formula_package("1+1"), Limits::default()).unwrap();
+    let mut transaction = source.edit();
     transaction.insert_rows("Formula".into(), 0, 2).unwrap();
     let commit = transaction.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .worksheet("Formula".into())
             .unwrap()
             .unwrap()
@@ -2175,27 +2753,27 @@ fn reference_free_formula_shifts_reopen_and_invert_exactly() {
             .value(),
         &Value::FormulaCache(FormulaCache::Empty)
     );
-    Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    Reader::new(Cursor::new(commit.package().bytes())).unwrap();
     let wire = commit.patch().semantic().to_deterministic_json().unwrap();
     let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
     assert!(durable.plan_transfer(&source).is_executable());
     let replay = durable.apply(&source).unwrap();
-    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
+    assert_eq!(replay.package().bytes(), commit.package().bytes());
     let restored = commit
         .patch()
         .semantic()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .unwrap();
-    assert_eq!(restored.snapshot().bytes(), source.bytes());
+    assert_eq!(restored.package().bytes(), source.bytes());
 
-    let column_source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
-    let mut columns = column_source.transaction();
+    let column_source = Snapshot::from_bytes(formula_package("1+1"), Limits::default()).unwrap();
+    let mut columns = column_source.edit();
     columns.insert_columns("Formula".into(), 0, 2).unwrap();
     let column_commit = columns.commit().unwrap();
     assert_eq!(
         column_commit
-            .snapshot()
+            .package()
             .worksheet("Formula".into())
             .unwrap()
             .unwrap()
@@ -2209,19 +2787,23 @@ fn reference_free_formula_shifts_reopen_and_invert_exactly() {
         .patch()
         .semantic()
         .inverse()
-        .apply(column_commit.snapshot())
+        .apply(column_commit.package())
         .unwrap();
-    assert_eq!(column_restored.snapshot().bytes(), column_source.bytes());
+    assert_eq!(column_restored.package().bytes(), column_source.bytes());
 }
 
 #[test]
 fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
-    let source = Snapshot::from_bytes(positioned_formula_package("A1+$B$2+C1:C3", 4, 4)).unwrap();
-    let mut transaction = source.transaction();
+    let source = Snapshot::from_bytes(
+        positioned_formula_package("A1+$B$2+C1:C3", 4, 4),
+        Limits::default(),
+    )
+    .unwrap();
+    let mut transaction = source.edit();
     transaction.insert_rows("Formula".into(), 1, 2).unwrap();
     let commit = transaction.commit().unwrap();
 
-    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let reopened = Reader::new(Cursor::new(commit.package().bytes())).unwrap();
     assert_eq!(
         reopened
             .xls_worksheet(0)
@@ -2237,24 +2819,24 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     let transfer = durable.plan_transfer(&source);
     assert!(transfer.is_executable());
     let replay = transfer.execute(&source).unwrap();
-    assert_eq!(replay.snapshot().bytes(), commit.snapshot().bytes());
-    let restored = durable.inverse().apply(commit.snapshot()).unwrap();
-    assert_eq!(restored.snapshot().bytes(), source.bytes());
+    assert_eq!(replay.package().bytes(), commit.package().bytes());
+    let restored = durable.inverse().apply(commit.package()).unwrap();
+    assert_eq!(restored.package().bytes(), source.bytes());
 
     let mut history = source.history(HistoryLimits::new(2, u64::MAX));
     commit.clone().record_in(&mut history).unwrap();
     assert!(history.undo());
     assert_eq!(history.current().bytes(), source.bytes());
     assert!(history.redo());
-    assert_eq!(history.current().bytes(), commit.snapshot().bytes());
+    assert_eq!(history.current().bytes(), commit.package().bytes());
 
-    let mut rename = source.transaction();
+    let mut rename = source.edit();
     rename.rename_sheet("Formula".into(), "Shifted").unwrap();
     let rename = rename.commit().unwrap().patch().semantic().clone();
     let plan = SemanticPatch::plan_three_way(&source, &durable, &rename).unwrap();
     let merged = plan.merged().unwrap();
     let merged_commit = merged.apply(&source).unwrap();
-    let merged_reopen = Workbook::new(Cursor::new(merged_commit.snapshot().bytes())).unwrap();
+    let merged_reopen = Reader::new(Cursor::new(merged_commit.package().bytes())).unwrap();
     assert_eq!(merged_reopen.sheets()[0].name(), "Shifted");
     assert_eq!(
         merged_reopen
@@ -2266,12 +2848,15 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
         Some("=((A1+$B$4)+(C1:C5))")
     );
 
-    let column_source =
-        Snapshot::from_bytes(positioned_formula_package("A1+$B$2+C1:C3", 4, 4)).unwrap();
-    let mut columns = column_source.transaction();
+    let column_source = Snapshot::from_bytes(
+        positioned_formula_package("A1+$B$2+C1:C3", 4, 4),
+        Limits::default(),
+    )
+    .unwrap();
+    let mut columns = column_source.edit();
     columns.insert_columns("Formula".into(), 1, 2).unwrap();
     let column_commit = columns.commit().unwrap();
-    let column_reopen = Workbook::new(Cursor::new(column_commit.snapshot().bytes())).unwrap();
+    let column_reopen = Reader::new(Cursor::new(column_commit.package().bytes())).unwrap();
     assert_eq!(
         column_reopen
             .xls_worksheet(0)
@@ -2286,17 +2871,18 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
             .patch()
             .semantic()
             .inverse()
-            .apply(column_commit.snapshot())
+            .apply(column_commit.package())
             .unwrap()
-            .snapshot()
+            .package()
             .bytes(),
         column_source.bytes()
     );
 
-    let dependent = Snapshot::from_bytes(positioned_formula_package("A2", 4, 4)).unwrap();
+    let dependent =
+        Snapshot::from_bytes(positioned_formula_package("A2", 4, 4), Limits::default()).unwrap();
     assert!(
         dependent
-            .transaction()
+            .edit()
             .delete_rows("Formula".into(), 1, 1)
             .is_err()
     );
@@ -2310,9 +2896,14 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
 type MatrixRecord = (u16, Vec<u8>);
 
 fn matrix_records(package: &[u8]) -> Vec<MatrixRecord> {
-    let mut ole = OleFile::open(Cursor::new(package.to_vec())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(package.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
-    Records::new(&stream)
+    Records::new(&stream, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| {
             let record = record.unwrap();
             (record.kind().get(), record.payload().to_vec())
@@ -2384,7 +2975,7 @@ fn matrix_worksheet_index(records: &[MatrixRecord], kind: u16) -> usize {
 }
 
 fn matrix_outcome(bytes: Vec<u8>) -> String {
-    match Snapshot::from_bytes(bytes) {
+    match Snapshot::from_bytes(bytes, Limits::default()) {
         Ok(snapshot) => format!("ok:{}", snapshot.worksheet_count()),
         Err(error) => error.to_string(),
     }
@@ -2394,7 +2985,7 @@ fn matrix_outcome(bytes: Vec<u8>) -> String {
 /// `Snapshot::from_bytes`.
 ///
 /// The private offset inventory (`parse_workbook_stream`) frames the Workbook
-/// stream before the complete eager `Workbook::new` does, and
+/// stream before the complete eager `Reader::new` does, and
 /// `resolve_shared_strings` runs after both. Every row below is a stream that
 /// one of those three owners refuses, and the refusal text says which owner
 /// won. Fusing the two framing passes — deriving the inventory from the eager
@@ -2528,7 +3119,7 @@ fn snapshot_open_first_error_matrix_is_frozen() {
             ),
             (
                 "globals-no-xf".to_string(),
-                "Unsafe edit refused: opened-workbook transaction requires at least one XF resource"
+                "edit cells refused (unsupported_content): opened-workbook transaction requires at least one XF resource"
                     .to_string()
             ),
             (
@@ -2561,12 +3152,12 @@ fn snapshot_open_first_error_matrix_is_frozen() {
             ),
             (
                 "worksheet-bof-missing".to_string(),
-                "Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"
+                "edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader"
                     .to_string()
             ),
             (
                 "stray-string-after-formula".to_string(),
-                "Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"
+                "edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader"
                     .to_string()
             ),
             (
@@ -2587,8 +3178,8 @@ fn snapshot_retains_the_open_shared_string_property_table() {
         formula_free_package(),
         two_sheet_matrix_package(),
     ] {
-        let snapshot = Snapshot::from_bytes(bytes.clone()).unwrap();
-        let workbook = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+        let snapshot = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
+        let workbook = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
         let strings = workbook.shared_strings_shared();
         assert_eq!(snapshot.inner.shared_strings.len(), strings.len());
         assert_eq!(snapshot.inner.shared_string_properties.len(), strings.len());
@@ -2603,7 +3194,7 @@ fn snapshot_retains_the_open_shared_string_property_table() {
 }
 
 fn two_sheet_matrix_package() -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let first = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(first, 3, 2, 4.5).unwrap();
     writer.write_string(first, 6, 0, "alpha").unwrap();
@@ -2611,7 +3202,7 @@ fn two_sheet_matrix_package() -> Vec<u8> {
     writer.write_number(second, 1, 1, 8.5).unwrap();
     writer.write_string(second, 2, 0, "beta").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -2622,17 +3213,17 @@ fn two_sheet_matrix_package() -> Vec<u8> {
 /// second parse redundant.
 #[test]
 fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
     let mut edit = source.edit();
     edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
     let commit = edit.commit_source_backed().unwrap();
-    let published = commit.snapshot().bytes().to_vec();
+    let published = commit.package().bytes().to_vec();
 
     // The complete reader's validation-only mode is the owner that answers
     // these checks at publication; the complete open further down is the
     // oracle its kept cell has to agree with.
-    let validated = Workbook::validation_only(
+    let validated = Reader::validation_only(
         Cursor::new(published.as_slice()),
         KeptCells::from_cells([(0, 3, 2)]).unwrap(),
     )
@@ -2642,7 +3233,7 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     require_macro_free_workbook(&validated).unwrap();
     let carried = carry_fixed_numeric_inventory(
         &source,
-        &commit.snapshot().inner.workbook_stream,
+        &commit.package().inner.workbook_stream,
         &[Change {
             sheet: 0,
             entry: source.inner.sheets[0]
@@ -2661,18 +3252,18 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     // The target snapshot's own recorded verdicts come from the same parse.
     assert!(
         commit
-            .snapshot()
+            .package()
             .inner
             .source_policy
             .public_worksheet_coverage
     );
     assert_eq!(
-        commit.snapshot().inner.source_policy.protection,
+        commit.package().inner.source_policy.protection,
         SourceProtectionPolicy::Unprotected
     );
-    assert!(commit.snapshot().inner.source_policy.macro_free_workbook);
+    assert!(commit.package().inner.source_policy.macro_free_workbook);
 
-    let independent = Workbook::new(Cursor::new(published.as_slice())).unwrap();
+    let independent = Reader::new(Cursor::new(published.as_slice())).unwrap();
     let complete = independent
         .xls_worksheet(0)
         .unwrap()
@@ -2684,7 +3275,7 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     assert_eq!(format!("{kept:?}"), format!("{complete:?}"));
     assert!(matches!(
         validated.kept_cell(0, 3, 3),
-        Err(Error::UnsafeEdit(message)) if message.contains("not asked to keep")
+        Err(Error::Internal(reason)) if reason.contains("not asked to keep")
     ));
 }
 
@@ -2692,16 +3283,19 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
 /// before it adopted the validated rendering: publish the stream through a
 /// fresh package editor, then finish (render) the editor a second time.
 fn rerendered_artifact(source: &Snapshot, workbook_stream: &[u8]) -> Vec<u8> {
-    let mut package = PackageEditor::open(
+    let mut package = ObjectPackage::open_with_options(
         source.bytes().to_vec(),
-        Targets::default(),
-        Limits::default(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(Limits::default()),
     )
+    .unwrap()
+    .edit()
     .unwrap();
     package
         .put_stream_shared(&source.inner.workbook_path, Arc::from(workbook_stream))
         .unwrap();
-    package.finish().unwrap()
+    crate::scoped::object_editor_bytes(&package).unwrap()
 }
 
 /// The generic commit publishes the rendering its package publication
@@ -2728,7 +3322,7 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         fixture("poi/test-data/spreadsheet/54016.xls"),
         fixture("ole/xls/WithCustomViews.xls"),
     ] {
-        let source = Snapshot::from_bytes(bytes).unwrap();
+        let source = Snapshot::from_bytes(bytes, Limits::default()).unwrap();
         let (sheet, reference, value) = source
             .worksheets()
             .find_map(|worksheet| {
@@ -2749,12 +3343,16 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         // Fixed-numeric route.
         let mut numeric = source.edit();
         numeric
-            .set_numeric(Selector::Position(sheet), reference, value + 1.0)
+            .set_numeric(
+                Selector::Position(Position::new(sheet)),
+                reference,
+                value + 1.0,
+            )
             .unwrap();
         let numeric = numeric.commit().unwrap();
         assert_eq!(
-            numeric.snapshot().bytes(),
-            rerendered_artifact(&source, numeric.snapshot().workbook_stream()).as_slice()
+            numeric.package().bytes(),
+            rerendered_artifact(&source, numeric.package().workbook_stream()).as_slice()
         );
         checked += 1;
 
@@ -2763,7 +3361,7 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             .map(|column| Reference::new(1_000, column).unwrap())
             .find(|candidate| {
                 source
-                    .worksheet(Selector::Position(sheet))
+                    .worksheet(Selector::Position(Position::new(sheet)))
                     .unwrap()
                     .unwrap()
                     .cell(*candidate)
@@ -2773,12 +3371,16 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             .unwrap();
         let mut structural = source.edit();
         structural
-            .insert_cell(Selector::Position(sheet), free, Value::Number(42.0))
+            .insert_cell(
+                Selector::Position(Position::new(sheet)),
+                free,
+                Value::Number(42.0),
+            )
             .unwrap();
         let structural = structural.commit().unwrap();
         assert_eq!(
-            structural.snapshot().bytes(),
-            rerendered_artifact(&source, structural.snapshot().workbook_stream()).as_slice()
+            structural.package().bytes(),
+            rerendered_artifact(&source, structural.package().workbook_stream()).as_slice()
         );
         checked += 1;
     }
@@ -2790,11 +3392,11 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
 /// committed workbook.
 #[test]
 fn rename_refuses_every_worksheet_name_the_reader_refuses() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     for name in [
         "", "a\u{3}b", "a\0b", "a:b", "a\\b", "a/b", "a?b", "a*b", "a[b", "a]b", "'a", "a'",
     ] {
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         assert!(
             matches!(
                 transaction.rename_sheet("Sheet1".into(), name),
@@ -2804,13 +3406,53 @@ fn rename_refuses_every_worksheet_name_the_reader_refuses() {
         );
     }
     let long = format!("{}\u{1F600}", "a".repeat(30));
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     assert!(transaction.rename_sheet("Sheet1".into(), &long).is_err());
 
     let astral = format!("{}\u{1F600}", "a".repeat(29));
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction.rename_sheet("Sheet1".into(), &astral).unwrap();
     let commit = transaction.commit().unwrap();
-    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+    let reopened = Reader::new(Cursor::new(commit.package().bytes().to_vec())).unwrap();
     assert_eq!(reopened.sheets()[0].name(), astral);
 }
+
+#[test]
+fn shared_ole_file_editor_matches_an_owned_byte_open() {
+    let bytes = package();
+    let owned = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
+    let shared = SharedOleFile::open(
+        Arc::new(litchi_core::OwnedSource::new(bytes.clone())),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
+    let adopted =
+        Snapshot::from_shared_ole_file(&shared, Limits::default(), OleFileLimits::default())
+            .unwrap();
+    assert_eq!(adopted.bytes(), owned.bytes());
+    assert_eq!(adopted.worksheet_count(), owned.worksheet_count());
+    assert_eq!(adopted.workbook_stream(), owned.workbook_stream());
+
+    let length = u64::try_from(bytes.len()).unwrap();
+    let tight = OleFileLimits::new(length - 1).unwrap();
+    assert!(matches!(
+        Snapshot::from_shared_ole_file(&shared, Limits::default(), tight),
+        Err(Error::Cfb(litchi_cfb::OleError::LimitExceeded { observed, .. })) if observed == length
+    ));
+}
+
+#[test]
+fn eager_workbook_exposes_its_exact_source_bytes() {
+    let bytes = package();
+    let workbook = Reader::new(Cursor::new(bytes.clone())).unwrap();
+    assert_eq!(workbook.get_ref().get_ref(), &bytes);
+}
+
+const fn assert_send_sync<T: Send + Sync>() {}
+// Risk R3 of unified-ops record 0003: the unified `Xls` handle retains these
+// owners behind an `Arc`, so they must stay thread-safe.
+const _: () = {
+    assert_send_sync::<Snapshot>();
+    assert_send_sync::<crate::SourceBackedWorkbook>();
+    assert_send_sync::<Reader<Cursor<Vec<u8>>>>();
+};

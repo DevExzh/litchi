@@ -15,19 +15,20 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use std::thread;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{RawWireField, RawWireFields, WireView},
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
     pages_hidden_state_codec as hidden_codec, tp, tsa, tsce, tsd, tsp, tst, tswp,
 };
 use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};
 use litchi_pages::{
-    BodyTableHiddenAxesError as Error, BodyTableHiddenAxesLimitKind, BodyTableSelector, Limits,
-    Package, PackageError,
+    BodyTableSelector, Package, PackageError, table::hidden_axes::transaction::Error,
+    table::hidden_axes::transaction::LimitKind as BodyTableHiddenAxesLimitKind,
 };
 use prost::Message as _;
 
@@ -101,6 +102,7 @@ fn append_unknown_scalar_fields(output: &mut Vec<u8>, varint_field: u32, value: 
         output,
         UNKNOWN_LENGTH_FIELD,
         UNKNOWN_LENGTH_VALUE,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(())
 }
@@ -218,8 +220,12 @@ fn table_formula_object(index: usize, column: bool) -> u64 {
         + u64::try_from(index * 2 + usize::from(!column)).expect("fixture index fits")
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -230,7 +236,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -422,7 +432,12 @@ fn model_payload(index: usize, name: &str, options: TableOptions) -> TestResult<
     if options.user_hidden {
         let mut owner_payload = owner.encode_to_vec();
         append_unknown_wire_fields(&mut owner_payload, UNKNOWN_OWNER_FIELD, UNKNOWN_OWNER_VALUE)?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 70, &owner_payload)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            70,
+            &owner_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     // Literal unknown model field: no focused codec can manufacture this
     // field, so source preservation is tested against an independent shape.
@@ -699,7 +714,8 @@ fn synthetic_package_with_metadata(
     }
 
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -764,22 +780,26 @@ fn metadata_archive(document: &Archive) -> TestResult<Vec<u8>> {
             &[],
         )?],
     };
-    Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn preview_count(package: &[u8]) -> usize {
-    Catalog::from_bytes(package)
+    Catalog::from_bytes(package, Default::default())
         .unwrap_or_else(|error| panic!("package preview catalog is valid: {error}"))
         .iter()
         .filter(|entry| PREVIEWS.contains(&entry.name()))
@@ -790,14 +810,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -805,12 +829,15 @@ fn rewrite_document_archive(
 }
 
 fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     Ok(archive
         .object(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?
@@ -826,12 +853,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -843,7 +873,8 @@ fn rewrite_metadata(
     let mut metadata = tsp::PackageMetadata::decode(message.data.as_slice())?;
     mutate(&mut metadata)?;
     message.data = metadata.encode_to_vec();
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
         Limits::default(),
@@ -915,7 +946,7 @@ fn metadata_uuid_collision(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn remove_metadata_member(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let members = catalog
         .iter()
         .filter(|entry| entry.name() != METADATA_MEMBER)
@@ -929,18 +960,21 @@ fn remove_metadata_member(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn metadata_physical_id_collision(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
-        archive.insert_object(object(
-            METADATA_OBJECT_IDENTIFIER,
-            FILTER_SET_MESSAGE_TYPE,
-            filter_set_payload(),
-            &[],
-        )?)?;
+        archive.insert_object(
+            object(
+                METADATA_OBJECT_IDENTIFIER,
+                FILTER_SET_MESSAGE_TYPE,
+                filter_set_payload(),
+                &[],
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let metadata = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
@@ -1008,7 +1042,7 @@ fn replace_length_field(
     field_number: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -1017,6 +1051,7 @@ fn replace_length_field(
                 &mut output,
                 field_number,
                 replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             replaced = true;
         } else {
@@ -1030,7 +1065,7 @@ fn replace_length_field(
 }
 
 fn replace_raw_field(source: &[u8], field_number: u32, replacement: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -1059,10 +1094,13 @@ fn append_duplicate_model_message(package: &[u8], index: usize) -> TestResult<Ve
             .ok_or("missing table-model message")?
             .data
             .clone();
-        model.push_message(RawMessage {
-            type_: TABLE_MODEL_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        model.push_message(
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -1079,10 +1117,13 @@ fn append_duplicate_info_message(package: &[u8], index: usize) -> TestResult<Vec
             .ok_or("missing table-info message")?
             .data
             .clone();
-        info.push_message(RawMessage {
-            type_: TABLE_INFO_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        info.push_message(
+            RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -1104,7 +1145,7 @@ fn append_duplicate_formula_owner(package: &[u8], index: usize) -> TestResult<Ve
             .clone();
         let mut duplicate = owner;
         duplicate.archive_info.identifier = Some(table_formula_owner(index) + 10_000);
-        archive.insert_object(duplicate)?;
+        archive.insert_object(duplicate, Default::default())?;
         Ok(())
     })
 }
@@ -1258,14 +1299,19 @@ fn duplicate_uid_map_entry(package: &[u8], index: usize) -> TestResult<Vec<u8>> 
 
 fn duplicate_hidden_owner_field(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    let owner = WireView::parse(&payload)?
+    let owner = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 70)
         .ok_or("missing hidden-state owner")?
         .payload()
         .to_vec();
     let mut duplicate = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut duplicate, 70, &owner)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut duplicate,
+        70,
+        &owner,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_model_raw(package, index, &duplicate)
 }
 
@@ -1374,7 +1420,11 @@ fn wrong_model_map_metadata_path(package: &[u8], index: usize) -> TestResult<Vec
             .iter_mut()
             .find(|field| field.path.as_slice() == [TABLE_MODEL_UID_MAP_FIELD])
             .ok_or("missing model UID-map field metadata")?;
-        field.path = FieldPath::new(vec![TABLE_MODEL_UID_MAP_FIELD + 1]);
+        field.path = litchi_iwa_core::FieldPath::new(
+            vec![TABLE_MODEL_UID_MAP_FIELD + 1],
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         Ok(())
     })
 }
@@ -1431,12 +1481,14 @@ fn info_payload(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 
 fn hidden_owner_payload_from_package(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    Ok(WireView::parse(&payload)?
-        .fields()
-        .find(|field| field.number() == 70)
-        .ok_or("missing hidden-state owner")?
-        .payload()
-        .to_vec())
+    Ok(
+        WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 70)
+            .ok_or("missing hidden-state owner")?
+            .payload()
+            .to_vec(),
+    )
 }
 
 // The fuzz input is a small descriptor.  It always builds and exercises a
@@ -1625,6 +1677,7 @@ fn aggregate_ownerless_fixture(cross_component: bool) -> TestResult<Vec<u8>> {
             type_: FORMULA_OWNER_MESSAGE_TYPE,
             data: payload.encode_to_vec(),
         },
+        Default::default(),
     )?;
     owner.archive_info.message_infos[0].field_infos.clear();
     let engine = object(
@@ -1681,14 +1734,16 @@ fn aggregate_ownerless_fixture(cross_component: bool) -> TestResult<Vec<u8>> {
             &Archive {
                 objects: vec![engine, owner],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?)
     } else {
         archive.objects.push(engine);
         None
     };
-    let document = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let document =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut members = catalog
         .iter()
         .map(|entry| {
@@ -1743,7 +1798,12 @@ fn exercise_aggregate_owner_creation(descriptor: &[u8]) {
         .set(requested.clone())
         .commit();
     if !cross {
-        assert!(matches!(result, Err(Error::UnsupportedDependency)));
+        assert!(matches!(
+            result,
+            Err(Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            ))
+        ));
         assert_eq!(package.exact_bytes(), source.as_slice());
         return;
     }
@@ -1797,8 +1857,11 @@ fn exercise_native_existing_owner(descriptor: &[u8]) {
         2 * 1024 * 1024,
     )
     .expect("finite native fixture limits");
-    let package = Package::from_bytes_with_limits(source, limits)
-        .expect("qualified native hidden-axis source");
+    let package = Package::from_bytes_with_options(
+        source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )
+    .expect("qualified native hidden-axis source");
     let before = package.body_table_hidden_axes(0usize).expect("native read");
     let expected_before = if starts_hidden {
         HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).expect("native axes")
@@ -1838,7 +1901,11 @@ fn exercise_native_existing_owner(descriptor: &[u8]) {
         package.text().expect("source text")
     );
     let target_bytes = commit.package().exact_bytes();
-    let reopened = Package::from_bytes_with_limits(&target_bytes, limits).expect("native reopen");
+    let reopened = Package::from_bytes_with_options(
+        &target_bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )
+    .expect("native reopen");
     assert_eq!(
         reopened
             .body_table_hidden_axes(0usize)
@@ -2185,11 +2252,16 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
                 "valid descriptor edit unexpectedly rejected: {error}"
             );
             if indexed_ownerless_nonempty_set {
-                assert_eq!(error, Error::UnsupportedDependency);
+                assert_eq!(error, Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency));
             } else if selected_index == 0 && flags & 0x08 != 0 {
-                assert_eq!(error, Error::TableLocked);
+                assert_eq!(
+                    error,
+                    Error::Refused(
+                        litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+                    )
+                );
             } else {
-                assert_eq!(error, Error::UnsupportedDependency);
+                assert_eq!(error, Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency));
             }
             black_box(error);
             return;
@@ -2534,8 +2606,10 @@ fn assert_member_locality(
     selected_index: usize,
     owner_created: bool,
 ) {
-    let source_catalog = Catalog::from_bytes(source).expect("source catalog is valid");
-    let target_catalog = Catalog::from_bytes(target).expect("target catalog is valid");
+    let source_catalog =
+        Catalog::from_bytes(source, Default::default()).expect("source catalog is valid");
+    let target_catalog =
+        Catalog::from_bytes(target, Default::default()).expect("target catalog is valid");
 
     for source_entry in source_catalog.iter() {
         let name = source_entry.name();
@@ -2765,7 +2839,7 @@ fn assert_non_identity_uid_map(archive: &Archive, index: usize) {
 fn assert_uid_map_route(package: &[u8], index: usize) {
     let model = model_payload_from_package(package, index)
         .unwrap_or_else(|error| panic!("table {index} model payload is present: {error}"));
-    let model_fields = WireView::parse(&model)
+    let model_fields = WireView::parse(&model, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("table {index} model wire is valid: {error}"))
         .fields()
         .filter(|field| field.number() == TABLE_MODEL_UID_MAP_FIELD)
@@ -2777,7 +2851,7 @@ fn assert_uid_map_route(package: &[u8], index: usize) {
 
     let info = info_payload(package, index)
         .unwrap_or_else(|error| panic!("table {index} info payload is present: {error}"));
-    let info_fields = WireView::parse(&info)
+    let info_fields = WireView::parse(&info, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("table {index} info wire is valid: {error}"))
         .fields()
         .filter(|field| field.number() == TABLE_INFO_VIEW_UIDS_FIELD)
@@ -2796,7 +2870,7 @@ fn assert_uid_map_route(package: &[u8], index: usize) {
 }
 
 fn raw_field(payload: &[u8], field_number: u32) -> RawWireField<'_> {
-    let mut fields = RawWireFields::new(payload);
+    let mut fields = RawWireFields::new(payload, litchi_iwa_common::wire::RawWireLimits::default());
     loop {
         let field = fields
             .next()
@@ -2842,7 +2916,7 @@ fn assert_unknown_wire_fields(payload: &[u8], varint_field: u32, varint_value: u
 }
 
 fn unknown_raw_fields(payload: &[u8], field_numbers: &[u32]) -> Vec<Vec<u8>> {
-    let mut fields = RawWireFields::new(payload);
+    let mut fields = RawWireFields::new(payload, litchi_iwa_common::wire::RawWireLimits::default());
     let mut result = Vec::new();
     loop {
         let field = fields
@@ -3277,7 +3351,7 @@ fn assert_existing_owner_wire_state_preserved(
 
 fn assert_reopen_and_patch_invariants(
     source: &Package,
-    commit: &litchi_pages::BodyTableHiddenAxesCommit,
+    commit: &litchi_pages::table::hidden_axes::transaction::Commit,
     selector: BodyTableSelector<'static>,
     before: &HiddenAxes,
     after: &HiddenAxes,
@@ -3455,9 +3529,14 @@ fn exercise_malformed(source: &[u8], descriptor: &[u8]) {
                 Err(error) => {
                     assert_eq!(package.exact_bytes(), before);
                     if flags & 0x08 != 0 {
-                        assert_eq!(error, Error::TableLocked);
+                        assert_eq!(
+                            error,
+                            Error::Refused(
+                                litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+                            )
+                        );
                     } else if flags & 0x06 != 0 {
-                        assert_eq!(error, Error::UnsupportedDependency);
+                        assert_eq!(error, Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency));
                     } else {
                         panic!("metadata non-creation edit unexpectedly rejected: {error:?}");
                     }
@@ -3564,7 +3643,7 @@ fn assert_precise_malformed_error(mode: u8, error: Error) {
         assert!(
             matches!(
                 error,
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: BodyTableHiddenAxesLimitKind::WireFields,
                     ..
                 }
@@ -3574,8 +3653,12 @@ fn assert_precise_malformed_error(mode: u8, error: Error) {
         return;
     }
     let expected = match mode {
-        MODE_DUPLICATE_NAME => Error::AmbiguousTableName,
-        MODE_FILTER_METADATA => Error::UnsupportedDependency,
+        MODE_DUPLICATE_NAME => Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousTableName,
+        ),
+        MODE_FILTER_METADATA => Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ),
         _ => Error::InvalidSource,
     };
     assert_eq!(
@@ -3589,7 +3672,7 @@ fn assert_metadata_edit_error(mode: u8, error: Error) {
         MODE_METADATA_WATERMARK_NEAR_MAX => assert!(
             matches!(
                 error,
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
                     ..
                 }
@@ -3632,7 +3715,10 @@ fn exercise_data_dependent_limits(source: &[u8], descriptor: &[u8]) {
         FIXTURE_STREAM_CEILING,
     )
     .unwrap_or_else(|error| panic!("bounded limit profile must be valid: {error}"));
-    let package = match Package::from_bytes_with_limits(source, limits) {
+    let package = match Package::from_bytes_with_options(
+        source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         Ok(package) => {
             assert!(
                 maximum >= source_length,
@@ -3707,7 +3793,10 @@ fn exercise_limit_boundaries(source: &[u8]) {
             FIXTURE_STREAM_CEILING,
         )
         .unwrap_or_else(|error| panic!("limit-boundary profile must be valid: {error}"));
-        let package = match Package::from_bytes_with_limits(source, limits) {
+        let package = match Package::from_bytes_with_options(
+            source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 assert!(
                     maximum >= length,
@@ -3974,10 +4063,7 @@ fn nested_codec_options(source: &[u8]) -> hidden_codec::DecodeOptions {
 
 fn assert_resource_error(error: Error) {
     assert!(
-        matches!(
-            error,
-            Error::LimitExceeded { .. } | Error::Allocation { .. }
-        ),
+        matches!(error, Error::Limit { .. } | Error::Allocation { .. }),
         "valid bounded read returned an unexpected error: {error:?}"
     );
 }
@@ -3986,11 +4072,17 @@ fn assert_resource_or_expected_edit_error(error: Error) {
     assert!(
         matches!(
             error,
-            Error::LimitExceeded { .. }
+            Error::Limit { .. }
                 | Error::Allocation { .. }
-                | Error::TableLocked
-                | Error::UnsupportedDependency
-                | Error::UnsupportedSource
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+                )
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+                )
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+                )
         ),
         "valid bounded edit returned an unexpected error: {error:?}"
     );

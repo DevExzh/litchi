@@ -1,15 +1,14 @@
 //! Debug PresentationML authoring through the current typed writer facade.
 //!
-//! Run with: `cargo run --example pptx_debug`
+//! Run with: `cargo run -p litchi --example pptx_debug --features pptx`
 
-use litchi_pptx::Package;
 use litchi_pptx::backgrounds::SlideBackground;
 use litchi_pptx::transition::{Kind, Side, Speed, Transition};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
 
         let slide = presentation.add_slide()?;
@@ -59,6 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    let package = builder.build()?;
     package.save("pptx_debug_typed.pptx")?;
     println!("wrote pptx_debug_typed.pptx");
     Ok(())

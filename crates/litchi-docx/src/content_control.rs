@@ -26,7 +26,7 @@
     clippy::unnecessary_wraps,
     reason = "the Result signature preserves a uniform fallible codec API"
 )]
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::leniency::{ContentControlDefect, ToleranceReport};
 /// Content control support for Word documents.
 ///
@@ -46,25 +46,41 @@ use std::fmt;
 use std::str::FromStr;
 
 mod authoring;
+mod edit;
+mod limit;
 mod model;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the drafts stage the family edit; their accessors serve unit tests"
+)]
 mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the drafts stage the family edit; their accessors serve unit tests"
+)]
 mod patch;
 mod snapshot;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the drafts stage the family edit; their accessors serve unit tests"
+)]
 mod transaction;
 
 pub use authoring::{AuthoredProperties, AuthoringView, NamespaceRequirements, write_sdt_pr};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 pub use model::{
     BindingFlavor, Checksum, ChecksumStatus, ChecksumValue, DataBinding,
     FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Inventory, Limits, Lock, Occurrence,
     STORE_ITEM_CHECKSUM_NAMESPACE,
 };
-pub use package::{
-    ChecksumEntry, PackageChecksumStatus, PackageCommit, PackageLimits, PackagePatch,
-    PackageSnapshot, PackageTransaction, Story,
-};
-pub use patch::Patch;
+pub use package::{ChecksumEntry, PackageChecksumStatus, PackageLimits, PackageSnapshot, Story};
+pub(crate) use patch::DraftPatch;
 pub use snapshot::{AttributeSpan, BindingSpan, LockSpan, Snapshot, SourceOccurrence, Span};
-pub use transaction::{Commit, Edit, Transaction};
+pub use transaction::Operation;
+pub(crate) use transaction::{Draft, DraftCommit};
 
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2012/wordml";
@@ -735,7 +751,7 @@ impl ContentControl {
     pub(crate) fn extract_from_document_tolerant(
         doc_xml: &[u8],
     ) -> Result<(Vec<ContentControl>, ToleranceReport)> {
-        let mut inventory = Inventory::parse(doc_xml)?;
+        let mut inventory = Inventory::parse(doc_xml, &Default::default())?;
         let tolerance = std::mem::take(&mut inventory.tolerance);
         let controls = inventory
             .into_controls()
@@ -749,7 +765,11 @@ impl ContentControl {
 pub(crate) fn parse_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory> {
     limits.validate()?;
     if doc_xml.len() > limits.max_input_bytes {
-        return Err(limit("input bytes"));
+        return Err(crate::Error::ContentControlLimit {
+            kind: LimitKind::InputBytes,
+            actual: doc_xml.len(),
+            maximum: limits.max_input_bytes,
+        });
     }
     let capabilities = content_control_capabilities();
     validate_extension_ignorable(doc_xml, limits, &capabilities)?;
@@ -764,7 +784,11 @@ pub(crate) fn parse_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Invento
     };
     let selected = mce::process_markup_compatibility(doc_xml, &capabilities, &mce_limits)?.xml;
     if selected.len() > limits.max_mce_output_bytes {
-        return Err(limit("MCE output bytes"));
+        return Err(crate::Error::ContentControlLimit {
+            kind: LimitKind::MceOutputBytes,
+            actual: selected.len(),
+            maximum: limits.max_mce_output_bytes,
+        });
     }
     parse_selected_inventory(selected.as_ref(), limits)
 }
@@ -794,9 +818,19 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
     let mut tolerance = ToleranceReport::default();
 
     loop {
-        events = events.checked_add(1).ok_or_else(|| limit("event count"))?;
+        events = events
+            .checked_add(1)
+            .ok_or(crate::Error::ContentControlLimit {
+                kind: LimitKind::EventCount,
+                actual: usize::MAX,
+                maximum: limits.max_events,
+            })?;
         if events > limits.max_events {
-            return Err(limit("event count"));
+            return Err(crate::Error::ContentControlLimit {
+                kind: LimitKind::EventCount,
+                actual: events,
+                maximum: limits.max_events,
+            });
         }
         let decoder = reader.decoder();
         // Text and comments are separate events, so the position before an
@@ -815,7 +849,11 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
                     Error::InvalidFormat("content-control XML nesting is too deep".to_string())
                 })?;
                 if depth > limits.max_depth {
-                    return Err(limit("XML depth"));
+                    return Err(crate::Error::ContentControlLimit {
+                        kind: LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 if is_word_element(&namespace, &element, b"sdtPr") {
                     if pending.is_some() {
@@ -824,7 +862,11 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
                         ));
                     }
                     if occurrences.len() >= limits.max_content_controls {
-                        return Err(limit("content-control count"));
+                        return Err(crate::Error::ContentControlLimit {
+                            kind: LimitKind::Count,
+                            actual: (occurrences.len()).saturating_add(1),
+                            maximum: limits.max_content_controls,
+                        });
                     }
                     pending = Some(PendingContentControl::new(
                         depth,
@@ -977,27 +1019,55 @@ fn push_occurrence(
     limits: &Limits,
 ) -> Result<()> {
     if occurrences.len() >= limits.max_content_controls {
-        return Err(limit("content-control count"));
+        return Err(crate::Error::ContentControlLimit {
+            kind: LimitKind::Count,
+            actual: (occurrences.len()).saturating_add(1),
+            maximum: limits.max_content_controls,
+        });
     }
     if !control.data_bindings().is_empty() {
-        *bindings = bindings
-            .checked_add(control.data_bindings().len())
-            .ok_or_else(|| limit("binding count"))?;
+        *bindings = bindings.checked_add(control.data_bindings().len()).ok_or(
+            crate::Error::ContentControlLimit {
+                kind: LimitKind::BindingCount,
+                actual: usize::MAX,
+                maximum: limits.max_bindings,
+            },
+        )?;
         if *bindings > limits.max_bindings {
-            return Err(limit("binding count"));
+            return Err(crate::Error::ContentControlLimit {
+                kind: LimitKind::BindingCount,
+                actual: *bindings,
+                maximum: limits.max_bindings,
+            });
         }
     }
-    *list_items = list_items
-        .checked_add(control.list_items().len())
-        .ok_or_else(|| limit("list-item count"))?;
+    *list_items = list_items.checked_add(control.list_items().len()).ok_or(
+        crate::Error::ContentControlLimit {
+            kind: LimitKind::ListItemCount,
+            actual: usize::MAX,
+            maximum: limits.max_list_items,
+        },
+    )?;
     if *list_items > limits.max_list_items {
-        return Err(limit("list-item count"));
+        return Err(crate::Error::ContentControlLimit {
+            kind: LimitKind::ListItemCount,
+            actual: *list_items,
+            maximum: limits.max_list_items,
+        });
     }
-    *metadata_bytes = metadata_bytes
-        .checked_add(control.metadata_bytes())
-        .ok_or_else(|| limit("metadata bytes"))?;
+    *metadata_bytes = metadata_bytes.checked_add(control.metadata_bytes()).ok_or(
+        crate::Error::ContentControlLimit {
+            kind: LimitKind::MetadataBytes,
+            actual: usize::MAX,
+            maximum: limits.max_metadata_bytes,
+        },
+    )?;
     if *metadata_bytes > limits.max_metadata_bytes {
-        return Err(limit("metadata bytes"));
+        return Err(crate::Error::ContentControlLimit {
+            kind: LimitKind::MetadataBytes,
+            actual: *metadata_bytes,
+            maximum: limits.max_metadata_bytes,
+        });
     }
     let ordinal = occurrences.len();
     occurrences
@@ -1227,7 +1297,11 @@ fn parse_property(
             && is_word_element(namespace, element, b"listItem")
             && control.list_items.len() >= control.max_list_items
         {
-            return Err(limit("per-control list-item count"));
+            return Err(crate::Error::ContentControlLimit {
+                kind: LimitKind::PerControlListItemCount,
+                actual: control.list_items.len().saturating_add(1),
+                maximum: control.max_list_items,
+            });
         }
         Ok(
             parse_nested_property(namespace, element, decoder, resolver, control)
@@ -1770,9 +1844,17 @@ fn validate_extension_ignorable(
     loop {
         events = events
             .checked_add(1)
-            .ok_or_else(|| limit("MCE validation event count"))?;
+            .ok_or(crate::Error::ContentControlLimit {
+                kind: LimitKind::MceValidationEventCount,
+                actual: usize::MAX,
+                maximum: limits.max_events,
+            })?;
         if events > limits.max_events {
-            return Err(limit("MCE validation event count"));
+            return Err(crate::Error::ContentControlLimit {
+                kind: LimitKind::MceValidationEventCount,
+                actual: events,
+                maximum: limits.max_events,
+            });
         }
         let decoder = reader.decoder();
         let event = reader
@@ -1783,9 +1865,19 @@ fn validate_extension_ignorable(
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| limit("XML depth"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or(crate::Error::ContentControlLimit {
+                        kind: LimitKind::XmlDepth,
+                        actual: usize::MAX,
+                        maximum: limits.max_depth,
+                    })?;
                 if depth > limits.max_depth {
-                    return Err(limit("XML depth"));
+                    return Err(crate::Error::ContentControlLimit {
+                        kind: LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 let active = element_is_active(
                     &namespace,
@@ -1826,9 +1918,20 @@ fn validate_extension_ignorable(
                 });
             },
             Event::Empty(element) => {
-                let child_depth = depth.checked_add(1).ok_or_else(|| limit("XML depth"))?;
+                let child_depth =
+                    depth
+                        .checked_add(1)
+                        .ok_or(crate::Error::ContentControlLimit {
+                            kind: LimitKind::XmlDepth,
+                            actual: usize::MAX,
+                            maximum: limits.max_depth,
+                        })?;
                 if child_depth > limits.max_depth {
-                    return Err(limit("XML depth"));
+                    return Err(crate::Error::ContentControlLimit {
+                        kind: LimitKind::XmlDepth,
+                        actual: child_depth,
+                        maximum: limits.max_depth,
+                    });
                 }
                 let active = element_is_active(
                     &namespace,
@@ -1980,9 +2083,17 @@ fn extend_ignorable(
             .map_err(|error| Error::Xml(error.to_string()))?;
         *metadata = metadata
             .checked_add(value.len())
-            .ok_or_else(|| limit("MCE metadata bytes"))?;
+            .ok_or(crate::Error::ContentControlLimit {
+                kind: LimitKind::MceMetadataBytes,
+                actual: usize::MAX,
+                maximum: limits.max_metadata_bytes,
+            })?;
         if *metadata > limits.max_metadata_bytes {
-            return Err(limit("MCE metadata bytes"));
+            return Err(crate::Error::ContentControlLimit {
+                kind: LimitKind::MceMetadataBytes,
+                actual: *metadata,
+                maximum: limits.max_metadata_bytes,
+            });
         }
         for prefix in value.split_whitespace() {
             let mut qualified = Vec::new();
@@ -2000,11 +2111,20 @@ fn extend_ignorable(
                     "mc:Ignorable prefix '{prefix}' is not bound"
                 )));
             };
-            *namespace_bindings = namespace_bindings
-                .checked_add(1)
-                .ok_or_else(|| limit("MCE namespace bindings"))?;
+            *namespace_bindings =
+                namespace_bindings
+                    .checked_add(1)
+                    .ok_or(crate::Error::ContentControlLimit {
+                        kind: LimitKind::MceNamespaceBindings,
+                        actual: usize::MAX,
+                        maximum: limits.max_bindings,
+                    })?;
             if *namespace_bindings > limits.max_bindings {
-                return Err(limit("MCE namespace bindings"));
+                return Err(crate::Error::ContentControlLimit {
+                    kind: LimitKind::MceNamespaceBindings,
+                    actual: *namespace_bindings,
+                    maximum: limits.max_bindings,
+                });
             }
             effective.include(namespace);
         }
@@ -2091,10 +2211,6 @@ fn require_ignorable_extensions(
         }
     }
     Ok(())
-}
-
-fn limit(resource: &str) -> Error {
-    Error::InvalidFormat(format!("content-control {resource} limit exceeded"))
 }
 
 fn is_word_element(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, name: &[u8]) -> bool {
@@ -2296,14 +2412,14 @@ mod tests {
         // (leniency F2.8); the control and the inventory survive.
         for xml in invalid {
             let xml = xml.replace("xmlns:w=\"W\"", &format!("xmlns:w=\"{W}\""));
-            let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+            let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
             assert_eq!(inventory.occurrences().len(), 1, "{xml}");
             assert_eq!(inventory.tolerance_report().total(), 1, "{xml}");
         }
         let repaired = format!(
             r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="7"/><w:id w:val="8"/><w:lock w:val="invalid"/><w:text/><w:picture/></w:sdtPr>"#
         );
-        let inventory = Inventory::parse(repaired.as_bytes()).unwrap();
+        let inventory = Inventory::parse(repaired.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert_eq!(control.id_opt(), Some(7));
         assert!(!control.is_lock_delete() && !control.is_lock_content());
@@ -2374,7 +2490,7 @@ mod tests {
         let xml = format!(
             r#"<w:document xmlns:w="{W}"><w:sdtPr/><w:sdtPr><w:id w:val="7"/></w:sdtPr><w:sdtPr><w:id w:val="7"/></w:sdtPr></w:document>"#
         );
-        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
         assert_eq!(
             inventory
                 .occurrences()
@@ -2398,7 +2514,7 @@ mod tests {
             mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
             hash = STORE_ITEM_CHECKSUM_NAMESPACE,
         );
-        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
         let binding = inventory.occurrences()[0].control().data_binding().unwrap();
         assert!(binding.checksum().is_none());
         assert!(
@@ -2406,11 +2522,11 @@ mod tests {
         );
 
         let missing_ignorable = xml.replace(" mc:Ignorable=\"h\"", "");
-        assert!(Inventory::parse(missing_ignorable.as_bytes()).is_err());
+        assert!(Inventory::parse(missing_ignorable.as_bytes(), &Default::default()).is_err());
         let fake_namespace = xml.replace(STORE_ITEM_CHECKSUM_NAMESPACE, "urn:fake");
-        assert!(Inventory::parse(fake_namespace.as_bytes()).is_ok());
+        assert!(Inventory::parse(fake_namespace.as_bytes(), &Default::default()).is_ok());
         assert!(
-            Inventory::parse(fake_namespace.as_bytes())
+            Inventory::parse(fake_namespace.as_bytes(), &Default::default())
                 .unwrap()
                 .occurrences()[0]
                 .control()
@@ -2436,7 +2552,7 @@ mod tests {
                 mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
                 format = FORMATTING_ALLOWED_NAMESPACE,
             );
-            let control = Inventory::parse(xml.as_bytes())
+            let control = Inventory::parse(xml.as_bytes(), &Default::default())
                 .unwrap()
                 .into_controls()
                 .remove(0);
@@ -2448,7 +2564,7 @@ mod tests {
             format = FORMATTING_ALLOWED_NAMESPACE,
         );
         // The lock is kept and the misplaced qualifier dropped (F2.8).
-        let inventory = Inventory::parse(invalid.as_bytes()).unwrap();
+        let inventory = Inventory::parse(invalid.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert!(control.is_lock_delete());
         assert!(control.formatting_allowed().is_none());
@@ -2461,7 +2577,7 @@ mod tests {
             r#"<w:document xmlns:w="{W}" xmlns:mc="{mce}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><w:sdtPr><w:id w:val="1"/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="2"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#,
             mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
         );
-        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
         assert_eq!(inventory.occurrences().len(), 1);
         assert_eq!(inventory.occurrences()[0].id(), Some(2));
     }
@@ -2473,16 +2589,16 @@ mod tests {
             max_content_controls: 1,
             ..Limits::default()
         };
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_ok());
         limits.max_events = 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
         limits = Limits::default();
         limits.max_depth = 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
         limits = Limits::default();
         limits.max_metadata_bytes = 1;
         let tagged = format!(r#"<w:sdtPr xmlns:w="{W}"><w:tag w:val="ab"/></w:sdtPr>"#);
-        assert!(Inventory::parse_with_limits(tagged.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(tagged.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2505,7 +2621,7 @@ mod tests {
         };
         limits.max_mce_output_bytes = exact_mce_output;
         assert_eq!(
-            Inventory::parse_with_limits(xml.as_bytes(), &limits)
+            Inventory::parse(xml.as_bytes(), &limits)
                 .unwrap()
                 .occurrences()[0]
                 .id(),
@@ -2513,9 +2629,9 @@ mod tests {
         );
 
         limits.max_mce_output_bytes = exact_mce_output - 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
         limits.max_mce_output_bytes = 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2569,9 +2685,9 @@ mod tests {
             ..Limits::default()
         };
         limits.max_bindings = PREFIXES * (SCOPES + 1);
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_ok());
         limits.max_bindings -= 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2587,7 +2703,7 @@ mod tests {
             ..Limits::default()
         };
         assert_eq!(
-            Inventory::parse_with_limits(single_control.as_bytes(), &limits)
+            Inventory::parse(single_control.as_bytes(), &limits)
                 .unwrap()
                 .occurrences()[0]
                 .control()
@@ -2596,16 +2712,16 @@ mod tests {
             2
         );
         limits.max_list_items_per_control = 1;
-        assert!(Inventory::parse_with_limits(single_control.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(single_control.as_bytes(), &limits).is_err());
 
         let two_controls = format!(
             r#"<w:document xmlns:w="{W}"><w:sdtPr><w:dropDownList>{one}</w:dropDownList></w:sdtPr><w:sdtPr><w:dropDownList>{two}</w:dropDownList></w:sdtPr></w:document>"#
         );
         limits.max_list_items_per_control = 1;
         limits.max_list_items = 2;
-        assert!(Inventory::parse_with_limits(two_controls.as_bytes(), &limits).is_ok());
+        assert!(Inventory::parse(two_controls.as_bytes(), &limits).is_ok());
         limits.max_list_items = 1;
-        assert!(Inventory::parse_with_limits(two_controls.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(two_controls.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2616,7 +2732,8 @@ mod tests {
             std::str::from_utf8(WORD_2010_NAMESPACE).unwrap(),
             std::str::from_utf8(WORD_2012_NAMESPACE).unwrap(),
         );
-        let inventory = Inventory::parse(aliased_inherited.as_bytes()).unwrap();
+        let inventory =
+            Inventory::parse(aliased_inherited.as_bytes(), &Default::default()).unwrap();
         assert_eq!(inventory.occurrences()[0].control().kind(), Kind::Checkbox);
         assert_eq!(
             inventory.occurrences()[1].control().kind(),
@@ -2627,12 +2744,12 @@ mod tests {
             r#"<w:sdtPr xmlns:w="{W}" xmlns:a="{}"><a:entityPicker/></w:sdtPr>"#,
             std::str::from_utf8(WORD_2010_NAMESPACE).unwrap(),
         );
-        assert!(Inventory::parse(missing.as_bytes()).is_err());
+        assert!(Inventory::parse(missing.as_bytes(), &Default::default()).is_err());
 
         let rebound = format!(
             r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{mce}" xmlns:a="urn:foreign" mc:Ignorable="a"><a:wrapper xmlns:a="{}"><a:repeatingSection/></a:wrapper></w:sdtPr>"#,
             std::str::from_utf8(WORD_2012_NAMESPACE).unwrap(),
         );
-        assert!(Inventory::parse(rebound.as_bytes()).is_err());
+        assert!(Inventory::parse(rebound.as_bytes(), &Default::default()).is_err());
     }
 }

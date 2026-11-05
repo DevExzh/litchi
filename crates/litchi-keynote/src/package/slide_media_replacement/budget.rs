@@ -13,7 +13,7 @@ use litchi_iwa_protos::{
     package_metadata_media_codec::{DecodeReport, RewriteExecutionRequirements},
 };
 
-use super::{Package, SlideMediaDataError, SlideMediaDataLimitKind};
+use super::{Error, LimitKind, Package};
 
 /// Fallible operation-local budget for one media read, edit, commit, or patch
 /// application.  The counters are deliberately private; callers can only
@@ -63,12 +63,10 @@ pub(in crate::package) struct MediaBudgetUsage {
 
 impl MediaBudget {
     /// Build a ledger from the exact profiles retained by one package.
-    pub(super) fn for_package(package: &Package) -> Result<Self, SlideMediaDataError> {
+    pub(super) fn for_package(package: &Package) -> Result<Self, Error> {
         let physical = package.limits();
         let semantic = package.semantic_limits();
-        let wire = package
-            .semantic_wire_limits()
-            .map_err(|_| SlideMediaDataError::Read)?;
+        let wire = package.semantic_wire_limits().map_err(|_| Error::Read)?;
         let max_input_bytes = aggregate(as_usize(physical.max_input_bytes())?)?;
         let max_output_bytes = aggregate(as_usize(physical.max_input_bytes())?)?;
         let max_total_bytes = aggregate(as_usize(physical.max_total_bytes())?)?;
@@ -76,13 +74,13 @@ impl MediaBudget {
             .max_entries()
             .checked_add(semantic.max_objects())
             .and_then(|value| value.checked_add(semantic.max_references()))
-            .ok_or(SlideMediaDataError::InvalidSource)
+            .ok_or(Error::InvalidSource)
             .and_then(aggregate)?;
         let max_allocations = semantic
             .max_objects()
             .checked_add(semantic.max_references())
             .and_then(|value| value.checked_mul(4))
-            .ok_or(SlideMediaDataError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         Ok(Self {
             max_input_bytes,
             max_output_bytes,
@@ -124,7 +122,7 @@ impl MediaBudget {
         references: usize,
         allocations: usize,
         media_bytes: usize,
-    ) -> Result<Self, SlideMediaDataError> {
+    ) -> Result<Self, Error> {
         let mut budget = Self::for_package(package)?;
         budget.max_input_bytes = budget.max_input_bytes.min(input_bytes);
         budget.max_wire_fields = budget.max_wire_fields.min(fields);
@@ -137,10 +135,7 @@ impl MediaBudget {
     }
 
     /// Charge the retained physical catalog before any selected payload copy.
-    pub(super) fn charge_catalog(
-        &mut self,
-        catalog: &SourceCatalog,
-    ) -> Result<(), SlideMediaDataError> {
+    pub(super) fn charge_catalog(&mut self, catalog: &SourceCatalog) -> Result<(), Error> {
         self.input_bytes(catalog.source_bytes().len())?;
         self.entries(catalog.package().len())?;
         for entry in catalog.package().iter() {
@@ -151,100 +146,88 @@ impl MediaBudget {
     }
 
     /// Charge one bounded source or nested wire input.
-    pub(super) fn input_bytes(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn input_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.input_bytes,
             self.max_input_bytes,
             amount,
-            SlideMediaDataLimitKind::InputBytes,
+            LimitKind::InputBytes,
         )
     }
 
     /// Charge one candidate output or reopened artifact.
-    pub(super) fn output_bytes(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn output_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.output_bytes,
             self.max_output_bytes,
             amount,
-            SlideMediaDataLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
     /// Charge retained ZIP/IWA entries.
-    pub(super) fn entries(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn entries(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.entries,
             self.max_entries,
             amount,
-            SlideMediaDataLimitKind::Entries,
+            LimitKind::Entries,
         )
     }
 
     /// Check one member before a decompression or replacement allocation.
-    pub(super) fn entry_bytes(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn entry_bytes(&mut self, amount: usize) -> Result<(), Error> {
         if amount > self.max_entry_bytes {
-            return Err(limit(
-                SlideMediaDataLimitKind::EntryBytes,
-                amount,
-                self.max_entry_bytes,
-            ));
+            return Err(limit(LimitKind::EntryBytes, amount, self.max_entry_bytes));
         }
         Ok(())
     }
 
     /// Charge aggregate uncompressed ZIP bytes.
-    pub(super) fn total_bytes(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn total_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.total_bytes,
             self.max_total_bytes,
             amount,
-            SlideMediaDataLimitKind::TotalBytes,
+            LimitKind::TotalBytes,
         )
     }
 
     /// Charge semantic slides traversed by the focused operation.
-    pub(super) fn slides(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
-        Self::charge(
-            &mut self.slides,
-            self.max_slides,
-            amount,
-            SlideMediaDataLimitKind::Slides,
-        )
+    pub(super) fn slides(&mut self, amount: usize) -> Result<(), Error> {
+        Self::charge(&mut self.slides, self.max_slides, amount, LimitKind::Slides)
     }
 
     /// Charge rooted graph references retained by the selector/closure.
-    pub(super) fn references(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.references,
             self.max_references,
             amount,
-            SlideMediaDataLimitKind::References,
+            LimitKind::References,
         )
     }
 
     /// Charge materialized media bytes before copying or retaining them.
-    pub(super) fn media_bytes(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn media_bytes(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.media_bytes,
             self.max_media_bytes,
             amount,
-            SlideMediaDataLimitKind::MediaBytes,
+            LimitKind::MediaBytes,
         )
     }
 
     /// Charge one fallible allocation before calling `try_reserve`.
-    pub(super) fn allocation(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn allocation(&mut self, amount: usize) -> Result<(), Error> {
         self.media_bytes(amount)?;
-        let observed = self.allocations.checked_add(1).ok_or_else(|| {
-            limit(
-                SlideMediaDataLimitKind::Allocations,
-                usize::MAX,
-                self.max_allocations,
-            )
-        })?;
+        let observed = self
+            .allocations
+            .checked_add(1)
+            .ok_or_else(|| limit(LimitKind::Allocations, usize::MAX, self.max_allocations))?;
         if observed > self.max_allocations {
             return Err(limit(
-                SlideMediaDataLimitKind::Allocations,
+                LimitKind::Allocations,
                 observed,
                 self.max_allocations,
             ));
@@ -258,17 +241,14 @@ impl MediaBudget {
     pub(super) fn keynote_report(
         &mut self,
         report: keynote_media_codec::DecodeReport,
-    ) -> Result<(), SlideMediaDataError> {
+    ) -> Result<(), Error> {
         self.wire_fields(report.fields())?;
         self.wire_nesting(report.max_depth())?;
         self.wire_work(report.work_bytes())
     }
 
     /// Charge a strict PackageMetadata scan report.
-    pub(super) fn metadata_report(
-        &mut self,
-        report: DecodeReport,
-    ) -> Result<(), SlideMediaDataError> {
+    pub(super) fn metadata_report(&mut self, report: DecodeReport) -> Result<(), Error> {
         self.input_bytes(report.input_bytes())?;
         self.wire_fields(report.fields())?;
         self.wire_nesting(report.max_depth())?;
@@ -277,7 +257,7 @@ impl MediaBudget {
             report
                 .components()
                 .checked_add(report.data_records())
-                .ok_or(SlideMediaDataError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.references(report.data_references())?;
         self.references(report.owners())
@@ -289,38 +269,25 @@ impl MediaBudget {
     pub(super) fn metadata_options(
         &self,
         source: &[u8],
-    ) -> Result<litchi_iwa_protos::package_metadata_media_codec::DecodeOptions, SlideMediaDataError>
-    {
+    ) -> Result<litchi_iwa_protos::package_metadata_media_codec::DecodeOptions, Error> {
         let fields = self.remaining(
             self.wire_fields,
             self.max_wire_fields,
-            SlideMediaDataLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
-        let work = self.remaining(
-            self.wire_work,
-            self.max_wire_work,
-            SlideMediaDataLimitKind::WireWork,
-        )?;
-        let entries = self.remaining(
-            self.entries,
-            self.max_entries,
-            SlideMediaDataLimitKind::Entries,
-        )?;
-        let owners = self.remaining(
-            self.references,
-            self.max_references,
-            SlideMediaDataLimitKind::References,
-        )?;
+        let work = self.remaining(self.wire_work, self.max_wire_work, LimitKind::WireWork)?;
+        let entries = self.remaining(self.entries, self.max_entries, LimitKind::Entries)?;
+        let owners = self.remaining(self.references, self.max_references, LimitKind::References)?;
         let nesting = self.remaining(
             self.wire_nesting,
             self.max_wire_nesting,
-            SlideMediaDataLimitKind::WireNesting,
+            LimitKind::WireNesting,
         )?;
-        let nesting = u32::try_from(nesting).map_err(|_| SlideMediaDataError::InvalidSource)?;
+        let nesting = u32::try_from(nesting).map_err(|_| Error::InvalidSource)?;
         let output = self.remaining(
             self.output_bytes,
             self.max_output_bytes,
-            SlideMediaDataLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )?;
         Ok(
             litchi_iwa_protos::package_metadata_media_codec::DecodeOptions::new(
@@ -342,23 +309,19 @@ impl MediaBudget {
     pub(super) fn keynote_options(
         &self,
         source: &[u8],
-    ) -> Result<keynote_media_codec::DecodeOptions, SlideMediaDataError> {
+    ) -> Result<keynote_media_codec::DecodeOptions, Error> {
         let fields = self.remaining(
             self.wire_fields,
             self.max_wire_fields,
-            SlideMediaDataLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
-        let work = self.remaining(
-            self.wire_work,
-            self.max_wire_work,
-            SlideMediaDataLimitKind::WireWork,
-        )?;
+        let work = self.remaining(self.wire_work, self.max_wire_work, LimitKind::WireWork)?;
         let nesting = self.remaining(
             self.wire_nesting,
             self.max_wire_nesting,
-            SlideMediaDataLimitKind::WireNesting,
+            LimitKind::WireNesting,
         )?;
-        let nesting = u32::try_from(nesting).map_err(|_| SlideMediaDataError::InvalidSource)?;
+        let nesting = u32::try_from(nesting).map_err(|_| Error::InvalidSource)?;
         Ok(keynote_media_codec::DecodeOptions::new(
             source.len().max(1),
             fields,
@@ -372,7 +335,7 @@ impl MediaBudget {
     pub(super) fn metadata_requirements(
         &mut self,
         requirements: RewriteExecutionRequirements,
-    ) -> Result<(), SlideMediaDataError> {
+    ) -> Result<(), Error> {
         self.output_bytes(requirements.output_bytes())?;
         self.wire_fields(requirements.fields())?;
         self.wire_work(requirements.work_bytes())?;
@@ -380,7 +343,7 @@ impl MediaBudget {
             requirements
                 .components()
                 .checked_add(requirements.data_records())
-                .ok_or(SlideMediaDataError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.references(requirements.owners())?;
         self.allocations_count(requirements.allocations())?;
@@ -393,7 +356,7 @@ impl MediaBudget {
     pub(super) fn reassembly_requirements(
         &mut self,
         requirements: ReassemblyExecutionRequirements,
-    ) -> Result<(), SlideMediaDataError> {
+    ) -> Result<(), Error> {
         self.output_bytes(requirements.output_bytes())?;
         self.entries(requirements.offset_count())?;
         self.media_bytes(requirements.scratch_bytes())?;
@@ -420,22 +383,22 @@ impl MediaBudget {
     }
 
     /// Charge fields from a bounded wire view.
-    pub(super) fn wire_fields(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn wire_fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.wire_fields,
             self.max_wire_fields,
             amount,
-            SlideMediaDataLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
     /// Charge maximum nesting observed by a strict codec.
-    pub(super) fn wire_nesting(&mut self, amount: u32) -> Result<(), SlideMediaDataError> {
-        let amount = usize::try_from(amount).map_err(|_| SlideMediaDataError::InvalidSource)?;
+    pub(super) fn wire_nesting(&mut self, amount: u32) -> Result<(), Error> {
+        let amount = usize::try_from(amount).map_err(|_| Error::InvalidSource)?;
         self.wire_nesting = self.wire_nesting.max(amount);
         if self.wire_nesting > self.max_wire_nesting {
             return Err(limit(
-                SlideMediaDataLimitKind::WireNesting,
+                LimitKind::WireNesting,
                 self.wire_nesting,
                 self.max_wire_nesting,
             ));
@@ -444,28 +407,25 @@ impl MediaBudget {
     }
 
     /// Charge aggregate strict-plus-Buffa wire work.
-    pub(super) fn wire_work(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
+    pub(super) fn wire_work(&mut self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &mut self.wire_work,
             self.max_wire_work,
             amount,
-            SlideMediaDataLimitKind::WireWork,
+            LimitKind::WireWork,
         )
     }
 
     /// Charge an exact count of planned allocations without double-counting
     /// the retained and scratch byte reservations.
-    fn allocations_count(&mut self, amount: usize) -> Result<(), SlideMediaDataError> {
-        let observed = self.allocations.checked_add(amount).ok_or_else(|| {
-            limit(
-                SlideMediaDataLimitKind::Allocations,
-                usize::MAX,
-                self.max_allocations,
-            )
-        })?;
+    fn allocations_count(&mut self, amount: usize) -> Result<(), Error> {
+        let observed = self
+            .allocations
+            .checked_add(amount)
+            .ok_or_else(|| limit(LimitKind::Allocations, usize::MAX, self.max_allocations))?;
         if observed > self.max_allocations {
             return Err(limit(
-                SlideMediaDataLimitKind::Allocations,
+                LimitKind::Allocations,
                 observed,
                 self.max_allocations,
             ));
@@ -478,8 +438,8 @@ impl MediaBudget {
         current: &mut usize,
         maximum: usize,
         amount: usize,
-        kind: SlideMediaDataLimitKind,
-    ) -> Result<(), SlideMediaDataError> {
+        kind: LimitKind,
+    ) -> Result<(), Error> {
         let observed = current
             .checked_add(amount)
             .ok_or_else(|| limit(kind, usize::MAX, maximum))?;
@@ -490,12 +450,7 @@ impl MediaBudget {
         Ok(())
     }
 
-    fn remaining(
-        &self,
-        current: usize,
-        maximum: usize,
-        kind: SlideMediaDataLimitKind,
-    ) -> Result<usize, SlideMediaDataError> {
+    fn remaining(&self, current: usize, maximum: usize, kind: LimitKind) -> Result<usize, Error> {
         maximum
             .checked_sub(current)
             .filter(|remaining| *remaining > 0)
@@ -503,18 +458,16 @@ impl MediaBudget {
     }
 }
 
-fn as_usize(value: u64) -> Result<usize, SlideMediaDataError> {
-    usize::try_from(value).map_err(|_| SlideMediaDataError::InvalidSource)
+fn as_usize(value: u64) -> Result<usize, Error> {
+    usize::try_from(value).map_err(|_| Error::InvalidSource)
 }
 
-fn aggregate(value: usize) -> Result<usize, SlideMediaDataError> {
-    value
-        .checked_mul(4)
-        .ok_or(SlideMediaDataError::InvalidSource)
+fn aggregate(value: usize) -> Result<usize, Error> {
+    value.checked_mul(4).ok_or(Error::InvalidSource)
 }
 
-fn limit(kind: SlideMediaDataLimitKind, observed: usize, maximum: usize) -> SlideMediaDataError {
-    SlideMediaDataError::LimitExceeded {
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

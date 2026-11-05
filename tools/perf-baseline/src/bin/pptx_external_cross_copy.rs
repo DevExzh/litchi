@@ -2,9 +2,9 @@
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use litchi_perf_baseline::pptx_range_source::{PptxRangeSource, PptxRangeSourceConfig};
-use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_pptx::SourceBackedPresentation;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::ArchiveReader;
@@ -84,7 +84,11 @@ struct Member {
 fn members(bytes: &[u8]) -> Result<BTreeMap<String, Member>, Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut scratch)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut result = BTreeMap::new();
     for entry in index.entries() {
         let name = std::str::from_utf8(entry.raw_name_bytes())?.to_owned();
@@ -97,7 +101,8 @@ fn members(bytes: &[u8]) -> Result<BTreeMap<String, Member>, Box<dyn Error>> {
             .ok_or("short central record")?
             .fill(0);
         let member = Member {
-            payload: ArchiveReader::new(bytes)?.read(&name)?,
+            payload: ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?
+                .read(&name)?,
             local: bytes[usize::try_from(local.start)?..usize::try_from(local.end)?].to_vec(),
             central: record,
         };
@@ -197,7 +202,7 @@ fn check_output(
             return Err("copied semantic readback mismatch".into());
         }
     }
-    let eager = litchi_pptx::Package::from_vec(output.to_vec())?;
+    let eager = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let opened = eager.opened_presentation()?;
     if opened.slides().len() != 2 || opened.slides().iter().any(|slide| !slide.name().is_empty()) {
         return Err("eager slide catalog mismatch".into());
@@ -250,14 +255,21 @@ fn iteration(
         maximum_request: 0,
     };
     let started = Instant::now();
-    let source =
-        SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source_adapter.clone(),
-            ReadLimits::default(),
-            cache,
-            source_context,
-        )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(destination_adapter.clone(), ReadLimits::default(), cache, destination_context)?;
+    let source = SourceBackedPresentation::from_read_at_with_options(
+        source_adapter.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache)
+            .execution_context(source_context),
+    )?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
+        destination_adapter.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache)
+            .execution_context(destination_context),
+    )?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let open_ns = u64::try_from(started.elapsed().as_nanos())?;
     let opened =
         json!({"source":source_adapter.snapshot()?,"destination":destination_adapter.snapshot()?});
@@ -266,7 +278,9 @@ fn iteration(
     let plan_ns = u64::try_from(started.elapsed().as_nanos())?;
     let planned = json!({"source":source_adapter.snapshot()?,"destination":destination_adapter.snapshot()?,"source_budget":gauges(&source_budget),"destination_budget":gauges(&destination_budget)});
     let started = Instant::now();
-    let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let published = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut sink)?;
     let publication_ns = u64::try_from(started.elapsed().as_nanos())?;
     let published_reads = json!({
         "source": source_adapter.snapshot()?,

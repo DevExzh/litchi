@@ -17,7 +17,7 @@
 //! # References
 //!
 //! - ODF 1.4 Part 4, `OpenFormula` Format
-//! - odfdo: `3rdparty/odfdo/src/odfdo/utils/formula.py`
+//! - odfdo: `src/odfdo/utils/formula.py`
 use litchi_core::{Error, Resource, ResourceLimit, Result};
 use smallvec::SmallVec;
 use std::{borrow::Cow, convert::TryFrom, sync::Arc};
@@ -200,12 +200,7 @@ impl<'a> FormulaParser<'a> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(self) -> Result<Formula> {
-        self.parse_with_limits(&FormulaLimits::default())
-    }
-
-    /// Parse the formula with explicit finite byte and token limits.
-    pub fn parse_with_limits(mut self, limits: &FormulaLimits) -> Result<Formula> {
+    pub fn parse(mut self, limits: &FormulaLimits) -> Result<Formula> {
         // ODF stores formulas as `of:=...`, while the public codec also accepts
         // the shorter `=...` spelling.  Keep the original text in `Formula`,
         // but parse the body directly so stripping the prefix does not require
@@ -1177,7 +1172,7 @@ mod tests {
     fn test_parse_simple_formula() {
         let parser = FormulaParser::new("=A1+B2");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert_eq!(formula.tokens.len(), 3);
     }
@@ -1186,7 +1181,7 @@ mod tests {
     fn test_parse_function_formula() {
         let parser = FormulaParser::new("=SUM(A1:A10)");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(formula.tokens[0], Token::Function(_)));
     }
@@ -1194,20 +1189,20 @@ mod tests {
     #[test]
     fn test_function_calls_take_precedence_over_cell_reference_shape() {
         let formula = FormulaParser::new("=BIN2DEC (\"101\")")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BIN2DEC"));
         assert!(matches!(formula.tokens[1], Token::LParen));
 
         let formula = FormulaParser::new("=BINOM.DIST.RANGE(A1;1;2)")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BINOM.DIST.RANGE"));
 
         // Without an invocation parenthesis, the same spelling remains a
         // valid cell reference (column LOG, row 10).
         let formula = FormulaParser::new("=LOG10")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(
             &formula.tokens[0],
@@ -1218,7 +1213,7 @@ mod tests {
     #[test]
     fn test_parse_canonical_odf_formula_without_normalizing_the_input() {
         let formula = FormulaParser::new("of:=SUM([$Inputs.$A$1:.$B$2])")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
 
         assert_eq!(formula.text, "of:=SUM([$Inputs.$A$1:.$B$2])");
@@ -1258,7 +1253,7 @@ mod tests {
     #[test]
     fn test_parse_odf_formula_with_quoted_sheet_reference() {
         let formula = FormulaParser::new("OF:=['Bob''s'.$A$1]")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
 
         assert!(matches!(
@@ -1285,7 +1280,7 @@ mod tests {
     fn test_parse_absolute_reference() {
         let parser = FormulaParser::new("=$A$1");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::CellRef(cell_ref) => {
@@ -1327,7 +1322,7 @@ mod tests {
     #[test]
     fn test_string_literals_preserve_utf8_and_require_a_closing_quote() {
         let formula = FormulaParser::new("=UNICODE(\"α🌟\")")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(
             &formula.tokens[2],
@@ -1335,12 +1330,12 @@ mod tests {
         ));
 
         let formula = FormulaParser::new("=\"a\"\"b\"")
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::String(value) if value == "a\"b"));
 
         let formula = FormulaParser::new("=\"\"+A1")
-            .parse()
+            .parse(&Default::default())
             .expect("empty string literals should retain token boundaries");
         assert!(matches!(
             &formula.tokens[0],
@@ -1349,20 +1344,24 @@ mod tests {
         assert!(matches!(formula.tokens[1], Token::Operator('+')));
         assert!(matches!(formula.tokens[2], Token::CellRef(_)));
 
-        let error = FormulaParser::new("=\"a\0b\"").parse();
+        let error = FormulaParser::new("=\"a\0b\"").parse(&Default::default());
         assert!(matches!(
             error,
             Err(Error::InvalidFormat(message)) if message.contains("NUL")
         ));
 
-        assert!(FormulaParser::new("=\"unterminated").parse().is_err());
+        assert!(
+            FormulaParser::new("=\"unterminated")
+                .parse(&Default::default())
+                .is_err()
+        );
     }
 
     #[test]
     fn test_extract_cell_refs() {
         let parser = FormulaParser::new("=A1+B2+C3");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         let refs = extract_cell_refs(&formula);
         assert!(refs.len() >= 2); // At least A1 and B2
@@ -1371,7 +1370,7 @@ mod tests {
     #[test]
     fn test_extract_cell_refs_projects_legacy_compatible_rich_cells() {
         let formula = FormulaParser::new("=SUM(['Bob''s'.$A$1:.B2])")
-            .parse()
+            .parse(&Default::default())
             .expect("quoted rich cell range should parse");
         let refs = extract_cell_refs(&formula);
         assert!(matches!(
@@ -1386,7 +1385,7 @@ mod tests {
         ));
 
         let external = FormulaParser::new("=['file:///book.ods'#.A1]")
-            .parse()
+            .parse(&Default::default())
             .expect("external rich cell should parse");
         assert!(extract_cell_refs(&external).is_empty());
     }
@@ -1396,7 +1395,7 @@ mod tests {
         let limits = FormulaLimits::default()
             .with_reference_limits(reference::Limits::default().with_max_name_bytes(3));
         let error = FormulaParser::new("of:=[Sheet.A1]")
-            .parse_with_limits(&limits)
+            .parse(&limits)
             .expect_err("formula reference name limit should be enforced");
         assert!(matches!(error, Error::ResourceLimit(_)));
     }
@@ -1405,7 +1404,7 @@ mod tests {
     fn test_parse_formula_without_equals() {
         let parser = FormulaParser::new("A1+B1");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(!formula.tokens.is_empty());
     }
@@ -1414,7 +1413,7 @@ mod tests {
     fn test_cell_ref_parsing() {
         let parser = FormulaParser::new("=Sheet1.A1");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::CellRef(cell_ref) => {
@@ -1439,7 +1438,7 @@ mod tests {
     #[test]
     fn test_compact_cell_handoff_preserves_space_bearing_sheet_names() {
         let formula = FormulaParser::new("=A1 Sheet.B2+A1 .C3")
-            .parse()
+            .parse(&Default::default())
             .expect("legacy space-bearing sheet names should parse");
         assert!(matches!(
             &formula.tokens[0],
@@ -1467,7 +1466,7 @@ mod tests {
         fn tokenize_and_measure(source: &str) -> (usize, usize) {
             let mut parser = FormulaParser::new(source);
             // Keep the original formula prefix out of this private tokenizer
-            // loop; parse_with_limits makes the same body transition.
+            // loop; parse makes the same body transition.
             parser.position = 1;
             let mut token_count = 0;
             while !parser.is_at_end() {
@@ -1561,7 +1560,7 @@ mod tests {
     fn test_range_ref_parsing() {
         let parser = FormulaParser::new("=A1:B10");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::RangeRef(range_ref) => {
@@ -1588,7 +1587,7 @@ mod tests {
     fn test_number_token() {
         let parser = FormulaParser::new("=42.5");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::Number(n) => {
@@ -1612,7 +1611,7 @@ mod tests {
     fn test_string_token() {
         let parser = FormulaParser::new("=\"Hello World\"");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::String(s) => {
@@ -1636,13 +1635,13 @@ mod tests {
     fn test_boolean_tokens() {
         let parser = FormulaParser::new("=TRUE()");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "TRUE"));
 
         let parser = FormulaParser::new("=FALSE()");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "FALSE"));
     }
@@ -1651,7 +1650,7 @@ mod tests {
     fn test_operators() {
         let parser = FormulaParser::new("=A1+B1-C1*D1/E1^F1");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         // Should have cell refs and operators
         let operators: Vec<_> = formula
@@ -1666,7 +1665,7 @@ mod tests {
     fn test_parentheses() {
         let parser = FormulaParser::new("=(A1+B1)*C1");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         let has_lparen = formula.tokens.iter().any(|t| matches!(t, Token::LParen));
         let has_rparen = formula.tokens.iter().any(|t| matches!(t, Token::RParen));
@@ -1678,7 +1677,7 @@ mod tests {
     fn test_function_with_multiple_args() {
         let parser = FormulaParser::new("=IF(A1>0,\"Positive\",\"Negative\")");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::Function(f) if f == "IF"));
 
@@ -1695,7 +1694,7 @@ mod tests {
     fn test_nested_functions() {
         let parser = FormulaParser::new("=SUM(AVERAGE(A1:A10),MAX(B1:B10))");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         let functions: Vec<_> = formula
             .tokens
@@ -1725,7 +1724,7 @@ mod tests {
         // Mixed absolute/relative references
         let parser = FormulaParser::new("=$A1+B$1");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         match &formula.tokens[0] {
             Token::CellRef(cell_ref) => {
@@ -1860,7 +1859,7 @@ mod tests {
     fn test_extract_functions() {
         let parser = FormulaParser::new("=SUM(A1:A10)+AVERAGE(B1:B10)");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         let funcs = extract_functions(&formula);
         assert!(funcs.contains(&"SUM"));
@@ -1892,7 +1891,7 @@ mod tests {
         assert_eq!(STANDARD_FORMULA_FUNCTIONS.len(), 393);
         for name in STANDARD_FORMULA_FUNCTIONS.iter() {
             let formula = FormulaParser::new(&format!("={name}()"))
-                .parse()
+                .parse(&Default::default())
                 .expect("catalog function should parse as an invocation");
             assert!(matches!(&formula.tokens[0], Token::Function(found) if found == *name));
         }
@@ -1902,7 +1901,7 @@ mod tests {
     fn test_whitespace_handling() {
         let parser = FormulaParser::new("=  A1  +  B1  ");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(!formula.tokens.is_empty());
     }
@@ -1911,7 +1910,7 @@ mod tests {
     fn test_complex_formula() {
         let parser = FormulaParser::new("=IF(SUM(A1:A10)>100,AVERAGE(B1:B10),0)");
         let formula = parser
-            .parse()
+            .parse(&Default::default())
             .expect("test fixture or operation should succeed");
         assert!(!formula.tokens.is_empty());
         // Check all expected tokens are present

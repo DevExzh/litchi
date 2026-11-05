@@ -6,7 +6,8 @@ use litchi_iwa_archive::{
     Limits,
     package::{Catalog, EntryInsertion},
 };
-use litchi_numbers::{ChartData, ChartDataError, ChartSelector, Package, SheetSelector};
+use litchi_numbers::sheet::chart::data::Error as ChartDataError;
+use litchi_numbers::{ChartData, ChartSelector, Package, SheetSelector};
 
 #[path = "support/chart_arrangement_fixture.rs"]
 mod fixture;
@@ -34,7 +35,7 @@ fn synthetic_source() -> TestResult<Vec<u8>> {
 
 fn synthetic_source_with_previews() -> TestResult<Vec<u8>> {
     let source = synthetic_source()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     Ok(catalog.reassemble_with_insertions_to_bytes(
         &[
             EntryInsertion::new("preview.jpg", b"full preview"),
@@ -117,7 +118,7 @@ fn changed_chart_data_invalidates_previews_but_inverse_restores_exact_source() -
         .set(target)
         .commit()?;
     assert_eq!(changed.diagnostics().deleted_previews(), 3);
-    let target_catalog = Catalog::from_bytes(&exact_bytes(changed.package())?)?;
+    let target_catalog = Catalog::from_bytes(&exact_bytes(changed.package())?, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(target_catalog.iter().all(|entry| entry.name() != name));
     }
@@ -154,7 +155,10 @@ fn linked_native_chart_data_write_is_refused_before_publication() -> TestResult 
         .edit_sheet_chart_data(SheetSelector::index(0), ChartSelector::index(0))
         .and_then(|edit| edit.set(target).commit())
         .expect_err("native table-backed chart data must be refused");
-    assert!(matches!(error, ChartDataError::UnsupportedDependency));
+    assert!(matches!(
+        error,
+        ChartDataError::Refused(litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency)
+    ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }
@@ -215,8 +219,12 @@ fn native_retirement_chart_data_is_table_backed_and_refused() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let error = package
         .edit_sheet_chart_data(SheetSelector::index(0), ChartSelector::index(0))
+        .and_then(|edit| edit.commit())
         .expect_err("the resaved retirement chart is table-backed");
-    assert!(matches!(error, ChartDataError::UnsupportedDependency));
+    assert!(matches!(
+        error,
+        ChartDataError::Refused(litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency)
+    ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }
@@ -236,7 +244,10 @@ fn chart_data_write_preserves_source_axes() -> TestResult {
         .set(target)
         .commit()
         .expect_err("axis replacement must be refused");
-    assert!(matches!(error, ChartDataError::ShapeMismatch));
+    assert!(matches!(
+        error,
+        ChartDataError::Refused(litchi_numbers::sheet::chart::data::Refusal::ShapeMismatch)
+    ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }

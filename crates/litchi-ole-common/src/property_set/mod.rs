@@ -2,7 +2,7 @@
 //!
 //! The semantic model follows [MS-OLEPS] and the shared property-set rules in
 //! [MS-OSHARED]. Parsing and serialization are lossless within the supported
-//! typed grammar, while [`Editor`] stages complete CFB rewrites and publishes
+//! typed grammar, while [`Edit`] stages complete CFB rewrites and publishes
 //! them only after every requested mutation has validated successfully.
 //!
 //! [`PropertySetReader`] is an extension trait because the CFB container owns
@@ -17,6 +17,7 @@ pub mod document_summary;
 mod model;
 pub mod non_simple;
 pub mod summary_information;
+pub mod summary_properties;
 pub mod user_defined;
 
 #[cfg(test)]
@@ -47,7 +48,7 @@ pub use binding::{
     clippy::module_name_repetitions,
     reason = "the public extension-trait name distinguishes property-set readers from other readers"
 )]
-pub use codec::{Editor, PropertySetReader, SharedPropertySetReader};
+pub use codec::{Edit, PropertySetReader, SharedPropertySetReader};
 pub use model::{
     Array, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Dimension, DocParts, Guid, HeadingPair,
     HeadingPairs, IndirectPropertyName, Metadata, PID_DOC_PARTS, PID_HEADING_PAIRS,
@@ -56,8 +57,4 @@ pub use model::{
 };
 #[cfg(test)]
 pub(crate) use model::{DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE};
-pub use non_simple::{
-    Commit as NonSimpleCommit, Editor as NonSimpleEditor, Element as NonSimpleElement,
-    ElementKind as NonSimpleElementKind, Limits as NonSimpleLimits, Patch as NonSimplePatch,
-    Revision as NonSimpleRevision, Snapshot as NonSimpleSnapshot,
-};
+pub use summary_properties::SummaryProperties;

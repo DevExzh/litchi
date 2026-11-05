@@ -27,7 +27,7 @@
 
 use crate::constants;
 use crate::core::{
-    ArchiveLimits, OwnedPackage, PreparedPackage, SourcePackageLimits,
+    ArchiveLimits, OwnedPackage, PreparedPackage, SourceLimits,
     package::{MIMETYPE_LOCAL_PREFIX, PreparedCatalogFacts, read_owned_input},
 };
 use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
@@ -75,7 +75,7 @@ const MAX_MIMETYPE_BYTES: usize = 256;
 ///
 /// The probe is deliberately conservative: a ceiling hit returns `None` so
 /// the caller can run its normal bounded OPC path. The fields mirror the ZIP
-/// portion of the facade's OPC `ReadLimits` but remain owned by this crate to
+/// portion of the facade's OPC `SourceLimits` but remain owned by this crate to
 /// avoid a dependency cycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogProbeLimits {
@@ -214,7 +214,7 @@ pub enum CatalogDecision {
 /// probe. `Fallback` returns the original `Vec` allocation when strict ODF
 /// preparation cannot be completed; the facade then runs its historical
 /// catalog and byte-detector sequence. `Ok(None)` from
-/// [`reader_preparation_with_limits`] performs no full input read when the
+/// [`reader_preparation`] performs no full input read when the
 /// fixed local ODF MIME framing is absent.
 #[doc(hidden)]
 pub enum ReaderPreparation {
@@ -248,21 +248,8 @@ pub fn mime(value: &[u8]) -> Option<Format> {
     }
 }
 
-/// Read a recognized `office:mimetype` value from a flat `ODF` `XML` root.
-///
-/// The root must be `office:document` in the ODF office namespace. Namespace
-/// prefixes are resolved semantically. The returned value is decoded and XML
-/// attribute whitespace is normalized before classification, then copied into
-/// an owned string.
-#[must_use]
-pub fn flat_mime(value: &[u8]) -> Option<String> {
-    flat_mime_with_limits(value, Limits::default())
-        .ok()
-        .flatten()
-}
-
 /// Read a recognized flat `ODF` MIME value under explicit finite limits.
-pub fn flat_mime_with_limits(value: &[u8], limits: Limits) -> Result<Option<String>> {
+pub fn flat_mime(value: &[u8], limits: Limits) -> Result<Option<String>> {
     check_input_len(value.len(), limits, "ODF flat detector input")?;
     with_flat_mime(value, |raw_mimetype| {
         let trimmed_mimetype = trim_ascii(raw_mimetype);
@@ -345,43 +332,29 @@ fn with_flat_mime<T>(
     }
 }
 
-/// Detect a flat `OpenDocument` `XML` document.
-#[inline]
-#[must_use]
-pub fn flat(value: &[u8]) -> Option<Format> {
-    flat_with_limits(value, Limits::default()).ok().flatten()
-}
-
 /// Detect a flat `OpenDocument` XML document under explicit finite limits.
-pub fn flat_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+pub fn flat(value: &[u8], limits: Limits) -> Result<Option<Format>> {
     check_input_len(value.len(), limits, "ODF flat detector input")?;
     with_flat_mime(value, |raw_mimetype| Ok(mime(raw_mimetype)))
 }
 
-/// Detect a packaged or flat `OpenDocument` document from complete bytes.
-///
-/// Conforming ODF packages place an uncompressed `mimetype` entry first. The
-/// local ZIP header and payload are checked in place without allocating a
-/// decompression buffer. The central archive structure is also validated.
-#[must_use]
-pub fn bytes(value: &[u8]) -> Option<Format> {
-    bytes_with_limits(value, Limits::default()).ok().flatten()
-}
-
 /// Detect a packaged or flat `OpenDocument` document under explicit finite
 /// limits.
-pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+pub fn bytes(value: &[u8], limits: Limits) -> Result<Option<Format>> {
     check_input_len(value.len(), limits, "ODF detector input")?;
     if value.starts_with(ZIP_SIGNATURE) {
-        let Some(format) = packaged_mime_with_limits(value, limits)? else {
+        let Some(format) = packaged_mime(value, limits)? else {
             return Ok(None);
         };
         // The central archive structure is validated here. A compressed,
         // extra-field-carrying, or relocated `mimetype` member is a tolerated
         // container deviation (LENIENCY_AUDIT F9.1) recorded by the
         // subsequent open, so it no longer withholds the classification.
-        let archive =
-            soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            value,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .map_err(map_detector_zip_error)?;
         // The strict offset-0 sniff reads only the local header. When it
         // matched, the central record must agree that the member is stored:
         // a local/central compression disagreement is structural corruption
@@ -396,48 +369,16 @@ pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>>
         }
         return Ok(Some(format));
     }
-    flat_with_limits(value, limits)
-}
-
-/// Classify a packaged ODF candidate from its `mimetype` member.
-///
-/// The fixed offset-0 local grammar is checked first without allocating or
-/// inspecting the central directory. A re-zipped candidate whose `mimetype`
-/// member deviates from that grammar — compressed, carrying a local extra
-/// field, or relocated — is classified by reading the member by name from the
-/// central directory, the tolerant fallback LibreOffice applies. Only the
-/// container grammar is tolerated: the member's content is validated exactly,
-/// so an unknown MIME type, a malformed archive, or non-ZIP input returns
-/// `None`.
-#[must_use]
-pub fn packaged_mime(value: &[u8]) -> Option<Format> {
-    packaged_mime_with_limits(value, Limits::default())
-        .ok()
-        .flatten()
+    flat(value, limits)
 }
 
 /// Classify a packaged ODF candidate from its `mimetype` member under
 /// explicit finite limits.
-pub fn packaged_mime_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+pub fn packaged_mime(value: &[u8], limits: Limits) -> Result<Option<Format>> {
     check_input_len(value.len(), limits, "ODF detector input")?;
     Ok(packaged_mime_bytes(value)
         .and_then(mime)
         .or_else(|| tolerant_packaged_mime(value)))
-}
-
-/// Check whether a ZIP candidate has the reserved OPC content-types member.
-///
-/// This inspects only the central-directory catalog. It does not read or
-/// decompress a member and does not build an owned archive index, so a normal
-/// ODF package can avoid an unrelated full OPC probe. `Some(false)` means the
-/// ZIP catalog was valid and had no exact content-types member; `None` means
-/// the candidate was not a canonical, in-budget ZIP catalog. Any malformed,
-/// aliased, duplicate, encrypted, data-descriptor, ZIP64, prefixed, or
-/// trailing layout is deliberately unknown so the caller can invoke its
-/// existing bounded OPC path.
-#[must_use]
-pub fn packaged_has_ooxml_catalog(value: &[u8]) -> Option<bool> {
-    packaged_has_ooxml_catalog_with_limits(value, CatalogProbeLimits::default())
 }
 
 /// Check the OPC content-types member with explicit input and ZIP budgets.
@@ -447,10 +388,7 @@ pub fn packaged_has_ooxml_catalog(value: &[u8]) -> Option<bool> {
 /// conservative: callers must continue with their ordinary bounded OPC
 /// detector rather than treating the candidate as ordinary ODF.
 #[must_use]
-pub fn packaged_has_ooxml_catalog_with_limits(
-    value: &[u8],
-    limits: CatalogProbeLimits,
-) -> Option<bool> {
+pub fn packaged_has_ooxml_catalog(value: &[u8], limits: CatalogProbeLimits) -> Option<bool> {
     let length = u64::try_from(value.len()).ok()?;
     if length > limits.max_input_bytes {
         return None;
@@ -492,28 +430,12 @@ pub fn packaged_has_ooxml_catalog_with_limits(
     state.finish()
 }
 
-/// Check the reserved OPC content-types member from a positional ZIP source.
-///
-/// This is the source-backed counterpart to [`packaged_has_ooxml_catalog`]. It
-/// reads only ZIP metadata through [`ReadAt`], retaining the caller's source
-/// identity check and never materializing or decompressing a member. ZIP
-/// layout errors are reported as `Ok(None)` so an owning facade can retain its
-/// existing fallback/error policy for malformed candidates.
-///
-/// # Errors
-///
-/// Returns source I/O, source-change, or bounded scratch-buffer allocation
-/// errors.
-pub fn packaged_has_ooxml_catalog_read_at(source: &dyn ReadAt) -> Result<Option<bool>> {
-    packaged_has_ooxml_catalog_read_at_with_limits(source, CatalogProbeLimits::default())
-}
-
 /// Check the OPC content-types member from a positional source under bounds.
 ///
 /// ZIP layout errors become `Ok(None)`, while source-provider I/O and source
 /// identity changes remain typed errors. This distinction prevents a failing
 /// source from being silently reclassified as an ordinary ODF package.
-pub fn packaged_has_ooxml_catalog_read_at_with_limits(
+pub fn packaged_has_ooxml_catalog_read_at(
     source: &dyn ReadAt,
     limits: CatalogProbeLimits,
 ) -> Result<Option<bool>> {
@@ -604,20 +526,11 @@ pub fn packaged_has_ooxml_catalog_read_at_with_limits(
     detected
 }
 
-/// Check the reserved OPC content-types member from a seekable reader.
-///
-/// The reader's original position is restored before returning. As with the
-/// other catalog probes, this reads ZIP central-directory metadata only and
-/// returns `None` for non-ZIP or malformed candidates.
-pub fn packaged_has_ooxml_catalog_from_reader<R: Read + Seek>(reader: &mut R) -> Option<bool> {
-    packaged_has_ooxml_catalog_from_reader_with_limits(reader, CatalogProbeLimits::default())
-}
-
 /// Check the OPC content-types member from a seekable reader under bounds.
 ///
 /// The reader's cursor is restored even when the bounded metadata probe is
 /// uncertain or an underlying read/seek operation fails.
-pub fn packaged_has_ooxml_catalog_from_reader_with_limits<R: Read + Seek>(
+pub fn packaged_has_ooxml_catalog_from_reader<R: Read + Seek>(
     reader: &mut R,
     limits: CatalogProbeLimits,
 ) -> Option<bool> {
@@ -676,28 +589,9 @@ pub fn packaged_has_ooxml_catalog_from_reader_with_limits<R: Read + Seek>(
     detected
 }
 
-/// Detect a packaged ODF MIME type from a positional source.
-///
-/// The fast path reads only the fixed local header, the `mimetype` name, and
-/// its bounded stored payload, without allocating or inspecting the central
-/// directory. When that offset-0 grammar does not match, a re-zipped package
-/// whose `mimetype` member is compressed, carries a local extra field, or is
-/// not the first entry is classified by reading the member by name through
-/// the central directory under the default finite archive limits (see
-/// [`packaged_mime`]). Ownership and complete package validation stay with
-/// the family facade.  The source identity is checked before and after the probe;
-/// a source that changes while it is being read is rejected instead of being
-/// classified from a mixed snapshot.
-pub fn packaged_mime_read_at(source: &dyn ReadAt) -> Result<Option<Format>> {
-    packaged_mime_read_at_with_limits(source, Limits::default())
-}
-
 /// Detect a packaged ODF document from a positional source under explicit
 /// finite limits.
-pub fn packaged_mime_read_at_with_limits(
-    source: &dyn ReadAt,
-    limits: Limits,
-) -> Result<Option<Format>> {
+pub fn packaged_mime_read_at(source: &dyn ReadAt, limits: Limits) -> Result<Option<Format>> {
     limits.validate()?;
     let expected = source.version()?;
     let detected = (|| {
@@ -756,22 +650,23 @@ pub fn packaged_mime_read_at_with_limits(
 /// built, and the retained index is transferred to a concrete family facade
 /// without a second central-directory scan.
 #[must_use]
-pub fn prepared(value: Vec<u8>) -> Option<PreparedPackage> {
-    prepared_or_original(value).ok()
+pub fn prepared(value: Vec<u8>, limits: SourceLimits) -> Option<PreparedPackage> {
+    prepared_or_original(value, limits).ok()
 }
 
-/// Detect a packaged ODF document while preserving ownership on rejection.
+/// [`prepared_or_original`] under caller-selected source limits.
 ///
-/// A successful result retains the one validated ZIP index built by the
-/// detector. A rejected candidate returns the caller's original `Vec`
-/// allocation so a lower-precedence package detector can inspect it without a
-/// full-input clone.
+/// A candidate that exceeds `limits` is returned unchanged, so the caller's
+/// ordinary limited owner reports the typed limit failure.
 #[must_use = "inspect the prepared package or recover the original bytes"]
-pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPackage, Vec<u8>> {
-    let Some(format) = packaged_mime(&value) else {
+pub fn prepared_or_original(
+    value: Vec<u8>,
+    limits: SourceLimits,
+) -> std::result::Result<PreparedPackage, Vec<u8>> {
+    let Some(format) = packaged_mime(&value, Limits::default()).ok().flatten() else {
         return Err(value);
     };
-    let package = match OwnedPackage::from_prepared_bytes_or_recover(value) {
+    let package = match OwnedPackage::from_prepared_bytes_or_recover_with_limits(value, limits) {
         Ok(package) => package,
         // Strict indexing requires the `mimetype` member at offset zero. A
         // re-zipped package that relocated it is rebuilt at the ordinary
@@ -779,10 +674,7 @@ pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPacka
         // records a tolerated `mimetype` deviation; any other strict failure
         // keeps its historical rejection.
         Err(value) => {
-            let package = OwnedPackage::from_shared_bytes_or_recover_with_limits(
-                value,
-                SourcePackageLimits::default(),
-            )?;
+            let package = OwnedPackage::from_shared_bytes_or_recover_with_limits(value, limits)?;
             if package.tolerance_report().is_clean() {
                 return Err(package.into_inner());
             }
@@ -795,13 +687,6 @@ pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPacka
         return Err(package.into_inner());
     }
     Ok(PreparedPackage::new(package, format))
-}
-
-/// Compatibility spelling for callers that prefer the full detector name.
-#[inline]
-#[must_use]
-pub fn prepared_package(value: Vec<u8>) -> Option<PreparedPackage> {
-    prepared(value)
 }
 
 /// Prepare an ODF-shaped seekable reader once for a facade detector.
@@ -819,7 +704,7 @@ pub fn prepared_package(value: Vec<u8>) -> Option<PreparedPackage> {
 /// reader fallback. Every successful or failed operation restores the cursor
 /// supplied on entry; a restore failure is returned as an error.
 #[doc(hidden)]
-pub fn reader_preparation_with_limits<R: Read + Seek>(
+pub fn reader_preparation<R: Read + Seek>(
     reader: &mut R,
     limits: Limits,
     catalog_limits: CatalogProbeLimits,
@@ -907,7 +792,7 @@ fn preparation_limits(
     limits: Limits,
     catalog_limits: CatalogProbeLimits,
     length: u64,
-) -> SourcePackageLimits {
+) -> SourceLimits {
     let archive = if length <= catalog_limits.max_input_bytes {
         ArchiveLimits::new(
             catalog_limits.max_members,
@@ -920,7 +805,7 @@ fn preparation_limits(
     } else {
         ArchiveLimits::default()
     };
-    SourcePackageLimits::new(limits.max_input_bytes, archive)
+    SourceLimits::from_detection(limits.max_input_bytes, archive)
 }
 
 fn prepared_catalog_decision(
@@ -950,24 +835,15 @@ fn prepared_catalog_decision(
     }
 }
 
-/// Detect a packaged or flat `OpenDocument` stream.
-///
-/// Detection reads the complete stream from its beginning and restores the
-/// caller's original cursor position on every success or failure path. If the
-/// original position cannot be restored, this function returns `None`.
-pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
-    reader_with_limits(value, Limits::default()).ok().flatten()
-}
-
 /// Detect an ODF stream under explicit finite limits while restoring its
 /// original cursor position on every success or failure path.
-pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
+pub fn reader<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
     limits.validate()?;
     let original = value.stream_position()?;
     let detected = (|| {
         value.seek(SeekFrom::Start(0))?;
         let data = read_owned_input(&mut *value, limits.max_input_bytes, "ODF detector input")?;
-        bytes_with_limits(&data, limits)
+        bytes(&data, limits)
     })();
     value.seek(SeekFrom::Start(original))?;
     detected
@@ -1071,7 +947,7 @@ fn tolerant_packaged_mime(value: &[u8]) -> Option<Format> {
         return None;
     }
     let length = u64::try_from(value.len()).ok()?;
-    let archive = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+    let archive = soapberry_zip::office::IndexedArchive::from_reader(
         value,
         length,
         ArchiveLimits::default().into_zip_limits(),
@@ -1111,7 +987,7 @@ fn tolerant_packaged_mime_read_at(
     if !tolerant_lookup_admitted(header, name) {
         return Ok(None);
     }
-    let archive = match soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+    let archive = match soapberry_zip::office::IndexedArchive::from_reader(
         ReadAtZipSource { source },
         length,
         ArchiveLimits::default().into_zip_limits(),
@@ -1299,9 +1175,7 @@ fn catalog_probe_range_is_bounded(
 
 fn map_catalog_probe_zip_error<T>(error: soapberry_zip::Error) -> Result<Option<T>> {
     match error.into_kind() {
-        soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-            map_catalog_probe_io_error(error)
-        },
+        soapberry_zip::ErrorKind::IO(error) => map_catalog_probe_io_error(error),
         soapberry_zip::ErrorKind::Allocation { resource, source } => {
             Err(Error::Allocation { resource, source })
         },
@@ -1521,9 +1395,21 @@ mod tests {
                 r#"<?xml version="1.0"?><!--flat--><o:document xmlns:o="{}" o:mimetype="{mimetype}"><o:body><o:{body}/></o:body></o:document>"#,
                 String::from_utf8_lossy(OFFICE_NAMESPACE),
             );
-            assert_eq!(flat_mime(xml.as_bytes()).as_deref(), Some(mimetype));
-            assert_eq!(flat(xml.as_bytes()), Some(expected));
-            assert_eq!(bytes(xml.as_bytes()), Some(expected));
+            assert_eq!(
+                flat_mime(xml.as_bytes(), Limits::default())
+                    .ok()
+                    .flatten()
+                    .as_deref(),
+                Some(mimetype)
+            );
+            assert_eq!(
+                flat(xml.as_bytes(), Limits::default()).ok().flatten(),
+                Some(expected)
+            );
+            assert_eq!(
+                bytes(xml.as_bytes(), Limits::default()).ok().flatten(),
+                Some(expected)
+            );
         }
 
         let padded = format!(
@@ -1532,7 +1418,10 @@ mod tests {
             constants::ODF_TEXT,
         );
         assert_eq!(
-            flat_mime(padded.as_bytes()).as_deref(),
+            flat_mime(padded.as_bytes(), Limits::default())
+                .ok()
+                .flatten()
+                .as_deref(),
             Some(constants::ODF_TEXT)
         );
     }
@@ -1544,10 +1433,16 @@ mod tests {
             constants::ODF_TEXT,
         );
         assert_eq!(
-            flat_mime(xml.as_bytes()).as_deref(),
+            flat_mime(xml.as_bytes(), Limits::default())
+                .ok()
+                .flatten()
+                .as_deref(),
             Some(constants::ODF_TEXT)
         );
-        assert_eq!(flat(xml.as_bytes()), Some(Format::Odt));
+        assert_eq!(
+            flat(xml.as_bytes(), Limits::default()).ok().flatten(),
+            Some(Format::Odt)
+        );
     }
 
     #[test]
@@ -1558,24 +1453,31 @@ mod tests {
             r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/xml"/>"#,
             r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
         ] {
-            assert_eq!(flat(xml.as_bytes()), None);
+            assert_eq!(flat(xml.as_bytes(), Limits::default()).ok().flatten(), None);
         }
     }
 
     #[test]
     fn detects_packaged_documents_and_restores_nonzero_reader_position() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
         let package = writer
             .finish_to_bytes()
             .unwrap_or_else(|error| panic!("test package must be writable: {error}"));
-        assert_eq!(bytes(&package), Some(Format::Odt));
+        assert_eq!(
+            bytes(&package, Limits::default()).ok().flatten(),
+            Some(Format::Odt)
+        );
 
         let mut input = Cursor::new(package);
         input.set_position(7);
-        assert_eq!(reader(&mut input), Some(Format::Odt));
+        assert_eq!(
+            reader(&mut input, Limits::default()).ok().flatten(),
+            Some(Format::Odt)
+        );
         assert_eq!(input.position(), 7);
 
         let xml = format!(
@@ -1585,12 +1487,15 @@ mod tests {
         );
         let mut flat_input = Cursor::new(xml);
         flat_input.set_position(9);
-        assert_eq!(reader(&mut flat_input), Some(Format::Odt));
+        assert_eq!(
+            reader(&mut flat_input, Limits::default()).ok().flatten(),
+            Some(Format::Odt)
+        );
         assert_eq!(flat_input.position(), 9);
 
         let mut invalid = Cursor::new(b"not an OpenDocument file".to_vec());
         invalid.set_position(4);
-        assert_eq!(reader(&mut invalid), None);
+        assert_eq!(reader(&mut invalid, Limits::default()).ok().flatten(), None);
         assert_eq!(invalid.position(), 4);
     }
 
@@ -1601,7 +1506,8 @@ mod tests {
             (constants::ODF_SPREADSHEET, Format::Ods),
             (constants::ODF_PRESENTATION, Format::Odp),
         ] {
-            let mut writer = crate::core::PackageWriter::new();
+            let mut writer =
+                crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
             writer
                 .set_mimetype(mimetype)
                 .unwrap_or_else(|error| panic!("test package MIME must be accepted: {error}"));
@@ -1616,7 +1522,7 @@ mod tests {
             reader.set_position(7);
             reset_reader_snapshot_reads();
             crate::package::reset_index_build_count();
-            let preparation = reader_preparation_with_limits(
+            let preparation = reader_preparation(
                 &mut reader,
                 Limits::default(),
                 CatalogProbeLimits::default(),
@@ -1656,7 +1562,8 @@ mod tests {
             ("content.xml", b"<content/>"),
         ]);
 
-        let mut marker_writer = crate::core::PackageWriter::new();
+        let mut marker_writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         marker_writer
             .set_mimetype(constants::ODF_TEXT)
             .expect("test package MIME must be accepted");
@@ -1670,7 +1577,7 @@ mod tests {
         let catalog_over_limit = CatalogProbeLimits::default()
             .with_max_input_bytes(u64::try_from(ordinary.len() - 1).expect("test package length"));
         let mut reader = Cursor::new(marker);
-        let preparation = reader_preparation_with_limits(
+        let preparation = reader_preparation(
             &mut reader,
             Limits::default(),
             CatalogProbeLimits::default(),
@@ -1685,10 +1592,9 @@ mod tests {
         }
 
         let mut reader = Cursor::new(ordinary.clone());
-        let preparation =
-            reader_preparation_with_limits(&mut reader, Limits::default(), catalog_over_limit)
-                .expect("catalog uncertainty must not be an operation failure")
-                .expect("ordinary package must be an ODF candidate");
+        let preparation = reader_preparation(&mut reader, Limits::default(), catalog_over_limit)
+            .expect("catalog uncertainty must not be an operation failure")
+            .expect("ordinary package must be an ODF candidate");
         match preparation {
             ReaderPreparation::Prepared { catalog, .. } => {
                 assert_eq!(catalog, CatalogDecision::Unknown)
@@ -1707,12 +1613,12 @@ mod tests {
         strict_mimetype_mismatch[mimetype_central + 10..mimetype_central + 12]
             .copy_from_slice(&8_u16.to_le_bytes());
         assert_eq!(
-            packaged_has_ooxml_catalog(&strict_mimetype_mismatch),
+            packaged_has_ooxml_catalog(&strict_mimetype_mismatch, CatalogProbeLimits::default()),
             Some(false)
         );
         let mut reader = Cursor::new(strict_mimetype_mismatch);
         assert!(matches!(
-            reader_preparation_with_limits(
+            reader_preparation(
                 &mut reader,
                 Limits::default(),
                 CatalogProbeLimits::default(),
@@ -1728,7 +1634,7 @@ mod tests {
         let mut reader = Cursor::new(prefixed);
         reader.set_position(3);
         assert!(
-            reader_preparation_with_limits(
+            reader_preparation(
                 &mut reader,
                 Limits::default(),
                 CatalogProbeLimits::default(),
@@ -1803,7 +1709,7 @@ mod tests {
 
     fn assert_preparation_unknown(bytes: &[u8]) {
         let mut reader = Cursor::new(bytes.to_vec());
-        let preparation = reader_preparation_with_limits(
+        let preparation = reader_preparation(
             &mut reader,
             Limits::default(),
             CatalogProbeLimits::default(),
@@ -1823,7 +1729,7 @@ mod tests {
 
     fn assert_preparation_fallback_or_unknown(bytes: &[u8]) {
         let mut reader = Cursor::new(bytes.to_vec());
-        let preparation = reader_preparation_with_limits(
+        let preparation = reader_preparation(
             &mut reader,
             Limits::default(),
             CatalogProbeLimits::default(),
@@ -1868,13 +1774,13 @@ mod tests {
 
     #[test]
     fn bounded_reader_uses_max_plus_one_and_restores_position() {
-        let mut reader = Cursor::new(b"xx".to_vec());
-        reader.set_position(1);
-        let error = reader_with_limits(&mut reader, Limits::new(1)).unwrap_err();
+        let mut input = Cursor::new(b"xx".to_vec());
+        input.set_position(1);
+        let error = reader(&mut input, Limits::new(1)).unwrap_err();
         assert!(matches!(error, Error::ResourceLimit(_)));
-        assert_eq!(reader.position(), 1);
+        assert_eq!(input.position(), 1);
         assert!(matches!(
-            reader_with_limits(&mut reader, Limits::new(0)),
+            reader(&mut input, Limits::new(0)),
             Err(Error::InvalidFormat(_))
         ));
     }
@@ -1909,7 +1815,8 @@ mod tests {
 
     #[test]
     fn packaged_detection_rejects_nonconforming_local_mimetype_entries() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
@@ -1919,16 +1826,26 @@ mod tests {
 
         let mut compressed = package.clone();
         compressed[8..10].copy_from_slice(&8_u16.to_le_bytes());
-        assert_eq!(bytes(&compressed), None);
+        assert_eq!(bytes(&compressed, Limits::default()).ok().flatten(), None);
 
         let mut corrupt = package.clone();
         let payload = LOCAL_HEADER_BYTES + MIMETYPE_NAME.len();
         corrupt[payload] ^= 1;
-        assert_eq!(bytes(&corrupt), None);
+        assert_eq!(bytes(&corrupt, Limits::default()).ok().flatten(), None);
 
-        assert_eq!(bytes(&package[..LOCAL_HEADER_BYTES]), None);
+        assert_eq!(
+            bytes(&package[..LOCAL_HEADER_BYTES], Limits::default())
+                .ok()
+                .flatten(),
+            None
+        );
         let local_entry_end = LOCAL_HEADER_BYTES + MIMETYPE_NAME.len() + constants::ODF_TEXT.len();
-        assert_eq!(bytes(&package[..local_entry_end]), None);
+        assert_eq!(
+            bytes(&package[..local_entry_end], Limits::default())
+                .ok()
+                .flatten(),
+            None
+        );
     }
 
     #[test]
@@ -1937,30 +1854,48 @@ mod tests {
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             ("content.xml", b"[Content_Types].xml"),
         ]);
-        assert_eq!(packaged_has_ooxml_catalog(&ordinary), Some(false));
+        assert_eq!(
+            packaged_has_ooxml_catalog(&ordinary, CatalogProbeLimits::default()),
+            Some(false)
+        );
 
         let case_insensitive = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             ("[content_types].xml", b"<broken>"),
         ]);
-        assert_eq!(packaged_has_ooxml_catalog(&case_insensitive), Some(true));
+        assert_eq!(
+            packaged_has_ooxml_catalog(&case_insensitive, CatalogProbeLimits::default()),
+            Some(true)
+        );
 
         let normalized = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             ("/[Content_Types].xml", b"<broken>"),
         ]);
-        assert_eq!(packaged_has_ooxml_catalog(&normalized), None);
+        assert_eq!(
+            packaged_has_ooxml_catalog(&normalized, CatalogProbeLimits::default()),
+            None
+        );
 
         let directory = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             ("[Content_Types].xml/", b""),
         ]);
-        assert_eq!(packaged_has_ooxml_catalog(&directory), Some(false));
+        assert_eq!(
+            packaged_has_ooxml_catalog(&directory, CatalogProbeLimits::default()),
+            Some(false)
+        );
 
         let mut malformed = ordinary;
         malformed.truncate(malformed.len() - 1);
-        assert_eq!(packaged_has_ooxml_catalog(&malformed), None);
-        assert_eq!(packaged_has_ooxml_catalog(b"not a ZIP"), None);
+        assert_eq!(
+            packaged_has_ooxml_catalog(&malformed, CatalogProbeLimits::default()),
+            None
+        );
+        assert_eq!(
+            packaged_has_ooxml_catalog(b"not a ZIP", CatalogProbeLimits::default()),
+            None
+        );
     }
 
     #[test]
@@ -1997,10 +1932,7 @@ mod tests {
             u64::MAX,
             u64::MAX,
         );
-        assert_eq!(
-            packaged_has_ooxml_catalog_with_limits(&ordinary, limits),
-            None
-        );
+        assert_eq!(packaged_has_ooxml_catalog(&ordinary, limits), None);
 
         let input_limited = CatalogProbeLimits::new(
             u64::try_from(ordinary.len() - 1).expect("test ZIP length"),
@@ -2011,10 +1943,7 @@ mod tests {
             u64::MAX,
             u64::MAX,
         );
-        assert_eq!(
-            packaged_has_ooxml_catalog_with_limits(&ordinary, input_limited),
-            None
-        );
+        assert_eq!(packaged_has_ooxml_catalog(&ordinary, input_limited), None);
     }
 
     #[derive(Debug)]
@@ -2120,19 +2049,22 @@ mod tests {
     #[test]
     fn positional_catalog_probe_preserves_provider_errors_and_source_changes() {
         assert_eq!(
-            packaged_has_ooxml_catalog_read_at(&ShortReadAt { length: 128 })
-                .expect("short source is a layout uncertainty"),
+            packaged_has_ooxml_catalog_read_at(
+                &ShortReadAt { length: 128 },
+                CatalogProbeLimits::default()
+            )
+            .expect("short source is a layout uncertainty"),
             None
         );
         assert!(matches!(
-            packaged_has_ooxml_catalog_read_at(&ProviderFailure),
+            packaged_has_ooxml_catalog_read_at(&ProviderFailure, CatalogProbeLimits::default()),
             Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::PermissionDenied
         ));
         assert!(matches!(
             packaged_has_ooxml_catalog_read_at(&CentralProviderFailure {
                 signature: *b"PK\x03\x04",
                 first_read: std::sync::atomic::AtomicBool::new(true),
-            }),
+            }, CatalogProbeLimits::default()),
             Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::ConnectionReset
         ));
 
@@ -2145,7 +2077,7 @@ mod tests {
             revision: std::sync::atomic::AtomicU64::new(0),
         };
         assert!(matches!(
-            packaged_has_ooxml_catalog_read_at(&source),
+            packaged_has_ooxml_catalog_read_at(&source, CatalogProbeLimits::default()),
             Err(Error::SourceChanged { .. })
         ));
     }
@@ -2249,7 +2181,7 @@ mod tests {
         };
         short.seek(SeekFrom::Start(7)).expect("test cursor");
         assert_eq!(
-            packaged_has_ooxml_catalog_from_reader(&mut short),
+            packaged_has_ooxml_catalog_from_reader(&mut short, CatalogProbeLimits::default()),
             Some(false)
         );
         assert_eq!(short.cursor.position(), 7);
@@ -2259,7 +2191,10 @@ mod tests {
             refused_position: 11,
         };
         failing.cursor.set_position(failing.refused_position);
-        assert_eq!(packaged_has_ooxml_catalog_from_reader(&mut failing), None);
+        assert_eq!(
+            packaged_has_ooxml_catalog_from_reader(&mut failing, CatalogProbeLimits::default()),
+            None
+        );
     }
 
     #[test]
@@ -2272,13 +2207,9 @@ mod tests {
         let mut short = Cursor::new(ordinary[..LOCAL_HEADER_BYTES - 1].to_vec());
         short.set_position(5);
         assert!(
-            reader_preparation_with_limits(
-                &mut short,
-                Limits::default(),
-                CatalogProbeLimits::default(),
-            )
-            .expect("short input is detector uncertainty")
-            .is_none()
+            reader_preparation(&mut short, Limits::default(), CatalogProbeLimits::default(),)
+                .expect("short input is detector uncertainty")
+                .is_none()
         );
         assert_eq!(short.position(), 5);
 
@@ -2288,7 +2219,7 @@ mod tests {
         };
         read_failure.cursor.set_position(6);
         assert!(
-            reader_preparation_with_limits(
+            reader_preparation(
                 &mut read_failure,
                 Limits::default(),
                 CatalogProbeLimits::default(),
@@ -2303,7 +2234,7 @@ mod tests {
         };
         seek_failure.cursor.set_position(8);
         assert!(
-            reader_preparation_with_limits(
+            reader_preparation(
                 &mut seek_failure,
                 Limits::default(),
                 CatalogProbeLimits::default(),
@@ -2319,7 +2250,7 @@ mod tests {
         };
         restore_failure.cursor.set_position(9);
         assert!(
-            reader_preparation_with_limits(
+            reader_preparation(
                 &mut restore_failure,
                 Limits::default(),
                 CatalogProbeLimits::default(),
@@ -2330,7 +2261,8 @@ mod tests {
 
     #[test]
     fn positional_packaged_probe_reuses_strict_local_mimetype_grammar() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_PRESENTATION)
             .expect("test package MIME");
@@ -2341,31 +2273,36 @@ mod tests {
         let source = litchi_core::OwnedSource::new(package.clone());
 
         assert_eq!(
-            packaged_mime_read_at(&source).expect("positional probe"),
-            packaged_mime(&package)
+            packaged_mime_read_at(&source, Limits::default()).expect("positional probe"),
+            packaged_mime(&package, Limits::default()).ok().flatten()
         );
         assert_eq!(
-            packaged_has_ooxml_catalog_read_at(&source).expect("positional catalog probe"),
-            packaged_has_ooxml_catalog(&package)
+            packaged_has_ooxml_catalog_read_at(&source, CatalogProbeLimits::default())
+                .expect("positional catalog probe"),
+            packaged_has_ooxml_catalog(&package, CatalogProbeLimits::default())
         );
         let mut seekable = Cursor::new(package.clone());
         seekable.set_position(5);
         assert_eq!(
-            packaged_has_ooxml_catalog_from_reader(&mut seekable),
+            packaged_has_ooxml_catalog_from_reader(&mut seekable, CatalogProbeLimits::default()),
             Some(false)
         );
         assert_eq!(seekable.position(), 5);
         let mut malformed = package.clone();
         malformed.truncate(malformed.len() - 1);
         assert_eq!(
-            packaged_has_ooxml_catalog_read_at(&litchi_core::OwnedSource::new(malformed))
-                .expect("malformed positional catalog probe"),
+            packaged_has_ooxml_catalog_read_at(
+                &litchi_core::OwnedSource::new(malformed),
+                CatalogProbeLimits::default()
+            )
+            .expect("malformed positional catalog probe"),
             None
         );
         assert_eq!(
-            packaged_mime_read_at(&litchi_core::OwnedSource::new(
-                package[..LOCAL_HEADER_BYTES].to_vec()
-            ))
+            packaged_mime_read_at(
+                &litchi_core::OwnedSource::new(package[..LOCAL_HEADER_BYTES].to_vec()),
+                Limits::default()
+            )
             .expect("short positional probe"),
             None
         );
@@ -2374,14 +2311,16 @@ mod tests {
     #[test]
     fn prepared_detection_retains_one_bounded_index_and_rejects_hostile_archives() {
         crate::package::reset_index_build_count();
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
         let package = writer
             .finish_to_bytes()
             .unwrap_or_else(|error| panic!("test package must be writable: {error}"));
-        let retained = prepared(package).expect("valid package must prepare");
+        let retained =
+            prepared(package, SourceLimits::default()).expect("valid package must prepare");
         assert_eq!(retained.format(), Format::Odt);
         assert_ne!(retained.prepared_index_identity(), 0);
         assert_eq!(crate::package::index_build_count(), 1);
@@ -2396,22 +2335,22 @@ mod tests {
             ("Pictures/a", b"one"),
             ("./Pictures/a", b"two"),
         ]);
-        assert!(prepared(duplicate).is_none());
+        assert!(prepared(duplicate, SourceLimits::default()).is_none());
 
         let traversal = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             ("../Pictures/a", b"one"),
             ("Pictures/a", b"two"),
         ]);
-        assert!(prepared(traversal).is_none());
+        assert!(prepared(traversal, SourceLimits::default()).is_none());
 
         let oversized_name = format!("{}.xml", "x".repeat(4 * 1024));
         let oversized = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             (&oversized_name, b"one"),
         ]);
-        assert!(prepared(oversized).is_none());
-        assert!(prepared(b"PK\x03\x04truncated".to_vec()).is_none());
+        assert!(prepared(oversized, SourceLimits::default()).is_none());
+        assert!(prepared(b"PK\x03\x04truncated".to_vec(), SourceLimits::default()).is_none());
 
         let mut forged = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
@@ -2421,7 +2360,7 @@ mod tests {
         let mimetype_central_offset = central_record(&forged, b"mimetype");
         forged[mimetype_central_offset + 42..mimetype_central_offset + 46]
             .copy_from_slice(&(content_local_offset as u32).to_le_bytes());
-        assert!(prepared(forged).is_none());
+        assert!(prepared(forged, SourceLimits::default()).is_none());
 
         let mut invalid_utf8 = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
@@ -2431,18 +2370,19 @@ mod tests {
         invalid_utf8[invalid_local + 30] = 0xff;
         let invalid_central = central_record(&invalid_utf8, b"content.xml");
         invalid_utf8[invalid_central + 46] = 0xff;
-        assert!(prepared(invalid_utf8).is_none());
+        assert!(prepared(invalid_utf8, SourceLimits::default()).is_none());
 
         let traversal = zip_with_entries(&[
             ("mimetype", constants::ODF_TEXT.as_bytes()),
             ("../content.xml", b"junk"),
         ]);
-        assert!(prepared(traversal).is_none());
+        assert!(prepared(traversal, SourceLimits::default()).is_none());
     }
 
     #[test]
     fn rejected_prepared_detection_returns_the_original_allocation() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .expect("test package mimetype must be accepted");
@@ -2455,7 +2395,7 @@ mod tests {
         let pointer = invalid.as_ptr();
         let capacity = invalid.capacity();
 
-        let recovered = match prepared_or_original(invalid) {
+        let recovered = match prepared_or_original(invalid, SourceLimits::default()) {
             Err(recovered) => recovered,
             Ok(_) => panic!("malformed ODF index must return its source"),
         };

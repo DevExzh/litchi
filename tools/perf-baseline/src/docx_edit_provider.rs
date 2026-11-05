@@ -44,7 +44,7 @@ use std::{
 };
 
 use litchi_core::{FileSource, OwnedSource, ReadAt, SourceVersion};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -167,12 +167,12 @@ impl Config {
 #[derive(Clone, Copy, Debug, Serialize)]
 struct ReadLimitsRecord {
     max_input_bytes: u64,
-    max_archive_members: usize,
+    max_members: usize,
     max_archive_member_name_bytes: u64,
     max_archive_metadata_bytes: u64,
     max_archive_compressed_bytes: u64,
-    max_archive_entry_bytes: u64,
-    max_archive_total_bytes: u64,
+    max_entry_bytes: u64,
+    max_aggregate_bytes: u64,
     max_parts: usize,
     max_part_bytes: u64,
     max_total_part_bytes: u64,
@@ -184,23 +184,23 @@ struct ReadLimitsRecord {
     max_relationships_per_part: usize,
     max_total_relationships: usize,
     max_relationship_graph_nodes: usize,
-    max_xml_events: usize,
+    max_events: usize,
     max_total_relationship_xml_events: usize,
-    max_xml_depth: usize,
+    max_depth: usize,
     max_xml_attribute_bytes: usize,
     max_relationship_target_bytes: usize,
 }
 
 impl ReadLimitsRecord {
-    fn from_limits(limits: ReadLimits) -> Self {
+    fn from_limits(limits: SourceLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
-            max_archive_members: limits.max_archive_members(),
+            max_members: limits.max_members(),
             max_archive_member_name_bytes: limits.max_archive_member_name_bytes(),
             max_archive_metadata_bytes: limits.max_archive_metadata_bytes(),
             max_archive_compressed_bytes: limits.max_archive_compressed_bytes(),
-            max_archive_entry_bytes: limits.max_archive_entry_bytes(),
-            max_archive_total_bytes: limits.max_archive_total_bytes(),
+            max_entry_bytes: limits.max_entry_bytes(),
+            max_aggregate_bytes: limits.max_aggregate_bytes(),
             max_parts: limits.max_parts(),
             max_part_bytes: limits.max_part_bytes(),
             max_total_part_bytes: limits.max_total_part_bytes(),
@@ -212,9 +212,9 @@ impl ReadLimitsRecord {
             max_relationships_per_part: limits.max_relationships_per_part(),
             max_total_relationships: limits.max_total_relationships(),
             max_relationship_graph_nodes: limits.max_relationship_graph_nodes(),
-            max_xml_events: limits.max_xml_events(),
+            max_events: limits.max_events(),
             max_total_relationship_xml_events: limits.max_total_relationship_xml_events(),
-            max_xml_depth: limits.max_xml_depth(),
+            max_depth: limits.max_depth(),
             max_xml_attribute_bytes: limits.max_xml_attribute_bytes(),
             max_relationship_target_bytes: limits.max_relationship_target_bytes(),
         }
@@ -244,7 +244,7 @@ struct LimitsRecord {
 }
 
 fn limits_record() -> LimitsRecord {
-    let read_limits = ReadLimits::default();
+    let read_limits = SourceLimits::default();
     let cache_limits = SourceCacheLimits::default();
     LimitsRecord {
         read_limits: ReadLimitsRecord::from_limits(read_limits),
@@ -876,13 +876,13 @@ fn prepare() -> Result<Prepared, Box<dyn Error>> {
     }
     crate::verify_docx_source_edit_output(&corpus, &expected_output)?;
     let source_document_xml = commit.patch().source().xml_bytes().to_vec();
-    let candidate_document_xml = commit.snapshot().xml_bytes().to_vec();
+    let candidate_document_xml = commit.patch().target().xml_bytes().to_vec();
     let replayed = commit.patch().apply(commit.patch().source())?;
-    let replay_forward_verified = replayed.xml_bytes() == commit.snapshot().xml_bytes();
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
+    let replay_forward_verified = replayed.xml_bytes() == commit.patch().target().xml_bytes();
+    let restored = commit.patch().inverse().apply(commit.patch().target())?;
     let inverse_restores_source_verified =
         restored.xml_bytes() == commit.patch().source().xml_bytes();
-    let stale_target_refusal_verified = commit.patch().apply(commit.snapshot()).is_err();
+    let stale_target_refusal_verified = commit.patch().apply(commit.patch().target()).is_err();
     let foreign_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(expected_output.clone()),
     ))?;
@@ -952,11 +952,11 @@ fn run_sample(
     let started = Instant::now();
     let (materializations, commit) =
         crate::publish_docx_source_edit(Arc::clone(&provider.source), &mut sink)?;
-    let commit_changed = commit.patch().changed();
+    let commit_changed = !commit.patch().is_noop();
     let commit_operations = commit.diagnostics().operations();
     let commit_identity_verified = commit.patch().source().xml_bytes()
         == prepared.source_document_xml.as_slice()
-        && commit.snapshot().xml_bytes() == prepared.candidate_document_xml.as_slice();
+        && commit.patch().target().xml_bytes() == prepared.candidate_document_xml.as_slice();
     // The commit owns its candidate snapshot and is intentionally dropped in
     // the lifecycle clock.  Replay/inverse checks use the separately gated
     // preflight artifact so this drop remains part of the measured boundary.
@@ -1610,7 +1610,7 @@ mod tests {
     #[test]
     fn limits_report_uses_package_defaults_without_claiming_managed_budget() {
         let report = limits_record();
-        let read_limits = ReadLimits::default();
+        let read_limits = SourceLimits::default();
         let cache_limits = SourceCacheLimits::default();
         assert_eq!(
             report.read_limits.max_input_bytes,

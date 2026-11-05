@@ -6,7 +6,7 @@ use litchi_core::OwnedSource;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 
-use crate::{Error, Package, Result, SourceBackedPresentation, SourceBackedPresentationEditor};
+use crate::{Error, Result, SourceBackedPresentation, SourceBackedPresentationEditor};
 
 type TestResult<T = ()> = Result<T>;
 
@@ -48,7 +48,7 @@ fn same_length_tampered_plan_payloads_reject_before_output() -> TestResult {
         let error = editor
             .publish_cross_slide_copy_to_stream(&mut output, &plan)
             .expect_err("tampered private plan must not publish");
-        assert!(matches!(error, Error::StaleSource));
+        assert!(matches!(error, Error::PatchConflict));
         assert!(
             output.is_empty(),
             "stale plan must fail before writing output"
@@ -72,7 +72,7 @@ fn candidate_readback_rejects_same_length_image_and_chart_payloads() -> TestResu
 
         let error = verify_candidate(&editor, &source, &candidate)
             .expect_err("candidate readback must reject changed payload bytes");
-        assert!(matches!(error, Error::StaleSource));
+        assert!(matches!(error, Error::PatchConflict));
     }
 
     Ok(())
@@ -124,7 +124,10 @@ fn flipped_payload(payload: &PreparedPayload) -> PreparedPayload {
 }
 
 fn source_fixture() -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(authored_fixture(&["source-one", "source-two"])?)?;
+    let mut package = OpcPackage::from_vec(
+        authored_fixture(&["source-one", "source-two"])?,
+        litchi_opc::SourceLimits::default(),
+    )?;
     let image_uri = PackURI::new("/ppt/media/guard-image.png").map_err(Error::Uri)?;
     let chart_uri = PackURI::new("/ppt/charts/guard-chart.xml").map_err(Error::Uri)?;
     package.try_add_part(Box::new(BlobPart::new(
@@ -173,16 +176,18 @@ fn chart_payload() -> Vec<u8> {
 }
 
 fn authored_fixture(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         for title in slide_titles {
             let slide = presentation.add_slide()?;
             slide.set_title(title);
             slide.add_text_box(&format!("body:{title}"), 10, 20, 300, 400);
         }
     }
-    let mut archive = OpcPackage::from_vec(package.to_bytes()?)?;
+    let package = builder.build()?;
+    let mut archive =
+        OpcPackage::from_vec(package.to_bytes()?, litchi_opc::SourceLimits::default())?;
     for (index, title) in slide_titles.iter().enumerate() {
         let uri =
             PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).map_err(Error::Uri)?;

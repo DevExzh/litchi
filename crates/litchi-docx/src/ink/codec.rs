@@ -7,6 +7,7 @@
     reason = "parser bindings are refined after each bounded validation step"
 )]
 
+use crate::ink::LimitKind;
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, OffsetLimits, active_offsets};
 use quick_xml::XmlVersion;
@@ -123,7 +124,15 @@ pub(crate) fn scan(
     max_anchors: usize,
 ) -> Result<Vec<Anchor>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("story XML bytes", xml.len(), MAX_XML_BYTES));
+        return Err(limit(LimitKind::StoryXmlBytes, xml.len(), MAX_XML_BYTES));
+    }
+    // Frames are classified on namespace values as written, while active
+    // anchors come from the markup-compatibility processor: a binding spelled
+    // with references would make the two disagree.
+    if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
+        return Err(invalid(
+            "DOCX story XML spells the markup-compatibility namespace with references",
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -208,7 +217,7 @@ pub(crate) fn scan(
                 if !root_seen || stack.is_empty() {
                     return Err(invalid("DOCX story has an unexpected end element"));
                 }
-                validate_qname(element.name().as_ref(), "XML end QName")?;
+                validate_qname(element.name().as_ref(), LimitKind::XmlEndQName)?;
                 if matches!(namespace, ResolveResult::Unknown(_)) {
                     return Err(invalid(
                         "DOCX story end element uses an unknown namespace prefix",
@@ -220,7 +229,7 @@ pub(crate) fn scan(
                 }
             },
             Event::Text(text) => {
-                bounded(text.as_ref(), MAX_TEXT_BYTES, "XML text")?;
+                bounded(text.as_ref(), MAX_TEXT_BYTES, LimitKind::XmlText)?;
                 let text = super::xml::text(text.as_ref())?;
                 if !root_seen {
                     prolog_started = true;
@@ -234,21 +243,25 @@ pub(crate) fn scan(
                 }
             },
             Event::CData(data) => {
-                bounded(data.as_ref(), MAX_TEXT_BYTES, "XML CDATA")?;
+                bounded(data.as_ref(), MAX_TEXT_BYTES, LimitKind::XmlCdata)?;
                 super::xml::text(data.as_ref())?;
                 if !root_seen || root_closed {
                     return Err(invalid("DOCX story has CDATA outside its root"));
                 }
             },
             Event::Comment(comment) => {
-                bounded(comment.as_ref(), MAX_COMMENT_BYTES, "XML comment")?;
+                bounded(comment.as_ref(), MAX_COMMENT_BYTES, LimitKind::XmlComment)?;
                 super::xml::text(comment.as_ref())?;
                 if !root_seen {
                     prolog_started = true;
                 }
             },
             Event::GeneralRef(reference) => {
-                bounded(reference.as_ref(), MAX_REFERENCE_BYTES, "XML reference")?;
+                bounded(
+                    reference.as_ref(),
+                    MAX_REFERENCE_BYTES,
+                    LimitKind::XmlReference,
+                )?;
                 super::xml::reference(reference.as_ref())?;
                 if !root_seen || root_closed {
                     return Err(invalid("DOCX story has a reference outside its root"));
@@ -258,7 +271,7 @@ pub(crate) fn scan(
                 bounded(
                     declaration.as_ref(),
                     MAX_DECLARATION_BYTES,
-                    "XML declaration",
+                    LimitKind::XmlDeclaration,
                 )?;
                 super::xml::declaration(&declaration)?;
                 if declaration_seen || prolog_started || root_seen {
@@ -269,14 +282,14 @@ pub(crate) fn scan(
                 declaration_seen = true;
             },
             Event::DocType(doctype) => {
-                bounded(doctype.as_ref(), MAX_DECLARATION_BYTES, "XML DTD")?;
+                bounded(doctype.as_ref(), MAX_DECLARATION_BYTES, LimitKind::XmlDtd)?;
                 return Err(invalid("DOCX story rejects DTDs"));
             },
             Event::PI(instruction) => {
                 bounded(
                     instruction.as_ref(),
                     MAX_DECLARATION_BYTES,
-                    "XML processing instruction",
+                    LimitKind::XmlProcessingInstruction,
                 )?;
                 return Err(invalid("DOCX story rejects processing instructions"));
             },
@@ -291,7 +304,11 @@ pub(crate) fn scan(
 
     let selected_offsets = select_active_offsets(xml, &pending, max_nodes, max_depth)?;
     if selected_offsets.len() > max_anchors {
-        return Err(limit("ink anchors", selected_offsets.len(), max_anchors));
+        return Err(limit(
+            LimitKind::Anchors,
+            selected_offsets.len(),
+            max_anchors,
+        ));
     }
     collect_active_anchors(
         xml,
@@ -357,9 +374,9 @@ fn collect_active_anchors(
                 let depth = stack
                     .len()
                     .checked_add(1)
-                    .ok_or_else(|| limit("XML depth", usize::MAX, max_depth))?;
+                    .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, max_depth))?;
                 if depth > max_depth {
-                    return Err(limit("XML depth", depth, max_depth));
+                    return Err(limit(LimitKind::XmlDepth, depth, max_depth));
                 }
                 let parent = semantic_parent(&stack);
                 let frame = classify_frame(&namespace, &element, parent, resolver, dialect);
@@ -429,9 +446,9 @@ fn collect_active_anchors(
                 let depth = stack
                     .len()
                     .checked_add(1)
-                    .ok_or_else(|| limit("XML depth", usize::MAX, max_depth))?;
+                    .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, max_depth))?;
                 if depth > max_depth {
-                    return Err(limit("XML depth", depth, max_depth));
+                    return Err(limit(LimitKind::XmlDepth, depth, max_depth));
                 }
                 let parent = semantic_parent(&stack);
                 let frame = classify_frame(&namespace, &element, parent, resolver, dialect);
@@ -593,7 +610,7 @@ fn observe_mce_child(
                 context.choice_count = context
                     .choice_count
                     .checked_add(1)
-                    .ok_or_else(|| limit("MCE choices", usize::MAX, usize::MAX))?;
+                    .ok_or_else(|| limit(LimitKind::MceChoices, usize::MAX, usize::MAX))?;
                 let requires = choice_requires_kind(element, resolver);
                 if context.choice_count == 1 {
                     context.choice_requires = requires;
@@ -606,7 +623,7 @@ fn observe_mce_child(
                 context.fallback_count = context
                     .fallback_count
                     .checked_add(1)
-                    .ok_or_else(|| limit("MCE fallbacks", usize::MAX, usize::MAX))?;
+                    .ok_or_else(|| limit(LimitKind::MceFallbacks, usize::MAX, usize::MAX))?;
             },
             _ => {},
         }
@@ -897,9 +914,9 @@ fn observe_start_envelope(
     let depth = stack
         .len()
         .checked_add(1)
-        .ok_or_else(|| limit("XML depth", usize::MAX, max_depth))?;
+        .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, max_depth))?;
     if depth > max_depth {
-        return Err(limit("XML depth", depth, max_depth));
+        return Err(limit(LimitKind::XmlDepth, depth, max_depth));
     }
     if *root_seen && root_closed {
         return Err(invalid("DOCX story has more than one XML root"));
@@ -928,9 +945,9 @@ fn observe_empty_envelope(
     let depth = stack
         .len()
         .checked_add(1)
-        .ok_or_else(|| limit("XML depth", usize::MAX, max_depth))?;
+        .ok_or_else(|| limit(LimitKind::XmlDepth, usize::MAX, max_depth))?;
     if depth > max_depth {
-        return Err(limit("XML depth", depth, max_depth));
+        return Err(limit(LimitKind::XmlDepth, depth, max_depth));
     }
     if stack.is_empty() {
         if *root_seen {
@@ -1107,7 +1124,7 @@ fn push_pending(
 ) -> Result<()> {
     if pending.len() >= max_candidates {
         return Err(limit(
-            "ink candidate anchors",
+            LimitKind::CandidateAnchors,
             pending.len().saturating_add(1),
             max_candidates,
         ));
@@ -1140,14 +1157,23 @@ fn select_active_offsets(
     let marked_extra = pending
         .len()
         .checked_mul(MAX_MCE_MARKER_BYTES_PER_ANCHOR)
-        .ok_or_else(|| limit("MCE marked XML bytes", usize::MAX, MAX_MCE_MARKED_BYTES))?;
-    let marked_bytes = xml
-        .len()
-        .checked_add(marked_extra)
-        .ok_or_else(|| limit("MCE marked XML bytes", usize::MAX, MAX_MCE_MARKED_BYTES))?;
+        .ok_or_else(|| {
+            limit(
+                LimitKind::MceMarkedXmlBytes,
+                usize::MAX,
+                MAX_MCE_MARKED_BYTES,
+            )
+        })?;
+    let marked_bytes = xml.len().checked_add(marked_extra).ok_or_else(|| {
+        limit(
+            LimitKind::MceMarkedXmlBytes,
+            usize::MAX,
+            MAX_MCE_MARKED_BYTES,
+        )
+    })?;
     if marked_bytes > MAX_MCE_MARKED_BYTES {
         return Err(limit(
-            "MCE marked XML bytes",
+            LimitKind::MceMarkedXmlBytes,
             marked_bytes,
             MAX_MCE_MARKED_BYTES,
         ));
@@ -1192,7 +1218,7 @@ fn mce_output_limit(marked_bytes: usize, max_nodes: usize, max_depth: usize) -> 
     let growth_factor = max_nodes.max(max_depth).max(MIN_GROWTH_FACTOR);
     let expanded = marked_bytes
         .checked_mul(growth_factor)
-        .ok_or_else(|| limit("MCE output bytes", usize::MAX, MAX_OUTPUT_BYTES))?;
+        .ok_or_else(|| limit(LimitKind::MceOutputBytes, usize::MAX, MAX_OUTPUT_BYTES))?;
     Ok(expanded.min(MAX_OUTPUT_BYTES))
 }
 
@@ -1227,14 +1253,14 @@ fn element_offset(
 fn observe_node(nodes: &mut usize, maximum: usize) -> Result<()> {
     *nodes = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("XML nodes", usize::MAX, maximum))?;
+        .ok_or_else(|| limit(LimitKind::XmlNodes, usize::MAX, maximum))?;
     if *nodes > maximum {
-        return Err(limit("XML nodes", *nodes, maximum));
+        return Err(limit(LimitKind::XmlNodes, *nodes, maximum));
     }
     Ok(())
 }
 
-fn validate_qname(name: &[u8], resource: &'static str) -> Result<()> {
+fn validate_qname(name: &[u8], resource: LimitKind) -> Result<()> {
     if name.is_empty() || name.len() > MAX_QNAME_BYTES {
         return Err(limit(resource, name.len(), MAX_QNAME_BYTES));
     }
@@ -1255,7 +1281,7 @@ fn validate_qname(name: &[u8], resource: &'static str) -> Result<()> {
     Ok(())
 }
 
-fn bounded(bytes: &[u8], maximum: usize, resource: &'static str) -> Result<()> {
+fn bounded(bytes: &[u8], maximum: usize, resource: LimitKind) -> Result<()> {
     if bytes.len() > maximum {
         return Err(limit(resource, bytes.len(), maximum));
     }
@@ -1282,9 +1308,9 @@ const fn dialect_word_namespace(dialect: StoryDialect) -> &'static [u8] {
     }
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn limit(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::InkLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }

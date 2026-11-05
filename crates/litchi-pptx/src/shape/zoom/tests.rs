@@ -223,12 +223,13 @@ fn constructors_and_typed_mutations_validate_domains() {
 
 #[test]
 fn package_context_resolves_targets_and_rejects_dangling_image_relationships() {
-    let mut package = crate::Package::new().expect("new package");
-    package
-        .presentation_mut()
+    let mut builder = crate::builder::Builder::new().expect("new package");
+    builder
+        .presentation()
         .expect("writer")
         .add_slide()
         .expect("slide");
+    let package = builder.build().expect("new package");
     let bytes = package.to_bytes().expect("serialize");
     let mut package = crate::Package::from_bytes(&bytes).expect("reopen");
 

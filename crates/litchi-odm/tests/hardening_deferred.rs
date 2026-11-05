@@ -2,7 +2,7 @@
 
 use litchi_core::Error;
 use litchi_odf_common::core::PackageWriter;
-use litchi_odm::{Builder, Master};
+use litchi_odm::{Builder, Package};
 
 const MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const CONTENT: &str = concat!(
@@ -15,7 +15,7 @@ const CONTENT: &str = concat!(
 );
 
 fn package(mimetype: &str, content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
@@ -31,14 +31,14 @@ fn content(inner: &str) -> String {
 fn odm_truncation_and_mutation_sweeps_never_panic() {
     let bytes = package(MIME, CONTENT);
     for end in 0..bytes.len() {
-        drop(Master::from_bytes(bytes[..end].to_vec()));
+        drop(Package::from_bytes(&bytes[..end]));
     }
     for position in 0..bytes.len() {
         let mut mutated = bytes.clone();
         mutated[position] ^= 1;
-        drop(Master::from_bytes(mutated));
+        drop(Package::from_bytes(&mutated));
     }
-    assert!(Master::from_bytes(bytes).is_ok());
+    assert!(Package::from_bytes(&bytes).is_ok());
 }
 
 #[test]
@@ -66,8 +66,10 @@ fn odm_malformed_and_misplaced_inputs_return_typed_errors() {
     ];
     for case in cases {
         assert!(matches!(
-            Master::from_bytes(case),
-            Err(Error::InvalidFormat(_) | Error::XmlCompactness { .. })
+            Package::from_bytes(&case),
+            Err(litchi_odf_common::Error::Core(
+                Error::InvalidFormat(_) | Error::XmlCompactness { .. }
+            ))
         ));
     }
 }

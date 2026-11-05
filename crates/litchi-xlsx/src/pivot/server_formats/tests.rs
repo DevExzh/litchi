@@ -77,8 +77,14 @@ fn package() -> OpcPackage {
 fn reads_and_edits_server_formats() {
     let mut package = package();
     let snapshot = Snapshot::load(&package, PivotTableSelector::Name("Pivot")).unwrap();
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("en-US"));
-    assert_eq!(snapshot.formats()[1], ServerFormat::new(None, None));
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("en-US")
+    );
+    assert_eq!(
+        snapshot.server_formats().formats()[1],
+        ServerFormat::new(None, None)
+    );
 
     let before = package
         .get_part(snapshot.table_part())
@@ -89,9 +95,9 @@ fn reads_and_edits_server_formats() {
     transaction
         .update_server_format(
             0,
-            ServerFormatEdit {
-                culture: AttributeEdit::Clear,
-                format: AttributeEdit::Set("#,##0".to_owned()),
+            Format {
+                culture: Attribute::Clear,
+                format: Attribute::Set("#,##0".to_owned()),
             },
         )
         .unwrap();
@@ -107,7 +113,9 @@ fn reads_and_edits_server_formats() {
     );
     assert_ne!(changed, before.as_slice());
     assert_eq!(
-        commit.snapshot().formats()[0].format.as_deref(),
+        commit.snapshot().server_formats().formats()[0]
+            .format
+            .as_deref(),
         Some("#,##0")
     );
 
@@ -119,7 +127,10 @@ fn reads_and_edits_server_formats() {
     );
     patch.apply(&mut package).unwrap();
     assert_eq!(
-        Snapshot::load(&package, "Pivot").unwrap().formats()[1]
+        Snapshot::load(&package, "Pivot")
+            .unwrap()
+            .server_formats()
+            .formats()[1]
             .format
             .as_deref(),
         Some("0")
@@ -167,9 +178,9 @@ fn ordered_list_edits_update_count_and_round_trip_exactly() {
     assert!(changed_text.contains("count=\"3\""));
     assert!(changed_text.contains("culture=\"fr-FR\""));
     assert!(changed_text.contains("format=\"&amp; &lt;\""));
-    assert_eq!(commit.snapshot().formats().len(), 3);
+    assert_eq!(commit.snapshot().server_formats().formats().len(), 3);
     assert_eq!(
-        commit.snapshot().formats()[0],
+        commit.snapshot().server_formats().formats()[0],
         ServerFormat::new(None, None)
     );
 
@@ -196,7 +207,7 @@ fn ordered_list_reorder_preserves_leaf_source_and_count_lexical_bytes() {
     );
     assert!(original_text.contains("<x15:serverFormat culture=\"en-US\" format=\"0.00\"/>"));
     assert_eq!(
-        commit.snapshot().formats()[0],
+        commit.snapshot().server_formats().formats()[0],
         ServerFormat::new(None, None)
     );
 }
@@ -212,16 +223,19 @@ fn ordered_list_refuses_removing_required_final_child() {
 
 #[test]
 fn ordinary_workbook_structural_edit_uses_same_public_path() {
-    let workbook = Workbook::from_package(package()).unwrap();
+    let workbook = crate::Package::from_opc(package()).unwrap();
     let mut edit = workbook.edit_pivot_table("Pivot").unwrap();
     edit.push_server_format(ServerFormat::new(None, Some("0".to_owned())))
         .unwrap();
     edit.reorder_server_formats(&[2, 0, 1]).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().formats().len(), 3);
-    assert_eq!(commit.snapshot().formats()[0].format.as_deref(), Some("0"));
-    let round_trip = commit.patch().inverse().apply(commit.workbook()).unwrap();
-    assert_eq!(round_trip.snapshot().formats().len(), 2);
+    assert_eq!(commit.patch().after().formats().len(), 3);
+    assert_eq!(
+        commit.patch().after().formats()[0].format.as_deref(),
+        Some("0")
+    );
+    let round_trip = commit.patch().inverse().apply(commit.package()).unwrap();
+    assert_eq!(round_trip.patch().after().formats().len(), 2);
 }
 
 #[test]
@@ -252,7 +266,7 @@ fn worksheet_metadata_deduplicates_canonical_target_edges() {
         .unwrap();
 
     let workbook = package.main_document_part().unwrap();
-    let catalog = raw::parse_catalog(workbook.blob()).unwrap();
+    let catalog = raw::parse_catalog(workbook.blob(), &SourceLimits::default()).unwrap();
     let relationship_index = RelationshipIndex::build(&package).unwrap();
     let names = worksheet_pivot_names(&package, &catalog, &relationship_index).unwrap();
     assert_eq!(names, vec!["Pivot"]);
@@ -260,7 +274,7 @@ fn worksheet_metadata_deduplicates_canonical_target_edges() {
 
 #[test]
 fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
-    let workbook = Workbook::from_package(package()).unwrap();
+    let workbook = crate::Package::from_opc(package()).unwrap();
     let view = workbook.pivot_table("Pivot").unwrap();
     assert_eq!(view.table_name(), "Pivot");
     assert_eq!(
@@ -271,22 +285,25 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
     let mut edit = workbook.edit_pivot_table("Pivot").unwrap();
     edit.update_server_format(
         0,
-        ServerFormatEdit {
-            culture: AttributeEdit::Clear,
-            format: AttributeEdit::Set("#,##0".to_owned()),
+        Format {
+            culture: Attribute::Clear,
+            format: Attribute::Set("#,##0".to_owned()),
         },
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().formats()[0].format.as_deref(),
+        commit.patch().after().formats()[0].format.as_deref(),
         Some("#,##0")
     );
 
-    let next = commit.workbook();
+    let next = commit.package();
     assert_eq!(
-        next.pivot_table("Pivot").unwrap().formats()[0]
+        next.pivot_table("Pivot")
+            .unwrap()
+            .server_formats()
+            .formats()[0]
             .format
             .as_deref(),
         Some("#,##0")
@@ -294,7 +311,7 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
     let inverse = commit.patch().inverse();
     let restored = inverse.apply(next).unwrap();
     assert_eq!(
-        restored.snapshot().formats()[0].culture.as_deref(),
+        restored.patch().after().formats()[0].culture.as_deref(),
         Some("en-US")
     );
 }
@@ -302,7 +319,7 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
 #[test]
 fn scanner_admits_tree_before_resolving_a_second_root() {
     let source = br#"<pivotTableDefinition/><bad:second xmlns:xml="urn:not-xml"/>"#;
-    let error = scan_xml(source, "pivotTableDefinition", ReadLimits::default()).unwrap_err();
+    let error = scan_xml(source, "pivotTableDefinition", SourceLimits::default()).unwrap_err();
     assert!(
         error.to_string().contains("multiple roots"),
         "second-root admission must precede namespace validation: {error}"

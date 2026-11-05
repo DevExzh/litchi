@@ -1321,14 +1321,14 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_package_round_trip() {
-        use crate::{Builder, Document, mutable::MutableDocument};
+        use crate::{Builder, mutable::MutableDocument};
         let mut form = InteractiveForm::new("Main");
         form.add_control(ButtonControl::new("Run", "run_1"))
             .unwrap();
         let mut builder = Builder::new();
         builder.add_interactive_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
-        let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+        let document = builder.build().unwrap().document().unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert_eq!(mutable.interactive_controls().unwrap().len(), 1);
         let checkbox: InteractiveControl = CheckboxControl::new("Check", "check_1").into();

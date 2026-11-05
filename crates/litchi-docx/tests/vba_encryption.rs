@@ -27,7 +27,11 @@ fn encrypted_vba_noops_preserve_graph_and_provenance() {
     let plain_path = directory.path().join("plain.docx");
 
     let mut package = Package::new().unwrap();
-    package.set_vba(project("Stable", "same")).unwrap();
+    package = {
+        let mut edit = package.edit_vba();
+        edit.set(project("Stable", "same")).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package
         .save_encrypted(&macro_path, PASSWORD, Mode::Agile)
         .unwrap();
@@ -45,10 +49,17 @@ fn encrypted_vba_noops_preserve_graph_and_provenance() {
         .unwrap()
         .blob_arc();
 
-    opened.set_vba(project("Stable", "same")).unwrap();
-    opened
-        .put_vba(payload("Stable", "same"), &VbaSupplementalData::new())
-        .unwrap();
+    opened = {
+        let mut edit = opened.edit_vba();
+        edit.set(project("Stable", "same")).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    opened = {
+        let mut edit = opened.edit_vba();
+        edit.put(payload("Stable", "same"), &VbaSupplementalData::new())
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     let after = opened.vba().unwrap().unwrap();
     assert_eq!(before, after);
@@ -71,13 +82,18 @@ fn encrypted_vba_noops_preserve_graph_and_provenance() {
     assert_eq!(opened.encryption(), Some(Mode::Agile));
     assert_eq!(std::fs::read(&macro_path).unwrap(), source);
 
-    let mut plain = Package::new().unwrap();
+    let plain = Package::new().unwrap();
     plain
         .save_encrypted(&plain_path, PASSWORD, Mode::Standard)
         .unwrap();
     let source = std::fs::read(&plain_path).unwrap();
     let mut opened = Package::open_with_password(&plain_path, PASSWORD).unwrap();
-    assert!(!opened.clear_vba().unwrap());
+    assert!(!{
+        let mut edit = opened.edit_vba();
+        let value = edit.clear().unwrap();
+        opened = edit.commit().unwrap().into_package();
+        value
+    });
     assert_eq!(opened.encryption(), Some(Mode::Standard));
     assert_eq!(std::fs::read(&plain_path).unwrap(), source);
 }
@@ -88,36 +104,40 @@ fn encrypted_vba_changes_are_refused_atomically() {
     let plain_path = directory.path().join("plain.docx");
     let macro_path = directory.path().join("macro.docm");
 
-    let mut plain = Package::new().unwrap();
+    let plain = Package::new().unwrap();
     plain
         .save_encrypted(&plain_path, PASSWORD, Mode::Agile)
         .unwrap();
     let source = std::fs::read(&plain_path).unwrap();
-    let mut opened = Package::open_with_password(&plain_path, PASSWORD).unwrap();
+    let opened = Package::open_with_password(&plain_path, PASSWORD).unwrap();
     assert!(matches!(
-        opened.set_vba(project("Added", "set")),
-        Err(Error::UnsafeEdit {
-            operation: "set_vba",
-            ..
-        })
-    ));
+                {
+    let mut edit = opened.edit_vba();
+    edit.set(project("Added", "set")).map(|_| ()).and_then(|()| edit.commit().map(|_| ()))
+                },
+                Err(Error::Refused(refusal)) if refusal.operation() == "set_vba"
+        ));
     assert!(matches!(
-        opened.put_vba(payload("Added", "put"), &VbaSupplementalData::new()),
-        Err(Error::UnsafeEdit {
-            operation: "put_vba",
-            ..
-        })
+            {
+                let mut edit = opened.edit_vba();
+                edit.put(payload("Added", "put"), &VbaSupplementalData::new()).map(|_| ()).and_then(|()| edit.commit().map(|_| ()))
+            },
+            Err(Error::Refused(refusal)) if refusal.operation() == "put_vba"
     ));
     assert!(opened.vba().unwrap().is_none());
     assert_eq!(std::fs::read(&plain_path).unwrap(), source);
 
     let mut package = Package::new().unwrap();
-    package.set_vba(project("Existing", "keep")).unwrap();
+    package = {
+        let mut edit = package.edit_vba();
+        edit.set(project("Existing", "keep")).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package
         .save_encrypted(&macro_path, PASSWORD, Mode::Standard)
         .unwrap();
     let source = std::fs::read(&macro_path).unwrap();
-    let mut opened = Package::open_with_password(&macro_path, PASSWORD).unwrap();
+    let opened = Package::open_with_password(&macro_path, PASSWORD).unwrap();
     let before = opened.vba().unwrap().unwrap();
     let project_before = opened
         .opc_package()
@@ -125,11 +145,11 @@ fn encrypted_vba_changes_are_refused_atomically() {
         .unwrap()
         .blob_arc();
     assert!(matches!(
-        opened.clear_vba(),
-        Err(Error::UnsafeEdit {
-            operation: "clear_vba",
-            ..
-        })
+            {
+                let mut edit = opened.edit_vba();
+                edit.clear().map(|_| ()).and_then(|()| edit.commit().map(|_| ()))
+            },
+            Err(Error::Refused(refusal)) if refusal.operation() == "clear_vba"
     ));
     let after = opened.vba().unwrap().unwrap();
     assert_eq!(before, after);
@@ -150,35 +170,58 @@ fn explicit_plaintext_copy_allows_vba_changes() {
     let encrypted_path = directory.path().join("source.docx");
     let plaintext_path = directory.path().join("editable.docx");
 
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package
         .save_encrypted(&encrypted_path, PASSWORD, Mode::Agile)
         .unwrap();
-    let mut encrypted = Package::open_with_password(&encrypted_path, PASSWORD).unwrap();
+    let encrypted = Package::open_with_password(&encrypted_path, PASSWORD).unwrap();
     assert!(matches!(
-        encrypted.set_vba(project("First", "refused")),
-        Err(Error::UnsafeEdit { .. })
+        {
+            let mut edit = encrypted.edit_vba();
+            edit.set(project("First", "refused"))
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        },
+        Err(Error::Refused(_))
     ));
     encrypted.save_plain(&plaintext_path).unwrap();
 
     let mut plaintext = Package::open(&plaintext_path).unwrap();
-    plaintext.set_vba(project("First", "accepted")).unwrap();
-    plaintext
-        .put_vba(
+    plaintext = {
+        let mut edit = plaintext.edit_vba();
+        edit.set(project("First", "accepted")).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    plaintext = {
+        let mut edit = plaintext.edit_vba();
+        edit.put(
             payload("Replacement", "accepted"),
             &VbaSupplementalData::new(),
         )
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert_eq!(
         plaintext
             .vba()
             .unwrap()
             .unwrap()
-            .project(plaintext.opc_package())
+            .project(plaintext.opc_package(), &Limits::default())
             .unwrap()
             .name(),
         "Replacement"
     );
-    assert!(plaintext.clear_vba().unwrap());
-    assert!(!plaintext.clear_vba().unwrap());
+    assert!({
+        let mut edit = plaintext.edit_vba();
+        let value = edit.clear().unwrap();
+        plaintext = edit.commit().unwrap().into_package();
+        value
+    });
+    assert!(!{
+        let mut edit = plaintext.edit_vba();
+        let value = edit.clear().unwrap();
+        plaintext = edit.commit().unwrap().into_package();
+        value
+    });
+    assert!(plaintext.vba().unwrap().is_none());
 }

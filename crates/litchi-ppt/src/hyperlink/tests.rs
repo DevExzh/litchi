@@ -2,6 +2,30 @@ use super::*;
 use crate::consts::RecordType;
 use crate::records::Record;
 
+fn source_limits() -> crate::SourceLimits {
+    crate::SourceLimits::default()
+}
+
+fn interaction_limits() -> InteractionLimits {
+    InteractionLimits::default()
+}
+
+fn parse_interaction_bytes(bytes: &[u8]) -> crate::package::Result<Interaction> {
+    Interaction::parse_bytes(bytes, &interaction_limits())
+}
+
+fn parse_interaction(record: &Record) -> crate::package::Result<Interaction> {
+    Interaction::parse(record, &interaction_limits())
+}
+
+fn interaction_to_bytes(value: &Interaction) -> crate::package::Result<Vec<u8>> {
+    value.to_bytes(&interaction_limits())
+}
+
+fn interaction_to_record(value: &Interaction) -> crate::package::Result<Record> {
+    value.to_record(&interaction_limits())
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -44,7 +68,7 @@ mod interaction_protocol_tests {
     fn exact_round_trip_preserves_trigger_macro_bytes_and_undefined_data() {
         let macro_data = [b'R', 0, b'u', 0, b'n', 0, 0, 0, 1, 0];
         let bytes = interaction(1, &atom(), Some(&macro_data));
-        let parsed = Interaction::parse_bytes(&bytes).unwrap();
+        let parsed = parse_interaction_bytes(&bytes).unwrap();
         assert_eq!(parsed.trigger, InteractionTrigger::MouseOver);
         assert_eq!(parsed.macro_name.as_deref(), Some("Run"));
         assert_eq!(
@@ -52,7 +76,7 @@ mod interaction_protocol_tests {
             macro_data
         );
         assert_eq!(parsed.unused, [0xAA, 0xBB, 0xCC]);
-        assert_eq!(parsed.to_bytes().unwrap(), bytes);
+        assert_eq!(interaction_to_bytes(&parsed).unwrap(), bytes);
     }
 
     #[test]
@@ -66,12 +90,12 @@ mod interaction_protocol_tests {
         .unwrap();
         value.hyperlink_id = 42;
         value.custom_show_return = true;
-        let bytes = value.to_bytes().unwrap();
+        let bytes = interaction_to_bytes(&value).unwrap();
         assert_eq!(
-            Interaction::parse(&value.to_record().unwrap()).unwrap(),
+            parse_interaction(&interaction_to_record(&value).unwrap()).unwrap(),
             value
         );
-        assert_eq!(Interaction::parse_bytes(&bytes).unwrap(), value);
+        assert_eq!(parse_interaction_bytes(&bytes).unwrap(), value);
     }
 
     #[test]
@@ -90,24 +114,24 @@ mod interaction_protocol_tests {
             .to_payload(),
             Some(&[b'X', 0]),
         );
-        let parsed = Interaction::parse_bytes(&bytes).unwrap();
+        let parsed = parse_interaction_bytes(&bytes).unwrap();
         assert_eq!(parsed.macro_name.as_deref(), Some("X"));
-        assert_eq!(parsed.to_bytes().unwrap(), bytes);
+        assert_eq!(interaction_to_bytes(&parsed).unwrap(), bytes);
     }
 
     #[test]
     fn rejects_bad_container_atom_and_child_order() {
         let valid_atom = atom();
         for instance in [2u16, 0x0FFF] {
-            assert!(Interaction::parse_bytes(&interaction(instance, &valid_atom, None)).is_err());
+            assert!(parse_interaction_bytes(&interaction(instance, &valid_atom, None)).is_err());
         }
-        assert!(Interaction::parse_bytes(&record(0, 0, RecordType::InteractiveInfo, &[])).is_err());
-        assert!(Interaction::parse_bytes(&interaction(0, &valid_atom[..15], None)).is_err());
+        assert!(parse_interaction_bytes(&record(0, 0, RecordType::InteractiveInfo, &[])).is_err());
+        assert!(parse_interaction_bytes(&interaction(0, &valid_atom[..15], None)).is_err());
 
         let name = record(0, 2, RecordType::CString, &[b'A', 0]);
         let atom_record = record(0, 0, RecordType::InteractiveInfoAtom, &valid_atom);
         assert!(
-            Interaction::parse_bytes(&record(
+            parse_interaction_bytes(&record(
                 0x0F,
                 0,
                 RecordType::InteractiveInfo,
@@ -122,14 +146,14 @@ mod interaction_protocol_tests {
         for (offset, value) in [(8usize, 8u8), (10, 7), (12, 4)] {
             let mut bad = atom();
             bad[offset] = value;
-            assert!(Interaction::parse_bytes(&interaction(0, &bad, None)).is_err());
+            assert!(parse_interaction_bytes(&interaction(0, &bad, None)).is_err());
         }
         let mut reserved = atom();
         reserved[11] |= 0x10;
-        assert!(Interaction::parse_bytes(&interaction(0, &reserved, None)).is_err());
-        assert!(Interaction::parse_bytes(&interaction(0, &atom(), Some(&[1]))).is_err());
-        assert!(Interaction::parse_bytes(&interaction(0, &atom(), Some(&[1, 0]))).is_err());
-        assert!(Interaction::parse_bytes(&interaction(0, &atom(), Some(&[0, 0xD8]))).is_err());
+        assert!(parse_interaction_bytes(&interaction(0, &reserved, None)).is_err());
+        assert!(parse_interaction_bytes(&interaction(0, &atom(), Some(&[1]))).is_err());
+        assert!(parse_interaction_bytes(&interaction(0, &atom(), Some(&[1, 0]))).is_err());
+        assert!(parse_interaction_bytes(&interaction(0, &atom(), Some(&[0, 0xD8]))).is_err());
     }
 
     #[test]
@@ -157,7 +181,7 @@ mod interaction_protocol_tests {
         );
         let mut trailing = bytes;
         trailing.push(0);
-        assert!(Interaction::parse_bytes(&trailing).is_err());
+        assert!(parse_interaction_bytes(&trailing).is_err());
 
         let value = Interaction::new(
             InteractionTrigger::Click,
@@ -170,6 +194,32 @@ mod interaction_protocol_tests {
         };
         assert!(value.validate_with_limits(limits).is_err());
         assert!(value.to_bytes_with_limits(limits).is_err());
+    }
+
+    #[test]
+    fn admits_interaction_at_recursive_aggregate_boundary() {
+        let value = Interaction::new(
+            InteractionTrigger::Click,
+            InteractionAction::NoAction,
+            InteractionLinkTarget::Nil,
+        );
+        // The InteractiveInfo payload is 24 bytes and its atom contributes
+        // another 16 bytes to the parser's aggregate payload charge.
+        let exact = InteractionLimits {
+            max_aggregate_payload_bytes: 40,
+            ..Default::default()
+        };
+        let bytes = value.to_bytes(&exact).unwrap();
+        assert_eq!(bytes.len(), 32);
+        assert_eq!(value.to_record(&exact).unwrap().data.len(), 24);
+        assert_eq!(Interaction::parse_bytes(&bytes, &exact).unwrap(), value);
+
+        let one_under = InteractionLimits {
+            max_aggregate_payload_bytes: 39,
+            ..Default::default()
+        };
+        assert!(value.to_bytes(&one_under).is_err());
+        assert!(Interaction::parse_bytes(&bytes, &one_under).is_err());
     }
 }
 
@@ -258,7 +308,9 @@ mod hyperlink_tests {
         atom[12] = target;
         let payload = record_bytes(0, 0, 4083, &atom);
         let bytes = record_bytes(0x0f, trigger, 4082, &payload);
-        Record::parse(&bytes, 0).unwrap().0
+        Record::parse(&bytes, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0
     }
 
     fn root(list: Option<Record>, extensions: &[Vec<u8>]) -> Record {
@@ -287,7 +339,7 @@ mod hyperlink_tests {
             Some(external_object_list(7, &[hyperlink(3)])),
             &[hyperlink9(3, Some("Open example"), 7)],
         );
-        let hyperlinks = Hyperlinks::parse(&root).unwrap();
+        let hyperlinks = Hyperlinks::parse(&root, &source_limits()).unwrap();
         assert_eq!(hyperlinks.id_seed, Some(7));
         let hyperlink = hyperlinks.get(3).unwrap();
         assert_eq!(hyperlink.friendly_name.as_deref(), Some("Example"));
@@ -302,15 +354,18 @@ mod hyperlink_tests {
 
     #[test]
     fn parses_and_resolves_interactive_hyperlinks() {
-        let interaction = Interaction::parse(&interaction_record(0, 0x09, 8)).unwrap();
+        let interaction = parse_interaction(&interaction_record(0, 0x09, 8)).unwrap();
         assert_eq!(interaction.trigger, InteractionTrigger::Click);
         assert_eq!(interaction.action, InteractionAction::Hyperlink);
         assert_eq!(interaction.link_target, InteractionLinkTarget::Url);
         assert!(interaction.animated);
         assert!(interaction.visited);
 
-        let hyperlinks =
-            Hyperlinks::parse(&root(Some(external_object_list(3, &[hyperlink(3)])), &[])).unwrap();
+        let hyperlinks = Hyperlinks::parse(
+            &root(Some(external_object_list(3, &[hyperlink(3)])), &[]),
+            &source_limits(),
+        )
+        .unwrap();
         assert_eq!(
             interaction
                 .hyperlink(&hyperlinks)
@@ -320,9 +375,9 @@ mod hyperlink_tests {
             Some("https://example.test")
         );
 
-        assert!(Interaction::parse(&interaction_record(2, 0, 8)).is_err());
-        assert!(Interaction::parse(&interaction_record(0, 0x10, 8)).is_err());
-        assert!(Interaction::parse(&interaction_record(0, 0, 4)).is_err());
+        assert!(parse_interaction(&interaction_record(2, 0, 8)).is_err());
+        assert!(parse_interaction(&interaction_record(0, 0x10, 8)).is_err());
+        assert!(parse_interaction(&interaction_record(0, 0, 4)).is_err());
     }
 
     #[test]
@@ -333,42 +388,61 @@ mod hyperlink_tests {
             4055,
             &record_bytes(0, 0, 4051, &1u32.to_le_bytes()),
         );
-        let hyperlinks =
-            Hyperlinks::parse(&root(Some(external_object_list(1, &[atom_only])), &[])).unwrap();
+        let hyperlinks = Hyperlinks::parse(
+            &root(Some(external_object_list(1, &[atom_only])), &[]),
+            &source_limits(),
+        )
+        .unwrap();
         assert_eq!(hyperlinks.get(1).unwrap().target, None);
     }
 
     #[test]
     fn rejects_invalid_hyperlink_ids_and_extensions() {
         assert!(
-            Hyperlinks::parse(&root(Some(external_object_list(2, &[hyperlink(3)])), &[],)).is_err()
-        );
-        assert!(
-            Hyperlinks::parse(&root(
-                Some(external_object_list(3, &[hyperlink(3), hyperlink(3)])),
-                &[],
-            ))
+            Hyperlinks::parse(
+                &root(Some(external_object_list(2, &[hyperlink(3)])), &[]),
+                &source_limits(),
+            )
             .is_err()
         );
         assert!(
-            Hyperlinks::parse(&root(
-                Some(external_object_list(3, &[hyperlink(3)])),
-                &[hyperlink9(4, None, 0)],
-            ))
+            Hyperlinks::parse(
+                &root(
+                    Some(external_object_list(3, &[hyperlink(3), hyperlink(3)])),
+                    &[],
+                ),
+                &source_limits(),
+            )
             .is_err()
         );
         assert!(
-            Hyperlinks::parse(&root(
-                Some(external_object_list(3, &[hyperlink(3)])),
-                &[hyperlink9(3, None, 8)],
-            ))
+            Hyperlinks::parse(
+                &root(
+                    Some(external_object_list(3, &[hyperlink(3)])),
+                    &[hyperlink9(4, None, 0)],
+                ),
+                &source_limits(),
+            )
             .is_err()
         );
         assert!(
-            Hyperlinks::parse(&root(
-                Some(external_object_list(3, &[hyperlink(3)])),
-                &[hyperlink9(3, None, 0), hyperlink9(3, None, 0)],
-            ))
+            Hyperlinks::parse(
+                &root(
+                    Some(external_object_list(3, &[hyperlink(3)])),
+                    &[hyperlink9(3, None, 8)],
+                ),
+                &source_limits(),
+            )
+            .is_err()
+        );
+        assert!(
+            Hyperlinks::parse(
+                &root(
+                    Some(external_object_list(3, &[hyperlink(3)])),
+                    &[hyperlink9(3, None, 0), hyperlink9(3, None, 0)],
+                ),
+                &source_limits(),
+            )
             .is_err()
         );
     }
@@ -378,8 +452,11 @@ mod hyperlink_tests {
         let mut invalid_utf16 = hyperlink(1);
         invalid_utf16[28..30].copy_from_slice(&0xd800u16.to_le_bytes());
         assert!(
-            Hyperlinks::parse(&root(Some(external_object_list(1, &[invalid_utf16])), &[],))
-                .is_err()
+            Hyperlinks::parse(
+                &root(Some(external_object_list(1, &[invalid_utf16])), &[]),
+                &source_limits(),
+            )
+            .is_err()
         );
 
         let mut payload = record_bytes(0, 0, 4051, &1u32.to_le_bytes());
@@ -387,7 +464,22 @@ mod hyperlink_tests {
         payload.extend_from_slice(&record_bytes(0, 1, 4026, &unicode("early")));
         let out_of_order = record_bytes(0x0f, 0, 4055, &payload);
         assert!(
-            Hyperlinks::parse(&root(Some(external_object_list(1, &[out_of_order])), &[],)).is_err()
+            Hyperlinks::parse(
+                &root(Some(external_object_list(1, &[out_of_order])), &[]),
+                &source_limits(),
+            )
+            .is_err()
         );
+    }
+
+    #[test]
+    fn hyperlink_collection_uses_selected_record_limits() {
+        let root = root(Some(external_object_list(3, &[hyperlink(3)])), &[]);
+        let selected = crate::SourceLimits::builder()
+            .max_record_bytes(16)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(Hyperlinks::parse(&root, &selected).is_err());
     }
 }

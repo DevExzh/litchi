@@ -9,16 +9,11 @@ use std::collections::HashSet;
 use super::inventory::object_for_reference;
 
 impl Editor {
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.changed
-    }
-
     /// # Errors
     ///
     /// Returns an error when a managed field does not resolve to its owning
     /// `ObjectPool` storage.
-    pub fn objects(&self) -> Result<Vec<Reference>> {
+    pub(crate) fn objects(&self) -> Result<Vec<Reference>> {
         managed_objects(&self.word, &self.pieces, &self.fields)?
             .into_iter()
             .map(|mut reference| {
@@ -41,7 +36,7 @@ impl Editor {
     /// Adds an object at the main-story boundary. No existing logical range
     /// is shifted outside the main story; subsequent story piece CPs shift
     /// consistently.
-    pub fn add(&mut self, options: WriteOptions) -> Result<Reference> {
+    pub(crate) fn add(&mut self, options: WriteOptions) -> Result<Reference> {
         validate_options(&options, self)?;
         let mut candidate = self.clone();
         let target = object_target(options.storage_id)?;
@@ -147,7 +142,7 @@ impl Editor {
         })
     }
 
-    pub fn remove(&mut self, storage_id: u32) -> Result<Reference> {
+    pub(crate) fn remove(&mut self, storage_id: u32) -> Result<Reference> {
         let object = self
             .objects()?
             .into_iter()
@@ -209,7 +204,7 @@ impl Editor {
     }
 
     /// Reorders a contiguous suffix of editor-managed object fields.
-    pub fn reorder(&mut self, storage_ids: &[u32]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, storage_ids: &[u32]) -> Result<()> {
         let objects = self.objects()?;
         if storage_ids.len() != objects.len() || objects.is_empty() {
             return Err(corrupted(

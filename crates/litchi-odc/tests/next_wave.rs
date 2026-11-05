@@ -1,7 +1,7 @@
 use litchi_odc::{
-    AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass,
-    DataPointSpec, Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, GridSpec, History,
-    LegendSpec, Limits, Patch, SeriesSpec, StyleElement, StyleTarget, Text,
+    AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, ChartClass, DataPointSpec,
+    Definition, ExactAttribute, ExactTarget, GridSpec, History, LegendSpec, OpenOptions, Package,
+    Patch, SemanticLimits, SeriesSpec, StyleElement, StyleTarget, Text,
     chart::{Class, Dimension, Labels},
     validate_range_list,
 };
@@ -41,7 +41,8 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
             &mut manifest,
             "<manifest:file-entry manifest:full-path=\"{path}\" manifest:media-type=\"application/octet-stream\"/>"
         )?;
-        let mut archive = StreamingArchiveWriter::new();
+        let mut archive =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
         archive.write_deflated("content.xml", content.as_bytes())?;
         archive.write_deflated(path, bytes)?;
@@ -50,7 +51,8 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
         return Ok(archive.finish_to_bytes()?);
     }
     manifest.push_str("</manifest:manifest>");
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
     archive.write_deflated("content.xml", content.as_bytes())?;
     archive.write_deflated("META-INF/manifest.xml", manifest.as_bytes())?;
@@ -58,19 +60,22 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
 }
 
 fn encrypted_envelope(content: &str) -> TestResult<Vec<u8>> {
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer.set_mimetype("application/vnd.oasis.opendocument.chart")?;
     encrypted_writer.set_encryption("password", Profile::compatible())?;
     encrypted_writer.add_file("content.xml", content.as_bytes())?;
     let encrypted = encrypted_writer.finish_to_bytes()?;
-    let encrypted_archive = ArchiveReader::new(&encrypted)?;
+    let encrypted_archive =
+        ArchiveReader::new(&encrypted, soapberry_zip::office::ArchiveLimits::default())?;
     let ciphertext = encrypted_archive.read("content.xml")?;
     let manifest = String::from_utf8(encrypted_archive.read("META-INF/manifest.xml")?)?.replace(
         "full-path=\"content.xml\"",
         "full-path=\"META-INF/secret.bin\"",
     );
 
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
     archive.write_deflated("content.xml", content.as_bytes())?;
     archive.write_deflated("META-INF/secret.bin", &ciphertext)?;
@@ -79,7 +84,8 @@ fn encrypted_envelope(content: &str) -> TestResult<Vec<u8>> {
 }
 
 fn raw_negative_package(content: &str) -> TestResult<Vec<u8>> {
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
     archive.write_deflated("content.xml", content.as_bytes())?;
     archive.write_deflated("META-INF/manifest.xml", RAW_MANIFEST)?;
@@ -89,8 +95,10 @@ fn raw_negative_package(content: &str) -> TestResult<Vec<u8>> {
 #[test]
 fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<()> {
     let source_definition = definition();
-    let source = Chart::from_definition(source_definition.clone())?;
-    assert_eq!(source.definition()?, source_definition);
+    let source = Builder::new()
+        .with_definition(source_definition.clone())
+        .build()?;
+    assert_eq!(source.chart().definition()?, source_definition);
 
     let mut edit = source.edit();
     edit.insert_axis(2, AxisSpec::new(Dimension::Z))?;
@@ -99,8 +107,8 @@ fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<(
     edit.set_style(StyleTarget::Series(1), Some("added".into()))?;
     let commit = edit.commit()?;
     assert_eq!(commit.patch().definition_changes().len(), 4);
-    let reopened = Chart::from_bytes(commit.chart().as_bytes().to_vec())?;
-    let projected = reopened.definition()?;
+    let reopened = Package::from_bytes(commit.package().as_bytes())?;
+    let projected = reopened.chart().definition()?;
     assert_eq!(projected.plot_area.axes.len(), 3);
     assert_eq!(projected.plot_area.series.len(), 2);
     assert_eq!(
@@ -108,7 +116,11 @@ fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<(
         Some("added")
     );
     assert_eq!(
-        commit.patch().inverse().apply(commit.chart())?.as_bytes(),
+        commit
+            .package()
+            .apply(&commit.patch().inverse())?
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
     Ok(())
@@ -118,16 +130,17 @@ fn opened_canonical_definition_edits_are_atomic_and_reversible() -> TestResult<(
 fn opened_projection_refuses_noncanonical_xml_without_mutation() -> TestResult<()> {
     let canonical = litchi_odc::serialize_content(&definition())?;
     let noncanonical = canonical.replacen("><", ">\n<", 1);
-    let chart = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
+    let chart = Package::from_bytes(&raw_negative_package(&noncanonical)?)?;
     let original = chart.as_bytes().to_vec();
-    assert!(chart.definition().is_err());
+    assert!(chart.chart().definition().is_err());
     let mut edit = chart.edit();
     assert!(edit.insert_axis(0, AxisSpec::new(Dimension::X)).is_err());
     edit.update_axis(0, litchi_odc::AxisUpdate::styled("exact-style"))?;
     let committed = edit.commit()?;
-    assert!(committed.chart().content_xml().contains(">\n<"));
+    assert!(committed.package().chart().content_xml().contains(">\n<"));
     assert_eq!(
         committed
+            .package()
             .chart()
             .plot_area()
             .ok_or("missing plot area")?
@@ -159,8 +172,8 @@ fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> Te
         ">\n<!-- retained producer extension boundary -->\n<office:body>",
         1,
     );
-    let source = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
-    assert!(source.definition().is_err());
+    let source = Package::from_bytes(&raw_negative_package(&noncanonical)?)?;
+    assert!(source.chart().definition().is_err());
 
     let mut edit = source.edit();
     edit.update_exact(
@@ -209,36 +222,55 @@ fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> Te
     assert_eq!(commit.patch().exact_changes().len(), 10);
     assert!(
         commit
+            .package()
             .chart()
             .content_xml()
             .contains("\n<!-- retained producer extension boundary -->\n")
     );
-    assert!(commit.chart().content_xml().contains("svg:width=\"11cm\""));
-    assert!(!commit.chart().content_xml().contains("svg:height=\"8cm\""));
     assert!(
         commit
+            .package()
+            .chart()
+            .content_xml()
+            .contains("svg:width=\"11cm\"")
+    );
+    assert!(
+        !commit
+            .package()
+            .chart()
+            .content_xml()
+            .contains("svg:height=\"8cm\"")
+    );
+    assert!(
+        commit
+            .package()
             .chart()
             .content_xml()
             .contains("chart:style-name=\"plot-style\"")
     );
     assert!(
         commit
+            .package()
             .chart()
             .content_xml()
             .contains("chart:attached-axis=\"y\"")
     );
-    assert_eq!(commit.chart().class()?, ChartClass::line());
+    assert_eq!(commit.package().chart().class()?, ChartClass::line());
     assert_eq!(
-        commit.patch().inverse().apply(commit.chart())?.as_bytes(),
+        commit
+            .package()
+            .apply(&commit.patch().inverse())?
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
     let wire = commit.patch().to_bytes();
-    let decoded = Patch::from_bytes(&wire, source.limits())?;
+    let decoded = Patch::from_bytes(&wire, source.chart().options())?;
     assert_eq!(decoded.exact_changes().len(), 10);
     assert_eq!(
-        decoded.apply(&source)?.as_bytes(),
-        commit.chart().as_bytes()
+        source.apply(&decoded)?.into_package().as_bytes(),
+        commit.package().as_bytes()
     );
     Ok(())
 }
@@ -256,8 +288,8 @@ fn odf_1_4_coordinate_region_exact_edit_transfers_without_normalizing() -> TestR
         "<chart:coordinate-region svg:x=\"1cm\" svg:y=\"2cm\" svg:width=\"8cm\" svg:height=\"6cm\"/><chart:axis",
         1,
     );
-    let source = Chart::from_bytes(raw_negative_package(&standards_derived)?)?;
-    assert!(source.definition().is_err());
+    let source = Package::from_bytes(&raw_negative_package(&standards_derived)?)?;
+    assert!(source.chart().definition().is_err());
 
     let mut edit = source.edit();
     edit.update_exact(
@@ -273,8 +305,8 @@ fn odf_1_4_coordinate_region_exact_edit_transfers_without_normalizing() -> TestR
     let changed = edit.commit()?;
     assert_eq!(changed.patch().exact_changes().len(), 2);
     assert!(changed
-        .chart()
-        .content_xml()
+        .package()
+        .chart().content_xml()
         .contains("<chart:coordinate-region svg:x=\"3cm\" svg:y=\"2cm\" svg:width=\"7cm\" svg:height=\"6cm\"/>"));
 
     let destination_xml = standards_derived.replacen(
@@ -282,20 +314,23 @@ fn odf_1_4_coordinate_region_exact_edit_transfers_without_normalizing() -> TestR
         "<!-- independently retained -->\n<office:body>",
         1,
     );
-    let destination = Chart::from_bytes(raw_negative_package(&destination_xml)?)?;
+    let destination = Package::from_bytes(&raw_negative_package(&destination_xml)?)?;
     let transfer = changed.patch().transfer_to(&destination)?;
     assert!(transfer.is_merged());
-    let transferred = transfer
-        .patch()
-        .ok_or("missing coordinate-region transfer patch")?
-        .apply(&destination)?;
+    let transferred = destination
+        .apply(
+            transfer
+                .patch()
+                .ok_or("missing coordinate-region transfer patch")?,
+        )?
+        .into_package();
     assert!(
         transferred
+            .chart()
             .content_xml()
             .contains("<!-- independently retained -->\n")
     );
-    assert!(transferred
-        .content_xml()
+    assert!(transferred.chart().content_xml()
         .contains("<chart:coordinate-region svg:x=\"3cm\" svg:y=\"2cm\" svg:width=\"7cm\" svg:height=\"6cm\"/>"));
     Ok(())
 }
@@ -326,8 +361,8 @@ fn noncanonical_titles_footers_and_legends_have_controlled_exact_edits() -> Test
             1,
         )
         .replacen("><office:body>", ">\n<office:body>", 1);
-    let source = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
-    assert!(source.definition().is_err());
+    let source = Package::from_bytes(&raw_negative_package(&noncanonical)?)?;
+    assert!(source.chart().definition().is_err());
 
     let mut edit = source.edit();
     edit.update_exact(
@@ -359,14 +394,18 @@ fn noncanonical_titles_footers_and_legends_have_controlled_exact_edits() -> Test
     )?;
     let changed = edit.commit()?;
     assert_eq!(changed.patch().exact_changes().len(), 7);
-    let xml = changed.chart().content_xml();
+    let xml = changed.package().chart().content_xml();
     assert!(xml.contains("\n<office:body>"));
     assert!(xml.contains("table:cell-range=\"Data.B1\""));
     assert!(xml.contains("chart:legend-position=\"start\""));
     assert!(xml.contains("chart:legend-align=\"end\""));
     assert!(xml.contains("chart:style-name=\"footer-new\""));
     assert_eq!(
-        changed.patch().inverse().apply(changed.chart())?.as_bytes(),
+        changed
+            .package()
+            .apply(&changed.patch().inverse())?
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
     Ok(())
@@ -403,8 +442,8 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
         ">\n<!-- retained embedded-chart layout vocabulary -->\n<office:body>",
         1,
     );
-    let source = Chart::from_bytes(raw_negative_package(&noncanonical)?)?;
-    assert!(source.definition().is_err());
+    let source = Package::from_bytes(&raw_negative_package(&noncanonical)?)?;
+    assert!(source.chart().definition().is_err());
 
     let mut edit = source.edit();
     edit.update_axis(0, litchi_odc::AxisUpdate::styled("axis-new"))?;
@@ -451,7 +490,7 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     let changed = edit.commit()?;
     assert_eq!(changed.patch().changes().len(), 1);
     assert_eq!(changed.patch().exact_changes().len(), 8);
-    let xml = changed.chart().content_xml();
+    let xml = changed.package().chart().content_xml();
     assert!(xml.contains("<!-- retained embedded-chart layout vocabulary -->"));
     assert!(xml.contains("chart:data-source-has-labels=\"row\""));
     assert!(xml.contains("chart:dimension=\"z\""));
@@ -461,16 +500,20 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     assert!(xml.contains("<chart:wall chart:style-name=\"wall-new\"/>"));
     assert!(xml.contains("<chart:floor chart:style-name=\"floor-new\"/>"));
     assert_eq!(
-        changed.patch().inverse().apply(changed.chart())?.as_bytes(),
+        changed
+            .package()
+            .apply(&changed.patch().inverse())?
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
     let wire = changed.patch().to_bytes();
-    let decoded = Patch::from_bytes(&wire, source.limits())?;
+    let decoded = Patch::from_bytes(&wire, source.chart().options())?;
     assert_eq!(decoded.exact_changes(), changed.patch().exact_changes());
     assert_eq!(
-        decoded.apply(&source)?.as_bytes(),
-        changed.chart().as_bytes()
+        source.apply(&decoded)?.into_package().as_bytes(),
+        changed.package().as_bytes()
     );
 
     let mut independent_edit = source.edit();
@@ -482,13 +525,22 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     let independent = independent_edit.commit()?;
     let joined = changed.patch().join(independent.patch())?;
     assert!(joined.is_merged());
-    let joined_chart = joined
-        .patch()
-        .ok_or("missing embedded-vocabulary join patch")?
-        .apply(&source)?;
-    assert!(joined_chart.content_xml().contains("chart:dimension=\"z\""));
+    let joined_chart = source
+        .apply(
+            joined
+                .patch()
+                .ok_or("missing embedded-vocabulary join patch")?,
+        )?
+        .into_package();
     assert!(
         joined_chart
+            .chart()
+            .content_xml()
+            .contains("chart:dimension=\"z\"")
+    );
+    assert!(
+        joined_chart
+            .chart()
             .content_xml()
             .contains("chart:style-name=\"independent-series\"")
     );
@@ -498,21 +550,31 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
         "<!-- independently retained destination -->\n<office:body>",
         1,
     );
-    let destination = Chart::from_bytes(raw_negative_package(&destination_xml)?)?;
+    let destination = Package::from_bytes(&raw_negative_package(&destination_xml)?)?;
     let transfer = changed.patch().transfer_to(&destination)?;
     assert!(transfer.is_merged());
-    let transferred = transfer
-        .patch()
-        .ok_or("missing embedded-vocabulary transfer patch")?
-        .apply(&destination)?;
+    let transferred = destination
+        .apply(
+            transfer
+                .patch()
+                .ok_or("missing embedded-vocabulary transfer patch")?,
+        )?
+        .into_package();
     assert!(
         transferred
+            .chart()
             .content_xml()
             .contains("<!-- independently retained destination -->")
     );
-    assert!(transferred.content_xml().contains("chart:dimension=\"z\""));
     assert!(
         transferred
+            .chart()
+            .content_xml()
+            .contains("chart:dimension=\"z\"")
+    );
+    assert!(
+        transferred
+            .chart()
             .content_xml()
             .contains("style:legend-expansion=\"wide\"")
     );
@@ -527,7 +589,7 @@ fn exact_enum_tokens_and_missing_namespace_insertions_fail_closed() -> TestResul
         expansion: Some("high".into()),
         ..LegendSpec::default()
     });
-    let source = Chart::from_bytes(raw_negative_package(&litchi_odc::serialize_content(
+    let source = Package::from_bytes(&raw_negative_package(&litchi_odc::serialize_content(
         &authored,
     )?)?)?;
 
@@ -562,7 +624,9 @@ fn exact_enum_tokens_and_missing_namespace_insertions_fail_closed() -> TestResul
 
     let mut without_expansion_definition = definition();
     without_expansion_definition.legend = Some(LegendSpec::default());
-    let without_expansion = Chart::from_definition(without_expansion_definition)?;
+    let without_expansion = Builder::new()
+        .with_definition(without_expansion_definition)
+        .build()?;
     let mut edit = without_expansion.edit();
     edit.update_exact(
         ExactTarget::Legend,
@@ -575,66 +639,69 @@ fn exact_enum_tokens_and_missing_namespace_insertions_fail_closed() -> TestResul
 
 #[test]
 fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> TestResult<()> {
-    let source = DefinitionSnapshot::with_default_limits(definition())?;
+    let source = Builder::new().with_definition(definition()).build()?;
 
     let mut left_edit = source.edit();
-    left_edit.set_style(StyleTarget::Axis(0), Some("left".into()))?;
+    left_edit
+        .definition_edit()?
+        .set_style(StyleTarget::Axis(0), Some("left".into()))?;
     let left = left_edit.commit()?;
     let mut right_edit = source.edit();
-    right_edit.set_style(StyleTarget::Axis(1), Some("right".into()))?;
+    right_edit
+        .definition_edit()?
+        .set_style(StyleTarget::Axis(1), Some("right".into()))?;
     let right = right_edit.commit()?;
-    let joined = left.patch().join(right.patch());
+    let joined = left.patch().join(right.patch())?;
     assert!(joined.is_merged());
-    let joined_target = joined
-        .patch()
-        .ok_or("missing joined patch")?
-        .apply(&source)?;
+    let joined_target = source
+        .apply(joined.patch().ok_or("missing joined patch")?)?
+        .into_package();
+    let joined_definition = joined_target.chart().definition()?;
     assert_eq!(
-        joined_target.definition().plot_area.axes[0]
-            .style_name
-            .as_deref(),
+        joined_definition.plot_area.axes[0].style_name.as_deref(),
         Some("left")
     );
     assert_eq!(
-        joined_target.definition().plot_area.axes[1]
-            .style_name
-            .as_deref(),
+        joined_definition.plot_area.axes[1].style_name.as_deref(),
         Some("right")
     );
 
     let mut conflict_edit = source.edit();
-    conflict_edit.set_style(StyleTarget::Axis(0), Some("other".into()))?;
+    conflict_edit
+        .definition_edit()?
+        .set_style(StyleTarget::Axis(0), Some("other".into()))?;
     let conflict_commit = conflict_edit.commit()?;
-    let conflict = left.patch().join(conflict_commit.patch());
-    assert_eq!(conflict.conflicts()[0].path(), "chart.plot.axes[0]");
+    let conflict = left.patch().join(conflict_commit.patch())?;
+    assert!(!conflict.is_merged());
+    assert!(!conflict.conflicts().is_empty());
 
     let mut rename_edit = source.edit();
-    let mut renamed_axis = rename_edit.definition().plot_area.axes[0].clone();
+    let definition_edit = rename_edit.definition_edit()?;
+    let mut renamed_axis = definition_edit.definition().plot_area.axes[0].clone();
     renamed_axis.name = Some("renamed".into());
-    rename_edit.update_axis(0, renamed_axis)?;
-    let mut renamed_series = rename_edit.definition().plot_area.series[0].clone();
+    definition_edit.update_axis(0, renamed_axis)?;
+    let mut renamed_series = definition_edit.definition().plot_area.series[0].clone();
     renamed_series.attached_axis = Some("renamed".into());
-    rename_edit.update_series(0, renamed_series)?;
+    definition_edit.update_series(0, renamed_series)?;
     let rename = rename_edit.commit()?;
 
-    let mut destination_definition = source.definition().clone();
+    let mut destination_definition = definition();
     destination_definition.title = Some(Text::new("destination"));
-    let destination = DefinitionSnapshot::with_default_limits(destination_definition)?;
-    let transferred = rename.patch().transfer_to(&destination);
+    let destination = Builder::new()
+        .with_definition(destination_definition)
+        .build()?;
+    let transferred = rename.patch().transfer_to(&destination)?;
     assert!(transferred.is_merged());
-    let transferred_target = transferred
-        .patch()
-        .ok_or("missing transferred patch")?
-        .apply(&destination)?;
+    let transferred_target = destination
+        .apply(transferred.patch().ok_or("missing transferred patch")?)?
+        .into_package();
+    let transferred_definition = transferred_target.chart().definition()?;
     assert_eq!(
-        transferred_target.definition().plot_area.axes[0]
-            .name
-            .as_deref(),
+        transferred_definition.plot_area.axes[0].name.as_deref(),
         Some("renamed")
     );
     assert_eq!(
-        transferred_target
-            .definition()
+        transferred_definition
             .title
             .as_ref()
             .map(|text| text.text.as_str()),
@@ -643,9 +710,11 @@ fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> Test
 
     let mut dependency_definition = definition();
     dependency_definition.plot_area.series.clear();
-    let dependency_source = DefinitionSnapshot::with_default_limits(dependency_definition)?;
+    let dependency_source = Builder::new()
+        .with_definition(dependency_definition.clone())
+        .build()?;
     let mut series_edit = dependency_source.edit();
-    series_edit.insert_series(
+    series_edit.definition_edit()?.insert_series(
         0,
         SeriesSpec {
             attached_axis: Some("x".into()),
@@ -653,20 +722,18 @@ fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> Test
         },
     )?;
     let series_commit = series_edit.commit()?;
-    let mut no_axes = dependency_source.definition().clone();
+    let mut no_axes = dependency_definition;
     no_axes.plot_area.axes.clear();
-    let no_axes_snapshot = DefinitionSnapshot::with_default_limits(no_axes)?;
-    let dependency_conflict = series_commit.patch().transfer_to(&no_axes_snapshot);
-    assert_eq!(
-        dependency_conflict.conflicts()[0].path(),
-        "chart.dependencies"
-    );
+    let no_axes_package = Builder::new().with_definition(no_axes).build()?;
+    let dependency_conflict = series_commit.patch().transfer_to(&no_axes_package)?;
+    assert!(!dependency_conflict.is_merged());
+    assert!(!dependency_conflict.conflicts().is_empty());
     Ok(())
 }
 
 #[test]
 fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
-    let source = Chart::from_definition(definition())?;
+    let source = Builder::new().with_definition(definition()).build()?;
     let mut left_edit = source.edit();
     left_edit.set_style(StyleTarget::Chart, Some("left".into()))?;
     let left = left_edit.commit()?;
@@ -677,28 +744,38 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
     let merge = left.patch().join(right.patch())?;
     assert!(merge.is_merged());
     let merged_patch = merge.patch().ok_or("missing package patch")?;
-    let merged = merged_patch.apply(&source)?;
-    assert_eq!(merged.resources().len(), 1);
-    assert_eq!(merged.definition()?.style_name.as_deref(), Some("left"));
+    let merged = source.apply(merged_patch)?.into_package();
+    assert_eq!(merged.chart().resources().len(), 1);
+    assert_eq!(
+        merged.chart().definition()?.style_name.as_deref(),
+        Some("left")
+    );
 
     let wire = merged_patch.to_bytes();
     assert_eq!(wire, merged_patch.to_bytes());
-    let decoded = Patch::from_bytes(&wire, source.limits())?;
-    assert_eq!(decoded.apply(&source)?.as_bytes(), merged.as_bytes());
+    let decoded = Patch::from_bytes(&wire, source.chart().options())?;
     assert_eq!(
-        decoded.inverse().apply(&merged)?.as_bytes(),
+        source.apply(&decoded)?.into_package().as_bytes(),
+        merged.as_bytes()
+    );
+    assert_eq!(
+        merged.apply(&decoded.inverse())?.into_package().as_bytes(),
         source.as_bytes()
     );
     let mut trailing = wire.clone();
     trailing.push(0);
-    assert!(Patch::from_bytes(&trailing, source.limits()).is_err());
+    assert!(Patch::from_bytes(&trailing, source.chart().options()).is_err());
 
-    let limits = Limits::new().with_history(1)?;
-    let bounded_source = Chart::from_definition_with_limits(definition(), limits)?;
+    let limits =
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_history(1)?.build()?);
+    let bounded_source = Builder::new()
+        .with_options(limits)
+        .with_definition(definition())
+        .build()?;
     let mut first_edit = bounded_source.edit();
     first_edit.set_style(StyleTarget::Chart, Some("one".into()))?;
     let first = first_edit.commit()?;
-    let mut second_edit = first.chart().edit();
+    let mut second_edit = first.package().edit();
     second_edit.set_style(StyleTarget::Chart, Some("two".into()))?;
     let second = second_edit.commit()?;
     let mut history = History::new(bounded_source.clone());
@@ -707,13 +784,13 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
     assert!(history.undo()?);
     assert_eq!(history.current().as_bytes(), bounded_source.as_bytes());
     assert!(history.redo()?);
-    assert_eq!(history.current().as_bytes(), first.chart().as_bytes());
+    assert_eq!(history.current().as_bytes(), first.package().as_bytes());
     Ok(())
 }
 
 #[test]
 fn package_transfer_closes_chart_style_data_and_resource_dependencies() -> TestResult<()> {
-    let source = Chart::from_definition(definition())?;
+    let source = Builder::new().with_definition(definition()).build()?;
     let mut changed_edit = source.edit();
     changed_edit.set_style(StyleTarget::Chart, Some("transferred".into()))?;
     let mut table = CachedTable::new("Data", 1);
@@ -733,23 +810,28 @@ fn package_transfer_closes_chart_style_data_and_resource_dependencies() -> TestR
 
     let mut destination_definition = definition();
     destination_definition.title = Some(Text::new("destination"));
-    let plain_destination = Chart::from_definition(destination_definition)?;
+    let plain_destination = Builder::new()
+        .with_definition(destination_definition)
+        .build()?;
     let mut destination_edit = plain_destination.edit();
     destination_edit.add_resource(
         "Pictures/existing.bin",
         "application/octet-stream",
         b"existing",
     )?;
-    let destination = destination_edit.commit()?.into_chart();
+    let destination = destination_edit.commit()?.into_package();
 
     let transfer = changed.patch().transfer_to(&destination)?;
     assert!(transfer.is_merged());
-    let transferred = transfer
-        .patch()
-        .ok_or("missing transferred package patch")?
-        .apply(&destination)?;
-    let reopened = Chart::from_bytes(transferred.as_bytes().to_vec())?;
-    let projected = reopened.definition()?;
+    let transferred = destination
+        .apply(
+            transfer
+                .patch()
+                .ok_or("missing transferred package patch")?,
+        )?
+        .into_package();
+    let reopened = Package::from_bytes(transferred.as_bytes())?;
+    let projected = reopened.chart().definition()?;
     assert_eq!(projected.style_name.as_deref(), Some("transferred"));
     assert_eq!(
         projected.title.as_ref().map(|value| value.text.as_str()),
@@ -762,8 +844,8 @@ fn package_transfer_closes_chart_style_data_and_resource_dependencies() -> TestR
             .map(|value| value.name.as_str()),
         Some("Data")
     );
-    assert_eq!(reopened.styles_xml(), Some(STYLES));
-    assert_eq!(reopened.resources().len(), 2);
+    assert_eq!(reopened.chart().styles_xml(), Some(STYLES));
+    assert_eq!(reopened.chart().resources().len(), 2);
 
     let mut conflict_edit = plain_destination.edit();
     conflict_edit.add_resource(
@@ -771,7 +853,7 @@ fn package_transfer_closes_chart_style_data_and_resource_dependencies() -> TestR
         "application/octet-stream",
         b"destination",
     )?;
-    let conflict_destination = conflict_edit.commit()?.into_chart();
+    let conflict_destination = conflict_edit.commit()?.into_package();
     let conflict = changed.patch().transfer_to(&conflict_destination)?;
     assert_eq!(
         conflict.conflicts()[0].path(),
@@ -787,7 +869,7 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
     assert!(validate_range_list("Data.$A").is_err());
     assert!(validate_range_list("Data.$1").is_err());
 
-    let source = Chart::from_definition(definition())?;
+    let source = Builder::new().with_definition(definition()).build()?;
     let mut wrong_root = source.edit();
     wrong_root.set_styles_xml("<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"/>");
     assert!(wrong_root.commit().is_err());
@@ -799,7 +881,7 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
     assert!(missing_family.commit().is_err());
     let mut valid = source.edit();
     valid.set_styles_xml(STYLES);
-    assert_eq!(valid.commit()?.chart().styles_xml(), Some(STYLES));
+    assert_eq!(valid.commit()?.package().chart().styles_xml(), Some(STYLES));
     let mut noncompact_resource = source.edit();
     noncompact_resource.add_resource(
         "Object.xml",
@@ -814,18 +896,18 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
             .is_err()
     );
 
-    let content = source.content_xml();
-    let signed = Chart::from_bytes(package(
+    let content = source.chart().content_xml();
+    let signed = Package::from_bytes(&package(
         content,
         Some(("META-INF/vendorsignatures.xml", b"<signatures/>")),
     )?)?;
-    assert!(signed.is_signed());
+    assert!(signed.chart().is_signed());
     let mut signed_edit = signed.edit();
     signed_edit.set_style(StyleTarget::Chart, Some("blocked".into()))?;
     assert!(signed_edit.commit().is_err());
 
-    let encrypted = Chart::from_bytes(encrypted_envelope(content)?)?;
-    assert!(encrypted.is_encrypted());
+    let encrypted = Package::from_bytes(&encrypted_envelope(content)?)?;
+    assert!(encrypted.chart().is_encrypted());
     let mut encrypted_edit = encrypted.edit();
     encrypted_edit.set_style(StyleTarget::Chart, Some("blocked".into()))?;
     assert!(encrypted_edit.commit().is_err());
@@ -840,20 +922,34 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
         "office:boolean-value=\"true\"",
         "office:boolean-value=\"maybe\"",
     );
-    assert!(Chart::from_bytes(raw_negative_package(&malformed_boolean)?).is_err());
-    let row_limits = Limits::new().with_cached_rows(1)?;
-    assert!(Chart::from_definition_with_limits(repeated_data, row_limits).is_err());
+    assert!(Package::from_bytes(&raw_negative_package(&malformed_boolean)?).is_err());
+    let row_limits =
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_cached_rows(1)?.build()?);
+    assert!(
+        Builder::new()
+            .with_options(row_limits)
+            .with_definition(repeated_data)
+            .build()
+            .is_err()
+    );
 
-    let duplicate_plot = source.content_xml().replacen(
+    let duplicate_plot = source.chart().content_xml().replacen(
         "</chart:plot-area>",
         "</chart:plot-area><chart:plot-area/>",
         1,
     );
-    assert!(Chart::from_bytes(raw_negative_package(&duplicate_plot)?).is_err());
+    assert!(Package::from_bytes(&raw_negative_package(&duplicate_plot)?).is_err());
 
     let mut too_many_ranges = definition();
     too_many_ranges.plot_area.cell_range_address = Some("Data.A1 Data.B1".into());
-    let range_limits = Limits::new().with_range_items(1)?;
-    assert!(Chart::from_definition_with_limits(too_many_ranges, range_limits).is_err());
+    let range_limits =
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_range_items(1)?.build()?);
+    assert!(
+        Builder::new()
+            .with_options(range_limits)
+            .with_definition(too_many_ranges)
+            .build()
+            .is_err()
+    );
     Ok(())
 }

@@ -1,10 +1,10 @@
 //! Typed ODF drawing opacity-gradient resources.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
@@ -12,7 +12,6 @@ const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const SVG_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const LOEXT_NS: &[u8] = b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_OPACITIES: usize = 65_536;
 const MAX_STOPS: usize = 65_536;
@@ -354,14 +353,14 @@ type Attributes = HashMap<(NamespaceKind, String), String>;
 ///
 /// Returns an error when the XML is malformed, violates the ODF resource grammar, or exceeds a
 /// configured resource limit.
-pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
+pub fn parse_drawing_opacities(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Collection, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("opacity") {
         return Ok(Collection::default());
     }
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("drawing opacity XML exceeds 64 MiB");
-    }
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -371,9 +370,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
     let mut stop_count = 0usize;
 
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid drawing opacity XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
@@ -381,9 +378,9 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                 reject_spoofed_name(namespace, &local)?;
                 if active.is_some() {
                     if namespace == NamespaceKind::Loext && local == "opacity-stop" {
-                        return invalid("loext:opacity-stop must be empty");
+                        return invalid_odf("loext:opacity-stop must be empty");
                     }
-                    return invalid("draw:opacity contains an unsupported child element");
+                    return invalid_odf("draw:opacity contains an unsupported child element");
                 }
                 if namespace == NamespaceKind::Draw && local == "opacity" {
                     ensure_location(&stack)?;
@@ -395,7 +392,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                 }
                 stack.push(Frame { namespace, local });
                 if stack.len() > MAX_DEPTH {
-                    return invalid(format!("opacity XML exceeds {MAX_DEPTH} levels"));
+                    return invalid_odf(format!("opacity XML exceeds {MAX_DEPTH} levels"));
                 }
             },
             Event::Empty(ref element) => {
@@ -406,7 +403,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                         || namespace != NamespaceKind::Loext
                         || local != "opacity-stop"
                     {
-                        return invalid("draw:opacity contains an unsupported child element");
+                        return invalid_odf("draw:opacity contains an unsupported child element");
                     }
                     ensure_count(stop_count, MAX_STOPS, "opacity stops")?;
                     opacity.value.extension_stops.push(parse_stop(
@@ -422,7 +419,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                         .opacities
                         .push(parse_opacity(&reader, element, &mut aggregate)?);
                 } else if namespace == NamespaceKind::Loext && local == "opacity-stop" {
-                    return invalid("loext:opacity-stop must be inside draw:opacity");
+                    return invalid_odf("loext:opacity-stop must be inside draw:opacity");
                 }
             },
             Event::End(_) => {
@@ -434,7 +431,7 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                     .is_some_and(|opacity| opacity.parent_depth == stack.len())
                 {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "opacity" {
-                        return invalid("unexpected draw:opacity end element");
+                        return invalid_odf("unexpected draw:opacity end element");
                     }
                     let opacity = active.take().ok_or_else(|| {
                         make_error("drawing opacity ended without an active definition")
@@ -447,14 +444,14 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| make_error(format!("invalid opacity text: {error}")))?;
                 if !value.chars().all(char::is_whitespace) {
-                    return invalid("draw:opacity cannot contain text");
+                    return invalid_odf("draw:opacity cannot contain text");
                 }
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
-                return invalid("draw:opacity cannot contain character data");
+                return invalid_odf("draw:opacity cannot contain character data");
             },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid("DTDs and processing instructions are prohibited in opacities");
+                return invalid_odf("DTDs and processing instructions are prohibited in opacities");
             },
             Event::Eof => break,
             Event::Text(_)
@@ -466,14 +463,14 @@ pub fn parse_drawing_opacities(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     if !stack.is_empty() || active.is_some() {
-        return invalid("unterminated drawing opacity XML");
+        return invalid_odf("unterminated drawing opacity XML");
     }
     result.validate()?;
     Ok(result)
 }
 
 fn parse_opacity(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Definition> {
@@ -510,7 +507,7 @@ fn parse_opacity(
 }
 
 fn parse_stop(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Stop> {
@@ -582,7 +579,7 @@ fn parse_decimal(value: &str, signed: bool, name: &str) -> Result<f64> {
 }
 
 fn attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Attributes> {
@@ -792,6 +789,10 @@ fn decode(value: &[u8], what: &str) -> Result<String> {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))
+}
+
+fn invalid_odf<T>(message: impl Into<String>) -> std::result::Result<T, crate::Error> {
+    Err(crate::Error::from(make_error(message)))
 }
 
 fn make_error(message: impl Into<String>) -> Error {

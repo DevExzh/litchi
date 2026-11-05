@@ -59,8 +59,8 @@ impl StylesTable {
     ///
     /// This standalone constructor cannot report repairs; an opened workbook
     /// repairs and records them instead (see [`crate::leniency`]).
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        crate::styles::read(bytes)
+    pub fn from_bytes(bytes: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        crate::styles::read(bytes, limits)
             .map(Self::from_owner)
             .map_err(map_owner_error)
     }
@@ -69,9 +69,10 @@ impl StylesTable {
     /// Excel-compatible repair into `report` (see [`crate::leniency`]).
     pub(crate) fn from_bytes_with_report(
         bytes: &[u8],
+        limits: crate::raw::Limits,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Self> {
-        crate::styles::read_with_report(bytes, report)
+        crate::styles::read_with_report(bytes, limits, report)
             .map(Self::from_owner)
             .map_err(map_owner_error)
     }
@@ -99,32 +100,36 @@ impl StylesTable {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub(crate) fn parse_font(data: &[u8]) -> Result<Font> {
-        crate::styles::parse_font(data).map_err(map_owner_error)
+    pub(crate) fn parse_font(data: &[u8], limits: crate::raw::Limits) -> Result<Font> {
+        crate::styles::parse_font(data, limits).map_err(map_owner_error)
     }
 
     #[allow(
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub(crate) fn parse_fill(data: &[u8]) -> Result<Fill> {
-        crate::styles::parse_fill(data).map_err(map_owner_error)
+    pub(crate) fn parse_fill(data: &[u8], limits: crate::raw::Limits) -> Result<Fill> {
+        crate::styles::parse_fill(data, limits).map_err(map_owner_error)
     }
 
     #[allow(
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub(crate) fn parse_direct_color(data: &[u8], offset: usize) -> Result<Option<u32>> {
-        crate::styles::parse_direct_color(data, offset).map_err(map_owner_error)
+    pub(crate) fn parse_direct_color(
+        data: &[u8],
+        offset: usize,
+        limits: crate::raw::Limits,
+    ) -> Result<Option<u32>> {
+        crate::styles::parse_direct_color(data, offset, limits).map_err(map_owner_error)
     }
 
     #[allow(
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub(crate) fn parse_border(data: &[u8]) -> Result<Border> {
-        crate::styles::parse_border(data)
+    pub(crate) fn parse_border(data: &[u8], limits: crate::raw::Limits) -> Result<Border> {
+        crate::styles::parse_border(data, limits)
             .map(from_owner_border)
             .map_err(map_owner_error)
     }
@@ -133,16 +138,16 @@ impl StylesTable {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub(crate) fn parse_num_fmt(data: &[u8]) -> Result<(u32, String)> {
-        crate::styles::parse_num_fmt(data).map_err(map_owner_error)
+    pub(crate) fn parse_num_fmt(data: &[u8], limits: crate::raw::Limits) -> Result<(u32, String)> {
+        crate::styles::parse_num_fmt(data, limits).map_err(map_owner_error)
     }
 
     #[allow(
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub(crate) fn parse_xf(data: &[u8]) -> Result<CellFormat> {
-        crate::styles::parse_cell_format(data)
+    pub(crate) fn parse_xf(data: &[u8], limits: crate::raw::Limits) -> Result<CellFormat> {
+        crate::styles::parse_cell_format(data, limits)
             .map(from_owner_cell_format)
             .map_err(map_owner_error)
     }
@@ -314,7 +319,7 @@ mod tests {
             data.extend_from_slice(&unit.to_le_bytes());
         }
 
-        let font = StylesTable::parse_font(&data).unwrap();
+        let font = StylesTable::parse_font(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(font.name, "Arial");
         assert_eq!(font.size, 12.0);
         assert_eq!(font.color, Some(0x80402010));
@@ -331,7 +336,7 @@ mod tests {
         data[4..12].copy_from_slice(&direct_color(0xFFFF0000));
         data[12..20].copy_from_slice(&direct_color(0x4000FF00));
 
-        let fill = StylesTable::parse_fill(&data).unwrap();
+        let fill = StylesTable::parse_fill(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(fill.pattern_type, 1);
         assert_eq!(fill.fg_color, Some(0xFFFF0000));
         assert_eq!(fill.bg_color, Some(0x4000FF00));
@@ -350,7 +355,7 @@ mod tests {
         data[12] = 2 | (1 << 3) | 0x40;
         data[13] = 1 | (2 << 2);
 
-        let format = StylesTable::parse_xf(&data).unwrap();
+        let format = StylesTable::parse_xf(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(format.num_fmt_id, 165);
         assert_eq!(format.font_id, 2);
         assert_eq!(format.fill_id, 3);
@@ -373,7 +378,7 @@ mod tests {
             data.extend_from_slice(&unit.to_le_bytes());
         }
         assert_eq!(
-            StylesTable::parse_num_fmt(&data).unwrap(),
+            StylesTable::parse_num_fmt(&data, crate::raw::Limits::DEFAULT).unwrap(),
             (166, "0.00000".to_string())
         );
     }
@@ -381,16 +386,16 @@ mod tests {
     #[test]
     fn rejects_truncated_style_records_and_invalid_direct_color() {
         assert!(matches!(
-            StylesTable::parse_font(&[0; 20]),
+            StylesTable::parse_font(&[0; 20], crate::raw::Limits::DEFAULT),
             Err(Error::InvalidLength { .. })
         ));
         assert!(matches!(
-            StylesTable::parse_fill(&[0; 67]),
+            StylesTable::parse_fill(&[0; 67], crate::raw::Limits::DEFAULT),
             Err(Error::InvalidLength { .. })
         ));
         let invalid = [4, 0, 0, 0, 1, 2, 3, 4];
         assert!(matches!(
-            StylesTable::parse_direct_color(&invalid, 0),
+            StylesTable::parse_direct_color(&invalid, 0, crate::raw::Limits::DEFAULT),
             Err(Error::Unrecognized { .. })
         ));
     }
@@ -409,11 +414,15 @@ mod tests {
                 "{}/../../test-data/ooxml/xlsb/{fixture}",
                 env!("CARGO_MANIFEST_DIR")
             );
-            let package = OpcPackage::from_reader(File::open(path).unwrap()).unwrap();
+            let package = OpcPackage::from_reader(
+                File::open(path).unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
+            .unwrap();
             let part = package
                 .get_part(&PackURI::new("/xl/styles.bin").unwrap())
                 .unwrap();
-            let styles = StylesTable::from_bytes(part.blob()).unwrap();
+            let styles = StylesTable::from_bytes(part.blob(), crate::raw::Limits::DEFAULT).unwrap();
 
             assert!(!styles.fonts.is_empty(), "{fixture}");
             assert!(styles.fills.len() >= 2, "{fixture}");
@@ -445,11 +454,15 @@ mod tests {
         if !path.exists() {
             return;
         }
-        let package = OpcPackage::from_reader(File::open(path).unwrap()).unwrap();
+        let package = OpcPackage::from_reader(
+            File::open(path).unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/styles.bin").unwrap())
             .unwrap();
-        let styles = StylesTable::from_bytes(part.blob()).unwrap();
+        let styles = StylesTable::from_bytes(part.blob(), crate::raw::Limits::DEFAULT).unwrap();
         assert!(styles.num_fmts.keys().any(|id| *id >= 164));
     }
 }

@@ -13,5 +13,6 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use crate::Error;
 pub use model::DataLabelFlag;
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, LimitKind, Package, Patch};

@@ -23,6 +23,7 @@ pub(super) fn rewrite_visibility(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let wire_limits = source.wire_limits().map_err(map_wire_error)?;
     let preview_plan =
         crate::package::rendering_invalidation::root_preview_deletions(catalog.package())
@@ -54,15 +55,15 @@ pub(super) fn rewrite_visibility(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits.snappy_limits().map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
         drop(stream);
         if let Some(object) = archive.object(selection.slide_identifier) {
@@ -82,7 +83,7 @@ pub(super) fn rewrite_visibility(
             archive
                 .object_mut(selection.slide_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     index,
                     RawMessage {
                         type_: SLIDE_MESSAGE_TYPE,
@@ -127,11 +128,9 @@ pub(super) fn rewrite_visibility(
                 !node_changed
             };
         }
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
-        let replacement = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let replacement = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         drop(bytes);
         compressed.push((*name, replacement));
     }
@@ -179,7 +178,7 @@ pub(super) fn rewrite_visibility_payload(
     if before == after {
         return Err(Error::Verification);
     }
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let role_number = match kind {
         super::Kind::Title => TITLE_REFERENCE_FIELD,
         super::Kind::Body => BODY_REFERENCE_FIELD,
@@ -228,7 +227,7 @@ pub(super) fn rewrite_visibility_payload(
     };
     let output_len = retained.checked_add(append).ok_or(Error::InvalidSource)?;
     if output_len > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: output_len as u64,
             maximum: limits.max_output_bytes() as u64,
@@ -241,7 +240,7 @@ pub(super) fn rewrite_visibility_payload(
         .and_then(|value| value.checked_add(view.len().saturating_mul(2)))
         .ok_or(Error::InvalidSource)?;
     if work > limits.max_rewrite_work() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: work as u64,
             maximum: limits.max_rewrite_work() as u64,
@@ -266,7 +265,9 @@ pub(super) fn rewrite_visibility_payload(
         && after == State::Visible
         && (remaining_owned_fields == 0 || remaining_z_order_fields == 0)
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     for field in view.fields() {
         let selected_list = matches!(field.number(), OWNED_DRAWABLES_FIELD | Z_ORDER_FIELD)
@@ -323,8 +324,8 @@ pub(super) fn visibility_payload_delta_matches(
         })
         .ok_or(Error::InvalidSource)?;
     budget.charge_work(work)?;
-    let source_view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
-    let target_view = WireView::parse_with_limits(target, limits).map_err(map_wire_error)?;
+    let source_view = WireView::parse(source, limits).map_err(map_wire_error)?;
+    let target_view = WireView::parse(target, limits).map_err(map_wire_error)?;
     let role_number = match kind {
         super::Kind::Title => TITLE_REFERENCE_FIELD,
         super::Kind::Body => BODY_REFERENCE_FIELD,
@@ -470,7 +471,7 @@ mod tests {
                 WireLimits::default(),
                 &mut budget,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed,
                 maximum,

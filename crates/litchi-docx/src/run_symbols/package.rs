@@ -8,9 +8,9 @@
 )]
 //! Run and writer facades for the `symEx` semantic owner.
 
+use crate::builder::{Run as DraftRun, RunContent};
 use crate::error::{Error, Result};
 use crate::paragraph::Run;
-use crate::writer::{MutableRun, RunContent};
 
 use super::codec;
 use super::{Symbol, Symbols};
@@ -56,11 +56,11 @@ impl Run {
     /// Returns an error if the operation cannot be completed.
     pub fn set_symbols(&mut self, value: Symbols) -> Result<&mut Self> {
         if self.is_managed() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "run.set_symbols",
-                reason: "managed run views cannot detach source-owned XML",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "run.set_symbols",
+                "managed run views cannot detach source-owned XML",
+            ));
         }
         let _parser_admission = self.parser_admission()?;
         let original = self.xml_bytes();
@@ -112,7 +112,7 @@ impl Run {
     }
 }
 
-impl MutableRun {
+impl DraftRun {
     /// Borrow the symbol authored on this new run, if any.
     #[inline]
     #[must_use]

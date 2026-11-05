@@ -35,9 +35,9 @@
 //! Tests for the master-document subdocument directory (`PlcfWKB`) and the
 //! referenced-file name table (`SttbFnm`), MS-DOC 2.8.34 and 2.9.288.
 //!
-//! No fixture in `test-data/` or `3rdparty/poi/test-data/document/` carries a
+//! No fixture in `test-data/` or Apache POI's `test-data/document/` carries a
 //! non-zero `lcbPlcfWkb` or `lcbSttbFnm` (the one hit elsewhere,
-//! `3rdparty/libreoffice-core/sw/qa/extras/ww8export/data/tdf59896.doc`, holds
+//! LibreOffice core `sw/qa/extras/ww8export/data/tdf59896.doc`, holds
 //! a garbage `lcbSttbFnm` and no table stream at all), so table content is
 //! covered by the synthesized unit tests in `parts::subdocuments`; these
 //! tests pin down that ordinary documents parse cleanly and report `None`.
@@ -56,7 +56,11 @@ fn fixture(relative: &str) -> PathBuf {
 
 fn parse(relative: &str) -> Option<Collection> {
     let path = fixture(relative);
-    let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(&path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -80,7 +84,7 @@ fn word97_era_document_without_master_document_tables_reports_none() {
 
 #[test]
 fn exposes_subdocuments_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture("test-data/poi/test-data/document/47950_normal.doc")).unwrap(),
     )
     .unwrap();

@@ -1,0 +1,160 @@
+{
+  "source_parent": "ee74c234972527b6cf906a094c30f133b95d6701",
+  "source_files": [
+    {
+      "path": "crates/litchi-iwa-protos/src/numbers_table_cell_storage_codec.rs",
+      "bytes": 381767,
+      "sha256": "a1fadd3117237317441ca953e0d7f3a63a8d3c4da0d9e5b94cd245723a098c18"
+    },
+    {
+      "path": "tools/api_glossary.json",
+      "bytes": 939593,
+      "sha256": "ad339c5f030ea9521506a78a1e40959709cd1aa579e21a32ff96d9137b124dbb"
+    },
+    {
+      "path": "tools/validate_api_disposition.py",
+      "bytes": 15460,
+      "sha256": "808649978a7c985f400053c3515f6176e8ff4e1a220211d877c18495d5e465a0"
+    },
+    {
+      "path": "tools/test_validate_api_disposition.py",
+      "bytes": 20170,
+      "sha256": "ff2902af1da68a53bac3a4cecb85b2c72bf4fcb30ebd8b98928e465101bdec3f"
+    }
+  ],
+  "root_lock": {
+    "path": "Cargo.lock",
+    "bytes": 139606,
+    "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+  },
+  "steps": [
+    {
+      "name": "tooling",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_validate_api_disposition",
+        "tools.test_check_api_glossary"
+      ],
+      "exit_code": 0,
+      "seconds": 1.331648724997649,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/tooling.log",
+      "log_bytes": 167,
+      "log_sha256": "f1ae9791cd71b7b2b6f886156cfa980bb82bce19071296bf07f86aae198f242c",
+      "target_pre_bytes": 6083810704,
+      "target_post_bytes": 6083810704
+    },
+    {
+      "name": "codec-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-iwa-protos",
+        "--lib",
+        "numbers_table_cell_storage_codec"
+      ],
+      "exit_code": 0,
+      "seconds": 52.818272336997325,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/codec-tests.log",
+      "log_bytes": 8727,
+      "log_sha256": "f0db3be8a7f5bc487abfe09fcdc79eb9d4f2d3eb7172c128050b9d6ff04d8956",
+      "target_pre_bytes": 6083810704,
+      "target_post_bytes": 6298379134
+    },
+    {
+      "name": "consumers",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-keynote",
+        "-p",
+        "litchi-numbers",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 51.19814022000355,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/consumers.log",
+      "log_bytes": 2226,
+      "log_sha256": "384cd3b606ff40861979f571928ec48fa6f7b8e9ec6256374cd47d5499117858",
+      "target_pre_bytes": 6298379134,
+      "target_post_bytes": 6467782349
+    },
+    {
+      "name": "rustdoc",
+      "command": [
+        "cargo",
+        "rustdoc",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-iwa-protos",
+        "--lib",
+        "--all-features",
+        "--",
+        "-Zunstable-options",
+        "--output-format",
+        "json",
+        "--document-hidden-items"
+      ],
+      "exit_code": 0,
+      "seconds": 21.98234867300198,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/rustdoc.log",
+      "log_bytes": 569,
+      "log_sha256": "a08dfa82cf91e8870c993518398dd6b59ef06412f47eaaf66ded78558fd4a2a8",
+      "target_pre_bytes": 6467782349,
+      "target_post_bytes": 6595576309
+    },
+    {
+      "name": "new-glossary",
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "iwa-protos-wire-codecs",
+        "--json",
+        "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target/doc/litchi_iwa_protos.json"
+      ],
+      "exit_code": 0,
+      "seconds": 2.3097055920079583,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/new-glossary.log",
+      "log_bytes": 152,
+      "log_sha256": "bff41c2b3eede6b424ea03f2a85c62e8abaa487380569a65ca6436cd74397da2",
+      "target_pre_bytes": 6595576309,
+      "target_post_bytes": 6595576309
+    }
+  ],
+  "old_capture_negative_control": {
+    "artifact": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-082fbeafe8/output/inventory/litchi_iwa_protos.json",
+      "bytes": 67363729,
+      "sha256": "ef7aec8961906f5c72df5cde00545421b73596365bf690cb6317c29eb7a16f21"
+    },
+    "failures": [
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::PreparedDataStoreControlCellSpecTableReferenceRewrite exposes banned name PreparedDataStoreControlCellSpecTableReferenceRewrite; use PreparedDataStoreControlCellSpecTableRewrite (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::PreparedTableModelControlCellSpecTableReferenceRewrite exposes banned name PreparedTableModelControlCellSpecTableReferenceRewrite; use PreparedTableModelControlCellSpecTableRewrite (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::prepare_data_store_control_cell_spec_table_reference_rewrite exposes banned name PreparedDataStoreControlCellSpecTableReferenceRewrite; use PreparedDataStoreControlCellSpecTableRewrite (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::prepare_data_store_control_cell_spec_table_reference_rewrite exposes banned name prepare_data_store_control_cell_spec_table_reference_rewrite; use prepare_data_store_control_cell_spec_table_rewrite (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::prepare_table_model_control_cell_spec_table_reference_rewrite exposes banned name PreparedTableModelControlCellSpecTableReferenceRewrite; use PreparedTableModelControlCellSpecTableRewrite (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::prepare_table_model_control_cell_spec_table_reference_rewrite exposes banned name prepare_table_model_control_cell_spec_table_reference_rewrite; use prepare_table_model_control_cell_spec_table_rewrite (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::rewrite_data_store_control_cell_spec_table_reference exposes banned name rewrite_data_store_control_cell_spec_table_reference; use rewrite_data_store_control_cell_spec_table (record 0362ul14)",
+      "litchi_iwa_protos::numbers_table_cell_storage_codec::rewrite_table_model_control_cell_spec_table_reference exposes banned name rewrite_table_model_control_cell_spec_table_reference; use rewrite_table_model_control_cell_spec_table (record 0362ul14)"
+    ],
+    "note": "Eight findings cover six banned declarations and two references in return types."
+  },
+  "new_rustdoc": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/litchi_iwa_protos.json",
+    "bytes": 66976246,
+    "sha256": "640532ba18f65714f9f7a117a9b81fdd306f9bc44ec7db8fa9bedf6805dc8e55"
+  },
+  "new_profile_gate": "PASS six exact removed names absent and canonical scope present",
+  "disposition_rows": 84,
+  "disposition_validation": "PASS exact one-to-one complete evidence/owner",
+  "independent_review": "49raw/descriptor +35AST/wire source roles verified; all21sourcehashes/84mappingkeys verified; finitealias-removal and14dispositiontestsPASS; raw/fullgate/nativequalification separate"
+}

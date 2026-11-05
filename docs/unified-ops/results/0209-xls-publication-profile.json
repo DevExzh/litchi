@@ -1,0 +1,44 @@
+{
+  "schema": "litchi.xls_publication_profile.v1",
+  "event": "cycles:u",
+  "frequency_hz": 199,
+  "call_graph": "dwarf,16384",
+  "benchmark_samples": 3,
+  "scope": "whole harness, including generation, warmup and verification; diagnostic only, not paired timing",
+  "analysis_command": "DEBUGINFOD_URLS='' perf report -i CAPTURE --stdio --no-children --percent-limit 0 -g none",
+  "captures": [
+    {
+      "phase": "before",
+      "source_commit": "90a797358b100a9dcee3182e7428ba8c1fda204f",
+      "binary_sha256": "8c759476a3d9c2c6b45758755c05543228b6be8bb13c5e530675e4f6d696cb3b",
+      "samples": 1101,
+      "lost_samples": 0,
+      "capture_name": "litchi-unified-0209-perf.data",
+      "capture_bytes": 18461200,
+      "capture_sha256": "a239fb396d98baea33e3d16c4bf8fa01aa5d50e2ccbc9cb072098ea8119ea1c0",
+      "capture_retained": false,
+      "regenerate_command": "LITCHI_XLS_BENCH_SAMPLES=3 perf record -e cycles:u -F 199 --call-graph dwarf,16384 -o litchi-unified-0209-perf.data target/release/examples/xls_batch_bench",
+      "selected_self_percent": {
+        "patch_coordinate_dependencies": 14.17,
+        "semantic_BTreeMap_clone_subtree": 4.35
+      }
+    },
+    {
+      "phase": "after",
+      "source_commit": "2241f4a7f3d79660efd6f34b4091c9afefb95d7b",
+      "binary_sha256": "13e78288b32a80793dd3821d3c69a26b2f9bd833802ba4309d7f40f96097b157",
+      "samples": 795,
+      "lost_samples": 0,
+      "capture_name": "litchi-unified-0209-after-perf.data",
+      "capture_bytes": 13343584,
+      "capture_sha256": "1fb2dd58549051acf19a53dd833a7b77d0c1ceb3c9a851e385f5bb5c9fe124fc",
+      "capture_retained": false,
+      "regenerate_command": "LITCHI_XLS_BENCH_SAMPLES=3 perf record -e cycles:u -F 199 --call-graph dwarf,16384 -o litchi-unified-0209-after-perf.data target/release/examples/xls_batch_bench",
+      "selected_self_percent": {
+        "patch_coordinate_dependencies": 0.0,
+        "semantic_BTreeMap_clone_subtree": 0.0
+      }
+    }
+  ],
+  "caveat": "Zero denotes no observed self samples, not zero runtime cost. Capture shares use different totals. Temporary raw captures removed after reduction; no executable retained."
+}

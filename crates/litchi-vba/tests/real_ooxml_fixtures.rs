@@ -51,7 +51,8 @@ fn real_powerpoint_vba_source_is_bounded_and_lossless() {
 
 #[test]
 fn real_excel_cfb_project_exposes_references_and_project_wm() {
-    let mut ole = OleFile::open(Cursor::new(EXCEL_CFB)).expect("Excel CFB fixture");
+    let mut ole = OleFile::open(Cursor::new(EXCEL_CFB), litchi_cfb::OleFileLimits::default())
+        .expect("Excel CFB fixture");
     let project = Project::open(
         &mut ole,
         &["_VBA_PROJECT_CUR"],
@@ -87,7 +88,11 @@ fn real_excel_cfb_project_exposes_references_and_project_wm() {
 
 #[test]
 fn real_excel_form_project_exposes_designer_frame_metadata() {
-    let mut ole = OleFile::open(Cursor::new(EXCEL_FORM_CFB)).expect("Excel form CFB fixture");
+    let mut ole = OleFile::open(
+        Cursor::new(EXCEL_FORM_CFB),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("Excel form CFB fixture");
     let limits = Limits {
         max_cfb_bytes: EXCEL_FORM_CFB.len(),
         max_compressed_stream_bytes: 64 * 1024,

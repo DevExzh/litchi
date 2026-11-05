@@ -1,0 +1,302 @@
+[package]
+name        = "litchi-ops"
+description = "Unified operations layer for Litchi: one open/get/query/set/batch/save surface over the per-format owners."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+
+# Format features mirror the `litchi` facade's per-format features. Each one
+# gains its `dep:` leaf edge, and the matching `tools/crate_boundaries.json`
+# entry, in the change that first uses it (ADR 0033, record 0004). The error
+# module (M0a step S2) wires the leaf errors of the tier 1-2 formats and RTF;
+# the `OpenOptions` sub-options (step S3) name OOXML, DOC, PPT and ODF limit
+# types; detection (step S4) needs the OLE, OPC, ODF and RTF probes and owners;
+# the legacy handles (step S5d) read OLE property sets through
+# `litchi-ole-common`.
+# The iWork features (owner decision D1, record 0296) read and write Pages,
+# Keynote and Numbers packages through their leaf owners: `File::Pages`,
+# `File::Keynote` and `File::Numbers` hold the leaf `Package` behind one
+# object-tree adapter (`format::iwork`), whose internal umbrella is
+# `iwork-adapter`. Detection classifies iWork packages itself, as the last
+# ZIP candidate, through `litchi-iwa-detect`; the leaves' prepared-source
+# ingress (`internal-iwork-source`) adopts the detection's parsed container
+# without a second ZIP pass.
+# `encryption` (step S6) adds `Locked::unlock`: OOXML package decryption
+# through `litchi-crypto`, the OOXML leaves' decrypted-package constructors,
+# and legacy PowerPoint decryption. It also lets an OOXML-only build parse the
+# compound file an encrypted OOXML package arrives in.
+# The legacy binary formats remove a compound-file signature after
+# `Signed::unsign` through `litchi-sign` (step S6b, record 0013).
+doc     = [
+    "dep:litchi-cfb",
+    "dep:litchi-crypto",
+    "dep:litchi-doc",
+    "dep:litchi-ole-common",
+    "dep:litchi-sign",
+    "dep:litchi-vba",
+]
+sign    = ["dep:litchi-sign", "litchi-ppt?/sign"]
+docx    = ["dep:base64", "dep:litchi-docx", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "opc"]
+ppt     = ["dep:litchi-biff", "dep:litchi-cfb", "dep:litchi-ograph", "dep:litchi-ole-common", "dep:litchi-ppt", "dep:litchi-sign"]
+pptx    = ["dep:base64", "dep:chrono", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
+xls     = [
+    "dep:base64",
+    "dep:litchi-biff",
+    "dep:litchi-cfb",
+    "dep:litchi-ograph",
+    "dep:litchi-ole-common",
+    "dep:litchi-sign",
+    "dep:litchi-vba",
+    "dep:litchi-xls",
+]
+xlsx    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
+xlsb    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
+rtf     = ["dep:litchi-rtf", "dep:chrono"]
+odt     = ["dep:litchi-odf-common", "dep:litchi-odt", "dep:soapberry-zip"]
+ods     = ["dep:base64", "dep:litchi-odf-common", "dep:litchi-ods", "dep:soapberry-zip"]
+odp     = ["dep:litchi-odf-common", "dep:litchi-odp", "dep:soapberry-zip"]
+# The ODF text-family formats read and write through the ODT body machinery
+# (record 0282): `File::Oth`/`File::Odm` hold the ODT handle; the leaf crate
+# supplies the minimal package `create` starts from.
+oth     = ["odt", "dep:litchi-oth"]
+odm     = ["odt", "dep:litchi-odm"]
+# The ODF object formats (record 0282) share one object-tree adapter
+# (`format::odf_tree`); `odf-objects` is its internal umbrella and is turned
+# on by each of them. Code is gated on `cfg(odf_objects)` (build.rs), set when
+# at least one object format is on (record 0358a).
+odg         = ["odf-objects", "dep:litchi-odg"]
+odc         = ["odf-objects", "dep:litchi-odc"]
+odi         = ["odf-objects", "dep:litchi-odi"]
+odb         = ["odf-objects", "dep:litchi-odb"]
+odf-formula = ["odf-objects", "dep:litchi-odf-formula"]
+odf-objects = ["dep:litchi-odf-common", "dep:soapberry-zip"]
+pages   = ["iwork-adapter", "dep:litchi-pages", "litchi-pages/internal-iwork-source"]
+keynote = ["iwork-adapter", "dep:base64", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
+numbers = ["iwork-adapter", "dep:litchi-numbers", "litchi-numbers/internal-iwork-source"]
+iwork-adapter = ["dep:litchi-iwa-archive", "dep:litchi-iwa-detect"]
+
+encryption = [
+    "dep:litchi-cfb",
+    "dep:litchi-crypto",
+    "litchi-docx?/encryption",
+    "litchi-ooxml-common?/encryption",
+    "litchi-ppt?/encryption",
+    "litchi-pptx?/encryption",
+    "litchi-xlsx?/encryption",
+]
+
+# Mirrors the facade's `opc` capability, which detection consults on its own
+# (an XLS-only build with OPC enabled bounds its workbook path probe).
+opc = ["dep:litchi-opc"]
+
+# `markdown` (step S7) implements `litchi_markdown::ToMarkdown` for `File`,
+# its family views and the `compat` element wrappers: the facade's Markdown
+# adapter moved here, because the trait and `File` are both foreign to the
+# facade. `formula` renders OMML and MTEF formulas as LaTeX in that output,
+# and `yaml` writes document properties as YAML front matter; each mirrors
+# the facade feature of the same name, which turns it on.
+markdown = ["dep:base64", "dep:litchi-markdown"]
+formula = ["dep:litchi-formula", "litchi-doc?/formula"]
+yaml = ["dep:serde-saphyr"]
+
+# `eval` (record 0266) evaluates spreadsheet formulas through the
+# `litchi-eval` engine: `File::evaluate`, `File::recalculate` and the
+# `calc` module. The facade's `eval` feature turns it on.
+eval = ["dep:litchi-eval"]
+
+# Compiles the detection probe counter and the test-only source detectors the
+# `litchi` facade's unit tests exercise. Enabled only by `litchi`'s
+# dev-dependency; never part of a release build.
+test-support = []
+
+[dependencies]
+caseless = { workspace = true }
+unicode-normalization = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64              = { workspace = true, optional = true } # Markdown, DOCX, PPTX, XLSX, XLSB, XLS, ODS and Keynote picture image data URIs
+chrono              = { workspace = true, optional = true } # RTF metadata timestamps; PPTX comment dates
+litchi-biff         = { workspace = true, optional = true } # Typed Graph framing errors
+litchi-cfb          = { workspace = true, optional = true }
+litchi-core         = { workspace = true }
+litchi-crypto       = { workspace = true, optional = true, features = ["ooxml"] }
+litchi-doc          = { workspace = true, optional = true }
+litchi-docx         = { workspace = true, optional = true }
+litchi-drawingml    = { workspace = true, optional = true }
+litchi-eval         = { workspace = true, optional = true } # Formula evaluation (record 0266)
+litchi-formula      = { workspace = true, optional = true }
+litchi-iwa-archive  = { workspace = true, optional = true } # iWork physical error classification (record 0306)
+litchi-iwa-detect   = { workspace = true, optional = true } # iWork detection (record 0296)
+litchi-keynote      = { workspace = true, optional = true } # Keynote owner (record 0296)
+litchi-markdown     = { workspace = true, optional = true }
+litchi-numbers      = { workspace = true, optional = true } # Numbers owner (record 0296)
+litchi-odb          = { workspace = true, optional = true }
+litchi-odc          = { workspace = true, optional = true }
+litchi-odf-common   = { workspace = true, optional = true }
+litchi-odf-formula  = { workspace = true, optional = true }
+litchi-odg          = { workspace = true, optional = true }
+litchi-odi          = { workspace = true, optional = true }
+litchi-odp          = { workspace = true, optional = true }
+soapberry-zip       = { workspace = true, optional = true }
+litchi-ods          = { workspace = true, optional = true }
+litchi-odt          = { workspace = true, optional = true }
+litchi-odm          = { workspace = true, optional = true }
+litchi-ograph       = { workspace = true, optional = true } # Typed legacy chart errors
+litchi-ole-common   = { workspace = true, optional = true }
+litchi-oth          = { workspace = true, optional = true }
+litchi-pages        = { workspace = true, optional = true } # Pages owner (record 0296)
+litchi-ooxml-common = { workspace = true, optional = true }
+litchi-opc          = { workspace = true, optional = true }
+litchi-ppt          = { workspace = true, optional = true }
+litchi-pptx         = { workspace = true, optional = true }
+litchi-rtf          = { workspace = true, optional = true }
+litchi-sheet-text   = { workspace = true } # Delimited tokenizer and decoding for `File::import` (record 0354)
+litchi-sign         = { workspace = true, optional = true }
+litchi-vba          = { workspace = true, optional = true }
+litchi-xls          = { workspace = true, optional = true }
+litchi-xlsb         = { workspace = true, optional = true }
+litchi-xlsx         = { workspace = true, optional = true }
+memchr              = { workspace = true } # Markdown HTML escaping; find/replace literal search
+quick-xml           = { workspace = true } # Raw layer: part addressing and `raw_set` splices (record 0336)
+serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
+sha2                = { workspace = true } # Streaming content proofs for process-local patch replay
+
+[dev-dependencies]
+proptest = "1.5" # PathArg display fixed point (record 0338 F2)
+tempfile = { workspace = true }
+zip      = { version = "8", default-features = false, features = ["deflate"] }
+
+[[test]]
+name = "path_allocations"
+required-features = ["test-support"]
+
+[[example]]
+name = "query_walk_bench"
+required-features = ["test-support"]
+
+# Representative queries over the OOXML corpora return what they returned
+# before the query-walker optimizations (record 0262).
+[[test]]
+name              = "query_corpus_differential"
+required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
+
+# Prints the corpus query digests, to compare two builds (record 0262).
+[[example]]
+name              = "query_corpus_digest"
+required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
+
+[lints]
+workspace = true
+
+# Formula-evaluation parity against the corpus' cached results (record 0266).
+[[example]]
+name              = "sheet_features_bench"
+required-features = ["xls", "ods"]
+
+[[example]]
+name              = "eval_parity"
+required-features = ["xlsx", "xlsb", "xls", "eval"]
+
+# Paired leaf-vs-unified import and evaluation measurements (record 0266).
+[[example]]
+name              = "m4_bench"
+required-features = ["xlsx", "xlsb", "xls", "eval"]
+
+# XLS CSV-import scaling across row counts (record 0359fa).
+[[example]]
+name              = "xls_import_scaling"
+required-features = ["xls"]
+
+# Sheet-trait static-dispatch measurements: evaluation and per-cell reads (record 0353).
+[[example]]
+name              = "sheet_dispatch_bench"
+required-features = ["xlsx", "xlsb", "xls", "eval"]
+
+# Paired leaf-vs-unified template merge measurements (record 0274).
+[[example]]
+name              = "merge_bench"
+required-features = ["docx"]
+
+# Paired leaf-vs-unified find/replace measurements (record 0273).
+[[example]]
+name              = "find_replace_bench"
+required-features = ["docx", "pptx"]
+
+# Paired leaf-vs-unified measurements of the remaining ODF formats (record 0282).
+[[example]]
+name              = "odf_leaves_bench"
+required-features = ["oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]
+
+# Untimed correctness and bounded phase protocol for the shared-triad ODF
+# qualification lane (record 0362uw).  Keep this example out of no-default
+# and single-format all-targets checks: it deliberately pairs all four
+# changed families.
+[[example]]
+name              = "odf_shared_triad_qualification"
+required-features = ["odc", "odi", "oth", "odm"]
+
+# Paired leaf-vs-unified field refresh measurements (record 0279).
+[[example]]
+name              = "refresh_bench"
+required-features = ["docx", "xlsx", "eval"]
+
+# Paired leaf-vs-unified iWork measurements (record 0296).
+[[example]]
+name              = "iwork_bench"
+required-features = ["pages", "keynote", "numbers"]
+
+# Paired leaf-vs-unified iWork directory and open-option routes (record 0306).
+[[example]]
+name              = "iwork_directory_bench"
+required-features = ["pages", "keynote", "numbers"]
+
+# Paired leaf-vs-unified Numbers measurements (record 0297).
+[[example]]
+name              = "numbers_unified_bench"
+required-features = ["numbers"]
+
+# Paired leaf-vs-unified Pages write measurements (record 0299).
+[[example]]
+name              = "pages_bench"
+required-features = ["pages"]
+
+# Paired leaf-vs-unified Keynote measurements (record 0298).
+[[example]]
+name              = "keynote_bench"
+required-features = ["keynote"]
+
+# Paired leaf-vs-unified find, merge and import on more formats (record 0295).
+[[example]]
+name              = "m4_formats_bench"
+required-features = ["odt", "doc", "ods"]
+
+# Paired leaf-vs-unified XLSX worksheet feature measurements (record 0320).
+[[example]]
+name              = "xlsx_features_bench"
+required-features = ["xlsx"]
+
+# Paired leaf-vs-unified OOXML write follow-up measurements (record 0325).
+[[example]]
+name              = "ooxml_followups_bench"
+required-features = ["docx", "pptx", "xlsx"]
+
+# Paired leaf-vs-unified XLSB worksheet feature measurements (record 0322).
+[[example]]
+name              = "xlsb_features_bench"
+required-features = ["xlsb"]
+
+# `File::dump` against a read-only traversal (record 0336).
+[[example]]
+name              = "dump_bench"
+required-features = ["docx", "xlsx", "pptx"]
+
+# `File::dump` round trips over corpus files and built documents (record 0336).
+[[test]]
+name              = "dump_round_trip"
+required-features = ["docx", "xlsx", "xlsb", "pptx", "ods", "odt", "rtf", "doc", "xls", "ppt", "odp", "odg"]

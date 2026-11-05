@@ -2,6 +2,7 @@
 
 /// Validation failures for a table-cell inset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The supplied distance was NaN or infinite.
     #[error("table-cell inset must be finite")]

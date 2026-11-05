@@ -1,13 +1,16 @@
 //! Opt-in XLSB semantic CRUD baseline.
 //!
 //! This binary intentionally lives outside the default perf matrix. It uses
-//! only the public XLSB owner and umbrella-facade APIs, and keeps the complete
+//! only the public XLSB owner and umbrella-facade APIs (since M0a step S9,
+//! `litchi::open_bytes` and `litchi::File` for the umbrella's full text, in
+//! place of the deleted `litchi::sheet::Workbook`), and keeps the complete
 //! reopen/preservation checks outside the timed sample interval. The default
 //! corpus is a public POI workbook with opaque members and a VBA payload; the
 //! payload is treated as inert and is checked as an untouched package member.
 
 use litchi::common::FileFormat;
 use litchi::sheet::{WorkbookTrait, Worksheet};
+use litchi_core::sheet::Cell as _;
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_opc::SourceCacheDiagnostics;
 use litchi_xlsb::SourceBackedWorkbook;
@@ -513,7 +516,7 @@ impl Corpus {
             semantic_cells.push((cell.row(), cell.column(), cell.value().clone()));
         }
         let full_text = facade_text(&bytes)?;
-        let package = litchi_xlsb::Package::from_slice(&bytes)?;
+        let package = litchi_xlsb::Package::from_bytes(&bytes)?;
         let part_digests = package_part_digests(package.opc_package());
         Ok(Self {
             path: path.to_path_buf(),
@@ -908,14 +911,23 @@ fn run_case_with_opener(
     match case {
         Case::OpenIdentify => {
             if identify_facade {
-                let format = litchi::detect_file_format_from_bytes(&corpus.bytes)
-                    .ok_or_else(|| "facade could not identify the XLSB fixture".to_string())?;
+                let format = litchi::detect_file_format_from_bytes(
+                    &corpus.bytes,
+                    &litchi::common::SourceLimits::default(),
+                )
+                .ok_or_else(|| "facade could not identify the XLSB fixture".to_string())?;
                 if format != FileFormat::Xlsb {
                     return Err(format!("facade identified fixture as {format:?}, not XLSB").into());
                 }
-                let workbook = litchi::sheet::open_xlsb_workbook_from_bytes(&corpus.bytes)?;
+                // The leaf call the deleted `sheet::open_xlsb_workbook_from_bytes`
+                // wrapped (M0a step S9), with the same default read limits.
+                let package = litchi_xlsb::Package::from_bytes_with_options(
+                    &corpus.bytes,
+                    litchi_xlsb::OpenOptions::new()
+                        .source_limits(litchi_xlsb::SourceLimits::default()),
+                )?;
                 return Ok(RunOutcome::Projection {
-                    count: workbook.worksheet_count(),
+                    count: package.workbook()?.worksheet_count(),
                     text: None,
                 });
             }
@@ -965,37 +977,49 @@ fn run_case_with_opener(
             text: Some(facade_text(&corpus.bytes)?),
         }),
         Case::NoopTransactionCommitSave => {
-            let mut workbook = opener(&corpus.bytes)?;
-            let snapshot = workbook.cell_values(corpus.selected_sheet)?;
-            let commit = snapshot.edit().commit()?;
-            if !commit.patch().is_empty() {
+            let workbook = opener(&corpus.bytes)?;
+            let selector = worksheet_selector(&workbook, corpus.selected_sheet)?;
+            let edit = workbook
+                .into_package()
+                .edit_cell_values(selector)?
+                .resolve()?
+                .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
+            let commit = edit.commit()?;
+            if commit.diagnostics().changed() || !commit.patch().is_noop() {
                 return Err("public exact no-op commit unexpectedly changed bytes".into());
             }
-            workbook.apply_cell_values(corpus.selected_sheet, &commit)?;
-            Ok(RunOutcome::Saved(save_workbook(&workbook)?))
+            Ok(RunOutcome::Saved(save_package(&commit.into_package())?))
         },
         Case::EditOneExistingScalarSave => {
-            let mut workbook = opener(&corpus.bytes)?;
+            let workbook = opener(&corpus.bytes)?;
             let target = corpus
                 .edits
                 .first()
                 .ok_or_else(|| "no editable scalar target".to_string())?;
-            let mut edit = workbook.edit_cell_values(corpus.selected_sheet)?;
+            let selector = worksheet_selector(&workbook, corpus.selected_sheet)?;
+            let mut edit = workbook
+                .into_package()
+                .edit_cell_values(selector)?
+                .resolve()?
+                .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             edit.set_value(target.reference, target.after.clone())?;
             let commit = edit.commit()?;
-            workbook.apply_cell_values(corpus.selected_sheet, &commit)?;
-            Ok(RunOutcome::Saved(save_workbook(&workbook)?))
+            Ok(RunOutcome::Saved(save_package(&commit.into_package())?))
         },
         Case::EditCeilOnePercentExistingCellsSave => {
-            let mut workbook = opener(&corpus.bytes)?;
+            let workbook = opener(&corpus.bytes)?;
             let count = corpus.stored_cell_count.div_ceil(100);
-            let mut edit = workbook.edit_cell_values(corpus.selected_sheet)?;
+            let selector = worksheet_selector(&workbook, corpus.selected_sheet)?;
+            let mut edit = workbook
+                .into_package()
+                .edit_cell_values(selector)?
+                .resolve()?
+                .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             for target in corpus.edits.iter().take(count) {
                 edit.set_value(target.reference, target.after.clone())?;
             }
             let commit = edit.commit()?;
-            workbook.apply_cell_values(corpus.selected_sheet, &commit)?;
-            Ok(RunOutcome::Saved(save_workbook(&workbook)?))
+            Ok(RunOutcome::Saved(save_package(&commit.into_package())?))
         },
     }
 }
@@ -1010,19 +1034,21 @@ fn verify_case(
     observed_text_bytes: Option<usize>,
     observed_text_sha256: Option<&str>,
 ) -> Result<GateReport> {
-    let malformed_input_refused = litchi_xlsb::Package::from_bytes(vec![0, 1, 2, 3]).is_err();
+    let malformed_input_refused = litchi_xlsb::Package::from_bytes(&[0, 1, 2, 3]).is_err();
     let tight_limits_refused = {
-        let limit = litchi_xlsb::ReadLimits::builder()
+        let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1))?)?
             .build()?;
-        litchi_xlsb::Package::from_bytes_with_limits(corpus.bytes.clone(), limit).is_err()
+        litchi_xlsb::Package::from_bytes_with_options(
+            &corpus.bytes,
+            litchi_xlsb::OpenOptions::new().source_limits(limit),
+        )
+        .is_err()
     };
     let tight_cell_limits_refused = {
         let workbook = opener(&corpus.bytes)?;
         let limits = litchi_xlsb::cell_values::Limits::new(1, 1, 1, 1);
-        workbook
-            .cell_values_with_limits(corpus.selected_sheet, limits)
-            .is_err()
+        cell_values_under(&workbook, corpus.selected_sheet, limits).is_err()
     };
     let fixture_cell_count_within_dimensions = sparse_gate(corpus)?;
     let catalog_text_sha256 = sha256_hex(corpus.worksheet_names.join("\u{1f}").as_bytes());
@@ -1071,7 +1097,7 @@ fn verify_case(
     let output_matches_across_samples = sample_identities
         .iter()
         .all(|identity| identity == &output_identity);
-    let output_package = litchi_xlsb::Package::from_slice(output)?;
+    let output_package = litchi_xlsb::Package::from_bytes(output)?;
     let output_parts = package_part_digests(output_package.opc_package());
     let changed_part_names: Vec<String> = corpus
         .part_digests
@@ -1202,14 +1228,18 @@ fn verify_source_case(
         SourceBackedWorkbook::from_read_at(source).is_err()
     };
     let tight_limits_refused = {
-        let limit = litchi_xlsb::ReadLimits::builder()
+        let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1))?)?
             .build()?;
         let source: Arc<dyn ReadAt> = Arc::new(CountingReadAt::new(
             corpus.bytes.clone(),
             Arc::new(SourceReadCounters::default()),
         ));
-        SourceBackedWorkbook::from_read_at_with_limits(source, limit).is_err()
+        SourceBackedWorkbook::from_read_at_with_options(
+            source,
+            litchi_xlsb::OpenOptions::new().source_limits(limit),
+        )
+        .is_err()
     };
     // SourceBackedWorksheet::materialize currently exposes the format-level
     // read limits but no separate cell-value limit parameter. Keep this gate
@@ -1369,19 +1399,58 @@ fn open_direct(bytes: &[u8]) -> Result<litchi_xlsb::Workbook> {
 }
 
 fn open_direct_without_drawings(bytes: &[u8]) -> Result<litchi_xlsb::Workbook> {
-    Ok(litchi_xlsb::Workbook::new_without_drawing_parse(
+    Ok(litchi_xlsb::Workbook::new_with_options(
         Cursor::new(bytes.to_vec()),
+        litchi_xlsb::OpenOptions::new().parse_drawings(false),
     )?)
 }
 
+/// The umbrella's full text of an XLSB workbook: `litchi::open_bytes` and
+/// `File::text`, the unified successor of the deleted
+/// `litchi::sheet::Workbook::from_bytes` byte route (M0a step S9).
 fn facade_text(bytes: &[u8]) -> Result<String> {
-    litchi::sheet::Workbook::from_bytes(bytes.to_vec())?.text()
+    Ok(litchi::open_bytes(bytes.to_vec())?.text()?)
 }
 
+#[cfg(test)]
 fn save_workbook(workbook: &litchi_xlsb::Workbook) -> Result<Vec<u8>> {
     let mut output = Cursor::new(Vec::new());
     workbook.save(&mut output)?;
     Ok(output.into_inner())
+}
+
+/// One worksheet's cell values read under explicit cell-value budgets: the
+/// same graph projected with those semantic limits.
+fn cell_values_under(
+    workbook: &litchi_xlsb::Workbook,
+    sheet: usize,
+    limits: litchi_xlsb::cell_values::Limits,
+) -> Result<litchi_xlsb::cell_values::Snapshot> {
+    let package = workbook
+        .to_package()
+        .with_semantic_limits(litchi_xlsb::SemanticLimits::new().cell_values(limits));
+    Ok(package.workbook()?.cell_values(sheet)?)
+}
+
+fn save_package(package: &litchi_xlsb::Package) -> Result<Vec<u8>> {
+    Ok(package.to_bytes()?)
+}
+
+fn worksheet_selector(
+    workbook: &litchi_xlsb::Workbook,
+    worksheet_position: usize,
+) -> Result<usize> {
+    workbook
+        .sheets()
+        .find(|tab| {
+            tab.worksheet_position()
+                .is_some_and(|position| position.get() == worksheet_position)
+        })
+        .map(|tab| tab.position().get())
+        .ok_or_else(|| {
+            format!("worksheet ordinal {worksheet_position} is missing from the XLSB tab catalog")
+                .into()
+        })
 }
 
 fn replacement_for(cell: &StoredCell, workbook: &litchi_xlsb::Workbook) -> Option<Value> {
@@ -1681,20 +1750,22 @@ mod tests {
     #[test]
     fn malformed_and_tight_limits_are_refused() {
         let corpus = Corpus::load(&fixture_path()).expect("corpus");
-        let limit = litchi_xlsb::ReadLimits::builder()
+        let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1)).expect("u64"))
             .expect("limit")
             .build()
             .expect("limits");
-        assert!(litchi_xlsb::Package::from_bytes_with_limits(corpus.bytes.clone(), limit).is_err());
-        assert!(litchi_xlsb::Package::from_bytes(vec![0, 1, 2, 3]).is_err());
+        assert!(
+            litchi_xlsb::Package::from_bytes_with_options(
+                &corpus.bytes,
+                litchi_xlsb::OpenOptions::new().source_limits(limit)
+            )
+            .is_err()
+        );
+        assert!(litchi_xlsb::Package::from_bytes(&[0, 1, 2, 3]).is_err());
         let workbook = open_direct(&corpus.bytes).expect("workbook");
         let limits = litchi_xlsb::cell_values::Limits::new(1, 1, 1, 1);
-        assert!(
-            workbook
-                .cell_values_with_limits(corpus.selected_sheet, limits)
-                .is_err()
-        );
+        assert!(cell_values_under(&workbook, corpus.selected_sheet, limits).is_err());
     }
 
     #[test]
@@ -1792,7 +1863,7 @@ mod tests {
         }
         assert_eq!(
             corpus.report().package_part_count,
-            litchi_xlsb::Package::from_slice(&corpus.bytes)
+            litchi_xlsb::Package::from_bytes(&corpus.bytes)
                 .expect("package")
                 .opc_package()
                 .iter_parts()
@@ -1823,8 +1894,8 @@ mod tests {
         let workbook = open_direct_without_drawings(&bytes).expect("projection workbook");
         assert!(workbook.sheet_drawings().is_empty());
         let output = save_workbook(&workbook).expect("projection save");
-        let before = litchi_xlsb::Package::from_slice(&bytes).expect("input package");
-        let after = litchi_xlsb::Package::from_slice(&output).expect("output package");
+        let before = litchi_xlsb::Package::from_bytes(&bytes).expect("input package");
+        let after = litchi_xlsb::Package::from_bytes(&output).expect("output package");
         let before_parts = package_part_digests(before.opc_package());
         assert!(
             before_parts.keys().any(|name| name.contains("/drawings/")),
@@ -1840,36 +1911,38 @@ mod tests {
         assert_eq!(before_parts, package_part_digests(after.opc_package()));
 
         let mut raw_noop = open_direct_without_drawings(&bytes).expect("raw no-op projection");
-        raw_noop
-            .edit_opc(|_| Ok(()))
-            .expect("raw no-op projection publication");
+        edit_opc(&mut raw_noop, |_| Ok(())).expect("raw no-op projection publication");
         assert!(raw_noop.sheet_drawings().is_empty());
         let raw_noop_output = save_workbook(&raw_noop).expect("raw no-op projection save");
         let raw_noop_package =
-            litchi_xlsb::Package::from_slice(&raw_noop_output).expect("raw no-op package");
+            litchi_xlsb::Package::from_bytes(&raw_noop_output).expect("raw no-op package");
         assert_eq!(
             before_parts,
             package_part_digests(raw_noop_package.opc_package())
         );
 
-        let mut changed = open_direct_without_drawings(&bytes).expect("changed projection");
+        let changed = open_direct_without_drawings(&bytes).expect("changed projection");
         let target = corpus.edits.first().expect("editable scalar");
+        let selector = worksheet_selector(&changed, corpus.selected_sheet).expect("sheet selector");
         let mut edit = changed
-            .edit_cell_values(corpus.selected_sheet)
-            .expect("projection edit");
+            .to_package()
+            .edit_cell_values(selector)
+            .expect("projection edit")
+            .resolve()
+            .expect("worksheet resolution")
+            .expect("selected tab is a worksheet");
         edit.set_value(target.reference, target.after.clone())
             .expect("projection scalar edit");
         let commit = edit.commit().expect("projection commit");
-        changed
-            .apply_cell_values(corpus.selected_sheet, &commit)
-            .expect("projection publication");
+        let changed_package = commit.into_package();
+        let changed_output = changed_package.to_bytes().expect("projection package save");
+        let changed = owned(changed_package);
         assert!(
             changed.sheet_drawings().is_empty(),
             "drawing-skipped projection must retain its explicit typed-inventory boundary after publication"
         );
-        let changed_output = save_workbook(&changed).expect("changed projection save");
         let changed_package =
-            litchi_xlsb::Package::from_slice(&changed_output).expect("changed output package");
+            litchi_xlsb::Package::from_bytes(&changed_output).expect("changed output package");
         let changed_parts = package_part_digests(changed_package.opc_package());
         assert_ne!(
             before_parts, changed_parts,
@@ -1896,42 +1969,39 @@ mod tests {
             open_direct_without_drawings(&bytes).expect("raw drawing edit projection");
         let raw_before_parts = package_part_digests(raw_drawing.opc_package());
         let raw_before_relationships = package_relationships(raw_drawing.opc_package());
-        raw_drawing
-            .edit_opc(|package| {
-                let part = package.get_part_mut(&drawing_uri)?;
-                let mut blob = part.blob().to_vec();
-                for whitespace in [
-                    b">\r\n<".as_slice(),
-                    b">\n<",
-                    b">\r<",
-                    b"> \t<",
-                    b"> \r<",
-                    b">\t<",
-                ] {
-                    while let Some(offset) = blob
-                        .windows(whitespace.len())
-                        .position(|window| window == whitespace)
-                    {
-                        blob.splice(offset..offset + whitespace.len(), b"><".iter().copied());
-                    }
+        edit_opc(&mut raw_drawing, |package| {
+            let part = package.get_part_mut(&drawing_uri)?;
+            let mut blob = part.blob().to_vec();
+            for whitespace in [
+                b">\r\n<".as_slice(),
+                b">\n<",
+                b">\r<",
+                b"> \t<",
+                b"> \r<",
+                b">\t<",
+            ] {
+                while let Some(offset) = blob
+                    .windows(whitespace.len())
+                    .position(|window| window == whitespace)
+                {
+                    blob.splice(offset..offset + whitespace.len(), b"><".iter().copied());
                 }
-                let marker = b"macro=\"\"";
-                let offset = blob
-                    .windows(marker.len())
-                    .position(|window| window == marker)
-                    .ok_or_else(|| {
-                        litchi_xlsb::package::error::Error::InvalidFormat(
-                            "drawing marker missing".to_owned(),
-                        )
-                    })?;
-                blob.splice(
-                    offset + marker.len() - 1..offset + marker.len() - 1,
-                    b"x".iter().copied(),
-                );
-                part.set_blob(blob);
-                Ok(())
-            })
-            .expect("raw drawing mutation publication");
+            }
+            let marker = b"macro=\"\"";
+            let offset = blob
+                .windows(marker.len())
+                .position(|window| window == marker)
+                .ok_or_else(|| {
+                    litchi_xlsb::package::error::Error::InvalidFormat("drawing marker missing")
+                })?;
+            blob.splice(
+                offset + marker.len() - 1..offset + marker.len() - 1,
+                b"x".iter().copied(),
+            );
+            part.set_blob(blob);
+            Ok(())
+        })
+        .expect("raw drawing mutation publication");
         assert!(
             raw_drawing.sheet_drawings().is_empty(),
             "raw drawing mutation must retain the skipped typed boundary"
@@ -1958,14 +2028,16 @@ mod tests {
         );
         let raw_saved = save_workbook(&raw_drawing).expect("raw drawing mutation save");
         let raw_reopened =
-            litchi_xlsb::Package::from_slice(&raw_saved).expect("raw drawing mutation reopen");
+            litchi_xlsb::Package::from_bytes(&raw_saved).expect("raw drawing mutation reopen");
         assert_eq!(
             raw_after_parts,
             package_part_digests(raw_reopened.opc_package()),
             "raw drawing mutation must survive save/reopen"
         );
 
-        let mut package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("raw OPC package");
+        let mut package =
+            litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+                .expect("raw OPC package");
         let sheet_uri =
             litchi_opc::PackURI::new("/xl/worksheets/sheet1.bin").expect("worksheet URI");
         let drawing_rel_id = package
@@ -1987,21 +2059,20 @@ mod tests {
             eager_empty.sheet_drawings().is_empty(),
             "fixture with no drawing relationship starts with an empty eager inventory"
         );
-        eager_empty
-            .edit_opc(|package| {
-                package
-                    .get_part_mut(&sheet_uri)?
-                    .rels_mut()
-                    .add_relationship(
+        edit_opc(&mut eager_empty, |package| {
+            package
+                .get_part_mut(&sheet_uri)?
+                .rels_mut()
+                .add_relationship(
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing"
                         .to_owned(),
                     "../drawings/drawing1.xml".to_owned(),
                     drawing_rel_id.clone(),
                     false,
                 );
-                Ok(())
-            })
-            .expect("restore drawing relationship");
+            Ok(())
+        })
+        .expect("restore drawing relationship");
         assert_eq!(
             eager_empty.sheet_drawings().len(),
             1,
@@ -2023,14 +2094,13 @@ mod tests {
                 .find(|part| part.partname().as_str().contains("/drawings/"))
                 .map(|part| part.partname().clone())
                 .expect("drawing part");
-            workbook
-                .edit_opc(|package| {
-                    package
-                        .get_part_mut(&drawing_uri)?
-                        .set_blob(b"<broken-drawing/>".to_vec());
-                    Ok(())
-                })
-                .expect("opaque drawing mutation");
+            edit_opc(&mut workbook, |package| {
+                package
+                    .get_part_mut(&drawing_uri)?
+                    .set_blob(b"<broken-drawing/>".to_vec());
+                Ok(())
+            })
+            .expect("opaque drawing mutation");
             assert!(workbook.sheet_drawings().is_empty());
             Ok::<_, Error>((workbook, drawing_uri))
         };
@@ -2039,7 +2109,8 @@ mod tests {
             malformed(&bytes).expect("malformed structure no-op fixture");
         let structure_noop_before = package_part_digests(structure_noop.opc_package());
         let structure_noop_commit = structure_noop
-            .edit_workbook_structure()
+            .to_package()
+            .edit()
             .expect("structure no-op edit")
             .commit()
             .expect("structure no-op commit");
@@ -2048,9 +2119,13 @@ mod tests {
             structure_noop_commit.patch().before(),
             structure_noop_commit.patch().after()
         );
-        structure_noop
-            .apply_workbook_structure(&structure_noop_commit)
-            .expect("structure no-op publication");
+        structure_noop = owned(
+            structure_noop
+                .to_package()
+                .apply(structure_noop_commit.patch())
+                .expect("structure no-op publication")
+                .into_package(),
+        );
         assert!(structure_noop.sheet_drawings().is_empty());
         assert_eq!(
             package_part_digests(structure_noop.opc_package()),
@@ -2068,15 +2143,20 @@ mod tests {
             .get(drawing_uri.as_str())
             .cloned()
             .expect("malformed drawing digest");
-        let mut structure_edit = structure.edit_workbook_structure().expect("structure edit");
+        let mut structure_edit = structure.to_package().edit().expect("structure edit");
         let new_name = format!("{}_v3", corpus.worksheet_names[0]);
         structure_edit
-            .rename_sheet(0, new_name)
-            .expect("structure rename");
+            .set_sheet_name(0, new_name)
+            .expect("structure rename")
+            .expect("resolved worksheet selector");
         let structure_commit = structure_edit.commit().expect("structure commit");
-        structure
-            .apply_workbook_structure(&structure_commit)
-            .expect("structure publication");
+        structure = owned(
+            structure
+                .to_package()
+                .apply(structure_commit.patch())
+                .expect("structure publication")
+                .into_package(),
+        );
         assert!(structure.sheet_drawings().is_empty());
         let structure_parts = package_part_digests(structure.opc_package());
         assert_eq!(
@@ -2088,14 +2168,19 @@ mod tests {
             malformed(&bytes).expect("malformed calculation fixture");
         let calculation_before = package_part_digests(calculation.opc_package());
         let calculation_commit = calculation
+            .to_package()
             .edit_calculation_chain()
             .expect("calculation edit")
             .commit()
             .expect("calculation no-op commit");
-        assert!(calculation_commit.patch().is_empty());
-        calculation
-            .apply_calculation_chain(&calculation_commit)
-            .expect("calculation no-op publication");
+        assert!(calculation_commit.patch().is_noop());
+        calculation = owned(
+            calculation
+                .to_package()
+                .apply_calculation_chain(calculation_commit.patch())
+                .expect("calculation no-op publication")
+                .into_package(),
+        );
         assert!(calculation.sheet_drawings().is_empty());
         assert_eq!(
             package_part_digests(calculation.opc_package()),
@@ -2107,25 +2192,55 @@ mod tests {
             calculation_before.get(calculation_drawing_uri.as_str())
         );
 
-        let (mut scalar, scalar_drawing_uri) = malformed(&bytes).expect("malformed scalar fixture");
+        let (scalar, scalar_drawing_uri) = malformed(&bytes).expect("malformed scalar fixture");
         let scalar_before = package_part_digests(scalar.opc_package());
         let target = corpus.edits.first().expect("editable scalar");
+        let selector = worksheet_selector(&scalar, corpus.selected_sheet).expect("sheet selector");
         let mut edit = scalar
-            .edit_cell_values(corpus.selected_sheet)
-            .expect("scalar edit");
+            .to_package()
+            .edit_cell_values(selector)
+            .expect("scalar edit")
+            .resolve()
+            .expect("worksheet resolution")
+            .expect("selected tab is a worksheet");
         edit.set_value(target.reference, target.after.clone())
             .expect("scalar value");
         let commit = edit.commit().expect("scalar commit");
-        scalar
-            .apply_cell_values(corpus.selected_sheet, &commit)
-            .expect("scalar publication with opaque drawing");
+        let scalar_package = commit.into_package();
+        let scalar_output = scalar_package.to_bytes().expect("scalar package save");
+        let scalar = owned(scalar_package);
         assert!(scalar.sheet_drawings().is_empty());
-        let scalar_after = package_part_digests(scalar.opc_package());
+        let scalar_after_package =
+            litchi_xlsb::Package::from_bytes(&scalar_output).expect("scalar output package");
+        let scalar_after = package_part_digests(scalar_after_package.opc_package());
         assert_eq!(
             scalar_after.get(scalar_drawing_uri.as_str()),
             scalar_before.get(scalar_drawing_uri.as_str()),
             "changed scalar must leave malformed opaque drawing bytes untouched"
         );
+    }
+
+    /// An owned projection of a package under its retained policies.
+    fn owned(package: litchi_xlsb::Package) -> litchi_xlsb::Workbook {
+        litchi_xlsb::Workbook::from_opc_package_with_options(
+            package.opc_package().clone(),
+            litchi_xlsb::OpenOptions::new()
+                .external_link_limits(package.external_link_limits())
+                .leniency(package.leniency())
+                .parse_drawings(package.drawings_parsed()),
+        )
+        .expect("owned projection")
+    }
+
+    /// One raw OPC edit through `Package::edit_opc`, adopted in place.
+    fn edit_opc(
+        workbook: &mut litchi_xlsb::Workbook,
+        operation: impl FnOnce(&mut litchi_opc::OpcPackage) -> litchi_xlsb::package::PackageResult<()>,
+    ) -> litchi_xlsb::package::PackageResult<()> {
+        let mut edit = workbook.to_package().edit_opc()?;
+        edit.update(operation)?;
+        *workbook = owned(edit.commit()?.into_package());
+        Ok(())
     }
 
     trait SavedBytes {

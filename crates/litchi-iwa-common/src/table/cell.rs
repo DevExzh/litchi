@@ -3,6 +3,8 @@
 use crate::shape::stroke::Stroke;
 
 pub mod conditional_highlight;
+/// Checked, archive-free cell display and control formats (record 0368).
+pub mod data_format;
 pub mod layout;
 pub mod number_format;
 pub mod value;

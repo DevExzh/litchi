@@ -296,11 +296,12 @@ pub(crate) fn parse_embedded_xml_package(
     expected_namespace: &[u8],
     expected_root: &[u8],
 ) -> Result<EmbeddedXmlPackage> {
-    let package = OpcPackage::from_bytes(data).map_err(|error| {
-        Error::Corrupted(format!(
-            "{record_name} contains an invalid ECMA-376 package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "{record_name} contains an invalid ECMA-376 package: {error}"
+            ))
+        })?;
     let mut found_part_name = None;
     for part in package.try_iter_parts() {
         let part = part.map_err(|error| {
@@ -344,11 +345,12 @@ pub(crate) fn parse_embedded_xml_package(
 }
 
 pub(crate) fn parse_theme_package(data: &[u8]) -> Result<ThemePackage> {
-    let package = OpcPackage::from_bytes(data).map_err(|error| {
-        Error::Corrupted(format!(
-            "RoundTripThemeAtom contains an invalid ECMA-376 package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "RoundTripThemeAtom contains an invalid ECMA-376 package: {error}"
+            ))
+        })?;
     let mut theme_part = None;
     for part in package.try_iter_parts() {
         let part = part.map_err(|error| {
@@ -567,11 +569,12 @@ fn parse_color_scheme_index(value: &str) -> std::result::Result<ColorSchemeIndex
 }
 
 pub(crate) fn parse_animation_package(data: &[u8]) -> Result<AnimationPackage> {
-    let package = OpcPackage::from_bytes(data).map_err(|error| {
-        Error::Corrupted(format!(
-            "RoundTripAnimationAtom contains an invalid ECMA-376 package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "RoundTripAnimationAtom contains an invalid ECMA-376 package: {error}"
+            ))
+        })?;
     let mut timing_relationships = package
         .rels()
         .iter()
@@ -817,8 +820,10 @@ mod tests {
     }
 
     fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
-        let archive = ArchiveReader::new(package).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let archive =
+            ArchiveReader::new(package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let normalized_path = path.trim_start_matches('/');
         let mut replaced = false;
         for name in archive.file_names() {
@@ -850,7 +855,7 @@ mod tests {
             );
         }
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         let mut output_bytes = output.into_inner();
         for (name, _content_type, _relationship_type, data) in parts {
             output_bytes = replace_zip_member_raw(&output_bytes, name, data);
@@ -904,7 +909,7 @@ mod tests {
             false,
         );
         let mut output = Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         replace_zip_member_raw(&output.into_inner(), "/theme/theme/theme1.xml", theme_xml)
     }
 

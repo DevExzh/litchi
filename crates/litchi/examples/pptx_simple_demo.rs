@@ -2,17 +2,15 @@
 //!
 //! Run with: cargo run --example pptx_simple_demo --features ooxml
 
-use litchi_pptx::{MutablePresentation, Package};
-
 const EMU_PER_INCH: i64 = 914_400;
 const TEXT_WIDTH: i64 = 7_315_200;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating typed PPTX demonstration...\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         add_title_slide(presentation)?;
         add_shapes_slide(presentation)?;
@@ -20,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_path = "pptx_simple_demo.pptx";
     println!("\nSaving to {}...", output_path);
+    let package = builder.build()?;
     package.save(output_path)?;
     println!("✓ Done!");
 
@@ -27,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn add_title_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Slide 1: Title");
     let slide = presentation.add_slide()?;
@@ -46,7 +45,7 @@ fn add_title_slide(
 }
 
 fn add_shapes_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Slide 2: Shapes");
     let slide = presentation.add_slide()?;

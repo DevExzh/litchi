@@ -285,7 +285,7 @@ impl ScanBudget {
         // of trying to preserve an unbounded group subtree whose schema and
         // cache ownership cannot be proven here.
         self.report.charge_scan(source.len(), self.limits)?;
-        let view = WireView::parse_with_limits(source, self.limits)?;
+        let view = WireView::parse(source, self.limits)?;
         let observed = self.report.fields.saturating_add(view.len());
         if observed > self.limits.max_fields() {
             return Err(WireError::LimitExceeded {
@@ -374,7 +374,7 @@ fn invalidate_if_needed_inner(
     budget: &mut ScanBudget,
 ) -> Result<bool, InvalidationError> {
     charge_scan_archive_structure(object, false, budget)?;
-    object.validate_with_limits(archive_limits)?;
+    object.validate(archive_limits)?;
     charge_scan_message_selection(object, budget)?;
     let message_index = selected_message_index(object)?;
     budget.add_work(1)?;
@@ -406,7 +406,7 @@ fn invalidate_if_needed_inner(
     // The core replacement revalidates the enclosing object and walks its
     // metadata again before its atomic commit.
     charge_scan_archive_structure(object, true, budget)?;
-    object.replace_message_pruning_references_preserving_header_with_limits(
+    object.replace_message_pruning_references_preserving_header(
         message_index,
         RawMessage {
             type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -2027,7 +2027,7 @@ fn strict_varint(payload: &[u8]) -> Result<u64, InvalidationError> {
 
 #[cfg(test)]
 mod tests {
-    use litchi_iwa_core::{FieldInfo, FieldPath, MessageInfo};
+    use litchi_iwa_core::{FieldInfo, MessageInfo};
 
     use super::*;
 
@@ -2762,6 +2762,7 @@ mod tests {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
                 data: payload,
             }],
+            Default::default(),
         )?;
         let fields = &mut object.archive_info.message_infos[0].field_infos;
         fields
@@ -2786,6 +2787,7 @@ mod tests {
                     data: vec![0xa5; PAYLOAD_BYTES],
                 },
             ],
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[1];
         info.versions.extend(
@@ -2809,7 +2811,11 @@ mod tests {
             info.data_references.push(identifier.saturating_add(10_000));
         }
         info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![27, 1, 2, 3]),
+            path: litchi_iwa_core::FieldPath::new(
+                vec![27, 1, 2, 3],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
             object_references: info.object_references.clone(),
             data_references: info.data_references.clone(),
             known_field_version: (0..u32::try_from(METADATA_ITEMS)
@@ -2879,28 +2885,45 @@ mod tests {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
                 data: payload,
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0] = MessageInfo {
             object_references: vec![77, 78, 99],
             data_references: vec![55, 56],
             field_infos: vec![
                 FieldInfo {
-                    path: FieldPath::new(vec![DATABASE_THUMBNAIL_FIELD]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![DATABASE_THUMBNAIL_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     object_references: vec![77],
                     ..FieldInfo::default()
                 },
                 FieldInfo {
-                    path: FieldPath::new(vec![DATABASE_THUMBNAILS_FIELD]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![DATABASE_THUMBNAILS_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     object_references: vec![78],
                     ..FieldInfo::default()
                 },
                 FieldInfo {
-                    path: FieldPath::new(vec![THUMBNAILS_FIELD]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![THUMBNAILS_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     data_references: vec![55],
                     ..FieldInfo::default()
                 },
                 FieldInfo {
-                    path: FieldPath::new(vec![2]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![2],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     object_references: vec![99],
                     data_references: vec![56],
                     ..FieldInfo::default()

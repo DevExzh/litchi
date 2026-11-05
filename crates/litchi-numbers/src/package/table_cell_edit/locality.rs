@@ -1214,6 +1214,7 @@ mod tests {
                 type_,
                 data: payload.to_vec(),
             }],
+            Default::default(),
         )
         .expect("small canonical test object")
     }
@@ -1519,7 +1520,11 @@ mod tests {
     #[test]
     fn aggregate_reference_transition_preserves_unmentioned_field_infos_exactly() {
         let mut source_object = object(2, 20, b"before");
-        let mut field = FieldInfo::new(vec![11]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![11], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(10);
         source_object.archive_info.message_infos[0]
             .field_infos
@@ -1556,7 +1561,12 @@ mod tests {
     #[test]
     fn directional_replace_requires_complete_exact_field_reference_transition() {
         let mut source_object = object(2, 20, b"before");
-        let mut field = FieldInfo::new(vec![4, 1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![4, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(10);
         source_object.archive_info.message_infos[0]
             .field_infos

@@ -513,7 +513,8 @@ pub(super) fn compare_datetime(a: &str, b: &str) -> Result<std::cmp::Ordering> {
     }
 }
 
-pub(super) fn validate_cache_set(caches: &[Cache]) -> Result<()> {
+pub(super) fn validate_cache_set<'a>(caches: impl IntoIterator<Item = &'a Cache>) -> Result<()> {
+    let caches = caches.into_iter().collect::<Vec<_>>();
     if caches.len() > MAX_CACHES {
         return Err(limit("cache count"));
     }
@@ -590,7 +591,8 @@ pub(super) fn validate_views_local(value: &Views) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_global_views(values: &[Part]) -> Result<()> {
+pub(super) fn validate_global_views<'a>(values: impl IntoIterator<Item = &'a Part>) -> Result<()> {
+    let values = values.into_iter().collect::<Vec<_>>();
     let count: usize = values
         .iter()
         .map(|value| value.timelines.timelines.len())

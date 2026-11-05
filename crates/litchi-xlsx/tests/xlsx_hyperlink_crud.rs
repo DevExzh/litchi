@@ -5,19 +5,19 @@
 
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{PackURI, TargetMode};
-use litchi_xlsx::{Hyperlink, HyperlinkReference, Package, Workbook};
+use litchi_xlsx::{Hyperlink, HyperlinkReference, Package};
 
 const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-fn workbook() -> Workbook {
-    Package::create().unwrap().into_workbook().unwrap()
+fn workbook() -> Package {
+    Package::new().unwrap()
 }
 
-fn strict_workbook() -> Workbook {
-    let mut raw = Package::create().unwrap().into_plain_opc();
+fn strict_workbook() -> Package {
+    let mut raw = Package::new().unwrap().into_plain_opc();
     let workbook_uri = raw.main_document_part().unwrap().partname().clone();
     let strict_workbook_xml = std::str::from_utf8(raw.get_part(&workbook_uri).unwrap().blob())
         .unwrap()
@@ -50,7 +50,7 @@ fn strict_workbook() -> Workbook {
     raw.get_part_mut(&worksheet_uri)
         .unwrap()
         .set_blob(strict_worksheet_xml);
-    Package::from_opc(raw).unwrap().into_workbook().unwrap()
+    Package::from_opc(raw).unwrap()
 }
 
 fn internal(reference: &str, location: &str) -> Hyperlink {
@@ -69,8 +69,9 @@ fn external(reference: &str, target: &str) -> Hyperlink {
     .unwrap()
 }
 
-fn links(workbook: &Workbook) -> Vec<Hyperlink> {
+fn links(workbook: &Package) -> Vec<Hyperlink> {
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -89,7 +90,7 @@ fn hyperlinks_add_replace_remove_and_reopen() {
             .put_hyperlink(external("B2", "https://example.test/inert"))
             .unwrap();
     }
-    let after = edit.commit().unwrap().into_workbook();
+    let after = edit.commit().unwrap().into_package();
 
     let initial_links = links(&after);
     assert_eq!(initial_links.len(), 2);
@@ -117,10 +118,10 @@ fn hyperlinks_add_replace_remove_and_reopen() {
             Some("https://example.test/inert")
         );
         sheet
-            .replace_hyperlink(external("A1", "https://example.test/replaced"))
+            .put_hyperlink(external("A1", "https://example.test/replaced"))
             .unwrap();
     }
-    let after_replace = edit.commit().unwrap().into_workbook();
+    let after_replace = edit.commit().unwrap().into_package();
     let links = links(&after_replace);
     assert_eq!(links.len(), 1);
     assert_eq!(links[0].reference().as_str(), "A1");
@@ -142,7 +143,7 @@ fn hyperlink_patch_inverse_restores_source_snapshot() {
         .unwrap();
     let (after, patch) = edit.commit().unwrap().into_parts();
 
-    let restored = after.apply(&patch.inverse()).unwrap().into_workbook();
+    let restored = after.apply(&patch.inverse()).unwrap().into_package();
     assert!(links(&restored).is_empty());
     assert_eq!(
         restored.to_plain_bytes().unwrap(),
@@ -162,8 +163,8 @@ fn hyperlink_add_then_remove_is_an_exact_noop() {
         assert_eq!(removed, Some(href));
     }
     let commit = edit.commit().unwrap();
-    assert!(commit.patch().is_empty());
-    let unchanged = commit.into_workbook();
+    assert!(commit.patch().is_noop());
+    let unchanged = commit.into_package();
     assert_eq!(
         unchanged.to_plain_bytes().unwrap(),
         base.to_plain_bytes().unwrap()
@@ -187,7 +188,7 @@ fn hyperlink_joins_keep_disjoint_ranges_and_reject_same_semantic_range() {
         .put_hyperlink(external("C3", "https://example.test/right"))
         .unwrap();
     left.join(right).unwrap();
-    let joined = left.commit().unwrap().into_workbook();
+    let joined = left.commit().unwrap().into_package();
     assert_eq!(links(&joined).len(), 2);
 
     let mut same_left = base.edit().unwrap();
@@ -210,14 +211,14 @@ fn hyperlink_joins_keep_disjoint_ranges_and_reject_same_semantic_range() {
 #[test]
 fn hyperlink_edit_refuses_unknown_owner_markup() {
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
-    let mut raw = Package::create().unwrap().into_plain_opc();
+    let mut raw = Package::new().unwrap().into_plain_opc();
     raw.get_part_mut(&worksheet_uri).unwrap().set_blob(
         format!(
             r#"<worksheet xmlns="{MAIN}"><sheetData/><hyperlinks><hyperlink ref="A1" location="Sheet1!B2"><vendor/></hyperlink></hyperlinks></worksheet>"#
         )
         .into_bytes(),
     );
-    let base = Package::from_opc(raw).unwrap().into_workbook().unwrap();
+    let base = Package::from_opc(raw).unwrap();
     let mut edit = base.edit().unwrap();
     let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
     assert!(sheet.put_hyperlink(internal("A1", "Sheet1!C3")).is_err());
@@ -232,9 +233,9 @@ fn strict_worksheet_external_hyperlink_commit_reopens_with_strict_relationship()
         .unwrap()
         .put_hyperlink(external("A1", "https://example.test/strict"))
         .unwrap();
-    let committed = edit.commit().unwrap().into_workbook();
+    let committed = edit.commit().unwrap().into_package();
     let bytes = committed.to_plain_bytes().unwrap();
-    let raw = Package::from_bytes(bytes.clone()).unwrap().into_plain_opc();
+    let raw = Package::from_bytes(&bytes).unwrap().into_plain_opc();
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let relationship = raw
         .get_part(&worksheet_uri)
@@ -246,7 +247,7 @@ fn strict_worksheet_external_hyperlink_commit_reopens_with_strict_relationship()
     assert_eq!(relationship.reltype(), rt::STRICT_HYPERLINK);
     assert_eq!(relationship.target_mode(), TargetMode::External);
 
-    let reopened = Package::from_bytes(bytes).unwrap().into_workbook().unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let reopened_links = links(&reopened);
     assert_eq!(reopened_links.len(), 1);
     assert_eq!(reopened_links[0].reference().as_str(), "A1");
@@ -266,7 +267,7 @@ fn hyperlink_patch_rejects_stale_relationship_without_mutating_target() {
         .put_hyperlink(external("A1", "https://example.test/original"))
         .unwrap();
     let (after, patch) = edit.commit().unwrap().into_parts();
-    let after_raw = Package::from_bytes(after.to_plain_bytes().unwrap())
+    let after_raw = Package::from_bytes(&after.to_plain_bytes().unwrap())
         .unwrap()
         .into_plain_opc();
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
@@ -280,7 +281,7 @@ fn hyperlink_patch_rejects_stale_relationship_without_mutating_target() {
         .r_id()
         .to_owned();
 
-    let mut stale_opc = Package::from_bytes(base.to_plain_bytes().unwrap())
+    let mut stale_opc = Package::from_bytes(&base.to_plain_bytes().unwrap())
         .unwrap()
         .into_plain_opc();
     stale_opc
@@ -294,10 +295,7 @@ fn hyperlink_patch_rejects_stale_relationship_without_mutating_target() {
             TargetMode::External,
         )
         .unwrap();
-    let stale = Package::from_opc(stale_opc)
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let stale = Package::from_opc(stale_opc).unwrap();
     let before = stale.to_plain_bytes().unwrap();
     assert!(matches!(
         stale.apply(&patch),

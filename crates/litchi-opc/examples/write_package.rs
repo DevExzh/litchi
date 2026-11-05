@@ -11,6 +11,7 @@
 //! cargo run -p litchi-opc --example write_package
 //! ```
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter, XmlPart};
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -64,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writeln!(out, "Serialized package size: {on_disk_size} bytes")?;
 
     // --- 3. Read the package back to verify the round trip --------------
-    let reopened = OpcPackage::open(&out_path)?;
+    let reopened = OpcPackage::open(&out_path, SourceLimits::default())?;
     writeln!(
         out,
         "\nRe-opened package: {} parts, {} package relationships",

@@ -16,6 +16,6 @@ mod tests;
 
 pub use litchi_odf_common::annotation::{Annotation, Element, Node};
 pub use model::{Cell, Entry, Selector};
-pub use transaction::{Commit, Operation, Patch, Snapshot, Transaction, update};
+pub use transaction::{Edit, Snapshot};
 
 pub(crate) use package::replace_content;

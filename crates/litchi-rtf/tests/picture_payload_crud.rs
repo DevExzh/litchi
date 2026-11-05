@@ -5,13 +5,21 @@
 )]
 
 use litchi_rtf::{
-    Document,
+    EditOptions, Package, SemanticLimitKind, SemanticLimits,
     edit::{
-        Composition, CompositionLimits, Error, Limits, MAX_PICTURE_PAYLOAD_OPERATIONS,
+        Composition, CompositionLimits, Error, MAX_PICTURE_PAYLOAD_OPERATIONS,
         PicturePayloadReplacement,
     },
 };
 use serde_json::Value;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 const PNG_A: &[u8] = &[
     0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02, 0xab, 0xcd,
@@ -62,7 +70,7 @@ fn decode_hex(input: &str) -> Vec<u8> {
 
 #[test]
 fn selected_payload_splice_preserves_hex_layout_metadata_and_other_bytes() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     assert_eq!(source.pictures()[0].data(), PNG_A);
     assert_eq!(source.pictures()[1].data(), PNG_B);
     let before_second = source.pictures()[1].clone();
@@ -70,49 +78,49 @@ fn selected_payload_splice_preserves_hex_layout_metadata_and_other_bytes() {
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();
-    let output = commit.snapshot().to_bytes().unwrap();
+    let output = commit.package().to_bytes().unwrap();
     let expected = two_picture_source().replace("0102aBcd", "1122cDef");
 
     assert_eq!(output, expected.as_bytes());
-    assert_eq!(commit.snapshot().pictures()[0].data(), PNG_C);
-    assert_eq!(commit.snapshot().pictures()[1], before_second);
-    assert_eq!(commit.snapshot().text(), source.text());
+    assert_eq!(commit.package().pictures()[0].data(), PNG_C);
+    assert_eq!(commit.package().pictures()[1], before_second);
+    assert_eq!(commit.package().text(), source.text());
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().operation_count(), 1);
 }
 
 #[test]
 fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut no_op = source.edit();
     no_op.replace_picture_payload(0, PNG_A).unwrap();
     let no_op = no_op.commit().unwrap();
     assert!(!no_op.diagnostics().changed());
-    assert!(no_op.snapshot().same_snapshot(&source));
+    assert!(no_op.package().same_snapshot(&source));
 
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
     );
-    let stale = Document::parse(r"{\rtf1 unrelated}").unwrap();
+    let stale = Package::parse(r"{\rtf1 unrelated}").unwrap();
     assert!(matches!(
-        commit.patch().apply(&stale),
+        stale.apply(commit.patch()),
         Err(Error::PatchConflict)
     ));
 }
 
 #[test]
 fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let replacements = [
         PicturePayloadReplacement::new(0, PNG_C),
         PicturePayloadReplacement::new(1, PNG_A),
@@ -120,18 +128,19 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
     let mut edit = source.edit();
     edit.replace_picture_payloads(&replacements).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().pictures()[0].data(), PNG_C);
-    assert_eq!(commit.snapshot().pictures()[1].data(), PNG_A);
+    assert_eq!(commit.package().pictures()[0].data(), PNG_C);
+    assert_eq!(commit.package().pictures()[1].data(), PNG_A);
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
     assert_eq!(
         applied
             .apply_durable(&durable.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -141,7 +150,7 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
     mixed.replace_picture_payload(0, PNG_C).unwrap();
     assert!(matches!(
         mixed.replace_body_text("not composable"),
-        Err(Error::BodyDestinationConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "body splices and retained-destination edits cannot compose safely"
     ));
 
     let invalid = [
@@ -170,20 +179,47 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
         })
     ));
 
-    let mut bounded = source.edit_with_limits(Limits::new(1));
+    let mut bounded =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     assert!(matches!(
         bounded.replace_picture_payloads(&replacements),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
     assert_eq!(bounded.operation_count(), 0);
 }
 
 #[test]
+fn replacement_budget_counts_exact_picture_transport_bytes() {
+    let source = Package::parse(two_picture_source()).unwrap();
+    // The first payload's source transport includes its two spaces and CRLF:
+    // eight hex pairs + one space + eight pairs + CRLF + one space + eight
+    // pairs = 28 bytes. The second transport is 25 bytes.
+    let limits = SemanticLimits::builder()
+        .max_replacement_bytes(28)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(limits));
+    edit.replace_picture_payload(0, PNG_C).unwrap();
+    assert!(matches!(
+        edit.replace_picture_payload(1, PNG_A),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::ReplacementBytes,
+            observed: 53,
+            maximum: 28,
+        })
+    ));
+    assert_eq!(edit.operation_count(), 1);
+    assert!(edit.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
 fn refuses_size_format_nested_opaque_and_protected_sources() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut wrong_size = source.edit();
     assert!(matches!(
         wrong_size.replace_picture_payload(0, &PNG_C[..PNG_C.len() - 1]),
@@ -195,10 +231,10 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     wrong_format[0] = 0;
     assert!(matches!(
         source.edit().replace_picture_payload(0, wrong_format),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let nested = Document::parse(concat!(
+    let nested = Package::parse(concat!(
         r"{\rtf1{\*\shppict{\pict\pngblip ",
         "89504e470d0a1a0a0102abcd",
         r"}}}",
@@ -206,10 +242,10 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     .unwrap();
     assert!(matches!(
         nested.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let opaque = Document::parse(concat!(
+    let opaque = Package::parse(concat!(
         r"{\rtf1\future42{\pict\pngblip ",
         "89504e470d0a1a0a0102abcd",
         r"}}",
@@ -217,10 +253,10 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     .unwrap();
     assert!(matches!(
         opaque.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let protected = Document::parse(concat!(
+    let protected = Package::parse(concat!(
         r"{\rtf1\allprot\enforceprot1{\pict\pngblip ",
         "89504e470d0a1a0a0102abcd",
         r"}}",
@@ -230,25 +266,25 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     edit.replace_picture_payload(0, PNG_C).unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(Error::ProtectedDocument { .. })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
-    assert!(Document::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0}}").is_err());
+    assert!(Package::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0}}").is_err());
 
     let late_control =
-        Document::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd\picw1}}").unwrap();
+        Package::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd\picw1}}").unwrap();
     assert!(matches!(
         late_control.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let unknown_picture_control =
-        Document::parse(r"{\rtf1{\pict\pngblip\vendorpicture1 89504e470d0a1a0a0102abcd}}").unwrap();
+        Package::parse(r"{\rtf1{\pict\pngblip\vendorpicture1 89504e470d0a1a0a0102abcd}}").unwrap();
     assert!(matches!(
         unknown_picture_control
             .edit()
             .replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     for ambiguous in [
@@ -256,18 +292,18 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         r"{\rtf1{\pict\pngblip\jpegblip 89504e470d0a1a0a0102abcd}}",
         r"{\rtf1{\pict\pngblip\picw1\picw2 89504e470d0a1a0a0102abcd}}",
     ] {
-        let ambiguous = Document::parse(ambiguous).unwrap();
+        let ambiguous = Package::parse(ambiguous).unwrap();
         assert!(matches!(
             ambiguous.edit().replace_picture_payload(0, PNG_C),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
     }
 
     let external_picture =
-        Document::parse(r"{\rtf1{\pict\pngblip\blipfile1 89504e470d0a1a0a0102abcd}}").unwrap();
+        Package::parse(r"{\rtf1{\pict\pngblip\blipfile1 89504e470d0a1a0a0102abcd}}").unwrap();
     assert!(matches!(
         external_picture.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
@@ -276,20 +312,24 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
     let mut binary = br"{\rtf1{\pict\jpegblip\bin6 ".to_vec();
     binary.extend_from_slice(&[0xff, 0xd8, 0x01, 0x02, 0xff, 0xd9]);
     binary.extend_from_slice(br"}}");
-    let binary = Document::from_bytes(&binary).unwrap();
+    let binary = Package::from_bytes(&binary).unwrap();
     assert!(matches!(
         binary
             .edit()
             .replace_picture_payload(0, [0xff, 0xd8, 3, 4, 0xff, 0xd9]),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let compressed_bytes =
-        litchi_rtf::transport::compress(two_picture_source().as_bytes(), true).unwrap();
-    let compressed = Document::from_bytes(&compressed_bytes).unwrap();
+    let compressed_bytes = litchi_rtf::transport::compress(
+        two_picture_source().as_bytes(),
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
+    let compressed = Package::from_bytes(&compressed_bytes).unwrap();
     assert!(matches!(
         compressed.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let sources = [
@@ -299,7 +339,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         ),
         concat!(
             r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd}",
-            r"{\object\objemb{\*\objclass Package}{\*\objdata 0102}{\result fallback}}}",
+            r"{\object\objemb{\*\objclass Document}{\*\objdata 0102}{\result fallback}}}",
         ),
         concat!(
             r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd}",
@@ -307,10 +347,10 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         ),
     ];
     for source in sources {
-        let source = Document::parse(source).unwrap();
+        let source = Package::parse(source).unwrap();
         assert!(matches!(
             source.edit().replace_picture_payload(0, PNG_C),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
     }
 }
@@ -318,16 +358,16 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
 #[test]
 fn jpeg_payload_retains_markers_and_exact_layout() {
     let source =
-        Document::parse(r"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 01aB fF d9}B}").unwrap();
+        Package::parse(r"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 01aB fF d9}B}").unwrap();
     let replacement = [0xff, 0xd8, 0xaa, 0x55, 0xff, 0xd9];
     let mut edit = source.edit();
     edit.replace_picture_payload(0, replacement).unwrap();
-    let output = edit.commit().unwrap().snapshot().to_bytes().unwrap();
+    let output = edit.commit().unwrap().package().to_bytes().unwrap();
     assert_eq!(
         output,
         br"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 aa55 fF d9}B}"
     );
-    let reopened = Document::from_bytes(&output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(reopened.pictures()[0].data(), replacement);
 }
 
@@ -338,7 +378,7 @@ fn picture_specific_batch_ceiling_accepts_64_and_refuses_65_atomically() {
         source.push_str(r"{\pict\pngblip 89504e470d0a1a0a0102abcd}");
     }
     source.push('}');
-    let source = Document::parse(&source).unwrap();
+    let source = Package::parse(&source).unwrap();
     let accepted = (0..MAX_PICTURE_PAYLOAD_OPERATIONS)
         .map(|position| PicturePayloadReplacement::new(position, PNG_C))
         .collect::<Vec<_>>();
@@ -353,9 +393,10 @@ fn picture_specific_batch_ceiling_accepts_64_and_refuses_65_atomically() {
     let mut edit = source.edit();
     assert!(matches!(
         edit.replace_picture_payloads(&refused),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 65,
-            limit: 64
+            maximum: 64
         })
     ));
     assert_eq!(edit.operation_count(), 0);
@@ -368,7 +409,7 @@ fn composition_cannot_bypass_the_picture_specific_batch_ceiling() {
         source.push_str(r"{\pict\pngblip 89504e470d0a1a0a0102abcd}");
     }
     source.push('}');
-    let source = Document::parse(&source).unwrap();
+    let source = Package::parse(&source).unwrap();
     let limits = CompositionLimits::new(65, 2, 130, 4);
     let mut composition = Composition::new(&source, limits);
     for position in 0..MAX_PICTURE_PAYLOAD_OPERATIONS {
@@ -403,16 +444,17 @@ fn composition_cannot_bypass_the_picture_specific_batch_ceiling() {
     }
     assert!(matches!(
         composition.commit(),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 65,
-            limit: 64
+            maximum: 64
         })
     ));
 }
 
 #[test]
 fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();
@@ -427,15 +469,18 @@ fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
             &first, limits,
         )
         .unwrap();
-    let applied = source.apply_durable(&decoded).unwrap();
+    let applied = source.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 
-    let stale = Document::parse(
+    let stale = Package::parse(
         two_picture_source()
             .replace("0102aBcd", "0102abce")
             .as_str(),
@@ -449,7 +494,7 @@ fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
 
 #[test]
 fn durable_patch_rejects_transport_layout_changes_and_unknown_fields() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();

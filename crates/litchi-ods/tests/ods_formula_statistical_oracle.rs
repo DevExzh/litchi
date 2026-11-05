@@ -85,7 +85,8 @@ fn compare(function: &str) {
     );
     for row in rows.iter().filter(|row| row["function"] == function) {
         let formula = row["formula"].as_str().expect("formula");
-        let expression = Expression::parse(formula).expect("reference expression parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("reference expression parses");
         let cells = Cells(row["cells"].as_array().expect("typed cells"));
         for mode in [Mode::Scalar, Mode::Matrix] {
             let context = Context::new(&execution, Position::new("Main", 0, 0)).with_mode(mode);

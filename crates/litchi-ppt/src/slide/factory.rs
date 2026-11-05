@@ -1,13 +1,12 @@
 use super::directory::{SlideDirectory, SlideDirectoryEntry};
-use super::notes::{NoteDescriptor, NotesIndex};
+use super::notes::NoteDescriptor;
 use crate::consts::RecordType;
 /// `SlideFactory` - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::{PayloadStore, Record};
-use once_cell::unsync::OnceCell;
 use std::sync::Arc;
 
 /// Factory for creating slides from document data using persist mapping.
@@ -27,9 +26,10 @@ pub struct SlideFactory<'doc> {
     source: PayloadStore<'doc>,
     /// Persist ID to byte offset mapping
     persist_mapping: &'doc PersistMapping,
-    notes_index: OnceCell<NotesIndex>,
+    /// The slide directory, which also holds the presentation's notes index
+    /// (L-PPT-R2), so a factory parses nothing but the slides it is asked for
     slide_directory: &'doc SlideDirectory,
-    record_limits: RecordLimits,
+    source_limits: SourceLimits,
 }
 
 impl<'doc> SlideFactory<'doc> {
@@ -45,7 +45,7 @@ impl<'doc> SlideFactory<'doc> {
             doc_data,
             persist_mapping,
             slide_directory,
-            RecordLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -53,13 +53,13 @@ impl<'doc> SlideFactory<'doc> {
         doc_data: &'doc [u8],
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Self {
         Self::from_source(
             PayloadStore::Owned(doc_data),
             persist_mapping,
             slide_directory,
-            record_limits,
+            source_limits,
         )
     }
 
@@ -74,13 +74,13 @@ impl<'doc> SlideFactory<'doc> {
         document: &'doc Arc<Vec<u8>>,
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Self {
         Self::from_source(
             PayloadStore::Shared(document),
             persist_mapping,
             slide_directory,
-            record_limits,
+            source_limits,
         )
     }
 
@@ -88,14 +88,13 @@ impl<'doc> SlideFactory<'doc> {
         source: PayloadStore<'doc>,
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Self {
         Self {
             source,
             persist_mapping,
-            notes_index: OnceCell::new(),
             slide_directory,
-            record_limits,
+            source_limits,
         }
     }
 
@@ -139,7 +138,7 @@ impl<'doc> SlideFactory<'doc> {
     fn parse_slide_at_offset(
         &self,
         offset: u32,
-        entry: &SlideDirectoryEntry,
+        entry: &'doc SlideDirectoryEntry,
     ) -> Result<SlideData<'doc>> {
         let offset_usize = offset as usize;
 
@@ -151,7 +150,7 @@ impl<'doc> SlideFactory<'doc> {
 
         // Parse the Slide record at this offset
         let (record, _consumed) =
-            Record::parse_from_store_with_limits(self.source, offset_usize, self.record_limits)?;
+            Record::parse_from_store_with_limits(self.source, offset_usize, self.source_limits)?;
 
         if record.record_type != RecordType::Slide {
             return Err(Error::InvalidFormat(format!(
@@ -160,12 +159,11 @@ impl<'doc> SlideFactory<'doc> {
             )));
         }
 
-        let note_descriptor = self
-            .notes_index
-            .get_or_init(|| {
-                NotesIndex::build_with_limits(self.source, self.slide_directory, self.record_limits)
-            })
-            .descriptor(&record, entry.persist_id(), self.persist_mapping);
+        let note_descriptor = self.slide_directory.notes_index().descriptor(
+            &record,
+            entry.slide_id(),
+            self.persist_mapping,
+        );
 
         Ok(SlideData {
             persist_id: entry.persist_id(),
@@ -173,11 +171,12 @@ impl<'doc> SlideFactory<'doc> {
             slide_list_text: entry.list_text().to_string(),
             outline_text_interactions: entry.outline_text_interactions().to_vec(),
             outline_text_refs: entry.outline_text_refs().to_vec(),
+            outline_text_bodies: entry.outline_text_bodies(),
             offset: offset_usize,
             record,
             doc_data: self.source,
             note_descriptor,
-            record_limits: self.record_limits,
+            source_limits: self.source_limits,
         })
     }
 
@@ -211,6 +210,8 @@ pub struct SlideData<'doc> {
     /// Range-anchored actions from `SlideListWithText` text bodies.
     pub(crate) outline_text_interactions: Vec<crate::TextBodyInteractions>,
     pub(crate) outline_text_refs: Vec<crate::OutlineTextRef>,
+    /// The slide's slide-list text bodies, borrowed from the directory.
+    pub(crate) outline_text_bodies: &'doc [crate::OutlineTextBody],
     /// Byte offset in document stream
     pub offset: usize,
     /// Parsed Slide record
@@ -219,7 +220,7 @@ pub struct SlideData<'doc> {
     /// payload bytes from (for lazy speaker-notes parsing)
     doc_data: PayloadStore<'doc>,
     pub(crate) note_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
-    pub(crate) record_limits: RecordLimits,
+    pub(crate) source_limits: SourceLimits,
 }
 
 impl<'doc> SlideData<'doc> {
@@ -276,11 +277,12 @@ impl<'doc> SlideData<'doc> {
             slide_list_text: String::new(),
             outline_text_interactions: Vec::new(),
             outline_text_refs: Vec::new(),
+            outline_text_bodies: &[],
             offset,
             record,
             doc_data: PayloadStore::Owned(doc_data),
             note_descriptor: Ok(None),
-            record_limits: RecordLimits::default(),
+            source_limits: SourceLimits::default(),
         }
     }
 }

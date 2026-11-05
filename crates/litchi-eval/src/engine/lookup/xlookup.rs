@@ -4,7 +4,7 @@ use litchi_core::sheet::{CellValue, Result};
 use super::super::{EvalCtx, evaluate_expression, flatten_range_expr, to_number};
 use super::helpers::{find_exact_match_index, is_1d};
 
-pub(crate) async fn eval_xlookup(
+pub(crate) fn eval_xlookup(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -16,9 +16,9 @@ pub(crate) async fn eval_xlookup(
         ));
     }
 
-    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let lookup_array = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
-    let return_array = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let lookup_array = flatten_range_expr(ctx, current_sheet, &args[1])?;
+    let return_array = flatten_range_expr(ctx, current_sheet, &args[2])?;
 
     if !is_1d(&lookup_array) || !is_1d(&return_array) {
         return Ok(CellValue::Error(
@@ -33,13 +33,13 @@ pub(crate) async fn eval_xlookup(
     }
 
     let if_not_found = if args.len() >= 4 {
-        Some(evaluate_expression(ctx, current_sheet, &args[3]).await?)
+        Some(evaluate_expression(ctx, current_sheet, &args[3])?)
     } else {
         None
     };
 
     if args.len() >= 5 {
-        let mm_val = evaluate_expression(ctx, current_sheet, &args[4]).await?;
+        let mm_val = evaluate_expression(ctx, current_sheet, &args[4])?;
         match to_number(&mm_val) {
             Some(0.0) => {},
             _ => {
@@ -94,8 +94,8 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_xlookup_basic() {
+    #[test]
+    fn test_xlookup_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -115,12 +115,12 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 3),
             range_expr("Sheet1", 2, 1, 2, 3),
         ];
-        let result = eval_xlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("B".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_xlookup_not_found() {
+    #[test]
+    fn test_xlookup_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -137,15 +137,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 2),
             range_expr("Sheet1", 2, 1, 2, 2),
         ];
-        let result = eval_xlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xlookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("not found")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_xlookup_if_not_found() {
+    #[test]
+    fn test_xlookup_if_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -164,12 +164,12 @@ mod tests {
             range_expr("Sheet1", 2, 1, 2, 2),
             str_expr("Not Found"),
         ];
-        let result = eval_xlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("Not Found".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_xlookup_string_lookup() {
+    #[test]
+    fn test_xlookup_string_lookup() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -192,17 +192,17 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 3),
             range_expr("Sheet1", 2, 1, 2, 3),
         ];
-        let result = eval_xlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xlookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(200));
     }
 
-    #[tokio::test]
-    async fn test_xlookup_wrong_args() {
+    #[test]
+    fn test_xlookup_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args = vec![num_expr(1.0), num_expr(2.0)];
-        let result = eval_xlookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xlookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 3 to 6")),
             _ => panic!("Expected Error"),

@@ -35,6 +35,7 @@
 
 mod binding_tracker;
 mod error;
+mod signature;
 
 pub mod custom;
 pub mod custom_data;
@@ -69,6 +70,6 @@ pub mod private {
     };
 }
 
-pub use error::{Error, Result};
-pub use properties::{Keywords, Props};
+pub use error::{Error, LimitKind, Result};
+
 pub use xml::XmlError;

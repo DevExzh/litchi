@@ -1,8 +1,39 @@
 /// Exact-source transactions for the fill stored directly on one section.
 pub mod background;
+/// Adding and removing sections (record 0312).
+pub mod lifecycle {
+    pub use crate::package::section_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+/// Exact-source transactions for one section's name.
+pub mod name {
+    pub use crate::package::section_name::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+/// Paragraph-level transactions over one section's body text.
+pub mod paragraphs {
+    pub use crate::package::section_paragraphs::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
 pub mod pagination;
 /// Exact-source transactions for the settings stored on one section.
 pub mod settings;
+/// Character styling of spans of one section's body text (record 0309).
+pub mod text_style {
+    pub use crate::package::section_text_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Run,
+    };
+    pub use litchi_iwa_text_wire::CharacterProperties;
+}
+/// Exact-source transactions for one section's body text.
+pub mod text {
+    pub use crate::package::section_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
 
 use std::{fmt, sync::Arc};
 

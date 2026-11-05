@@ -2,11 +2,10 @@
 
 use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
+use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcPackage, PackURI, Relationship, Relationships, SourceBackedPackage, SourceLineage,
-    TargetMode,
+    OpcPackage, PackURI, Relationship, Relationships, SourceBackedPackage, TargetMode,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -32,8 +31,6 @@ pub struct Snapshot {
     sheet_position: usize,
     protected: bool,
     source: SourceState,
-    source_version: Option<SourceVersion>,
-    source_lineage: Option<SourceLineage>,
     context: Option<ExecutionContext>,
 }
 
@@ -55,7 +52,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_xml = workbook.blob();
-        let catalog = raw::parse_catalog(workbook_xml)?;
+        let catalog = raw::parse_catalog(workbook_xml, &package.read_limits())?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("hyperlink worksheet selector did not resolve"))?;
         let catalog_sheet = catalog.sheets.get(sheet_position).ok_or_else(|| {
@@ -97,8 +94,6 @@ impl Snapshot {
             parsed,
             protected,
             None,
-            None,
-            None,
         )
     }
 
@@ -114,12 +109,11 @@ impl Snapshot {
             });
         }
         let source_version = package.source_version()?;
-        let source_lineage = package.source_lineage();
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_payload = SourcePayload::from_part_data(package, workbook.data()?)?;
         let workbook_xml = workbook_payload.as_bytes();
-        let catalog = raw::parse_catalog(workbook_xml)?;
+        let catalog = raw::parse_catalog(workbook_xml, &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("hyperlink worksheet selector did not resolve"))?;
@@ -166,8 +160,6 @@ impl Snapshot {
             worksheet.rels(),
             parsed,
             protected,
-            Some(source_version),
-            Some(source_lineage),
             package.execution_context(),
         )?;
         package.check_execution()?;
@@ -192,8 +184,6 @@ impl Snapshot {
         worksheet_relationships: &Relationships,
         parsed: Vec<ParsedHyperlink>,
         protected: bool,
-        source_version: Option<SourceVersion>,
-        source_lineage: Option<SourceLineage>,
         context: Option<ExecutionContext>,
     ) -> Result<Self> {
         let (values, relationship_ids) = split_parsed(parsed)?;
@@ -220,8 +210,6 @@ impl Snapshot {
                 sheet_relationship: SourceRelationship::capture(sheet_relationship)?,
                 worksheet_relationships: capture_relationships(worksheet_relationships)?,
             },
-            source_version,
-            source_lineage,
             context,
         })
     }
@@ -259,12 +247,6 @@ impl Snapshot {
     #[must_use]
     pub fn hyperlinks(&self) -> &[Hyperlink] {
         &self.values
-    }
-
-    /// Alias for [`Self::hyperlinks`].
-    #[must_use]
-    pub fn values(&self) -> &[Hyperlink] {
-        self.hyperlinks()
     }
 
     /// Developer-facing worksheet name captured at ingress.
@@ -341,17 +323,6 @@ impl Snapshot {
             })
     }
 
-    pub(crate) fn matches_entries(&self, entries: &[SourceEntry]) -> bool {
-        entries.len() == self.values.len()
-            && entries
-                .iter()
-                .zip(self.values.iter().zip(self.relationship_ids.iter()))
-                .all(|(entry, (value, relationship_id))| {
-                    &entry.value == value
-                        && entry.relationship_id.as_ref() == relationship_id.as_ref()
-                })
-    }
-
     pub(crate) fn matches_entries_checked(&self, entries: &[SourceEntry]) -> Result<bool> {
         if entries.len() != self.values.len() {
             return Ok(false);
@@ -376,28 +347,6 @@ impl Snapshot {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position
             && self.source == other.source
-    }
-
-    pub(crate) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let Ok(current) = Self::load(package, self.sheet_position) else {
-            return false;
-        };
-        self.same_source(&current)
-    }
-
-    pub(crate) fn matches_source_backed(&self, package: &SourceBackedPackage) -> Result<bool> {
-        if let Some(lineage) = self.source_lineage.as_ref()
-            && lineage != &package.source_lineage()
-        {
-            return Ok(false);
-        }
-        if let Some(version) = self.source_version
-            && package.source_version()? != version
-        {
-            return Ok(false);
-        }
-        let current = Self::load_source_backed(package, self.sheet_position)?;
-        Ok(self.same_source(&current))
     }
 
     fn reconstructed_relationships(&self) -> Result<Relationships> {
@@ -593,10 +542,9 @@ fn validate_surface(workbook_xml: &[u8], worksheet_xml: &[u8]) -> Result<bool> {
 }
 
 fn reject_mce(xml: &[u8], owner: &str) -> Result<()> {
-    if xml
-        .windows(MCE_NAMESPACE.len())
-        .any(|window| window == MCE_NAMESPACE)
-    {
+    // Literally or through a declaration spelled with references, which the
+    // namespace comparisons of the scan cannot see (record 0011).
+    if litchi_ooxml_common::mce::mentions_namespace(xml) {
         return Err(invalid(format!(
             "XLSX {owner} hyperlink editing refuses markup-compatibility content"
         )));

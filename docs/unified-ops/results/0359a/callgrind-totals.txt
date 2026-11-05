@@ -1,0 +1,17 @@
+# callgrind --tool=callgrind, LITCHI_PROBE_ONLY=<scenario> legacy_w5_probe <rounds>; Ir totals
+doc_open_get-after-1 166042863
+doc_open_get-after-6 576227980
+doc_open_get-before-1 166056843
+doc_open_get-before-6 576254698
+doc_set-after-1 290445967
+doc_set-after-6 1070545698
+doc_set-before-1 290454550
+doc_set-before-6 1070513171
+rtf_batch1k-after-1 459270436
+rtf_batch1k-after-6 1141120378
+rtf_batch1k-before-1 459399057
+rtf_batch1k-before-6 1141384099
+xls_set-after-1 66647612
+xls_set-after-6 122281058
+xls_set-before-1 66707139
+xls_set-before-6 122431976

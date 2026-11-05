@@ -1,0 +1,106 @@
+{
+  "schema": "iwork-numbers-chart-series-style-callgrind-v1",
+  "source_commit": "3dd6a6fee751253f3e061eb6229f9c02233637dc",
+  "source_clean": true,
+  "policy": {
+    "ratio": "leaf/host inclusive Callgrind Ir",
+    "max_ratio": 1.05,
+    "cpu": 7,
+    "calls_per_side": 2,
+    "wall_time_claim": false,
+    "annotation": "callgrind_annotate --auto=no --inclusive=yes --threshold=100 --show-percs=yes"
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/bin/parity-3dd6a6fee7-release-debug1",
+    "mode": "0555",
+    "bytes": 219623840,
+    "sha256": "f0fd836369ebf3346183dcb94ae29159a03852d810eff748cd86989a7d65b043"
+  },
+  "plan": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/callgrind-plan-v1.json",
+    "sha256": "ace539ce39cfdfce33ad07f97dfc646996e8c39114bc530c14efc2b4399a8b4e"
+  },
+  "capture_manifest": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/capture-manifest-v1.json",
+    "sha256": "fe7040fd9c03f71c3ebd7c9b9a495e842981ea81189c8617a3f93cafc2295906"
+  },
+  "validator": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+    "sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e"
+  },
+  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/capture-v1",
+  "artifact_hashes_sha256": "c70b7ab1ffa1e5810d6232806e3071d044867ba09faecd2fc929d51a92ef876f",
+  "annotation_hashes_sha256": "71d9c971f10727d3f39c7229b82c4517b34f416803210db677fbc3029a6d9bb2",
+  "routes": [
+    {
+      "id": "numbers_chart_series_fills_set",
+      "operation": "set",
+      "scenario": "chart series fills",
+      "fixture": "Column2d source-built chart",
+      "host_ir": 266012588,
+      "leaf_ir": 58927439,
+      "ratio": 0.221521242446,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_w2a_cost::w2a_host_route_2",
+        "leaf": "numbers_w2a_cost::w2a_leaf_route_2"
+      }
+    },
+    {
+      "id": "numbers_chart_series_strokes_set",
+      "operation": "set",
+      "scenario": "chart series strokes",
+      "fixture": "Line2d source-built chart",
+      "host_ir": 254696939,
+      "leaf_ir": 58755837,
+      "ratio": 0.230689215311,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_w2a_cost::w2a_host_route_2",
+        "leaf": "numbers_w2a_cost::w2a_leaf_route_2"
+      }
+    },
+    {
+      "id": "numbers_chart_series_symbol_fills_set",
+      "operation": "set",
+      "scenario": "chart series symbol fills",
+      "fixture": "Line2d source-built chart",
+      "host_ir": 266043359,
+      "leaf_ir": 58818332,
+      "ratio": 0.221085511103,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_w2a_cost::w2a_host_route_2",
+        "leaf": "numbers_w2a_cost::w2a_leaf_route_2"
+      }
+    },
+    {
+      "id": "numbers_chart_series_symbol_outlines_set",
+      "operation": "set",
+      "scenario": "chart series symbol outlines",
+      "fixture": "Line2d source-built chart",
+      "host_ir": 255539602,
+      "leaf_ir": 58734393,
+      "ratio": 0.229844581976,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_w2a_cost::w2a_host_route_2",
+        "leaf": "numbers_w2a_cost::w2a_leaf_route_2"
+      }
+    }
+  ],
+  "scope_note": "Source-bound pre-merge WP evidence; coordinator must rerun after integrated trunk merge. No native or wall-time claim.",
+  "coordinator_audit": {
+    "raw_receipt": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/coordinator-raw-audit-v1.json",
+    "raw_receipt_sha256": "a62d7bf39d095a35382b47f25b948f62e5a93fac19442684b76ab63b0fc3a91c",
+    "c063_derived_receipt": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/audit-v2/derived-v2.json",
+    "c063_derived_receipt_sha256": "19de2a1ef67c937956cf68e1e6ee85347c2bc0f644155d595b383197f75ed76c",
+    "routes": 4,
+    "captures": 8,
+    "status": "passed"
+  }
+}

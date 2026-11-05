@@ -33,8 +33,8 @@
 )]
 
 use litchi_doc::{
-    Package, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable, ProofingStatus,
-    ProofingTables, Writer,
+    Builder, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable, ProofingStatus,
+    ProofingTables, raw::Reader,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -105,7 +105,7 @@ fn proofing_tables() -> ProofingTables {
     ProofingTables::try_new(Some(spelling), Some(grammar)).unwrap()
 }
 
-fn assert_authored_tables(package: &mut Package<Cursor<Vec<u8>>>, expected: &ProofingTables) {
+fn assert_authored_tables(package: &mut Reader<Cursor<Vec<u8>>>, expected: &ProofingTables) {
     let document = package.document().unwrap();
     assert_eq!(document.proofing_tables().unwrap(), expected);
     assert!(
@@ -123,7 +123,7 @@ fn assert_authored_tables(package: &mut Package<Cursor<Vec<u8>>>, expected: &Pro
 #[test]
 fn spelling_and_grammar_tables_round_trip_through_write_to() {
     let expected = proofing_tables();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("alpha beta").unwrap();
     writer.set_proofing_tables(expected.clone());
 
@@ -136,15 +136,15 @@ fn spelling_and_grammar_tables_round_trip_through_write_to() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_authored_tables(&mut package, &expected);
 }
 
 #[test]
 fn proofing_tables_round_trip_through_file_save_and_can_be_cleared() {
     let expected = proofing_tables();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("alpha beta").unwrap();
     writer.set_proofing_tables(expected.clone());
     let removed = writer
@@ -154,10 +154,10 @@ fn proofing_tables_round_trip_through_file_save_and_can_be_cleared() {
     writer.set_proofing_table(removed);
 
     let path = temporary_doc_path();
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(path).unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     assert_authored_tables(&mut package, &expected);
 }
 
@@ -178,13 +178,13 @@ fn output_rejects_out_of_document_proofing_cps_before_writing() {
     )
     .unwrap();
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("x").unwrap();
     writer.set_proofing_table(table);
 
     let original = vec![0xA5; 16];
-    let mut output = Cursor::new(original.clone());
-    let error = writer.write_to(&mut output).unwrap_err();
+    let output = Cursor::new(original.clone());
+    let error = writer.build().unwrap_err();
     assert!(error.to_string().contains("proofing terminal CP"));
     assert_eq!(output.into_inner(), original);
 }

@@ -4,6 +4,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 use litchi_drawingml::theme::{FontSet, Override, Palette, Theme, codec};
@@ -21,23 +22,31 @@ pub struct Authored {
 
 /// Add a validated theme part at the next free `/ppt/theme/themeN.xml` URI.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add(
+pub(crate) fn add(
     package: &mut OpcPackage,
     name: &str,
     colors: &Palette,
     fonts: &FontSet,
 ) -> Result<Authored> {
     let uri = next_part_uri(package, "/ppt/theme/theme", ".xml")?;
-    let xml = codec::encode_part(name, colors, fonts)?;
+    let xml = codec::encode_part(name, colors, fonts, codec::Limits::DEFAULT)?;
+    refuse_signed_change(package)?;
     package.add_part(Box::new(BlobPart::new(
         uri.clone(),
         ct::OFC_THEME.to_owned(),
         xml,
     )));
-    package.unsign();
+    settle_unsigned_change(package)?;
     validate(package)?;
     Ok(Authored {
         part_name: uri.to_string(),
@@ -46,15 +55,27 @@ pub fn add(
 
 /// Attach one theme part to a slide master, replacing any previous theme link.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> Result<String> {
+pub(crate) fn attach(
+    package: &mut OpcPackage,
+    master_name: &str,
+    theme_name: &str,
+) -> Result<String> {
     let master_uri = uri(master_name, "theme master")?;
     let theme_uri = uri(theme_name, "theme part")?;
     require_type(package, &master_uri, ct::PML_SLIDE_MASTER)?;
     require_type(package, &theme_uri, ct::OFC_THEME)?;
     let target = theme_uri.relative_ref(master_uri.base_uri());
+    refuse_signed_change(package)?;
     let master = package.get_part_mut(&master_uri)?;
     let old: Vec<String> = master
         .rels()
@@ -66,7 +87,7 @@ pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> 
         master.rels_mut().remove(&id);
     }
     let relationship_id = master.relate_to(&target, rt::THEME);
-    package.unsign();
+    settle_unsigned_change(package)?;
     validate(package)?;
     Ok(relationship_id)
 }
@@ -79,7 +100,10 @@ pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> 
 pub fn load(package: &OpcPackage, theme_name: &str) -> Result<Theme> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
-    Ok(codec::read(package.get_part(&uri)?.blob())?)
+    Ok(codec::read(
+        package.get_part(&uri)?.blob(),
+        codec::Limits::DEFAULT,
+    )?)
 }
 
 /// Read the permissive summary view used by producer-facing theme inspection.
@@ -95,54 +119,93 @@ pub fn load_summary(package: &OpcPackage, theme_name: &str) -> Result<super::par
 
 /// Replace only the color palette of an existing theme part.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_colors(package: &mut OpcPackage, theme_name: &str, colors: &Palette) -> Result<()> {
+pub(crate) fn put_colors(
+    package: &mut OpcPackage,
+    theme_name: &str,
+    colors: &Palette,
+) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
     let original = package.get_part(&uri)?.blob().to_vec();
     let patched = codec::replace_scheme(
         &original,
         b"clrScheme",
-        &codec::encode_palette_fragment(colors)?,
+        &codec::encode_palette_fragment(colors, codec::Limits::DEFAULT)?,
+        codec::Limits::DEFAULT,
     )?;
-    if codec::read(&patched)?.colors != *colors {
+    if codec::read(&patched, codec::Limits::DEFAULT)?.colors != *colors {
         return Err(invalid("color palette did not survive theme read-back"));
     }
+    // A palette that patches to the stored bytes publishes nothing, so an
+    // exact no-op keeps a signed package byte for byte.
+    if patched == original {
+        return validate(package);
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(patched);
-    package.unsign();
+    settle_unsigned_change(package)?;
     validate(package)
 }
 
 /// Replace only the font set of an existing theme part.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) -> Result<()> {
+pub(crate) fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
     let original = package.get_part(&uri)?.blob().to_vec();
     let patched = codec::replace_scheme(
         &original,
         b"fontScheme",
-        &codec::encode_fonts_fragment(fonts)?,
+        &codec::encode_fonts_fragment(fonts, codec::Limits::DEFAULT)?,
+        codec::Limits::DEFAULT,
     )?;
-    if codec::read(&patched)?.fonts != *fonts {
+    if codec::read(&patched, codec::Limits::DEFAULT)?.fonts != *fonts {
         return Err(invalid("font set did not survive theme read-back"));
     }
+    // A font set that patches to the stored bytes publishes nothing, so an
+    // exact no-op keeps a signed package byte for byte.
+    if patched == original {
+        return validate(package);
+    }
+    refuse_signed_change(package)?;
     package.get_part_mut(&uri)?.set_blob(patched);
-    package.unsign();
+    settle_unsigned_change(package)?;
     validate(package)
 }
 
 /// Create or replace a slide/layout theme override.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_override(
+pub(crate) fn put_override(
     package: &mut OpcPackage,
     parent_name: &str,
     value: &Override,
@@ -152,7 +215,7 @@ pub fn put_override(
     if !matches!(parent.content_type(), ct::PML_SLIDE | ct::PML_SLIDE_LAYOUT) {
         return Err(invalid("theme overrides attach only to slides and layouts"));
     }
-    let xml = codec::encode_override(value)?;
+    let xml = codec::encode_override(value, codec::Limits::DEFAULT)?;
     let existing = parent
         .rels()
         .iter()
@@ -160,14 +223,26 @@ pub fn put_override(
     if let Some(relationship) = existing {
         let target = relationship.target_partname()?;
         require_type(package, &target, ct::OFC_THEME_OVERRIDE)?;
+        // An override that encodes to the stored bytes publishes nothing, so
+        // an exact no-op keeps a signed package byte for byte.
+        if package.get_part(&target)?.blob() == xml.as_slice() {
+            if codec::read_override(&xml, codec::Limits::DEFAULT)? != *value {
+                return Err(invalid("theme override did not survive read-back"));
+            }
+            return Ok(target.to_string());
+        }
+        refuse_signed_change(package)?;
         package.get_part_mut(&target)?.set_blob(xml);
-        if codec::read_override(package.get_part(&target)?.blob())? != *value {
+        if codec::read_override(package.get_part(&target)?.blob(), codec::Limits::DEFAULT)?
+            != *value
+        {
             return Err(invalid("theme override did not survive read-back"));
         }
-        package.unsign();
+        settle_unsigned_change(package)?;
         return Ok(target.to_string());
     }
     let target = next_part_uri(package, "/ppt/theme/themeOverride", ".xml")?;
+    refuse_signed_change(package)?;
     package.add_part(Box::new(BlobPart::new(
         target.clone(),
         ct::OFC_THEME_OVERRIDE.to_owned(),
@@ -177,10 +252,10 @@ pub fn put_override(
     package
         .get_part_mut(&parent_uri)?
         .relate_to(&reference, rt::THEME_OVERRIDE);
-    if codec::read_override(package.get_part(&target)?.blob())? != *value {
+    if codec::read_override(package.get_part(&target)?.blob(), codec::Limits::DEFAULT)? != *value {
         return Err(invalid("theme override did not survive read-back"));
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(target.to_string())
 }
 
@@ -203,15 +278,23 @@ pub fn load_override(package: &OpcPackage, parent_name: &str) -> Result<Option<O
     require_type(package, &target, ct::OFC_THEME_OVERRIDE)?;
     Ok(Some(codec::read_override(
         package.get_part(&target)?.blob(),
+        codec::Limits::DEFAULT,
     )?))
 }
 
 /// Remove an override and delete its part when no other parent references it.
 ///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bool> {
+pub(crate) fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bool> {
     let parent_uri = uri(parent_name, "theme override parent")?;
     let parent = package.get_part(&parent_uri)?;
     let Some(relationship) = parent
@@ -223,6 +306,7 @@ pub fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bo
     };
     let target = relationship.target_partname()?;
     let id = relationship.r_id().to_owned();
+    refuse_signed_change(package)?;
     package.get_part_mut(&parent_uri)?.rels_mut().remove(&id);
     let still_used = package.iter_parts().any(|part| {
         part.rels().iter().any(|r| {
@@ -234,7 +318,7 @@ pub fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bo
     if !still_used {
         package.remove_part(&target);
     }
-    package.unsign();
+    settle_unsigned_change(package)?;
     Ok(true)
 }
 
@@ -264,7 +348,7 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
             }
             let target = theme.target_partname()?;
             require_type(package, &target, ct::OFC_THEME)?;
-            let _ = codec::read(package.get_part(&target)?.blob())?;
+            let _ = codec::read(package.get_part(&target)?.blob(), codec::Limits::DEFAULT)?;
         }
         if matches!(part.content_type(), ct::PML_SLIDE | ct::PML_SLIDE_LAYOUT) {
             for relationship in part.rels().iter().filter(|r| is_override_rel(r.reltype())) {
@@ -273,11 +357,54 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
                 }
                 let target = relationship.target_partname()?;
                 require_type(package, &target, ct::OFC_THEME_OVERRIDE)?;
-                let _ = codec::read_override(package.get_part(&target)?.blob())?;
+                let _ = codec::read_override(
+                    package.get_part(&target)?.blob(),
+                    codec::Limits::DEFAULT,
+                )?;
             }
         }
     }
     Ok(())
+}
+
+/// The theme part a presentation's colors and fonts come from: the
+/// presentation part's own theme relationship, else the first slide
+/// master's (record 0321; OfficeCLI's `GetThemePart` order). `None` for a
+/// presentation with neither.
+///
+/// # Errors
+///
+/// Returns an error for a malformed presentation part, master list or
+/// relationship target.
+pub fn presentation_theme(package: &OpcPackage) -> Result<Option<PackURI>> {
+    let main = package.main_document_part()?;
+    if let Some(target) = theme_target(main)? {
+        return Ok(Some(target));
+    }
+    let presentation = crate::parts::PresentationPart::from_part(main)?;
+    let Some(first) = presentation.slide_master_references()?.into_iter().next() else {
+        return Ok(None);
+    };
+    let Some(relationship) = main.rels().get(&first) else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("slide-master relationship must be internal"));
+    }
+    let master = package.get_part(&relationship.target_partname()?)?;
+    theme_target(master)
+}
+
+/// The internal theme relationship target of one part, if it has one.
+pub(crate) fn theme_target(part: &dyn litchi_opc::Part) -> Result<Option<PackURI>> {
+    match part
+        .rels()
+        .iter()
+        .find(|relationship| is_theme_rel(relationship.reltype()) && !relationship.is_external())
+    {
+        Some(relationship) => Ok(Some(relationship.target_partname()?)),
+        None => Ok(None),
+    }
 }
 
 /// Allocate a deterministic free part name for theme adapters.

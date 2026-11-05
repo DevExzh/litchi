@@ -25,11 +25,27 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Whether applying the patch changes nothing.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
+    /// The patch that undoes this one.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
     pub fn apply(&self, target: &mut Snapshot) -> Result<()> {
         if target != &self.before {
-            return Err(Error::UnsafeEdit(
-                "CompressPictures snapshot changed since the patch was prepared".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit picture compression",
+                reason: "CompressPictures snapshot changed since the patch was prepared",
+            });
         }
         self.after.validate()?;
         *target = self.after.clone();
@@ -39,12 +55,12 @@ impl Patch {
 
 /// Detached editor; the source snapshot is never modified.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(snapshot: Snapshot) -> Self {
         Self {
             base: snapshot.clone(),
@@ -52,8 +68,9 @@ impl Transaction {
         }
     }
 
+    /// The staged settings, as a read view.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn staged(&self) -> &Snapshot {
         &self.working
     }
 
@@ -134,14 +151,23 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn commit(self) -> Result<Patch> {
+    pub fn commit(self) -> Result<Commit> {
         self.working.validate()?;
-        Ok(Patch {
+        let patch = Patch {
             before: self.base,
-            after: self.working,
-        })
+            after: self.working.clone(),
+        };
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(self.working, patch, diagnostics))
     }
 }
+
+/// A published picture-compression edit: the new snapshot, its reversible
+/// patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
+
+/// Content-free diagnostics of one picture-compression commit.
+pub use litchi_core::edit::Diagnostics;
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidRecord {

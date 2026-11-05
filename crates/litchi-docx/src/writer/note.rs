@@ -2,15 +2,15 @@
     clippy::unwrap_used,
     reason = "the invariant is established immediately before extraction"
 )]
-use super::paragraph::MutableParagraph;
+use super::paragraph::Paragraph;
 
 /// Footnote or endnote entry.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Note {
     /// Note ID (starting from 1)
     pub(crate) id: u32,
     /// Note content (paragraphs)
-    pub(crate) paragraphs: Vec<MutableParagraph>,
+    pub(crate) paragraphs: Vec<Paragraph>,
 }
 
 impl Note {
@@ -32,14 +32,14 @@ impl Note {
     /// # Panics
     ///
     /// Panics if an internal writer invariant is violated.
-    pub fn add_paragraph(&mut self) -> &mut MutableParagraph {
-        let para = MutableParagraph::new();
+    pub fn add_paragraph(&mut self) -> &mut Paragraph {
+        let para = Paragraph::new();
         self.paragraphs.push(para);
         self.paragraphs.last_mut().unwrap()
     }
 
     /// Add a paragraph with text to this note.
-    pub fn add_paragraph_with_text(&mut self, text: &str) -> &mut MutableParagraph {
+    pub fn add_paragraph_with_text(&mut self, text: &str) -> &mut Paragraph {
         let para = self.add_paragraph();
         para.add_run_with_text(text);
         para
