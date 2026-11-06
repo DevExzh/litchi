@@ -5343,7 +5343,7 @@
       "assertions": [
         "Discover all 17 native embedded charts, then assert Radar family, three named series, category/value counts and exact ExternSheet/area references."
       ],
-      "scope_limit": "Only Radar family semantics are qualified here. OfPie and high/low/close stock classification gaps discovered in the other charts remain open; general BIFF chart grammar is partial."
+      "scope_limit": "Radar wire-family semantics only in this test; separate indexed tests cover OfPie and the native stock Line/high-low representation. General BIFF chart authoring remains partial."
     },
     {
       "crate": "litchi-xls",
@@ -5380,7 +5380,7 @@
     {
       "crate": "litchi-xls",
       "target": "microsoft_office_native_charts",
-      "name": "native_radar_geometry_edit_changes_only_one_chart_record",
+      "name": "native_embedded_chart_geometry_edits_change_only_the_selected_record",
       "fixtures": [
         "excel/excel-chart-families.xls"
       ],
@@ -5388,9 +5388,84 @@
         "xls-182"
       ],
       "assertions": [
-        "Native Radar geometry update tolerates the valid host prelude, changes exactly one Chart record, preserves other charts/CFB streams, and supports exact inverse."
+        "Individually update the geometry of all 17 native embedded charts; each edit changes exactly one Chart record, preserves every other BIFF record/CFB stream and chart model, and supports an exact inverse."
       ],
-      "scope_limit": "Fixed Chart payload only; host drawing object bounds are not resized and broader embedded-chart mutation remains unsupported."
+      "scope_limit": "Fixed Chart payload only; host drawing bounds are not resized, and broader embedded-chart mutation remains unsupported."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_charts",
+      "name": "native_of_pie_retains_automatic_split_and_series_references",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "Native BopPop is exposed as OfPie, with Pie subtype, automatic split, secondary size 75, gap 150, no shadow, one named series and exact ExternSheet 15 area references; no axes and source bytes unchanged."
+      ],
+      "scope_limit": "Only the native automatic pie-of-pie settings are qualified. No custom membership, split-rule mutation, full chart authoring, or rendering."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_charts",
+      "name": "native_stock_keeps_numeric_date_categories_and_high_low_lines",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "Native High/Low/Close series have exact five-point ranges, numeric/date category format 14, source DateTime serials 46296 through 46300, exact source values and high-low line style."
+      ],
+      "scope_limit": "BIFF encodes this profile as Line plus CrtLine HighLow, without drop bars. Such lines can also occur on ordinary line charts; no distinct stock wire type or UI classification is inferred."
+    },
+    {
+      "crate": "litchi-ograph",
+      "target": "microsoft_office_native_charts",
+      "name": "native_seventeen_biff_charts_keep_families_series_owners_and_exact_replay",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "All 17 native BIFF chart streams parse with expected wire families, regular series counts, axis counts, auxiliary error/trend parent bindings, OfPie settings, secondary-axis combo ownership and exact stream replay."
+      ],
+      "scope_limit": "Wire-family and inert metadata semantics only; 3-D and stock presentation are not reconstructed, and unknown records remain opaque. No formula evaluation or native Office reopen."
+    },
+    {
+      "crate": "litchi-ograph",
+      "target": "microsoft_office_native_charts",
+      "name": "native_scatter_error_cache_values_are_bound_to_auxiliary_series",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "Ten exact saved custom error values bind to the correct two auxiliary series, all four error-bar series point to primary series one, and the linear trend retains equation/R-squared flags."
+      ],
+      "scope_limit": "Saved auxiliary ownership and cache data only; no error computation or trend fitting."
+    },
+    {
+      "crate": "litchi-ograph",
+      "target": "microsoft_office_native_charts",
+      "name": "native_of_pie_full_model_reauthoring_has_a_typed_preservation_refusal",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "Changing native OfPie settings through the generic model rejects full reauthoring with Refused(UnsupportedContent), preserving the explicit opaque-record placement boundary."
+      ],
+      "scope_limit": "This is the full-model writer boundary, not a restriction on supported source-preserving chart-area transactions. No general chart mutation is claimed."
     }
   ]
 }

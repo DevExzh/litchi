@@ -18,7 +18,7 @@ use super::validate;
 use super::validate::valid_props;
 use super::wire::{
     AREA, AREA_FORMAT, AXC_EXT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BEGIN, BOF_DATASHEET,
-    BRAI, CAT_SER_RANGE, CELL_LABEL, CHART_FORMAT, CHART_REC, CONTINUE, COUNTRY, CRT_LINE,
+    BOP_POP, BRAI, CAT_SER_RANGE, CELL_LABEL, CHART_FORMAT, CHART_REC, CONTINUE, COUNTRY, CRT_LINE,
     CRT_LINK, DATA_FORMAT, DATA_LAB_EXT, DATA_LAB_EXT_CONTENTS, DEFAULT_TEXT, DIMENSIONS, DROP_BAR,
     END, EXCEL_BOOL_ERR, EXCLUDE_COLUMNS, EXCLUDE_ROWS, FONT_X, FRAME, LEGEND, LINE, LINE_FORMAT,
     MAIN_WINDOW, MARKER_FORMAT, MAX_STATUS, OBJECT_LINK, ORIENT, PIE, PIE_FORMAT, PLOT_AREA,
@@ -175,7 +175,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         if strict_excel && group_depth == Some(depth) {
             let family = matches!(
                 record.kind(),
-                BAR | LINE | PIE | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE
+                BAR | LINE | PIE | BOP_POP | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE
             );
             if !group_family_seen && !family {
                 return invalid(
@@ -918,7 +918,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 parent_group_started = true;
                 pending_begin = true;
             },
-            BAR | LINE | PIE | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE => {
+            BAR | LINE | PIE | BOP_POP | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE => {
                 if group_depth != Some(depth) {
                     return invalid(record, "chart-family record appears outside ChartFormat");
                 }
@@ -1719,6 +1719,9 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
 fn parse_family(record: RecordRef<'_>) -> Result<Family> {
     let data = record.payload();
     match record.kind() {
+        BOP_POP => Ok(Family::OfPie {
+            options: crate::record::of_pie::Options::parse(record)?,
+        }),
         BAR => {
             exact(record, 6)?;
             Ok(Family::Bar {

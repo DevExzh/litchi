@@ -401,6 +401,7 @@ fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
     push_record(out, CHART_FORMAT, &header)?;
     push_record(out, BEGIN, &[])?;
     match group.family {
+        Family::OfPie { options } => options.write(out)?,
         Family::Line { flags } => push_record(out, LINE, &flags.to_le_bytes())?,
         Family::Area { flags } => push_record(out, AREA, &flags.to_le_bytes())?,
         Family::Bar {
@@ -522,6 +523,36 @@ mod radar_tests {
                 .collect::<Vec<_>>();
             assert_eq!(records.len(), 1);
             assert_eq!(records[0].payload(), [3, 0, 0, 0]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod of_pie_tests {
+    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
+    use super::*;
+    use crate::record::of_pie;
+    use litchi_biff::Records;
+
+    #[test]
+    fn chart_group_emission_keeps_the_of_pie_subtype_and_split_payload() {
+        for kind in [of_pie::Kind::Pie, of_pie::Kind::Bar] {
+            let options =
+                of_pie::Options::new(kind, of_pie::Split::Percent(25), 75, 150, true).unwrap();
+            let mut group = Group::line();
+            group.family = Family::OfPie { options };
+            let mut encoder = Encoder::new(Limits::default().biff).unwrap();
+            encode_group(&mut encoder, &group).unwrap();
+            let bytes = encoder.finish();
+            let records = Records::new(&bytes, Limits::default().biff)
+                .unwrap()
+                .map(|r| r.unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                records.iter().map(|r| r.kind()).collect::<Vec<_>>(),
+                [CHART_FORMAT, BEGIN, of_pie::Options::KIND, CRT_LINK, END]
+            );
+            assert_eq!(of_pie::Options::parse(records[2]).unwrap(), options);
         }
     }
 }

@@ -238,6 +238,7 @@ impl Model {
                 flags,
             } if rotation == 0 && hole == 0 && flags == 0 => GraphFamily::Pie,
             Family::Area { .. }
+            | Family::OfPie { .. }
             | Family::Scatter { .. }
             | Family::Radar { .. }
             | Family::Surface { .. }

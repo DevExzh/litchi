@@ -7,6 +7,7 @@ pub mod chart3d;
 pub mod frame;
 pub mod line;
 pub mod marker;
+pub mod of_pie;
 pub mod pie;
 pub mod series;
 

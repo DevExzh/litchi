@@ -20,6 +20,10 @@ pub enum Family {
         hole: u16,
         flags: u16,
     },
+    /// Pie-of-pie or bar-of-pie settings from `BopPop`.
+    OfPie {
+        options: crate::record::of_pie::Options,
+    },
     Scatter {
         bubble_percent: group::BubblePercent,
         bubble_kind: group::BubbleKind,

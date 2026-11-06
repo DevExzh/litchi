@@ -200,6 +200,10 @@ fn chart_type(family: litchi_ppt::chart::semantic::Family) -> &'static str {
         ),
         Family::Pie { hole, .. } if hole > 0 => "doughnut",
         Family::Pie { .. } => "pie",
+        Family::OfPie { options } => match options.kind() {
+            litchi_ograph::record::of_pie::Kind::Pie => "pieOfPie",
+            litchi_ograph::record::of_pie::Kind::Bar => "barOfPie",
+        },
         Family::Scatter { flags, .. } if flags & 0x0001 != 0 => "bubble",
         Family::Scatter { .. } => "scatter",
         Family::Radar { .. } => "radar",

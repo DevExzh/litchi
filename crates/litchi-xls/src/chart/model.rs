@@ -627,6 +627,11 @@ pub enum GroupKind {
         /// Validated BIFF option bits.
         flags: u16,
     },
+    /// Pie-of-pie or bar-of-pie settings from `BopPop`.
+    OfPie {
+        /// Checked subtype, split rule, secondary size, gap and shadow.
+        options: litchi_ograph::record::of_pie::Options,
+    },
     /// Scatter or bubble chart.
     Scatter {
         /// Bubble-size percentage.
@@ -678,13 +683,17 @@ pub enum Kind {
     Area,
     /// Pie or doughnut chart.
     Pie,
+    /// Pie of pie or bar of pie; inspect the group's options for the subtype.
+    OfPie,
     /// Scatter or bubble chart.
     Scatter,
     /// Radar chart.
     Radar,
     /// Surface chart.
     Surface,
-    /// Stock chart.
+    /// Stock-style line group with both high-low lines and up/down bars.
+    /// BIFF has no distinct stock-family record; high-low/close charts without
+    /// up/down bars retain `Line` and expose their high-low lines in the group.
     Stock,
     /// Multiple chart groups.
     Combo,
@@ -1031,6 +1040,11 @@ impl Chart {
     }
 
     /// Derives the concise chart family from the configured groups.
+    ///
+    /// `Stock` is a structural convenience for line groups with both high-low
+    /// lines and up/down bars, not a distinct BIFF record type. High-low lines
+    /// alone also occur on ordinary line charts (MS-XLS 2.4.68); callers can
+    /// inspect the group and series to distinguish their own display profiles.
     #[must_use]
     pub fn kind(&self) -> Kind {
         match self.groups.as_slice() {
@@ -1049,6 +1063,7 @@ impl Chart {
                 GroupKind::Bar { .. } => Kind::Bar,
                 GroupKind::Area { .. } => Kind::Area,
                 GroupKind::Pie { .. } => Kind::Pie,
+                GroupKind::OfPie { .. } => Kind::OfPie,
                 GroupKind::Scatter { .. } => Kind::Scatter,
                 GroupKind::Radar { .. } => Kind::Radar,
                 GroupKind::Surface { .. } => Kind::Surface,

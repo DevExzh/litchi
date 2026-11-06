@@ -36,6 +36,7 @@ pub(crate) const SERIES_LIST: u16 = 0x1016;
 pub(crate) const BAR: u16 = 0x1017;
 pub(crate) const LINE: u16 = 0x1018;
 pub(crate) const PIE: u16 = 0x1019;
+pub(crate) const BOP_POP: u16 = litchi_ograph::record::of_pie::Options::KIND.get();
 pub(crate) const AREA: u16 = 0x101a;
 pub(crate) const SCATTER: u16 = 0x101b;
 pub(crate) const CRT_LINE: u16 = line::Line::KIND.get();
@@ -323,6 +324,7 @@ pub(crate) fn known_record(kind: u16) -> bool {
             | BAR
             | LINE
             | PIE
+            | BOP_POP
             | AREA
             | SCATTER
             | RADAR

@@ -35,6 +35,7 @@ pub(super) const LEGEND: RecordKind = RecordKind::from_wire(0x1015);
 pub(super) const SERIES_LIST: RecordKind = RecordKind::from_wire(0x1016);
 pub(super) const BAR: RecordKind = RecordKind::from_wire(0x1017);
 pub(super) const LINE: RecordKind = RecordKind::from_wire(0x1018);
+pub(super) const BOP_POP: RecordKind = crate::record::of_pie::Options::KIND;
 pub(super) const PIE: RecordKind = RecordKind::from_wire(0x1019);
 pub(super) const AREA: RecordKind = RecordKind::from_wire(0x101A);
 pub(super) const SCATTER: RecordKind = RecordKind::from_wire(0x101B);

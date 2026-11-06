@@ -14,7 +14,7 @@ use super::model::{
 use super::package::{is_chart_bof, ranges_with};
 use super::wire::{
     AREA, AREA_FORMAT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BAR_SHAPE, BEGIN, BLANK, BOF,
-    BRAI, CAT_SER_RANGE, CHART, CHART_FORMAT, CONTINUE, CRT_LINE, CRT_LINK, DATA_FORMAT,
+    BOP_POP, BRAI, CAT_SER_RANGE, CHART, CHART_FORMAT, CONTINUE, CRT_LINE, CRT_LINK, DATA_FORMAT,
     DATA_LAB_EXT, DATA_LAB_EXT_CONTENTS, DEFAULT_TEXT, DROP_BAR, END, EOF, FONT_X, FRAME, LABEL,
     LEGEND, LINE, LINE_FORMAT, MARKER_FORMAT, NUMBER, OBJECT_LINK, PIE, PIE_FORMAT, PLOT_AREA,
     PLOT_GROWTH, RADAR, RADAR_AREA, SCATTER, SER_TO_CRT, SERIES, SERIES_FORMAT, SERIES_LIST,
@@ -245,7 +245,7 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
                 });
                 group_depth = depth.checked_add(1);
             },
-            BAR | LINE | PIE | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE => {
+            BAR | LINE | PIE | BOP_POP | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE => {
                 if group_depth != Some(depth) {
                     return invalid(value.kind, "chart family appears outside ChartFormat");
                 }
@@ -1023,6 +1023,10 @@ pub(crate) fn parse_chart_references(tokens: &[u8]) -> Result<Vec<CellRef>> {
 
 pub(crate) fn parse_group(kind: u16, data: &[u8]) -> Result<GroupKind> {
     Ok(match kind {
+        BOP_POP => GroupKind::OfPie {
+            options: litchi_ograph::record::of_pie::Options::from_payload(data)
+                .map_err(|error| graph_error(BOP_POP, error))?,
+        },
         BAR => {
             exact(data, 6, BAR)?;
             GroupKind::Bar {
@@ -1245,6 +1249,7 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> 
 #[cfg(test)]
 pub(super) fn write_group(out: &mut GraphEncoder, group: &Group) -> Result<()> {
     match &group.kind {
+        GroupKind::OfPie { options } => options.write(out)?,
         GroupKind::Line { flags } => push_record(out, LINE, &flags.to_le_bytes())?,
         GroupKind::Area { flags } => push_record(out, AREA, &flags.to_le_bytes())?,
         GroupKind::Bar {
@@ -1331,6 +1336,29 @@ mod radar_tests {
                     matches!(parse_group(kind, &vec![0; length]), Err(Error::InvalidRecord { record_type, .. }) if record_type == kind)
                 );
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod of_pie_tests {
+    use super::*;
+    use litchi_ograph::record::of_pie;
+
+    #[test]
+    fn of_pie_group_serialization_uses_bop_pop_without_a_line_fallback() {
+        for kind in [of_pie::Kind::Pie, of_pie::Kind::Bar] {
+            let options =
+                of_pie::Options::new(kind, of_pie::Split::Position(2), 75, 500, true).unwrap();
+            let mut chart = Chart::default();
+            chart.groups[0].kind = GroupKind::OfPie { options };
+            let bytes = serialize_chart(&chart, Limits::default()).unwrap();
+            let read = parse_chart(&bytes, Limits::default()).unwrap();
+            assert_eq!(read.kind(), super::super::Kind::OfPie);
+            assert_eq!(read.groups[0].kind, chart.groups[0].kind);
+            let records = ranges_with(&bytes, Limits::default().max_records_per_chart).unwrap();
+            assert_eq!(records.iter().filter(|r| r.kind == BOP_POP).count(), 1);
+            assert!(!records.iter().any(|r| r.kind == LINE));
         }
     }
 }

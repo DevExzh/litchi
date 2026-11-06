@@ -85,6 +85,11 @@ pub(super) fn validate(chart: &Model, limits: Limits, require_topology: bool) ->
         }
         *seen = true;
         match group.family {
+            Family::OfPie { options } => {
+                if chart.context.kind() == crate::chart::Kind::Graph {
+                    options.validate_graph()?;
+                }
+            },
             Family::Line { flags } | Family::Area { flags } if flags & !7 != 0 => {
                 return invalid_model("group", "line or area reserved flags are nonzero");
             },
