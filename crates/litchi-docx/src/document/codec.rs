@@ -1,10 +1,6 @@
-#![expect(
-    clippy::shadow_reuse,
-    reason = "parser bindings are intentionally refined after validation"
-)]
 //! Bounded document-XML codecs for the main `WordprocessingML` document.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::section::{Section, Sections};
 
 /// Extract sections from the document XML.
@@ -13,22 +9,8 @@ use crate::section::{Section, Sections};
 /// in two places:
 /// 1. Inside `<w:pPr>` (paragraph properties) - defines a section break
 /// 2. At the end of `<w:body>` - defines the last section
-pub(super) fn extract_sections(xml_bytes: &[u8]) -> Result<Sections> {
-    let mut sections_xml = Vec::new();
-    crate::namespace::scan_word_element_ranges(xml_bytes, &[b"sectPr"], |_, start, length| {
-        let start = usize::try_from(start)
-            .map_err(|_source_error| Error::InvalidFormat("section offset overflow".to_string()))?;
-        let length = usize::try_from(length)
-            .map_err(|_source_error| Error::InvalidFormat("section length overflow".to_string()))?;
-        let end = start
-            .checked_add(length)
-            .ok_or_else(|| Error::InvalidFormat("section range overflow".to_string()))?;
-        let raw = xml_bytes.get(start..end).ok_or_else(|| {
-            Error::InvalidFormat("section range is outside document XML".to_string())
-        })?;
-        sections_xml.push(Section::from_xml_bytes(raw.to_vec())?);
-        Ok(())
-    })?;
+pub(super) fn extract_sections(part: &dyn litchi_opc::Part) -> Result<Sections> {
+    let mut sections_xml = crate::section::footnote_columns::active_sections(part)?;
 
     // If no sections were found, create a default section
     if sections_xml.is_empty() {

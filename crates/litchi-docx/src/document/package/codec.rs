@@ -46,8 +46,11 @@ impl Document {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
+    /// Selected sections are detached with their inherited namespace and
+    /// compatibility context. Their XML may be normalized while selecting
+    /// nested compatibility branches; the package's source bytes stay intact.
     pub fn sections(&self) -> Result<Sections> {
-        codec::extract_sections(self.part.xml_bytes())
+        codec::extract_sections(self.part.part())
     }
 
     /// Capture an immutable, source-order section inventory.

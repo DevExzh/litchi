@@ -823,10 +823,7 @@ impl Package {
                     .map_err(|source| writer.document_error(source))?;
                 Cow::Borrowed(data.as_bytes())
             } else {
-                let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
-                capabilities
-                    .understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
-                capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+                let capabilities = visible_document_capabilities();
                 litchi_ooxml_common::mce::process_markup_compatibility(
                     data.as_bytes(),
                     &capabilities,

@@ -20,5 +20,6 @@ mod validation;
 mod tests;
 
 pub use model::Layout;
+pub(crate) use package::active_sections;
 pub use package::parse_part;
 pub use transaction::Snapshot;

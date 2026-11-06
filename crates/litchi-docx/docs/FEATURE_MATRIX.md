@@ -247,3 +247,21 @@ obfuscation key and removing unused Times New Roman faces preserves the
 remaining resources and unrelated body/settings/style parts, with save/reopen
 and exact inverse checks. No font installation, glyph coverage, subset-algorithm,
 licensing-policy or rendering conclusion follows from these tests.
+
+`tests/microsoft_office_native_layout.rs` qualifies the native Word layout
+DOCX/DOTX pair. Main-document visibility retains Word 2012 metadata, exposing
+the collapsed heading and two-column footnote-area setting. Detached section
+views select active source owners and nested compatibility branches, carry
+inherited namespace/`Ignorable` context, and validate the extension without
+inventing a missing requirement. Their XML is a contextual semantic fragment;
+compatibility projection can normalize it, while package source bytes remain
+unchanged. Borrowed paragraph setters retain inherited namespace bindings when
+a changed view detaches, avoiding an unbound or duplicated collapse marker.
+
+Native checks cover detached collapse/footnote-column changes, explicit zero
+versus absence, preservation through source title edits and exact unrelated
+package members/inverse bytes. Public operations check the heading path and
+title edits on file-backed Auto and eager inputs. The same fixtures have two
+exact SEQ Figure/Table fields with cached result 1 and a four-cell AutoCaption
+table. These tests do not calculate fields, enforce UI collapse, lay out notes,
+author package-level extension transactions or claim a fresh Word reopen.

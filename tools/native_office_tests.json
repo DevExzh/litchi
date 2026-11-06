@@ -3459,6 +3459,108 @@
         "ppt",
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_layout",
+      "name": "native_collapsed_heading_and_footnote_columns_reach_public_views",
+      "fixtures": [
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-103",
+        "docx-104"
+      ],
+      "assertions": [
+        "DOCX/DOTX public views expose the native collapsed Heading1 as Enabled, one section with two footnote-area columns, and user footnote1 with its exact marker."
+      ],
+      "scope_limit": "Stored metadata only. Body columns, footnote layout, heading visibility and pagination are not computed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_layout",
+      "name": "native_section_extension_mutations_keep_page_and_note_settings",
+      "fixtures": [
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-103"
+      ],
+      "assertions": [
+        "Detached native section changes footnote columns2->3 by only the value span, preserves page size/margins/body columns, supports removal and explicit zero, and leaves the source package unchanged."
+      ],
+      "scope_limit": "Detached section codec edits only; no package-level footnote-column transaction or native rendering claim."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_layout",
+      "name": "native_borrowed_heading_can_change_collapse_state_without_losing_text_or_style",
+      "fixtures": [
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-104"
+      ],
+      "assertions": [
+        "A borrowed native heading is detached safely for Enabled/Disabled/absent state changes; text and direct paragraph properties stay equal and the source package remains exact."
+      ],
+      "scope_limit": "Detached paragraph setter scope only; no public operations collapsed-property mutation is asserted."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_layout",
+      "name": "native_layout_source_text_edits_preserve_extensions_and_secondary_parts",
+      "fixtures": [
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-103",
+        "docx-104"
+      ],
+      "assertions": [
+        "Native DOCX/DOTX source title edits save/reopen with both extension values retained, every other OPC member exact and inverse/source bytes equal."
+      ],
+      "scope_limit": "Preservation through supported text edits rather than package authoring of the extensions."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_layout",
+      "name": "native_caption_fields_keep_sequence_identifiers_and_cached_results",
+      "fixtures": [
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-113"
+      ],
+      "assertions": [
+        "Exactly two native SEQ Figure/Table instructions, identifiers, absent bookmark, cached1 and false dirty/locked state; all four native AutoCaption table cells are exact."
+      ],
+      "scope_limit": "Stored field output only. No caption metadata-table coverage, automatic sequence calculation or AutoCaption rule execution."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_word_layout_extension_values_survive_public_title_edits",
+      "fixtures": [
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-103",
+        "docx-104"
+      ],
+      "assertions": [
+        "File-backed Auto and byte Eager routes find the exact /body/p[3] heading path, edit title text, reopen Enabled/two-column metadata, retain all other parts and inverse/source bytes."
+      ],
+      "scope_limit": "Public query/text preservation only; the operations layer does not expose collapsed/footnote-column mutation in this test.",
+      "required_features": [
+        "docx"
+      ]
     }
   ]
 }

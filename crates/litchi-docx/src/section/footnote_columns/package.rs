@@ -1,14 +1,6 @@
 #![expect(
-    clippy::redundant_locals,
-    reason = "the local rebinding narrows the parser state"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
-)]
-#![expect(
-    clippy::shadow_same,
-    reason = "the validated binding intentionally replaces its fallible precursor"
 )]
 #![expect(
     clippy::shadow_unrelated,
@@ -46,7 +38,15 @@ const MC_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibi
 /// Returns an error if the operation cannot be completed.
 pub fn parse_part(part: &dyn Part) -> Result<Vec<Snapshot>> {
     let xml = part.blob();
-    let xml = xml;
+    section_ranges(xml)?
+        .into_iter()
+        .map(|(start, end, context)| {
+            Snapshot::from_xml_with_context(section_bytes(xml, start, end)?.to_vec(), context)
+        })
+        .collect()
+}
+
+fn section_ranges(xml: &[u8]) -> Result<Vec<(usize, usize, Context)>> {
     let mut snapshots = Vec::new();
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -121,10 +121,7 @@ pub fn parse_part(part: &dyn Part) -> Result<Vec<Snapshot>> {
                     && element.local_name().as_ref() == b"sectPr"
                 {
                     let context = Context::from_resolver(&resolver, effective_ignorable)?;
-                    let bytes = xml.get(event_start..event_end).ok_or_else(|| {
-                        Error::InvalidFormat("section XML range is outside its part".into())
-                    })?;
-                    snapshots.push(Snapshot::from_xml_with_context(bytes.to_vec(), context)?);
+                    snapshots.push((event_start, event_end, context));
                 }
             },
             Event::End(_) => {
@@ -136,10 +133,7 @@ pub fn parse_part(part: &dyn Part) -> Result<Vec<Snapshot>> {
                     continue;
                 };
                 if target_depth == depth {
-                    let bytes = xml.get(start..event_end).ok_or_else(|| {
-                        Error::InvalidFormat("section XML range is outside its part".into())
-                    })?;
-                    snapshots.push(Snapshot::from_xml_with_context(bytes.to_vec(), context)?);
+                    snapshots.push((start, event_end, context));
                 } else {
                     capture = Some((start, target_depth, context));
                 }
@@ -201,8 +195,133 @@ fn direct_ignorable(
     Ok(value)
 }
 
+/// Build detached section views from selected source owners, retaining the
+/// inherited namespace and Ignorable context that a visibility pass removes.
+pub(crate) fn active_sections(part: &dyn Part) -> Result<Vec<crate::section::Section>> {
+    use litchi_ooxml_common::mce;
+    let xml = part.blob();
+    let ranges = section_ranges(xml)?;
+    let offsets = ranges
+        .iter()
+        .map(|(start, _, _)| {
+            u32::try_from(*start)
+                .map_err(|_| Error::InvalidFormat("section offset exceeds u32".into()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let active = mce::active_offsets(
+        xml,
+        &offsets,
+        &crate::parts::document_part::visible_document_capabilities(),
+        &mce::OffsetLimits::default(),
+    )?
+    .into_iter()
+    .collect::<std::collections::HashSet<_>>();
+    let mut sections = Vec::new();
+    for ((start, end, context), offset) in ranges.into_iter().zip(offsets) {
+        if !active.contains(&offset) {
+            continue;
+        }
+        // Validate the source extension before giving the section a standalone
+        // namespace envelope. This must not invent a missing Ignorable rule.
+        let _ = Snapshot::from_xml_with_context(
+            section_bytes(xml, start, end)?.to_vec(),
+            context.clone(),
+        )?;
+        let fragment =
+            mce::self_contained_fragment(xml, start, end - start, &mce::Limits::default())?;
+        let fragment = with_inherited_ignorable(fragment.as_ref(), context.ignorable())?;
+        let visible = mce::process_markup_compatibility(
+            &fragment,
+            &crate::parts::document_part::visible_document_capabilities(),
+            &mce::Limits::default(),
+        )?;
+        // Preserve the authored fragment when processing only normalizes
+        // namespace spelling. When nested compatibility changes visibility,
+        // use that selected projection and restore its inherited requirement.
+        let projected = visible.report.alternate_content_count != 0
+            || visible.report.ignored_elements != 0
+            || visible.report.unwrapped_elements != 0
+            || visible.report.ignored_attributes != 0;
+        let section = if projected {
+            with_inherited_ignorable(visible.xml.as_ref(), context.ignorable())?
+        } else {
+            fragment
+        };
+        sections.push(crate::section::Section::from_xml_bytes(section)?);
+    }
+    Ok(sections)
+}
+
+fn with_inherited_ignorable(xml: &[u8], ignorable: Option<&str>) -> Result<Vec<u8>> {
+    let Some(ignorable) = ignorable else {
+        return Ok(xml.to_vec());
+    };
+    let mut reader = NsReader::from_reader(xml);
+    let event = reader
+        .read_event()
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    let (Event::Start(root) | Event::Empty(root)) = event else {
+        return Err(Error::InvalidFormat(
+            "section fragment has no element root".into(),
+        ));
+    };
+    if direct_ignorable(&root, reader.resolver(), reader.decoder())?.is_some() {
+        return Ok(xml.to_vec());
+    }
+    let mut prefix = "mc".to_owned();
+    let mut suffix = 0usize;
+    loop {
+        let name = format!("{prefix}:Ignorable");
+        match reader
+            .resolver()
+            .resolve_attribute(quick_xml::name::QName(name.as_bytes()))
+            .0
+        {
+            ResolveResult::Bound(Namespace(ns)) if ns != MC_NAMESPACE => {
+                suffix += 1;
+                prefix = format!("mc{suffix}");
+            },
+            _ => break,
+        }
+    }
+    let name = format!("{prefix}:Ignorable");
+    let bound = matches!(reader.resolver().resolve_attribute(quick_xml::name::QName(name.as_bytes())).0,ResolveResult::Bound(Namespace(ns)) if ns==MC_NAMESPACE);
+    let mut addition = format!(
+        " {prefix}:Ignorable=\"{}\"",
+        quick_xml::escape::escape(ignorable)
+    );
+    if !bound {
+        addition.push_str(&format!(
+            " xmlns:{prefix}=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
+        ));
+    }
+    let mut at = usize::try_from(reader.buffer_position())
+        .map_err(|_| Error::InvalidFormat("section root offset exceeds usize".into()))?
+        - 1;
+    if xml.get(at.wrapping_sub(1)) == Some(&b'/') {
+        at -= 1;
+    }
+    let output_len = xml
+        .len()
+        .checked_add(addition.len())
+        .ok_or_else(|| Error::InvalidFormat("section context size overflows".into()))?;
+    if output_len > super::validation::MAX_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "section context exceeds XML byte limit".into(),
+        ));
+    }
+    let mut result = xml.to_vec();
+    result.splice(at..at, addition.bytes());
+    Ok(result)
+}
+
 fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     origin
         .offset(reader.buffer_position())
         .ok_or_else(|| Error::InvalidFormat("document XML offset overflow".into()))
+}
+
+fn section_bytes(xml: &[u8], start: usize, end: usize) -> Result<&[u8]> {
+    xml.get(start..end)
+        .ok_or_else(|| Error::InvalidFormat("section source range escapes document XML".into()))
 }

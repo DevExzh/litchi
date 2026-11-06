@@ -611,17 +611,19 @@ pub struct DocumentPart<'a> {
 }
 
 /// The markup-compatibility profile a main document is read with: the OOXML
-/// baseline, plus the Word 2010 (`w14`) and Word 2023 UTC-date (`w16du`)
-/// namespaces.
+/// baseline, plus Word 2010 (`w14`), Word 2012 (`w15`) and Word 2023 UTC-date
+/// (`w16du`) namespaces.
 ///
 /// Word 2010 paragraph and drawing extensions are declared ignorable by
 /// producers. Keeping those namespaces understood at the package boundary
 /// lets `w14:paraId`, `w14:textId`, `w14:noSpellErr` and unrelated `w14`
-/// markup survive the visibility pass for typed and opaque readers.
+/// markup survive the visibility pass for typed and opaque readers. Word
+/// 2012 supplies the typed collapsed-heading and footnote-column properties.
 pub(crate) fn visible_document_capabilities() -> litchi_ooxml_common::mce::Capabilities {
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
     capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
     capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+    capabilities.understand_namespace("http://schemas.microsoft.com/office/word/2012/wordml");
     capabilities
 }
 

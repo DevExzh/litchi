@@ -750,3 +750,82 @@ fn native_pptx_transition_edits_preserve_zoom_owners_through_public_modes() {
     }
     assert!(std::fs::read(path).unwrap() == bytes);
 }
+
+#[cfg(feature = "docx")]
+#[test]
+fn native_word_layout_extension_values_survive_public_title_edits() {
+    use litchi_docx::{paragraph::Collapsed, section::footnote_columns::Layout};
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word");
+    for name in ["word-layout-extensions.docx", "word-layout-extensions.dotx"] {
+        let path = root.join(name);
+        let bytes = std::fs::read(&path).unwrap();
+        for mode in [SourceMode::Auto, SourceMode::Eager] {
+            let options = OpenOptions::new().source_mode(mode);
+            let file = if mode == SourceMode::Auto {
+                litchi_ops::open_with(&path, &options).unwrap()
+            } else {
+                litchi_ops::open_bytes_with(bytes.clone(), &options).unwrap()
+            };
+            let found = file
+                .query("p[text=COLLAPSED_HEADING_016]")
+                .unwrap()
+                .collect::<litchi_ops::Result<Vec<_>>>()
+                .unwrap();
+            assert_eq!(found.len(), 1);
+            assert_eq!(found[0].path().to_string(), "/body/p[3]");
+            let commit = file
+                .edit(|edit| edit.set("/body/p[1]/r[1]", props! {"text"=>"LAYOUT_PUBLIC_REVIEWED"}))
+                .unwrap();
+            let after = commit.file().to_bytes().unwrap();
+            let reopened = litchi_ops::open_bytes_with(after.clone(), &options).unwrap();
+            assert_eq!(
+                reopened
+                    .get("/body/p[1]")
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some("LAYOUT_PUBLIC_REVIEWED")
+            );
+            let owner = litchi_docx::Package::from_bytes(&after).unwrap();
+            let document = owner.document().unwrap();
+            assert_eq!(
+                document.paragraphs().unwrap()[2].collapsed().unwrap(),
+                Some(Collapsed::Enabled)
+            );
+            assert_eq!(
+                document
+                    .sections()
+                    .unwrap()
+                    .iter_mut()
+                    .next()
+                    .unwrap()
+                    .footnote_columns()
+                    .unwrap(),
+                Some(Layout::new(2).unwrap())
+            );
+            let original = litchi_docx::Package::from_bytes(&bytes).unwrap();
+            for part in original.opc_package().iter_parts() {
+                if part.partname().as_str() != "/word/document.xml" {
+                    let after = owner.opc_package().get_part(part.partname()).unwrap();
+                    let before = original.opc_package().get_part(part.partname()).unwrap();
+                    assert!(after.blob() == before.blob(), "changed {}", part.partname());
+                }
+            }
+            assert!(
+                commit
+                    .patch()
+                    .inverse()
+                    .apply(commit.file())
+                    .unwrap()
+                    .to_bytes()
+                    .unwrap()
+                    == bytes
+            );
+            assert!(file.to_bytes().unwrap() == bytes);
+        }
+        assert!(std::fs::read(path).unwrap() == bytes);
+    }
+}

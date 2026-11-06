@@ -47,9 +47,14 @@ impl Paragraph {
             ));
         }
         let _parser_admission = self.parser_admission()?;
-        let original = self.xml_bytes();
-        let rewritten = codec::rewrite(original, value)?;
-        if rewritten.as_slice() != original {
+        if self.collapsed()? == value {
+            return Ok(self);
+        }
+        // A paragraph sliced from a main document inherits namespace bindings.
+        // Keep them when the changed view detaches from its source allocation.
+        let original = self.self_contained_xml()?;
+        let rewritten = codec::rewrite(&original, value)?;
+        if rewritten != original {
             self.xml_data = super::super::model::XmlData::Owned(rewritten.into_boxed_slice());
         }
         Ok(self)

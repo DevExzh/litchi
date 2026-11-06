@@ -58,6 +58,9 @@ struct Binding {
 }
 
 impl Context {
+    pub(crate) fn ignorable(&self) -> Option<&str> {
+        self.ignorable.as_deref()
+    }
     /// Capture the currently effective bindings without retaining the reader.
     pub(crate) fn from_resolver(
         resolver: &NamespaceResolver,
