@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "735935442affb66e95f01b8e569cde944a86eca5",
+  "base_commit": "4fa9ec2c567bb580e9f03c73fe8f21c04c0dbd08",
+  "problem": "Native Word source-backed story text and external-hyperlink redaction stopped at blanket markup-compatibility guards. word-text-structure.docx has ordinary root mc:Ignorable metadata: its footnote snapshot refused the namespace declaration and its redaction snapshot refused the attribute, despite the existing shared proof being able to establish source/projection agreement. Native inline revision dispositions and other source editing paths also lacked operation regressions.",
+  "changes": [
+    "Admit source-backed story metadata through the existing bounded MCE source/projection agreement proof after the lexical scan enforces namespace, XML, event and selected-entry limits. The proof builds no projected XML, retains source bytes, and checks cancellation while scanning. The same admission applies to glossary scans.",
+    "Replace the redaction owner blanket Ignorable refusal with the shared proof and an explicit Ignorable allowance. Keep branch directives/elements, unsafe hidden content, external relationship closure and encoded MCE namespace binding guards.",
+    "Add five native regressions for all four direct insertion/deletion dispositions, precise whole-family revision boundaries, hyperlink detachment/redaction and native footnote/endnote/header/comment text publication.",
+    "Add two synthetic regression functions for literal/encoded aliases, preserved opaque metadata and rejected unbound/nested Ignorable, ProcessContent and hidden Word content. Raw redaction closure tests exercise the changed owner directly, independently of the package admission gate.",
+    "Map four additional feature rows to partial assertions; update existing feature notes and correct stale revision-family API names. The original native authoring inventory remains unchanged."
+  ],
+  "verification_scope": {
+    "native_inputs": [
+      "word/word-review-controls.docx",
+      "word/word-tracked-moves.docx",
+      "word/word-text-structure.docx",
+      "word/word-tables-layout.docx"
+    ],
+    "inline_revisions": "Native paragraph 3 contains insertion ID 2 (REVIEW_INSERT_003) and deletion ID 3 (REVIEW_DELETE_003). Accept/accept, reject/reject, accept/reject and reject/accept yield INSERT, DELETE, INSERT+DELETE and empty text respectively. Both original format changes (IDs 0/1) retain Ryker Zhu, 2026-10-15T13:49:00Z and dateUtc 2026-10-15T05:49:00Z. File save/reopen changes only document.xml, with exact bytes outside the selected paragraph. Reopened inverse restores all original member bytes.",
+    "revision_boundary": "The ordinary reader recognizes all four revisions in both review-controls and tracked-moves. The whole-main-story family snapshot and accept-all/reject-all paths intentionally retain their existing InvalidFormat diagnostics for unsupported property changes and paragraph/property move owners. These are asserted exactly, with no staged mutation and byte-exact no-op commits. This does not claim the native full-paragraph moves can be resolved.",
+    "detachment": "Native Reference link uses rId11. The reversible detachment owner reports one wrapper/one retained relationship, removes exactly the opening and closing hyperlink tags, preserves all other document bytes and all package members, and restores original members through a reopened inverse. Repeating detachment is an exact no-op.",
+    "redaction": "The native target is https://example.com/litchi-fixture. The forward redaction removes exactly rId11 and its wrapper while retaining visible text. Only document.xml and document.xml.rels change; remaining relationship attributes are semantically identical and all other members are byte-exact. Empty target selection is an exact no-op. Retained-owner inverse restores exact source bytes, while reopened inverse returns Refused(UnsupportedOperation), as required by the forward-only closure contract. No URL is fetched.",
+    "secondary_stories": "Footnote 1 changes expected value 42 to 43; endnote 1 changes 84 to 85; header 0 changes HEADER_DEFAULT_002 to HEADER_CHANGED_002; comment 5 changes review fixture comment to edited fixture comment. Each native before-value is asserted. Publication changes only its owning part. All bytes outside the owned text slots remain exact, including note definition markers, separator and reply siblings, root compatibility attributes, paragraph/run properties and review metadata. Reopened inverse restores all original members. Native notes have separate leading-space text slots, so whole-paragraph replacement may redistribute text among those slots without changing their surrounding XML.",
+    "compatibility_limits": "The shared proof admits declared-only or valid Ignorable metadata, including opaque markup that contains no understood content. It does not enable MCE branch selection. Story namespace aliases and encoded MCE namespace declarations are decoded and proved; redaction keeps its earlier encoded-binding refusal because its owner scan resolves literal namespace values. Unbound prefix errors, hidden Word content, ProcessContent and unsupported nested Ignorable are tested. XML/source/namespace/depth/event limits and signature/protection/freshness fences remain in force.",
+    "remaining_scope": "No native Word reopen, rendering, field evaluation, remote fetch or macro/control execution occurred. General property revision resolution, complete paragraph moves, footer field editing, general story batches, portable redaction inverses, glossary CRUD, and visual/run-style affinity of whole-paragraph replacements remain outside these assertions."
+  },
+  "results": {
+    "new_native_tests": 5,
+    "new_synthetic_regression_tests": 2,
+    "docx_all_features_passed": 2425,
+    "ops_passed": 202,
+    "facade_passed": 21,
+    "rust_passed": 2648,
+    "rust_ignored": 0,
+    "python_passed": 75,
+    "count_note": "Rust total sums the three final test commands, whose test targets belong to different crates. Earlier focused reruns are excluded. Five new native function identities enter the semantic index; the two synthetic guard functions do not.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 267,
+      "indexed_tests": 360,
+      "reviewed_native_fixture_gaps": 4,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 267,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 42,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 54,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1,
+        "reviewed_native_fixture_gap_requires_followup": 4
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-full.log",
+        "bytes": 245503,
+        "sha256": "acc22507f6ed3e8ec6b0721f9a0aece5760110cae55c0616f849ed464a4744e5"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-full.log 2>&1",
+      "suites": 86,
+      "passed": 2425,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-ops.log",
+        "bytes": 36412,
+        "sha256": "30aa9d341671dbd77bf26d9ef50397864a58ac7947eeb2baaf1c147175a50946"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-ops.log 2>&1",
+      "suites": 20,
+      "passed": 202,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-facade.log",
+        "bytes": 19664,
+        "sha256": "dcebc32ca4136aac06c1f64c6f1ce2f34aea2525f89e7cf5a772a89de82e1046"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-clippy.log",
+        "bytes": 20513,
+        "sha256": "9352a875d6c6770a8909851e560da35b6631e2260e5e84110133783d6002dd08"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-python.log",
+        "bytes": 667,
+        "sha256": "c00317f76a38e51d9a60ce98992b1d941b6ecb5e2bcf9cdac9e1b86682cb78e4"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-source-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-coverage.json",
+        "bytes": 910204,
+        "sha256": "b883b259ef4aae28330ba72b063f14b48079b0a81fdd17fc180a90432cec0e86"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-coverage.json 2>&1"
+    }
+  ],
+  "initial_reproduction": {
+    "artifact": {
+      "file_name": "native-docx-source-first.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-source-first.log",
+      "bytes": 23580,
+      "sha256": "af1c1ddf504e84d3bad92350b0fe6b44503a3d53d95e527bdfaaeb9356c7284b"
+    },
+    "note": "The initial native source-backed run reproduced both UnsupportedContent failures on immutable inputs. Direct inline revision actions and reversible detachment already passed. Later test assumptions were corrected to the existing contract: empty redaction selection is the no-op, native notes have two literal text slots, and an unbound Ignorable prefix returns the package MCE error rather than an unsupported-content refusal."
+  },
+  "additional_checks": [
+    "rustfmt --edition 2024 --check on all six changed Rust files passed.",
+    "git diff --check and git diff --cached --check passed.",
+    "Both AGENTS.md staged size/binaries guards printed nothing before the source commit. No executables were staged.",
+    "Hashes of the three pre-existing untracked files remain unchanged.",
+    "Only pre-existing vendor warnings remain: 77 from zlib-rs and 3 from allsorts; owner Clippy passed with -D warnings."
+  ],
+  "goal_status": "active; 267 of 494 rows have partial assertions. Remaining operation, bounded-evidence, unsupported, UI/external and fixture-gap reviews are still required."
+}
