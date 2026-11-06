@@ -42,13 +42,34 @@ pub(crate) enum SlideMce {
     /// Some strictly inside top-level shape-tree children (record 0303).
     /// Only whole-child removal is admitted, proven on the source bytes.
     Enclosed,
+    /// Compatibility wrappers at the shape-tree boundary. Direct transition
+    /// edits retain this complete source subtree; positional shape edits do
+    /// not have that guarantee and remain refused.
+    ShapeTree,
+}
+
+#[derive(Clone, Copy)]
+enum ShapeMce {
+    Refuse,
+    Enclosed,
+    Tree,
+}
+
+impl ShapeMce {
+    fn admits(self, shape_tree: bool, tree_child: bool, depth: usize) -> bool {
+        match self {
+            Self::Refuse => false,
+            Self::Enclosed => tree_child && depth >= 5,
+            Self::Tree => shape_tree && depth >= 4,
+        }
+    }
 }
 
 /// Admit a source-backed slide for a snapshot, publication or replay.
-/// Source validation refuses only for markup compatibility that
-/// lies strictly inside top-level shape-tree children (an OLE object's
-/// `mc:AlternateContent` under its `p:graphicFrame`) is admitted as
-/// [`SlideMce::Enclosed`]; any other refusal stands.
+/// Compatibility strictly inside top-level shape children is admitted as
+/// [`SlideMce::Enclosed`]. Wrappers at the shape-tree boundary are admitted as
+/// [`SlideMce::ShapeTree`] for direct transition edits. Positional shape edits
+/// retain their guards, and compatibility outside these owners remains refused.
 pub(crate) fn admit_source_with_limits(
     xml: &[u8],
     operation: &'static str,
@@ -69,13 +90,22 @@ pub(crate) fn admit_source_with_limits(
             MCE_BRANCH_SELECTION,
         ));
     }
-    let layout = locate_with(xml, operation, true, transition_limits)?;
+    let (layout, mode) = match locate_with(xml, operation, ShapeMce::Enclosed, transition_limits) {
+        Ok(layout) => (layout, SlideMce::Enclosed),
+        Err(Error::Refused(refusal)) if refusal.reason() == MCE_OUTSIDE_TRANSITION => {
+            let layout = locate_with(xml, operation, ShapeMce::Tree, transition_limits)?;
+            // Admission reads the selected scene under the caller's limits;
+            // transition publication still uses the untouched source bytes.
+            let _ = crate::shape::Scene::read(xml, shape_limits)?;
+            (layout, SlideMce::ShapeTree)
+        },
+        Err(error) => return Err(error),
+    };
     let _ = validate_owner_for_read_with_limits(xml, &layout, transition_limits)?;
-    Ok(SlideMce::Enclosed)
+    Ok(mode)
 }
 
-/// The refusal for an edit other than whole-child removal on an
-/// [`SlideMce::Enclosed`] slide.
+/// The refusal for a shape edit outside its supported compatibility scope.
 pub(crate) fn enclosed_edit_refusal(operation: &'static str) -> Error {
     Error::refused(
         litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -173,9 +203,9 @@ pub(crate) fn read_direct_with_limits(
     xml: &[u8],
     transition_limits: crate::transition::Limits,
 ) -> Result<Option<Transition>> {
-    let layout = locate(xml, "read_transition", transition_limits)?;
+    let layout = locate_with(xml, "read_transition", ShapeMce::Tree, transition_limits)?;
     if layout.transition.is_none() {
-        return Ok(None);
+        return crate::transition::read(xml, transition_limits);
     }
     validate_owner_for_read_with_limits(xml, &layout, transition_limits)
 }
@@ -189,11 +219,13 @@ pub(crate) fn stage_with_limits(
     operation: &'static str,
     protection_limits: crate::presentation_properties::metadata::protection::Limits,
 ) -> Result<(Option<Vec<u8>>, bool)> {
-    let layout = locate(xml, operation, transition_limits)?;
+    let layout = locate_with(xml, operation, ShapeMce::Tree, transition_limits)?;
     let current = if layout.transition.is_some() {
         validate_owner_for_read_with_limits(xml, &layout, transition_limits)?
     } else {
-        None
+        // Validate MCE even when the source has no transition; an insertion
+        // must not silently accept malformed unrelated compatibility markup.
+        crate::transition::read(xml, transition_limits)?
     };
 
     // A value read from this exact source is an authoring no-op, including
@@ -287,7 +319,7 @@ pub(crate) fn stage_with_limits(
         ));
     }
 
-    let published_layout = locate(&output, operation, transition_limits)?;
+    let published_layout = locate_with(&output, operation, ShapeMce::Tree, transition_limits)?;
     let published = if published_layout.transition.is_some() {
         validate_owner_for_read_with_limits(&output, &published_layout, transition_limits)?
     } else {
@@ -496,14 +528,7 @@ fn alternate_fragment(
         .transition
         .as_ref()
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
-    let active = active_transition_range(xml, owner, operation, transition_limits)?;
-    let Some(active) = active else {
-        return Err(Error::refused(
-            litchi_core::edit::RefusalKind::UnsupportedContent,
-            operation,
-            "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
-        ));
-    };
+    let active = active_transition_or_insertion(xml, owner, operation, transition_limits)?;
     let canonical = crate::transition::write(target, transition_limits)?;
     let canonical_range = first_transition_range(&canonical, transition_limits)?;
     let fragment = canonical
@@ -572,7 +597,7 @@ fn alternate_fragment_len(
         .transition
         .as_ref()
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
-    let active = active_transition_range(xml, owner, operation, transition_limits)?.ok_or(Error::refused(litchi_core::edit::RefusalKind::UnsupportedContent, operation, "source-backed transition edit cannot insert into an AlternateContent owner without an active transition"))?;
+    let active = active_transition_or_insertion(xml, owner, operation, transition_limits)?;
     let canonical = crate::transition::write(target, transition_limits)?;
     let canonical_range = first_transition_range(&canonical, transition_limits)?;
     let fragment = canonical
@@ -978,6 +1003,10 @@ fn active_choice(
                 }
             },
             Event::End(_) => {
+                if active.is_empty() && start == active.start {
+                    validate_extension_bindings(&reader, requirements)?;
+                    return checked_active_choice(&stack);
+                }
                 if depth == 0 {
                     return Err(invalid("AlternateContent branch stack has unmatched end"));
                 }
@@ -1100,6 +1129,100 @@ fn requires_attribute_range(xml: &[u8], start: usize, end: usize) -> Result<Rang
 /// Find the transition selected by the same bounded MCE processor used for
 /// typed reads.  `active_offsets` preserves source coordinates while it
 /// selects a branch, avoiding a lossy reserialization of the owner.
+/// Reuse an existing transition span, or the end of the selected empty
+/// branch left by `clear_alternate_fragment`. Only comments, processing
+/// instructions and whitespace may remain in an insertion branch.
+fn active_transition_or_insertion(
+    xml: &[u8],
+    owner: &Range<usize>,
+    operation: &'static str,
+    limits: crate::transition::Limits,
+) -> Result<Range<usize>> {
+    if let Some(active) = active_transition_range(xml, owner, operation, limits)? {
+        return Ok(active);
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut branch: Option<bool> = None;
+    let mut offsets = Vec::new();
+    loop {
+        let start = position(&reader, origin)?;
+        if start >= owner.end {
+            break;
+        }
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                nodes = add_node(nodes, limits)?;
+                depth = enter_depth(depth, limits)?;
+                if depth == 3
+                    && start > owner.start
+                    && is_markup_element(&namespace)
+                    && matches!(element.local_name().as_ref(), b"Choice" | b"Fallback")
+                {
+                    branch = Some(true);
+                } else if depth > 3 && branch.is_some() {
+                    branch = Some(false);
+                }
+            },
+            Event::Empty(_) => {
+                nodes = add_node(nodes, limits)?;
+                let child_depth = enter_depth(depth, limits)?;
+                if child_depth > 3 && branch.is_some() {
+                    branch = Some(false);
+                }
+            },
+            Event::Text(text) if branch.is_some() => {
+                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    branch = Some(false);
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if branch.is_some() => branch = Some(false),
+            Event::End(_) => {
+                if depth == 3 {
+                    if branch == Some(true) {
+                        offsets.push(
+                            u32::try_from(start)
+                                .map_err(|_| invalid("transition branch offset exceeds u32"))?,
+                        );
+                    }
+                    branch = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("transition branch nesting is invalid"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    let mut capabilities = litchi_ooxml_common::mce::Capabilities::ooxml_baseline();
+    capabilities
+        .understand_namespace("http://schemas.microsoft.com/office/powerpoint/2010/main")
+        .understand_namespace("http://schemas.microsoft.com/office/powerpoint/2012/main")
+        .understand_namespace("http://schemas.microsoft.com/office/powerpoint/2015/09/main");
+    let selected = litchi_ooxml_common::mce::active_offsets(
+        xml,
+        &offsets,
+        &capabilities,
+        &transition_offset_limits(limits),
+    )?;
+    let [offset] = selected.as_slice() else {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            operation,
+            "transition insertion requires one selected empty paired compatibility branch",
+        ));
+    };
+    let offset =
+        usize::try_from(*offset).map_err(|_| invalid("transition branch offset exceeds usize"))?;
+    Ok(offset..offset)
+}
+
 fn active_transition_range(
     xml: &[u8],
     owner: &Range<usize>,
@@ -1160,27 +1283,27 @@ fn transition_start_offsets(
             maximum: transition_limits.input_bytes(),
         });
     }
-    let owner_bytes = xml
-        .get(owner.clone())
+    xml.get(owner.clone())
         .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?;
-    let mut reader = NsReader::from_reader(owner_bytes);
-    let origin = ReaderOrigin::of(owner_bytes);
+    // The transition can inherit any PML prefix from the slide root. A
+    // detached owner loses that binding and only happened to work for `p`.
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut offsets = Vec::new();
     let mut nodes = 0usize;
     loop {
-        let local_start = position(&reader, origin)?;
+        let start = position(&reader, origin)?;
+        if start >= owner.end {
+            break;
+        }
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 nodes = add_node(nodes, transition_limits)?;
-                if is_pml_element(&namespace, element.name(), b"transition") {
-                    let absolute = owner
-                        .start
-                        .checked_add(local_start)
-                        .ok_or_else(|| invalid("transition offset overflow"))?;
-                    offsets.push(absolute);
+                if start >= owner.start && is_pml(&namespace, element.name(), b"transition") {
+                    offsets.push(start);
                     if offsets.len() > transition_limits.nodes() {
                         return Err(Error::Limit {
                             kind: crate::opened::LimitKind::Codec(
@@ -1656,15 +1779,16 @@ fn locate(
     operation: &'static str,
     transition_limits: crate::transition::Limits,
 ) -> Result<Layout> {
-    locate_with(xml, operation, false, transition_limits)
+    locate_with(xml, operation, ShapeMce::Refuse, transition_limits)
 }
 
-/// [`locate`], optionally admitting markup compatibility strictly inside a
-/// top-level shape-tree child (`p:sld/p:cSld/p:spTree/*/…`, record 0303).
+/// [`locate`] with an explicit policy for compatibility inside the shape tree.
+/// Transition splices can retain that complete subtree; shape edits need the
+/// stricter direct-child boundary (record 0303).
 fn locate_with(
     xml: &[u8],
     operation: &'static str,
-    enclosed: bool,
+    shape_mce: ShapeMce,
     transition_limits: crate::transition::Limits,
 ) -> Result<Layout> {
     if xml.len() > transition_limits.input_bytes() {
@@ -1744,7 +1868,7 @@ fn locate_with(
                     }
                 } else if is_markup_element(&namespace)
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
-                    && !(enclosed && tree_child && depth >= 5)
+                    && !shape_mce.admits(shape_tree, tree_child, depth)
                 {
                     return Err(Error::refused(
                         litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1792,7 +1916,7 @@ fn locate_with(
                     }
                 } else if is_markup_element(&namespace)
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
-                    && !(enclosed && tree_child && event_depth >= 5)
+                    && !shape_mce.admits(shape_tree, tree_child, event_depth)
                 {
                     return Err(Error::refused(
                         litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -2358,7 +2482,7 @@ mod tests {
         )
         .expect("tight profile");
         assert!(matches!(
-            super::locate_with(xml.as_bytes(), "test", false, tight),
+            super::locate_with(xml.as_bytes(), "test", super::ShapeMce::Refuse, tight),
             Err(crate::Error::Limit {
                 kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
                 observed: 4,
@@ -2372,7 +2496,7 @@ mod tests {
             defaults.retained_bytes(),
         )
         .expect("larger profile");
-        super::locate_with(xml.as_bytes(), "test", false, larger)
+        super::locate_with(xml.as_bytes(), "test", super::ShapeMce::Refuse, larger)
             .expect("larger finite profile remains valid");
     }
 }

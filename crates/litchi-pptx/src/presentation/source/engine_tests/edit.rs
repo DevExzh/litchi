@@ -1083,7 +1083,17 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
     let mce = fixture("", mce_slide_xml(), false);
     let editor =
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
-    assert!(matches!(editor.edit_slide(0), Err(Error::Refused(_))));
+    let mut edit = editor.edit_slide(0).expect("transition-only MCE snapshot");
+    assert!(matches!(
+        edit.set_shape_text("Title", "after"),
+        Err(Error::Refused(_))
+    ));
+    assert!(
+        edit.set_transition(&Transition::new(crate::transition::Kind::Fade {
+            black: None
+        }))
+        .unwrap()
+    );
 
     let strict =
         fixture_with_presentation_namespace(STRICT_PML, "", shape_xml(STRICT_PML, "before"), false);

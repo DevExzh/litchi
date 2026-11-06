@@ -195,8 +195,8 @@ Century Gothic fonts and owning theme relationship/hash. Its transition checks
 cover Push/Up/Medium with 3000ms automatic advance, Morph/ByObject with a saved
 1500ms extension duration, absent transitions and semantic fragment write/read.
 The Push part has no explicit duration despite the historical UI observation.
-These tests do not qualify every transition extension, source transition edits
-beside unrelated Zoom MCE, theme overrides or native playback.
+These read/fragment tests do not qualify every transition extension, theme
+overrides or native playback. Native source edits are qualified separately below.
 
 `tests/microsoft_office_native_visual.rs` checks all twelve native table cells,
 grid widths, row heights and style switches. Column-width reads retain the
@@ -239,3 +239,28 @@ validation. Removing the baseline's active anchor collects its orphan InkML
 payload and retains the inactive picture fallback; inverse restores the source.
 Whole visual-object deletion, replay-target cleanup and shared-payload removal
 remain open.
+
+`tests/microsoft_office_native_transitions.rs` qualifies direct transition
+edits beside native Zoom MCE. A separate source admission mode retains the
+complete shape tree while allowing transition splices; source positional shape
+edits and removal keep their guards. Creating, replacing, clearing and
+reinserting transitions after reopen preserves shape XML, animation timing,
+inactive transition fallbacks and unrelated package members. Inherited PML
+namespace aliases remain resolvable when locating the active transition.
+
+The variant sweep applies transitions to all 52 slides in the fourteen
+unencrypted native presentation, template, slideshow and macro-enabled files
+through both eager and source-backed APIs. Macro payloads, media, embedded
+workbooks and other resources remain inert and byte exact. Source overlays
+retain original archive bytes for no-op/inverse; eager publication follows its
+existing ZIP recompression and compact changed-XML declaration policy. Public
+operations cover atomic Push/Morph updates and clear/reinsert in both modes.
+Durable transition-patch wire grammar, general shape-MCE mutation and playback
+are not promoted by these tests.
+
+Zoom discovery now respects default namespace resets (`xmlns=""`), including
+the native table and equation slides, while named-prefix undeclarations remain
+refused. Its presentation-structure dependency accepts all six container MIME
+types; native catalog tests bind exact IDs, part names and relationships and
+reject a non-presentation main-part content type. Extended guides and variant
+master/layout authoring need separate qualification.

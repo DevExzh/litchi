@@ -258,3 +258,16 @@ fn package_context_resolves_targets_and_rejects_dangling_image_relationships() {
         .expect("stage bad relationship");
     assert!(package.put_zooms(0, owner).is_err());
 }
+
+#[test]
+fn default_namespace_reset_keeps_zoom_source_and_named_prefix_guards() {
+    let xml=owner_text().replacen("<p:nvGrpSpPr/>",r#"<p:nvGrpSpPr><foreign xmlns="urn:outer"><child xmlns=""><leaf/></child><tail/></foreign></p:nvGrpSpPr>"#,1);
+    let owner = Owner::read(xml.as_bytes()).unwrap();
+    assert_eq!(owner.len(), 3);
+    assert_eq!(owner.to_xml().unwrap(), xml.as_bytes());
+    assert!(matches!(owner.get(0), Some(Zoom::Section(_))));
+    assert!(matches!(owner.get(1), Some(Zoom::Slide(_))));
+    assert!(matches!(owner.get(2), Some(Zoom::Summary(_))));
+    let invalid = xml.replace("xmlns=\"\"", "xmlns:bad=\"\"");
+    assert!(Owner::read(invalid.as_bytes()).is_err());
+}

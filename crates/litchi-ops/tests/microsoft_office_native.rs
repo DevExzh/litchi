@@ -636,3 +636,117 @@ fn native_pptx_table_queries_and_cell_row_edits_preserve_other_slides() {
     }
     assert_eq!(std::fs::read(path).unwrap(), bytes);
 }
+
+#[cfg(feature = "pptx")]
+#[test]
+fn native_pptx_transition_edits_preserve_zoom_owners_through_public_modes() {
+    use litchi_pptx::transition::{self, Kind, Morph, Side};
+    let bytes = include_bytes!(
+        "../../../test-data/microsoft-office/powerpoint/powerpoint-master-motion.pptx"
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("native.pptx");
+    std::fs::write(&path, bytes).unwrap();
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = if mode == SourceMode::Auto {
+            litchi_ops::open_with(&path, &options).unwrap()
+        } else {
+            litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap()
+        };
+        let committed = source
+            .edit(|edit| {
+                edit.set("/slide[2]", props! {"transition"=>"push-left-1750"})?;
+                edit.set("/slide[3]", props! {"transition"=>"morph-byword-1750"})
+            })
+            .unwrap();
+        let after = committed.file().to_bytes().unwrap();
+        let owner = litchi_pptx::Package::from_bytes(&after).unwrap();
+        let p = owner.presentation().unwrap();
+        let slides = p.slides().unwrap();
+        for (index, kind) in [(1, Kind::Push(Side::Left)), (2, Kind::Morph(Morph::ByWord))] {
+            let value = transition::read(
+                slides[index].part().part().blob(),
+                transition::Limits::DEFAULT,
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(value.kind(), &kind);
+            assert_eq!(value.duration().unwrap().get(), 1750);
+            let original = litchi_pptx::Package::from_bytes(bytes).unwrap();
+            let q = original.presentation().unwrap();
+            let original = q.slides().unwrap();
+            let a = original[index].zooms().unwrap();
+            let b = slides[index].zooms().unwrap();
+            assert!(a.iter().eq(b.iter()));
+        }
+        let cleared = committed
+            .file()
+            .set("/slide[3]", props! {"transition"=>"none"})
+            .unwrap();
+        let cleared_owner = litchi_pptx::Package::from_bytes(&cleared.to_bytes().unwrap()).unwrap();
+        assert!(
+            transition::read(
+                cleared_owner.presentation().unwrap().slides().unwrap()[2]
+                    .part()
+                    .part()
+                    .blob(),
+                transition::Limits::DEFAULT
+            )
+            .unwrap()
+            .is_none()
+        );
+        let restored = cleared
+            .set("/slide[3]", props! {"transition"=>"morph-byword-1750"})
+            .unwrap();
+        let reopened = litchi_ops::open_bytes_with(restored.to_bytes().unwrap(), &options).unwrap();
+        let restored_owner =
+            litchi_pptx::Package::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let restored_value = transition::read(
+            restored_owner.presentation().unwrap().slides().unwrap()[2]
+                .part()
+                .part()
+                .blob(),
+            transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(restored_value.kind(), &Kind::Morph(Morph::ByWord));
+        assert_eq!(restored_value.duration().unwrap().get(), 1750);
+        let original_members = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+            bytes.to_vec(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
+        let changed_members = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+            after,
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            original_members.member_names().unwrap(),
+            changed_members.member_names().unwrap()
+        );
+        for name in original_members.member_names().unwrap() {
+            if !["ppt/slides/slide2.xml", "ppt/slides/slide3.xml"].contains(&name.as_str()) {
+                assert!(
+                    original_members.read_member(&name).unwrap()
+                        == changed_members.read_member(&name).unwrap(),
+                    "changed {name}"
+                );
+            }
+        }
+        assert!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == bytes
+        );
+        assert!(source.to_bytes().unwrap() == bytes);
+    }
+    assert!(std::fs::read(path).unwrap() == bytes);
+}

@@ -444,6 +444,13 @@ fn apply_namespace_declarations(
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
         if value.is_empty() {
+            if name == b"xmlns" {
+                // An empty default declaration removes the inherited default
+                // namespace for this subtree. Named prefixes stay bound.
+                let previous = namespaces.remove("");
+                changes.push((prefix, previous));
+                continue;
+            }
             return Err(Error::Invalid("zoom namespace URI cannot be empty".into()));
         }
         changes.push((prefix.clone(), namespaces.insert(prefix, value)));

@@ -15,6 +15,7 @@ use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::OpcPackage;
+use litchi_opc::constants::content_type as ct;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -1708,8 +1709,12 @@ fn require_permutation(expected: &[u32], actual: &[u32], what: &str) -> Result<(
 fn require_presentation(content_type: &str) -> Result<()> {
     if matches!(
         content_type,
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
-            | "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml"
+        ct::PML_PRESENTATION_MAIN
+            | ct::PML_PRES_MACRO_MAIN
+            | ct::PML_SLIDESHOW_MAIN
+            | ct::PML_TEMPLATE_MAIN
+            | ct::PML_SLIDESHOW_MACRO_MAIN
+            | ct::PML_TEMPLATE_MACRO_MAIN
     ) {
         Ok(())
     } else {

@@ -3077,6 +3077,137 @@
         "Public removal clears the active ink annotation and rId2, collects only ink1.xml, keeps the inactive PNG fallback and all unrelated package members, and inverses to exact source bytes."
       ],
       "scope_limit": "Baseline ink without replay timing only. The inactive raster fallback is intentionally retained; whole visual-object deletion, replay-target cleanup and shared-payload removal remain unqualified."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_transitions",
+      "name": "native_eager_transition_crud_preserves_zoom_shapes_timing_and_other_members",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-424",
+        "pptx-425",
+        "pptx-426"
+      ],
+      "assertions": [
+        "Eager no-op/add/replace/clear/reinsert after reopen for slides1-3, exact requested effects/duration/advance/click values, source XML shapes/timing and inactive transition fallbacks preserved, all unrelated members exact and inverse restores the eager source representation."
+      ],
+      "scope_limit": "Direct transition ownership only. Eager ZIP recompression and the changed XML declaration CRLF follow the existing compact serializer contract; no rendering or playback."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_transitions",
+      "name": "native_source_transition_edits_match_eager_semantics_and_inverse",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-424",
+        "pptx-425",
+        "pptx-426"
+      ],
+      "assertions": [
+        "Source-backed reads and add/replace/clear/reinsert after reopen match eager semantics, preserve Zoom/shape/timing/fallback bytes and other members, retain exact native source/inverse bytes and refuse stale inverse application."
+      ],
+      "scope_limit": "In-memory source patch replay is qualified; durable wire grammar and broader shape-MCE edits are separate scopes."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_transitions",
+      "name": "native_zoom_transition_admission_keeps_shape_edit_guards_and_failure_atomicity",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-424"
+      ],
+      "assertions": [
+        "Source shape text/removal stay typed-refused while direct transitions are admitted. Missing Requires, nested transition elements and MCE outside the shape tree are refused; immutable sources and source-mode no-op commits remain exact."
+      ],
+      "scope_limit": "Malformed MCE cannot form an eager commit snapshot; this is explicitly checked instead of requiring publication of invalid source XML."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_transitions",
+      "name": "native_morph_namespace_alias_variant_can_clear_and_restore_its_active_branch",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-426"
+      ],
+      "assertions": [
+        "An in-memory lexical q-prefix variant of native Morph clears and restores its selected branch using the original inherited PresentationML namespace context."
+      ],
+      "scope_limit": "The tracked fixture is unchanged; the alias variant is a namespace regression, not a separately native-authored fixture."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_transitions",
+      "name": "native_transition_edits_preserve_all_unencrypted_variants_and_resources",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx"
+      ],
+      "feature_rows": [
+        "pptx-424"
+      ],
+      "assertions": [
+        "All52 slides across14 native PPTX/POTX/PPSX/PPTM/POTM/PPSM files accept a typed transition through eager and source routes. Reopened semantics, every unrelated package member, shape/Zoom/timing data and inverse/source bytes are asserted."
+      ],
+      "scope_limit": "Stored transitions and inert resource preservation only. No macro/media execution, external resolution, playback or fresh Office acceptance."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_transitions",
+      "name": "native_presentation_structure_variants_keep_the_saved_slide_catalog",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm"
+      ],
+      "feature_rows": [
+        "pptx-406"
+      ],
+      "assertions": [
+        "All six native container kinds expose exact saved slide IDs256..260 or256, ordered part names and internal relationship owners. A Word main-part content-type spoof is refused."
+      ],
+      "scope_limit": "Slide catalog portion of the structure family only; extended guides and variant-specific master/layout authoring remain unqualified."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_pptx_transition_edits_preserve_zoom_owners_through_public_modes",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-424",
+        "pptx-426"
+      ],
+      "assertions": [
+        "File-backed Auto and byte Eager public transactions atomically set Push/Left and Morph/ByWord at1750ms; clear/reinsert reopens with exact semantics, Zoom values and unrelated members stay exact, and inverse/source bytes match."
+      ],
+      "scope_limit": "Public transition shorthand and in-memory inverse only; no playback or new durable transition-patch grammar.",
+      "required_features": [
+        "pptx"
+      ]
     }
   ]
 }

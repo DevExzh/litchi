@@ -234,6 +234,9 @@ pub(crate) fn validate_enclosed_removal_pair_with_limits(
     if before_mce == SlideMce::Plain && after_mce == SlideMce::Plain {
         return Ok(false);
     }
+    if before_mce == SlideMce::ShapeTree || after_mce == SlideMce::ShapeTree {
+        return Err(enclosed_edit_refusal(operation));
+    }
     let (larger, smaller) = if before.len() >= after.len() {
         (before, after)
     } else {

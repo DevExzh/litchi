@@ -3000,6 +3000,11 @@ impl SourceBackedSlideEdit {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<bool> {
         self.check_execution()?;
+        if self.source.mce == crate::presentation::transition::SlideMce::ShapeTree {
+            return Err(crate::presentation::transition::enclosed_edit_refusal(
+                "remove_shape",
+            ));
+        }
         if self.operation_used {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedOperation,
@@ -3433,9 +3438,9 @@ impl SourceBackedSlideEdit {
         check_execution_context(self.context.as_ref())
     }
 
-    /// Markup compatibility enclosed in shape children admits only whole
-    /// top-level shape removal; every other edit keeps the guard
-    /// (record 0303).
+    /// Shape edits retain the compatibility guard. The separate transition
+    /// path preserves the entire shape tree, while enclosed whole-child
+    /// removal keeps its dedicated source proof (record 0303).
     fn refuse_enclosed(&self, operation: &'static str) -> Result<()> {
         if self.source.mce == crate::presentation::transition::SlideMce::Plain {
             Ok(())
