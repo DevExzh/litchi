@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "161dbff7f382243a40334a22206587c74d189ef4",
+  "base_commit": "86e9fd1f691cdcd0c6eb312df9942e316422cc33",
+  "problem": "Native Word font resources/declarations lacked semantic and mutation assertions across DOCX, DOC and RTF. The RTF ftruetype spelling was ignored, yielding Nil declarations. Its native run edit then failed because raw transport hex bytes were compared to decoded semantic text, and the edited token consumed a physical carriage return outside its visible text.",
+  "changes": [
+    "Accept native Word ftruetype as an import alias for the existing TrueType declaration; canonical writing continues to emit fttruetype. Duplicate-format checks apply to both spellings and payload presence stays independent of format.",
+    "Share document/group encoding-control interpretation between parser and ordinary source-run mapping. Decode lexical byte transport using the semantic run font explicit codepage, charset and scoped document fallback before matching its text span. Existing source-axis and dependent-content guards remain unchanged.",
+    "Use the same byte-based intermediate decoding ceiling as the parser rather than counting UTF-8 transport chars as multiple source bytes. Preserve physical leading/trailing CR/LF outside visible text when calculating edit spans.",
+    "Add three DOCX font tests, two DOC font tests, one RTF font test and one public facade test, plus four focused alias/charset/budget/line-break regressions. Add sha2 as a DOC test-only dependency for independent legacy block identity checks."
+  ],
+  "verification_scope": {
+    "docx": "Full/save-subset native packages expose three exact names and six/two face styles, GUID keys, stored payload lengths/SHA-256, and clear sfnt SHA-256 after deobfuscation. Reobfuscation restores exact stored bytes; font-family no-op and package reopen are exact.",
+    "subset": "Both Aptos clear programs are identical across full/save-subset variants. w:saveSubsetFonts is a global saved preference, separate from absent per-face w:subsetted. No general subsetting or licensing interpretation is inferred.",
+    "docx_edits": "One Aptos Regular face is replaced with the same clear program under a fresh key; save/reopen validates requested stored bytes and clear hash while all other fonts/body/settings/style members stay exact. Removing Times New Roman collects exactly font3/4/5 and retains other resources. Inverses restore source bytes.",
+    "doc": "Exact six SttbfFfn names, two SttbTtmbd offsets3630/573197, font indices5/3, false bold/italic and absent subset order, plus DOP embedding flag. Source-bounded Cambria Math/Aptos blocks have exact569567/99845 lengths and recorded hashes. Body editing preserves descriptions and blocks through reopen/inverse; legacy font bytes stay opaque.",
+    "rtf": "Five paragraphs,91 sparse font definitions, ten empty TrueType fontemb declarations with exact names/indices/theme roles, absent file/data fields, and Cambria Math without fontemb. Canonical writing retains the complete table and text. Native title editing preserves table/symbols and every source byte outside the edited visible span, including physical CRLF, with exact inverse.",
+    "facade": "Public native RTF Aptos run property and title mutation reopen with unchanged remaining text, font table and empty datastore; source and inverse bytes are exact.",
+    "focused": "Standard/native font spellings with absent and inline payloads, canonical spelling and duplicate rejection; Windows1252/Greek/CP932 precedence/Cyrillic/DOS437/DOS850/Macintosh decoding; group encoding restoration beside Unicode;10,000-byte high-character decoding budget parity; CRLF/LF/CR text-edge preservation.",
+    "verification": "Full DOC/DOCX and RTF owner suites, affected Word/RTF operations and eight-format facade suites pass. Clippy, formatting, corpus integrity and CI configuration checks pass. All newly exposed supported behavior defects have permanent regressions.",
+    "environment": "All139 native files/four import assets and three pre-existing untracked files retain their bytes. No font installation, glyph rendering, legal licensing determination, macro execution, external resolution or fresh Microsoft Word reopen occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 6552,
+    "rust_ignored": 3,
+    "python_passed": 72,
+    "new_native_docx_tests": 3,
+    "new_native_doc_tests": 2,
+    "new_native_rtf_tests": 1,
+    "new_native_facade_tests": 1,
+    "new_focused_tests": 4,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 190,
+      "indexed_tests": 193,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 190,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 48,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 66,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "ignored_tests": [
+    "package::tests::test_invalid_file (pre-existing DOC external-fixture test)",
+    "package::tests::test_open_package (pre-existing DOC external-fixture test)",
+    "libreoffice_probe_files (pre-existing operations utility writing external DOC_WRITE_DIR probe files)"
+  ],
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-docx --features litchi-docx/encryption,litchi-docx/vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-word-owners.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-word-owners.log",
+        "bytes": 370065,
+        "sha256": "4df15364fe10c20581cfb69d440327da31a2a087fb54c565f78958ebb78e77e1"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-docx --features litchi-docx/encryption,litchi-docx/vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-fonts-word-owners.log 2>&1",
+      "suites": 131,
+      "passed": 3860,
+      "failed": 0,
+      "ignored": 2
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-rtf-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-rtf-owner-final.log",
+        "bytes": 158751,
+        "sha256": "405979c812a3f7f386eedf60790d4f5b1759c35d0965073b9f38082e3bd12a5a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-fonts-rtf-owner-final.log 2>&1",
+      "suites": 186,
+      "passed": 1567,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,rtf,encryption --lib --test 'doc_*' --test 'docx_*' --test 'rtf_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-ops-final.log",
+        "bytes": 101877,
+        "sha256": "c0d5482f23db8c20e2792d42b381c621e6737c0f88c0727519a942fec95cc8ac"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,rtf,encryption --lib --test 'doc_*' --test 'docx_*' --test 'rtf_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-fonts-ops-final.log 2>&1",
+      "suites": 43,
+      "passed": 1013,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-facade-final.log",
+        "bytes": 32751,
+        "sha256": "7684360d7176fdff1d16b33b303078a59dac4c622036d3c18517e8cd09bf4168"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/word-fonts-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 112,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf -p litchi-doc -p litchi-docx -p litchi-ops -p litchi --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/doc,litchi-ops/docx,litchi-ops/rtf,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption,litchi/formula,litchi/markdown --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-clippy-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-clippy-first.log",
+        "bytes": 17568,
+        "sha256": "4bd2637b2beed6cf50ba7a941a62424c24d10e27474dd042fcb7afd16ede1b88"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf -p litchi-doc -p litchi-docx -p litchi-ops -p litchi --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/doc,litchi-ops/docx,litchi-ops/rtf,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption,litchi/formula,litchi/markdown --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/word-fonts-clippy-first.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-python-final.log",
+        "bytes": 664,
+        "sha256": "34986e3b1f0fbbc393d94c935bc3032937f1a25c0203d396c4ae459bfb200fc2"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/word-fonts-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/word-fonts-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-coverage-final.json",
+        "bytes": 714608,
+        "sha256": "be6ee826ca86c7d278dfccea85d1bdf2c91be31e205c7d5e4fb9f89a63bd261c"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/word-fonts-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-doc/tests/microsoft_office_native.rs crates/litchi-docx/tests/microsoft_office_native_fonts.rs crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs crates/litchi-rtf/src/codec/parser/codec/controls.rs crates/litchi-rtf/src/codec/parser/codec/mod.rs crates/litchi-rtf/src/codec/parser/mod.rs crates/litchi-rtf/src/edit.rs crates/litchi-rtf/tests/embedded_fonts.rs crates/litchi-rtf/tests/microsoft_office_native.rs crates/litchi-rtf/tests/run_text_native.rs crates/litchi/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-fonts-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-doc/tests/microsoft_office_native.rs crates/litchi-docx/tests/microsoft_office_native_fonts.rs crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs crates/litchi-rtf/src/codec/parser/codec/controls.rs crates/litchi-rtf/src/codec/parser/codec/mod.rs crates/litchi-rtf/src/codec/parser/mod.rs crates/litchi-rtf/src/edit.rs crates/litchi-rtf/tests/embedded_fonts.rs crates/litchi-rtf/tests/microsoft_office_native.rs crates/litchi-rtf/tests/run_text_native.rs crates/litchi/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/word-fonts-format-final.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "word-fonts-rtf-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-rtf-first.log",
+        "bytes": 1044,
+        "sha256": "d4edd1bd9ad28b109d5d63fe94320faf8950e346f0e6dbaa884ffc46ecef2e78"
+      },
+      "scope": "The native font regression observes EmbeddedFontFormat::Nil instead of TrueType for native ftruetype declarations.",
+      "regenerate": "Copy native_font_declarations_keep_empty_payloads_and_sparse_theme_indices from source_commit into a scratch checkout of base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native native_font_declarations_keep_empty_payloads_and_sparse_theme_indices"
+    },
+    {
+      "artifact": {
+        "file_name": "word-fonts-rtf-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-rtf-after.log",
+        "bytes": 1157,
+        "sha256": "59746d31f2bd8cdbc87b54b7f753df7588141b5c4387ce58c1ea1cfcf2673c77"
+      },
+      "scope": "After recognizing the native format spelling, title edit publication refuses because encoded transport text does not match the semantic run axis.",
+      "regenerate": "Apply only the ftruetype dispatch alias plus the native test to base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native native_font_declarations_keep_empty_payloads_and_sparse_theme_indices"
+    },
+    {
+      "artifact": {
+        "file_name": "word-fonts-rtf-lexical-check.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-rtf-lexical-check.log",
+        "bytes": 1247,
+        "sha256": "c1764db9eb13e03f08b5fb9bdb7963c321382d3a6074ba657c0845266deb2491"
+      },
+      "scope": "Intermediate charset-aware source matching passes the semantic edit but loses the physical CR before LF at the replaced token boundary.",
+      "regenerate": "In a scratch checkout of source_commit, restore only the old Text visible_span calculation in ordinary_run_source_map, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native native_font_declarations_keep_empty_payloads_and_sparse_theme_indices"
+    },
+    {
+      "artifact": {
+        "file_name": "word-fonts-rtf-budget-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-fonts-rtf-budget-before.log",
+        "bytes": 1108,
+        "sha256": "9f8806fd2f46a294c1feb23ee30a0ab26782ad1dc8be94cce0ad6fb99b4ba083"
+      },
+      "scope": "An intermediate decoder over-counted two-byte UTF-8 transport chars and refused a10,000-byte escape sequence the parser admits. The final helper uses actual transport-byte length.",
+      "regenerate": "In a scratch checkout of source_commit, calculate decode_source_run worst_case from text.len instead of bytes.len, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test run_text_native source_run_decoding_uses_the_same_byte_budget_as_the_parser"
+    }
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/word/embedded-fonts-inspection.json",
+    "crates/litchi-rtf/src/codec/parser/codec/content.rs",
+    "crates/litchi-rtf/src/codec/lexer/codec/scanner/text.rs"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_fonts-b6914f3e623959f4",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_fonts-b6914f3e623959f4",
+      "bytes": 13249528,
+      "sha256": "34729cb1d3e3868e87424244458733f54c1c9ff10f736d733a3c0bd5f14cf9bf",
+      "source_commit": "161dbff7f382243a40334a22206587c74d189ef4",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-docx --features litchi-docx/encryption,litchi-docx/vba-inspection --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-3a6e3bc65c2d553b",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-3a6e3bc65c2d553b",
+      "bytes": 13796424,
+      "sha256": "ff921af1822bd49b80869d05615fb3605565c7173a1993a728d2dde22cb9800c",
+      "source_commit": "161dbff7f382243a40334a22206587c74d189ef4",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-14834ce69a321400",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-14834ce69a321400",
+      "bytes": 145033248,
+      "sha256": "afa8d88d21d3d38b04b1257a34521e053302da7ae698f250f2e300c54955db91",
+      "source_commit": "161dbff7f382243a40334a22206587c74d189ef4",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1"
+    }
+  ],
+  "remaining_scope": [
+    "The full eight-format goal remains active.139/139 fixtures are indexed, but190/494 rows have partial assertions across193 tests; no row is declared complete by the index.",
+    "All252 historical pending statuses remain unchanged. Unasserted gaps:66 native-evidence semantic rows,63 operation rows,48 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "Font registration, glyph shaping/rendering/substitution and general native subsetting are not qualified. Legacy DOC font blocks are opaque; native RTF declarations contain no actual program payload.",
+    "Word native drawing/OLE/SVG/mail-merge/field/navigation metadata, remaining DOC/RTF stories/layout policies, all remaining Excel/PowerPoint scopes and external/UI reconciliation remain active."
+  ]
+}
