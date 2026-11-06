@@ -12,6 +12,208 @@ fn native(name: &str) -> Package {
 }
 
 #[test]
+fn native_equations_keep_shape_owners_formula_structure_and_fallback_parts() {
+    let package = native("powerpoint-fonts-math-handout.pptx");
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    assert_eq!(slides.len(), 4);
+    assert!(slides[0].equations().unwrap().is_empty());
+    // Expected formulae follow the stored OMML; the inspection prose uses
+    // typographic superscripts, whereas m:t contains ordinary digits.
+    let expected = [
+        (r"𝑥=\frac{−𝑏±\sqrt{𝑏^{2}−4𝑎𝑐}}{2𝑎}", "𝑥=−𝑏±𝑏2−4𝑎𝑐2𝑎"),
+        (r"\sum_{𝑘=1}^{4} 𝑘^{2}=30", "𝑘=14𝑘2=30"),
+        // The current formula projection documents text-only fallback for
+        // matrices; this assertion does not claim row/column semantics.
+        ("𝐴=1234", "𝐴=1234"),
+    ];
+    let reopened = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    let reopened_presentation = reopened.presentation().unwrap();
+    let reopened_slides = reopened_presentation.slides().unwrap();
+    for (index, (formula, text)) in expected.into_iter().enumerate() {
+        let slide = &slides[index + 1];
+        let equations = slide.equations().unwrap();
+        assert_eq!(equations.len(), 1);
+        assert_eq!(equations[0].shape_id(), Some(3));
+        assert_eq!(equations[0].formula(), formula);
+        assert_eq!(equations[0].text(), text);
+        assert_eq!(reopened_slides[index + 1].equations().unwrap(), equations);
+        assert_eq!(
+            reopened_slides[index + 1].part().part().blob(),
+            slide.part().part().blob()
+        );
+        let relationship = slide.part().part().rels().get("rId2").unwrap();
+        assert!(!relationship.is_external());
+        assert_eq!(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::IMAGE
+        );
+        let target = relationship.target_partname().unwrap();
+        assert_eq!(
+            target.as_str(),
+            format!("/ppt/media/image{}.png", index + 1)
+        );
+        let original_image = package.opc().unwrap().get_part(&target).unwrap();
+        let reopened_image = reopened.opc().unwrap().get_part(&target).unwrap();
+        assert_eq!(original_image.content_type(), "image/png");
+        assert!(original_image.blob().starts_with(b"\x89PNG\r\n\x1a\n"));
+        assert_eq!(original_image.blob(), reopened_image.blob());
+    }
+    assert!(package.math_properties().unwrap().is_none());
+}
+
+#[test]
+fn native_transition_projection_keeps_push_morph_and_saved_timing() {
+    use litchi_pptx::transition::{self, Kind, Morph, Ms, Side, Speed};
+    let package = native("powerpoint-master-motion.pptx");
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let transitions: Vec<_> = slides
+        .iter()
+        .map(|slide| {
+            transition::read(slide.part().part().blob(), transition::Limits::DEFAULT).unwrap()
+        })
+        .collect();
+    assert_eq!(transitions.len(), 7);
+    let push = transitions[1].as_ref().unwrap();
+    assert_eq!(push.kind(), &Kind::Push(Side::Up));
+    assert_eq!(push.speed(), Speed::Medium);
+    assert_eq!(push.after().map(Ms::get), Some(3000));
+    assert!(push.click());
+    // The native UI reported 0.75 seconds, but this part saved only spd=med.
+    assert_eq!(push.duration(), None);
+    let morph = transitions[2].as_ref().unwrap();
+    assert_eq!(morph.kind(), &Kind::Morph(Morph::ByObject));
+    assert_eq!(morph.speed(), Speed::Slow);
+    assert_eq!(morph.duration().map(Ms::get), Some(1500));
+    assert_eq!(morph.after(), None);
+    assert!(morph.click());
+    for index in [0, 3, 4, 5, 6] {
+        assert!(transitions[index].is_none());
+    }
+    for transition in [push, morph] {
+        let fragment = transition::write(transition, transition::Limits::DEFAULT).unwrap();
+        let xml = format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{fragment}</p:sld>"#
+        );
+        let reopened = transition::read(xml.as_bytes(), transition::Limits::DEFAULT)
+            .unwrap()
+            .unwrap();
+        assert!(reopened.same_semantics(transition));
+    }
+}
+
+#[test]
+fn native_master_theme_keeps_ion_palette_and_font_owners() {
+    let package = native("powerpoint-master-motion.pptx");
+    let presentation = package.presentation().unwrap();
+    let masters = presentation.slide_masters().unwrap();
+    assert_eq!(masters.len(), 1);
+    let master = &masters[0];
+    let theme = master.theme().unwrap().unwrap();
+    assert_eq!(theme.name, "Ion");
+    assert_eq!(
+        theme.major_font.as_ref().unwrap().typeface,
+        "Century Gothic"
+    );
+    assert_eq!(
+        theme.minor_font.as_ref().unwrap().typeface,
+        "Century Gothic"
+    );
+    assert_eq!(
+        theme
+            .colors
+            .iter()
+            .map(|color| (
+                color.name.as_str(),
+                color.rgb.as_deref(),
+                color.system_color.as_deref()
+            ))
+            .collect::<Vec<_>>(),
+        [
+            ("dk1", Some("000000"), Some("windowText")),
+            ("lt1", Some("FFFFFF"), Some("window")),
+            ("dk2", Some("1E5155"), None),
+            ("lt2", Some("EBEBEB"), None),
+            ("accent1", Some("B01513"), None),
+            ("accent2", Some("EA6312"), None),
+            ("accent3", Some("E6B729"), None),
+            ("accent4", Some("6AAC90"), None),
+            ("accent5", Some("54849A"), None),
+            ("accent6", Some("9E5E9B"), None),
+            ("hlink", Some("58C1BA"), None),
+            ("folHlink", Some("9DFFCB"), None),
+        ]
+    );
+    let relationship = master
+        .part()
+        .part()
+        .rels()
+        .iter()
+        .find(|r| r.reltype() == litchi_opc::constants::relationship_type::THEME)
+        .unwrap();
+    assert!(!relationship.is_external());
+    let target = relationship.target_partname().unwrap();
+    assert_eq!(target.as_str(), "/ppt/theme/theme1.xml");
+    let part = package.opc().unwrap().get_part(&target).unwrap();
+    assert_eq!(part.blob().len(), 7010);
+    assert_eq!(
+        sha256(part.blob()),
+        "7be9ced965f7ce8f26f6d9776e719e8df09e4bdf0a874f2a256da54e778a3750"
+    );
+}
+
+#[test]
+fn native_handout_placeholders_expose_saved_text_visibility_and_background() {
+    use litchi_pptx::presentation_properties::metadata::handout::{Limits, Master};
+    let package = native("powerpoint-fonts-math-handout.pptx");
+    let opc = package.opc().unwrap();
+    let part = opc
+        .get_part(&litchi_opc::PackURI::new("/ppt/handoutMasters/handoutMaster1.xml").unwrap())
+        .unwrap();
+    let parsed =
+        Master::parse_xml(std::str::from_utf8(part.blob()).unwrap(), Limits::DEFAULT).unwrap();
+    assert_eq!(
+        parsed.header_footer.header_text.as_deref(),
+        Some("HANDOUT_HEADER_009")
+    );
+    assert_eq!(
+        parsed.header_footer.footer_text.as_deref(),
+        Some("HANDOUT_FOOTER_009")
+    );
+    assert!(parsed.header_footer.show_header);
+    assert!(parsed.header_footer.show_footer);
+    assert!(parsed.header_footer.show_slide_number);
+    assert!(!parsed.header_footer.show_date_time);
+    assert!(!parsed.header_footer.auto_date);
+    assert_eq!(parsed.header_footer.date_time_text, None);
+    assert_eq!(parsed.background_color.as_deref(), Some("00B0F0"));
+    // The print dialog was canceled; no six-slide print preference was saved.
+    assert!(
+        litchi_pptx::presentation_properties::load_from_package(
+            opc,
+            litchi_pptx::presentation_properties::Limits::default()
+        )
+        .unwrap()
+        .unwrap()
+        .print
+        .is_none()
+    );
+    let xml = parsed.to_xml(Limits::DEFAULT).unwrap();
+    let reopened = Master::parse_xml(&xml, Limits::DEFAULT).unwrap();
+    assert_eq!(
+        reopened.header_footer.header_text,
+        parsed.header_footer.header_text
+    );
+    assert_eq!(
+        reopened.header_footer.footer_text,
+        parsed.header_footer.footer_text
+    );
+    assert_eq!(reopened.background_color, parsed.background_color);
+    assert!(!reopened.header_footer.show_date_time);
+}
+
+#[test]
 fn native_powerpoint_font_payload_and_face_metadata_remain_inert() {
     use litchi_pptx::font::{self, Style};
     let package = native("powerpoint-fonts-math-handout.pptx");

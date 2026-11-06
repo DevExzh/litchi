@@ -3,141 +3,136 @@
 //! Handout masters define the layout for printed handouts that show
 //! multiple slides per page.
 
-use super::super::{BoundedString, Limits, process_str};
+use super::super::{BoundedString, Limits};
 use super::model::Master;
 use crate::presentation_properties::metadata::new_guid;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::{count_up_to, first_wins};
-use quick_xml::Reader;
-use quick_xml::events::Event;
 
 impl Master {
-    /// Parse handout master XML.
+    /// Read direct header/footer placeholders, their visibility, and a direct
+    /// solid RGB background from handout master XML. Other shapes, styling and
+    /// theme fills are outside this projection.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
-        if xml.len() > limits.max_input_bytes() {
-            return Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
-                observed: xml.len(),
-                maximum: limits.max_input_bytes(),
-            });
-        }
-        let mut master = Self::default();
-        let xml = process_str(xml, limits)?;
-        if xml.len() > limits.max_output_bytes() {
-            return Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
-                observed: xml.len(),
-                maximum: limits.max_output_bytes(),
-            });
-        }
-        let mut reader = Reader::from_str(xml.as_ref());
-        reader.config_mut().trim_text(true);
-        let mut nodes = 0usize;
-        let mut depth = 0usize;
-
-        loop {
-            match reader.read_event() {
-                Ok(Event::Start(element)) => {
-                    depth = depth.checked_add(1).ok_or_else(|| Error::Limit {
-                        kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::XmlDepth,
-                        ),
-                        observed: usize::MAX,
-                        maximum: limits.max_depth(),
-                    })?;
-                    if depth > limits.max_depth() {
-                        return Err(Error::Limit {
-                            kind: crate::opened::LimitKind::Codec(
-                                crate::opened::CodecLimitKind::XmlDepth,
-                            ),
-                            observed: depth,
-                            maximum: limits.max_depth(),
-                        });
-                    }
-                    parse_element(&element, reader.decoder(), &mut master, &mut nodes, limits)?;
-                },
-                Ok(Event::Empty(element)) => {
-                    check_empty_depth(depth, limits)?;
-                    parse_element(&element, reader.decoder(), &mut master, &mut nodes, limits)?
-                },
-                Ok(Event::End(_)) => {
-                    depth = depth.checked_sub(1).ok_or_else(|| {
-                        Error::Invalid("handout-master XML has an unmatched end tag".into())
-                    })?;
-                },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::Xml(e.to_string())),
-                _ => {},
-            }
-        }
-
-        if depth != 0 {
-            return Err(Error::Invalid(
-                "handout-master XML has an unterminated element".into(),
-            ));
-        }
-
-        Ok(master)
+        super::reader::parse(xml, limits)
     }
 
-    /// Generate handout master XML.
-    /// Structure matches Apache POI PowerPoint-created files.
+    /// Generate a fresh handout master from the represented text, flags and
+    /// background. This does not preserve a source shape tree. The print
+    /// layout belongs in `presProps.xml`, not in this part. The `layout` and
+    /// `show_slide_images` authoring hints are not serialized.
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
+        for value in [
+            self.header_footer.header_text.as_deref(),
+            self.header_footer.footer_text.as_deref(),
+            self.header_footer.date_time_text.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_text(value, limits)?;
+        }
+        if let Some(color) = &self.background_color {
+            super::super::check_string(color, limits, "handout background")?;
+            validate_color(color)?;
+        }
         let mut xml = BoundedString::new(limits, "serialized handout-master XML");
-
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
-        xml.push_str(r#"<p:handoutMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#)?;
-
-        // Common slide data
-        xml.push_str("<p:cSld>")?;
-
-        // Background - use bgPr with solidFill like PowerPoint
-        xml.push_str(r#"<p:bg><p:bgPr><a:solidFill><a:schemeClr val="bg1"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>"#)?;
-
-        // Shape tree with ALL 4 placeholders
-        xml.push_str("<p:spTree>")?;
-        xml.push_str(
-            r#"<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>"#,
+        xml.push_str(r#"<p:handoutMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill>"#)?;
+        if let Some(color) = &self.background_color {
+            xml.write_fmt(format_args!(r#"<a:srgbClr val="{color}"/>"#))?;
+        } else {
+            xml.push_str(r#"<a:schemeClr val="bg1"/>"#)?;
+        }
+        xml.push_str(r#"</a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>"#)?;
+        write_placeholder(&mut xml, 0, self.header_footer.header_text.as_deref(), None)?;
+        write_placeholder(
+            &mut xml,
+            1,
+            self.header_footer.date_time_text.as_deref(),
+            self.header_footer.auto_date.then_some("datetime1"),
         )?;
-        xml.push_str(r#"<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>"#)?;
-
-        // Header placeholder (top left)
-        xml.push_str(r#"<p:sp><p:nvSpPr><p:cNvPr id="2" name="Header Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="hdr" sz="quarter"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#)?;
-
-        // Date placeholder (top right) - with field for auto date
+        write_placeholder(&mut xml, 2, self.header_footer.footer_text.as_deref(), None)?;
+        write_placeholder(&mut xml, 3, Some("‹#›"), Some("slidenum"))?;
+        xml.push_str(r#"</p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>"#)?;
         xml.write_fmt(format_args!(
-            r#"<p:sp><p:nvSpPr><p:cNvPr id="3" name="Date Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="dt" sz="quarter" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="3884613" y="0"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle><a:lvl1pPr algn="r"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:fld id="{}" type="datetime1"><a:rPr lang="en-US"/><a:pPr/><a:t>1/1/2000</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#,
-            new_guid()
+            r#"<p:hf hdr="{}" ftr="{}" dt="{}" sldNum="{}"/></p:handoutMaster>"#,
+            u8::from(self.header_footer.show_header),
+            u8::from(self.header_footer.show_footer),
+            u8::from(self.header_footer.show_date_time),
+            u8::from(self.header_footer.show_slide_number)
         ))?;
-
-        // Footer placeholder (bottom left)
-        xml.push_str(r#"<p:sp><p:nvSpPr><p:cNvPr id="4" name="Footer Placeholder 3"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="ftr" sz="quarter" idx="2"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="8685213"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#)?;
-
-        // Slide number placeholder (bottom right) - with field
-        xml.write_fmt(format_args!(
-            r#"<p:sp><p:nvSpPr><p:cNvPr id="5" name="Slide Number Placeholder 4"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldNum" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="3884613" y="8685213"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"/><a:lstStyle><a:lvl1pPr algn="r"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:fld id="{}" type="slidenum"><a:rPr lang="en-US"/><a:pPr/><a:t>‹#›</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#,
-            new_guid()
-        ))?;
-
-        xml.push_str("</p:spTree>")?;
-        xml.push_str("</p:cSld>")?;
-
-        // Color map (required element)
-        xml.push_str(r#"<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>"#)?;
-
-        xml.push_str("</p:handoutMaster>")?;
         Ok(xml.finish())
     }
 }
 
-fn parse_element(
+fn write_placeholder(
+    xml: &mut BoundedString,
+    index: usize,
+    text: Option<&str>,
+    field: Option<&str>,
+) -> Result<()> {
+    let (kind, name, x, y) = match index {
+        0 => ("hdr", "Header Placeholder 1", 0, 0),
+        1 => ("dt", "Date Placeholder 2", 3884613, 0),
+        2 => ("ftr", "Footer Placeholder 3", 0, 8685213),
+        _ => ("sldNum", "Slide Number Placeholder 4", 3884613, 8685213),
+    };
+    let alignment = if index.is_multiple_of(2) { "l" } else { "r" };
+    let anchor = if index >= 2 { r#" anchor="b""# } else { "" };
+    xml.write_fmt(format_args!(r#"<p:sp><p:nvSpPr><p:cNvPr id="{}" name="{name}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="{kind}" sz="quarter" idx="{index}"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"{anchor}/><a:lstStyle><a:lvl1pPr algn="{alignment}"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p>"#, index+2))?;
+    if let Some(field) = field {
+        xml.write_fmt(format_args!(
+            r#"<a:fld id="{}" type="{field}"><a:rPr lang="en-US"/><a:pPr/>"#,
+            new_guid()
+        ))?;
+        if let Some(text) = text {
+            write_text(xml, text)?;
+        }
+        xml.push_str("</a:fld>")?;
+    } else if let Some(text) = text {
+        for (index, line) in text.split('\n').enumerate() {
+            if index != 0 {
+                xml.push_str("<a:br/>")?;
+            }
+            xml.push_str("<a:r>")?;
+            write_text(xml, line)?;
+            xml.push_str("</a:r>")?;
+        }
+    }
+    xml.push_str(r#"<a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#)
+}
+
+fn write_text(xml: &mut BoundedString, text: &str) -> Result<()> {
+    xml.push_str(r#"<a:t xml:space="preserve">"#)?;
+    xml.push_escaped_xml(text)?;
+    xml.push_str("</a:t>")
+}
+
+pub(super) fn validate_color(value: &str) -> Result<()> {
+    if value.len() != 6 || !value.bytes().all(|v| v.is_ascii_hexdigit()) {
+        return Err(Error::Invalid(
+            "handout background must be a six-digit RGB value".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn validate_text(value: &str, limits: Limits) -> Result<()> {
+    super::super::check_string(value, limits, "handout placeholder text")?;
+    if value.chars().any(|c| !matches!(c, '\u{9}' | '\u{a}' | '\u{d}' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}')) {
+        return Err(Error::Invalid("handout text contains an invalid XML character".into()));
+    }
+    Ok(())
+}
+
+pub(super) fn check_element(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-    master: &mut Master,
     nodes: &mut usize,
     limits: Limits,
 ) -> Result<()> {
@@ -154,31 +149,7 @@ fn parse_element(
         });
     }
     check_attributes(element, decoder, limits)?;
-    match element.local_name().as_ref() {
-        b"hf" => {
-            for attr in first_wins(element).flatten() {
-                match attr.key.as_ref() {
-                    b"hdr" => master.header_footer.show_header = attr.value.as_ref() == b"1",
-                    b"ftr" => master.header_footer.show_footer = attr.value.as_ref() == b"1",
-                    b"sldNum" => {
-                        master.header_footer.show_slide_number = attr.value.as_ref() == b"1";
-                    },
-                    b"dt" => master.header_footer.show_date_time = attr.value.as_ref() == b"1",
-                    _ => {},
-                }
-            }
-        },
-        b"srgbClr" => {
-            for attr in first_wins(element).flatten() {
-                if attr.key.as_ref() == b"val"
-                    && let Ok(color) = std::str::from_utf8(&attr.value)
-                {
-                    master.background_color = Some(color.to_string());
-                }
-            }
-        },
-        _ => {},
-    }
+
     Ok(())
 }
 
@@ -237,7 +208,7 @@ fn check_attributes(
     Ok(())
 }
 
-fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+pub(super) fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
     let observed = depth.checked_add(1).unwrap_or(usize::MAX);
     if observed > limits.max_depth() {
         return Err(Error::Limit {
@@ -299,7 +270,7 @@ mod tests {
     #[test]
     fn parsed_handout_attributes_keep_their_first_occurrence() {
         let single = Master::parse_xml(
-            r#"<p:handoutMaster><p:hf hdr="0" ftr="1" sldNum="1" dt="0"/><a:srgbClr val="112233"/></p:handoutMaster>"#,
+            r#"<p:handoutMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="112233"/></a:solidFill></p:bgPr></p:bg></p:cSld><p:hf hdr="0" ftr="1" sldNum="1" dt="0"/></p:handoutMaster>"#,
             Limits::DEFAULT,
         )
         .unwrap();
@@ -310,7 +281,7 @@ mod tests {
         assert_eq!(single.background_color.as_deref(), Some("112233"));
 
         let repeated = Master::parse_xml(
-            r#"<p:handoutMaster><p:hf hdr="0" ftr="1" hdr="1" ftr="0" sldNum="1" dt="0" dt="1" sldNum="0"/><a:srgbClr val="112233" val="445566"/></p:handoutMaster>"#,
+            r#"<p:handoutMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="112233" val="445566"/></a:solidFill></p:bgPr></p:bg></p:cSld><p:hf hdr="0" ftr="1" hdr="1" ftr="0" sldNum="1" dt="0" dt="1" sldNum="0"/></p:handoutMaster>"#,
             Limits::DEFAULT,
         )
         .unwrap();
@@ -324,20 +295,20 @@ mod tests {
     #[test]
     fn crowded_handout_attributes_are_read_first_wins() {
         let xml = format!(
-            "<p:handoutMaster><p:hf{} ftr=\"1\"/><a:srgbClr{}/></p:handoutMaster>",
-            crowded("hdr", "1", "0"),
+            r#"<p:handoutMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr{}/></a:solidFill></p:bgPr></p:bg></p:cSld><p:hf{} ftr="1"/></p:handoutMaster>"#,
             crowded("val", "112233", "445566"),
+            crowded("hdr", "1", "0"),
         );
         let master = Master::parse_xml(&xml, Limits::DEFAULT).unwrap();
         assert!(master.header_footer.show_header);
         assert!(master.header_footer.show_footer);
-        assert!(!master.header_footer.show_slide_number);
+        assert!(master.header_footer.show_slide_number); // Omitted hf attribute defaults to true.
         assert_eq!(master.background_color.as_deref(), Some("112233"));
     }
 
     #[test]
     fn duplicate_attributes_count_against_the_selected_physical_limit() {
-        let xml = r#"<p:handoutMaster><p:hf hdr="1" hdr="0" ftr="1"/></p:handoutMaster>"#;
+        let xml = r#"<p:handoutMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:hf hdr="1" hdr="0" ftr="1"/></p:handoutMaster>"#;
         let exact = Limits::DEFAULT.with_attributes(3).unwrap();
         Master::parse_xml(xml, exact).expect("three physical attributes fit");
 

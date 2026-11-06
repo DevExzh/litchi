@@ -2770,6 +2770,69 @@
       "required_features": [
         "ppt"
       ]
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_handout_placeholders_expose_saved_text_visibility_and_background",
+      "fixtures": [
+        "powerpoint/powerpoint-fonts-math-handout.pptx"
+      ],
+      "feature_rows": [
+        "pptx-403",
+        "pptx-408"
+      ],
+      "assertions": [
+        "Exact HANDOUT_HEADER_009/HANDOUT_FOOTER_009, active header/footer/slide-number placeholders, absent date, direct 00B0F0 background and absent saved print preference; fresh represented-field XML write/read."
+      ],
+      "scope_limit": "Direct placeholder text/flags and solid RGB only. Fresh authoring does not preserve a source shape tree; layout/show_slide_images are separate authoring hints. No saved six-slide preference, rendering or native Office reopen is claimed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_equations_keep_shape_owners_formula_structure_and_fallback_parts",
+      "fixtures": [
+        "powerpoint/powerpoint-fonts-math-handout.pptx"
+      ],
+      "feature_rows": [
+        "pptx-443"
+      ],
+      "assertions": [
+        "Three equations owned by shape3: exact fraction/radical/superscript/summation formulae and raw m:t text; matrix text-only projection; exact source slide XML and fallback PNG bytes through package write/reopen, with internal image relationship owners."
+      ],
+      "scope_limit": "No equation editing/evaluation/rendering or matrix row/column model. Slide-level math is present while presentation-level math defaults are absent; text-only matrix projection is explicitly partial."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_transition_projection_keeps_push_morph_and_saved_timing",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-424",
+        "pptx-425",
+        "pptx-426"
+      ],
+      "assertions": [
+        "Native Push/Up/Medium/click/3000ms advance without a saved explicit duration; Morph/ByObject/Slow/click/exact1500ms p14 duration; five absent transitions and semantic fragment write/read."
+      ],
+      "scope_limit": "Stored transition projection only. p14 scope is the saved duration extension, not every 2010 effect; preset transitions and source-backed transition edits beside unrelated Zoom MCE still need qualification. No playback or UI duration inference."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_master_theme_keeps_ion_palette_and_font_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-405"
+      ],
+      "assertions": [
+        "Exact Ion twelve-slot RGB/system palette and Century Gothic major/minor fonts, internal master theme relationship, exact7010-byte theme part and SHA-256."
+      ],
+      "scope_limit": "Native theme summary and owner identity only; override mutation, inherited visual resolution and native rendering remain unqualified."
     }
   ]
 }

@@ -16,7 +16,7 @@ pub enum Layout {
 }
 
 impl Layout {
-    /// Get the layout type string for handout-master XML.
+    /// Get the legacy layout label. Use [`Self::print_what`] for print preferences.
     #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -78,9 +78,14 @@ pub struct HeaderFooter {
 /// Handout master for a presentation.
 #[derive(Debug, Clone)]
 pub struct Master {
+    /// Authoring hint for the separate `presProps.xml` print preferences.
+    /// The handout-master codec does not read or write this field.
     pub layout: Layout,
     pub header_footer: HeaderFooter,
+    /// Direct solid-fill RGB background, without `#`. Theme fills are not resolved.
     pub background_color: Option<String>,
+    /// Authoring hint for a renderer. The handout-master codec does not read
+    /// or write slide-image visibility.
     pub show_slide_images: bool,
 }
 

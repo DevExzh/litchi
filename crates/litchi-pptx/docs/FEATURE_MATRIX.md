@@ -57,7 +57,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Sections | ✅ | ✅ | ✅ | Typed section IDs and names, resolved slide-index membership, and graph-safe ordered CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | Typed named subsets and graph-safe ordered CRUD; `presentation_properties::metadata::custom_show::{Snapshot, Edit, Commit, Patch}` adds source-checked XML inverse edits |
 | Slide masters and layouts | ✅ | ✅ | ✅ | Semantic master/layout reading with shape and placeholder inventory, typed layout references, matching/type metadata, `p232:phTypeExt` cameo/unknown placeholder metadata, source-checked reversible add/remove/update transactions across slide, master, and layout owners, relationship validation, new-master and layout authoring, unknown-shape-byte preservation, and unreferenced-layout removal |
-| Handout master | ✅ | ✅ | ✅ | Root relationship resolution, handout settings, and header/footer metadata |
+| Handout master | 🟡 | ✅ | 🟡 | Direct header/footer/date/slide-number placeholder text and visibility, explicit `p:hf` overrides, and direct solid RGB background; bounded fresh XML authoring retains represented fields. The codec does not preserve source shapes/styles or serialize the separate print-layout/slide-image hints. |
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | `Package::{notes, put_notes, remove_notes, clear_notes}` uses semantic slide selectors, while `notes::{Snapshot, Edit, Commit, Patch}` provides bounded source-checked notes-slide/master/theme/text lifecycle edits; opaque XML and exclusively owned descendants are handled losslessly, slide comments remain slide-owned, and notes are never rendered or activated |
 | Themes, color maps, and overrides | ✅ | ✅ | ✅ | Master-, layout-, and slide-scoped theme resolution, typed color maps and overrides, 12-slot color schemes, major/minor font schemes, attachment, replacement, removal, and orphan cleanup; contextual `color_map::{Snapshot, Edit, Commit, Patch}` adds source-checked map edits, while fmtScheme authoring is not covered |
 | Presentation property structure and extended guides | ✅ | ✅ | ✅ | `presentation_properties::metadata::structure::{Snapshot, Edit, Commit, Patch}` and `guides::{Snapshot, Edit, Commit, Patch}` edit ordered sections/custom-show references and bounded `p15` guide XML while retaining unrelated extension namespaces |
@@ -172,5 +172,28 @@ player, external target or animation is executed.
 The native `powerpoint-fonts-math-handout.pptx` regression checks the single
 Cambria Math Regular face and the exact 129261-byte EOT payload/SHA-256 before
 and after package serialization. Font bytes remain inert; this is not glyph
-coverage, registration, rendering or font-edit evidence. The native handout
-placeholder projection remains a separate coverage gap.
+coverage, registration, rendering or font-edit evidence.
+
+The same fixture now checks the exact native handout header/footer labels,
+slide-number presence, absent date, and `00B0F0` background. The parser recognizes
+direct placeholder owners when `p:hf` is absent, uses schema Boolean defaults
+when it is present, and excludes foreign/nested shadow elements. Fresh XML
+authoring retains the represented text, flags and RGB value; it does not
+preserve native shapes, styles or layout. Generated field IDs have the required
+8-4-4-4-12 GUID segments. The canceled print-dialog selection saved no `p:prnPr`,
+so no six-slide layout is inferred. `layout` and `show_slide_images` remain
+authoring hints outside this codec.
+
+Native slide equations are checked separately from presentation-level math
+defaults: shape IDs, exact fraction/radical/superscript/sum formulae and raw
+`m:t` text, plus unchanged source XML and fallback PNGs after package reopen.
+The matrix remains a documented text-only projection; row/column semantics,
+editing, calculation and rendering are not covered.
+
+The master-motion fixture checks the exact Ion palette, system-color fallbacks,
+Century Gothic fonts and owning theme relationship/hash. Its transition checks
+cover Push/Up/Medium with 3000ms automatic advance, Morph/ByObject with a saved
+1500ms extension duration, absent transitions and semantic fragment write/read.
+The Push part has no explicit duration despite the historical UI observation.
+These tests do not qualify every transition extension, source transition edits
+beside unrelated Zoom MCE, theme overrides or native playback.

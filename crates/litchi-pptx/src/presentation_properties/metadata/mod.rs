@@ -749,7 +749,8 @@ pub(crate) fn new_guid() -> String {
         .map_or(0, |duration| duration.as_nanos() as u64);
     let mixed = ticks ^ sequence.rotate_left(17);
     format!(
-        "{{{mixed:08X}-{part2:04X}-{part3:04X}-{part4:04X}-{part5:012X}}}",
+        "{{{part1:08X}-{part2:04X}-{part3:04X}-{part4:04X}-{part5:012X}}}",
+        part1 = mixed as u32,
         part2 = (mixed >> 32) as u16,
         part3 = (mixed >> 16) as u16,
         part4 = mixed as u16,
