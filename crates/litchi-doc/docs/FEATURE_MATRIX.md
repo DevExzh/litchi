@@ -231,3 +231,10 @@ Cambria Math and Aptos blocks at the recorded `WordDocument` offsets. A body
 edit retains both descriptions and block bytes through reopen and inverse.
 The legacy programs remain opaque; these assertions do not interpret them as
 OOXML sfnt resources, install fonts or qualify legacy font-program authoring.
+
+The native mail-merge test reads exact `Pms` flags, current record and data-file
+descriptor, resolves its `SttbFnm` entry as metadata, and checks four merge-field
+caches and two counters. The DOC retains a DOCX source path; it is neither
+followed nor silently relinked. The historical Word missing-source prompt's
+cause remains unresolved. No-op reopen preservation does not qualify source
+editing, recipient filtering, ODSO authoring or merge execution.

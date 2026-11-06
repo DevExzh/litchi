@@ -326,21 +326,42 @@ impl Package {
         conformance: mail_merge::Conformance,
         used_ids: &mut std::collections::HashSet<String>,
     ) -> Result<(StoredRelationship, Option<BlobPart>)> {
-        let id = allocate_mail_merge_relationship_id(label, used_ids)?;
-        let settings_target = self.settings_part_snapshot()?.target;
-        match source {
-            Source::External(uri) => {
-                validate_mail_merge_external_uri(&uri)?;
-                Ok((
+        let snapshot = self.settings_part_snapshot()?;
+        let reltype = mail_merge_relationship_type(conformance, relationship_suffix);
+        // Updating record/filter settings need not rename an unchanged inert
+        // external source. Keep its admitted ID and relationship XML.
+        if let Source::External(uri) = &source {
+            validate_mail_merge_external_uri(uri)?;
+            if let Some(existing) = snapshot.relationships.iter().find(|relationship| {
+                relationship.external
+                    && relationship.reltype == reltype
+                    && relationship.target == *uri
+                    && !used_ids.contains(&relationship.id)
+            }) {
+                used_ids.insert(existing.id.clone());
+                return Ok((
                     StoredRelationship {
-                        reltype: mail_merge_relationship_type(conformance, relationship_suffix),
-                        target: uri,
-                        id,
+                        reltype: existing.reltype.clone(),
+                        target: existing.target.clone(),
+                        id: existing.id.clone(),
                         external: true,
                     },
                     None,
-                ))
-            },
+                ));
+            }
+        }
+        let id = allocate_mail_merge_relationship_id(label, used_ids)?;
+        let settings_target = snapshot.target;
+        match source {
+            Source::External(uri) => Ok((
+                StoredRelationship {
+                    reltype,
+                    target: uri,
+                    id,
+                    external: true,
+                },
+                None,
+            )),
             Source::Internal {
                 bytes,
                 content_type,
@@ -352,7 +373,7 @@ impl Package {
                 let part = BlobPart::new(uri, content_type, bytes);
                 Ok((
                     StoredRelationship {
-                        reltype: mail_merge_relationship_type(conformance, relationship_suffix),
+                        reltype,
                         target,
                         id,
                         external: false,

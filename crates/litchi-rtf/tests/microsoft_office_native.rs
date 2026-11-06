@@ -311,6 +311,62 @@ fn native_word_mail_merge_preserves_empty_file_table_and_inert_source() {
 }
 
 #[test]
+fn native_legacy_form_defaults_and_undefined_selections_survive_model_writing() {
+    use litchi_rtf::FormFieldType;
+    let source = native("word-legacy-form.rtf");
+    let fields = source.raw().form_fields();
+    assert_eq!(fields.len(), 3);
+    assert_eq!(
+        fields
+            .iter()
+            .map(|f| (f.field_type, f.name.as_deref()))
+            .collect::<Vec<_>>(),
+        [
+            (FormFieldType::Text, Some("FixtureText010")),
+            (FormFieldType::CheckBox, Some("FixtureCheck010")),
+            (FormFieldType::DropDown, Some("FixtureDropdown010")),
+        ]
+    );
+    assert_eq!(fields[0].default_text.as_deref(), Some("FORM_VALUE_010"));
+    assert_eq!(fields[0].result_text, "FORM_VALUE_010");
+    assert_eq!(fields[0].max_length, Some(24));
+    assert_eq!(fields[0].help_text.as_deref(), Some("HELP_TEXT_010"));
+    assert!(fields[0].calculate_on_exit && fields[0].own_help);
+    assert_eq!(fields[1].default_checked(), Some(true));
+    assert_eq!(fields[1].half_point_size, Some(28));
+    assert_eq!(fields[1].result, Some(25));
+    assert_eq!(fields[1].checked(), None);
+    assert!(!fields[1].calculate_on_exit);
+    assert_eq!(fields[2].default_result, Some(0));
+    assert_eq!(fields[2].result, Some(25));
+    assert_eq!(fields[2].selected_index(), None);
+    assert_eq!(fields[2].selected_entry(), None);
+    assert_eq!(fields[2].list_entries, ["OPTION_A_010", "OPTION_B_010"]);
+    assert!(fields[2].has_list_box);
+    assert!(!fields[2].calculate_on_exit);
+    for field in fields {
+        assert!(field.status_text.is_none());
+        assert!(field.entry_macro.is_none() && field.exit_macro.is_none());
+        assert_eq!(
+            &source.text()[field.position..field.range_end],
+            field.result_text
+        );
+    }
+    let written = serialize_model(&source);
+    assert_eq!(written.raw().form_fields(), fields);
+    assert_eq!(written.text(), source.text());
+    let bookmarks = |p: &Package| {
+        p.raw()
+            .bookmarks()
+            .bookmarks()
+            .iter()
+            .map(|b| (b.name.to_string(), b.content.to_string()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(bookmarks(&written), bookmarks(&source));
+}
+
+#[test]
 fn native_word_table_style_retains_all_seven_conditional_definitions() {
     let source = native("word-tables-layout.rtf");
     let sheet = source.raw().stylesheet();

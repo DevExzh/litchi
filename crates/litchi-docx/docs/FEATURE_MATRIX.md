@@ -265,3 +265,17 @@ title edits on file-backed Auto and eager inputs. The same fixtures have two
 exact SEQ Figure/Table fields with cached result 1 and a four-cell AutoCaption
 table. These tests do not calculate fields, enforce UI collapse, lay out notes,
 author package-level extension transactions or claim a fresh Word reopen.
+
+`tests/microsoft_office_native_mail_merge.rs` checks the stored Word mail-merge
+settings, external source URI, nested field/counter caches and the separate
+14-column, two-record source table. Updating record/error settings retains an
+unchanged source relationship's ID and XML; save/reopen, inverse and removal
+preserve the body and unrelated members. Changed targets and relationship
+dialects remain explicit edits. The native file has no recipients part or
+ODSO payload, so it does not qualify those authoring families.
+
+Native protected/unprotected legacy forms expose three inert field codes,
+their actual caches and bookmark identities. The DOCX field view does not
+interpret `ffData`; the operations title-edit regression preserves that XML
+and all field/bookmark content exactly on Auto and eager routes. No source
+lookup, merge, field evaluation, form activation or fresh Word reopen occurs.

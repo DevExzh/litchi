@@ -248,14 +248,24 @@ impl Package {
         part: BlobPart,
     ) -> Result<()> {
         use litchi_opc::constants::relationship_type as rt;
+        use litchi_opc::part::Part;
 
         if !snapshot.relationship_exists {
             // Acquire the only fallible mutable reference before changing package state.
             self.opc
                 .get_part_mut(&snapshot.document_uri)?
                 .relate_to("settings.xml", rt::SETTINGS);
+            self.opc.add_part(Box::new(part));
+        } else {
+            // Replacing the entire part revokes OPC's source relationship
+            // member even if the relationships are unchanged. Update the
+            // existing owner so settings-only edits retain that source token.
+            let original = self.opc.get_part_mut(&snapshot.target)?;
+            original.set_blob_shared(part.blob_arc());
+            if !original.rels().same_entries(part.rels()) {
+                *original.rels_mut() = part.rels().clone();
+            }
         }
-        self.opc.add_part(Box::new(part));
         Ok(())
     }
 

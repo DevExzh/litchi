@@ -452,6 +452,67 @@ fn native_word_binary_form_data_retains_defaults_and_undefined_stored_states() {
 }
 
 #[test]
+fn native_word_mail_merge_retains_original_source_path_and_cached_records() {
+    use litchi_doc::parts::mail_merge::{MailMergeDestination, MailMergeType, MergeDataSourceKind};
+    let package = native("word-mailmerge-fields.doc");
+    let document = package.document();
+    let state = document.mail_merge_state().unwrap();
+    assert!(state.state.main_document && state.state.data_source);
+    assert!(!state.state.header_file && !state.state.is_automatic && !state.state.record_selection);
+    assert!(state.state.suppress_blank_lines);
+    assert_eq!(state.state.merge_type, MailMergeType::None);
+    assert_eq!(state.state.destination, MailMergeDestination::None);
+    assert_eq!(state.current_record, Some(1));
+    let source = state.sources[usize::from(state.fetch_source_index)];
+    assert_eq!(source.source_kind, MergeDataSourceKind::DataFile);
+    assert!(source.link_to_file);
+    assert!(!source.uses_query);
+    let file = document
+        .subdocuments()
+        .unwrap()
+        .file_name(source.file_name)
+        .unwrap();
+    assert_eq!(
+        file.kind(),
+        litchi_doc::parts::subdocuments::Kind::MailMergeDataSource
+    );
+    // Word saved the DOCX path even in the binary DOC. Do not silently relink it.
+    assert_eq!(
+        file.path(),
+        "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx"
+    );
+    assert_eq!(file.relative_path(), None);
+    let fields = document.merge_fields().unwrap();
+    assert_eq!(
+        fields
+            .iter()
+            .map(|f| (f.field_name(), f.cached_result()))
+            .collect::<Vec<_>>(),
+        [
+            ("FirstName", Some("«FirstName»")),
+            ("LastName", Some("«LastName»")),
+            ("Amount", Some("«Amount»")),
+            ("FirstName", Some("Alex"))
+        ]
+    );
+    let counters = document.mail_merge_counters().unwrap();
+    assert_eq!(
+        counters
+            .iter()
+            .map(|f| (f.instruction().trim(), f.cached_result()))
+            .collect::<Vec<_>>(),
+        [
+            ("MERGEREC", Some("«Merge Record #»")),
+            ("MERGESEQ", Some("«Merge Sequence #»"))
+        ]
+    );
+    let reopened = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.document().mail_merge(), document.mail_merge());
+    assert_eq!(reopened.document().subdocuments(), document.subdocuments());
+    assert_eq!(reopened.document().merge_fields().unwrap(), fields);
+}
+
+#[test]
 fn native_word_binary_review_comments_retain_reply_parent_and_local_timestamps() {
     let package = native("word-review-controls.doc");
     let comments = package.document().comments().unwrap();

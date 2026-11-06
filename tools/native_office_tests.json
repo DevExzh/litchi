@@ -3561,6 +3561,138 @@
       "required_features": [
         "docx"
       ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_mail_merge",
+      "name": "native_mail_merge_settings_and_field_caches_are_inert",
+      "fixtures": [
+        "word/word-mailmerge-fields.docx"
+      ],
+      "feature_rows": [
+        "docx-089",
+        "docx-113"
+      ],
+      "assertions": [
+        "Exact formLetters/textFile/newDocument settings, active record/error mode and inert external target; absent ODSO/recipient data; four merge fields including nested uncached FirstName, IF stored operand text/cache and two counter caches."
+      ],
+      "scope_limit": "Stored metadata only; no source resolution, merge execution or field recalculation. The outer IF instruction includes the stored nested operand Alex; the nested MERGEFIELD has no w:t cache."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_mail_merge",
+      "name": "native_mail_merge_source_table_has_two_exact_records",
+      "fixtures": [
+        "word/word-mailmerge-source.docx"
+      ],
+      "feature_rows": [
+        "docx-072"
+      ],
+      "assertions": [
+        "One table with 14 exact headers and two exact records, including empty cells and decimal strings; absent merge settings and fields."
+      ],
+      "scope_limit": "Directly opens the tracked source fixture; does not follow the main document external relationship or execute a merge."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_mail_merge",
+      "name": "native_mail_merge_update_clear_and_replay_preserve_body_and_other_parts",
+      "fixtures": [
+        "word/word-mailmerge-fields.docx"
+      ],
+      "feature_rows": [
+        "docx-089"
+      ],
+      "assertions": [
+        "Update current record/error mode, retain rId1 and exact relationship member bytes, save/reopen, exact package-member inverse, and clear merge settings/relationship while preserving body and source."
+      ],
+      "scope_limit": "External source only; native fixture has no recipient/ODSO payload. Package assignment can add modeled ODSO metadata. No field refresh or native Word reopen."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_mail_merge",
+      "name": "native_mail_merge_source_reuse_requires_matching_target_and_dialect",
+      "fixtures": [
+        "word/word-mailmerge-fields.docx"
+      ],
+      "feature_rows": [
+        "docx-089"
+      ],
+      "assertions": [
+        "Changed external URI and Strict relationship dialect survive publication; unchanged source stays inert and immutable."
+      ],
+      "scope_limit": "Metadata graph conversion only; no source access or native-app validation of converted output."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_mail_merge",
+      "name": "native_legacy_form_instructions_caches_and_bookmarks_are_not_evaluated",
+      "fixtures": [
+        "word/word-legacy-form.docx",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "docx-113",
+        "docx-117"
+      ],
+      "assertions": [
+        "FORMTEXT/FORMCHECKBOX/FORMDROPDOWN kinds, stored text cache, absent checkbox/drop-down caches, clean/unlocked flags and three exact bookmark IDs/names."
+      ],
+      "scope_limit": "DOCX LegacyForm exposes field codes/cache, not ffData property interpretation. Protection enforcement and host control interaction are outside this test."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_mail_merge_retains_original_source_path_and_cached_records",
+      "fixtures": [
+        "word/word-mailmerge-fields.doc"
+      ],
+      "feature_rows": [
+        "doc-050",
+        "doc-037"
+      ],
+      "assertions": [
+        "Exact Pms flags/current record, DataFile descriptor and SttbFnm DOCX path in binary DOC; four merge-field caches and two counters; no-op reopen retains metadata."
+      ],
+      "scope_limit": "Stored DOCX path is not relinked; native missing-source prompt cause remains unresolved. No source access, ODSO authoring, merge execution or field recalculation."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_legacy_form_defaults_and_undefined_selections_survive_model_writing",
+      "fixtures": [
+        "word/word-legacy-form.rtf"
+      ],
+      "feature_rows": [
+        "rtf-478",
+        "rtf-475"
+      ],
+      "assertions": [
+        "Three exact form kinds/names; text default/cache/max length/help; default-checked box size28 with undefined result25; two drop-down entries/default0 with undefined result25; text ranges and full form payload survive canonical writing with bookmarks."
+      ],
+      "scope_limit": "Undefined stored result remains distinct from default; missing native status text stays absent. No control activation, entry/exit macro execution or protection editing."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_word_mail_merge_and_form_payloads_survive_public_title_edits",
+      "fixtures": [
+        "word/word-mailmerge-fields.docx",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "docx-073",
+        "docx-089",
+        "docx-113",
+        "docx-117"
+      ],
+      "assertions": [
+        "Auto and eager public title edits save/reopen; exact document payload except title preserves ffData, nested instructions, field caches and bookmarks; unrelated part payloads and source bytes stay unchanged."
+      ],
+      "scope_limit": "Generic title edit only; no interpretation of ffData, form interaction, merge or field evaluation.",
+      "required_features": [
+        "docx"
+      ]
     }
   ]
 }

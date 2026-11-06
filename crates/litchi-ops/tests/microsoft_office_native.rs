@@ -829,3 +829,78 @@ fn native_word_layout_extension_values_survive_public_title_edits() {
         assert!(std::fs::read(path).unwrap() == bytes);
     }
 }
+
+#[cfg(feature = "docx")]
+#[test]
+fn native_word_mail_merge_and_form_payloads_survive_public_title_edits() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word");
+    for (name, title) in [
+        ("word-mailmerge-fields.docx", "WORD_MAILMERGE_009"),
+        ("word-legacy-form-unprotected.docx", "WORD_LEGACY_FORM_010"),
+    ] {
+        let path = root.join(name);
+        let bytes = std::fs::read(&path).unwrap();
+        for mode in [SourceMode::Auto, SourceMode::Eager] {
+            let options = OpenOptions::new().source_mode(mode);
+            let file = litchi_ops::open_with(&path, &options).unwrap();
+            assert_eq!(
+                file.get("/body/p[1]")
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some(title)
+            );
+            let changed = file
+                .set("/body/p[1]/r[1]", props! {"text"=>"NATIVE_FIELDS_REVIEWED"})
+                .unwrap();
+            let directory = tempfile::tempdir().unwrap();
+            let destination = directory.path().join(name);
+            changed.save_as(&destination).unwrap();
+            let reopened = litchi_ops::open_with(&destination, &options).unwrap();
+            assert_eq!(
+                reopened
+                    .get("/body/p[1]")
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some("NATIVE_FIELDS_REVIEWED")
+            );
+            let original = litchi_docx::Package::from_bytes(&bytes).unwrap();
+            let owner = litchi_docx::Package::open(&destination).unwrap();
+            assert_eq!(
+                owner.mail_merge_settings().unwrap(),
+                original.mail_merge_settings().unwrap()
+            );
+            for metadata in original.opc_package().iter_parts() {
+                let before = original
+                    .opc_package()
+                    .get_part(metadata.partname())
+                    .unwrap();
+                let after = owner.opc_package().get_part(metadata.partname()).unwrap();
+                if metadata.partname().as_str() == "/word/document.xml" {
+                    // Exact rest-of-document equality includes ffData, nested
+                    // field instructions, cached results and paired bookmarks.
+                    let expected = std::str::from_utf8(before.blob()).unwrap().replacen(
+                        title,
+                        "NATIVE_FIELDS_REVIEWED",
+                        1,
+                    );
+                    assert!(after.blob() == expected.as_bytes());
+                } else {
+                    assert!(
+                        after.blob() == before.blob(),
+                        "changed {}",
+                        metadata.partname()
+                    );
+                }
+            }
+            assert!(file.to_bytes().unwrap() == bytes);
+        }
+        assert!(std::fs::read(path).unwrap() == bytes);
+    }
+}
