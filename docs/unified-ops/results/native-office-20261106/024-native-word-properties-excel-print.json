@@ -1,0 +1,338 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "cc04820c5a094d1c1a43873823d8986720e1ed82",
+  "base_commit": "dc1e6f15fc6923818529b75ca195be0e4203948f",
+  "problem": "Native Excel omits gridLinesSet while setting gridLines, exposing an incorrect false schema default that reported no printed gridlines. Its source-backed print-option edit also compacted the full worksheet, deleting producer CRLF outside the selected element. Native Word property/web-settings families lacked semantic lifecycle regressions.",
+  "changes": [
+    "Make PrintOptions::new and Default use the normative true default for gridLinesSet; preserve explicit false and keep gridLines default false.",
+    "Separate source-backed print-option splicing from compact authored replacement. Both reuse the same bounded namespace/owner scanner and semantic readback; the source route retains every byte outside its selected element.",
+    "Add six native Word tests for core/application/custom property reads, composite updates, insertion/removal, graph inverse, macro/template preservation, web-setting reads, screen edits and removal.",
+    "Add three native Excel tests for exact headers/footers, print flags and source edits, frozen panes and three-pane selections, and eager/source view agreement.",
+    "Add two synthetic tests covering default/explicit flag combinations in both OOXML dialects and source splice fidelity for BOM, whitespace, comments and preserved cell text.",
+    "Map four newly asserted feature rows without changing historical fixture statuses or claiming whole-feature completion."
+  ],
+  "verification_scope": {
+    "word_properties": "The review document exposes its native title/subject/author/description, four keywords, category, revision and exact UTC timestamps. Application metadata keeps the saved template, producer version, company/manager and counts. Custom properties retain FixtureId text, ExpectedCount I32(42) and IsNative Boolean true, including case-insensitive lookup.",
+    "word_edits": "Composite core/app/custom CRUD changes only the three property parts, preserves exact unmodeled HeadingPairs/TitlesOfParts bytes, saves/reopens and reverses at member level. Family removal restores every actual part payload and complete relationship/content-type element attributes after reopen. Removal inverses may regenerate those two graph streams; their original lexical serialization is not part of these typed graph patches.",
+    "word_variants": "DOCX/DOTX/DOCM/DOTM title edits preserve all other members, including templates and inert VBA. Native optimizeForBrowser/allowPNG read true; absent web encoding/screen/frameset/divs remain distinct. Exact no-op put, one source-only screen-size insertion, temporary save/reopen, inverse and idempotent web-part removal are tested.",
+    "excel_print": "Native left/center/right header/footer text retains Aptos Narrow formatting, color codes and inert sheet/file/page fields. Omitted gridLinesSet is true under both Strict and Transitional CT_PrintOptions schemas. The native print settings therefore request gridlines. Disabling them and enabling vertical centering changes exactly the selected printOptions element, keeps every unrelated XML/member byte, saves/reopens and restores the retained source archive.",
+    "excel_views": "Select Sheet1 by name because the values/formulas fixture starts with a chart sheet. Its frozen B2 pane keeps split values 1/1 and TopRight B1, BottomLeft A2 and BottomRight B2 selections. Interaction-print stores B2:I5 and date1904-breaks stores B6. Window 0, Normal mode, 100% zoom, display flags and tab selection agree between eager and source readers.",
+    "limitations": "No fresh Word/Excel reopen, rendering, pagination, recalculation, field evaluation, printing or macro execution. The print fixture has no printer-specific DEVMODE part. The date1904 workbook custom views are distinct from namedSheetViews; named-view absence does not qualify custom-view runtime parity. Web frameset/div/border behavior and general view/header-footer editing remain outside these assertions."
+  },
+  "results": {
+    "main_rust_suite_passes": 6159,
+    "final_focused_rust_passes": 9,
+    "rust_ignored": 0,
+    "python_passed": 72,
+    "new_native_tests": 9,
+    "new_synthetic_tests": 2,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 232,
+      "indexed_tests": 276,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 232,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 26,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-owner.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-owner.log",
+        "bytes": 500513,
+        "sha256": "f0079fe0787898f247c80f860d8ee2c6ca0ba3cd79e3e63982c48c4cce30c120"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-excel-properties-owner.log 2>&1",
+      "suites": 170,
+      "passed": 5024,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,xlsx,encryption --lib --test 'docx_*' --test 'xlsx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-ops.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-ops.log",
+        "bytes": 101485,
+        "sha256": "cbe1954ba20c85d05dcfdcd54337b9209e658cf687da5d14ee55913687fddb64"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,xlsx,encryption --lib --test 'docx_*' --test 'xlsx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-excel-properties-ops.log 2>&1",
+      "suites": 33,
+      "passed": 1020,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-facade.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-facade.log",
+        "bytes": 33014,
+        "sha256": "9fe3145934de77774ad33c53e0b32ea117e71a01ce52be151ee14e349353439b"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/word-excel-properties-facade.log 2>&1",
+      "suites": 30,
+      "passed": 115,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-xlsx -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection,litchi-ops/docx,litchi-ops/xlsx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-clippy.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-clippy.log",
+        "bytes": 17607,
+        "sha256": "15b66db351edc55f8bd8627b987637f113472449b4d3cb2d38c3637fc966056c"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-xlsx -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection,litchi-ops/docx,litchi-ops/xlsx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/word-excel-properties-clippy.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --test microsoft_office_native_properties --test microsoft_office_native_print_views -- --nocapture",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-focused-accepted.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-focused-accepted.log",
+        "bytes": 18373,
+        "sha256": "30bf2373ccd1f7230d3b363850b632ef95adb0f61c573bf53753b4231e2dd2e8"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --test microsoft_office_native_properties --test microsoft_office_native_print_views -- --nocapture > /tmp/litchi-native-office.GMvwp4/word-excel-properties-focused-accepted.log 2>&1",
+      "suites": 2,
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --test microsoft_office_native_properties --test microsoft_office_native_print_views --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-clippy-focused.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-clippy-focused.log",
+        "bytes": 17611,
+        "sha256": "52015c47e27cfb11ba9fdec0eb576e4d2bdf45a1b7dad574f3bcde7ac5d24d1c"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --test microsoft_office_native_properties --test microsoft_office_native_print_views --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/word-excel-properties-clippy-focused.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-python.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-python.log",
+        "bytes": 664,
+        "sha256": "052ec92ac8eb4dca40828462aa0dd7c2b89c04b9d456df9db9ac0108f05dce6f"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/word-excel-properties-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-gate.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/word-excel-properties-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-coverage.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-coverage.json",
+        "bytes": 807780,
+        "sha256": "1702a683e876d864a199683787b76a75ea9391a88e21f0b0408c2b5234b700cf"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/word-excel-properties-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-xlsx/src/print_options.rs crates/litchi-xlsx/src/print_options/source.rs crates/litchi-xlsx/src/raw/worksheet_property.rs crates/litchi-xlsx/tests/microsoft_office_native_print_views.rs crates/litchi-docx/tests/microsoft_office_native_properties.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-format.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-xlsx/src/print_options.rs crates/litchi-xlsx/src/print_options/source.rs crates/litchi-xlsx/src/raw/worksheet_property.rs crates/litchi-xlsx/tests/microsoft_office_native_print_views.rs crates/litchi-docx/tests/microsoft_office_native_properties.rs > /tmp/litchi-native-office.GMvwp4/word-excel-properties-format.log 2>&1"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-excel-properties-diff-check.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-diff-check.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "git diff --check > /tmp/litchi-native-office.GMvwp4/word-excel-properties-diff-check.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "word-excel-properties-initial.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-excel-properties-initial.log",
+        "bytes": 19684,
+        "sha256": "d9841b9d759f7ad0f82f0fa7e846a90aae083bc58100e6d494d815fb9dbbdf70"
+      },
+      "observation": "The native print regressions failed grid_lines_set and prints_grid_lines before the default fix. Initial view selection by position 0 also correctly resolved the chart sheet; the regression now explicitly selects native Sheet1."
+    },
+    {
+      "artifact": {
+        "file_name": "excel-print-splice-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/excel-print-splice-probe.log",
+        "bytes": 19955,
+        "sha256": "70b77fa3f44a764e2499df600d8f73c5a51f9400bb82c399b8bce8a08f61b380"
+      },
+      "observation": "After the default fix, exact source comparison first differed at byte 55: the original CRLF after the XML declaration was removed. The separate source splice fixes that loss."
+    },
+    {
+      "artifact": {
+        "file_name": "word-properties-reproducer.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-properties-reproducer.log",
+        "bytes": 18693,
+        "sha256": "7bae6c80cedb7d44b39484c470c0f27bcfeb80ca1f78ac3e5992528823e26571"
+      },
+      "observation": "Initial Word removal-inverse assertions demanded raw manifest/relationship bytes. Inspection of GraphPatch PartState and shared property Change proved their scope is exact part payloads plus typed graph identity. Final tests retain exact part bytes and compare all graph element/attribute values, while unchanged/update-only graphs retain exact member bytes."
+    }
+  ],
+  "specification": {
+    "reference": "ECMA-376 fifth edition, Part1 Strict and Part4 Transitional XML Schemas, sml.xsd CT_PrintOptions",
+    "rule": "gridLinesSet has default=true in both schemas. horizontalCentered, verticalCentered, headings and gridLines have default=false.",
+    "schema_evidence": {
+      "file_name": "print-options-schema-evidence.json",
+      "path": "/tmp/litchi-native-office.GMvwp4/print-options-schema-evidence.json",
+      "bytes": 1789,
+      "sha256": "f4624032bb778cb323cac9c8b9cc71d64691853fddf9ab24743ff966c4ca70dc"
+    },
+    "schemas": [
+      {
+        "archive": "3rdparty/specs/ECMA-376/ECMA-376-1_5th_edition_december_2016.zip",
+        "schema_archive": "OfficeOpenXML-XMLSchema-Strict.zip",
+        "schema": "sml.xsd",
+        "schema_bytes": 244208,
+        "schema_sha256": "dc4b61faf2b62d2caf875faf40bb14a8f3c0cf3dc52763a2db394a28e79634b4",
+        "excerpt": "<xsd:complexType name=\"CT_PrintOptions\">\r\n    <xsd:attribute name=\"horizontalCentered\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"verticalCentered\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"headings\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"gridLines\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"gridLinesSet\" type=\"xsd:boolean\" use=\"optional\" default=\"true\"/>\r\n  </xsd:complexType>"
+      },
+      {
+        "archive": "3rdparty/specs/ECMA-376/ECMA-376-4_5th_edition_december_2016.zip",
+        "schema_archive": "OfficeOpenXML-XMLSchema-Transitional.zip",
+        "schema": "sml.xsd",
+        "schema_bytes": 246716,
+        "schema_sha256": "495debc8fa967b77ed37799747b049832f2c95b2ecdb9f19ddcd68f8c9f96ab9",
+        "excerpt": "<xsd:complexType name=\"CT_PrintOptions\">\r\n    <xsd:attribute name=\"horizontalCentered\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"verticalCentered\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"headings\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"gridLines\" type=\"xsd:boolean\" use=\"optional\" default=\"false\"/>\r\n    <xsd:attribute name=\"gridLinesSet\" type=\"xsd:boolean\" use=\"optional\" default=\"true\"/>\r\n  </xsd:complexType>"
+      }
+    ],
+    "usage": "Read-only local specification research. No production code, tests or repository scripts depend on the untracked specifications tree."
+  },
+  "evidence_sources": [
+    {
+      "file_name": "word-review-controls.docx",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/word/word-review-controls.docx",
+      "bytes": 19090,
+      "sha256": "b85582dfe2d04d0157252e1697bf67e64c1e50a1c3a7023fd1afc37238e49f9c"
+    },
+    {
+      "file_name": "word-text-structure.docx",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/word/word-text-structure.docx",
+      "bytes": 21905,
+      "sha256": "7d53afea4431fae334095489dd70a86f1650de68390daa055f1387c69162a57a"
+    },
+    {
+      "file_name": "word-math-navigation.dotx",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/word/word-math-navigation.dotx",
+      "bytes": 17499,
+      "sha256": "c3107f4aa9a4c2663505cb627761f68e10b21810ea6a6f590b6b86803a0e915d"
+    },
+    {
+      "file_name": "word-recorded-macro.docm",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/word/word-recorded-macro.docm",
+      "bytes": 19304,
+      "sha256": "47c8419628481a99234a1454616411e69036a0693444eb06caa678994856468c"
+    },
+    {
+      "file_name": "word-recorded-macro.dotm",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/word/word-recorded-macro.dotm",
+      "bytes": 19241,
+      "sha256": "af1d15a6e9ca38ebf2904118067b0dfaaa511332c5e9da8e601f3e45cad8ee0f"
+    },
+    {
+      "file_name": "excel-interaction-print.xlsx",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/excel/excel-interaction-print.xlsx",
+      "bytes": 13089,
+      "sha256": "85254132754529fb47ffd4cc047d64d519c86a1452917d56688e94de85c4e887"
+    },
+    {
+      "file_name": "excel-values-formulas-chart.xlsx",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+      "bytes": 18686,
+      "sha256": "7b9b6602d687d3b0f65915611723c1cc60934e6ecca9c54bec44403904afbd57"
+    },
+    {
+      "file_name": "excel-date1904-breaks.xlsx",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/excel/excel-date1904-breaks.xlsx",
+      "bytes": 10521,
+      "sha256": "6c8c3dcb769a54c5bd0847ef67a56cfc0fafca94f9e0718e01e2b3eb81a7d80b"
+    }
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_properties-983c2dfdd772137f",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_properties-983c2dfdd772137f",
+      "bytes": 14253704,
+      "sha256": "073dadd99ee8b1766e0b79508b4f7b48afc521d853de32b4ad0f63a49c39db7b",
+      "source_commit": "cc04820c5a094d1c1a43873823d8986720e1ed82",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --test microsoft_office_native_properties --test microsoft_office_native_print_views -- --nocapture"
+    },
+    {
+      "file_name": "microsoft_office_native_print_views-3bdf7d3deefa6f28",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_print_views-3bdf7d3deefa6f28",
+      "bytes": 16544368,
+      "sha256": "7750423ddafde7b2853b530bace7451a54449bd436f768f16c9b3442c5d1353c",
+      "source_commit": "cc04820c5a094d1c1a43873823d8986720e1ed82",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --test microsoft_office_native_properties --test microsoft_office_native_print_views -- --nocapture"
+    },
+    {
+      "file_name": "litchi_xlsx-24a2b4c400668ac4",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/litchi_xlsx-24a2b4c400668ac4",
+      "bytes": 107913504,
+      "sha256": "02390658cd314b3cc4e79a88be02ebbe83f218d35fe9d466ba63734dd8f3fbcc",
+      "source_commit": "cc04820c5a094d1c1a43873823d8986720e1ed82",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx -p litchi-xlsx --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-xlsx/encryption,litchi-xlsx/vba-inspection --lib --tests --no-fail-fast"
+    }
+  ],
+  "remaining_scope": "Overall goal remains active. All 139 fixtures have indexed tests; 232 of 494 feature rows have scoped partial assertions, with 26 native-evidence semantic rows still unasserted. Historical 252 pending labels and UI/external/unsupported review categories remain unchanged.",
+  "environment": {
+    "warnings": "Existing vendor/zlib-rs warnings only; no new Clippy warnings.",
+    "preserved_untracked_files": [
+      "crates/litchi/examples/bench_word_parse.rs",
+      "docs/adr/0033-unified-api-glossary-and-default-policies.md",
+      "perf.data"
+    ]
+  }
+}
