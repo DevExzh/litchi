@@ -835,7 +835,7 @@ fn boundary_end(input: &str, end: usize) -> usize {
 /// Whether the group whose `{` precedes `after` is a destination: an
 /// ignorable `\*` destination or one whose `\par` controls belong to
 /// another story or to no story.
-fn opens_destination(after: &[u8]) -> bool {
+pub(super) fn opens_destination(after: &[u8]) -> bool {
     let after = after.trim_ascii_start();
     let Some(rest) = after.strip_prefix(b"\\") else {
         return false;

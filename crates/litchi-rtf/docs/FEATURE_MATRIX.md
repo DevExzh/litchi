@@ -116,3 +116,22 @@ and ordinary-root transfer refuses a native receiver with opaque destinations;
 both boundaries have typed refusal and unchanged-source assertions. No native
 visual edit, empty-default-shape authoring, rendering or object activation is
 inferred from the successful snapshot and transfer cases.
+
+Native layout regressions qualify document page-default inheritance, section
+geometry, grouped section boundaries, explicit page breaks, running header/footer
+stories, note bodies/separators and selected passive policies. Document page
+controls and their section overrides have separate tokens; `sectd` restores the
+document geometry, and explicit section overrides remain distinct. `sectdefaultcl`
+sets the default document grid without resetting columns or line pitch.
+`SectionDocumentGridType::Default` now serializes as `sectdefaultcl`; the separate
+`SnapToGrid` variant uses the specification's literal `sectspecifygenN`, with the
+older `sectspecifygen` spelling accepted on input.
+
+Native header, footnote/endnote and section-value edits preserve unrelated
+source bytes and invert after reopen. Section edits follow retained definition
+identity across ordinary formatting groups and inherited sections. Balanced
+`fcs` character-script groups are admitted by destination text splicing; controls
+that change state outside a balanced selected group remain subject to the
+existing exact-source/canonical-publication boundaries. These tests do not claim
+pagination, PAGE/note-number evaluation, note-area columns, general policy CRUD
+or fresh Word acceptance of edited files.

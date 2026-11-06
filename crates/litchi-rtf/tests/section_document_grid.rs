@@ -60,7 +60,7 @@ fn parses_bundled_libreoffice_document_grid_fixture() {
     let document = Tree::parse_bytes(fixture, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.sections().iter().any(|section| {
         section.properties.document_grid.line_grid == Some(360)
-            && section.properties.document_grid.grid_type.is_none()
+            && section.properties.document_grid.grid_type == Some(SectionDocumentGridType::Default)
     }));
 }
 
@@ -69,7 +69,9 @@ fn parses_all_grid_types() {
     for (control, expected) in [
         ("sectspecifyl", SectionDocumentGridType::LinesAndCharacters),
         ("sectspecifycl", SectionDocumentGridType::CharactersOnly),
-        ("sectspecifygen", SectionDocumentGridType::Default),
+        ("sectspecifygen", SectionDocumentGridType::SnapToGrid),
+        ("sectspecifygenN", SectionDocumentGridType::SnapToGrid),
+        ("sectdefaultcl", SectionDocumentGridType::Default),
     ] {
         let source = format!(r"{{\rtf1\{control} X}}");
         let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -125,6 +127,7 @@ fn inert_destinations_do_not_change_document_grid() {
         r"{\rtf1{\footer\sectlinegrid312 Footer}Body}",
         r"{\rtf1{\field{\*\fldinst IF \sectlinegrid312 1 1}{\fldrslt visible}}Body}",
         r"{\rtf1 A{\footnote\sectlinegrid312\sectspecifygen Note}Body}",
+        r"{\rtf1 A{\footnote\sectdefaultcl Note}Body}",
         r"{\rtf1{\object\sectlinegrid312}Body}",
     ] {
         let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();

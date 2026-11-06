@@ -4423,6 +4423,149 @@
         "External then self supporting books, exact encoded virtual path, three source sheet names, three references, absent external names and exact Sheet1 D6=49.75/Sheet2 B4=14 caches with zero-based row/column coordinates; Sheet1 remains visible."
       ],
       "scope_limit": "Read-only external metadata/cache projection. No external target access, refresh, formula evaluation or public external-link transaction claim."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_section_resets_keep_document_margins_and_landscape_columns",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-472",
+        "rtf-484"
+      ],
+      "assertions": [
+        "Two sections retain document margins1440, portrait12240x15840 and landscape15840x12240, two columns and explicit default grid with line pitch360."
+      ],
+      "scope_limit": "Effective stored page/column geometry only; no pagination, rendering or general layout-policy authoring."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_grouped_section_break_binds_the_landscape_section",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-472"
+      ],
+      "assertions": [
+        "The formatting-group sect marker survives at the exact main-story byte boundary after Second section begins below and binds retained section1."
+      ],
+      "scope_limit": "Section boundary identity only; no computed page count."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_header_footer_stories_retain_paragraphs_and_cached_page_fields",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-472",
+        "rtf-473"
+      ],
+      "assertions": [
+        "Exact HeaderRight/FooterLeft/FooterRight text and physical ownership, two footer PAGE fields with cached empty/2 results and matching story references, and four exact note-separator marker/paragraph sequences."
+      ],
+      "scope_limit": "Stored story definitions and field caches only; inherited header rendering and PAGE evaluation are not performed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_footnote_and_endnote_stories_keep_their_exact_text_and_kind",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-layout-extensions.rtf"
+      ],
+      "feature_rows": [
+        "rtf-473"
+      ],
+      "assertions": [
+        "One endnote and one footnote across the two sources, exact note body text, stored/default reference marks, document note-kind flags and endnote placement, and exactly one body note event per source."
+      ],
+      "scope_limit": "No numbering recalculation or footnote-area column inference from the marker text. Source notes remain separate from main-story text."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_passive_layout_policies_survive_canonical_writing",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-484"
+      ],
+      "assertions": [
+        "Page-layout view100%, zero gutter, legacy footnote layout, validatexml1, footnote placement/kind and complete effective section properties survive actual model writing and reparse."
+      ],
+      "scope_limit": "Passive policy metadata only; no schema validation, UI behavior or general document-policy transactions."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_running_header_edit_changes_only_the_selected_text",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-472",
+        "rtf-457"
+      ],
+      "assertions": [
+        "HeaderRight paragraph0 replacement is exactly one source marker substitution; main text and other stories remain intact, reopen reads the new text and inverse restores the exact original bytes."
+      ],
+      "scope_limit": "One header paragraph without dependent fields or drawings; other header/footer editing profiles remain unqualified."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_note_text_edits_preserve_main_story_sections_and_note_identity",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-layout-extensions.rtf"
+      ],
+      "feature_rows": [
+        "rtf-473",
+        "rtf-457"
+      ],
+      "assertions": [
+        "Footnote/endnote text replacement survives temporary save/reopen with kind/reference/anchor intact. Every source byte outside the selected note group, all chftn markers, main text and section properties are retained; inverse is byte-exact."
+      ],
+      "scope_limit": "Whole note-text replacement permits balanced character-formatting groups, including fcs. It does not author note layout or positional child objects."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_landscape_section_edit_preserves_the_first_section_and_auxiliary_stories",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-472",
+        "rtf-457"
+      ],
+      "assertions": [
+        "Set landscape section columns3 and left margin1000 using exactly the intended source insertion/replacement; first-section geometry, body and auxiliary stories remain unchanged and inverse restores the source."
+      ],
+      "scope_limit": "Bounded section-value edits only; no section lifecycle or pagination claim."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_layout",
+      "name": "native_visual_page_breaks_keep_exact_body_offsets_and_event_order",
+      "fixtures": [
+        "word/word-visual-objects.rtf",
+        "word/word-vector-diagram.rtf"
+      ],
+      "feature_rows": [
+        "rtf-465"
+      ],
+      "assertions": [
+        "Exact page-break byte positions [96,115] and [75,97], absent column/soft breaks and unchanged event order on source reopen. Actual model writing of the visual-object source also preserves the full body-event order, page positions and body text."
+      ],
+      "scope_limit": "Explicit stored page breaks only; no computed pagination. The vector fixture retains its separately tested structural-opaque canonical-writer boundary."
     }
   ]
 }

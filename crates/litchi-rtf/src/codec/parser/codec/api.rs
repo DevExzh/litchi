@@ -147,6 +147,8 @@ impl<'a> Parser<'a> {
             print_layout_settings: crate::DocumentPrintLayoutSettings::default(),
             print_layout_settings_seen: 0,
             section_gutter_overrides: Vec::new(),
+            document_page_defaults: crate::SectionProperties::default(),
+            section_geometry_overrides: Vec::new(),
             theme_languages: crate::DocumentThemeLanguages::default(),
             theme_languages_seen: 0,
             xml_policies: crate::DocumentXmlPolicies::default(),
@@ -595,6 +597,7 @@ impl<'a> Parser<'a> {
                 crate::Error::MalformedDocument("RTF body paragraph count overflow".to_string())
             })?;
         let body_story_events = self.finalize_body_story_events()?;
+        self.resolve_document_page_defaults();
 
         let revision_save = if self.saw_revision_save_table || self.saw_revision_save_root {
             Some(crate::RevisionSaveMetadata::new(

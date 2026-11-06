@@ -770,6 +770,13 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::SectionPage
             | ControlWord::SectionEvenPage
             | ControlWord::SectionOddPage
+            | ControlWord::SectionPageWidth(_)
+            | ControlWord::SectionPageHeight(_)
+            | ControlWord::SectionMarginLeft(_)
+            | ControlWord::SectionMarginRight(_)
+            | ControlWord::SectionMarginTop(_)
+            | ControlWord::SectionMarginBottom(_)
+            | ControlWord::SectionLandscape
             | ControlWord::PageWidth(_)
             | ControlWord::PageHeight(_)
             | ControlWord::MarginLeft(_)
@@ -814,7 +821,7 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::SectionVerticalRendering(_)
             | ControlWord::SectionHorizontalRendering(_)
             | ControlWord::SectionNoColumnBalance(_)
-            | ControlWord::SectionDefaultColumns(_)
+            | ControlWord::SectionDefaultGrid(_)
             | ControlWord::SectionFootnotePlacement(_)
             | ControlWord::SectionEndnoteHere
             | ControlWord::SectionFootnoteStart(_)
@@ -1713,6 +1720,8 @@ pub(crate) struct Parser<'a> {
     print_layout_settings: crate::DocumentPrintLayoutSettings,
     print_layout_settings_seen: u8,
     section_gutter_overrides: Vec<bool>,
+    document_page_defaults: crate::SectionProperties,
+    section_geometry_overrides: Vec<u8>,
     theme_languages: crate::DocumentThemeLanguages,
     theme_languages_seen: u8,
     xml_policies: crate::DocumentXmlPolicies,

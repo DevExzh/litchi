@@ -8,6 +8,40 @@ use super::{
     require_parameterless, section_style_reference,
 };
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "other controls are not page geometry"
+)]
+fn page_geometry_mask(control: &ControlWord<'_>) -> u8 {
+    match control {
+        ControlWord::PageWidth(_) | ControlWord::SectionPageWidth(_) => 1,
+        ControlWord::PageHeight(_) | ControlWord::SectionPageHeight(_) => 2,
+        ControlWord::MarginLeft(_) | ControlWord::SectionMarginLeft(_) => 4,
+        ControlWord::MarginRight(_) | ControlWord::SectionMarginRight(_) => 8,
+        ControlWord::MarginTop(_) | ControlWord::SectionMarginTop(_) => 16,
+        ControlWord::MarginBottom(_) | ControlWord::SectionMarginBottom(_) => 32,
+        ControlWord::Landscape | ControlWord::SectionLandscape => 64,
+        _ => 0,
+    }
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "caller selects document geometry controls"
+)]
+fn apply_page_geometry(properties: &mut crate::SectionProperties, control: &ControlWord<'_>) {
+    match control {
+        ControlWord::PageWidth(v) => properties.page_width = *v,
+        ControlWord::PageHeight(v) => properties.page_height = *v,
+        ControlWord::MarginLeft(v) => properties.margin_left = *v,
+        ControlWord::MarginRight(v) => properties.margin_right = *v,
+        ControlWord::MarginTop(v) => properties.margin_top = *v,
+        ControlWord::MarginBottom(v) => properties.margin_bottom = *v,
+        ControlWord::Landscape => properties.orientation = crate::PageOrientation::Landscape,
+        _ => {},
+    }
+}
+
 impl Parser<'_> {
     #[allow(
         clippy::wildcard_enum_match_arm,
@@ -210,6 +244,40 @@ impl Parser<'_> {
         }
     }
 
+    /// Apply final document defaults once; per-section overrides remain local.
+    /// Deferring this avoids rescanning earlier sections for each global control.
+    pub(super) fn resolve_document_page_defaults(&mut self) {
+        let defaults = &self.document_page_defaults;
+        for (section, mask) in self
+            .sections
+            .iter_mut()
+            .zip(&self.section_geometry_overrides)
+        {
+            let p = &mut section.properties;
+            if mask & 1 == 0 {
+                p.page_width = defaults.page_width;
+            }
+            if mask & 2 == 0 {
+                p.page_height = defaults.page_height;
+            }
+            if mask & 4 == 0 {
+                p.margin_left = defaults.margin_left;
+            }
+            if mask & 8 == 0 {
+                p.margin_right = defaults.margin_right;
+            }
+            if mask & 16 == 0 {
+                p.margin_top = defaults.margin_top;
+            }
+            if mask & 32 == 0 {
+                p.margin_bottom = defaults.margin_bottom;
+            }
+            if mask & 64 == 0 {
+                p.orientation = defaults.orientation;
+            }
+        }
+    }
+
     pub(super) fn begin_section(&mut self) -> crate::Result<()> {
         if self.sections.len() >= MAX_SECTIONS {
             return Err(crate::Error::MalformedDocument(
@@ -220,7 +288,7 @@ impl Parser<'_> {
             .sections
             .last()
             .map(|section| section.properties.clone())
-            .unwrap_or_default();
+            .unwrap_or_else(|| self.document_page_defaults.clone());
         let inherited_gutter_override = self
             .section_gutter_overrides
             .last()
@@ -235,6 +303,8 @@ impl Parser<'_> {
                 .unwrap_or_default()
                 .cast_signed();
         }
+        let inherited_geometry = self.section_geometry_overrides.last().copied().unwrap_or(0);
+        self.section_geometry_overrides.push(inherited_geometry);
         let section_index = self.sections.len();
         self.sections.push(section);
         self.section_gutter_overrides
@@ -271,6 +341,7 @@ impl Parser<'_> {
                 | ControlWord::PageNumberHeadingSeparator(_)
                 | ControlWord::SectionLineGrid(_)
                 | ControlWord::SectionDocumentGrid(_)
+                | ControlWord::SectionDefaultGrid(_)
         );
         if is_body_scoped_section_control
             && self.current_state()?.destination != Destination::DocumentBody
@@ -282,6 +353,26 @@ impl Parser<'_> {
                 .states
                 .last()
                 .is_some_and(|state| state.destination == Destination::DocumentBody);
+
+        if matches!(
+            control,
+            ControlWord::PageWidth(_)
+                | ControlWord::PageHeight(_)
+                | ControlWord::MarginLeft(_)
+                | ControlWord::MarginRight(_)
+                | ControlWord::MarginTop(_)
+                | ControlWord::MarginBottom(_)
+                | ControlWord::Landscape
+        ) {
+            if !in_root_document_body {
+                return Ok(true);
+            }
+            apply_page_geometry(&mut self.document_page_defaults, control);
+            if self.sections.is_empty() {
+                self.begin_section()?;
+            }
+            return Ok(true);
+        }
 
         if let Some(side) = match control {
             ControlWord::PageBorderTop => Some(crate::PageBorderSide::Top),
@@ -308,7 +399,16 @@ impl Parser<'_> {
         }
 
         if matches!(control, ControlWord::Section) {
-            if in_root_document_body {
+            let state = self.current_state()?;
+            if state.destination != Destination::DocumentBody {
+                return Ok(true);
+            }
+            if state.in_table || state.table_nesting_level >= 2 {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF section break is not permitted in a table cell".into(),
+                ));
+            }
+            {
                 self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                     crate::BodyStoryEvent::SectionBreak(crate::SectionBreak::new(
                         self.body_text_len,
@@ -374,6 +474,13 @@ impl Parser<'_> {
         {
             *overridden = true;
         }
+        if let Some(flags) = self.section_geometry_overrides.last_mut() {
+            if matches!(control, ControlWord::SectionDefault) {
+                *flags = 0;
+            } else {
+                *flags |= page_geometry_mask(control);
+            }
+        }
         let section = self.sections.last_mut().ok_or_else(|| {
             crate::Error::ParserError("failed to create RTF section state".to_string())
         })?;
@@ -388,7 +495,7 @@ impl Parser<'_> {
             ControlWord::TitlePage => properties.title_page = true,
             ControlWord::SectionEndnoteHere => properties.note_options.endnote_here = true,
             ControlWord::SectionDefault => {
-                *properties = super::super::super::section::SectionProperties::default();
+                *properties = self.document_page_defaults.clone();
                 properties.margin_gutter = self
                     .print_layout_settings
                     .document_gutter_twips
@@ -458,12 +565,12 @@ impl Parser<'_> {
             ControlWord::SectionColumn => properties.break_type = SectionBreakType::Column,
             ControlWord::SectionEvenPage => properties.break_type = SectionBreakType::EvenPage,
             ControlWord::SectionOddPage => properties.break_type = SectionBreakType::OddPage,
-            ControlWord::PageWidth(value) => properties.page_width = *value,
-            ControlWord::PageHeight(value) => properties.page_height = *value,
-            ControlWord::MarginLeft(value) => properties.margin_left = *value,
-            ControlWord::MarginRight(value) => properties.margin_right = *value,
-            ControlWord::MarginTop(value) => properties.margin_top = *value,
-            ControlWord::MarginBottom(value) => properties.margin_bottom = *value,
+            ControlWord::SectionPageWidth(value) => properties.page_width = *value,
+            ControlWord::SectionPageHeight(value) => properties.page_height = *value,
+            ControlWord::SectionMarginLeft(value) => properties.margin_left = *value,
+            ControlWord::SectionMarginRight(value) => properties.margin_right = *value,
+            ControlWord::SectionMarginTop(value) => properties.margin_top = *value,
+            ControlWord::SectionMarginBottom(value) => properties.margin_bottom = *value,
             ControlWord::MarginGutter(value) => properties.margin_gutter = *value,
             ControlWord::PaperSourceFirst(value) => {
                 properties.paper_source.first = Some(paper_source_bin(*value, "binfsxn")?);
@@ -473,7 +580,7 @@ impl Parser<'_> {
             },
             ControlWord::HeaderDistance(value) => properties.header_distance = *value,
             ControlWord::FooterDistance(value) => properties.footer_distance = *value,
-            ControlWord::Landscape => properties.orientation = PageOrientation::Landscape,
+            ControlWord::SectionLandscape => properties.orientation = PageOrientation::Landscape,
             ControlWord::Columns(value) => {
                 let value = value.unwrap_or(1);
                 let count = u16::try_from(value).map_err(|_err| {
@@ -629,9 +736,9 @@ impl Parser<'_> {
                 require_parameterless(*param, "nocolbal")?;
                 properties.balance_columns = false;
             },
-            ControlWord::SectionDefaultColumns(param) => {
+            ControlWord::SectionDefaultGrid(param) => {
                 require_parameterless(*param, "sectdefaultcl")?;
-                properties.columns = crate::SectionColumns::default();
+                properties.document_grid.grid_type = Some(crate::SectionDocumentGridType::Default);
             },
             ControlWord::PageNumberFormat(format) => {
                 properties.page_number_format = *format;

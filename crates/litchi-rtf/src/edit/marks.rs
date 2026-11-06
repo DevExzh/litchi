@@ -825,33 +825,26 @@ fn tab_splices(
     }
 }
 
-/// The root-level `\sect` controls of the body, in source order.
+/// Visible body section breaks in source order, including formatting groups.
 fn section_breaks(source: &Source<'_>) -> Vec<Range<usize>> {
     let bytes = source.bytes();
-    let mut depth = 0usize;
-    let mut destination: Vec<bool> = Vec::new();
+    let mut destinations = Vec::new();
     let mut out = Vec::new();
-    for (index, (token, span)) in source.tokens.iter().zip(&source.spans).enumerate() {
+    for (token, span) in source.tokens.iter().zip(&source.spans) {
         match token {
-            Token::OpenBrace => {
-                let ignorable = source
-                    .tokens
-                    .get(index + 1)
-                    .and_then(|_| source.spans.get(index + 1))
-                    .and_then(|next| bytes.get(next.clone()))
-                    .is_some_and(|raw| raw.starts_with(b"\\*"));
-                depth += 1;
-                destination.push(ignorable || destination.last().copied().unwrap_or(false));
-            },
+            Token::OpenBrace => destinations.push(
+                destinations.last().copied().unwrap_or(false)
+                    || super::producer_paragraphs::opens_destination(
+                        bytes.get(span.end..).unwrap_or_default(),
+                    ),
+            ),
             Token::CloseBrace => {
-                depth = depth.saturating_sub(1);
-                destination.pop();
+                destinations.pop();
             },
-            Token::Control(_) if depth == 1 => {
-                let raw = bytes.get(span.clone()).unwrap_or_default();
-                if control_name(raw) == b"sect" {
-                    out.push(span.clone());
-                }
+            Token::Control(crate::lexer::ControlWord::Section)
+                if !destinations.last().copied().unwrap_or(false) =>
+            {
+                out.push(span.clone())
             },
             _ => {},
         }
@@ -992,19 +985,48 @@ fn section_splices(
     Ok(())
 }
 
-/// The source region of section `section`: from the end of the previous
-/// root-level `\sect` (or the document start) to its own `\sect` (or the
-/// document end).
-fn section_region(source: &Source<'_>, section: usize) -> Range<usize> {
+/// Resolve a retained section definition through the parser's actual body
+/// boundaries. Inherited sections need not have separate definitions.
+fn section_region(
+    package: &Package,
+    source: &Source<'_>,
+    section: usize,
+) -> Result<Range<usize>, Error> {
     let breaks = section_breaks(source);
-    let start = match section.checked_sub(1) {
-        Some(previous) => breaks.get(previous).map_or(0, |span| span.end),
+    let boundaries = package.raw().section_breaks().collect::<Vec<_>>();
+    if breaks.len() != boundaries.len() {
+        return Err(Error::unsupported_source(
+            "section source boundaries do not match the main story",
+        ));
+    }
+    let previous = if section == 0 {
+        None
+    } else {
+        Some(
+            boundaries
+                .iter()
+                .position(|b| b.next_section == Some(section))
+                .ok_or(Error::unsupported_source(
+                    "section definition has no matching body boundary",
+                ))?,
+        )
+    };
+    let start = match previous {
+        Some(index) => {
+            breaks
+                .get(index)
+                .ok_or(Error::unsupported_source(
+                    "section source boundary is missing",
+                ))?
+                .end
+        },
         None => 0,
     };
+    let next = previous.map_or(0, |i| i + 1);
     let end = breaks
-        .get(section)
+        .get(next)
         .map_or(source.input.len(), |span| span.start);
-    start..end
+    Ok(start..end)
 }
 
 /// Apply `splices` to `input`; they must not overlap.
@@ -1096,7 +1118,7 @@ fn splice(package: &Package, input: &str, marks: &[Mark]) -> Result<Vec<u8>, Err
                 tab_splices(&source, &range, stops, &mut splices);
             },
             Mark::SectionValues { section, values } => {
-                let region = section_region(&source, *section);
+                let region = section_region(package, &source, *section)?;
                 section_splices(&source, &region, values, &mut splices)?;
             },
         }

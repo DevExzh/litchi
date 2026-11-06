@@ -371,6 +371,7 @@ fn is_character_format_control(name: &[u8]) -> bool {
             | b"up"
             | b"dn"
             | b"f"
+            | b"fcs"
             | b"fs"
             | b"cf"
             | b"cb"

@@ -566,9 +566,10 @@ pub enum SectionDocumentGridType {
     LinesAndCharacters,
     /// Character grid only (`sectspecifycl`).
     CharactersOnly,
-    /// Default grid marker (`sectspecifygen`): neither `sectspecifycl` nor
-    /// `sectspecifyl` was authored by the producing application.
+    /// Explicit default grid state (`sectdefaultcl`).
     Default,
+    /// Snap text to the character grid (`sectspecifygenN`).
+    SnapToGrid,
 }
 
 impl SectionDocumentGridType {
@@ -578,7 +579,8 @@ impl SectionDocumentGridType {
         match self {
             Self::LinesAndCharacters => "sectspecifyl",
             Self::CharactersOnly => "sectspecifycl",
-            Self::Default => "sectspecifygen",
+            Self::Default => "sectdefaultcl",
+            Self::SnapToGrid => "sectspecifygenN",
         }
     }
 }
