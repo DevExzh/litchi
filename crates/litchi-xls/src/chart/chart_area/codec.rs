@@ -52,12 +52,9 @@ pub(crate) fn patch(input: &[u8], change: Change, limits: Limits) -> Result<Vec<
             "chart-area patch requires a complete chart substream",
         ));
     }
-    if records.get(1).is_none_or(|value| value.kind != CHART) {
-        return Err(conflict(
-            "source Chart record is not at the chart-area owner position",
-        ));
-    }
-
+    // MS-XLS 2.1.7.20.1 CHARTSHEETCONTENT permits a host prelude (page
+    // setup, protection, drawing records, Units, ...) before CHARTFOMATS.
+    // Locate the unique source-checked Chart instead of assuming BOF+Chart.
     let mut chart_range = None;
     for value in records.iter().filter(|value| value.kind == CHART) {
         if chart_range.is_some() {

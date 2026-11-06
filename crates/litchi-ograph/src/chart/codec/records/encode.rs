@@ -437,11 +437,9 @@ fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
             push_record(out, SCATTER, &data)?;
         },
         Family::Radar { filled, flags } => {
-            push_record(
-                out,
-                if filled { RADAR_AREA } else { RADAR },
-                &flags.to_le_bytes(),
-            )?;
+            let mut data = [0; 4];
+            put_u16(&mut data, 0, flags)?;
+            push_record(out, if filled { RADAR_AREA } else { RADAR }, &data)?;
         },
         Family::Surface { flags } => push_record(out, SURFACE, &flags.to_le_bytes())?,
     }
@@ -501,4 +499,29 @@ fn area_bytes(value: format::Area) -> [u8; 16] {
     data[12..14].copy_from_slice(&value.foreground_index.to_le_bytes());
     data[14..16].copy_from_slice(&value.background_index.to_le_bytes());
     data
+}
+
+#[cfg(test)]
+mod radar_tests {
+    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
+    use super::*;
+    use litchi_biff::Records;
+
+    #[test]
+    fn radar_emission_includes_canonical_unused_bytes() {
+        for (kind, filled) in [(RADAR, false), (RADAR_AREA, true)] {
+            let mut group = Group::line();
+            group.family = Family::Radar { filled, flags: 3 };
+            let mut wire = Encoder::new(Limits::default().biff).unwrap();
+            encode_group(&mut wire, &group).unwrap();
+            let bytes = wire.finish();
+            let records = Records::new(&bytes, Limits::default().biff)
+                .unwrap()
+                .map(|r| r.unwrap())
+                .filter(|r| r.kind() == kind)
+                .collect::<Vec<_>>();
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0].payload(), [3, 0, 0, 0]);
+        }
+    }
 }

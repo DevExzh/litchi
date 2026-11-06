@@ -349,6 +349,17 @@ impl Patch {
             }
         }
         for delta in &self.deltas {
+            if let (Some(before), Some(after)) = (&delta.before, &delta.after)
+                && before.content_type == after.content_type
+                && before.relationships == after.relationships
+            {
+                // A payload-only replay must retain the source relationship
+                // serialization, including Excel's companion ordering.
+                target
+                    .get_part_mut(&delta.name)?
+                    .set_blob_shared(Arc::clone(&after.blob));
+                continue;
+            }
             target.remove_part(&delta.name);
             if let Some(after) = &delta.after {
                 target.add_part(Box::new(after.to_part(delta.name.clone())?));

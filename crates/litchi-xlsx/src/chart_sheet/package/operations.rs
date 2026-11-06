@@ -312,7 +312,15 @@ pub(super) fn load_chart_resource(
                 return Err(limit("classic chart relationship count"));
             }
             add_resource(total, part.blob().len(), MAX_CHART_BYTES, "chart bytes")?;
-            let referenced = classic_chart_relationship_ids(part.blob(), conformance)?;
+            let mut referenced = classic_chart_relationship_ids(part.blob(), conformance)?;
+            // Excel emits style/color companions without an r:id in chartSpace.
+            // Their relationship type supplies the binding; all other resources
+            // still require an explicit reference.
+            for relationship in part.rels().iter() {
+                if classic_companion(relationship.reltype()).is_some() {
+                    referenced.insert(relationship.r_id().to_owned());
+                }
+            }
             let actual = part
                 .rels()
                 .iter()
@@ -564,7 +572,11 @@ fn load_classic_chart_resource(
     conformance: Conformance,
     total: &mut usize,
 ) -> Result<ChartOutboundResource> {
+    let companion = classic_companion(relationship.reltype());
     if relationship.is_external() {
+        if companion.is_some() {
+            return Err(invalid("external classic chart companion is rejected"));
+        }
         if relationship.target_ref().is_empty()
             || relationship.target_ref().len() > MAX_EXTENSION_RELATIONSHIP_STRING_BYTES
         {
@@ -593,6 +605,19 @@ fn load_classic_chart_resource(
         return Err(invalid("classic chart dependency is outside /xl"));
     }
     let part = package.get_part(&name)?;
+    let maximum = if let Some((content_type, root, maximum)) = companion {
+        validate_classic_companion(
+            name.as_str(),
+            part.content_type(),
+            part.blob(),
+            content_type,
+            root,
+            maximum,
+        )?;
+        maximum
+    } else {
+        MAX_CHART_EMBEDDED_PACKAGE_BYTES
+    };
     if !part.rels().is_empty() {
         return Err(invalid(
             "classic chart opaque dependency must be a relationship-free leaf",
@@ -601,7 +626,7 @@ fn load_classic_chart_resource(
     add_resource(
         total,
         part.blob().len(),
-        MAX_CHART_EMBEDDED_PACKAGE_BYTES,
+        maximum,
         "classic chart opaque dependency bytes",
     )?;
     Ok(ChartOutboundResource::Opaque(ChartOpaqueResource {
@@ -611,6 +636,42 @@ fn load_classic_chart_resource(
         content_type: part.content_type().to_owned(),
         data: part.blob().to_vec(),
     }))
+}
+
+/// The native Excel fixtures use the 2011 relationship spelling. MS-ODRAWXML
+/// 2.1.1/2.1.2 also defines the 2012 spelling for the same companion parts.
+fn classic_companion(relationship_type: &str) -> Option<(&'static str, &'static str, usize)> {
+    match relationship_type {
+        CHART_STYLE_REL | "http://schemas.microsoft.com/office/2012/relationships/chartStyle" => {
+            Some((CHART_STYLE_CT, "chartStyle", MAX_CHART_STYLE_BYTES))
+        },
+        CHART_COLOR_STYLE_REL
+        | "http://schemas.microsoft.com/office/2012/relationships/chartColorStyle" => Some((
+            CHART_COLOR_STYLE_CT,
+            "colorStyle",
+            MAX_CHART_COLOR_STYLE_BYTES,
+        )),
+        _ => None,
+    }
+}
+
+fn validate_classic_companion(
+    name: &str,
+    actual_type: &str,
+    data: &[u8],
+    content_type: &str,
+    root: &str,
+    maximum: usize,
+) -> Result<()> {
+    if !name.starts_with("/xl/charts/") || !name.ends_with(".xml") {
+        return Err(invalid(
+            "chart companion target is outside /xl/charts or lacks .xml suffix",
+        ));
+    }
+    if actual_type != content_type {
+        return Err(invalid("classic chart companion has invalid content type"));
+    }
+    validate_chart_companion_xml(data, root, maximum)
 }
 
 pub(super) fn load_chart_user_shapes_resource(
@@ -1716,7 +1777,14 @@ fn validate_classic_chart_relationship_values<'a>(
     total: &mut usize,
     resources: &mut BTreeMap<String, &'a Vec<u8>>,
 ) -> Result<()> {
-    let referenced = classic_chart_relationship_ids(&chart.data, conformance)?;
+    if outbound_resources
+        .len()
+        .saturating_add(usize::from(user_shapes.is_some()))
+        > MAX_CHART_RELATIONSHIPS
+    {
+        return Err(limit("classic chart relationship count"));
+    }
+    let mut referenced = classic_chart_relationship_ids(&chart.data, conformance)?;
     let mut declared = BTreeSet::new();
     if let Some(user_shapes) = user_shapes {
         if !declared.insert(user_shapes.relationship_id.clone()) {
@@ -1763,6 +1831,9 @@ fn validate_classic_chart_relationship_values<'a>(
                 }
             },
             ChartOutboundResource::External(external) => {
+                if classic_companion(&external.relationship_type).is_some() {
+                    return Err(invalid("external classic chart companion is rejected"));
+                }
                 if external.relationship_type.is_empty()
                     || !external.relationship_type.contains(':')
                     || external.target.is_empty()
@@ -1782,10 +1853,26 @@ fn validate_classic_chart_relationship_values<'a>(
                 }
                 litchi_opc::ContentType::new(opaque.content_type.clone())
                     .map_err(|error| invalid(error.to_string()))?;
+                let maximum = if let Some((content_type, root, maximum)) =
+                    classic_companion(&opaque.relationship_type)
+                {
+                    validate_classic_companion(
+                        uri.as_str(),
+                        &opaque.content_type,
+                        &opaque.data,
+                        content_type,
+                        root,
+                        maximum,
+                    )?;
+                    referenced.insert(opaque.relationship_id.clone());
+                    maximum
+                } else {
+                    MAX_CHART_EMBEDDED_PACKAGE_BYTES
+                };
                 add_resource(
                     total,
                     opaque.data.len(),
-                    MAX_CHART_EMBEDDED_PACKAGE_BYTES,
+                    maximum,
                     "classic chart opaque dependency bytes",
                 )?;
                 if resources

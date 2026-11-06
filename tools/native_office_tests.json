@@ -5220,6 +5220,177 @@
         "The native notes-style package is a no-op when unchanged. Replacing it with a validated body-style XML containing sz=1800 survives temp save/reopen with exact stored XML; malformed-root refusal leaves the valid edit staged, all other records remain exact and inverse restores the source."
       ],
       "scope_limit": "OPC/style XML storage only; no font rendering, layout computation, master OfficeArt synthesis or native application reopen."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_charts",
+      "name": "native_seventeen_chart_families_keep_formula_cache_and_axis_semantics",
+      "fixtures": [
+        "excel/excel-chart-families.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-236"
+      ],
+      "assertions": [
+        "All 17 chart families, host order, group and axis counts, series indices/title references, exact category/value/XY/bubble formula ranges and saved caches; error-bar and trendline metadata; untouched package bytes."
+      ],
+      "scope_limit": "Saved classic-chart metadata only. No evaluation, rendering, modern ChartEx qualification, or complete chart CRUD."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_charts",
+      "name": "native_seventeen_chart_families_keep_formula_cache_and_axis_semantics",
+      "fixtures": [
+        "excel/excel-chart-families.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-310"
+      ],
+      "assertions": [
+        "All 17 chart families, host order, group and axis counts, series indices/title references, exact category/value/XY/bubble formula ranges and saved caches; error-bar and trendline metadata; untouched package bytes."
+      ],
+      "scope_limit": "Saved classic-chart metadata only. No evaluation, rendering, modern ChartEx qualification, or complete chart CRUD."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_charts",
+      "name": "native_chart_sheets_and_pivot_binding_resolve_their_resource_graphs",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-pivot-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-236",
+        "xlsx-247"
+      ],
+      "assertions": [
+        "Native chart-sheet tab and chart resource owners, exact sales and filtered pivot caches/formulas; pivot source resolves to typed PivotTable1 on Sheet2."
+      ],
+      "scope_limit": "Read-only chart and pivot binding; no pivot refresh, layout computation, or fresh Office reopen."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_charts",
+      "name": "native_implicit_chart_companions_validate_without_weakening_other_relationships",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-236"
+      ],
+      "assertions": [
+        "Native implicit style/color companions retain original bytes and IDs. Typed graph accepts 2011/2012 aliases; rejects wrong type/root/path, external style, and unrelated unreferenced relationship."
+      ],
+      "scope_limit": "Bounded classic chart-sheet resources only; no style rendering or general extension relationship qualification."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_charts",
+      "name": "native_embedded_chart_cache_update_preserves_companions_and_inverts",
+      "fixtures": [
+        "excel/excel-chart-families.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-236"
+      ],
+      "assertions": [
+        "Change one saved numeric cache point; save/reopen changes only chart1.xml and inverse restores every package member, including original companion relationship serialization."
+      ],
+      "scope_limit": "Payload replacement only; caches are edited explicitly, not recalculated. Other chart lifecycle operations remain unqualified by this test."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_charts",
+      "name": "native_chart_sheets_keep_saved_sales_and_pivot_chart_semantics",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-309",
+        "xlsb-316"
+      ],
+      "assertions": [
+        "Complete-tab chart-sheet index and drawing owner; exact saved sales/pivot caches and formula ranges, native XLSB pivot source prefix and format ID."
+      ],
+      "scope_limit": "Pivot source metadata is read without refresh or a new typed pivot-table resolution assertion; no chart-sheet creation/rendering."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_charts",
+      "name": "native_cell_edit_keeps_chart_graph_and_saved_caches_inert",
+      "fixtures": [
+        "excel/excel-chart-families.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-310"
+      ],
+      "assertions": [
+        "Edit source cell B2, save/reopen with changed scalar and unchanged chart cache, chart parts, styles/colors and relationships; exact inverse."
+      ],
+      "scope_limit": "Cell mutation preserves chart graph; this does not qualify chart editing or recalculation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_charts",
+      "name": "native_radar_is_discoverable_with_three_series_and_biff_cell_links",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "Discover all 17 native embedded charts, then assert Radar family, three named series, category/value counts and exact ExternSheet/area references."
+      ],
+      "scope_limit": "Only Radar family semantics are qualified here. OfPie and high/low/close stock classification gaps discovered in the other charts remain open; general BIFF chart grammar is partial."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_charts",
+      "name": "native_sales_and_pivot_chart_sheets_expose_saved_series_and_caches",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-pivot-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-181",
+        "xls-182"
+      ],
+      "assertions": [
+        "Chart-sheet owners, bar family, sales names/area references and all 24 cached cells; native pivot chart literal series and North/Grand Total cached values 9.5."
+      ],
+      "scope_limit": "Saved chart contents only; BIFF pivot binding remains opaque, and no refresh/evaluation/rendering is claimed. BIFF includes a Grand Total cache point absent from the OOXML companion."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_charts",
+      "name": "native_chart_sheet_cache_edit_preserves_unrelated_records_and_inverts",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "One saved chart cache edit survives save/reopen; exactly one NUMBER record changes; unrelated streams/records and chart model remain intact; exact inverse."
+      ],
+      "scope_limit": "Existing chart-sheet cache only; no fresh chart authoring, formula evaluation, or renderer."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_charts",
+      "name": "native_radar_geometry_edit_changes_only_one_chart_record",
+      "fixtures": [
+        "excel/excel-chart-families.xls"
+      ],
+      "feature_rows": [
+        "xls-182"
+      ],
+      "assertions": [
+        "Native Radar geometry update tolerates the valid host prelude, changes exactly one Chart record, preserves other charts/CFB streams, and supports exact inverse."
+      ],
+      "scope_limit": "Fixed Chart payload only; host drawing object bounds are not resized and broader embedded-chart mutation remains unsupported."
     }
   ]
 }

@@ -1060,10 +1060,11 @@ pub(crate) fn parse_group(kind: u16, data: &[u8]) -> Result<GroupKind> {
             }
         },
         RADAR | RADAR_AREA => {
-            exact(data, 2, kind)?;
+            // MS-XLS 2.4.212/213: option bits plus two ignored bytes.
+            exact(data, 4, kind)?;
             GroupKind::Radar {
                 filled: kind == RADAR_AREA,
-                flags: u16_at(data, 0)?,
+                flags: u16_at(data, 0)? & 3,
             }
         },
         SURFACE => {
@@ -1276,11 +1277,11 @@ pub(super) fn write_group(out: &mut GraphEncoder, group: &Group) -> Result<()> {
             d.extend(flags.to_le_bytes());
             push_record(out, SCATTER, &d)?;
         },
-        GroupKind::Radar { filled, flags } => push_record(
-            out,
-            if *filled { RADAR_AREA } else { RADAR },
-            &flags.to_le_bytes(),
-        )?,
+        GroupKind::Radar { filled, flags } => {
+            let mut data = [0; 4];
+            data[..2].copy_from_slice(&flags.to_le_bytes());
+            push_record(out, if *filled { RADAR_AREA } else { RADAR }, &data)?;
+        },
         GroupKind::Surface { flags } => push_record(out, SURFACE, &flags.to_le_bytes())?,
     }
     for value in &group.lines {
@@ -1295,4 +1296,41 @@ pub(super) fn write_group(out: &mut GraphEncoder, group: &Group) -> Result<()> {
         push_record(out, END, &[])?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod radar_tests {
+    use super::*;
+    #[test]
+    fn radar_wire_lengths_reserved_bits_and_emission_follow_biff8() {
+        for (kind, filled) in [(RADAR, false), (RADAR_AREA, true)] {
+            for flags in 0..=3 {
+                let parsed = parse_group(kind, &[0xfc | flags, 0xff, 0xa5, 0x5a]).unwrap();
+                assert_eq!(
+                    parsed,
+                    GroupKind::Radar {
+                        filled,
+                        flags: u16::from(flags)
+                    }
+                );
+                let group = Group {
+                    order: 0,
+                    vary_colors: false,
+                    kind: parsed,
+                    lines: Vec::new(),
+                    drop_bars: Vec::new(),
+                };
+                let mut wire = GraphEncoder::new(litchi_biff::Limits::default()).unwrap();
+                write_group(&mut wire, &group).unwrap();
+                let mut expected = kind.to_le_bytes().to_vec();
+                expected.extend([4, 0, flags, 0, 0, 0]);
+                assert_eq!(wire.finish(), expected);
+            }
+            for length in [0, 2, 3, 5] {
+                assert!(
+                    matches!(parse_group(kind, &vec![0; length]), Err(Error::InvalidRecord { record_type, .. }) if record_type == kind)
+                );
+            }
+        }
+    }
 }

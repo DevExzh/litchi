@@ -1775,10 +1775,12 @@ fn parse_family(record: RecordRef<'_>) -> Result<Family> {
             })
         },
         RADAR | RADAR_AREA => {
-            exact(record, 2)?;
+            // MS-OGRAPH 2.4.81/82 and MS-XLS 2.4.212/213 include
+            // fourteen ignored flag bits and two ignored trailing bytes.
+            exact(record, 4)?;
             Ok(Family::Radar {
                 filled: record.kind() == RADAR_AREA,
-                flags: u16_at(data, 0, record)?,
+                flags: u16_at(data, 0, record)? & 3,
             })
         },
         SURFACE => {
@@ -1846,4 +1848,48 @@ fn add_raw(
         Raw::parsed(record.kind(), data, record.offset()),
         "unknown chart records",
     )
+}
+
+#[cfg(test)]
+mod radar_tests {
+    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
+    use super::*;
+    use litchi_biff::{Encoder, Records};
+
+    #[test]
+    fn radar_records_require_four_bytes_and_ignore_reserved_fields() {
+        for (kind, filled) in [(RADAR, false), (RADAR_AREA, true)] {
+            for flags in 0..=3 {
+                let mut wire = Encoder::new(Limits::default().biff).unwrap();
+                wire.push(kind, &[0xfc | flags, 0xff, 0xa5, 0x5a]).unwrap();
+                let bytes = wire.finish();
+                let record = Records::new(&bytes, Limits::default().biff)
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    parse_family(record).unwrap(),
+                    Family::Radar {
+                        filled,
+                        flags: u16::from(flags)
+                    }
+                );
+            }
+            for length in [0, 2, 3, 5] {
+                let mut wire = Encoder::new(Limits::default().biff).unwrap();
+                wire.push(kind, &vec![0; length]).unwrap();
+                let bytes = wire.finish();
+                let record = Records::new(&bytes, Limits::default().biff)
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .unwrap();
+                assert!(matches!(
+                    parse_family(record),
+                    Err(Error::InvalidChart { .. })
+                ));
+            }
+        }
+    }
 }
