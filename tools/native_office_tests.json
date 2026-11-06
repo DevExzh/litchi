@@ -4888,6 +4888,198 @@
         "Moving the native table range while retaining its filter and/or sort snapshot returns the typed table filter/sort metadata refusal before a package is built."
       ],
       "scope_limit": "This guards against silently rebinding retained metadata. General filter/sort range editing is not implemented by these immutable snapshots."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_vba",
+      "name": "native_word_vba_storage_and_decoded_modules_are_bounded_and_inert",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-030"
+      ],
+      "assertions": [
+        "Exact Macros/VBA topology, required/optional streams, module/SRP names, code page 10000, ThisDocument/NewMacros types/offsets/flags and complete LF source bytes; exact reference names and PROJECT/PROJECTwm no-op encoding; cold and cached module-count limits."
+      ],
+      "scope_limit": "Directory presence remains distinct from source inspection. No macro compilation, execution, signature trust or template instantiation."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_vba",
+      "name": "native_word_body_edit_keeps_every_vba_stream_and_reopens_typed_source",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-030"
+      ],
+      "assertions": [
+        "A first-paragraph edit and temporary save/reopen preserve every stream except WordDocument/table streams, including all VBA caches and source; reopened VBA still matches exact module text and metadata, and inverse restores original archive bytes."
+      ],
+      "scope_limit": "Preservation through a body edit only; legacy project replacement/removal and runtime macro behavior are not claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_biff_vba_markers_storage_and_source_agree",
+      "fixtures": [
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-151"
+      ],
+      "assertions": [
+        "Native ObProj/storage/ObNoMacros marker consistency, absent host code names, exact _VBA_PROJECT_CUR/VBA directory topology, one Module1 at offset 1428, code page 10000, exact LF source and MSForms/Office references; typed PROJECT/PROJECTwm and module limits."
+      ],
+      "scope_limit": "Stored presence and inert inspection only; no macro execution or template instantiation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_biff_cell_edit_preserves_and_reopens_the_vba_project",
+      "fixtures": [
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-151"
+      ],
+      "assertions": [
+        "Changing B2 to 43 changes only the Workbook stream; native VBA source/caches and all other CFB streams remain exact through save/reopen, full typed inspection and inverse."
+      ],
+      "scope_limit": "No legacy VBA project mutation or code execution is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_ooxml_vba_graph_source_and_limits_are_explicit",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm"
+      ],
+      "feature_rows": [
+        "xlsx-257"
+      ],
+      "assertions": [
+        "Exact workbook/rId5/project-part ownership, 10752-byte payload hashes and native project GUIDs, code page/module/source/reference metadata, cached accessor budgets and explicit standalone CFB byte refusal."
+      ],
+      "scope_limit": "Requires vba-inspection. Reads stored source only; no module execution or trust decisions."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_ooxml_vba_noop_remove_and_inverse_preserve_template_and_parts",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm"
+      ],
+      "feature_rows": [
+        "xlsx-257"
+      ],
+      "assertions": [
+        "Storing the same validated native payload is an exact no-op; removal is idempotent, changes only the project and graph manifests, converts XLSM/XLTM main types to the corresponding nonmacro type, and temporary reopen/inverse restores every original member."
+      ],
+      "scope_limit": "Requires vba-inspection. Package/template content-type behavior is asserted, not native Excel template instantiation."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_ooxml_vba_replacement_keeps_source_modules_and_unrelated_parts",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm"
+      ],
+      "feature_rows": [
+        "xlsx-257"
+      ],
+      "assertions": [
+        "Replace the XLSM project with the native XLTM project payload; exact replacement bytes, source text, relationship IDs/targets/modes and all part content types persist, unrelated members remain exact and inverse restores the original members."
+      ],
+      "scope_limit": "Requires vba-inspection. Replacement uses existing inert Excel projects; no source execution or fresh native-app reopen."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_binary_vba_graph_source_and_limits_are_explicit",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-327"
+      ],
+      "assertions": [
+        "Exact workbook.bin/rId5/project ownership, absent declared signatures, 10752-byte payload SHA-256 and GUID, code page 10000, Module1 offset/source/reference fields and cold/cached module limits."
+      ],
+      "scope_limit": "Requires vba-inspection. Signature absence is directory metadata, not a trust result; macros remain inert."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_binary_vba_noop_remove_and_inverse_preserve_all_other_members",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-327"
+      ],
+      "assertions": [
+        "Same-payload put is an exact no-op; idempotent clear changes only the VBA part and manifests, preserves the binary workbook content type, and temporary reopen/inverse restores every original member and decoded source."
+      ],
+      "scope_limit": "Requires vba-inspection. No macro execution, project-signature validation or fresh Excel reopen."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_vba",
+      "name": "native_excel_binary_vba_replacement_keeps_source_modules_and_unrelated_parts",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-recorded-macro.xlsm"
+      ],
+      "feature_rows": [
+        "xlsb-327"
+      ],
+      "assertions": [
+        "Replace the XLSB project with the native XLSM project payload; exact bytes/source, stable rId5 and complete graph semantics, unchanged unrelated members and exact-member inverse."
+      ],
+      "scope_limit": "Requires vba-inspection. Same-host MS-OVBA payload transfer only; no runtime or general cross-application compatibility claim."
+    },
+    {
+      "crate": "litchi-vba",
+      "target": "microsoft_office_native_vba",
+      "name": "native_vba_aggregate_source_limit_is_exact_across_recorded_modules",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "excel/excel-recorded-macro.xls"
+      ],
+      "feature_rows": [
+        "doc-030",
+        "xls-151"
+      ],
+      "assertions": [
+        "Native Word source totals 733 bytes across two modules and Excel 428 bytes in one. Exact aggregate limits admit; one byte less returns TotalSourceBytes before excess decompression."
+      ],
+      "scope_limit": "Codec budgets over existing CFB project roots only, without opening or executing Office."
+    },
+    {
+      "crate": "litchi-vba",
+      "target": "microsoft_office_native_vba",
+      "name": "native_vba_reference_name_edits_preserve_module_metadata_and_other_references",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "excel/excel-recorded-macro.xls"
+      ],
+      "feature_rows": [
+        "doc-030",
+        "xls-151"
+      ],
+      "assertions": [
+        "Unchanged reference serialization returns the exact native compressed dir stream. Renaming the Office display reference source-bound preserves project name/code page, all module metadata, reference kinds and every other reference raw record after decode."
+      ],
+      "scope_limit": "Directory-stream serialization only; no containing-document publication, type-library resolution, macro execution or native acceptance."
     }
   ]
 }
