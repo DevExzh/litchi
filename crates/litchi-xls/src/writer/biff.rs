@@ -474,8 +474,8 @@ pub(crate) fn write_mdx_metadata<W: Write>(
     workbook::write_mdx_metadata(writer, value)
 }
 
-pub(crate) fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> Result<()> {
-    workbook::write_xfcrc(writer, xf_count)
+pub(crate) fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16, checksum: u32) -> Result<()> {
+    workbook::write_xfcrc(writer, xf_count, checksum)
 }
 
 pub(crate) fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::XfExt) -> Result<()> {

@@ -429,12 +429,12 @@ pub(super) fn write_mdx_metadata<W: Write>(
 /// Write an XFCRC record (MS-XLS 2.4.354) declaring `xf_count` XF records.
 ///
 /// Record type: 0x087C
-pub(super) fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> Result<()> {
+pub(super) fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16, checksum: u32) -> Result<()> {
     write_record_header(writer, 0x087C, 20)?;
     writer.write_all(&0x087Cu16.to_le_bytes())?;
     writer.write_all(&[0; 12])?; // FrtHeader remainder + reserved
     writer.write_all(&xf_count.to_le_bytes())?;
-    writer.write_all(&0xB463_87D8u32.to_le_bytes())?; // checksum constant
+    writer.write_all(&checksum.to_le_bytes())?;
     Ok(())
 }
 

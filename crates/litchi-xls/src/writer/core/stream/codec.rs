@@ -154,6 +154,7 @@ pub(crate) fn generate_workbook_stream(
     //  - XF records (style and cell formats)
     fmt.write_fonts(&mut stream)?;
     fmt.write_number_formats(&mut stream)?;
+    let xf_start = stream.len();
     fmt.write_formats(&mut stream)?;
     // XFS = 16*XF [XFCRC 16*4050XFExt] precedes the DXF records: one XFCRC
     // counts the XF table, then come the caller's extensions and the pivot
@@ -175,7 +176,13 @@ pub(crate) fn generate_workbook_stream(
                 )));
             }
         }
-        biff::write_xfcrc(&mut stream, cxfs)?;
+        let mut crc = litchi_core::mso_crc32::MsoCrc32::new();
+        // Each BIFF8 XF has a 4-byte record header and a 20-byte payload.
+        debug_assert_eq!(stream.len() - xf_start, xf_count * 24);
+        for xf in stream[xf_start..].chunks_exact(24) {
+            crc.update(&xf[4..]);
+        }
+        biff::write_xfcrc(&mut stream, cxfs, crc.finalize())?;
         for extension in xf_extensions {
             biff::write_xf_ext(&mut stream, extension)?;
         }

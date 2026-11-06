@@ -5933,6 +5933,183 @@
         "An ordinary scalar edit saves/reopens while preserving typed query table metadata, both imported data regions, both query-table parts and all other members; only the selected worksheet and binary index change, and inverse restores the native source."
       ],
       "scope_limit": "Source preservation of inert query dependencies only. No query is run, refreshed or reconstructed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_merge_anchor_resolves_effective_font_alignment_and_number_formats",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls"
+      ],
+      "feature_rows": [
+        "xls-147",
+        "xls-157"
+      ],
+      "assertions": [
+        "Sheet2 A1:C1 merge and exact anchor text; effective Aptos Narrow 12pt bold/center style; six native date/time/percentage number-format IDs; quote-prefix text identity; create-only merge mutation refuses a source-bound worksheet."
+      ],
+      "scope_limit": "Native reads and immutable no-op only; no general merge CRUD, palette/theme rendering or full style-table edit qualification."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_rich_sst_runs_resolve_utf16_boundaries_and_logical_font_ids",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-140",
+        "xls-147"
+      ],
+      "assertions": [
+        "Exact rich text; UTF-16 run offsets 14/18/19 and logical font IDs 8/0/7; reserved font index 4 is absent; bold/plain/italic Aptos Narrow fonts resolve."
+      ],
+      "scope_limit": "Native rich SST read only; phonetic metadata is absent and rich-string editing is not claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_alignment_edit_preserves_merge_cells_values_and_other_cfb_streams",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls"
+      ],
+      "feature_rows": [
+        "xls-147",
+        "xls-157"
+      ],
+      "assertions": [
+        "Sheet2 A2 right-alignment/wrap edit survives file save/reopen; independent MS-OSHARED checksum oracle verifies native 69-XF checksum 0x82cdd373 and updated 70-XF summary; native XF prefix and XFExt bytes retained.",
+        "All worksheet values/formulas, merged ranges, fonts and unrelated CFB streams are preserved; inverse restores exact source bytes."
+      ],
+      "scope_limit": "One palette-based format append and inverse. FormatChange clears fHasXFExt on the new XF by its existing contract; it does not clone native theme overrides. No native merge CRUD, Office rendering or extended-format appearance-fidelity claim."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_merge_anchor_and_number_formats_retain_local_style_values",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-210",
+        "xlsx-213"
+      ],
+      "assertions": [
+        "Exact Sheet2 A1:C1 merge and anchor text; local Aptos Narrow 12pt bold and center alignment; date/time formats, exact percentage codes and quote prefix; byte-exact no-op."
+      ],
+      "scope_limit": "Typed local styles only; theme resolution, rendering and all style inheritance are not covered."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_rich_text_runs_keep_fonts_and_explicit_vs_inherited_properties",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-203",
+        "xlsx-210"
+      ],
+      "assertions": [
+        "Four exact run texts distinguish absent prefix properties from explicit Aptos Narrow 12pt bold/plain/italic run formatting."
+      ],
+      "scope_limit": "Native shared rich text read only; absent phonetics and other rich metadata remain uncovered."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_merge_remove_create_and_inverse_keep_unrelated_package_parts",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-213"
+      ],
+      "assertions": [
+        "Remove A1:C1 and create A10:C10 on Sheet2; file save/reopen retains anchor value; only sheet2.xml changes and inverse restores all original member bytes."
+      ],
+      "scope_limit": "One rectangular merge lifecycle; no layout/rendering or every overlap/protection case."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_rich_run_text_edit_retains_fonts_and_unrelated_native_parts",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-203",
+        "xlsx-210"
+      ],
+      "assertions": [
+        "Change only bold run text to BOLD; reopened rich model retains all run properties; value edit removes native calcChain and updates only its manifest/calculation dependencies plus sheet1.xml.",
+        "All unrelated members remain exact; inverse restores original members with semantically identical workbook relationship serialization."
+      ],
+      "scope_limit": "One same-length run edit and documented calculation invalidation; no recalculation or fresh Office reopen."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_merge_anchor_and_formats_resolve_the_binary_style_table",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-290",
+        "xlsb-292"
+      ],
+      "assertions": [
+        "Exact Sheet2 A1:C1 merge and anchor text; binary style resolves Aptos Narrow 12pt bold/center; six exact date/time/percentage number-format IDs; byte-exact no-op."
+      ],
+      "scope_limit": "Typed style reads only; no rendered theme colors or all style mutation paths."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_rich_sst_runs_resolve_exact_font_changes",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-281",
+        "xlsb-290"
+      ],
+      "assertions": [
+        "Exact shared rich text with run offsets 14/18/19 and font IDs 4/0/3 resolves Aptos Narrow 12pt bold/plain/italic; native phonetic data is absent."
+      ],
+      "scope_limit": "Shared-string model read only; inline rich strings and phonetic authoring require separate evidence."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_merge_remove_create_overlap_refusal_and_inverse_preserve_cell_records",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-292"
+      ],
+      "assertions": [
+        "Replace native A1:C1 with A10:C10; typed InvalidValue overlap refusal; save/reopen changes only sheet2.bin and retains every non-merge binary record; exact byte inverse."
+      ],
+      "scope_limit": "One merge rectangle and overlap check; no rendering or every worksheet dependency shape."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_rich_string_copy_preserves_run_fonts_and_other_parts",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-281",
+        "xlsb-290"
+      ],
+      "assertions": [
+        "Existing inline-rich setter refuses native BrtCellIsst storage conversion with UnsupportedContent and leaves package unchanged.",
+        "Supported native A2-to-Z100 copy retains all shared-string models/fonts, original and copied cell values; only the SST part, sheet1 and its binary index change; file save/reopen and exact inverse pass."
+      ],
+      "scope_limit": "Same-workbook rich-string copy; no cross-workbook font remapping, arbitrary shared/inline conversion, phonetics or native application validation."
     }
   ]
 }

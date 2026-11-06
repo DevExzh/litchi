@@ -1878,6 +1878,32 @@ fn apply_xf_resource(
     super::validate_xf_payload(payload)?;
     let globals = workbook_globals(workbook)?;
     let xfs: Vec<_> = globals.iter().filter(|record| record.kind == XF).collect();
+    let crc_record = globals
+        .iter()
+        .find(|record| record.kind == crate::number_format::XFCRC_RECORD);
+    if let Some(record) = crc_record {
+        // A stale CRC can mean the retained XFExt records no longer describe
+        // these XFs. Do not silently validate those extensions by repairing it.
+        let mut crc = litchi_core::mso_crc32::MsoCrc32::new();
+        for xf in &xfs {
+            crc.update(&workbook[xf.start + 4..xf.end]);
+        }
+        if record.end - record.start != 24
+            || binary::read_u32_le_at(workbook, record.start + 20)? != crc.finalize()
+        {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit cells",
+                "XFCRC does not validate the source XF table",
+            ));
+        }
+        if insert && xfs.len() >= crate::writer::formatting::MAX_XF_RECORDS_WITH_XFCRC {
+            return Err(Error::TooMany {
+                collection: "XF records of a workbook with XFCRC",
+                limit: crate::writer::formatting::MAX_XF_RECORDS_WITH_XFCRC,
+            });
+        }
+    }
     if insert {
         if usize::from(index.get()) != xfs.len() {
             return Err(Error::refused(
@@ -1901,7 +1927,8 @@ fn apply_xf_resource(
                 .to_le_bytes(),
         );
         record.extend_from_slice(payload);
-        return replace_range_and_adjust_bounds(workbook, last.end, last.end, &record);
+        replace_range_and_adjust_bounds(workbook, last.end, last.end, &record)?;
+        return refresh_xfcrc(workbook);
     }
     if usize::from(index.get()) + 1 != xfs.len() {
         return Err(Error::refused(
@@ -1930,7 +1957,29 @@ fn apply_xf_resource(
             "XF inverse resource remains referenced by a cell",
         ));
     }
-    replace_range_and_adjust_bounds(workbook, last.start, last.end, &[])
+    replace_range_and_adjust_bounds(workbook, last.start, last.end, &[])?;
+    refresh_xfcrc(workbook)
+}
+
+/// MS-XLS 2.4.354: checksum only the XF payloads using MS-OSHARED 2.4.3.
+/// Keep the existing future-record header and every XFExt byte unchanged.
+fn refresh_xfcrc(workbook: &mut [u8]) -> Result<()> {
+    let globals = workbook_globals(workbook)?;
+    let Some(record) = globals
+        .iter()
+        .find(|record| record.kind == crate::number_format::XFCRC_RECORD)
+    else {
+        return Ok(());
+    };
+    let mut crc = litchi_core::mso_crc32::MsoCrc32::new();
+    let mut count = 0_u16;
+    for xf in globals.iter().filter(|record| record.kind == XF) {
+        count += 1;
+        crc.update(&workbook[xf.start + 4..xf.end]);
+    }
+    workbook[record.start + 18..record.start + 20].copy_from_slice(&count.to_le_bytes());
+    workbook[record.start + 20..record.end].copy_from_slice(&crc.finalize().to_le_bytes());
+    Ok(())
 }
 
 fn xf_reference_exists(workbook: &[u8], index: u16) -> Result<bool> {
@@ -6107,6 +6156,38 @@ mod tests {
         record.extend_from_slice(&u16::try_from(payload.len()).unwrap().to_le_bytes());
         record.extend_from_slice(payload);
         record
+    }
+
+    #[test]
+    fn xf_resource_refuses_stale_crc_and_count_overflow_before_mutation() {
+        fn globals(count: u16) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            for _ in 0..count {
+                bytes.extend(raw_record(XF, &[0; 20]));
+            }
+            let mut crc = [0; 20];
+            crc[..2].copy_from_slice(&crate::number_format::XFCRC_RECORD.to_le_bytes());
+            crc[14..16].copy_from_slice(&count.to_le_bytes());
+            bytes.extend(raw_record(crate::number_format::XFCRC_RECORD, &crc));
+            bytes.extend(raw_record(0x000a, &[]));
+            bytes
+        }
+        let mut at_limit = globals(4050);
+        let original = at_limit.clone();
+        assert!(matches!(
+            apply_xf_resource(&mut at_limit, StyleIndex(4050), &[0; 20], true),
+            Err(Error::TooMany { limit: 4050, .. })
+        ));
+        assert_eq!(at_limit, original);
+
+        let mut stale = globals(16);
+        stale[16 * 24 + 20] = 1;
+        let original = stale.clone();
+        assert!(matches!(
+            apply_xf_resource(&mut stale, StyleIndex(16), &[0; 20], true),
+            Err(Error::Refused(r)) if r.kind() == RefusalKind::UnsupportedContent
+        ));
+        assert_eq!(stale, original);
     }
 
     #[test]
