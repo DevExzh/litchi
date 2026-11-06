@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "0cd3fd06565c81041ba4e1187caa7240e0ac6486",
+  "base_commit": "a207defcb892b6cde7399260690cdabac501326a",
+  "problem": "The native Excel.Sheet.12 package target was rejected because it declared the XLSX file MIME rather than the generic package MIME. After admission, metadata publication targeted the inactive fallback while the reader selected the supported Choice. Existing typed package MIME and Strict relationship identity were also overwritten during source edits.",
+  "changes": [
+    "Recognize embedded package relationships independently of their registered file MIME and retain that declared MIME. Binary OLE relationships still require the fixed OLE-object MIME. The embedding remains opaque; accepting the relationship does not decode, activate or validate the embedded file format.",
+    "Preserve existing target MIME and relationship type through metadata/payload edits. Fresh Definition values retain the historical generic-package MIME because the authoring API supplies no MIME.",
+    "Select source OLE branches using the same bounded baseline MCE capability policy as inventory while retaining original byte spans. Inactive branch shape IDs still count during new-ID allocation. The original source XML is spliced only at the requested owner fields.",
+    "Add seven native PPTX OLE tests, one facade embedded-child test and three owner unit regressions; map the native OLE row without claiming complete OLE interoperability."
+  ],
+  "verification_scope": {
+    "inventory": "Exact slide3/index0/shape4/Content Placeholder3, Worksheet/Excel.Sheet.12, embedded package rId2, frame4851400,3486150,2489200,1028700, preview dimensions, specific XLSX MIME and18372-byte payload SHA-256. The81992-byte EMF SHA-256 belongs to the inactive branch; active preview_relationship_id is absent.",
+    "metadata": "Native object name/icon mutation save/reopens and changes only slide4.xml. Payload, frame, MIME, inactive fallback branch and every other package member remain exact, with exact source/inverse bytes.",
+    "payload": "Replace the PowerPoint-rewritten workbook with the original tracked native Excel workbook; only the embedding changes. A facade test separately edits Sheet2!Z100 inside the child, replaces it through the OLE owner and reopens the child. All other parent resources remain exact, including the existing preview.",
+    "embedded_semantics": "Exact Sales chart/Sheet1/Sheet2 inventory and typed sheet kinds. Four stored formulas SUM(B2:B5), SUM(D2:D5), Sheet1!D6 and SUM(Table1[Quantity]) retain their14/49.75 caches and Stored origin before and after the unrelated scalar edit. No evaluation or refresh occurs.",
+    "removal": "Graph-owning remove/detach deletes the exact native graphic frame and rId2, collects only the workbook, and retains the unowned inactive preview plus all unrelated members. Source shape removal instead retains resource edges/payloads by contract and qualifies durable forward/inverse after reopening as well as exact in-memory inverse.",
+    "addition": "A new inert native workbook allocates shape5/rId4/package1.bin with requested name/ProgID/frame and exact payload. Its MIME is the fresh-definition generic-package default. The original object and resources remain exact and inverse restores source.",
+    "negatives": "A staged metadata change followed by empty payload failure rolls back; replacement of a workbook with a second inbound reference is refused atomically. Unit tests preserve multiple package MIME values and Strict relationship identity. Supported-choice versus unsupported-choice/fallback edits change only the selected object and invert exactly.",
+    "verification": "Complete PPTX owner, affected PPT/PPTX operations and eight-format facade suites pass. The native target is repeated after the explicit active-preview absence assertion. Clippy, formatting, corpus integrity and CI configuration checks pass.",
+    "environment": "All139 Office fixtures/four assets retain their bytes; three pre-existing untracked files retain their recorded hashes. No fresh native Office reopen, OLE activation, macro/control execution, external resolution, media rendering, formula calculation or preview regeneration occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 2866,
+    "focused_native_passes": 7,
+    "rust_ignored": 1,
+    "python_passed": 72,
+    "new_native_pptx_tests": 7,
+    "new_native_facade_tests": 1,
+    "new_unit_tests": 3,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 186,
+      "indexed_tests": 186,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 186,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 48,
+        "native_evidence_needs_semantic_tests": 70,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "ignored_tests": [
+    "opened::cross_copy_plan::digest_reuse_tests::print_the_golden_transcript (pre-existing manual golden-output utility)"
+  ],
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-owner-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-owner-first.log",
+        "bytes": 232795,
+        "sha256": "580c6e8de5f2d9316b33679dbf8d270d3291503888fa47081e075aab15d79799"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/pptx-ole-owner-first.log 2>&1",
+      "suites": 112,
+      "passed": 2013,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test 'pptx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-ops-final.log",
+        "bytes": 78813,
+        "sha256": "f5e865d106d0146d46a90abc0d15c13b66c2ed339162e5dd6d79311963aaf5bb"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test 'pptx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/pptx-ole-ops-final.log 2>&1",
+      "suites": 35,
+      "passed": 742,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-facade-final.log",
+        "bytes": 32594,
+        "sha256": "85afa31138bbce70076ab0e4a65c3950daf705c3a9be8bc2e61d28eb9565c901"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/pptx-ole-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 111,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_ole",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-native-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-native-final.log",
+        "bytes": 17838,
+        "sha256": "4d45bc1c2a5e5614acfefb4ff632c647de536297aac5349b64a4201641b35f97"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_ole > /tmp/litchi-native-office.GMvwp4/pptx-ole-native-final.log 2>&1",
+      "suites": 1,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-pptx -p litchi-ops -p litchi --no-default-features --features litchi-pptx/encryption,litchi-pptx/vba-inspection,litchi-ops/ppt,litchi-ops/pptx,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption,litchi/formula,litchi/markdown --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-clippy-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-clippy-first.log",
+        "bytes": 17289,
+        "sha256": "666c58d0bd305da3c9de7aea09800a7e82f04adefc72c290840b460be9d992e2"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-pptx -p litchi-ops -p litchi --no-default-features --features litchi-pptx/encryption,litchi-pptx/vba-inspection,litchi-ops/ppt,litchi-ops/pptx,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption,litchi/formula,litchi/markdown --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/pptx-ole-clippy-first.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-python-final.log",
+        "bytes": 664,
+        "sha256": "6a9e1415693f2683cf868727e60dab11b017bcdb92b66c79e5aca8effe54abc6"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/pptx-ole-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/pptx-ole-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-coverage-final.json",
+        "bytes": 707247,
+        "sha256": "dadd239fca647dd0edaa0b0edd037a9c89d30e6250c60b1a227cc267077583b9"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/pptx-ole-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-pptx/src/presentation/embedded/ole/package.rs crates/litchi-pptx/src/presentation/embedded/ole/slide/codec.rs crates/litchi-pptx/src/presentation/embedded/ole/slide/transaction.rs crates/litchi-pptx/src/presentation/embedded/ole/slide/tests.rs crates/litchi-pptx/tests/microsoft_office_native_ole.rs crates/litchi/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-ole-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-pptx/src/presentation/embedded/ole/package.rs crates/litchi-pptx/src/presentation/embedded/ole/slide/codec.rs crates/litchi-pptx/src/presentation/embedded/ole/slide/transaction.rs crates/litchi-pptx/src/presentation/embedded/ole/slide/tests.rs crates/litchi-pptx/tests/microsoft_office_native_ole.rs crates/litchi/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/pptx-ole-format-final.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "pptx-ole-native-before-valid.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-native-before-valid.log",
+        "bytes": 18738,
+        "sha256": "833599ee7a4066d483b9f8411b13debb3f018e6f5aeb0bddd3dcec64a5dda8b0"
+      },
+      "scope": "Native inventory and metadata tests both fail with ContentType(expected generic package, actual XLSX).",
+      "regenerate": "Copy microsoft_office_native_ole.rs from source_commit into a scratch checkout of base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_ole native_excel_ole_inventory_keeps_frame_payload_type_and_preview"
+    },
+    {
+      "artifact": {
+        "file_name": "pptx-ole-native-mime-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-native-mime-after.log",
+        "bytes": 18127,
+        "sha256": "71da2e89505d7b934c53d3426ca2a5c03c00ec65b746f9aa665bf919abe46e49"
+      },
+      "scope": "After MIME admission/preservation, inventory passes but metadata publication fails because the source locator edited the fallback instead of the selected Choice.",
+      "regenerate": "In a scratch checkout of source_commit, restore only ole/slide/codec.rs from base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_ole native_excel_ole_metadata_edit_keeps_inactive_branch_and_unrelated_members"
+    },
+    {
+      "artifact": {
+        "file_name": "pptx-ole-strict-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-ole-strict-before.log",
+        "bytes": 18283,
+        "sha256": "6a373935251d049faf05cda5173962975c7ec467f79dbd903d62e1146d648978"
+      },
+      "scope": "Strict package edge regression observed a Transitional relationship after a metadata edit.",
+      "regenerate": "In a scratch checkout of source_commit, restore the original relationship_type assignment in build_after from base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --lib strict_package_relationship_identity_is_retained_by_metadata_edits"
+    }
+  ],
+  "specification_references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oi29500/32be961f-d71a-4812-913f-b675c79aa88a",
+    "https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.packaging.embeddedpackageparttype.xlsx?view=openxml-3.0.1"
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/powerpoint/media-objects-inspection.json",
+    "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+    "crates/litchi-pptx/src/presentation/embedded/ole/slide/tests.rs"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_ole-d9c1eb8281fd07a6",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_ole-d9c1eb8281fd07a6",
+      "bytes": 23065992,
+      "sha256": "470ef43b7b0a6f584450ecaf19fa9365c4c3571a37faab7b96587be17a451210",
+      "source_commit": "0cd3fd06565c81041ba4e1187caa7240e0ac6486",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_ole"
+    },
+    {
+      "file_name": "microsoft_office_native-14834ce69a321400",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-14834ce69a321400",
+      "bytes": 144958632,
+      "sha256": "956f7ea8a89dd19f574fc142a85b80a57365a97222532d949b9fb7b94044a837",
+      "source_commit": "0cd3fd06565c81041ba4e1187caa7240e0ac6486",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1"
+    },
+    {
+      "file_name": "ppt_ole_payload",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/ppt_ole_payload",
+      "bytes": 6179576,
+      "sha256": "f2d25d5bfd2c021b36c30e20845767a5c504d24c1d8556136984499bcc538d6e",
+      "source_commit": "0cd3fd06565c81041ba4e1187caa7240e0ac6486",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo run --locked --offline --manifest-path /tmp/litchi-native-office.GMvwp4/Cargo.toml --bin ppt_ole_payload"
+    }
+  ],
+  "remaining_scope": [
+    "The full eight-format goal remains active.139/139 fixtures are indexed, but186/494 rows have partial assertions across186 tests. None is declared complete by the index.",
+    "All252 historical pending statuses remain unchanged. Unasserted gaps:70 native-evidence semantic rows,63 operation rows,48 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "OLE metadata/payload operations do not regenerate previews or activate objects. Broader native linked-object, ActiveX and shared-object mutation support still needs evidence. The specific native EMF is inactive source material and remains outside the active object collection closure.",
+    "Legacy PPT embedded-workbook payload qualification, SVG lifecycle, general source shape-MCE mutation, visual inheritance, durable transition wire replay and remaining DOC/DOCX/RTF/XLS/XLSX/XLSB/PPT scopes and external/UI reconciliation remain active."
+  ],
+  "legacy_probe": {
+    "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo run --locked --offline --manifest-path /tmp/litchi-native-office.GMvwp4/Cargo.toml --bin ppt_ole_payload",
+    "exit_code": 0,
+    "source": {
+      "file_name": "ppt_ole_payload.rs",
+      "path": "/tmp/litchi-native-office.GMvwp4/src/bin/ppt_ole_payload.rs",
+      "bytes": 752,
+      "sha256": "cf7bb3f8e5aa87efdaadc10c4e85b335858ffff90cdebd9a909af471349de99c"
+    },
+    "log": {
+      "file_name": "ppt-ole-payload-probe-final.log",
+      "path": "/tmp/litchi-native-office.GMvwp4/ppt-ole-payload-probe-final.log",
+      "bytes": 20282,
+      "sha256": "abbd2c723aa7618854911b5d520a3925bdfe2e57af4ad4f96fd3a7f7684e1ffe"
+    },
+    "decoded_payload": {
+      "file_name": "native-ppt-ole-payload.bin",
+      "path": "/tmp/litchi-native-office.GMvwp4/native-ppt-ole-payload.bin",
+      "bytes": 1536,
+      "sha256": "d998e48d0f59823706f5c219e21e1d199d784dd1d871e420f3855f31af632c85"
+    },
+    "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo run --locked --offline --manifest-path /tmp/litchi-native-office.GMvwp4/Cargo.toml --bin ppt_ole_payload > /tmp/litchi-native-office.GMvwp4/ppt-ole-payload-probe-final.log 2>&1",
+    "result": "Native PPT persist2 decodes from119 stored bytes using ZlibSyncFlush to1536 bytes. The CFB reader reports no streams; an independent fixed-field directory inspection confirms Root Entry has kind5, no child/siblings, ENDOFCHAIN start and zero stream size; all three remaining directory slots have kind0. No embedded workbook semantics are inferred.",
+    "scope": "Read-only evidence changing the next legacy qualification action, not an indexed positive workbook test."
+  }
+}
