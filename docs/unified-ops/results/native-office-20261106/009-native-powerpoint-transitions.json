@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "8e37499771fa4778dfa9bdf74b84a4dd21ba06a5",
+  "base_commit": "a1169e12d11f418e19ad77be8c8b1589451393b2",
+  "problem": "Native direct transition edits failed beside unrelated Zoom MCE. Clearing an extension transition left an empty retained branch that could not be populated again. Active transition lookup lost inherited namespace aliases. The variant sweep also exposed rejected default namespace resets in Zoom discovery and a presentation-structure validator limited to two of six supported container MIME types.",
+  "changes": [
+    "Introduce an explicit shape-tree MCE admission mode for transition reads and source splices. Positional source shape/text/removal edits retain their guards; nested transitions, malformed MCE, direct-child/schema ordering failures and compatibility outside the permitted owners remain refused.",
+    "Locate the selected empty paired Choice/Fallback left by transition clearing through bounded MCE active offsets, then insert into that branch while preserving wrapper and inactive alternatives. Existing namespace-conflict and transition-domain checks remain active.",
+    "Resolve active transition offsets from the complete slide namespace context rather than a detached owner that only happened to recognize the conventional p prefix.",
+    "Honor xmlns=\"\" as a scoped default-namespace reset in Zoom inventory; named-prefix undeclarations remain refused.",
+    "Accept all six ordinary/macro-enabled presentation/template/slideshow main-part MIME types in the structure graph; non-presentation main-part types remain invalid.",
+    "Add six native/derived-variant owner tests, one public operations test and one namespace unit test; strengthen the existing source MCE test to retain shape-edit refusal while checking permitted transition editing."
+  ],
+  "verification_scope": {
+    "lifecycle": "Native master-motion slides1-3 cover absent, Push and Morph sources. Eager and source routes add/replace/clear/reinsert after reopening, assert requested effect/duration/advance/click semantics, exact no-ops, unchanged shape/Zoom/timing and inactive fallback bytes, unrelated members and inverse/source state.",
+    "source": "Public source-backed transition reads work on the native MCE slides. Stale inverse application is refused. The source route retains original archive bytes on no-op/inverse; source-local in-memory patch replay is covered, not a new durable wire grammar.",
+    "variants": "All52 slides across14 unencrypted PPTX/POTX/PPSX/PPTM/POTM/PPSM files accept the typed transition through both routes (104 source-based edits). Every unrelated OPC member is exact, including inert macros, media, fonts and embedded workbooks. Originals remain unchanged.",
+    "namespace": "A lexical q-prefix variant of native Morph clears/restores correctly while retaining the original namespace URI. Native table/equation slides with default namespace resets pass the sweep. The Zoom namespace unit test keeps three nonempty Zoom entries and exact source bytes while refusing a named-prefix undeclaration.",
+    "structure": "The six container kinds expose exact native slide IDs256..260 or256, ordered part names and internal relationship owners. A Word content-type spoof is refused. This covers catalog structure, not extended guides or variant master/layout authoring.",
+    "public_operations": "Auto file-backed and byte Eager modes atomically set Push/Left and Morph/ByWord with1750ms duration, clear/reinsert and reopen exact semantics, retain Zoom values and all unrelated members, and inverse to original source bytes.",
+    "publication": "Eager ZIP recompression and removal of the declaration CRLF in changed XML are existing serializer behavior. Tests compare exact member bytes outside edited slides, exact shape/timing/fallback spans within them, and source/eager output with only that explicit declaration normalization. Zoom semantic entries are compared independently of Owner, which also retains the complete slide XML.",
+    "negatives": "Source shape text/removal stay typed UnsupportedContent. Missing Requires, nested transitions and MCE outside the shape tree are refused. Malformed MCE also prevents coherent eager commit; immutable input bytes and source-mode no-op publication remain exact.",
+    "verification": "Complete owner, affected operations and eight-format facade suites pass. The native target is repeated after strengthening clear/reopen/reinsert checks. Clippy, formatting, corpus integrity and CI configuration verification pass.",
+    "environment": "All139 Office fixtures and four import assets pass size/SHA checks. The three pre-existing untracked files retain their hashes. No fresh native application reopen, rendering, playback, macro/control execution, media decoding, external resolution or refresh occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 2855,
+    "focused_native_passes": 6,
+    "rust_ignored": 1,
+    "python_passed": 72,
+    "new_native_pptx_tests": 6,
+    "new_native_ops_tests": 1,
+    "new_unit_tests": 1,
+    "variant_files": 14,
+    "variant_slides": 52,
+    "variant_edits": 104,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 185,
+      "indexed_tests": 178,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 185,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 48,
+        "native_evidence_needs_semantic_tests": 71,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "ignored_tests": [
+    "opened::cross_copy_plan::digest_reuse_tests::print_the_golden_transcript (pre-existing manual golden-output utility)"
+  ],
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-owner-final.log",
+        "bytes": 231527,
+        "sha256": "ded3d37a475aecb08b65b5d0057b2ee718c843b87648de7e2e1bea42d9ded0c0"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/pptx-transition-owner-final.log 2>&1",
+      "suites": 111,
+      "passed": 2003,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test 'pptx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-ops-final.log",
+        "bytes": 78833,
+        "sha256": "46b5f678e844f593af607a27ac734497236e44638632c2368cbcba4fd4c9d98c"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test 'pptx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/pptx-transition-ops-final.log 2>&1",
+      "suites": 35,
+      "passed": 742,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-facade-final.log",
+        "bytes": 32576,
+        "sha256": "e6baf59d38ba9194764c66847e1d7a241385415d0243aed72279f6566bde510d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/pptx-transition-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 110,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-native-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-native-final.log",
+        "bytes": 17846,
+        "sha256": "466c018c3a5704c3d362dfbf8f5494b988e98a02951a4b6afc2652b2aa29d1fb"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions > /tmp/litchi-native-office.GMvwp4/pptx-transition-native-final.log 2>&1",
+      "suites": 1,
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-pptx -p litchi-ops -p litchi --no-default-features --features litchi-pptx/encryption,litchi-pptx/vba-inspection,litchi-ops/ppt,litchi-ops/pptx,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption,litchi/formula,litchi/markdown --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-clippy-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-clippy-first.log",
+        "bytes": 17235,
+        "sha256": "361d31f946d1ee7af1e3ce1f063250436c82fd24bfc81cb4e895e349fc23e975"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-pptx -p litchi-ops -p litchi --no-default-features --features litchi-pptx/encryption,litchi-pptx/vba-inspection,litchi-ops/ppt,litchi-ops/pptx,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption,litchi/formula,litchi/markdown --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/pptx-transition-clippy-first.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-python-final.log",
+        "bytes": 664,
+        "sha256": "3125c69b5e3039836d9eba2a39596d23f5f688af7668808297007f827bd251f8"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/pptx-transition-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/pptx-transition-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-coverage-final.json",
+        "bytes": 699193,
+        "sha256": "91bad42598d20209425e7f880b6f882cb81f99a43a54af5f91ec3dbd3fda0edc"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/pptx-transition-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-pptx/src/presentation/transition.rs crates/litchi-pptx/src/presentation/source.rs crates/litchi-pptx/src/opened/enclosed_removal.rs crates/litchi-pptx/src/presentation/source/engine_tests/edit.rs crates/litchi-pptx/src/shape/zoom/codec.rs crates/litchi-pptx/src/shape/zoom/tests.rs crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs crates/litchi-pptx/tests/microsoft_office_native_transitions.rs crates/litchi-ops/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-transition-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-pptx/src/presentation/transition.rs crates/litchi-pptx/src/presentation/source.rs crates/litchi-pptx/src/opened/enclosed_removal.rs crates/litchi-pptx/src/presentation/source/engine_tests/edit.rs crates/litchi-pptx/src/shape/zoom/codec.rs crates/litchi-pptx/src/shape/zoom/tests.rs crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs crates/litchi-pptx/tests/microsoft_office_native_transitions.rs crates/litchi-ops/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/pptx-transition-format-final.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "pptx-transition-native-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-native-before.log",
+        "bytes": 18846,
+        "sha256": "d1bc6541629943ea2a370534a504816db6b60a1a045eedddc5e896ffd26a8e70"
+      },
+      "scope": "Native eager and source transition calls fail with the outside-transition MCE guard.",
+      "regenerate": "Copy the native transition test file from source_commit into a scratch checkout of base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions native_eager_transition_crud_preserves_zoom_shapes_timing_and_other_members"
+    },
+    {
+      "artifact": {
+        "file_name": "pptx-transition-native-second-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-native-second-after.log",
+        "bytes": 18659,
+        "sha256": "1e46a0f286c8664670d4665b8cc3c9b56fecc98aaedf6bc2686895dfc4f9594c"
+      },
+      "scope": "Intermediate result after shape-tree admission: reinsert after clear fails because there is no active transition. This log also contains an overly strict source/eager archive expectation later corrected to the documented compact-XML contract.",
+      "regenerate": "Apply only the shape-tree transition admission changes to base_commit with the native test file; run CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions native_eager_transition_crud_preserves_zoom_shapes_timing_and_other_members"
+    },
+    {
+      "artifact": {
+        "file_name": "pptx-transition-native-fourth.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-native-fourth.log",
+        "bytes": 18385,
+        "sha256": "0f1872112c64d7fe5ed8ebc48b98bf6b7c555a5fbe63ad1706dd6b6820a47ad1"
+      },
+      "scope": "Inherited q-prefix native variant fails semantic readback after clear; three other focused tests pass.",
+      "regenerate": "Restore only transition_start_offsets from base_commit in a scratch checkout of source_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions native_morph_namespace_alias_variant_can_clear_and_restore_its_active_branch"
+    },
+    {
+      "artifact": {
+        "file_name": "pptx-transition-native-matrix.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-native-matrix.log",
+        "bytes": 18503,
+        "sha256": "9d34998802b62dc5165e9467ba7316c30aa8292f2377d3e35f5e1616167b0b66"
+      },
+      "scope": "The variant sweep reaches the native text/table deck and Zoom discovery rejects its valid empty default namespace declaration.",
+      "regenerate": "Restore only apply_namespace_declarations in shape/zoom/codec.rs from base_commit in a scratch checkout of source_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions native_transition_edits_preserve_all_unencrypted_variants_and_resources"
+    },
+    {
+      "artifact": {
+        "file_name": "pptx-transition-native-matrix-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-transition-native-matrix-after.log",
+        "bytes": 18412,
+        "sha256": "7bae9fe73991588d35ce0902bfe75be47187ebe4a1dc5521d565af83f33a737d"
+      },
+      "scope": "After the default-namespace fix, the variant sweep reaches POTX and structure loading rejects its main-part MIME type.",
+      "regenerate": "Restore only require_presentation in metadata/structure/codec.rs from base_commit in a scratch checkout of source_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions native_presentation_structure_variants_keep_the_saved_slide_catalog"
+    }
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/powerpoint/master-motion-inspection.json",
+    "test-data/microsoft-office/powerpoint/format-variants-inspection.json",
+    "test-data/microsoft-office/powerpoint/ink-inspection.json",
+    "crates/litchi-pptx/src/presentation/source/primary/durable.rs"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_transitions-126c10daa4a1d009",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_transitions-126c10daa4a1d009",
+      "bytes": 24191848,
+      "sha256": "d46172b52cf2a58e47b90b0bd94b87fcd98b8502fc298c8eacd243a9543d1842",
+      "source_commit": "8e37499771fa4778dfa9bdf74b84a4dd21ba06a5",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native_transitions"
+    },
+    {
+      "file_name": "microsoft_office_native-10a5332adf994c28",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-10a5332adf994c28",
+      "bytes": 62050672,
+      "sha256": "8cdfbce674ef8fed6f48d76da389bbebe4700cef70272ce9af523c11672ee99f",
+      "source_commit": "8e37499771fa4778dfa9bdf74b84a4dd21ba06a5",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test 'pptx_*' --test microsoft_office_native --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The full eight-format goal remains active.139/139 fixtures are indexed, but185/494 rows have partial assertions across178 tests; no row is declared complete by the index.",
+    "All252 historical pending statuses remain unchanged. Unasserted gaps:71 native-evidence semantic rows,63 operation rows,48 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "General source shape-MCE edits, arbitrary empty compatibility-branch authoring beyond the retained paired branches, every transition extension, and durable transition-patch wire replay remain separate qualification work. Native playback/rendering are not performed.",
+    "The structure catalog MIME fix does not qualify extended guides or template/slideshow master/layout authoring; a separate master/layout authoring validator still merits native variant coverage.",
+    "Native OLE/SVG operations, broader inherited visual semantics, shared ink lifecycle, and remaining DOC/DOCX/RTF/XLS/XLSX/XLSB/PPT features and external/UI dispositions remain active."
+  ]
+}
