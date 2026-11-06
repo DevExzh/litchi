@@ -777,3 +777,76 @@ fn snapshot(package: &OpcPackage) -> Snapshot {
     let slide = package.get_part(&slide_name).expect("slide");
     load_snapshot(package, 0, slide, &mut Limits::default()).expect("snapshot")
 }
+
+#[test]
+fn scalar_mode_and_id_edits_keep_native_bytes_and_inactive_shared_ids() {
+    let anchor=br#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:future="urn:future" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><mc:Choice Requires="future"><p:contentPart p14:bwMode="black" r:id="rIdOpaque"><future:opaque/></p:contentPart></mc:Choice><mc:Choice Requires="p14"><p:contentPart p14:bwMode='gray' r:id='rIdOpaque'><p14:nvContentPartPr/><p14:xfrm><a:off x='1' y='2'/></p14:xfrm></p:contentPart></mc:Choice><mc:Fallback><p:pic/></mc:Fallback></mc:AlternateContent>"#;
+    for (id_first, mode) in [
+        (false, Some(BlackWhiteMode::White)),
+        (true, Some(BlackWhiteMode::White)),
+        (false, None),
+        (true, None),
+    ] {
+        let mut package = package_with_anchor(
+            anchor,
+            Some((rt::CUSTOM_XML, "../custom/opaque.xml", "rIdOpaque", false)),
+            None,
+        );
+        let source = snapshot(&package);
+        let mut edit = source.edit();
+        if id_first {
+            edit.set_relationship_id(0, "rIdChanged").unwrap();
+        }
+        edit.set_black_white_mode(0, mode).unwrap();
+        if !id_first {
+            edit.set_relationship_id(0, "rIdChanged").unwrap();
+        }
+        let commit = edit.commit().unwrap();
+        let expected = std::str::from_utf8(source.source_xml())
+            .unwrap()
+            .replace("r:id='rIdOpaque'", "r:id='rIdChanged'");
+        let expected = if mode.is_some() {
+            expected.replace("p14:bwMode='gray'", "p14:bwMode='white'")
+        } else {
+            expected.replace(" p14:bwMode='gray'", "")
+        };
+        assert!(
+            commit.snapshot().source_xml() == expected.as_bytes(),
+            "scalar edit must keep inactive branch, quote style and empty descendants"
+        );
+        apply_patch(&mut package, commit.patch()).unwrap();
+        let reloaded = snapshot(&package);
+        assert_eq!(reloaded.parts()[0].relationship_id(), "rIdChanged");
+        assert_eq!(reloaded.parts()[0].bw_mode(), mode);
+        let slide = package.get_part(source.slide_part_name()).unwrap();
+        assert!(slide.rels().get("rIdOpaque").is_some());
+        assert!(slide.rels().get("rIdChanged").is_some());
+        apply_patch(&mut package, &commit.patch().inverse()).unwrap();
+        assert!(snapshot(&package).source_xml() == source.source_xml());
+    }
+}
+
+#[test]
+fn relationship_reference_scanning_respects_namespaces_escaping_and_quotes() {
+    for ns in [
+        REL,
+        "http://purl.oclc.org/ooxml/officeDocument/relationships",
+    ] {
+        for attr in [
+            "alias:id=\"rIdKeep\"",
+            "alias:id = 'r&#73;dKeep'",
+            "alias:embed=\"rIdKeep\"",
+        ] {
+            let xml = format!(r#"<root xmlns:alias="{ns}"><child {attr}/></root>"#);
+            assert!(
+                super::codec::contains_relationship_reference(xml.as_bytes(), "rIdKeep").unwrap()
+            );
+        }
+    }
+    let xml=br#"<root xmlns:r="urn:foreign"><!-- r:id="rIdKeep" --><child r:id="rIdKeep"/><data><![CDATA[r:id='rIdKeep']]></data></root>"#;
+    assert!(!super::codec::contains_relationship_reference(xml, "rIdKeep").unwrap());
+    assert!(
+        super::codec::contains_relationship_reference(b"<root broken=unquoted/>", "rIdKeep")
+            .is_err()
+    );
+}

@@ -3,7 +3,7 @@ use crate::presentation::embedded::{
     MAX_XML_DEPTH, increment_nodes, invalid, is_presentationml_name, limit, relationship_value,
     validate_root,
 };
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -32,7 +32,18 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
             MAX_SLIDE_BYTES,
         ));
     }
-    let xml = process_ooxml(xml)?;
+    // Native PowerPoint ink is a p:contentPart inside a Choice requiring
+    // PowerPoint 2010. This owner understands that inert anchor; using the
+    // baseline capabilities instead selects its picture-only fallback.
+    let mut capabilities = Capabilities::ooxml_baseline();
+    capabilities.understand_namespace("http://schemas.microsoft.com/office/powerpoint/2010/main");
+    let limits = MceLimits {
+        max_input_bytes: MAX_SLIDE_BYTES,
+        max_output_bytes: MAX_SLIDE_BYTES,
+        max_depth: MAX_XML_DEPTH,
+        ..MceLimits::default()
+    };
+    let xml = process_markup_compatibility(xml, &capabilities, &limits)?.xml;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut ids = Vec::new();
     let mut nodes = 0usize;
@@ -309,5 +320,46 @@ pub(crate) fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)
             Event::Eof => return Err(invalid("slide has no root")),
             _ => {},
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "codec boundary assertions"
+)]
+mod tests {
+    use super::*;
+    fn slide(content: &str) -> String {
+        format!(
+            r#"<q:sld xmlns:q="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ext="http://schemas.microsoft.com/office/powerpoint/2010/main" xmlns:future="urn:future"><q:cSld><q:spTree>{content}</q:spTree></q:cSld></q:sld>"#
+        )
+    }
+    #[test]
+    fn ink_choice_uses_namespace_identity_and_skips_inactive_content() {
+        let content = r#"<mc:AlternateContent><mc:Choice Requires="future"><q:contentPart rel:id="inactive"/></mc:Choice><mc:Choice Requires="ext"><q:contentPart rel:id="active"/></mc:Choice><mc:Fallback><q:contentPart rel:id="fallback"/></mc:Fallback></mc:AlternateContent>"#;
+        assert_eq!(scan_slide(slide(content).as_bytes()).unwrap(), ["active"]);
+        let foreign = slide(content).replace(
+            "http://schemas.microsoft.com/office/powerpoint/2010/main",
+            "urn:other",
+        );
+        assert_eq!(scan_slide(foreign.as_bytes()).unwrap(), ["fallback"]);
+        let no_id = content.replace("rel:id=\"active\"", "");
+        assert!(
+            matches!(scan_slide(slide(&no_id).as_bytes()),Err(crate::Error::Invalid(message)) if message.contains("missing r:id"))
+        );
+    }
+    #[test]
+    fn selected_ink_anchors_keep_the_existing_content_count_limit() {
+        let content = "<q:contentPart rel:id=\"same\"/>".repeat(MAX_CONTENT_PARTS + 1);
+        assert!(matches!(
+            scan_slide(slide(&content).as_bytes()),
+            Err(crate::Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::ContentParts),
+                observed: 4097,
+                maximum: 4096
+            })
+        ));
     }
 }

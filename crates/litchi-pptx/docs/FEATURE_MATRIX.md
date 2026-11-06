@@ -106,7 +106,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Tags and customer data | 🟡 | ✅ | ✅ | Strict/transitional tag lists, direct and shape-owned tag CRUD, relationship inventory, customer-data and schema preservation, graph-safe shared-anchor handling, and inert values/extension markup |
 | Revision and change information | 🟡 | ✅ | 🟡 | `presentation_properties::metadata::changes::{Snapshot, Edit, Commit, Patch}` provides typed source-checked change/review metadata CRUD with opaque XML retention and relationship/orphan validation; this is not a complete collaborative change-history engine |
 | Web extensions and Office Add-ins | 🟡 | ✅ | 🟡 | Bounded task-pane/web-extension graph CRUD, shared payload bytes, typed inert links, extension-site handling, and graph budgets; add-ins are never loaded or executed and native Office behavior is not implied |
-| Ink annotations | ✅ | ✅ | ✅ | Bounded inert InkML content-part inventory and validated slide storage through p:contentPart and customXml relationships; no handwriting recognition, replay, rendering, or execution |
+| Ink annotations | ✅ | ✅ | ✅ | Bounded inert InkML content-part inventory and validated slide storage through p:contentPart and customXml relationships, including native PowerPoint 2010 MCE choices; no handwriting recognition, replay, rendering, or execution |
 | PowerPoint 2014 InkAction owners | 🟡 | 🟡 | 🟡 | `presentation::embedded::ink_actions` reads existing slide-owned MS-PPTX 2.2.3.1 `mc:AlternateContent` owners with exactly the supported `p14main`/`iact` Choice, `p:contentPart`, and sole `p:pic` fallback shape. Transitional and Strict slides require their matching `customXml` relationship URI and an explicitly declared `text/xml` target; target profiles reuse the shared source-preserving `iact:actions` model. Existing target scalar profile edits, exact no-op/inverse patches, stale-source/read-policy/content-type/relationship-closure checks, shared-target fan-out, signed-source refusal, and bounded readback are supported while inactive MCE/unknown bytes remain intact. This batch does not create or remove owners/parts, infer an InkML MIME or path, execute/render/recognize actions, or claim native Office interoperability. See the [owner design](../../../docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md) and [focused tests](../tests/pptx_ink_actions.rs). |
 
 ## Security, macros, and explicit extension coverage
@@ -218,3 +218,24 @@ IDs, bounds, coordinate transforms and a source-preserving child-text edit.
 These are inert data and mutation checks, not chart refresh, SmartArt layout,
 rendering or native-app reopen evidence. Merged-table examples, connector
 endpoint binding and broader visual inheritance remain separate gaps.
+
+`tests/microsoft_office_native_ink.rs` covers the native ink stroke and replay
+decks. Specialized InkML discovery selects the PowerPoint 2010 content-part
+choice, reports one trace and retains the exact payload/PNG hashes. Shared
+InkML reads verify the native brush dimensions/color, trace references and
+raw trace bytes; source serialization is exact. Replay timing retains its
+`entr:63` preset identity, target, click trigger and 2000ms duration without
+execution. These specimens have no distinct PowerPoint 2014 InkAction anchors.
+
+Native content-part transactions change an existing `bwMode` attribute and
+replace an inert payload while preserving the original anchor markup,
+fallback, timing and relationships. Source edits select only active anchors,
+even when inactive alternatives reuse a relationship ID. Relationship cleanup
+recognizes namespace aliases, quoting and escaped values in all retained
+branches. Adding the native payload under a fresh relationship/part also
+reopens and inverses exactly. These tests do not regenerate the raster preview,
+author Replay behavior, position newly attached ink, or claim fresh native-app
+validation. Removing the baseline's active anchor collects its orphan InkML
+payload and retains the inactive picture fallback; inverse restores the source.
+Whole visual-object deletion, replay-target cleanup and shared-payload removal
+remain open.

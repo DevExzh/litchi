@@ -51,6 +51,24 @@ struct ContentFrame {
     bw_mode_key: Option<Box<[u8]>>,
 }
 
+fn capabilities() -> Capabilities {
+    let mut capabilities = Capabilities::ooxml_baseline();
+    capabilities.understand_namespace(P14_URI);
+    capabilities
+}
+
+fn mce_limits() -> MceLimits {
+    MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_XML_DEPTH,
+        max_namespace_bindings: 4096,
+        max_directive_tokens: 4096,
+        max_choices_per_alternate: 1024,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
+}
+
 /// Scan one slide owner and retain each active content-part anchor exactly.
 pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     if xml.len() > MAX_XML_BYTES {
@@ -60,18 +78,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
             MAX_XML_BYTES,
         ));
     }
-    let mut capabilities = Capabilities::ooxml_baseline();
-    capabilities.understand_namespace(P14_URI);
-    let limits = MceLimits {
-        max_input_bytes: MAX_XML_BYTES,
-        max_output_bytes: MAX_XML_BYTES,
-        max_depth: MAX_XML_DEPTH,
-        max_namespace_bindings: 4096,
-        max_directive_tokens: 4096,
-        max_choices_per_alternate: 1024,
-        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
-    };
-    let processed = process_markup_compatibility(xml, &capabilities, &limits)?.xml;
+    let processed = process_markup_compatibility(xml, &capabilities(), &mce_limits())?.xml;
     let mut reader = NsReader::from_reader(processed.as_ref());
     let origin = ReaderOrigin::of(processed.as_ref());
     let mut frames = Vec::new();
@@ -434,6 +441,59 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
             _ => {},
         }
     }
+}
+
+/// Locate only source anchors selected by the same MCE policy as discovery.
+/// Inactive alternatives may reuse an active relationship ID; that does not
+/// make their anchor markup an edit target.
+pub(crate) fn locate_active_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
+    let anchors = locate_content_parts(xml)?;
+    if anchors.is_empty() {
+        return Ok(anchors);
+    }
+    let offsets = anchors
+        .iter()
+        .map(|anchor| {
+            u32::try_from(anchor.range.start)
+                .map_err(|_| invalid("content-part offset exceeds u32"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let limits = litchi_ooxml_common::mce::OffsetLimits {
+        max_source_bytes: MAX_XML_BYTES,
+        max_offsets: super::super::MAX_XML_NODES,
+        max_marked_bytes: MAX_XML_BYTES,
+        processing: mce_limits(),
+    };
+    let active = litchi_ooxml_common::mce::active_offsets(xml, &offsets, &capabilities(), &limits)?
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>();
+    Ok(anchors
+        .into_iter()
+        .zip(offsets)
+        .filter_map(|(anchor, offset)| active.contains(&offset).then_some(anchor))
+        .collect())
+}
+
+/// A lexical edit of an existing mode attribute in an active source anchor.
+/// The key comes from the namespace-validated semantic view of that owner.
+pub(crate) fn source_bw_mode_replacement(
+    source: &[u8],
+    anchor: &SourceAnchor,
+    key: &[u8],
+    value: Option<BlackWhiteMode>,
+) -> Result<(Range<usize>, Vec<u8>)> {
+    let fragment = source
+        .get(anchor.range.clone())
+        .ok_or_else(|| invalid("content-part span escapes source"))?;
+    let (start, end) = content_part_start_tag(fragment)?;
+    let attribute = raw_attribute_span(&fragment[start..end], key)
+        .ok_or_else(|| invalid("source content-part mode attribute is missing"))?;
+    let (span, bytes) = match value {
+        Some(value) => (attribute.value, value.as_str().as_bytes().to_vec()),
+        None => (attribute.full, Vec::new()),
+    };
+    let base = anchor.range.start + start;
+    Ok((base + span.start..base + span.end, bytes))
 }
 
 /// Validate one detached anchor fragment and return its relationship ID.
@@ -913,14 +973,38 @@ pub(crate) fn replace_spans(
 
 /// Return whether a raw slide still contains a relationship attribute for an
 /// ID after a content-part anchor has been removed.
-pub(crate) fn contains_relationship_reference(xml: &[u8], relationship_id: &str) -> bool {
-    let double = format!(r#"r:id=\"{relationship_id}\""#);
-    let single = format!("r:id='{relationship_id}'");
-    xml.windows(double.len())
-        .any(|window| window == double.as_bytes())
-        || xml
-            .windows(single.len())
-            .any(|window| window == single.as_bytes())
+/// Inspect all source branches before collecting an unused relationship.
+/// The caller has already validated the complete source with the bounded
+/// anchor locator. Prefixes, quoting and escaped values are lexical choices;
+/// comments and foreign attributes are not relationship references.
+pub(crate) fn contains_relationship_reference(xml: &[u8], relationship_id: &str) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
+                    if matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *super::super::REL || *value == *super::super::STRICT_REL)
+                        && attribute
+                            .decoded_and_normalized_value(
+                                quick_xml::XmlVersion::Implicit1_0,
+                                reader.decoder(),
+                            )
+                            .map_err(|error| Error::Xml(error.to_string()))?
+                            == relationship_id
+                    {
+                        return Ok(true);
+                    }
+                }
+            },
+            Event::Eof => return Ok(false),
+            _ => {},
+        }
+    }
 }
 
 fn relationship_value_span(

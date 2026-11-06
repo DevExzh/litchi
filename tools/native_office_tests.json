@@ -2968,6 +2968,115 @@
         "ppt",
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_inkml_annotations_discover_the_active_compatibility_choice",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx"
+      ],
+      "feature_rows": [
+        "pptx-437"
+      ],
+      "assertions": [
+        "One active InkML annotation, exact slide/index/rId2/ink1 owner, one trace/no groups, exact2424-byte payload and1645-byte fallback PNG hashes; package write/reopen retains the inventory and bytes. The distinct InkAction owner has no anchors."
+      ],
+      "scope_limit": "Native PowerPoint2010 choice discovery and inert structural metadata; no handwriting rendering/playback, and absent InkAction anchors do not count as InkAction feature coverage."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_inkml_shared_projection_keeps_brush_trace_references_and_raw_data",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx"
+      ],
+      "feature_rows": [
+        "pptx-437"
+      ],
+      "assertions": [
+        "Typed width/height0.035cm/color#E71224 brush properties, #ctx0/#br0 trace references, exact1263-byte trace-data SHA-256, and byte-exact shared InkML writer output."
+      ],
+      "scope_limit": "Stored brush metadata and raw trace text only. Ink source/channel interpretation, trace reconstruction, recognition and rendering are outside this assertion."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_ink_replay_keeps_shared_target_duration_and_source_timing",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx"
+      ],
+      "feature_rows": [
+        "pptx-423",
+        "pptx-437"
+      ],
+      "assertions": [
+        "No baseline animation; replay exposes one entr:63 preset, target4, OnClick,2000ms, zero delay and retained visibility/drawProgress timing. Unmodified timing serialization is exact and reparses to the same effect metadata."
+      ],
+      "scope_limit": "Preset identity is preserved as a custom class/id; no named Replay authoring or visual execution is inferred."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_ink_owner_mode_and_payload_edits_keep_fallback_and_replay_bytes",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx"
+      ],
+      "feature_rows": [
+        "pptx-437"
+      ],
+      "assertions": [
+        "Public content-part transaction changes Auto to Gray and replaces the inert InkML color payload; save/reopen keeps one annotation and requested values. Only ink1 and one bwMode attribute in slide1 change; fallback/timing/relationships and all other members stay exact, inverse/source bytes match."
+      ],
+      "scope_limit": "Existing mode-attribute and opaque payload replacement only. The raster preview remains the original opaque resource; it is not regenerated for the changed brush color."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_ink_addition_allocates_fresh_owners_and_preserves_the_original_stroke",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx"
+      ],
+      "feature_rows": [
+        "pptx-437"
+      ],
+      "assertions": [
+        "Public ink addition allocates rId4/ink2, retains the exact native payload, reopens two annotations and changes only the new part/slide relationship/anchor/manifest. Original ink and other resources are exact and inverse restores the source."
+      ],
+      "scope_limit": "Passive attachment authoring on a native source; no new picture fallback, shape positioning, rendering or fresh PowerPoint acceptance claim."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_ink_choice_relationship_failures_are_reported_without_empty_success",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx"
+      ],
+      "feature_rows": [
+        "pptx-437"
+      ],
+      "assertions": [
+        "Selected native ink owner refuses missing relationship, missing payload, foreign InkML root, wrong relationship type and external target with precise Relationship/Opc PartNotFound/Invalid variants."
+      ],
+      "scope_limit": "In-memory negative variants leave the native fixture unchanged; targets are never fetched."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ink",
+      "name": "native_ink_removal_collects_the_orphan_payload_and_inverses_exactly",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-stroke.pptx"
+      ],
+      "feature_rows": [
+        "pptx-437"
+      ],
+      "assertions": [
+        "Public removal clears the active ink annotation and rId2, collects only ink1.xml, keeps the inactive PNG fallback and all unrelated package members, and inverses to exact source bytes."
+      ],
+      "scope_limit": "Baseline ink without replay timing only. The inactive raster fallback is intentionally retained; whole visual-object deletion, replay-target cleanup and shared-payload removal remain unqualified."
     }
   ]
 }

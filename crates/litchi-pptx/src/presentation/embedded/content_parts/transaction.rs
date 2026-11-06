@@ -784,7 +784,7 @@ fn build_relationships(
         .collect();
     let active_ids: HashSet<&str> = parts.iter().map(ContentPart::relationship_id).collect();
     for id in original_ids {
-        if !active_ids.contains(id) && !codec::contains_relationship_reference(source_xml, id) {
+        if !active_ids.contains(id) && !codec::contains_relationship_reference(source_xml, id)? {
             values.remove(id);
         }
     }
@@ -809,7 +809,7 @@ fn build_source(
     parts: &[ContentPart],
     origins: &[Option<usize>],
 ) -> Result<Vec<u8>> {
-    let locations = codec::locate_content_parts(source.source_xml())?;
+    let locations = codec::locate_active_content_parts(source.source_xml())?;
     let mut replacements = Vec::<(std::ops::Range<usize>, Vec<u8>)>::new();
     let mut inserts = HashMap::<usize, Vec<u8>>::new();
     for (origin, original) in source.parts.iter().enumerate() {
@@ -841,6 +841,34 @@ fn build_source(
                     location.relationship_span.clone(),
                     escape_attribute(replacement.relationship_id()).into_bytes(),
                 ));
+            } else if let Some(key) = original.anchor.bw_mode_key.as_deref()
+                && codec::rewrite_anchor_bw_mode(
+                    original.anchor.xml(),
+                    Some(key),
+                    false,
+                    replacement.bw_mode,
+                )
+                .and_then(|(xml, next_key, _)| {
+                    codec::rewrite_anchor_relationship_id(
+                        &xml,
+                        replacement.relationship_id(),
+                        next_key.as_deref().or(Some(key)),
+                    )
+                })
+                .is_ok_and(|xml| xml == replacement.anchor.xml)
+            {
+                replacements.push(codec::source_bw_mode_replacement(
+                    source.source_xml(),
+                    location,
+                    key,
+                    replacement.bw_mode,
+                )?);
+                if replacement.relationship_id() != original.relationship_id() {
+                    replacements.push((
+                        location.relationship_span.clone(),
+                        escape_attribute(replacement.relationship_id()).into_bytes(),
+                    ));
+                }
             } else {
                 replacements.push((location.range.clone(), replacement.anchor.xml.clone()));
             }
