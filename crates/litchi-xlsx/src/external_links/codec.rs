@@ -1397,7 +1397,16 @@ pub fn parse_external_link(xml: &[u8], limits: &SourceLimits) -> Result<Link> {
     if xml.len() > maximum {
         return Err(Error::limit(super::LimitKind::XmlBytes, xml.len(), maximum));
     }
-    let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+    capabilities.understand_namespace(
+        std::str::from_utf8(ALTERNATE_URLS_NAMESPACE).expect("static ASCII namespace"),
+    );
+    let xml = litchi_ooxml_common::mce::process_markup_compatibility(
+        xml,
+        &capabilities,
+        &litchi_ooxml_common::mce::Limits::default(),
+    )?
+    .xml;
     if xml.len() > maximum {
         return Err(Error::limit(super::LimitKind::XmlBytes, xml.len(), maximum));
     }

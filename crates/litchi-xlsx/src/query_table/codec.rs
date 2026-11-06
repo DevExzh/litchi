@@ -1081,6 +1081,85 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
 
+/// Preserve producer markup for an unchanged definition or a root-name-only edit.
+/// Other replacements retain the existing explicit whole-definition semantics.
+pub(crate) fn patch_name(
+    source: &[u8],
+    desired: &Table,
+    conformance: Conformance,
+) -> Result<Option<Vec<u8>>> {
+    let mut previous = parse_query_table(source)?;
+    let unchanged_name = previous.name == desired.name;
+    previous.name = desired.name.clone();
+    if &previous != desired {
+        return Ok(None);
+    }
+    let mut reader = NsReader::from_reader(source);
+    let origin = litchi_core::xml::ReaderOrigin::of(source);
+    loop {
+        let event = reader.read_event().map_err(xml_error)?;
+        let (element, closing) = match event {
+            Event::Start(e) => (e, 2),
+            Event::Empty(e) => (e, 3),
+            Event::Eof => return Err(invalid("query-table root is missing")),
+            _ => continue,
+        };
+        let (namespace, local) = reader.resolver().resolve_element(element.name());
+        if local.as_ref() != b"queryTable"
+            || !matches!(namespace,ResolveResult::Bound(ns) if ns.as_ref()==conformance.namespace().as_bytes())
+        {
+            return Ok(None);
+        }
+        if unchanged_name {
+            return Ok(Some(source.to_vec()));
+        }
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("query-table root offset overflow"))?;
+        let start = end
+            .checked_sub(element.len() + closing)
+            .ok_or_else(|| invalid("query-table root span is invalid"))?;
+        for attribute in element.checked_attributes() {
+            let attribute = attribute.map_err(xml_error)?;
+            if attribute.key.as_ref() != b"name" {
+                continue;
+            }
+            let std::borrow::Cow::Borrowed(value) = attribute.value else {
+                return Err(invalid("query-table name source is not borrowed"));
+            };
+            let offset = value
+                .as_ptr()
+                .addr()
+                .checked_sub(element.as_ref().as_ptr().addr())
+                .ok_or_else(|| invalid("query-table name span is invalid"))?;
+            if element.as_ref().get(offset..offset + value.len()) != Some(value) {
+                return Err(invalid("query-table name span is outside its root"));
+            }
+            let begin = start + 1 + offset;
+            let end = begin + value.len();
+            let mut escaped = Vec::new();
+            escape_attribute(&mut escaped, &desired.name);
+            let mut replacement = Vec::new();
+            for byte in escaped {
+                if byte == b'\'' {
+                    replacement.extend_from_slice(b"&apos;");
+                } else {
+                    replacement.push(byte);
+                }
+            }
+            if source.len() - value.len() + replacement.len() > MAX_PART_BYTES {
+                return Err(invalid("query-table part is too large"));
+            }
+            let mut output = Vec::with_capacity(source.len() - value.len() + replacement.len());
+            output.extend_from_slice(&source[..begin]);
+            output.extend_from_slice(&replacement);
+            output.extend_from_slice(&source[end..]);
+            return Ok(Some(output));
+        }
+        return Err(invalid("query-table name attribute is missing"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

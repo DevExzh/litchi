@@ -453,15 +453,60 @@ where
     query_owner_counts
         .try_reserve(query_parts.len())
         .map_err(|_| invalid("query-table owner allocation failed"))?;
+    let mut table_owners = HashMap::<String, usize>::new();
+    for source in package
+        .iter_parts()
+        .filter(|p| p.content_type() == WORKSHEET_CONTENT_TYPE)
+    {
+        for rel in source.rels().iter().filter(|r| {
+            matches!(
+                r.reltype(),
+                litchi_opc::constants::relationship_type::TABLE
+                    | litchi_opc::constants::relationship_type::STRICT_TABLE
+            )
+        }) {
+            if rel.is_external() || target_has_suffix(rel) {
+                continue;
+            }
+            let target = rel.target_partname()?;
+            *table_owners
+                .entry(target.as_str().to_ascii_lowercase())
+                .or_default() += 1;
+        }
+    }
     for source in package.iter_parts() {
         for relationship in source.rels().iter() {
             if !is_query_table_relationship(relationship.reltype()) {
                 continue;
             }
-            if source.content_type() != WORKSHEET_CONTENT_TYPE {
+            if source.content_type() != WORKSHEET_CONTENT_TYPE
+                && source.content_type() != ct::SML_TABLE
+            {
                 return Err(graph_invalid!(
-                    "only worksheet parts may source a query-table relationship",
+                    "only worksheet or table-definition parts may source a query-table relationship"
                 ));
+            }
+            if source.content_type() == ct::SML_TABLE {
+                let incoming = table_owners
+                    .get(&source.partname().as_str().to_ascii_lowercase())
+                    .copied()
+                    .unwrap_or(0);
+                if incoming != 1 {
+                    return Err(graph_invalid!(
+                        "query-table's table definition must have exactly one worksheet owner"
+                    ));
+                }
+                if source
+                    .rels()
+                    .iter()
+                    .filter(|r| is_query_table_relationship(r.reltype()))
+                    .count()
+                    != 1
+                {
+                    return Err(graph_invalid!(
+                        "table definition must have one query-table relationship"
+                    ));
+                }
             }
             if relationship.is_external() || target_has_suffix(relationship) {
                 return Err(graph_invalid!(
@@ -508,7 +553,7 @@ where
             .unwrap_or(0);
         if owners != 1 {
             return Err(graph_invalid!(format!(
-                "query-table part '{}' must have exactly one worksheet owner",
+                "query-table part '{}' must have exactly one worksheet or table-definition owner",
                 part.partname()
             )));
         }
@@ -728,12 +773,6 @@ impl SourceState {
             connection,
             query_tables,
         })
-    }
-
-    fn connection_relationship(&self) -> Option<&SourceRelationship> {
-        self.workbook_relationships
-            .iter()
-            .find(|relationship| is_connections_relationship(&relationship.relationship_type))
     }
 }
 
@@ -1060,7 +1099,11 @@ impl Edit {
         };
         if unchanged {
             let loaded = self.loaded.take().expect("connections graph loaded");
-            let patch = Patch::new(loaded.before.clone(), loaded.before.clone());
+            let patch = Patch::new(
+                loaded.before.clone(),
+                loaded.before.clone(),
+                crate::part_edit::PartPatch::default(),
+            );
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
                 loaded.before,
@@ -1094,7 +1137,18 @@ impl Edit {
         if snapshot.connections.as_ref() != staged.as_ref() {
             return Err(invalid("connection publication changed the staged model"));
         }
-        let patch = Patch::new(before, snapshot.clone());
+        let names = std::iter::once(before.workbook_part_name().to_owned())
+            .chain(
+                before
+                    .source
+                    .connection
+                    .iter()
+                    .chain(snapshot.source.connection.iter())
+                    .map(|part| part.part_uri.to_string()),
+            )
+            .collect();
+        let image = crate::part_edit::PartPatch::capture(&self.target, &candidate, &names)?;
+        let patch = Patch::new(before, snapshot.clone(), image);
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -1108,11 +1162,16 @@ impl Edit {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    image: crate::part_edit::PartPatch,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+    fn new(before: Snapshot, after: Snapshot, image: crate::part_edit::PartPatch) -> Self {
+        Self {
+            before,
+            after,
+            image,
+        }
     }
 
     /// Source state required before application.
@@ -1139,6 +1198,7 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            image: self.image.inverse(),
         }
     }
 
@@ -1158,8 +1218,7 @@ impl Patch {
             return Ok(());
         }
         crate::signature_policy::ensure_unsigned(target)?;
-        let mut candidate = target.clone();
-        restore_snapshot(&mut candidate, &self.after, &limits)?;
+        let candidate = self.image.apply_graph(target)?;
         let resulting = Snapshot::load(&candidate, &limits)?;
         if !resulting.same_source(&self.after) {
             return Err(invalid("connections patch publication changed its source"));
@@ -1279,60 +1338,6 @@ fn apply_connections(
             }
         },
         (None, None) => {},
-    }
-    validate_graph(package, limits).map(|_| ())
-}
-
-fn restore_snapshot(
-    package: &mut OpcPackage,
-    snapshot: &Snapshot,
-    limits: &SourceLimits,
-) -> Result<()> {
-    let workbook_name = package.main_document_part()?.partname().clone();
-    let existing = package
-        .get_part(&workbook_name)?
-        .rels()
-        .iter()
-        .find(|relationship| is_connections_relationship(relationship.reltype()))
-        .map(|relationship| {
-            if relationship.is_external() || target_has_suffix(relationship) {
-                return Err(invalid(
-                    "connections relationship must target an internal part URI",
-                ));
-            }
-            Ok(relationship
-                .target_partname()
-                .map(|target| (relationship.r_id().to_owned(), target))?)
-        })
-        .transpose()?;
-    if let Some((relationship_id, part_name)) = existing {
-        package
-            .get_part_mut(&workbook_name)?
-            .rels_mut()
-            .remove(&relationship_id);
-        if !package_part_is_referenced(package, &part_name) {
-            package.remove_part(&part_name);
-        }
-    }
-    if let Some(part) = &snapshot.source.connection {
-        package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
-            part.part_uri.clone(),
-            part.content_type.clone(),
-            part.bytes().to_vec(),
-        )))?;
-        let relationship = snapshot
-            .source
-            .connection_relationship()
-            .ok_or_else(|| invalid("connection snapshot is missing its workbook relationship"))?;
-        package
-            .get_part_mut(&workbook_name)?
-            .rels_mut()
-            .add_relationship(
-                relationship.relationship_type.clone(),
-                relationship.target.clone(),
-                relationship.id.clone(),
-                relationship.external,
-            );
     }
     validate_graph(package, limits).map(|_| ())
 }

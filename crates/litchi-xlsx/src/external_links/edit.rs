@@ -227,7 +227,11 @@ impl Edit {
         };
         if unchanged {
             let loaded = self.loaded.take().expect("external-link graph loaded");
-            let patch = Patch::new(loaded.before.clone(), loaded.before.clone());
+            let patch = Patch::new(
+                loaded.before.clone(),
+                loaded.before.clone(),
+                crate::part_edit::PartPatch::default(),
+            );
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
                 loaded.before,
@@ -257,7 +261,17 @@ impl Edit {
                 "external-link publication changed the staged graph",
             ));
         }
-        let patch = Patch::new(before, snapshot.clone());
+        let names = std::iter::once(before.workbook_part_name().to_owned())
+            .chain(
+                before
+                    .entries()
+                    .iter()
+                    .chain(snapshot.entries())
+                    .map(|e| e.part_uri.to_string()),
+            )
+            .collect();
+        let image = crate::part_edit::PartPatch::capture(&self.target, &candidate, &names)?;
+        let patch = Patch::new(before, snapshot.clone(), image);
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),

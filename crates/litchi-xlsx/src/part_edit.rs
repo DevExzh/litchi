@@ -649,7 +649,11 @@ impl PartPatch {
 
     /// Capture the parts named in `names` that differ between `before` and
     /// `after`.
-    fn capture(before: &OpcPackage, after: &OpcPackage, names: &BTreeSet<String>) -> Result<Self> {
+    pub(crate) fn capture(
+        before: &OpcPackage,
+        after: &OpcPackage,
+        names: &BTreeSet<String>,
+    ) -> Result<Self> {
         let mut deltas = Vec::new();
         for name in names {
             let name = PackURI::new(name.as_str()).map_err(|error| invalid(error.to_string()))?;

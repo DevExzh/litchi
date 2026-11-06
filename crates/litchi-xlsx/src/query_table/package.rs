@@ -29,37 +29,81 @@ pub fn load_worksheet_query_tables(
     package: &OpcPackage,
     worksheet_part: &PackURI,
 ) -> Result<Vec<Part>> {
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     let worksheet = package.get_part(worksheet_part)?;
-    let mut result = Vec::new();
-    let mut seen_parts = HashSet::new();
+    let mut owners = vec![worksheet.partname().clone()];
+    let mut seen_owners = HashSet::new();
     for relationship in worksheet
         .rels()
         .iter()
-        .filter(|relationship| is_query_table_relationship_type(relationship.reltype()))
+        .filter(|r| matches!(r.reltype(), rt::TABLE | rt::STRICT_TABLE))
     {
-        if relationship.is_external() {
-            return Err(invalid("query-table relationship cannot be external"));
+        if relationship.is_external() || relationship.target_ref().contains(['#', '?']) {
+            return Err(invalid(
+                "worksheet table relationship must target an internal part",
+            ));
         }
-        let part_name = relationship.target_partname()?;
-        if !seen_parts.insert(part_name.clone()) {
-            return Err(invalid("worksheet has duplicate query-table targets"));
+        let target = relationship.target_partname()?;
+        let table = package.get_part(&target)?;
+        if table.content_type() != ct::SML_TABLE {
+            return Err(invalid(
+                "worksheet table relationship has invalid content type",
+            ));
         }
-        let part = package.get_part(&part_name)?;
-        if part.content_type() != QUERY_TABLE_CONTENT_TYPE {
-            return Err(invalid(format!(
-                "query-table part '{part_name}' has invalid content type"
-            )));
+        if !seen_owners.insert(table.partname().as_str().to_ascii_lowercase()) {
+            return Err(invalid("worksheet has duplicate table targets"));
         }
-        if part.rels().iter().next().is_some() {
-            return Err(invalid("query-table parts must not have relationships"));
-        }
-        result.push(Part::new(
-            relationship.r_id().to_string(),
-            part_name.to_string(),
-            parse_query_table(part.blob())?,
-        ));
+        owners.push(table.partname().clone());
     }
-    result.sort_by(|left, right| left.relationship_id.cmp(&right.relationship_id));
+    let mut result = Vec::new();
+    let mut seen_parts = HashSet::new();
+    for owner in owners {
+        let part_owner = package.get_part(&owner)?;
+        let mut count = 0;
+        for relationship in part_owner
+            .rels()
+            .iter()
+            .filter(|r| is_query_table_relationship_type(r.reltype()))
+        {
+            count += 1;
+            if !owner.is_equivalent_to(worksheet_part) && count > 1 {
+                return Err(invalid(
+                    "table definition has multiple query-table relationships",
+                ));
+            }
+            if relationship.is_external() || relationship.target_ref().contains(['#', '?']) {
+                return Err(invalid(
+                    "query-table relationship must target an internal part",
+                ));
+            }
+            let part_name = relationship.target_partname()?;
+            let part = package.get_part(&part_name)?;
+            if !seen_parts.insert(part.partname().as_str().to_ascii_lowercase()) {
+                return Err(invalid("worksheet has duplicate query-table targets"));
+            }
+            if part.content_type() != QUERY_TABLE_CONTENT_TYPE {
+                return Err(invalid(format!(
+                    "query-table part '{part_name}' has invalid content type"
+                )));
+            }
+            if part.rels().iter().next().is_some() {
+                return Err(invalid("query-table parts must not have relationships"));
+            }
+            result.push(
+                Part::new(
+                    relationship.r_id().to_owned(),
+                    part.partname().to_string(),
+                    parse_query_table(part.blob())?,
+                )
+                .with_owner(&owner),
+            );
+        }
+    }
+    result.sort_by(|a, b| {
+        a.owner_part_name
+            .cmp(&b.owner_part_name)
+            .then_with(|| a.relationship_id.cmp(&b.relationship_id))
+    });
     Ok(result)
 }
 
@@ -68,9 +112,85 @@ pub fn find_worksheet_query_table(
     worksheet_part: &PackURI,
     relationship_id: &str,
 ) -> Result<Option<Part>> {
+    let mut matching = load_worksheet_query_tables(package, worksheet_part)?
+        .into_iter()
+        .filter(|p| p.relationship_id == relationship_id);
+    let found = matching.next();
+    if matching.next().is_some() {
+        return Err(invalid(
+            "query-table relationship ID is ambiguous across owner parts",
+        ));
+    }
+    Ok(found)
+}
+
+/// Find a query table by its package part identity, including table-owned entries.
+pub(crate) fn find_by_part_name(
+    package: &OpcPackage,
+    worksheet_part: &PackURI,
+    part_name: &str,
+) -> Result<Option<Part>> {
+    let target = PackURI::new(part_name).map_err(invalid)?;
     Ok(load_worksheet_query_tables(package, worksheet_part)?
         .into_iter()
-        .find(|item| item.relationship_id == relationship_id))
+        .find(|p| PackURI::new(p.part_name()).is_ok_and(|name| name.is_equivalent_to(&target))))
+}
+
+pub(crate) fn replace_by_part_name(
+    package: &mut OpcPackage,
+    worksheet_part: &PackURI,
+    part_name: &str,
+    query_table: Table,
+    conformance: Conformance,
+) -> Result<()> {
+    validate_query_table_connection(package, query_table.connection_id)?;
+    let existing = find_by_part_name(package, worksheet_part, part_name)?
+        .ok_or_else(|| invalid("query-table part was not found in the selected worksheet"))?;
+    replace_definition(package, &existing, query_table, conformance)
+}
+
+fn replace_definition(
+    package: &mut OpcPackage,
+    existing: &Part,
+    query_table: Table,
+    conformance: Conformance,
+) -> Result<()> {
+    if let Some(owner) = existing.owner_part_name() {
+        let owner = PackURI::new(owner).map_err(invalid)?;
+        if package.get_part(&owner)?.content_type()
+            == litchi_opc::constants::content_type::SML_TABLE
+        {
+            let bindings = |table: &Table| {
+                table
+                    .refresh()
+                    .into_iter()
+                    .flat_map(|refresh| refresh.fields())
+                    .map(|field| (field.id(), field.table_column_id()))
+                    .collect::<Vec<_>>()
+            };
+            if bindings(existing.query_table()) != bindings(&query_table) {
+                return Err(crate::Error::Unsupported {
+                    feature: "table-owned query field rebinding requires table-column updates",
+                });
+            }
+        }
+    }
+    let canonical = query_table.to_xml(conformance)?;
+    let part_name = PackURI::new(existing.part_name()).map_err(invalid)?;
+    let xml = super::codec::patch_name(
+        package.get_part(&part_name)?.blob(),
+        &query_table,
+        conformance,
+    )?
+    .unwrap_or(canonical);
+    parse_query_table(&xml)?;
+    crate::signature_policy::ensure_unsigned(package)?;
+    package.add_part(Box::new(BlobPart::new(
+        part_name,
+        QUERY_TABLE_CONTENT_TYPE.into(),
+        xml,
+    )));
+    Ok(())
 }
 
 /// Add an inert query-table part. The referenced connection must already exist.
@@ -109,11 +229,7 @@ pub(crate) fn add_worksheet_query_table(
             relationship_id.clone(),
             false,
         );
-    Ok(Part::new(
-        relationship_id,
-        part_name.to_string(),
-        query_table,
-    ))
+    Ok(Part::new(relationship_id, part_name.to_string(), query_table).with_owner(worksheet_part))
 }
 
 /// Replace the definition of one existing query-table part.
@@ -132,16 +248,7 @@ pub(crate) fn replace_worksheet_query_table(
     validate_query_table_connection(package, query_table.connection_id)?;
     let existing = find_worksheet_query_table(package, worksheet_part, relationship_id)?
         .ok_or_else(|| invalid("query-table relationship was not found"))?;
-    let xml = query_table.to_xml(conformance)?;
-    parse_query_table(&xml)?;
-    let part_name = PackURI::new(existing.part_name()).map_err(invalid)?;
-    crate::signature_policy::ensure_unsigned(package)?;
-    package.add_part(Box::new(BlobPart::new(
-        part_name,
-        QUERY_TABLE_CONTENT_TYPE.into(),
-        xml,
-    )));
-    Ok(())
+    replace_definition(package, &existing, query_table, conformance)
 }
 
 /// Remove one query-table relationship and its unreferenced part.
@@ -160,6 +267,14 @@ pub(crate) fn remove_worksheet_query_table(
         return Ok(false);
     };
     let part_name = PackURI::new(existing.part_name()).map_err(invalid)?;
+    if !existing
+        .owner_part_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case(worksheet_part.as_str()))
+    {
+        return Err(crate::Error::Unsupported {
+            feature: "table-owned query-table removal requires table conversion",
+        });
+    }
     crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(worksheet_part)?
@@ -185,6 +300,14 @@ pub(crate) fn reorder_worksheet_query_tables(
     ordered_relationship_ids: &[String],
 ) -> Result<Vec<Part>> {
     let existing = load_worksheet_query_tables(package, worksheet_part)?;
+    if existing.iter().any(|p| {
+        !p.owner_part_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case(worksheet_part.as_str()))
+    }) {
+        return Err(crate::Error::Unsupported {
+            feature: "query-table reorder across table-definition owners",
+        });
+    }
     if existing.len() != ordered_relationship_ids.len() {
         return Err(invalid(
             "query-table reorder must contain every relationship",
@@ -240,7 +363,7 @@ pub(crate) fn reorder_worksheet_query_tables(
             id.clone(),
             false,
         );
-        result.push(Part::new(id, item.part_name, item.query_table));
+        result.push(Part::new(id, item.part_name, item.query_table).with_owner(worksheet_part));
     }
     Ok(result)
 }

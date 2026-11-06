@@ -177,3 +177,220 @@ fn removal_preserves_a_query_table_target_shared_by_another_part() {
     let package = plain(&edit.commit().unwrap().into_package());
     assert!(package.get_part(&target).is_ok());
 }
+
+fn mixed_query_owners() -> (Package, String, String) {
+    let (base, worksheet) = package(Connections {
+        connections: vec![connection(1, "connection")],
+    });
+    let mut edit = base.edit_query_tables(0_usize).unwrap();
+    let direct = edit
+        .add(table("direct", 1), Conformance::Transitional)
+        .unwrap();
+    let indirect = edit
+        .add(table("indirect", 1), Conformance::Transitional)
+        .unwrap();
+    let mut opc = edit.commit().unwrap().into_package().into_plain_opc();
+    opc.get_part_mut(&worksheet)
+        .unwrap()
+        .rels_mut()
+        .remove(indirect.relationship_id());
+    let owner = PackURI::new("/xl/tables/table1.xml").unwrap();
+    let mut table=BlobPart::new(owner.clone(),litchi_opc::constants::content_type::SML_TABLE.into(),br#"<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Linked" displayName="Linked" ref="A1:A2" tableType="queryTable"><tableColumns count="1"><tableColumn id="1" name="Value" queryTableFieldId="1"/></tableColumns></table>"#.to_vec());
+    table.rels_mut().add_relationship(
+        litchi_xlsx::query_table::QUERY_TABLE_RELATIONSHIP_TYPE.into(),
+        "../queryTables/queryTable2.xml".into(),
+        direct.relationship_id().into(),
+        false,
+    );
+    opc.try_add_part(Box::new(table)).unwrap();
+    opc.get_part_mut(&worksheet)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            litchi_opc::constants::relationship_type::TABLE.into(),
+            "../tables/table1.xml".into(),
+            "rIdTable".into(),
+            false,
+        );
+    (
+        Package::from_opc(opc).unwrap(),
+        direct.relationship_id().into(),
+        indirect.part_name().into(),
+    )
+}
+
+#[test]
+fn table_owned_query_identity_disambiguates_local_ids_and_refuses_wrong_owner_removal() {
+    let (package, id, indirect) = mixed_query_owners();
+    let mut edit = package.edit_query_tables(0_usize).unwrap();
+    let original = edit.query_tables().unwrap();
+    assert_eq!(original.len(), 2);
+    assert_ne!(original[0].owner_part_name(), original[1].owner_part_name());
+    assert!(edit.query_table(&id).is_err());
+    assert!(
+        edit.replace(&id, table("wrong", 1), Conformance::Transitional)
+            .is_err()
+    );
+    assert!(edit.remove(&id).is_err());
+    assert_eq!(edit.query_tables().unwrap(), original);
+    let mut unbound = original
+        .iter()
+        .find(|part| part.part_name() == indirect)
+        .unwrap()
+        .query_table()
+        .clone();
+    unbound.set_refresh(None);
+    assert!(matches!(
+        edit.replace_part(&indirect, unbound, Conformance::Transitional),
+        Err(litchi_xlsx::Error::Unsupported { .. })
+    ));
+    assert_eq!(edit.query_tables().unwrap(), original);
+
+    edit.replace_part(&indirect, table("selected", 1), Conformance::Transitional)
+        .unwrap();
+    let after = edit.commit().unwrap().into_package();
+    let catalog = after
+        .workbook()
+        .sheet(0_usize)
+        .unwrap()
+        .unwrap()
+        .query_tables()
+        .unwrap();
+    assert_eq!(
+        catalog
+            .iter()
+            .find(|p| p.part_name() == indirect)
+            .unwrap()
+            .query_table()
+            .name(),
+        "selected"
+    );
+    assert_eq!(
+        catalog
+            .iter()
+            .find(|p| p.part_name() != indirect)
+            .unwrap()
+            .query_table()
+            .name(),
+        "direct"
+    );
+    let mut opc = after.into_plain_opc();
+    opc.get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+        .unwrap()
+        .rels_mut()
+        .remove(&id);
+    opc.remove_part(&PackURI::new("/xl/queryTables/queryTable1.xml").unwrap());
+    let only = Package::from_opc(opc).unwrap();
+    let mut edit = only.edit_query_tables(0_usize).unwrap();
+    assert!(matches!(
+        edit.remove(&id),
+        Err(litchi_xlsx::Error::Unsupported { .. })
+    ));
+    assert!(matches!(
+        edit.reorder(&[id]),
+        Err(litchi_xlsx::Error::Unsupported { .. })
+    ));
+    assert_eq!(edit.query_tables().unwrap().len(), 1);
+}
+
+#[test]
+fn table_query_owners_reject_external_duplicate_and_orphan_relationships() {
+    let (base, _, _) = mixed_query_owners();
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    let owner = PackURI::new("/xl/tables/table1.xml").unwrap();
+    for variant in 0..4 {
+        let mut opc = base.clone().into_plain_opc();
+        match variant {
+            0 => {
+                opc.get_part_mut(&worksheet)
+                    .unwrap()
+                    .rels_mut()
+                    .remove("rIdTable");
+            },
+            1 => {
+                opc.get_part_mut(&owner)
+                    .unwrap()
+                    .rels_mut()
+                    .add_relationship(
+                        litchi_xlsx::query_table::QUERY_TABLE_RELATIONSHIP_TYPE.into(),
+                        "../queryTables/queryTable1.xml".into(),
+                        "extra".into(),
+                        false,
+                    );
+            },
+            2 => {
+                opc.get_part_mut(&owner)
+                    .unwrap()
+                    .rels_mut()
+                    .add_relationship(
+                        litchi_xlsx::query_table::QUERY_TABLE_RELATIONSHIP_TYPE.into(),
+                        "https://invalid.example/query.xml".into(),
+                        "external".into(),
+                        true,
+                    );
+            },
+            _ => {
+                opc.get_part_mut(&worksheet)
+                    .unwrap()
+                    .rels_mut()
+                    .add_relationship(
+                        litchi_xlsx::query_table::QUERY_TABLE_RELATIONSHIP_TYPE.into(),
+                        "../queryTables/queryTable2.xml".into(),
+                        "duplicate".into(),
+                        false,
+                    );
+            },
+        }
+        assert!(
+            litchi_xlsx::connections::Snapshot::load(&opc, &opc.read_limits()).is_err(),
+            "variant {variant}"
+        );
+        if variant != 0 {
+            assert!(load_worksheet_query_tables(&opc, &worksheet).is_err());
+        }
+    }
+}
+
+#[test]
+fn query_rename_preserves_bom_quotes_entities_and_unknown_metadata() {
+    let (base, _) = package(Connections {
+        connections: vec![connection(1, "connection")],
+    });
+    let mut edit = base.edit_query_tables(0_usize).unwrap();
+    let part = edit
+        .add(table("before", 1), Conformance::Transitional)
+        .unwrap();
+    let mut opc = edit.commit().unwrap().into_package().into_plain_opc();
+    let original=b"\xef\xbb\xbf<?xml version='1.0'?>\r\n<q:queryTable xmlns:q='http://schemas.openxmlformats.org/spreadsheetml/2006/main' xmlns:mc='http://schemas.openxmlformats.org/markup-compatibility/2006' xmlns:v='urn:future' mc:Ignorable='v' name = 'b&#101;fore' connectionId='1' v:uid='opaque'><v:future>before</v:future></q:queryTable>";
+    opc.get_part_mut(&PackURI::new(part.part_name()).unwrap())
+        .unwrap()
+        .set_blob(original.to_vec());
+    let package = Package::from_opc(opc).unwrap();
+    let mut edit = package.edit_query_tables(0_usize).unwrap();
+    let mut value = edit.query_tables().unwrap()[0].query_table().clone();
+    value.set_name("after & 'quoted' \"value\"".into());
+    edit.replace_part(part.part_name(), value.clone(), Conformance::Transitional)
+        .unwrap();
+    let result = edit.commit().unwrap().into_package();
+    let raw = plain(&result)
+        .get_part(&PackURI::new(part.part_name()).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let expected = String::from_utf8(original.to_vec()).unwrap().replace(
+        "b&#101;fore",
+        "after &amp; &apos;quoted&apos; &quot;value&quot;",
+    );
+    assert!(raw == expected.as_bytes());
+    assert_eq!(
+        result
+            .workbook()
+            .sheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .query_tables()
+            .unwrap()[0]
+            .query_table(),
+        &value
+    );
+}

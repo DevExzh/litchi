@@ -4241,6 +4241,113 @@
         "Two anchored objects, one resolved PNG with exact hash and native name/alt text/rId1, exact cell anchor endpoints, and one named RoundRect with CF_SHAPE_005 text; drawings_parsed confirms the eager inventory."
       ],
       "scope_limit": "Floating drawing image scope only; in-cell rich-value bindings and SVG lifecycle are not inferred. No rendering, external resolution or shape editing."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_query_table_catalog_follows_both_worksheet_and_table_owners",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-227"
+      ],
+      "assertions": [
+        "Exactly one query table on each native sheet: table-owned ExternalData_1/connection2 with ID,Category,Amount field bindings and direct LEGACY_CSV_010/connection1. No-op archive bytes stay exact."
+      ],
+      "scope_limit": "Stored query-table ownership and metadata only; no imports, provider activation or refresh."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_connections_expose_text_import_and_inert_mashup_metadata",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-252",
+        "xlsx-227"
+      ],
+      "assertions": [
+        "Two validated native connections, exact Text code page/path/comma flags/field count and OleDb provider/command/keep-alive metadata; both query-table parts admitted through their actual owners."
+      ],
+      "scope_limit": "Paths and commands remain inert. Query definitions are not evaluated and the DataMashup payload is not interpreted."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_external_link_keeps_alternate_url_and_cached_sheets",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-250"
+      ],
+      "assertions": [
+        "Exact relative primary and absolute alternate target, three source sheet names, and cached Sheet1 D6=49.75 / Sheet2 B4=14 with row/sheet indices. The declared ignorable extension remains typed."
+      ],
+      "scope_limit": "Cached external data and relationship strings only; no link resolution, fetching or recalculation."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_query_table_rename_keeps_table_bindings_revisions_and_legacy_import",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-227"
+      ],
+      "assertions": [
+        "Native worksheet- and table-owned query-table names change by exactly one source substitution, preserving revision UID/MCE declarations, field bindings and every other package member. Temporary save/reopen and inverse restore all original member bytes."
+      ],
+      "scope_limit": "Name-only replacement is source-preserving. Whole-definition replacements retain canonical writer semantics; table-owned removal/reorder or field rebinding requires separate table conversion and returns Unsupported. ZIP compression identity after inverse is not promised."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_connection_description_edit_keeps_import_data_and_mashup_payloads",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-252"
+      ],
+      "assertions": [
+        "Edit connection2 description, reopen the native graph, preserve all other members including query parts, imported rows and DataMashup, and restore every member byte through inverse."
+      ],
+      "scope_limit": "Inert metadata edit only; no refresh or credential use. Member-level restoration does not assert identical ZIP compression."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_alternate_url_metadata_edit_preserves_both_inert_targets_and_caches",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-250"
+      ],
+      "assertions": [
+        "Add driveId to the native alternate URL owner, retain both targets and exact cached values, preserve all other members, and restore exact original member bytes through source-image inverse replay."
+      ],
+      "scope_limit": "No target access or live service identity validation. Full ZIP archive identity is separate from this part-level patch contract."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_connection_owner_creation_removal_and_inverse_preserve_original_members",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-252"
+      ],
+      "assertions": [
+        "Copy inert typed Text connection metadata into a native workbook with no connection owner, save/reopen id7, remove the last connection, and invert both lifecycle patches with every original member byte restored, including content types and workbook relationships."
+      ],
+      "scope_limit": "The original external links, rich values, embedded document and caches remain inert. No query execution, target access, native Office reopen or whole-ZIP byte identity claim."
     }
   ]
 }

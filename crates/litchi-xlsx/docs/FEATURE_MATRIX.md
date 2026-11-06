@@ -62,7 +62,7 @@ query, macro, chart, pivot, or external content is executed.
 | AutoFilter and sort | ✅ | ✅ | ✅ | AutoFilter ranges, filters, sort states, custom/dynamic filters, and supported extension metadata are available. Direct table sort states retain their exact saved worksheet ranges, including stale extents beyond the current table. Authoring requires owner-bounded ranges and accepts full column keys extending beyond the selected sort-state rows. Reading this metadata does not execute sorting or filtering against cells. |
 | Structured tables | ✅ | ✅ | ✅ | Table identity, display names, ranges, columns, totals, styles, AutoFilter, calculated-column formulas, and package relationships are typed and writable. |
 | Surveys attached to tables | 🟡 | 🟡 | 🟡 | Bounded table-owned Survey snapshots and transactions expose semantic table/column selectors, typed question/property CRUD, and exact source-bound patches. Namespace-aware parsing validates schema order, attributes, IDs, ST_Xstring fields, and caller limits before retained-source/output allocation. Existing edits preserve comments, namespace bindings, lexical attributes, opaque extensions, and neighboring XML; question moves within their original parent retain source subtrees. Catalog snapshots share parsed Surveys and callbacks isolate the selected value. Changed publication enforces source identity and signature policy. Retained content-type and relationship tokens support exact remove/save/reopen/inverse restoration, including empty relationship parts. Cross-parent opaque transfers are refused. Arbitrary detached opaque context, broader dependency closure, and native producer edit evidence remain incomplete. Rendering and submission are inert. [MS-XLSX] §§2.6.142–2.6.145. |
-| Query tables and external-data table metadata | ✅ | ✅ | ✅ | Query-table identity, fields, refresh/import metadata, relationships, and supported connection references are modeled. No query is fetched or refreshed. |
+| Query tables and external-data table metadata | 🟡 | ✅ | 🟡 | The worksheet catalog follows direct and table-definition owners and exposes the owning part. Existing definitions support replacement; names alone splice the original source. Direct worksheet owners support CRUD/reorder. Relationship IDs must be unambiguous across owners; `replace_part` selects a full part name when IDs collide. Table-owned removal/reorder and field rebinding are refused because they also require updating table/column query bindings. No query is fetched or refreshed. |
 | Data consolidation | 🟡 | ✅ | 🟡 | Consolidation metadata and source references have bounded typed coverage; consolidation calculations are not performed. |
 | Page margins | ✅ | ✅ | ✅ | Validated inch/point/millimeter constructors and typed reads cover all six required values. Ordinary workbook put/remove/copy/move edits are byte-minimal, verified, reversible, join/conflict aware, and exact-source checked. |
 | Page setup and print options | ✅ | ✅ | ✅ | Typed reads and ordinary workbook put/remove/copy/move edits cover all relationship-free core `pageSetup` settings plus centering, headings, and gridline print flags. Writes are compact, verified, reversible, join/conflict aware, and preserve an attached Printer Settings relationship; removal is refused while that relationship is attached. Native Excel for macOS zero DPI markers are retained as `Dpi::UNSPECIFIED`; `Dpi::new` continues to require a positive authored resolution. |
@@ -192,3 +192,21 @@ subtrees do not acquire typed refresh ownership. The fixture has no refresh
 intervals. Public relationship and style-complement writers now produce complete
 XML start tags; typed native data/structures/relationships pass codec round trips.
 This does not qualify rich-value cell binding, evaluation or service refresh.
+
+Native external-data tests qualify both query-table ownership routes in
+`excel-connections.xlsx`, including all three Power Query field bindings and
+the legacy import. Connections validation admits a table owner only through
+one worksheet relationship and rejects duplicate, external and orphan graphs.
+Native Text/OleDb metadata is read inertly; a description edit preserves
+imported data, query parts and DataMashup payloads.
+
+`excel-links-objects.xlsx` qualifies the declared-ignorable `alternateUrls`
+namespace, exact primary/alternate targets, source sheet names and stored
+49.75/14 caches. A drive-ID metadata edit preserves both targets and caches.
+Connection and external-link inverses replay captured part changes, including
+relationship and manifest images, while retaining their existing source guards.
+Native owner creation and last-connection removal also preserve unrelated
+parts and restore original relationship/manifest member bytes through inverse.
+Native save/reopen inverses restore exact package-member bytes; identical ZIP
+compression is outside the part-level patch contract. No external target,
+provider, macro, query or refresh was executed.

@@ -59,8 +59,8 @@ impl Package {
 }
 
 impl Edit {
-    /// The staged query tables of the worksheet, ordered by relationship
-    /// ID.
+    /// The worksheet's direct and table-owned query tables, ordered by owner
+    /// part name and then relationship ID.
     ///
     /// # Errors
     ///
@@ -69,7 +69,8 @@ impl Edit {
         super::package::load_worksheet_query_tables(self.staged.opc(), &self.worksheet)
     }
 
-    /// The staged query table with relationship ID `relationship_id`.
+    /// The staged query table with an unambiguous relationship ID.
+    /// IDs are local to owner parts; duplicate IDs across owners are refused.
     ///
     /// # Errors
     ///
@@ -119,6 +120,28 @@ impl Edit {
                 candidate,
                 &worksheet,
                 relationship_id,
+                query_table,
+                conformance,
+            )
+        })
+    }
+
+    /// Replace a query-table definition selected by its full package part name.
+    /// This disambiguates equal relationship IDs belonging to different tables.
+    /// The selected part must belong to this worksheet, directly or through one
+    /// of its table definitions; table and worksheet XML remain unchanged.
+    pub fn replace_part(
+        &mut self,
+        part_name: &str,
+        query_table: Table,
+        conformance: Conformance,
+    ) -> Result<()> {
+        let worksheet = self.worksheet.clone();
+        self.staged.update(|candidate| {
+            super::package::replace_by_part_name(
+                candidate,
+                &worksheet,
+                part_name,
                 query_table,
                 conformance,
             )

@@ -2,7 +2,6 @@
 
 use litchi_opc::OpcPackage;
 
-use super::package::apply_entries;
 use super::snapshot::Snapshot;
 use crate::error::{Error as XlsxError, Result};
 
@@ -11,11 +10,20 @@ use crate::error::{Error as XlsxError, Result};
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    image: crate::part_edit::PartPatch,
 }
 
 impl Patch {
-    pub(crate) fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+    pub(crate) fn new(
+        before: Snapshot,
+        after: Snapshot,
+        image: crate::part_edit::PartPatch,
+    ) -> Self {
+        Self {
+            before,
+            after,
+            image,
+        }
     }
 
     /// Source context required before applying this patch.
@@ -42,6 +50,7 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            image: self.image.inverse(),
         }
     }
 
@@ -59,13 +68,7 @@ impl Patch {
             return Ok(());
         }
 
-        let mut candidate = target.clone();
-        apply_entries(
-            &mut candidate,
-            self.before.entries(),
-            self.after.entries(),
-            self.after.conformance(),
-        )?;
+        let candidate = self.image.apply_graph(target)?;
         let resulting = Snapshot::load(&candidate, &limits)?;
         if !resulting.same_source(&self.after) || resulting.entries() != self.after.entries() {
             return Err(XlsxError::PatchConflict {

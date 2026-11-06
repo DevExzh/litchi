@@ -891,3 +891,17 @@ fn package_crud_keeps_relationship_graph_bounded_and_inert() {
         "removed external-link part must not become an orphan"
     );
 }
+
+#[test]
+fn alternate_url_namespace_survives_native_ignorable_declarations() {
+    let link = workbook_with_alternate_urls();
+    let mut part = build_external_link_part(
+        PackURI::new("/xl/externalLinks/externalLink1.xml").unwrap(),
+        &link,
+        &default_limits(),
+    )
+    .unwrap();
+    let xml=String::from_utf8(part.blob().to_vec()).unwrap().replace("<externalLink ",r#"<externalLink xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:alt="http://schemas.microsoft.com/office/spreadsheetml/2021/extlinks2021" mc:Ignorable="alt" "#);
+    part.set_blob(xml.into_bytes());
+    assert_eq!(load_link(&part, "bookRel", 0).unwrap().link, link);
+}

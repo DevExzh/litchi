@@ -781,6 +781,7 @@ impl Table {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Part {
+    pub(crate) owner_part_name: Option<String>,
     pub(crate) relationship_id: String,
     pub(crate) part_name: String,
     pub(crate) query_table: Table,
@@ -790,10 +791,23 @@ impl Part {
     #[must_use]
     pub fn new(relationship_id: String, part_name: String, query_table: Table) -> Self {
         Self {
+            owner_part_name: None,
             relationship_id,
             part_name,
             query_table,
         }
+    }
+
+    /// The worksheet or table-definition part that owns this relationship.
+    /// Detached values constructed with `new` have no package owner.
+    #[must_use]
+    pub fn owner_part_name(&self) -> Option<&str> {
+        self.owner_part_name.as_deref()
+    }
+
+    pub(crate) fn with_owner(mut self, owner: &litchi_opc::PackURI) -> Self {
+        self.owner_part_name = Some(owner.to_string());
+        self
     }
 
     #[must_use]
