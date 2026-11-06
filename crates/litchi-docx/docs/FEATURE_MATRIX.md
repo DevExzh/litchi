@@ -279,3 +279,20 @@ their actual caches and bookmark identities. The DOCX field view does not
 interpret `ffData`; the operations title-edit regression preserves that XML
 and all field/bookmark content exactly on Auto and eager routes. No source
 lookup, merge, field evaluation, form activation or fresh Word reopen occurs.
+
+`tests/microsoft_office_native_visuals.rs` qualifies the native Word visual and
+vector/diagram specimens. Picture metadata and JPEG/PNG/EMF identities, inert
+Excel OLE payloads, the separate doughnut chart workbook and cached data,
+SmartArt process nodes/definition identities, and the active VML text-box
+fallback have explicit assertions. SmartArt frame extents survive MCE's
+empty-element expansion and stay scoped to their inline/floating owner.
+
+A hole-size edit preserves chart companions, workbooks and exact unchanged
+relationship members, including Word's relative target spelling. Source SVG
+detach and subsequent reattach preserve the raster fallback and SmartArt
+parts; inverse restores the original archive. Public SmartArt outline edits
+retain the native frame extent and other visual payloads. The facade opens
+both embedded XLSX children independently and checks stored values/formulas.
+These tests do not render or refresh anything. The general drawing inventory
+still omits the alternate WPS/WPG branches selected away by its current MCE
+profile; the tested VML text-box fallback does not close that gap.

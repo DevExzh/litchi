@@ -3693,6 +3693,143 @@
       "required_features": [
         "docx"
       ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_picture_extents_alt_text_and_ole_workbook_are_distinct_resources",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-080",
+        "docx-082"
+      ],
+      "assertions": [
+        "Two DrawingML picture IDs/extents/alt texts and exact JPEG/PNG hashes; one Excel.Sheet.12 embedded object with Content aspect, exact EMF preview extent/hash and separate XLSX payload size/hash."
+      ],
+      "scope_limit": "Inert metadata/payload resolution only; floating alignment/wrapping, VML geometry, rendering and OLE activation are not qualified."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_doughnut_chart_retains_caches_and_its_separate_workbook",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-082"
+      ],
+      "assertions": [
+        "Native doughnut hole75, four category/value caches and formulas, title reference, exact chart/style/color/workbook graph and resource hashes; inline chart ID/extent."
+      ],
+      "scope_limit": "Stored values only; no calculation, label layout or native rendering. The chart workbook is distinct from the OLE workbook."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_smartart_process_retains_nodes_and_definition_identities",
+      "fixtures": [
+        "word/word-vector-diagram.docx"
+      ],
+      "feature_rows": [
+        "docx-082"
+      ],
+      "assertions": [
+        "Process diagram type, three exact node texts,18 points/18 connections, data/drawing part identity,5486400x3200400 frame and layout/style/colors definition IDs."
+      ],
+      "scope_limit": "No layout algorithm or drawing/render-parity validation; converted WPG group semantics are outside this test."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_rounded_rectangle_exposes_one_active_textbox_story",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-118"
+      ],
+      "assertions": [
+        "One active VML text-box story with exact two-paragraph text, shape name, VML anchor and absent WordArt styling."
+      ],
+      "scope_limit": "The text-box MCE profile selects the native VML fallback. General drawing_objects still omits the WPS branch; no positive general drawing-inventory claim is made."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_chart_hole_edit_preserves_cached_data_workbooks_and_companions",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-082"
+      ],
+      "assertions": [
+        "Change only hole size75 to55, save/reopen exact graph, preserve every unrelated OPC member including relative relationship spellings, and invert exact member bytes."
+      ],
+      "scope_limit": "Chart metadata edit only; no workbook refresh, type conversion, rendering or native Word reopen."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_svg_detach_replace_and_inverse_preserve_fallback_and_diagram_parts",
+      "fixtures": [
+        "word/word-vector-diagram.docx"
+      ],
+      "feature_rows": [
+        "docx-083",
+        "docx-082"
+      ],
+      "assertions": [
+        "Direct inline SVG identity and exact SVG/PNG hashes; detach then optionally reattach changed SVG in a second transaction; save/reopen preserves PNG and all diagram parts, and inverse restores complete source archive bytes."
+      ],
+      "scope_limit": "Attachment family does not replace an occupied owner in one batch. Two supported transactions are used; no SVG rendering or converted WPG semantic editing."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_word_smartart_outline_edits_preserve_extent_and_other_visuals",
+      "fixtures": [
+        "word/word-vector-diagram.docx"
+      ],
+      "feature_rows": [
+        "docx-073",
+        "docx-082"
+      ],
+      "assertions": [
+        "Auto/eager public SmartArt query/path, native node-text edit and explicit process-layout outline rebuild; save/reopen keeps native extent, exact converted-group XML and unrelated parts. Node text editing also preserves layout/style/colors/main XML; both edits invert exactly."
+      ],
+      "scope_limit": "Native node-text mutation and explicit bounded layout authoring are separate operations. No native/proprietary layout engine, rendering or fresh native-app validation.",
+      "required_features": [
+        "docx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_word_ole_and_chart_children_expose_distinct_workbook_values",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-080",
+        "docx-082"
+      ],
+      "assertions": [
+        "OLE child exposes exact sheet catalog and stored formula caches, retained through independent child edit; separate chart child exposes Sales/categories and four exact numeric lexemes; parent and original child archives remain unchanged."
+      ],
+      "scope_limit": "Children are opened explicitly as inert XLSX data; edited OLE child is not reinserted into parent and no Excel/Word execution or refresh occurs.",
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "ppt",
+        "pptx"
+      ]
     }
   ]
 }

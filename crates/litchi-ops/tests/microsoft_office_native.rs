@@ -904,3 +904,104 @@ fn native_word_mail_merge_and_form_payloads_survive_public_title_edits() {
         assert!(std::fs::read(path).unwrap() == bytes);
     }
 }
+
+#[cfg(feature = "docx")]
+#[test]
+fn native_word_smartart_outline_edits_preserve_extent_and_other_visuals() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word/word-vector-diagram.docx");
+    let bytes = std::fs::read(&path).unwrap();
+    let original = litchi_docx::Package::from_bytes(&bytes).unwrap();
+    let uri = litchi_opc::PackURI::new("/word/document.xml").unwrap();
+    let source_xml =
+        std::str::from_utf8(original.opc_package().get_part(&uri).unwrap().blob()).unwrap();
+    let start = source_xml.find("<mc:AlternateContent>").unwrap();
+    let end = source_xml[start..].find("</mc:AlternateContent>").unwrap()
+        + start
+        + "</mc:AlternateContent>".len();
+    let converted_group = &source_xml[start..end];
+    for (mode, node_only) in [
+        (SourceMode::Auto, true),
+        (SourceMode::Eager, true),
+        (SourceMode::Auto, false),
+        (SourceMode::Eager, false),
+    ] {
+        let options = OpenOptions::new().source_mode(mode);
+        let file = litchi_ops::open_with(&path, &options).unwrap();
+        let found = file
+            .query("smartart")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].path().to_string(), "/smartart[1]");
+        assert_eq!(
+            found[0].view().text().unwrap().as_deref(),
+            Some("ACQUIRE_013\nTRANSFORM_013\nVERIFY_013")
+        );
+        let commit = file
+            .edit(|e| {
+                if node_only {
+                    e.set("/smartart[1]/node[2]",props! {"text"=>"TRANSFORM_REVIEWED"})
+                } else { e.set(
+                    "/smartart[1]",
+                    props! {"layout"=>"process","text"=>"ACQUIRE_013\nTRANSFORM_REVIEWED\nVERIFY_013"},
+                ) }
+            })
+            .unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("smartart.docx");
+        commit.file().save_as(&destination).unwrap();
+        let reopened = litchi_docx::Package::open(&destination).unwrap();
+        let diagrams = reopened.smart_arts().unwrap();
+        assert_eq!(diagrams.len(), 1);
+        assert_eq!(
+            diagrams[0].text(),
+            "ACQUIRE_013\nTRANSFORM_REVIEWED\nVERIFY_013"
+        );
+        assert_eq!(diagrams[0].extent, Some((5486400, 3200400)));
+        assert_eq!(
+            diagrams[0].diagram_type(),
+            litchi_drawingml::diagram::DiagramType::Process
+        );
+        let after_xml =
+            std::str::from_utf8(reopened.opc_package().get_part(&uri).unwrap().blob()).unwrap();
+        assert!(after_xml.contains(converted_group));
+        for metadata in original.opc_package().iter_parts() {
+            let should_preserve = if node_only {
+                !["/word/diagrams/data1.xml", "/word/diagrams/drawing1.xml"]
+                    .contains(&metadata.partname().as_str())
+            } else {
+                metadata.partname() != &uri
+                    && !metadata.partname().as_str().starts_with("/word/diagrams/")
+            };
+            if should_preserve {
+                assert!(
+                    original
+                        .opc_package()
+                        .get_part(metadata.partname())
+                        .unwrap()
+                        .blob()
+                        == reopened
+                            .opc_package()
+                            .get_part(metadata.partname())
+                            .unwrap()
+                            .blob(),
+                    "changed {}",
+                    metadata.partname()
+                );
+            }
+        }
+        assert!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == bytes
+        );
+        assert!(file.to_bytes().unwrap() == bytes);
+    }
+}

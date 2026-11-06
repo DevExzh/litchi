@@ -430,9 +430,17 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
     // Stack of (graphicData depth, parsed anchor) frames for diagram anchors.
     let mut frames: Vec<(usize, Option<DiagramAnchor>)> = Vec::new();
     let mut anchors = Vec::new();
-    // The last drawing extent (`wp:extent`) seen, which a diagram anchor
-    // that follows it in the same drawing takes.
-    let mut extent: Option<(i64, i64)> = None;
+    // Each wp:inline/wp:anchor owns its direct extent. Processing MCE can
+    // expand empty elements, so both event forms must carry the same value.
+    // Keeping the owner depth also prevents a preceding drawing or a nested
+    // shape's geometry from supplying another diagram's extent.
+    let mut drawing_frames: Vec<(usize, Option<(i64, i64)>)> = Vec::new();
+    let wp = match conformance {
+        DiagramConformance::Transitional => {
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+        },
+        DiagramConformance::Strict => "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+    };
 
     loop {
         match reader.read_event().map_err(xml_error)? {
@@ -449,6 +457,14 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                         return Err(invalid("invalid document root or namespace"));
                     }
                     root = true;
+                } else if namespace == wp && matches!(local.as_str(), "inline" | "anchor") {
+                    drawing_frames.push((depth, None));
+                } else if namespace == wp && local == "extent" {
+                    if let Some(frame) = drawing_frames.last_mut()
+                        && depth == frame.0 + 1
+                    {
+                        frame.1 = drawing_extent(&element)?;
+                    }
                 } else if namespace == conformance.a() && local == "graphicData" {
                     let is_diagram =
                         attribute(&element, "uri")?.as_deref() == Some(conformance.dgm());
@@ -463,7 +479,7 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                         return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
                     let mut anchor = rel_ids(&reader, &element, conformance)?;
-                    anchor.extent = extent;
+                    anchor.extent = drawing_frames.last().and_then(|frame| frame.1);
                     frame.1 = Some(anchor);
                 }
             },
@@ -494,13 +510,18 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
                         return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
                     let mut anchor = rel_ids(&reader, &element, conformance)?;
-                    anchor.extent = extent;
+                    anchor.extent = drawing_frames.last().and_then(|frame| frame.1);
                     frame.1 = Some(anchor);
-                } else if local == "extent" && namespace.ends_with("wordprocessingDrawing") {
-                    extent = drawing_extent(&element)?;
+                } else if local == "extent" && namespace == wp {
+                    if let Some(frame) = drawing_frames.last_mut()
+                        && depth == frame.0
+                    {
+                        frame.1 = drawing_extent(&element)?;
+                    }
                 }
             },
             Event::End(_) => {
+                let _ = drawing_frames.pop_if(|frame| frame.0 == depth);
                 if let Some((_, anchor)) = frames.pop_if(|frame| frame.0 == depth) {
                     anchors.push(
                         anchor.ok_or_else(|| invalid("SmartArt graphicData lacks relIds child"))?,
@@ -519,7 +540,7 @@ fn scan_document_xml(xml: &[u8], conformance: DiagramConformance) -> Result<Vec<
             Event::Text(_) | Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
         }
     }
-    if !root || depth != 0 || !frames.is_empty() {
+    if !root || depth != 0 || !frames.is_empty() || !drawing_frames.is_empty() {
         return Err(invalid("missing or unterminated document root"));
     }
     Ok(anchors)
@@ -665,6 +686,42 @@ fn limit(label: &str) -> Error {
 mod tests {
     use super::*;
     use litchi_opc::part::BlobPart;
+
+    #[test]
+    fn diagram_extents_handle_both_xml_forms_and_stay_with_their_owner() {
+        for conformance in [DiagramConformance::Transitional, DiagramConformance::Strict] {
+            let wp = match conformance {
+                DiagramConformance::Transitional => {
+                    "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                },
+                DiagramConformance::Strict => {
+                    "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing"
+                },
+            };
+            let graphic = format!(
+                r#"<a:graphic><a:graphicData uri="{}"><dgm:relIds r:dm="rId1"/></a:graphicData></a:graphic>"#,
+                conformance.dgm()
+            );
+            let drawings = [
+                r#"<wp:extent cx="300" cy="200"/>"#,
+                "",
+                r#"<wp:extent cx="400" cy="250"></wp:extent>"#,
+                r#"<x:extent cx="999" cy="999"/><a:extLst><a:ext uri="inert"><wp:extent cx="888" cy="888"/></a:ext></a:extLst>"#,
+            ].iter().map(|extent| format!("<w:p><w:r><w:drawing><wp:inline>{extent}{graphic}</wp:inline></w:drawing></w:r></w:p>")).collect::<String>();
+            let xml = format!(
+                r#"<w:document xmlns:w="{}" xmlns:a="{}" xmlns:dgm="{}" xmlns:r="{}" xmlns:wp="{wp}" xmlns:x="urn:foreign:wordprocessingDrawing"><w:body>{drawings}</w:body></w:document>"#,
+                conformance.w(),
+                conformance.a(),
+                conformance.dgm(),
+                conformance.r()
+            );
+            let anchors = scan_document_xml(xml.as_bytes(), conformance).unwrap();
+            assert_eq!(
+                anchors.iter().map(|a| a.extent).collect::<Vec<_>>(),
+                [Some((300, 200)), None, Some((400, 250)), None]
+            );
+        }
+    }
 
     const STRICT_DOCX: &[u8] = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"

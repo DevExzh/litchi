@@ -392,6 +392,108 @@ fn native_powerpoint_embedded_chart_workbook_exposes_exact_cells_through_facade(
 }
 
 #[test]
+fn native_word_ole_and_chart_children_expose_distinct_workbook_values() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word/word-visual-objects.docx");
+    let parent = litchi::docx::Package::open(&path).unwrap();
+    let before = parent.to_bytes().unwrap();
+    let document = parent.document().unwrap();
+    let mut objects = Vec::new();
+    for paragraph in document.paragraphs().unwrap() {
+        for run in paragraph.runs().unwrap() {
+            for content in run.contents().unwrap() {
+                if let litchi::docx::paragraph::RunContent::EmbeddedObject(object) = content {
+                    objects.push(object);
+                }
+            }
+        }
+    }
+    assert_eq!(objects.len(), 1);
+    let main = parent.opc_package().main_document_part().unwrap();
+    let ole = objects[0]
+        .ole_data(parent.opc_package(), main.rels())
+        .unwrap()
+        .unwrap();
+    let child = litchi::open_bytes(ole.to_vec()).unwrap();
+    assert_eq!(child.format(), Some(FileFormat::Xlsx));
+    assert_eq!(
+        child.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sales chart", "Sheet1", "Sheet2"]
+    );
+    let check = |bytes: &[u8]| {
+        let workbook = litchi::xlsx::Package::from_bytes(bytes).unwrap();
+        for (sheet, address, formula, cache) in [
+            ("Sheet1", "B6", "SUM(B2:B5)", "14"),
+            ("Sheet2", "B3", "Sheet1!D6", "49.75"),
+        ] {
+            let sheet = workbook.workbook().sheet(sheet).unwrap().unwrap();
+            let cell = sheet.cell(address).unwrap();
+            let Some(litchi::xlsx::Cell::Formula(value)) = cell.stored() else {
+                panic!("native formula")
+            };
+            assert_eq!(value.text(), formula);
+            let cached = value.cached().unwrap();
+            let litchi::xlsx::Value::Number(number) = cached.value() else {
+                panic!("numeric cache")
+            };
+            assert_eq!(number.as_str(), cache);
+            assert_eq!(cached.origin(), litchi::xlsx::formula::Origin::Stored);
+        }
+    };
+    check(&ole);
+    let edited = child
+        .set(
+            "Sheet2!Z100",
+            litchi::props! {"value"=>"Word child reviewed"},
+        )
+        .unwrap();
+    check(&edited.to_bytes().unwrap());
+    let graph = parent.chart_graph().unwrap();
+    let payload = &graph.charts[0].workbook.as_ref().unwrap().data;
+    let chart = litchi::open_bytes(payload.clone()).unwrap();
+    assert_eq!(
+        chart.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sheet1"]
+    );
+    for (address, text) in [
+        ("B1", "Sales"),
+        ("A2", "1st Qtr"),
+        ("A3", "2nd Qtr"),
+        ("A4", "3rd Qtr"),
+        ("A5", "4th Qtr"),
+    ] {
+        assert_eq!(
+            chart
+                .get(format!("Sheet1!{address}").as_str())
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some(text)
+        );
+    }
+    let workbook = litchi::xlsx::Package::from_bytes(payload).unwrap();
+    let sheet = workbook.workbook().sheet("Sheet1").unwrap().unwrap();
+    for (address, expected) in [
+        ("B2", "8.1999999999999993"),
+        ("B3", "3.2"),
+        ("B4", "1.4"),
+        ("B5", "1.2"),
+    ] {
+        let cell = sheet.cell(address).unwrap();
+        let Some(litchi::xlsx::Cell::Value(litchi::xlsx::Value::Number(number))) = cell.stored()
+        else {
+            panic!("numeric chart value")
+        };
+        assert_eq!(number.as_str(), expected);
+    }
+    assert!(chart.to_bytes().unwrap() == *payload);
+    assert!(child.to_bytes().unwrap() == ole.as_ref());
+    assert!(parent.to_bytes().unwrap() == before);
+}
+
+#[test]
 fn native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_edit() {
     use litchi::pptx::presentation::embedded::ole::slide;
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

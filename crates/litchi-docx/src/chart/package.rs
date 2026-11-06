@@ -265,19 +265,16 @@ pub(crate) fn store_with_limits(
     for chart in &graph.charts {
         for companion in chart.styles.iter().chain(&chart.color_styles) {
             let uri = PackURI::new(&companion.part_name).map_err(Error::InvalidUri)?;
-            package.add_part(Box::new(BlobPart::new(
-                uri,
-                companion.content_type.clone(),
-                companion.data.clone(),
-            )));
+            replace_owned_payload(package, &uri, &companion.content_type, &companion.data)?;
         }
         if let Some(workbook) = &chart.workbook {
             let uri = PackURI::new(&workbook.part_name).map_err(Error::InvalidUri)?;
-            package.add_part(Box::new(BlobPart::new(
-                uri,
-                workbook.content_type.as_str().into(),
-                workbook.data.clone(),
-            )));
+            replace_owned_payload(
+                package,
+                &uri,
+                workbook.content_type.as_str(),
+                &workbook.data,
+            )?;
         }
         let chart_uri = PackURI::new(&chart.part_name).map_err(Error::InvalidUri)?;
         let mut part = BlobPart::new(
@@ -309,14 +306,40 @@ pub(crate) fn store_with_limits(
         }
         relationships.sort_by(|left, right| left.0.cmp(right.0));
         for (id, kind, target) in relationships {
-            part.rels_mut().add_relationship(
-                kind.into(),
-                target.relative_ref(chart_uri.base_uri()),
-                id.to_owned(),
-                false,
-            );
+            // Equivalent relative spellings are source data: Word commonly
+            // uses ../charts/style1.xml for a sibling of chart1.xml.
+            let reference = package
+                .get_part(&chart_uri)?
+                .rels()
+                .get(id)
+                .filter(|rel| {
+                    !rel.is_external()
+                        && rel.reltype() == kind
+                        && rel.target_partname().is_ok_and(|name| name == target)
+                })
+                .map_or_else(
+                    || target.relative_ref(chart_uri.base_uri()),
+                    |rel| rel.target_ref().to_owned(),
+                );
+            part.rels_mut()
+                .add_relationship(kind.into(), reference, id.to_owned(), false);
         }
-        package.add_part(Box::new(part));
+        replace_owned_payload(package, &chart_uri, &chart.content_type, &chart.data)?;
+        let existing = package.get_part_mut(&chart_uri)?;
+        if !existing.rels().same_entries(part.rels()) {
+            *existing.rels_mut() = part.rels().clone();
+        }
+    }
+    if current
+        .charts
+        .iter()
+        .map(|chart| (&chart.document_relationship_id, &chart.part_name))
+        .eq(graph
+            .charts
+            .iter()
+            .map(|chart| (&chart.document_relationship_id, &chart.part_name)))
+    {
+        return Ok(());
     }
     let document = package.get_part_mut(document_name)?;
     let ids: Vec<_> = document
@@ -341,6 +364,28 @@ pub(crate) fn store_with_limits(
             chart.document_relationship_id.clone(),
             false,
         );
+    }
+    Ok(())
+}
+
+// Ownership and content types were validated against the current graph.
+// Keep the existing part's source tokens when only its payload changes.
+fn replace_owned_payload(
+    package: &mut OpcPackage,
+    name: &PackURI,
+    content_type: &str,
+    bytes: &[u8],
+) -> Result<()> {
+    if package.get_part(name)?.content_type() != content_type {
+        package.add_part(Box::new(BlobPart::new(
+            name.clone(),
+            content_type.to_owned(),
+            bytes.to_vec(),
+        )));
+        return Ok(());
+    }
+    if package.get_part(name)?.blob() != bytes {
+        package.get_part_mut(name)?.set_blob(bytes.to_vec());
     }
     Ok(())
 }
