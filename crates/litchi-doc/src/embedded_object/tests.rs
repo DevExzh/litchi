@@ -537,6 +537,12 @@ fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
     let reverted = commit.patch().inverse().apply(&applied).unwrap();
     assert_eq!(reverted, source);
 
+    let mut removal = source.edit();
+    assert!(!removal.has_unmanaged_storage(77).unwrap());
+    removal.remove(77).unwrap();
+    assert!(!removal.has_unmanaged_storage(77).unwrap());
+    assert!(removal.snapshot().unwrap().storages().is_empty());
+
     let stale = Snapshot::open(base_doc(), Limits::default()).unwrap();
     assert!(matches!(
         commit.patch().apply(&stale),

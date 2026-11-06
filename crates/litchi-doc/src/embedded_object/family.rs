@@ -7,10 +7,16 @@
 //! whole-package [`Patch`] and [`Diagnostics`];
 //! [`crate::Package::apply_embedded_objects`] replays the patch. Objects are
 //! never activated: storages stay inert compound files.
+//!
+//! Selecting a discovered native storage without editor-managed field ownership
+//! for a storage-ID mutation returns [`Error::Refused`] with
+//! [`RefusalKind::UnsupportedContent`]. Passive reads remain available through
+//! [`Snapshot::storages`].
 
 use super::model::{Info, Inventory, Reference, WriteOptions};
 use super::transaction::{Snapshot, Transaction, TransactionError};
 use crate::equation::MtefEquationWriteOptions;
+use litchi_core::edit::{Refusal, RefusalKind};
 use litchi_ole_common::ole_streams::{self, native, presentation};
 
 crate::scoped::family!("embedded object");
@@ -41,6 +47,19 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    /// A native storage can be valid without the editor-owned field convention.
+    /// Refuse its mutation before a managed-field lookup labels it corrupted.
+    fn require_managed_storage(&mut self, storage_id: u32) -> Result<()> {
+        if self.inner_mut()?.has_unmanaged_storage(storage_id)? {
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::UnsupportedContent,
+                "edit embedded object",
+                "native ObjectPool storage has no editor-managed field ownership",
+            )));
+        }
+        Ok(())
+    }
+
     fn open(base: crate::scoped::Base) -> Result<Self> {
         Ok(Self { base, inner: None })
     }
@@ -107,6 +126,7 @@ impl Edit {
     /// Returns an error when the storage ID is not referenced or the candidate
     /// field/package rewrite fails validation.
     pub fn remove(&mut self, storage_id: u32) -> Result<Reference> {
+        self.require_managed_storage(storage_id)?;
         Ok(self.inner_mut()?.remove(storage_id)?)
     }
 
@@ -117,6 +137,9 @@ impl Edit {
     /// Returns an error when the IDs are not a complete valid permutation or
     /// the candidate field/package rewrite fails validation.
     pub fn reorder(&mut self, storage_ids: &[u32]) -> Result<()> {
+        for &storage_id in storage_ids {
+            self.require_managed_storage(storage_id)?;
+        }
         Ok(self.inner_mut()?.reorder(storage_ids)?)
     }
 
@@ -131,6 +154,7 @@ impl Edit {
     /// Returns an error when the storage ID is not referenced, the replacement
     /// is malformed/oversized, or the candidate package cannot be validated.
     pub fn replace_storage(&mut self, storage_id: u32, compound_file: Vec<u8>) -> Result<()> {
+        self.require_managed_storage(storage_id)?;
         Ok(self
             .inner_mut()?
             .replace_storage(storage_id, compound_file)?)
@@ -143,6 +167,7 @@ impl Edit {
     /// Returns an error when the storage ID is not referenced, the typed ODT
     /// is invalid, or the candidate package cannot be validated.
     pub fn set_info(&mut self, storage_id: u32, info: Info) -> Result<()> {
+        self.require_managed_storage(storage_id)?;
         Ok(self.inner_mut()?.set_info(storage_id, info)?)
     }
 
@@ -156,6 +181,7 @@ impl Edit {
     where
         F: FnOnce(&mut Info),
     {
+        self.require_managed_storage(storage_id)?;
         Ok(self.inner_mut()?.update_info(storage_id, edit)?)
     }
 
@@ -176,6 +202,7 @@ impl Edit {
             &mut litchi_ole_common::object::link::Link,
         ) -> std::result::Result<(), litchi_ole_common::Error>,
     {
+        self.require_managed_storage(storage_id)?;
         Ok(self.inner_mut()?.update_link(storage_id, limits, edit)?)
     }
 
@@ -190,6 +217,7 @@ impl Edit {
     where
         F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
+        self.require_managed_storage(storage_id)?;
         Ok(self
             .inner_mut()?
             .update_presentation(storage_id, index, limits, edit)?)
@@ -218,6 +246,7 @@ impl Edit {
         index: usize,
         patch: &presentation::Patch,
     ) -> Result<()> {
+        self.require_managed_storage(storage_id)?;
         Ok(self
             .inner_mut()?
             .apply_presentation_patch(storage_id, index, patch)?)
@@ -245,6 +274,7 @@ impl Edit {
     where
         F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
+        self.require_managed_storage(storage_id)?;
         Ok(self.inner_mut()?.update_native(storage_id, limits, edit)?)
     }
 
@@ -265,6 +295,7 @@ impl Edit {
 
     /// Applies a source-checked native-data patch to one managed object.
     pub fn apply_native_patch(&mut self, storage_id: u32, patch: &native::Patch) -> Result<()> {
+        self.require_managed_storage(storage_id)?;
         Ok(self.inner_mut()?.apply_native_patch(storage_id, patch)?)
     }
 

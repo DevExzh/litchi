@@ -3873,7 +3873,8 @@
         "word/word-visual-objects.doc"
       ],
       "feature_rows": [
-        "doc-029"
+        "doc-029",
+        "doc-058"
       ],
       "assertions": [
         "Snapshot.storages exposes two native ObjectPool keys, typed worksheet/chart CompObj names and ObjInfo flags, exact 18372-byte XLSX hash and distinct 30785-byte chart Workbook stream."
@@ -3889,7 +3890,8 @@
       ],
       "feature_rows": [
         "doc-029",
-        "doc-034"
+        "doc-034",
+        "doc-058"
       ],
       "assertions": [
         "A first-paragraph edit saves/reopens with the complete typed/unknown object-storage metadata and payload inventory unchanged; inverse restores exact source bytes."
@@ -3973,7 +3975,8 @@
       ],
       "feature_rows": [
         "doc-029",
-        "rtf-481"
+        "rtf-481",
+        "doc-058"
       ],
       "assertions": [
         "Explicit DOC ObjectPool and RTF OLE1/CFB extraction yields XLSX children with exact sheet catalog and stored SUM/Sheet1 reference caches; independent child edits retain those caches while both parents/original children remain unchanged."
@@ -5466,6 +5469,194 @@
         "Changing native OfPie settings through the generic model rejects full reauthoring with Refused(UnsupportedContent), preserving the explicit opaque-record placement boundary."
       ],
       "scope_limit": "This is the full-model writer boundary, not a restriction on supported source-preserving chart-area transactions. No general chart mutation is claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_unmanaged_object_edits_refuse_without_misreporting_corruption",
+      "fixtures": [
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-058"
+      ],
+      "assertions": [
+        "Both native ObjectPool storages remain present while managed metadata/lifecycle edits return Refused(UnsupportedContent), never invoke callbacks and publish an exact no-op after refusal."
+      ],
+      "scope_limit": "Native field ownership is outside the managed editor convention. This is a truthful mutation boundary, not a successful empty native object inventory."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_storage_compound_export_retains_child_streams_and_class_identity",
+      "fixtures": [
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-058"
+      ],
+      "assertions": [
+        "Both native storage exports retain every child stream byte and the distinct Excel worksheet/chart CLSIDs in the standalone CFB roots."
+      ],
+      "scope_limit": "Passive CFB extraction; no activation or inferred native field editing."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_embedded_word_obj_resolves_the_exact_cfb_payload",
+      "fixtures": [
+        "excel/excel-links-objects.xls",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "xls-185"
+      ],
+      "assertions": [
+        "Native Obj 3/type 8, flags, clipboard metadata and FtPictFmla resolve MBD00DD3649; its Package stream exactly equals the 13759-byte native Word source, with a distinct CompObj stream and unchanged source bytes."
+      ],
+      "scope_limit": "Inert typed object/storage metadata only; the nearby classic note is not misrepresented as an OLE object."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_obj_metadata_edit_preserves_storage_and_non_obj_records",
+      "fixtures": [
+        "excel/excel-links-objects.xls"
+      ],
+      "feature_rows": [
+        "xls-185"
+      ],
+      "assertions": [
+        "Change only the selected FtCmo print bit; preserve all other Obj metadata, all non-Obj records and every other CFB stream. Native note ID 1 blocks a colliding object-ID edit atomically; inverse restores the source."
+      ],
+      "scope_limit": "Bounded metadata edit only; no OfficeArt topology, presentation regeneration or object activation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_embedded_payload_replace_preserves_parent_records_and_inverts",
+      "fixtures": [
+        "excel/excel-links-objects.xls",
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "xls-185"
+      ],
+      "assertions": [
+        "Replace only the selected Package stream with another valid native Word document through a standalone CFB payload; save/reopen preserves Obj identity, class ID, Workbook and every unrelated stream; exact whole-artifact inverse."
+      ],
+      "scope_limit": "Inert payload replacement only; the retained preview is not regenerated or claimed to reflect the replacement."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_word_object_keeps_package_preview_and_anchor_identity",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "xlsx-241"
+      ],
+      "assertions": [
+        "Exact native Document ProgID, shape 1027, package/image edges, Word payload hash/size and EMF preview hash/size, A12 anchor endpoints and source flags; exact no-op publication."
+      ],
+      "scope_limit": "Classic worksheet object metadata only; no activation, rendering or external update."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_object_metadata_edit_changes_only_worksheet_xml_and_inverts",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-241"
+      ],
+      "assertions": [
+        "Alt-text update survives save/reopen; an attempted shape-ID change is atomic; only sheet1.xml changes and inverse restores every package member, including preview and payload bytes."
+      ],
+      "scope_limit": "Source metadata editing only; payload/preview identity and shape ID remain immutable in this family."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_embedded_word_catalog_agrees_across_eager_and_source_readers",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "xlsb-313"
+      ],
+      "assertions": [
+        "Eager and source-backed catalogs agree on worksheet owner, rId4, package kind and target; exact 13759-byte Word payload hash, lazy data and streamed data all match the tracked native child."
+      ],
+      "scope_limit": "Inert OPC relationship discovery; native BrtOleObject anchor semantics are not inferred from the catalog."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_word_payload_replacement_preserves_every_other_package_member",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb",
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "xlsb-313"
+      ],
+      "assertions": [
+        "A public raw-OPC transaction replaces only the native embedded Word part; save/reopen retains owner and relationship ID, every other member is unchanged, and inverse restores all member bytes."
+      ],
+      "scope_limit": "Raw package publication, not a typed BrtOleObject editor. Preview regeneration and ZIP transport byte identity are outside this part-level contract."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_embedded",
+      "name": "native_excel_embedded_word_payloads_open_with_identical_form_semantics",
+      "fixtures": [
+        "excel/excel-links-objects.xls",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-links-objects.xlsb",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "xls-185",
+        "xlsx-241",
+        "xlsb-313"
+      ],
+      "assertions": [
+        "Explicit child extraction from each native Excel container opens as DOCX with six paragraphs, exact form markers and query/path agreement, while original child bytes stay unchanged."
+      ],
+      "scope_limit": "Explicit inert child parsing only; no host-driven activation or link resolution.",
+      "required_features": [
+        "docx",
+        "xls",
+        "xlsx",
+        "xlsb"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_embedded",
+      "name": "edited_native_word_child_republishes_into_xlsb_without_refreshing_parent_caches",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "feature_rows": [
+        "xlsb-313"
+      ],
+      "assertions": [
+        "Facade paragraph edit in the extracted DOCX republishes through the XLSB raw-OPC transaction, survives file save/reopen, retains the other form markers and parent cached values 49.75/14, and inverse restores the original child."
+      ],
+      "scope_limit": "The parent preview stays cached and is not regenerated; no Office activation, formula evaluation or external refresh.",
+      "required_features": [
+        "docx",
+        "xls",
+        "xlsx",
+        "xlsb"
+      ]
     }
   ]
 }

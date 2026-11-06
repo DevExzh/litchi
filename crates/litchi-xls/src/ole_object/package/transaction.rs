@@ -926,6 +926,22 @@ fn inspect_opaque_obj(body: &[u8], identity: &mut OpaqueObjectIdentity) -> Resul
         .iter()
         .filter(|value| matches!(value, super::super::semantic::ObjSubrecord::Common(_)))
         .count();
+    // MS-XLS 2.4.181/2.5.149: a note has only FtCmo, FtNts and FtEnd.
+    // Its GUID and shared-note flag cannot reference an MBD/LNK storage.
+    // Retain it as opaque content while admitting its proven object ID.
+    if common.object_type == 0x0019
+        && common.object_id != 0
+        && let [
+            super::super::semantic::ObjSubrecord::Common(_),
+            super::super::semantic::ObjSubrecord::Unknown { kind: 0x000D, data },
+            super::super::semantic::ObjSubrecord::End,
+        ] = subrecords.as_slice()
+        && data.len() == 22
+        && u16::from_le_bytes([data[16], data[17]]) <= 1
+    {
+        identity.note_id(common.object_id)?;
+        return Ok(());
+    }
     if common_count != 1 || common.object_type != 8 || common.object_id == 0 {
         identity.ambiguous = true;
         return Ok(());
@@ -1187,5 +1203,55 @@ mod tests {
             .note_storage("MBD0000002A".to_string())
             .expect("duplicate opaque storage should be retained as a refusal");
         assert!(identity.ambiguous);
+    }
+}
+
+#[cfg(test)]
+mod native_note_identity_tests {
+    use super::*;
+    fn note(shared: u16) -> Vec<u8> {
+        let mut bytes = vec![0x15, 0, 18, 0, 25, 0, 1, 0, 0x11, 0x40];
+        bytes.extend([0; 12]);
+        bytes.extend([0x0d, 0, 22, 0]);
+        bytes.extend([0xa5; 16]);
+        bytes.extend(shared.to_le_bytes());
+        bytes.extend([0xff; 4]); // undefined FtNts bytes are ignored
+        bytes.extend([0; 4]);
+        bytes
+    }
+    #[test]
+    fn canonical_notes_contribute_ids_without_claiming_storage_ownership() {
+        for shared in [0, 1] {
+            let mut identities = OpaqueObjectIdentity::default();
+            inspect_opaque_obj(&note(shared), &mut identities).unwrap();
+            assert!(!identities.ambiguous);
+            assert_eq!(identities.ids, HashSet::from([1]));
+            assert!(identities.storages.is_empty());
+            identities.check_storage_rewrite("MBD00DD3649").unwrap();
+            assert!(identities.check_new_identity(1, "MBD00000001").is_err());
+            inspect_opaque_obj(&note(shared), &mut identities).unwrap();
+            assert!(identities.require_topology_proof().is_err());
+        }
+    }
+    #[test]
+    fn incomplete_or_extended_notes_remain_unproven() {
+        for case in 0..5 {
+            let mut bytes = note(0);
+            match case {
+                0 => bytes[6..8].fill(0),
+                1 => bytes[42..44].copy_from_slice(&2_u16.to_le_bytes()),
+                2 => {
+                    bytes.pop();
+                },
+                3 => {
+                    bytes.splice(48..48, [0x34, 0x12, 1, 0, 0]);
+                },
+                _ => bytes[4] = 0x1e,
+            }
+            let mut identities = OpaqueObjectIdentity::default();
+            inspect_opaque_obj(&bytes, &mut identities).unwrap();
+            assert!(identities.ambiguous, "case {case}");
+            assert!(identities.check_storage_rewrite("MBD00DD3649").is_err());
+        }
     }
 }

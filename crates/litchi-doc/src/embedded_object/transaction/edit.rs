@@ -71,6 +71,27 @@ impl Transaction {
         self.editor.objects().map_err(TransactionError::Invalid)
     }
 
+    /// Whether the current candidate has this storage without managed field
+    /// ownership. Consult the candidate so a removed managed object is not
+    /// confused with an unmanaged native object from the original snapshot.
+    pub(crate) fn has_unmanaged_storage(&self, storage_id: u32) -> Result<bool, TransactionError> {
+        if self
+            .objects()?
+            .iter()
+            .any(|reference| reference.storage_id == storage_id)
+        {
+            return Ok(false);
+        }
+        Ok(self.editor.package.objects().iter().any(|object| {
+            object
+                .key()
+                .strip_prefix('_')
+                .filter(|id| !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_digit()))
+                .and_then(|id| id.parse::<u32>().ok())
+                == Some(storage_id)
+        }))
+    }
+
     /// Adds one field and its inert `ObjectPool` storage.
     ///
     /// # Errors
