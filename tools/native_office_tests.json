@@ -1870,6 +1870,232 @@
       "required_features": [
         "doc"
       ]
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_hyperlink_retains_target_tooltip_and_revision_identity",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-218"
+      ],
+      "assertions": [
+        "Native A10 hyperlink has exact inert target, tooltip and 2014 revision GUID."
+      ],
+      "scope_limit": "Read-only hyperlink identity; no target resolution or collaboration service."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_hyperlink_edit_keeps_revision_uid_and_other_parts",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-218",
+        "xlsx-197"
+      ],
+      "assertions": [
+        "Tooltip replacement preserves native revision GUID, target and every unrelated member; reopen and inverse retain source state."
+      ],
+      "scope_limit": "Existing worksheet hyperlink only; no new-sheet links or external actions."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_variants_keep_catalog_kinds_and_every_package_member",
+      "fixtures": [
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx"
+      ],
+      "feature_rows": [
+        "xlsx-197",
+        "xlsx-198",
+        "xlsx-263"
+      ],
+      "assertions": [
+        "18 native XLSX/XLSM/XLTX/XLTM packages including Strict: exact sheet names/order/kinds/flavors, ordinary-cell reads, typed nonworksheet refusal and all no-op member payloads."
+      ],
+      "scope_limit": "Catalog/container baseline; no whole-feature claim for each embedded part."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_array_shared_dynamic_and_what_if_formula_owners_keep_stored_caches",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-202",
+        "xlsx-204",
+        "xlsx-205",
+        "xlsx-206",
+        "xlsx-214"
+      ],
+      "assertions": [
+        "CSE range/cache; all 100 ROW()*2 copied/shared formulas; SEQUENCE/FILTER/LET stored expressions, spill values and ownership; two what-if data-table ranges/caches. Formula caches report Stored/Unknown."
+      ],
+      "scope_limit": "No formula evaluation, dependency proof, scenario application or data-table calculation."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_agile_password_ingress_and_rekey_keep_clear_members",
+      "fixtures": [
+        "excel/excel-encrypted.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-260"
+      ],
+      "assertions": [
+        "Empty/wrong/correct passwords, native AgileAes256Sha512 profile, marker and 42/84 value/cache, implicit plaintext refusal, rekey with old-key rejection and all clear member payloads retained."
+      ],
+      "scope_limit": "In-memory decryption/rekey of one profile; no fresh Excel reopen.",
+      "required_features": [
+        "encryption"
+      ]
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_cell_create_update_remove_preserves_other_parts_and_inverts",
+      "fixtures": [
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx"
+      ],
+      "feature_rows": [
+        "xlsx-198",
+        "xlsx-202",
+        "xlsx-207",
+        "xlsx-208",
+        "xlsx-233"
+      ],
+      "assertions": [
+        "Scalar CRUD on 17 native variants; ProtectedSheet refusal on the protected eighteenth fixture. Chain removal and recalculation flags are explicit related changes; other payloads and workbook fields stay intact. Retained-owner inverses are byte exact, reopened inverses preserve all relationship fields and exact content-type/other member bytes."
+      ],
+      "scope_limit": "No worksheet restructuring or formula computation. Reopened workbook-relationship ordering may canonicalize; pass-through assets are not all typed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_validation_notes_names_and_print_settings_are_typed",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-209",
+        "xlsx-219",
+        "xlsx-222",
+        "xlsx-229",
+        "xlsx-230"
+      ],
+      "assertions": [
+        "Seven validation kinds/ranges/formula bounds and revision IDs; exact two classic note texts including author prefix and CRLF; three defined names; landscape, scale/first page, stored zero DPI, margins and cached totals."
+      ],
+      "scope_limit": "Stored validation and print metadata only; no input execution, pagination or printer interaction."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_1904_dates_breaks_and_hidden_rows_keep_stored_values",
+      "fixtures": [
+        "excel/excel-date1904-breaks.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-199",
+        "xlsx-202",
+        "xlsx-204",
+        "xlsx-211",
+        "xlsx-231"
+      ],
+      "assertions": [
+        "1904 date system, exact numeric lexical serials and formula caches including negative/time values, hidden rows/column and exact horizontal/vertical manual-break bounds."
+      ],
+      "scope_limit": "No date-format rendering, formula evaluation or pagination."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native",
+      "name": "native_excel_cryptoapi_password_contract_retains_profile_ciphertext_and_cells",
+      "fixtures": [
+        "excel/excel-encrypted.xls"
+      ],
+      "feature_rows": [
+        "xls-149"
+      ],
+      "assertions": [
+        "Absent/wrong/correct passwords, native CryptoAPI RC4 128-bit profile, exact Sheet1 marker and 42/84 cells, implicit-publication refusal and exact retained ciphertext reopen."
+      ],
+      "scope_limit": "No plaintext serialization, rekeying or encrypted-source editing; cached formula result only."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_encrypted_xlsb_has_an_explicit_unsupported_container_boundary",
+      "fixtures": [
+        "excel/excel-encrypted.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-329"
+      ],
+      "assertions": [
+        "Native encrypted CFB is rejected as UnsupportedFeature on byte, reader, path, eager workbook and lazy sequential/positional entry points; input-byte limits keep precedence."
+      ],
+      "scope_limit": "XLSB package decryption is unimplemented. Container-signature diagnostic only; no password testing or cryptographic validation claimed."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_excel_formula_queries_and_atomic_scalar_edits_work_on_both_owners",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-198",
+        "xlsx-202",
+        "xlsx-204"
+      ],
+      "assertions": [
+        "Both Auto/Eager routes query cached value 206 at D103, read formula ROW()*2, atomically create numeric and formula-looking inert string cells, reopen and exactly invert while preserving the original source."
+      ],
+      "scope_limit": "Ordinary scalar edits and stored-cache query only; no formula execution.",
+      "required_features": [
+        "xlsx"
+      ]
     }
   ]
 }

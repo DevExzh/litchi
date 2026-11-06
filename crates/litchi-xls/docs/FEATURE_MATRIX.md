@@ -104,3 +104,9 @@ rendering, external I/O, macro execution, or certificate trust.
 | Chart rendering and complete chart authoring | ❌ | ❌ | ❌ | The bounded chart model is intentionally not a renderer or a complete fresh chart writer; unsafe graph edits fail rather than producing a corrupt workbook. |
 | Macro, control, DDE, RTD, database, and external-link execution | ❌ | ❌ | ❌ | These protocol families are represented only as inert metadata or cached payloads. |
 | Certificate trust, revocation, and signed-content policy | ❌ | ❌ | ❌ | Signature verification establishes cryptographic integrity/signature validity only; it does not establish trust. |
+
+The native encrypted Excel regression in `tests/microsoft_office_native.rs`
+checks absent/wrong/correct passwords, the CryptoAPI RC4 128-bit source profile,
+Sheet1 markers and cached values 42/84, ordinary-publication refusal, and exact
+ciphertext retention through `to_encrypted_bytes`. It does not rekey, refresh
+formulas or reopen the result in Microsoft Excel.

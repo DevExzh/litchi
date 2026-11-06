@@ -4,6 +4,70 @@ use litchi_core::sheet::WorkbookTrait;
 use litchi_xls::raw::Reader;
 
 #[test]
+fn native_excel_cryptoapi_password_contract_retains_profile_ciphertext_and_cells() {
+    use litchi_core::sheet::CellValue;
+    use litchi_xls::package::Error;
+    use litchi_xls::{EncryptionProfile, OpenOptions, Package};
+    let bytes = include_bytes!("../../../test-data/microsoft-office/excel/excel-encrypted.xls");
+    assert!(matches!(
+        Package::from_bytes(bytes),
+        Err(Error::Reader(litchi_xls::Error::PasswordRequired))
+    ));
+    assert!(matches!(
+        Package::from_bytes_with_options(bytes, OpenOptions::new().password("wrong")),
+        Err(Error::Reader(litchi_xls::Error::InvalidPassword))
+    ));
+    let package =
+        Package::from_bytes_with_options(bytes, OpenOptions::new().password("OfficeFixture42!"))
+            .unwrap();
+    assert_eq!(
+        package.encryption(),
+        Some(EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
+    );
+    let workbook = package.workbook();
+    assert_eq!(workbook.worksheet_names().unwrap(), ["Sheet1"]);
+    let sheet = workbook.worksheet(0usize).unwrap().unwrap();
+    assert_eq!(
+        sheet
+            .cell_value(litchi_xls::cell_values::Reference::new(0, 0).unwrap())
+            .unwrap(),
+        Some(CellValue::String("EXCEL_ENCRYPTED_011".into()))
+    );
+    assert_eq!(
+        sheet
+            .cell_value(litchi_xls::cell_values::Reference::new(1, 1).unwrap())
+            .unwrap(),
+        Some(CellValue::Float(42.0))
+    );
+    assert_eq!(
+        sheet
+            .cell_value(litchi_xls::cell_values::Reference::new(2, 1).unwrap())
+            .unwrap(),
+        Some(CellValue::Float(84.0))
+    );
+    assert_eq!(package.source_bytes().unwrap(), bytes);
+    assert!(matches!(package.to_bytes(), Err(Error::EncryptionPolicy)));
+    let encrypted = package.to_encrypted_bytes().unwrap();
+    assert!(encrypted == bytes);
+    let reopened = Package::from_bytes_with_options(
+        &encrypted,
+        OpenOptions::new().password("OfficeFixture42!"),
+    )
+    .unwrap();
+    assert_eq!(reopened.encryption(), package.encryption());
+    assert_eq!(
+        reopened
+            .workbook()
+            .worksheet(0usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(litchi_xls::cell_values::Reference::new(2, 1).unwrap())
+            .unwrap(),
+        Some(CellValue::Float(84.0))
+    );
+}
+
+#[test]
 fn native_excel_metadata_reader_keeps_every_worksheet() {
     let bytes = include_bytes!("../../../test-data/microsoft-office/excel/excel-metadata.xls");
     let reader = Reader::new(std::io::Cursor::new(bytes.as_slice())).unwrap();

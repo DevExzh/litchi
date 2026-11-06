@@ -449,13 +449,7 @@ impl SourceBackedExternalLink {
 impl SourceBackedWorkbook {
     /// Open with the default bounded OPC read and cache policies.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at(
-            source,
-            litchi_opc::SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
-            litchi_opc::SourceReadPolicy::exact(),
-            None,
-        )?)
+        Self::from_read_at_with_options(source, crate::OpenOptions::default())
     }
 
     /// Open an XLSB package from a sequential reader with the default bounded
@@ -487,12 +481,7 @@ impl SourceBackedWorkbook {
         options.check_source()?;
         options.check_owning()?;
         Self::build(
-            SourceBackedPackage::from_reader(
-                reader,
-                options.source_limits,
-                litchi_opc::SourceCacheLimits::default(),
-                None,
-            )?,
+            crate::package::ingress::source_from_reader(reader, options.source_limits)?,
             options.external_link_limits,
             options.leniency,
             options.semantic_limits,
@@ -514,22 +503,12 @@ impl SourceBackedWorkbook {
     ) -> Result<Self> {
         options.check_source()?;
         let cache_limits = options.cache_limits.unwrap_or_default();
-        let package = match options.execution_context {
-            Some(context) => SourceBackedPackage::from_read_at(
-                source,
-                options.source_limits,
-                cache_limits,
-                litchi_opc::SourceReadPolicy::exact(),
-                Some(context),
-            )?,
-            None => SourceBackedPackage::from_read_at(
-                source,
-                options.source_limits,
-                cache_limits,
-                litchi_opc::SourceReadPolicy::exact(),
-                None,
-            )?,
-        };
+        let package = crate::package::ingress::source_from_read_at(
+            source,
+            options.source_limits,
+            cache_limits,
+            options.execution_context,
+        )?;
         Self::build(
             package,
             options.external_link_limits,

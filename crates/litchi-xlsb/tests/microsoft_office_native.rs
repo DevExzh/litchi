@@ -8,6 +8,70 @@ const INTERACTION: &[u8] =
     include_bytes!("../../../test-data/microsoft-office/excel/excel-interaction-print.xlsb");
 
 #[test]
+fn native_excel_encrypted_xlsb_has_an_explicit_unsupported_container_boundary() {
+    use litchi_xlsb::package::PackageError;
+    use litchi_xlsb::{Package, SourceBackedWorkbook};
+    let bytes = include_bytes!("../../../test-data/microsoft-office/excel/excel-encrypted.xlsb");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/excel/excel-encrypted.xlsb");
+    let errors = [
+        Package::from_bytes(bytes).err().unwrap(),
+        Package::from_reader(Cursor::new(bytes)).err().unwrap(),
+        Package::open(path).err().unwrap(),
+        Workbook::new(Cursor::new(bytes)).err().unwrap(),
+        SourceBackedWorkbook::from_reader(Cursor::new(bytes))
+            .err()
+            .unwrap(),
+        SourceBackedWorkbook::from_read_at(std::sync::Arc::new(litchi_core::OwnedSource::new(
+            bytes.to_vec(),
+        )))
+        .err()
+        .unwrap(),
+    ];
+    for error in errors {
+        assert!(matches!(
+            error,
+            PackageError::UnsupportedFeature(
+                "CFB containers at the XLSB boundary (including encrypted packages)"
+            )
+        ));
+    }
+    let limits = litchi_xlsb::SourceLimits::builder()
+        .max_input_bytes(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    for error in [
+        Package::from_bytes_with_options(
+            bytes,
+            litchi_xlsb::OpenOptions::new().source_limits(limits),
+        )
+        .err()
+        .unwrap(),
+        Package::from_reader_with_options(
+            Cursor::new(bytes),
+            litchi_xlsb::OpenOptions::new().source_limits(limits),
+        )
+        .err()
+        .unwrap(),
+        SourceBackedWorkbook::from_read_at_with_options(
+            std::sync::Arc::new(litchi_core::OwnedSource::new(bytes.to_vec())),
+            litchi_xlsb::OpenOptions::new().source_limits(limits),
+        )
+        .err()
+        .unwrap(),
+    ] {
+        assert!(matches!(
+            error,
+            PackageError::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                ..
+            })
+        ));
+    }
+}
+
+#[test]
 fn native_excel_validation_collection_exposes_all_seven_rules_and_cached_totals() {
     let workbook = Workbook::new(Cursor::new(INTERACTION)).unwrap();
     let sheet = workbook.worksheet(0).unwrap();

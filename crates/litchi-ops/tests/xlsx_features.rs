@@ -151,12 +151,17 @@ fn note_fonts_and_rich_runs() {
             Some("Alice: check")
         );
         let runs = get("/Sheet1/comment[2]", "runs").unwrap();
-        assert!(
-            runs.starts_with(r#"[{"text":"Alice:","bold":true"#),
-            "{runs}"
-        );
-        assert!(runs.contains(r#""superscript":true"#), "{runs}");
-        assert!(runs.contains(r##""color":"#0000FF""##), "{runs}");
+        // JSON object ordering depends on serde_json's feature set; the
+        // stored text and formatting values are the public contract.
+        let runs: serde_json::Value = serde_json::from_str(&runs).unwrap();
+        assert_eq!(runs.as_array().unwrap().len(), 2);
+        assert_eq!(runs[0]["text"], "Alice:");
+        assert_eq!(runs[0]["bold"], true);
+        assert_eq!(runs[0]["color"], "#0000FF");
+        assert_eq!(runs[1]["text"], " check");
+        assert_eq!(runs[1]["italic"], true);
+        assert_eq!(runs[1]["underline"], "double");
+        assert_eq!(runs[1]["superscript"], true);
         assert_eq!(get("/Sheet1/comment[2]", "font.bold"), None);
         // `font.*` alone keeps the text and rebuilds one run.
         let edited = file

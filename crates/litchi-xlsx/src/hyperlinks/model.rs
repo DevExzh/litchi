@@ -60,6 +60,7 @@ pub struct Hyperlink {
     external_target: Option<Box<str>>,
     display: Option<Box<str>>,
     tooltip: Option<Box<str>>,
+    revision_uid: Option<Box<str>>,
 }
 
 impl Hyperlink {
@@ -119,7 +120,27 @@ impl Hyperlink {
             external_target: external_target.map(String::into_boxed_str),
             display: display.map(String::into_boxed_str),
             tooltip: tooltip.map(String::into_boxed_str),
+            revision_uid: None,
         })
+    }
+
+    /// Retain or clear the inert Office revision identity (`xr:uid`).
+    /// The GUID spelling is preserved; no collaboration service is contacted.
+    pub fn with_revision_uid(mut self, value: Option<String>) -> Result<Self> {
+        if value
+            .as_deref()
+            .is_some_and(|value| !litchi_ooxml_common::custom_xml::valid_guid(value))
+        {
+            return Err(invalid("invalid XLSX hyperlink revision UID"));
+        }
+        self.revision_uid = value.map(String::into_boxed_str);
+        Ok(self)
+    }
+
+    /// Producer-authored revision GUID, when present.
+    #[must_use]
+    pub fn revision_uid(&self) -> Option<&str> {
+        self.revision_uid.as_deref()
     }
 
     /// Checked worksheet cell or range carrying the hyperlink.

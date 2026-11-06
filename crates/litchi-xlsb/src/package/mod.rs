@@ -19,6 +19,8 @@ use crate::leniency::{Leniency, ToleranceReport};
 use crate::package::error::Result;
 use crate::workbook::DrawingLoadPolicy;
 
+pub(crate) mod ingress;
+
 #[path = "../host/cell.rs"]
 pub(crate) mod cell;
 #[path = "../host/cells_reader/mod.rs"]
@@ -231,7 +233,8 @@ impl Package {
     /// errors, and the workbook validation errors.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        let package = OpcPackage::open(path, options.source_limits)?;
+        let file = std::fs::File::open(path).map_err(|error| PackageError::Opc(error.into()))?;
+        let package = ingress::from_reader(file, options.source_limits)?;
         Self::from_opc_with_options(package, options)
     }
 
@@ -254,7 +257,7 @@ impl Package {
     /// The errors of [`Self::open_with_options`].
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        let package = OpcPackage::from_vec(owned_input(bytes, &options)?, options.source_limits)?;
+        let package = ingress::from_vec(owned_input(bytes, &options)?, options.source_limits)?;
         Self::from_opc_with_options(package, options)
     }
 
@@ -271,7 +274,7 @@ impl Package {
     /// The errors of [`Self::open_with_options`].
     pub fn from_reader_with_options(reader: impl Read, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        let package = OpcPackage::from_reader(reader, options.source_limits)?;
+        let package = ingress::from_reader(reader, options.source_limits)?;
         Self::from_opc_with_options(package, options)
     }
 

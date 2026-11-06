@@ -346,9 +346,17 @@ fn plans_compile_for_xlsx_and_run_on_any_workbook() {
     }
     // Pages body tables (record 0299) and Keynote slide tables (record 0298)
     // have cells: the plan compiles for them too.
-    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Keynote)
-        .expect("Keynote slide-table cells");
-    assert_eq!(other.format(), litchi_core::FileFormat::Keynote);
+    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Keynote);
+    #[cfg(feature = "keynote")]
+    assert_eq!(
+        other.expect("Keynote slide-table cells").format(),
+        litchi_core::FileFormat::Keynote
+    );
+    #[cfg(not(feature = "keynote"))]
+    assert_eq!(
+        other.expect_err("disabled Keynote adapter").code(),
+        crate::Code::UnsupportedCapability
+    );
 }
 
 #[test]

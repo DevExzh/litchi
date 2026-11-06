@@ -520,17 +520,11 @@ fn parse_setup(
                 14
             },
             b"horizontalDpi" => {
-                setup.horizontal_dpi = Some(
-                    Dpi::new(parse_u32(&value, "horizontalDpi")?)
-                        .map_err(|error| invalid(error.to_string()))?,
-                );
+                setup.horizontal_dpi = Some(Dpi::from_wire(parse_u32(&value, "horizontalDpi")?));
                 15
             },
             b"verticalDpi" => {
-                setup.vertical_dpi = Some(
-                    Dpi::new(parse_u32(&value, "verticalDpi")?)
-                        .map_err(|error| invalid(error.to_string()))?,
-                );
+                setup.vertical_dpi = Some(Dpi::from_wire(parse_u32(&value, "verticalDpi")?));
                 16
             },
             b"copies" => {

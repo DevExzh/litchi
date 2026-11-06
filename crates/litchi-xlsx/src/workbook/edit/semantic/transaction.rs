@@ -5290,6 +5290,21 @@ impl Edit {
         } else {
             Vec::new()
         };
+        if !calculation_graph.is_empty() {
+            // Removing calcChain must not canonicalize unrelated producer
+            // defaults/overrides in [Content_Types].xml. Retain the same
+            // source-bound manifest transition used by composed SVG edits.
+            let limits = base.inner.package.read_limits();
+            let before = base.inner.package.source_content_types(limits)?;
+            let removals = calculation_graph
+                .iter()
+                .map(|change| change.part.partname().clone())
+                .collect::<Vec<_>>();
+            let after = before
+                .plan_edit(&[], &removals, limits)?
+                .materialize(limits)?;
+            content_types = Some(ContentTypesChange { before, after });
+        }
 
         if !effective_renames.is_empty()
             || !effective_tabs.is_empty()
@@ -5770,8 +5785,8 @@ impl Edit {
         }
         // Manifest edits must be validated before graph publication and are
         // applied after changed XML/relationship members are staged.
-        // (The concrete SVG planner supplies this token when needed.)
-        // Content types are otherwise untouched by ordinary worksheet edits.
+        // SVG edits and calculation-chain removal supply source-bound tokens.
+        // Other ordinary worksheet edits leave content types untouched.
         for change in &relationship_changes {
             change.apply(&mut package)?;
         }
@@ -6059,6 +6074,7 @@ impl Edit {
             + hyperlink.external_target().map_or(0, str::len)
             + hyperlink.display().map_or(0, str::len)
             + hyperlink.tooltip().map_or(0, str::len)
+            + hyperlink.revision_uid().map_or(0, str::len)
             + size_of::<crate::hyperlinks::Hyperlink>();
         let previous_bytes = self
             .sheets
@@ -7055,6 +7071,7 @@ fn hyperlink_action_retained_bytes(action: &HyperlinkAction) -> usize {
                 + value.external_target().map_or(0, str::len)
                 + value.display().map_or(0, str::len)
                 + value.tooltip().map_or(0, str::len)
+                + value.revision_uid().map_or(0, str::len)
                 + size_of::<crate::hyperlinks::Hyperlink>()
         },
         HyperlinkAction::Remove(reference) => {

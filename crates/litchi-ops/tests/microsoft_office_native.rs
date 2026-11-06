@@ -1,5 +1,5 @@
 //! Public operation contracts on native Microsoft Office specimens.
-#![cfg(any(feature = "doc", feature = "docx", feature = "pptx"))]
+#![cfg(any(feature = "doc", feature = "docx", feature = "pptx", feature = "xlsx"))]
 
 use litchi_ops::{OpenOptions, SourceMode, props};
 
@@ -207,5 +207,76 @@ fn native_word_binary_template_queries_and_atomic_edits_preserve_autotext() {
                 == bytes
         );
         assert!(source.to_bytes().unwrap() == bytes);
+    }
+}
+
+#[cfg(feature = "xlsx")]
+#[test]
+fn native_excel_formula_queries_and_atomic_scalar_edits_work_on_both_owners() {
+    let bytes =
+        include_bytes!("../../../test-data/microsoft-office/excel/excel-formula-owners.xlsx");
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap();
+        let nodes = source
+            .query("cell[value=206]")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].path().to_string(), "/sheet[1]/D103");
+        let cell = source.get("Sheet1!D103").unwrap();
+        assert_eq!(
+            cell.view()
+                .format()
+                .unwrap()
+                .find(|p| p.key() == "formula")
+                .unwrap()
+                .to_string(),
+            "ROW()*2"
+        );
+        let commit = source
+            .edit(|edit| {
+                edit.set("Sheet1!Z100", props! {"value"=>42})?;
+                edit.set("Sheet2!Z100", props! {"value"=>"=inert native text"})
+            })
+            .unwrap();
+        let after = commit.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(after.clone(), &options).unwrap();
+        assert_eq!(
+            reopened
+                .get("Sheet1!Z100")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("42")
+        );
+        assert_eq!(
+            reopened
+                .get("Sheet2!Z100")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("=inert native text")
+        );
+        let package = litchi_xlsx::Package::from_bytes(&after).unwrap();
+        assert!(
+            matches!(package.workbook().sheet("Sheet2").unwrap().unwrap().cell("Z100").unwrap().stored(),Some(litchi_xlsx::Cell::Value(litchi_xlsx::Value::Text(value))) if value.as_str()=="=inert native text")
+        );
+        assert!(source.to_bytes().unwrap() == bytes);
+        assert!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == bytes
+        );
     }
 }

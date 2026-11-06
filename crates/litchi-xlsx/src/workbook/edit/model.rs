@@ -2414,8 +2414,8 @@ pub(super) struct SvgFinalGuard {
     pub(super) expected_attached: bool,
 }
 
-/// Source-bound `[Content_Types].xml` transition retained for an SVG graph
-/// edit. The OPC token preserves unrelated defaults, comments, and ordering.
+/// Source-bound `[Content_Types].xml` transition retained for a graph edit.
+/// The OPC token preserves unrelated defaults, comments, and ordering.
 #[derive(Debug, Clone)]
 pub(super) struct ContentTypesChange {
     pub(super) before: OwnedContentTypes,

@@ -714,13 +714,21 @@ impl TryFrom<u32> for Copies {
 
 /// Printer resolution in dots per inch.
 ///
-/// Office requires an explicit resolution to be at least one dot per inch.
+/// Explicit authored resolutions are positive. Reads also retain the zero
+/// marker emitted by native Excel for macOS as [`Dpi::UNSPECIFIED`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Dpi(u32);
 
 impl Dpi {
     pub const DEFAULT: Self = Self(600);
+    /// Zero resolution marker emitted by native Excel for macOS.
+    /// This preserves stored metadata without inferring a physical DPI.
+    pub const UNSPECIFIED: Self = Self(0);
+
+    pub(crate) const fn from_wire(value: u32) -> Self {
+        Self(value)
+    }
 
     /// Construct an explicit positive printer resolution.
     pub const fn new(value: u32) -> Result<Self, RangeError> {
@@ -735,6 +743,12 @@ impl Dpi {
     #[must_use]
     pub const fn get(self) -> u32 {
         self.0
+    }
+
+    /// Whether the source stores a zero resolution marker.
+    #[must_use]
+    pub const fn is_unspecified(self) -> bool {
+        self.0 == 0
     }
 }
 

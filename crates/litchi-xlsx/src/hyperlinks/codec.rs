@@ -17,6 +17,7 @@ const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 const TRANSITIONAL_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+const REVISION_NAMESPACE: &str = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision";
 const MAX_WORKSHEET_XML_BYTES: usize = 256 * 1024 * 1024;
 const MAX_HYPERLINKS: usize = 1_048_576;
 const MAX_XML_DEPTH: usize = 64;
@@ -408,6 +409,7 @@ fn push_hyperlink(
     let mut location = None;
     let mut display = None;
     let mut tooltip = None;
+    let mut revision_uid = None;
     for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid XLSX hyperlink attribute: {error}")))?;
@@ -445,6 +447,11 @@ fn push_hyperlink(
             (None, "location") => location = Some(value),
             (None, "display") => display = Some(value),
             (None, "tooltip") => tooltip = Some(value),
+            (Some(REVISION_NAMESPACE), "uid") => {
+                if revision_uid.replace(value).is_some() {
+                    return Err(invalid("XLSX hyperlink has duplicate revision UIDs"));
+                }
+            },
             (Some(namespace), "id") if namespace == conformance.relationship_namespace() => {
                 if value.len() > MAX_RELATIONSHIP_ID_BYTES {
                     return Err(invalid(format!(
@@ -483,13 +490,10 @@ fn push_hyperlink(
             Ok(relationship.target_ref().to_owned())
         })
         .transpose()?;
-    hyperlinks.push(Hyperlink::from_parts(
-        reference,
-        location,
-        external_target,
-        display,
-        tooltip,
-    )?);
+    hyperlinks.push(
+        Hyperlink::from_parts(reference, location, external_target, display, tooltip)?
+            .with_revision_uid(revision_uid)?,
+    );
     Ok(())
 }
 
@@ -1146,6 +1150,9 @@ where
     let qualified_container = format!("{prefix}hyperlinks");
     let qualified_link = format!("{prefix}hyperlink");
     let has_external = relationship_ids.iter().any(Option::is_some);
+    let has_revision_uid = values.iter().any(|value| value.revision_uid().is_some());
+    // Do not shadow an authored main-namespace prefix on this container.
+    let revision_prefix = if prefix == "xr:" { "revisionUid" } else { "xr" };
     let mut output = Vec::new();
     output
         .try_reserve(values.len().saturating_mul(128).saturating_add(64))
@@ -1156,6 +1163,13 @@ where
         output.extend_from_slice(b" xmlns:r=\"");
         output.extend_from_slice(relationship_namespace.as_bytes());
         output.extend_from_slice(b"\"");
+    }
+    if has_revision_uid {
+        write_attribute(
+            &mut output,
+            &format!("xmlns:{revision_prefix}"),
+            REVISION_NAMESPACE,
+        );
     }
     output.extend_from_slice(b">");
     for (index, (value, relationship_id)) in values.iter().zip(relationship_ids).enumerate() {
@@ -1173,6 +1187,9 @@ where
         }
         if let Some(tooltip) = value.tooltip() {
             write_attribute(&mut output, "tooltip", tooltip);
+        }
+        if let Some(uid) = value.revision_uid() {
+            write_attribute(&mut output, &format!("{revision_prefix}:uid"), uid);
         }
         if let Some(relationship_id) = relationship_id {
             write_attribute(&mut output, "r:id", relationship_id);
@@ -1285,6 +1302,52 @@ mod tests {
             )
             .expect("test relationship");
         relationships
+    }
+
+    #[test]
+    fn revision_uids_round_trip_with_aliases_and_without_prefix_shadowing() {
+        let uid = "{3A497593-3366-B24C-A7AF-6952EF70F853}";
+        for (main, rel, kind) in [
+            (TRANSITIONAL_MAIN, TRANSITIONAL_REL, rt::HYPERLINK),
+            (STRICT_MAIN, STRICT_REL, rt::STRICT_HYPERLINK),
+        ] {
+            for prefix in ["", "s:", "xr:"] {
+                let xml = format!(
+                    r#"<{prefix}worksheet xmlns="{main}" xmlns:s="{main}" xmlns:xr="{main}" xmlns:r="{rel}" xmlns:q="{}"><{prefix}sheetData/><{prefix}hyperlinks><{prefix}hyperlink ref="A1" r:id="rIdHyperlink1" q:uid="{uid}"/></{prefix}hyperlinks></{prefix}worksheet>"#,
+                    super::REVISION_NAMESPACE
+                );
+                let relationships = relationships(kind, TargetMode::External);
+                let values = parse(xml.as_bytes(), &relationships).unwrap();
+                assert_eq!(values[0].revision_uid(), Some(uid));
+                let output =
+                    super::rewrite_hyperlinks(xml.as_bytes(), &values, &[Some("rIdHyperlink1")])
+                        .unwrap();
+                assert_eq!(parse(&output, &relationships).unwrap(), values);
+            }
+        }
+    }
+
+    #[test]
+    fn revision_uid_refuses_foreign_unqualified_duplicate_and_malformed_attributes() {
+        let uid = "{3A497593-3366-B24C-A7AF-6952EF70F853}";
+        for attributes in [
+            format!(r#"uid="{uid}""#),
+            format!(r#"foreign:uid="{uid}""#),
+            format!(r#"q:uid="{uid}" alias:uid="{uid}""#),
+            r#"q:uid="not-a-guid""#.into(),
+        ] {
+            let xml = format!(
+                r#"<worksheet xmlns="{TRANSITIONAL_MAIN}" xmlns:q="{revision}" xmlns:alias="{revision}" xmlns:foreign="urn:foreign"><hyperlinks><hyperlink ref="A1" location="Sheet1!A2" {attributes}/></hyperlinks></worksheet>"#,
+                revision = super::REVISION_NAMESPACE
+            );
+            assert!(
+                parse(
+                    xml.as_bytes(),
+                    &relationships(rt::HYPERLINK, TargetMode::External)
+                )
+                .is_err()
+            );
+        }
     }
 
     #[test]

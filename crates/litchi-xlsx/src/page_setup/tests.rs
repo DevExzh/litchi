@@ -231,7 +231,7 @@ fn relationship_ids_validate_before_borrowed_or_owned_storage() {
 
 #[test]
 fn relationship_projection_is_independent_from_nonconforming_settings() {
-    let xml = format!(r#"{START}<pageSetup horizontalDpi="0" r:id="rIdPrinter"/></worksheet>"#);
+    let xml = format!(r#"{START}<pageSetup horizontalDpi="-1" r:id="rIdPrinter"/></worksheet>"#);
     assert!(parse_worksheet_page_setup(xml.as_bytes()).is_err());
     assert_eq!(
         parse_worksheet_page_setup_relationship_id(xml.as_bytes())
@@ -240,6 +240,20 @@ fn relationship_projection_is_independent_from_nonconforming_settings() {
             .as_str(),
         "rIdPrinter"
     );
+}
+
+#[test]
+fn native_zero_resolution_markers_are_preserved_without_becoming_a_positive_dpi() {
+    let setup = parse(r#"<pageSetup horizontalDpi="0" verticalDpi="0"/>"#)
+        .unwrap()
+        .unwrap();
+    assert_eq!(setup.horizontal_dpi, Some(Dpi::UNSPECIFIED));
+    assert_eq!(setup.vertical_dpi, Some(Dpi::UNSPECIFIED));
+    assert!(setup.horizontal_dpi.unwrap().is_unspecified());
+    assert!(Dpi::new(0).is_err());
+    let written = write_page_setup(&setup);
+    let xml = std::str::from_utf8(&written).unwrap();
+    assert_eq!(parse(xml).unwrap(), Some(setup));
 }
 
 #[test]
@@ -257,8 +271,8 @@ fn parser_rejects_every_out_of_domain_numeric_family() {
     assert!(parse(r#"<pageSetup paperSize="0"/>"#).is_err());
     assert!(parse(r#"<pageSetup paperSize="48"/>"#).is_err());
     assert!(parse(r#"<pageSetup paperSize="119"/>"#).is_err());
-    assert!(parse(r#"<pageSetup horizontalDpi="0"/>"#).is_err());
-    assert!(parse(r#"<pageSetup verticalDpi="0"/>"#).is_err());
+    assert!(parse(r#"<pageSetup horizontalDpi="-1"/>"#).is_err());
+    assert!(parse(r#"<pageSetup verticalDpi="4294967296"/>"#).is_err());
     assert!(parse(r#"<pageSetup copies="0"/>"#).is_err());
     assert!(parse(r#"<pageSetup copies="32768"/>"#).is_err());
 }
@@ -383,11 +397,12 @@ fn loads_poi_resolution_and_relationship_fixture() {
 }
 
 #[test]
-fn rejects_a_libreoffice_fixture_with_nonconforming_zero_dpi() {
+fn retains_zero_dpi_markers_in_a_libreoffice_fixture_too() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx"
     );
-    let error = parse_fixture(path).unwrap_err();
-    assert!(error.to_string().contains("DPI"));
+    let setup = parse_fixture(path).unwrap();
+    assert_eq!(setup.horizontal_dpi, Some(Dpi::UNSPECIFIED));
+    assert_eq!(setup.vertical_dpi, Some(Dpi::UNSPECIFIED));
 }
