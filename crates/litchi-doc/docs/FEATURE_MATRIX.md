@@ -174,7 +174,7 @@ execution remain outside the DOC package API.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | OfficeArt/Escher drawing group and shape extraction | ✅ | ✅ | 🟡 | Data-stream OfficeArt, drawing-group anchors, shape properties, and text boxes are extracted; writer support covers main/header shapes and bounded shape kinds rather than every OfficeArt record |
-| Pictures and BLIP payloads | ✅ | ✅ | ✅ | EMF, WMF, PICT, JPEG, PNG, DIB/BMP, and TIFF payload families are extracted and authored with OfficeArt identifiers and required metafile/BMP normalization |
+| Pictures and BLIP payloads | ✅ | ✅ | ✅ | EMF, WMF, PICT, JPEG, PNG, DIB/BMP, and TIFF families have stored BLIP views and authoring support. Inline PICFs resolve in Data; floating anchors resolve through their story's Spa, shape identity, pib and BStore. Metafile compression remains explicit in read views; authoring performs required metafile/BMP normalization. |
 | Floating shapes, textboxes, and header drawings | 🟡 | ✅ | 🟡 | Main/header anchors, text-box stories, pictures, positions, and selected presets are authored; full OfficeArt geometry, WordArt, rotation/z-order, and layout are not a complete model |
 | Embedded OLE and package payloads | ✅ | ✅ | ✅ | Payload bytes, storage topology, and bounded typed `ObjInfo`/`ODTPersist2` metadata round-trip through the source-checked embedded-object transactions without OLE activation or payload deserialization |
 | MathType/MTEF Equation.3 objects | ✅ | ✅ | ✅ | Native equation extraction/conversion and bounded MTEF/Equation.3 authoring include registration streams, ObjInfo, preserved CLSIDs, and real image previews; layout/evaluation remain external |
@@ -248,3 +248,21 @@ inventory through save/reopen and exact inverse. Native field-to-storage
 ownership is not inferred from the editor-managed field index; the new storage
 view is read-only. The facade explicitly opens the extracted worksheet as
 XLSX data without activating an OLE server or refreshing any cache.
+
+Native picture regressions distinguish the inline JPEG, floating PNG, compressed
+EMF worksheet preview and PNG chart preview. A floating marker never treats an
+inherited CPicLocation as its image address: the native rounded rectangle and
+converted vector group therefore cannot alias the first inline picture. Shape
+and CP indexes are cached per story, with deferred bounded OfficeArt parsing;
+unresolvable Spa-to-shape references and ambiguous CP mappings are errors.
+`Image::drawing_shape_id`
+identifies the floating route, and direct PICF-only `Image::data` gives a typed
+`DrawingStoreRequired` refusal for it.
+
+Tests check native PICF goals/scales, the floating frame/wrapping, stored hashes,
+compressed EMF metadata and its independently decoded file hash. The vector
+document's empty default PICF remains an explicit `NoPicture` case. Body edits
+preserve image identities and bytes through anchor relocation, save/reopen and
+inverse. Generated main/header and missing-Data cases qualify the store route;
+resource editing, page layout, rendering and unified `picture` nodes are not
+inferred from these owner reads.

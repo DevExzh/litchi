@@ -3,8 +3,9 @@ use super::prelude::*;
 impl Document {
     /// Get image binary data for an embedded image.
     ///
-    /// This method extracts the image data from the `WordDocument` stream.
-    /// The data is returned as a `Cow` to minimize copying when possible.
+    /// Inline images use their Data-stream PICF; floating pictures resolve
+    /// through their story's shape identity and OfficeArt image store. The
+    /// returned view retains stored BLIP bytes, including metafile compression.
     ///
     /// # Arguments
     ///
@@ -17,7 +18,7 @@ impl Document {
     ///     for run in para.runs()? {
     ///         if let Some(img) = run.image() {
     ///             let data = doc.image_data(img)?;
-    ///             let pic_type = img.picture_type(&doc.word_document())?;
+    ///             let pic_type = data.kind();
     ///             // Process image data...
     ///         }
     ///     }
@@ -27,12 +28,41 @@ impl Document {
         &self,
         image: &crate::image::Image,
     ) -> std::result::Result<litchi_odraw::image::File<'_>, crate::image::ImageError> {
+        if let Some((header, shape_id)) = image.drawing_reference() {
+            return self
+                .0
+                .drawing_images
+                .data(header, shape_id, self.word_document());
+        }
         // Use the appropriate stream based on pic_offset
         let data_stream = self.get_data_stream(image.pic_offset()).ok_or(
             crate::image::ImageError::InvalidPicOffset(image.pic_offset()),
         )?;
         let word_document = self.word_document();
         image.data(data_stream, word_document)
+    }
+
+    pub(super) fn floating_image_at(
+        &self,
+        cp: u32,
+        hint: u32,
+    ) -> Result<Option<crate::image::Image>> {
+        let (header, relative, anchors) = if cp < self.0.fib.get_main_doc_range().1 {
+            (false, cp, self.shape_positions())
+        } else if let Some((start, _)) = self
+            .0
+            .fib
+            .get_header_range()
+            .filter(|(start, end)| cp >= *start && cp < *end)
+        {
+            (true, cp - start, self.header_shape_positions())
+        } else {
+            return Ok(None);
+        };
+        self.0
+            .drawing_images
+            .at_anchor(header, relative, hint, anchors)
+            .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
     }
 
     /// Get a reference to the `WordDocument` stream.
@@ -46,12 +76,9 @@ impl Document {
 
     /// Get the appropriate stream for picture data based on `pic_offset`.
     ///
-    /// According to Apache POI's `PicturesTable.getData()`:
-    /// - If Data stream exists and `pic_offset` < `data_stream.len()`, use Data stream
-    /// - Otherwise use `WordDocument` stream
-    ///
-    /// This is because pictures are typically stored in the Data stream,
-    /// not the `WordDocument` stream.
+    /// PICF offsets in the supported Word 97+ layout address the Data stream.
+    /// Floating anchors are resolved separately; their inherited CPicLocation
+    /// must not be reinterpreted as another inline picture's data address.
     pub(super) fn get_data_stream(&self, offset: u32) -> Option<&[u8]> {
         if let Some(data_stream) = &self.0.data_stream
             && (offset as usize) < data_stream.len()

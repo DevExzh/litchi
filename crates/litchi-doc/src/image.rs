@@ -1,6 +1,9 @@
 use super::parts::chp::CharacterProperties;
 use std::mem::size_of;
 
+mod drawing;
+pub(crate) use drawing::DrawingSource;
+
 const BLOCK_TYPE_OFFSET: usize = 0xE;
 const MM_MODE_TYPE_OFFSET: usize = 0x6;
 
@@ -24,6 +27,10 @@ pub enum ImageError {
     InvalidBlockType(u8),
     #[error("No picture found")]
     NoPicture,
+    #[error("Floating picture for shape {0} requires its document drawing store")]
+    DrawingStoreRequired(u32),
+    #[error("Invalid Word drawing image metadata: {0}")]
+    InvalidDrawing(String),
     #[error("Decompression failed: {0}")]
     DecompressionFailed(String),
 
@@ -91,7 +98,8 @@ fn does_block_contain_image(data_buff: &[u8], pic_offset: u32) -> Result<bool, I
     ))
 }
 
-/// Check if a run contains an image based on text and properties.
+/// Check if a run anchors an inline PICF image. Floating shapes need their
+/// document's Spa/OfficeArt context and cannot be recognized from a Data offset.
 pub fn has_picture(
     data_buff: &[u8],
     text: &str,
@@ -99,11 +107,9 @@ pub fn has_picture(
 ) -> Result<bool, ImageError> {
     if props.is_spec && !props.is_obj && !props.is_ole2 && !props.is_data {
         // Image should be in its own run, or in a run with the end-of-special
-        // marker. 0x0001 anchors an inline picture, 0x0008 a floating one.
-        if matches!(
-            text,
-            "\u{0001}" | "\u{0001}\u{0015}" | "\u{0008}" | "\u{0008}\u{0015}"
-        ) {
+        // marker. 0x0008 anchors an OfficeArt shape, which can be a picture,
+        // a text box or a group; its inherited CPicLocation is not a PICF link.
+        if matches!(text, "\u{0001}" | "\u{0001}\u{0015}") {
             let pic_offset = props.pic_offset.unwrap_or(0);
             return does_block_contain_image(data_buff, pic_offset);
         }
@@ -235,23 +241,48 @@ const _: () = {
 
 /// Embedded image in a Word document.
 ///
-/// This struct only stores metadata (offset). The actual binary data
-/// is loaded lazily via `Document::image_data()` to minimize memory usage.
+/// This struct stores a PICF offset or a floating drawing reference. Binary
+/// data is resolved as borrowed views via `Document::image_data()` without
+/// copying each image payload into its run.
 #[derive(Debug, Clone, Copy)]
 pub struct Image {
-    /// Offset in `WordDocument` stream where picture data starts
+    /// Stored CPicLocation value; a PICF offset only for an inline picture.
     pic_offset: u32,
+    drawing: Option<(bool, u32)>,
 }
 
 impl Image {
-    /// Create a new Image with the given offset.
+    /// Create an inline PICF descriptor with the given Data-stream offset.
     #[inline]
     #[must_use]
     pub fn new(pic_offset: u32) -> Self {
-        Self { pic_offset }
+        Self {
+            pic_offset,
+            drawing: None,
+        }
     }
 
-    /// Get the picture offset in the `WordDocument` stream.
+    pub(crate) fn from_drawing(pic_offset: u32, header: bool, shape_id: u32) -> Self {
+        Self {
+            pic_offset,
+            drawing: Some((header, shape_id)),
+        }
+    }
+
+    /// The OfficeArt shape identity of a floating picture. Resolve it with
+    /// `Document::image_data`; the stored CPicLocation may belong to another run.
+    #[must_use]
+    pub fn drawing_shape_id(&self) -> Option<u32> {
+        self.drawing.map(|(_, id)| id)
+    }
+
+    pub(crate) fn drawing_reference(&self) -> Option<(bool, u32)> {
+        self.drawing
+    }
+
+    /// Get the stored or default CPicLocation value. For inline pictures this addresses
+    /// the Data stream's PICF. For floating pictures it is only a legacy hint;
+    /// `drawing_shape_id` identifies the drawing-store route instead.
     #[inline]
     #[must_use]
     pub fn pic_offset(&self) -> u32 {
@@ -260,8 +291,9 @@ impl Image {
 
     /// Get raw image data from the document buffer (zero-copy when possible).
     ///
-    /// This method extracts and optionally decompresses the image data.
-    /// Use `Document::image_data()` for a higher-level API.
+    /// This method extracts an inline PICF's stored BLIP data. Metafile bytes
+    /// can remain compressed, as described by the BLIP metadata. Floating
+    /// pictures require the higher-level `Document::image_data()` API.
     ///
     /// - After header: actual picture content (may include BLIP container)
     ///
@@ -272,6 +304,10 @@ impl Image {
         word_document: &'data [u8],
     ) -> Result<litchi_odraw::image::File<'data>, ImageError> {
         use litchi_odraw::Record;
+
+        if let Some((_, shape_id)) = self.drawing {
+            return Err(ImageError::DrawingStoreRequired(shape_id));
+        }
 
         let base = usize::try_from(self.pic_offset)
             .map_err(|_| ImageError::InvalidPicOffset(self.pic_offset))?;
@@ -346,7 +382,8 @@ impl Image {
     }
 }
 
-/// Check if a run should have an image and create one if so.
+/// Recognize an inline PICF run and create its image descriptor. Floating
+/// pictures are resolved by the document owner instead.
 pub fn extract_image(
     data_buff: &[u8],
     text: &str,
@@ -367,6 +404,20 @@ pub fn extract_image(
 mod tests {
     use super::*;
     use crate::parts::chp::CharacterProperties;
+
+    #[test]
+    fn floating_marker_cannot_reuse_a_valid_inline_picf_offset() {
+        let mut data = vec![0; 68];
+        data[14] = 8;
+        let props = CharacterProperties {
+            is_spec: true,
+            pic_offset: Some(0),
+            ..Default::default()
+        };
+        assert!(has_picture(&data, "\u{0001}", &props).unwrap());
+        assert!(!has_picture(&data, "\u{0008}", &props).unwrap());
+        assert!(extract_image(&data, "\u{0008}", &props).unwrap().is_none());
+    }
 
     fn make_props(pic_offset: Option<u32>) -> CharacterProperties {
         CharacterProperties {

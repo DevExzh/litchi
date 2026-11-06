@@ -3989,6 +3989,54 @@
         "ppt",
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_picf_and_floating_store_images_resolve_to_their_own_payloads",
+      "fixtures": [
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-056",
+        "doc-057"
+      ],
+      "assertions": [
+        "Four exact run CPs and own JPEG/PNG/EMF/PNG identities, lengths/hashes; native floating shape 1026 resolves through its store despite inherited PICF hint 0; rounded rectangle is not an image. PICF goals/scales, 2880x1620 floating frame, square wrapping, compressed EMF metadata and decoded 74428-byte hash are exact."
+      ],
+      "scope_limit": "Stored resource reads only; metafile bytes remain compressed in File views. Low-level PICF access to a floating reference gives DrawingStoreRequired. No rendering, layout resolution or generic picture-node authoring."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_vector_picf_placeholders_stay_distinct_from_groups_and_real_images",
+      "fixtures": [
+        "word/word-vector-diagram.doc"
+      ],
+      "feature_rows": [
+        "doc-056"
+      ],
+      "assertions": [
+        "Two real PNG payloads have exact offsets, lengths and hashes; the 144-byte default PICF at 27846 yields typed NoPicture; the floating vector-group anchor is not an image alias."
+      ],
+      "scope_limit": "Empty default-picture descriptor remains distinct from a real file payload. No typed SVG/SmartArt parity or invented fallback bytes."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_picture_payloads_survive_body_edits_and_shape_anchor_relocation",
+      "fixtures": [
+        "word/word-visual-objects.doc",
+        "word/word-vector-diagram.doc"
+      ],
+      "feature_rows": [
+        "doc-034",
+        "doc-056"
+      ],
+      "assertions": [
+        "Changed first-paragraph text saves/reopens with the same PICF hints, floating shape identities, resource kinds/hashes and explicit empty descriptor, and inverts to exact original bytes."
+      ],
+      "scope_limit": "Body text edit and correct anchor relocation only; no native image replacement or group-child resource editing."
     }
   ]
 }

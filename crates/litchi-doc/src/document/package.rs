@@ -320,6 +320,19 @@ impl Document {
         );
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
         let header_shape_anchors = Self::parse_header_shape_anchors(&fib, &table_stream);
+        let drawing_images = crate::image::DrawingSource::new(
+            if shape_anchors.is_empty() && header_shape_anchors.is_empty() {
+                Ok(None)
+            } else {
+                capture_optional_table_range(
+                    &fib,
+                    &table_stream,
+                    crate::shape::FIB_INDEX_DGG_INFO,
+                    source_limits.max_entry_bytes(),
+                    "OfficeArtContent",
+                )
+            },
+        );
         let textbox_entries = Self::parse_textbox_entries(
             &fib,
             &table_stream,
@@ -465,6 +478,7 @@ impl Document {
             fib,
             word_document,
             data_stream,
+            drawing_images,
             text_extractor,
             chp_bin_table,
             pap_bin_table,

@@ -125,8 +125,12 @@ impl Document {
 
             // Create runs for the paragraph, checking for MTEF formulas, images, and OLE2 objects
             for run in runs {
-                let mut converted =
-                    self.convert_run(run.text, run.properties, &mut object_name_buffer);
+                let mut converted = self.convert_run(
+                    run.text,
+                    run.properties,
+                    run.range.start(),
+                    &mut object_name_buffer,
+                )?;
                 converted.set_cp_range(run.range);
                 run_objects.push(converted);
             }
@@ -153,8 +157,9 @@ impl Document {
         &self,
         text: String,
         props: crate::parts::chp::CharacterProperties,
+        cp: u32,
         object_name_buffer: &mut String,
-    ) -> Run {
+    ) -> Result<Run> {
         use crate::image::extract_image;
 
         // Primary matching: Use pic_offset to find MTEF data (most reliable)
@@ -168,7 +173,7 @@ impl Document {
 
                 if let Some(mtef_ast) = self.0.parsed_mtef.get(object_name_buffer.as_str()) {
                     // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
-                    return Run::with_mtef_formula(text, props, Arc::clone(mtef_ast));
+                    return Ok(Run::with_mtef_formula(text, props, Arc::clone(mtef_ast)));
                 }
             }
         }
@@ -178,7 +183,18 @@ impl Document {
             && Self::is_potential_mtef_formula(&text)
             && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
         {
-            return Run::with_mtef_formula(text, props, mtef_ast);
+            return Ok(Run::with_mtef_formula(text, props, mtef_ast));
+        }
+
+        if props.is_spec && matches!(text.as_str(), "\u{0008}" | "\u{0008}\u{0015}") {
+            if !props.is_obj
+                && !props.is_ole2
+                && !props.is_data
+                && let Some(image) = self.floating_image_at(cp, props.pic_offset.unwrap_or(0))?
+            {
+                return Ok(Run::with_image(text, props, image));
+            }
+            return Ok(Run::new(text, props));
         }
 
         // Check for embedded images
@@ -187,11 +203,11 @@ impl Document {
             && let Some(data_stream) = self.get_data_stream(pic_offset)
             && let Ok(Some(image)) = extract_image(data_stream, &text, &props)
         {
-            return Run::with_image(text, props, image);
+            return Ok(Run::with_image(text, props, image));
         }
 
         // Regular run without formula or image
-        Run::new(text, props)
+        Ok(Run::new(text, props))
     }
 
     /// Get all tables in the document.

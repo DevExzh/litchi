@@ -354,6 +354,48 @@ fn inline_and_floating_pictures_round_trip_through_doc_reader() {
 }
 
 #[test]
+fn floating_picture_resolves_from_the_store_without_a_data_stream() {
+    let png = make_png(32, 16);
+    let mut builder = Builder::new();
+    builder
+        .insert_floating_picture(
+            Picture::new(png.clone()).unwrap(),
+            FloatingPosition::new(1440, 720),
+        )
+        .unwrap();
+    let mut original = Cursor::new(Vec::new());
+    builder.build().unwrap().write_to(&mut original).unwrap();
+    let mut reader = litchi_cfb::OleFile::open(
+        Cursor::new(original.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
+    let mut writer = litchi_cfb::OleWriter::new();
+    for path in reader.list_streams() {
+        if path.as_slice() == ["Data"] {
+            continue;
+        }
+        let names = path.iter().map(String::as_str).collect::<Vec<_>>();
+        writer
+            .create_stream(&names, &reader.open_stream(&names).unwrap())
+            .unwrap();
+    }
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let package = litchi_doc::Package::from_bytes(&bytes.into_inner()).unwrap();
+    let document = package.document();
+    assert!(document.data_stream().is_none());
+    let runs = picture_runs(&document);
+    assert_eq!(runs.len(), 1);
+    let image = runs[0].image().unwrap();
+    assert_eq!(
+        image.drawing_shape_id(),
+        Some(document.shape_positions()[0].spa.shape_id)
+    );
+    assert_eq!(document.image_data(image).unwrap().data().unwrap(), png);
+}
+
+#[test]
 fn floating_picture_writes_valid_dgg_info() {
     use litchi_doc::parts::fib::FileInformationBlock;
     use litchi_odraw::Record;

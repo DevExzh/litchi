@@ -84,6 +84,8 @@ pub(in crate::document) struct DocumentState {
     /// The Data stream - contains embedded objects, pictures, etc.
     /// According to Apache POI, pictures are stored here, not in `WordDocument` stream.
     pub(in crate::document) data_stream: Option<Vec<u8>>,
+    /// Bounded OfficeArtContent used to resolve floating picture anchors.
+    pub(in crate::document) drawing_images: crate::image::DrawingSource,
     /// Text extractor - holds the extracted document text
     pub(in crate::document) text_extractor: TextExtractor,
     /// Character property bin table - parsed once and shared across all paragraph extractors
