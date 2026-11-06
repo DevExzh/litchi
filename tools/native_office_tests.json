@@ -3958,7 +3958,8 @@
       ],
       "feature_rows": [
         "rtf-481",
-        "rtf-457"
+        "rtf-457",
+        "rtf-459"
       ],
       "assertions": [
         "Each native object transfers independently into an ordinary generated RTF receiver with exact payload/class/preview pictures and wrapper roles; readback and inverse preserve source/target bytes. Native minimal receiver with opaque destinations gives the documented UnsupportedContent refusal."
@@ -6194,6 +6195,154 @@
         "Only the selected owning part changes; every XML byte outside its owned text slots remains exact, including note definition markers, paragraph/run properties, separator siblings, reply text, review metadata and root compatibility attributes. Reopened inverses restore all source members."
       ],
       "scope_limit": "Four native selected-story edits under the shared source/projection agreement proof. No branch selection, general multi-story batch, footer fields, glossary CRUD, rendering or fresh native application validation."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_validation",
+      "name": "native_form_instructions_exclude_bookmark_metadata_and_retain_complete_spans",
+      "fixtures": [
+        "word/word-legacy-form.rtf"
+      ],
+      "feature_rows": [
+        "rtf-475",
+        "rtf-477",
+        "rtf-478",
+        "rtf-462"
+      ],
+      "assertions": [
+        "Three native instructions resolve to FORMTEXT/FORMCHECKBOX/FORMDROPDOWN, with exact cached results and private flags false/true/true; bookmark names are excluded from instruction text.",
+        "Native bookmark positions 70/105/126 retain FORM_VALUE_010/empty/empty spans. Canonical writing/reopen retains field types, modifiers, form metadata and bookmarks; the input snapshot remains byte-exact."
+      ],
+      "scope_limit": "Main-body starred bookmark destinations inside field instructions and legacy form modifiers only. Non-body bookmark metadata remains opaque; no form execution, field evaluation or general revision resolution."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_validation",
+      "name": "native_validation_counts_and_redaction_plans_keep_unresolved_scope_explicit",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-tables-layout.rtf",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-write-reservation.rtf"
+      ],
+      "feature_rows": [
+        "rtf-462"
+      ],
+      "assertions": [
+        "Native syntax/root/document checks are valid, with exact field/object/picture/form counts across six fixtures. Known opaque syntax keeps the overall security, external-resolution and execution scope Unknown rather than clean.",
+        "Strict redaction returns the exact UnsupportedContent boundary. Best-effort no-op plans remove zero references, remain explicitly incomplete and retain the original bytes; mail-merge, form protection, objects and write-reservation exclusions are identified."
+      ],
+      "scope_limit": "The native specimens have no removable top-level template/next-file reference owned by this redactor. These tests qualify inventory and explicit incomplete/refusal behavior, not successful removal of all external content or a safety certification."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_validation",
+      "name": "native_payload_transport_derivatives_round_trip_with_bounds_and_checksum_checks",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-rtf-table-grid.rtf"
+      ],
+      "feature_rows": [
+        "rtf-463"
+      ],
+      "assertions": [
+        "Library-generated LZFu and MELA frames preserve every native payload byte on decompression, and retain exact text/paragraphs on package opening. Frame magic, finite output bounds and CRC rejection are asserted.",
+        "File publication and no-op commits retain generated transport bytes exactly; ordinary edits to compressed snapshots return typed UnsupportedContent. Native input bytes remain unchanged."
+      ],
+      "scope_limit": "The manifest fixtures are ordinary RTF; the transport frames are library-produced derivatives. Native Outlook-produced compressed fixtures and fresh native-app reopen are not claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_workflows",
+      "name": "native_logical_tail_append_preserves_source_bytes_and_replays_durable_inverse",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-rtf-table-grid.rtf",
+        "word/word-tables-layout.rtf",
+        "word/word-write-reservation.rtf",
+        "word/word-tracked-moves.rtf",
+        "word/word-layout-extensions.rtf"
+      ],
+      "feature_rows": [
+        "rtf-460"
+      ],
+      "assertions": [
+        "Append two plain paragraphs with Unicode, braces, backslash and tab to seven native sources. Exact paragraph counts and complete text are asserted; every original byte before and after the root-close insertion remains exact.",
+        "File save/reopen retains data-store/write-reservation metadata and table counts. Deterministic durable-patch encoding, replay and inverse on a reopened artifact restore exact bytes."
+      ],
+      "scope_limit": "Bounded ordinary-root plain append only; retained tracked-move metadata is not accepted/rejected, layout is not rendered and unrelated structure is not rewritten."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_workflows",
+      "name": "native_source_backed_tail_append_respects_write_windows_and_reopened_inverse",
+      "fixtures": [
+        "word/word-bidi-eastasia.rtf",
+        "word/word-rtf-table-grid.rtf"
+      ],
+      "feature_rows": [
+        "rtf-460"
+      ],
+      "assertions": [
+        "Source-backed publication into a short-write sink never offers more than the configured 17 bytes, and emits exactly the logical append artifact under a 257-byte publication window.",
+        "File save, source-byte splice preservation and inverse on an independently reopened source-backed owner pass; original source bytes remain unchanged."
+      ],
+      "scope_limit": "Two native source-backed append cases with finite execution/publication budgets; no arbitrary structure editing or native-app reopen."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_workflows",
+      "name": "native_tail_append_refusals_preserve_protected_and_dependent_sources",
+      "fixtures": [
+        "word/word-legacy-form.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-mailmerge-fields.rtf"
+      ],
+      "feature_rows": [
+        "rtf-460"
+      ],
+      "assertions": [
+        "Protected native inputs give Protected; dropped unknown syntax and external mail-merge dependencies give the exact UnsupportedContent source-proof diagnostics. Failed changes and no-op commits retain original bytes."
+      ],
+      "scope_limit": "Intentional append-source boundaries only. Unknown/dropped producer syntax and active/external dependencies are not thereby semantically implemented or certified safe."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_workflows",
+      "name": "native_table_cell_transfer_changes_only_the_recipient_literal",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-rtf-table-grid.rtf"
+      ],
+      "feature_rows": [
+        "rtf-459"
+      ],
+      "assertions": [
+        "Transfer native Apples from the tables-layout document into the grid document cell containing RTF_CELL_006. Every recipient byte except that literal remains exact; the adjacent 42 value is unchanged.",
+        "File save/reopen, inverse restoration and unchanged donor/receiver snapshots are asserted."
+      ],
+      "scope_limit": "Plain cell-text transfer between two native documents; no cross-document style/resource transfer or general table structure editing."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_workflows",
+      "name": "native_multilingual_text_can_feed_a_bounded_fresh_stream_in_single_byte_chunks",
+      "fixtures": [
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-456"
+      ],
+      "assertions": [
+        "Seven exact native paragraphs, including Arabic, Hebrew, Japanese and Chinese, feed a finite plain streaming writer one UTF-8 byte at a time. The reopened fresh derivative has exactly those paragraphs and no fields, tables or objects."
+      ],
+      "scope_limit": "Fresh plaintext derivative only. Native fonts, run formatting, layout and producer metadata are not copied, and this is not native Word authoring/reopen evidence."
     }
   ]
 }

@@ -47,6 +47,7 @@ fn write_body_story_for_test(
             &[], // legacy text boxes
             &[], // legacy drawings
             &[], // form fields
+            &[], // form-field modifiers
             &[], // fields
             &[], // sections
             story_events,

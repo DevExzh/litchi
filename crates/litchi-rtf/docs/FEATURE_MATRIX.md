@@ -57,8 +57,8 @@ An unsupported semantic row therefore does not imply loss on an untouched save.
 | Comments/annotations | ✅ | 🟡 | Retained annotation metadata and bounded comment-body transactions. No collaboration engine. `annotations.rs`, `transactions.rs`. |
 | Bookmarks and navigation entries | ✅ | 🟡 | Plain bookmarks, TOC/index navigation metadata, and cached content are retained. No index generation or field calculation. `navigation_entries.rs`, `table_story_navigation_revisions.rs`. |
 | Tracked revisions | ✅ | 🟡 | Insertion/deletion and structural revision metadata plus selected writer helpers; no general ordinary accept/reject or merge engine. `revisions.rs`, `structural_revisions.rs`. |
-| Fields and hyperlinks | ✅ | 🟡 | Instruction/cache/status models and inert typed references. Retained writing and checked passive field transfer; never refresh or evaluate. `field_status.rs`, `typed_hyperlinks_and_references.rs`. |
-| Form fields and editable/protected regions | ✅ | 🟡 | Inert control properties, protected users/ranges, and editable regions are modeled and retained. Native Word text defaults/help/max length, checkbox default/size, drop-down entries and undefined selections survive canonical writing with their result ranges and bookmarks. Default values are not substituted for absent results; controls never activate. `form_field_properties.rs`, `protection_ranges.rs`, `editable_regions.rs`, `microsoft_office_native.rs`. |
+| Fields and hyperlinks | ✅ | 🟡 | Instruction/cache/status models and inert typed references. Starred body bookmark destinations inside native field instructions retain their spans without polluting the instruction text; non-body bookmarks inside instructions stay opaque. Retained writing and checked passive field transfer; never refresh or evaluate. `field_status.rs`, `typed_hyperlinks_and_references.rs`. |
+| Form fields and editable/protected regions | ✅ | 🟡 | Inert control properties, protected users/ranges, and editable regions are modeled and retained. Native Word text defaults/help/max length, checkbox default/size, drop-down entries and undefined selections survive canonical writing with their result ranges and bookmarks. Form-owner modifier records retain native `flddirty`, `fldedit`, `fldlock` and `fldpriv` independently of the generic-field projection; adjacent empty forms keep distinct flags and newly authored forms use defaults. Default values are not substituted for absent results; controls never activate. `form_field_properties.rs`, `protection_ranges.rs`, `editable_regions.rs`, `microsoft_office_native.rs`. |
 | Math and equations | ✅ | 🟡 | Retained math trees/properties and writer support; no ordinary fresh math builder, evaluation, or layout. Native Word `mmath` envelopes, inline/display trees, character-format wrappers and both script-child orders are covered by `microsoft_office_native.rs`. Multiple equations in one display paragraph return typed `UnsupportedContent`; local run formatting and picture fallbacks remain source-owned. `math_zones.rs`, `math_properties.rs`. |
 | Pictures, drawings, shape groups, and text boxes | ✅ | 🟡 | Typed retained metadata and payloads, bounded picture edits, root-shape text transactions, and checked transfer. No visual renderer or arbitrary shape graph editor. `picture_properties.rs`, `shape_groups.rs`, `shape_text_frames.rs`, `legacy_drawings.rs`. |
 | OLE/embedded objects and Publisher objects | 🟡 | 🟡 | Inert object class/data/result metadata includes `ObjectKind::Publisher` (Macintosh Edition Manager). Nested result formatting groups retain scoped text decoding and preferred/fallback picture wrappers in `result_picture_wrappers`, distinct from body picture records. Canonical writing and passive transfer retain those wrappers and payloads; objects never activate or convert. `objects.rs`, `src/drawing/object.rs`, `microsoft_office_native_visuals.rs`. |
@@ -135,3 +135,17 @@ that change state outside a balanced selected group remain subject to the
 existing exact-source/canonical-publication boundaries. These tests do not claim
 pagination, PAGE/note-number evaluation, note-area columns, general policy CRUD
 or fresh Word acceptance of edited files.
+
+`microsoft_office_native_workflows.rs` qualifies bounded logical/source-backed
+plain append on native Word sources, durable replay/inverse, finite publication
+windows and a native-to-native table-cell text transfer. Protected, dropped-syntax
+and external-dependency sources retain precise refusal tests. The separate
+streaming case produces a plaintext derivative of native multilingual content;
+it does not copy the original formatting or layout.
+
+`microsoft_office_native_validation.rs` distinguishes parser-proven native counts
+from unresolved opaque scope. Its strict redaction cases refuse, and best-effort
+no-ops remain explicitly incomplete; no complete native external-content removal
+is claimed. LZFu/MELA cases wrap native payload bytes in library-generated
+transport, with byte-exact decompression, finite bounds and checksum checks.
+The native corpus does not contain Office-produced compressed-RTF transport.

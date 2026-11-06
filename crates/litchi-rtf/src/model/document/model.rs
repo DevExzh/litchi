@@ -202,6 +202,9 @@ pub struct Tree<'a> {
     field_safety: Vec<crate::validation::FieldSafety>,
     /// Ordered positional legacy form fields.
     form_fields: Vec<super::super::form_field::FormField<'a>>,
+    /// Field modifiers aligned with the typed form owners, independent of
+    /// the generic field projection and its separate clear operation.
+    form_field_statuses: Vec<crate::FieldStatus>,
     /// Inert producer provenance from the generator destination.
     generator: Option<crate::DocumentGenerator<'a>>,
     /// Ordered revision-save/session provenance.
@@ -711,6 +714,7 @@ impl<'a> Tree<'a> {
                 .into_iter()
                 .map(super::super::form_field::FormField::into_owned)
                 .collect(),
+            form_field_statuses: parsed.form_field_statuses,
             generator: parsed.generator.map(crate::DocumentGenerator::into_owned),
             revision_save: parsed.revision_save,
             xml_namespaces: parsed.saw_xml_namespace_table.then(|| {
@@ -2563,6 +2567,10 @@ impl<'a> Tree<'a> {
         &self.form_fields
     }
 
+    pub(crate) fn form_field_statuses(&self) -> &[crate::FieldStatus] {
+        &self.form_field_statuses
+    }
+
     /// Return inert producer provenance from the RTF generator destination.
     #[must_use]
     pub fn generator(&self) -> Option<&crate::DocumentGenerator<'_>> {
@@ -3710,6 +3718,7 @@ impl<'a> Tree<'a> {
         }
         let index = self.form_fields.len();
         self.form_fields.push(field);
+        self.form_field_statuses.push(crate::FieldStatus::default());
         self.insert_body_story_event(crate::BodyStoryEvent::FormFieldStart(index))?;
         self.insert_body_story_event(crate::BodyStoryEvent::FormFieldEnd(index))?;
         Ok(())
@@ -3718,6 +3727,7 @@ impl<'a> Tree<'a> {
     /// Remove all legacy form-field metadata without changing visible body text.
     pub fn clear_form_fields(&mut self) {
         self.form_fields.clear();
+        self.form_field_statuses.clear();
         self.body_story_events.retain(|event| {
             !matches!(
                 event,

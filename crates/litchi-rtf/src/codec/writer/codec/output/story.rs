@@ -69,11 +69,18 @@ impl<W: Write> Writer<W> {
         legacy_text_boxes: &[LegacyTextBox<'_>],
         legacy_drawings: &[LegacyDrawing<'_>],
         form_fields: &[FormField<'_>],
+        form_statuses: &[crate::FieldStatus],
         fields: &[Field<'_>],
         sections: &[Section<'_>],
         body_story_events: &[BodyStoryEvent],
         opaque_nodes: &[crate::opaque::Node],
     ) -> io::Result<()> {
+        if form_statuses.len() != form_fields.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF form-field modifier table is not aligned with its owners",
+            ));
+        }
         if bookmarks.bookmarks().is_empty()
             && move_bookmarks.is_empty()
             && custom_xml_tags.is_empty()
@@ -288,10 +295,10 @@ impl<W: Write> Writer<W> {
             ));
         }
         let mut form_field_bytes = 0usize;
-        let mut form_field_ranges: Vec<&FormField<'_>> = form_fields.iter().collect();
-        form_field_ranges.sort_by_key(|field| (field.position, field.range_end));
+        let mut form_field_ranges: Vec<_> = form_fields.iter().enumerate().collect();
+        form_field_ranges.sort_by_key(|(_, field)| (field.position, field.range_end));
         let mut previous_form_end = 0usize;
-        for field in form_field_ranges {
+        for (index, field) in form_field_ranges {
             field
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -339,7 +346,12 @@ impl<W: Write> Writer<W> {
             events.push(BodyEvent {
                 offset: field.position,
                 order: 1,
-                kind: BodyEventKind::FormFieldStart(field),
+                kind: BodyEventKind::FormFieldStart(
+                    field,
+                    *form_statuses
+                        .get(index)
+                        .ok_or_else(invalid_story_reference)?,
+                ),
             });
             events.push(BodyEvent {
                 offset: field.range_end,
@@ -1115,7 +1127,15 @@ impl<W: Write> Writer<W> {
                 },
                 BodyStoryEvent::FormFieldStart(index) => {
                     let field = take_story_item(form_fields, &mut saw_form_starts, index)?;
-                    (field.position, BodyEventKind::FormFieldStart(field))
+                    (
+                        field.position,
+                        BodyEventKind::FormFieldStart(
+                            field,
+                            *form_statuses
+                                .get(index)
+                                .ok_or_else(invalid_story_reference)?,
+                        ),
+                    )
                 },
                 BodyStoryEvent::FormFieldEnd(index) => {
                     let field = take_story_item(form_fields, &mut saw_form_ends, index)?;
@@ -1385,7 +1405,9 @@ impl<W: Write> Writer<W> {
             BodyEventKind::RevisionStart(revision) => self.write_revision_start(revision),
             BodyEventKind::RevisionEnd => self.write_str("}"),
             BodyEventKind::RevisionDeletion(revision) => self.write_revision(revision),
-            BodyEventKind::FormFieldStart(field) => self.write_form_field_start(field),
+            BodyEventKind::FormFieldStart(field, status) => {
+                self.write_form_field_start(field, status)
+            },
             BodyEventKind::FormFieldEnd => self.write_str("}}"),
             BodyEventKind::GenericField(field) => self.write_field_with_fields(field, fields, 0),
             BodyEventKind::PageBreak => self.write_str("\\page "),

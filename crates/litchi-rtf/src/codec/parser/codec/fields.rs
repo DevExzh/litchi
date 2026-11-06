@@ -291,6 +291,28 @@ impl Parser<'_> {
                                         _ => None,
                                     };
                                     match destination {
+                                        Some(
+                                            ControlWord::BookmarkStart | ControlWord::BookmarkEnd,
+                                        ) if matches!(
+                                            self.tokens.get(self.pos + 1),
+                                            Some(Token::Control(ControlWord::IgnorableDestination))
+                                        ) =>
+                                        {
+                                            // Word places form-field bookmark starts inside
+                                            // fldinst formatting groups. Their names are
+                                            // destination metadata, never instruction text.
+                                            self.pos += 1;
+                                            if enclosing_destination == Destination::DocumentBody
+                                                && !field_in_table
+                                            {
+                                                self.parse_bookmark_destination()?;
+                                            } else {
+                                                // The bookmark model owns body offsets only.
+                                                self.preserve_unknown_destination_in(
+                                                    crate::opaque::Context::Field,
+                                                )?;
+                                            }
+                                        },
                                         Some(ControlWord::FormField) => {
                                             if form_field.is_some() {
                                                 return Err(crate::Error::MalformedDocument(
@@ -547,6 +569,7 @@ impl Parser<'_> {
             }
             let index = self.form_fields.len();
             self.form_fields.push(form_field);
+            self.form_field_statuses.push(field_status);
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::FormFieldStart(index),
             ));

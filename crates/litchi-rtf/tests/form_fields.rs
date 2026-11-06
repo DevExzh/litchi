@@ -157,3 +157,75 @@ fn parses_bundled_libreoffice_form_field_fixtures() {
         );
     }
 }
+
+#[test]
+fn instruction_bookmarks_are_metadata_and_non_body_owners_remain_opaque() {
+    let source = concat!(
+        r"{\rtf1\ansi Before {\field{\*\fldinst {\*\bkmkstart Value} FORMTEXT",
+        r"{\*\formfield{\fftype0{\*\ffname Value}}}}{\fldrslt kept}}{\*\bkmkend Value}After}"
+    );
+    let p = litchi_rtf::Package::parse(source).unwrap();
+    assert_eq!(p.fields()[0].instruction.trim(), "FORMTEXT");
+    assert_eq!(p.fields()[0].field_type, litchi_rtf::FieldType::FormText);
+    let bookmark = p.raw().bookmarks().get("Value").unwrap();
+    assert_eq!(bookmark.position, 7);
+    assert_eq!(bookmark.content, "kept");
+    let header = r"{\rtf1\ansi{\header{\field{\*\fldinst {\*\bkmkstart HeaderOnly} AUTHOR{\*\bkmkend HeaderOnly}}{\fldrslt cached}}}Body}";
+    let p = litchi_rtf::Package::parse(header).unwrap();
+    assert_eq!(p.fields()[0].instruction.trim(), "AUTHOR");
+    assert!(p.raw().bookmarks().bookmarks().is_empty());
+    assert_eq!(p.raw().opaque_nodes().len(), 2);
+    assert!(p.to_bytes().unwrap() == header.as_bytes());
+}
+
+#[test]
+fn adjacent_empty_forms_keep_their_own_modifiers_and_authored_forms_use_defaults() {
+    let source = concat!(
+        r"{\rtf1\ansi",
+        r"{\field\flddirty\fldpriv{\*\fldinst FORMCHECKBOX{\*\formfield{\fftype1{\*\ffname One}}}}{\fldrslt }}",
+        r"{\field\fldedit\fldlock{\*\fldinst FORMCHECKBOX{\*\formfield{\fftype1{\*\ffname Two}}}}{\fldrslt }}}"
+    );
+    let donor=Tree::parse(r"{\rtf1{\field{\*\fldinst FORMCHECKBOX{\*\formfield{\fftype1{\*\ffname Three}}}}{\fldrslt }}}",litchi_rtf::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(source, litchi_rtf::OpenOptions::default()).unwrap();
+    let expected = document
+        .fields()
+        .iter()
+        .map(|f| f.status)
+        .collect::<Vec<_>>();
+    assert!(expected[0].dirty && expected[0].private && !expected[0].locked);
+    assert!(expected[1].edited && expected[1].locked && !expected[1].private);
+    document
+        .push_form_field(donor.form_fields()[0].clone())
+        .unwrap();
+    let output = write(&document);
+    let read = Tree::parse_bytes(&output, litchi_rtf::OpenOptions::default()).unwrap();
+    assert_eq!(
+        read.form_fields()
+            .iter()
+            .map(|f| f.name.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("One"), Some("Two"), Some("Three")]
+    );
+    assert_eq!(
+        read.fields().iter().map(|f| f.status).collect::<Vec<_>>(),
+        [expected[0], expected[1], litchi_rtf::FieldStatus::default()]
+    );
+    // Clearing the separate generic projection must not discard modifiers
+    // belonging to form owners that remain in the document.
+    document.clear_fields();
+    let output = write(&document);
+    let read = Tree::parse_bytes(&output, litchi_rtf::OpenOptions::default()).unwrap();
+    assert_eq!(
+        read.fields().iter().map(|f| f.status).collect::<Vec<_>>(),
+        [expected[0], expected[1], litchi_rtf::FieldStatus::default()]
+    );
+    document.clear_form_fields();
+    document
+        .push_form_field(donor.form_fields()[0].clone())
+        .unwrap();
+    let output = write(&document);
+    let read = Tree::parse_bytes(&output, litchi_rtf::OpenOptions::default()).unwrap();
+    assert_eq!(read.fields().len(), 1);
+    assert_eq!(read.fields()[0].status, litchi_rtf::FieldStatus::default());
+    assert_eq!(read.form_fields()[0].name.as_deref(), Some("Three"));
+}

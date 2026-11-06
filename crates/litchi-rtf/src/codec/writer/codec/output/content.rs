@@ -88,14 +88,34 @@ impl<W: Write> Writer<W> {
         self.write_str("}")
     }
 
+    pub(in super::super) fn write_field_status(
+        &mut self,
+        status: crate::FieldStatus,
+    ) -> io::Result<()> {
+        for (present, control) in [
+            (status.dirty, "flddirty"),
+            (status.edited, "fldedit"),
+            (status.locked, "fldlock"),
+            (status.private, "fldpriv"),
+        ] {
+            if present {
+                self.write_control_word(control, None)?;
+            }
+        }
+        Ok(())
+    }
+
     pub(in super::super) fn write_form_field_start(
         &mut self,
         field: &FormField<'_>,
+        status: crate::FieldStatus,
     ) -> io::Result<()> {
         field
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-        self.write_str("{\\field{\\*\\fldinst ")?;
+        self.write_str("{\\field")?;
+        self.write_field_status(status)?;
+        self.write_str("{\\*\\fldinst ")?;
         self.write_str(match field.field_type {
             FormFieldType::Text => "FORMTEXT",
             FormFieldType::CheckBox => "FORMCHECKBOX",

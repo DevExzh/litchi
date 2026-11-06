@@ -425,18 +425,7 @@ impl<W: Write> Writer<W> {
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{\\field")?;
-        if field.status.dirty {
-            self.write_str("\\flddirty")?;
-        }
-        if field.status.edited {
-            self.write_str("\\fldedit")?;
-        }
-        if field.status.locked {
-            self.write_str("\\fldlock")?;
-        }
-        if field.status.private {
-            self.write_str("\\fldpriv")?;
-        }
+        self.write_field_status(field.status)?;
 
         // Field instruction
         self.write_str("{\\*\\fldinst{")?;
