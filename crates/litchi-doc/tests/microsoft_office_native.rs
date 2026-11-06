@@ -609,3 +609,145 @@ fn changed_publication_refuses_preexisting_broken_glossary_header_coupling() {
         assert!(package.to_bytes().unwrap() == bytes);
     }
 }
+
+fn native_font_block_hashes(package: &Package) -> Vec<(String, usize, String)> {
+    use sha2::{Digest, Sha256};
+    let document = package.document();
+    let all = streams(&package.to_bytes().unwrap());
+    let stream = &all[&vec!["WordDocument".to_owned()]];
+    document
+        .embedded_fonts()
+        .unwrap()
+        .fonts()
+        .iter()
+        .map(|font| {
+            let start = usize::try_from(font.font_data_offset()).unwrap();
+            let size = usize::try_from(u32::from_le_bytes(
+                stream[start..start + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            let block = &stream[start..start + size];
+            let hash = Sha256::digest(block)
+                .iter()
+                .map(|v| format!("{v:02x}"))
+                .collect();
+            (
+                document
+                    .font_name(font.font_table_index())
+                    .unwrap()
+                    .unwrap()
+                    .to_owned(),
+                size,
+                hash,
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn native_binary_font_descriptions_resolve_exact_legacy_blocks() {
+    let package = native("word-embedded-fonts.doc");
+    let document = package.document();
+    assert_eq!(
+        document
+            .font_table()
+            .unwrap()
+            .unwrap()
+            .iter()
+            .map(|f| f.name())
+            .collect::<Vec<_>>(),
+        [
+            "Times New Roman",
+            "Symbol",
+            "Arial",
+            "Aptos",
+            "Aptos Display",
+            "Cambria Math"
+        ]
+    );
+    let fonts = document.embedded_fonts().unwrap().fonts();
+    assert_eq!(fonts.len(), 2);
+    assert_eq!(
+        fonts
+            .iter()
+            .map(|f| (
+                f.font_data_offset(),
+                f.font_table_index(),
+                f.is_bold(),
+                f.is_italic(),
+                f.subset_order()
+            ))
+            .collect::<Vec<_>>(),
+        [
+            (3630, 5, false, false, None),
+            (573197, 3, false, false, None)
+        ]
+    );
+    assert!(
+        document
+            .document_properties()
+            .unwrap()
+            .unwrap()
+            .base()
+            .embed_true_type_fonts()
+    );
+    assert_eq!(
+        native_font_block_hashes(&package),
+        [
+            (
+                "Cambria Math".into(),
+                569567,
+                "53e5b643b6f6382a558b814c3880067b2908ab5c4a4643beb627a1b3141de23c".into()
+            ),
+            (
+                "Aptos".into(),
+                99845,
+                "a2bb161962578ec61efc3bd7d887bb9fe3883bf2306c50610b8c5df1ab035191".into()
+            )
+        ]
+    );
+}
+
+#[test]
+fn native_binary_body_edit_preserves_embedded_font_descriptions_and_blocks() {
+    let package = native("word-embedded-fonts.doc");
+    let before = package.to_bytes().unwrap();
+    let hashes = native_font_block_hashes(&package);
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph(Position::new(0), "FONT_METADATA_PRESERVED")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .document()
+            .body_paragraph_text(Position::new(0))
+            .unwrap(),
+        Some("FONT_METADATA_PRESERVED")
+    );
+    assert_eq!(native_font_block_hashes(&reopened), hashes);
+    assert_eq!(
+        reopened.document().embedded_fonts(),
+        package.document().embedded_fonts()
+    );
+    assert!(
+        reopened
+            .document()
+            .document_properties()
+            .unwrap()
+            .unwrap()
+            .base()
+            .embed_true_type_fonts()
+    );
+    assert!(package.to_bytes().unwrap() == before);
+    assert!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == before
+    );
+}

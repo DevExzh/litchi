@@ -4,11 +4,11 @@
     reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
 )]
 use super::{
-    Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, Mbcs,
-    Paragraph, ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
+    Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, Paragraph,
+    ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
     ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
     ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphWrapping, Parser,
-    RevisionMetadata, RtfEncoding, State, TextDirection, UnderlineStyle, animated_text,
+    RevisionMetadata, State, TextDirection, UnderlineStyle, animated_text,
     apply_associated_character_control, apply_table_distance, apply_table_distance_side,
     character_grid, character_style_reference, character_type_selector, complex_script_selector,
     emphasis_mark, fit_text, floating_table_offset, floating_table_wrap_distance, font_size,
@@ -2753,32 +2753,13 @@ impl Parser<'_> {
             },
 
             // Character encoding
-            ControlWord::Ansi => {
-                state.encoding = RtfEncoding::Standard(Mbcs::WINDOWS_1252);
+            ControlWord::Ansi
+            | ControlWord::AnsiCodePage(_)
+            | ControlWord::Mac
+            | ControlWord::Pc
+            | ControlWord::Pca => {
+                state.encoding = state.encoding.with_control(control)?;
             },
-            ControlWord::AnsiCodePage(cp) => {
-                state.encoding = match *cp {
-                    437 => RtfEncoding::Cp437,
-                    850 => RtfEncoding::Cp850,
-                    _ => {
-                        let page = u32::try_from(*cp).map_err(|_| {
-                            crate::Error::MalformedDocument(format!(
-                                "invalid RTF ANSI code page {cp}"
-                            ))
-                        })?;
-                        // A positive page without an exact codec is refused
-                        // as unsupported, not as malformed (record 0347).
-                        RtfEncoding::Standard(
-                            Mbcs::new(page).ok_or(crate::Error::UnsupportedCodePage(page))?,
-                        )
-                    },
-                }
-            },
-            ControlWord::Mac => {
-                state.encoding = RtfEncoding::Standard(Mbcs::MACINTOSH);
-            },
-            ControlWord::Pc => state.encoding = RtfEncoding::Cp437,
-            ControlWord::Pca => state.encoding = RtfEncoding::Cp850,
 
             // Table control words
             ControlWord::InTable => {

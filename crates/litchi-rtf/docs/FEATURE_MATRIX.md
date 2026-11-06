@@ -89,3 +89,14 @@ test or native Office gate was run when this matrix was added. The transport
 suite contains specification vectors and checked-in native-resave artifacts;
 those fixtures do not prove compatibility with every producer/version.
 No performance improvement is claimed by this documentation change.
+
+The native Word embedded-font derivative has 91 sparse font definitions and
+ten empty `fontemb` declarations. Its `ftruetype` spelling is accepted as an
+import alias; canonical writing emits `fttruetype`. Exact names, theme roles,
+absent payload/file fields and font metadata survive writer and body-run edits.
+Empty declarations are not font-extraction evidence. Source-run matching uses
+the parser's font-codepage/charset precedence and scoped document encoding,
+including multibyte escapes; physical CR/LF outside visible text stays intact.
+The public facade regression checks the native Aptos property and text edit
+without losing unrelated symbol text or font declarations. Registration,
+substitution, licensing and rendering remain outside this evidence.

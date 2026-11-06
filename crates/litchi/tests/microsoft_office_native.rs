@@ -496,3 +496,54 @@ fn native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_e
     assert!(child.to_bytes().unwrap() == payload);
     assert!(parent.to_bytes().unwrap() == before);
 }
+
+#[test]
+fn native_rtf_font_run_edit_preserves_charset_text_and_font_declarations() {
+    let source = native("word/word-embedded-fonts.rtf", FileFormat::Rtf);
+    let before = source.to_bytes().unwrap();
+    let original = litchi::rtf::Package::from_bytes(&before).unwrap();
+    assert_eq!(
+        source
+            .get("/body/p[1]/r[1]")
+            .unwrap()
+            .view()
+            .format()
+            .unwrap()
+            .find(|p| p.key() == "font")
+            .unwrap()
+            .value()
+            .to_string(),
+        "Aptos"
+    );
+    let commit = source
+        .edit(|edit| {
+            edit.set(
+                "/body/p[1]/r[1]",
+                litchi::props! {"text"=>"FONT_RUN_REVIEWED"},
+            )
+        })
+        .unwrap();
+    let after = commit.file().to_bytes().unwrap();
+    let reopened = litchi::open_bytes(after.clone()).unwrap();
+    assert_eq!(
+        reopened.text().unwrap(),
+        source
+            .text()
+            .unwrap()
+            .replacen("WORD_EMBEDDED_FONTS_011", "FONT_RUN_REVIEWED", 1)
+    );
+    let owner = litchi::rtf::Package::from_bytes(&after).unwrap();
+    assert_eq!(owner.raw().font_table(), original.raw().font_table());
+    assert_eq!(owner.raw().data_store(), original.raw().data_store());
+    assert!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            == before
+    );
+    assert!(source.to_bytes().unwrap() == before);
+}

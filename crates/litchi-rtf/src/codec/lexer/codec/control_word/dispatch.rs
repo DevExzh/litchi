@@ -975,7 +975,10 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
         "panose" => ControlWord::FontPanose,
         "fontemb" => ControlWord::FontEmbedded,
         "ftnil" => ControlWord::FontEmbeddedType("nil"),
-        "fttruetype" => ControlWord::FontEmbeddedType("truetype"),
+        // Word 16.110.2 also emits `ftruetype` inside native fontemb groups.
+        // Keep the writer's canonical spelling while retaining that format
+        // declaration on import, including groups without a payload.
+        "fttruetype" | "ftruetype" => ControlWord::FontEmbeddedType("truetype"),
         "fontfile" => ControlWord::FontFile,
         "filetbl" => ControlWord::FileTable,
         "file" => ControlWord::FileEntry,

@@ -438,3 +438,121 @@ fn native_run_text_removal_projects_opaque_anchors_through_terminal_empty_paragr
         source_bytes
     );
 }
+
+#[test]
+fn source_run_edits_decode_font_pages_and_restore_group_encoding() {
+    for (source, expected) in [
+        (
+            r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset0 Latin;}}\f0\'e9}",
+            "é",
+        ),
+        (
+            r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset161 Greek;}}\f0\'d9\'f0}",
+            "Ωπ",
+        ),
+        (
+            r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset161\cpg932 Japanese;}}\f0\'82\'a0}",
+            "あ",
+        ),
+        (
+            r"{\rtf1\ansi\ansicpg1251{\fonttbl{\f0\fnil\fcharset1 Default;}}\f0\'cf\'f0\'e8\'e2\'e5\'f2}",
+            "Привет",
+        ),
+        (r"{\rtf1\pc{\fonttbl{\f0\fnil Default;}}\f0\'82}", "é"),
+        (r"{\rtf1\pca{\fonttbl{\f0\fnil Default;}}\f0\'82}", "é"),
+        (r"{\rtf1\mac{\fonttbl{\f0\fnil Default;}}\f0\'8e}", "é"),
+    ] {
+        let package = Package::from_bytes(source.as_bytes()).unwrap();
+        assert_eq!(paragraph_text(&package, 0), expected);
+        let mut edit = package.edit();
+        edit.replace_body_run_texts(&[replacement(0, 0, "replaced")])
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let after = commit.package().to_bytes().unwrap();
+        let reopened = Package::from_bytes(&after).unwrap();
+        assert_eq!(paragraph_text(&reopened, 0), "replaced");
+        assert_eq!(reopened.raw().font_table(), package.raw().font_table());
+        assert!(
+            commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .package()
+                .to_bytes()
+                .unwrap()
+                == source.as_bytes()
+        );
+    }
+    let source = r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset1 Default;}}\f0{\b\ansicpg1251 \'cf}\'e9{\i\u937?}}";
+    let package = Package::from_bytes(source.as_bytes()).unwrap();
+    assert_eq!(paragraph_text(&package, 0), "ПéΩ");
+    let mut edit = package.edit();
+    edit.replace_body_run_texts(&[replacement(0, 1, "new")])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(paragraph_text(commit.package(), 0), "ПnewΩ");
+    let published = String::from_utf8(commit.package().to_bytes().unwrap()).unwrap();
+    assert!(published.contains(r"\ansicpg1251 \'cf"));
+    assert!(published.contains(r"\u937?"));
+    assert!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == source.as_bytes()
+    );
+}
+
+#[test]
+fn source_run_decoding_uses_the_same_byte_budget_as_the_parser() {
+    let escapes = r"\'a3".repeat(10_000);
+    let source = format!(r"{{\rtf1\ansi{{\fonttbl{{\f0\fcharset0 Arial;}}}}\f0{escapes}}}");
+    let package = Package::from_bytes(source.as_bytes()).unwrap();
+    assert_eq!(paragraph_text(&package, 0), "£".repeat(10_000));
+    let mut edit = package.edit();
+    edit.replace_body_run_texts(&[replacement(0, 0, "kept bounded")])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(paragraph_text(commit.package(), 0), "kept bounded");
+    assert!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == source.as_bytes()
+    );
+}
+
+#[test]
+fn source_run_replacement_retains_physical_line_breaks_at_text_edges() {
+    for newline in ["\r\n", "\n", "\r"] {
+        let source = format!("{{\\rtf1\\ansi\\b {newline}before{newline}\\par tail}}");
+        let package = Package::from_bytes(source.as_bytes()).unwrap();
+        let mut edit = package.edit();
+        edit.replace_body_run_texts(&[replacement(0, 0, "after")])
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let bytes = commit.package().to_bytes().unwrap();
+        let before = source.find("before").unwrap();
+        assert!(bytes.starts_with(&source.as_bytes()[..before]));
+        assert!(bytes.ends_with(&source.as_bytes()[before + "before".len()..]));
+        assert_eq!(paragraph_text(commit.package(), 0), "after");
+        assert_eq!(paragraph_text(commit.package(), 1), "tail");
+        assert!(
+            commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .package()
+                .to_bytes()
+                .unwrap()
+                == source.as_bytes()
+        );
+    }
+}

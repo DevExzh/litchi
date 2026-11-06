@@ -532,3 +532,107 @@ fn native_word_math_retains_inline_and_display_equation_trees() {
         expected
     );
 }
+
+#[test]
+fn native_font_declarations_keep_empty_payloads_and_sparse_theme_indices() {
+    use litchi_rtf::{EmbeddedFontFormat, FontTheme};
+    let package = native("word-embedded-fonts.rtf");
+    let table = package.raw().font_table();
+    assert_eq!(package.paragraph_count(), 5);
+    assert_eq!(
+        (0..table.fonts().len())
+            .filter(|index| table.is_defined(u16::try_from(*index).unwrap()))
+            .count(),
+        91
+    );
+    let expected = [
+        (0, "Times New Roman", None),
+        (42, "Aptos", None),
+        (31500, "Times New Roman", Some(FontTheme::MajorLatin)),
+        (31501, "Times New Roman", Some(FontTheme::MajorDoubleByte)),
+        (31502, "Aptos Display", Some(FontTheme::MajorHighAnsi)),
+        (31503, "Times New Roman", Some(FontTheme::MajorBidi)),
+        (31504, "Times New Roman", Some(FontTheme::MinorLatin)),
+        (31505, "Times New Roman", Some(FontTheme::MinorDoubleByte)),
+        (31506, "Aptos", Some(FontTheme::MinorHighAnsi)),
+        (31507, "Times New Roman", Some(FontTheme::MinorBidi)),
+    ];
+    assert_eq!(
+        table
+            .fonts()
+            .iter()
+            .filter(|f| f.embedded.is_some())
+            .count(),
+        10
+    );
+    for (index, name, theme) in expected {
+        let font = table.get(index).unwrap();
+        assert_eq!(font.name, name);
+        assert_eq!(font.theme, theme);
+        let embedded = font.embedded.as_ref().unwrap();
+        assert_eq!(embedded.format, EmbeddedFontFormat::TrueType);
+        assert_eq!(embedded.file_name, None);
+        assert_eq!(embedded.file_code_page, None);
+        assert_eq!(embedded.data, None);
+    }
+    assert_eq!(table.get(34).unwrap().name, "Cambria Math");
+    assert!(table.get(34).unwrap().embedded.is_none());
+    assert!(!table.is_defined(1));
+    assert!(table.get(1).is_none());
+    let written = serialize_model(&package);
+    assert_eq!(written.raw().font_table(), table);
+    assert_eq!(written.text(), package.text());
+    assert!(written.raw().data_store().unwrap().data.is_empty());
+    let mut edit = package.edit();
+    edit.replace_body_run_texts(&[RunTextReplacement::new(
+        Position::new(0),
+        Position::new(0),
+        "FONTS_KEPT",
+    )])
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.raw().font_table(), table);
+    assert_eq!(
+        reopened.text(),
+        package
+            .text()
+            .replacen("WORD_EMBEDDED_FONTS_011", "FONTS_KEPT", 1)
+    );
+    let source = package.to_bytes().unwrap();
+    let changed = commit.package().to_bytes().unwrap();
+    let marker = b"WORD_EMBEDDED_FONTS_011";
+    let at = source
+        .windows(marker.len())
+        .position(|w| w == marker)
+        .unwrap();
+    assert!(changed.starts_with(&source[..at]));
+    let common = source
+        .iter()
+        .rev()
+        .zip(changed.iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    assert!(
+        changed.ends_with(&source[at + marker.len()..]),
+        "source boundary {:?}, changed boundary {:?}",
+        String::from_utf8_lossy(
+            &source[source.len().saturating_sub(common + 40)
+                ..(source.len() - common + 40).min(source.len())]
+        ),
+        String::from_utf8_lossy(
+            &changed[changed.len().saturating_sub(common + 40)
+                ..(changed.len() - common + 40).min(changed.len())]
+        )
+    );
+    assert!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == source
+    );
+}

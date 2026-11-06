@@ -8671,7 +8671,8 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
     let mut run_offset = 0usize;
     let mut run_source_start = None;
     let mut unicode_skip = 1usize;
-    let mut unicode_skip_stack = Vec::new();
+    let mut encoding = crate::codec::parser::SourceTextEncoding::default();
+    let mut text_state_stack = Vec::new();
     let mut ignored_group_depth = 0usize;
     let mut text_offset = 0usize;
     let mut token_index = 0usize;
@@ -8700,15 +8701,15 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         let ignored_before = ignored_group_depth;
         match token {
             crate::lexer::Token::OpenBrace => {
-                unicode_skip_stack.push(unicode_skip);
+                text_state_stack.push((unicode_skip, encoding));
                 if ignored_before != 0 || ordinary_run_group_is_destination(&tokens, token_index) {
                     ignored_group_depth = ignored_group_depth.saturating_add(1);
                 }
             },
             crate::lexer::Token::CloseBrace => {
-                unicode_skip = unicode_skip_stack.pop().ok_or(Error::unsupported_source(
-                    "ordinary run source has an unmatched closing group",
-                ))?;
+                (unicode_skip, encoding) = text_state_stack.pop().ok_or(
+                    Error::unsupported_source("ordinary run source has an unmatched closing group"),
+                )?;
                 if ignored_before != 0 {
                     ignored_group_depth = ignored_group_depth.saturating_sub(1);
                 }
@@ -8734,14 +8735,38 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                             "ordinary run text suffix is not a character boundary",
                         ))?;
                 if !value.is_empty() {
-                    let start = absolute_span.start.checked_add(current_text_offset).ok_or(
-                        Error::InputTooLarge {
+                    // Plain text tokens may consume physical CR/LF without
+                    // returning them as visible text. Keep that trivia out
+                    // of the edited run range, including a native CRLF split
+                    // across successive lexical tokens.
+                    let raw = source_bytes.get(absolute_span.clone()).ok_or(
+                        Error::unsupported_source("ordinary text span is outside the source"),
+                    )?;
+                    let leading = raw
+                        .iter()
+                        .take_while(|byte| matches!(byte, b'\r' | b'\n'))
+                        .count();
+                    let trailing = raw
+                        .iter()
+                        .rev()
+                        .take_while(|byte| matches!(byte, b'\r' | b'\n'))
+                        .count();
+                    let start = absolute_span
+                        .start
+                        .checked_add(leading)
+                        .and_then(|start| start.checked_add(current_text_offset))
+                        .ok_or(Error::InputTooLarge {
                             observed: usize::MAX,
                             limit: source.limits().max_input_bytes(),
-                        },
-                    )?;
-                    visible_span = start..absolute_span.end;
-                    visible = Some(value.to_owned());
+                        })?;
+                    visible_span = start..absolute_span.end.saturating_sub(trailing);
+                    let font = paragraph_runs
+                        .get(paragraph)
+                        .and_then(|runs| runs.get(run))
+                        .and_then(|run| {
+                            source.model().font_table().get(run.format().raw().font_ref)
+                        });
+                    visible = Some(encoding.decode_source_run(value, font)?);
                 }
             },
             crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(_)) => {
@@ -8920,6 +8945,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 visible = Some("\t".to_owned());
             },
             crate::lexer::Token::Control(control) => {
+                encoding = encoding.with_control(control)?;
                 visible = run_control_symbol_text(control).map(str::to_owned);
                 if visible.is_none()
                     && matches!(
@@ -9022,7 +9048,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         && paragraph_runs
             .get(paragraph)
             .is_some_and(|selected| run == selected.len() && run_offset == 0);
-    if !unicode_skip_stack.is_empty()
+    if !text_state_stack.is_empty()
         || ignored_group_depth != 0
         || (paragraph != paragraphs.len() && !final_unterminated_paragraph)
         || paragraph_runs

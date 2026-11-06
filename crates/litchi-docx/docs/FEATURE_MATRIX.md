@@ -237,3 +237,13 @@ The machine-readable scope is `tools/native_office_tests.json`. Package
 preservation does not establish typed coverage of every embedded feature, and
 these Litchi round trips do not claim a fresh Microsoft Word reopen. Historical
 fixture statuses in `coverage.json` remain separate from test assertions.
+
+`tests/microsoft_office_native_fonts.rs` checks the full and save-subset native
+font specimens: three font-table names, six versus two faces, exact keys,
+obfuscated payload hashes and deobfuscated sfnt hashes. The global save-subset
+setting is distinct from absent per-face `subsetted` attributes; the two Aptos
+clear programs are identical in these files. Replacing one face under a new
+obfuscation key and removing unused Times New Roman faces preserves the
+remaining resources and unrelated body/settings/style parts, with save/reopen
+and exact inverse checks. No font installation, glyph coverage, subset-algorithm,
+licensing-policy or rendering conclusion follows from these tests.

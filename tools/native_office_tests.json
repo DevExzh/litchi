@@ -3339,6 +3339,126 @@
         "ppt",
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_fonts",
+      "name": "native_full_and_subset_font_variants_keep_exact_faces_keys_and_clear_payloads",
+      "fixtures": [
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx"
+      ],
+      "feature_rows": [
+        "docx-081"
+      ],
+      "assertions": [
+        "Full/subset-save variants expose exact three font names and six/two face styles, GUID keys, stored sizes/SHA-256 and deobfuscated sfnt SHA-256; original resource part bytes, absent per-face subsetted flags, distinct global save preference and exact font no-op/reopen are checked."
+      ],
+      "scope_limit": "The two retained Aptos clear programs are identical despite different save preferences/keys. No subset algorithm, glyph coverage, legal licensing decision, font registration or rendering is inferred."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_fonts",
+      "name": "native_font_replacement_reobfuscates_one_face_and_preserves_other_resources",
+      "fixtures": [
+        "word/word-embedded-fonts.docx"
+      ],
+      "feature_rows": [
+        "docx-081"
+      ],
+      "assertions": [
+        "Replace Aptos Regular with the same clear program under a fresh obfuscation key; save/reopen returns exact requested stored bytes and clear hash, preserves all other font payloads/body/settings/style parts, and inverses to source."
+      ],
+      "scope_limit": "Resource/key replacement only, not changing the font program or regenerating glyph subsets."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_fonts",
+      "name": "native_unused_font_removal_collects_only_its_three_embedded_faces",
+      "fixtures": [
+        "word/word-embedded-fonts.docx"
+      ],
+      "feature_rows": [
+        "docx-081"
+      ],
+      "assertions": [
+        "Remove unused Times New Roman entry and exactly its three font parts; retain Aptos/Aptos Display resources and every unrelated member, with exact inverse."
+      ],
+      "scope_limit": "Removing this unused font-table entry only; no font substitution or layout claim."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_binary_font_descriptions_resolve_exact_legacy_blocks",
+      "fixtures": [
+        "word/word-embedded-fonts.doc"
+      ],
+      "feature_rows": [
+        "doc-012",
+        "doc-060"
+      ],
+      "assertions": [
+        "Exact six SttbfFfn names, two SttbTtmbd offsets/font indices/bold/italic/subset-order fields, enabled DOP embedding flag and both source-bounded legacy block sizes/SHA-256."
+      ],
+      "scope_limit": "The legacy blocks stay opaque; their outer length and source identity are checked without interpreting them as sfnt programs or licensing data."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_binary_body_edit_preserves_embedded_font_descriptions_and_blocks",
+      "fixtures": [
+        "word/word-embedded-fonts.doc"
+      ],
+      "feature_rows": [
+        "doc-012",
+        "doc-060"
+      ],
+      "assertions": [
+        "Native title replacement reopens with unchanged font descriptions, embedding flag and exact two legacy block hashes; inverse/source bytes match."
+      ],
+      "scope_limit": "Body edit preservation only; legacy font-program authoring is not qualified."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_font_declarations_keep_empty_payloads_and_sparse_theme_indices",
+      "fixtures": [
+        "word/word-embedded-fonts.rtf"
+      ],
+      "feature_rows": [
+        "rtf-466",
+        "rtf-457"
+      ],
+      "assertions": [
+        "Five paragraphs and91 sparse font definitions, ten exact fontemb names/indices/theme roles with native TrueType alias and absent file/byte payloads; canonical writer and source title edit retain all font metadata and symbols, with exact inverse."
+      ],
+      "scope_limit": "Empty declarations are actual native data, not a successful font extraction claim. Canonical writing uses fttruetype; source text edits decode font charset/codepage before matching run spans."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_rtf_font_run_edit_preserves_charset_text_and_font_declarations",
+      "fixtures": [
+        "word/word-embedded-fonts.rtf"
+      ],
+      "feature_rows": [
+        "rtf-466",
+        "rtf-457"
+      ],
+      "assertions": [
+        "Public facade reads the exact Aptos font property, edits the native title run, reopens unchanged remaining text/font table/datastore and inverses to source bytes."
+      ],
+      "scope_limit": "Public ordinary run edit only; no font payloads exist in the RTF specimen.",
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "ppt",
+        "pptx"
+      ]
     }
   ]
 }

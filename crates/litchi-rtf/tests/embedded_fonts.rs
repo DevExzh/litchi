@@ -123,3 +123,35 @@ fn rejects_malformed_embedded_fonts() {
         );
     }
 }
+
+#[test]
+fn native_ftruetype_alias_preserves_format_and_duplicate_detection() {
+    for spelling in ["fttruetype", "ftruetype"] {
+        for payload in ["", "00010000"] {
+            let source = format!(
+                r"{{\rtf1{{\fonttbl{{\f0\fnil{{\*\fontemb\{spelling} {payload}}}Example;}}}}}}"
+            );
+            let doc = Tree::parse(&source, litchi_rtf::OpenOptions::default()).unwrap();
+            let embedded = doc.font_table().get(0).unwrap().embedded.as_ref().unwrap();
+            assert_eq!(embedded.format, EmbeddedFontFormat::TrueType);
+            assert_eq!(embedded.data.is_some(), !payload.is_empty());
+            let mut bytes = Vec::new();
+            Writer::new(&mut bytes).write_document(&doc).unwrap();
+            assert!(
+                std::str::from_utf8(&bytes)
+                    .unwrap()
+                    .contains(r"\fttruetype")
+            );
+            let reopened = Tree::parse_bytes(&bytes, litchi_rtf::OpenOptions::default()).unwrap();
+            assert_eq!(reopened.font_table(), doc.font_table());
+        }
+    }
+    for controls in [
+        r"\fttruetype\ftruetype",
+        r"\ftruetype\ftnil",
+        r"\ftruetype\ftruetype",
+    ] {
+        let source = format!(r"{{\rtf1{{\fonttbl{{\f0\fnil{{\*\fontemb{controls}}}Example;}}}}}}");
+        assert!(Tree::parse(&source, litchi_rtf::OpenOptions::default()).is_err());
+    }
+}

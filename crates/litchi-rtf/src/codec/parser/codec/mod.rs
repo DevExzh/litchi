@@ -65,7 +65,7 @@ fn disables_body_block_reservation(control: &ControlWord<'_>) -> bool {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum RtfEncoding {
+pub(crate) enum RtfEncoding {
     Standard(Mbcs),
     Cp437,
     Cp850,
@@ -210,6 +210,70 @@ fn required_paragraph_indent(raw_value: Option<i32>, name: &str) -> Result<i32, 
 }
 
 impl RtfEncoding {
+    /// Apply document/group encoding controls with the same domain checks
+    /// used while parsing. Source-run proofs need this state too.
+    pub(crate) fn with_control(self, control: &ControlWord<'_>) -> crate::Result<Self> {
+        Ok(match control {
+            ControlWord::Ansi => Self::Standard(Mbcs::WINDOWS_1252),
+            ControlWord::AnsiCodePage(437) | ControlWord::Pc => Self::Cp437,
+            ControlWord::AnsiCodePage(850) | ControlWord::Pca => Self::Cp850,
+            ControlWord::AnsiCodePage(cp) => {
+                let page = u32::try_from(*cp).map_err(|_| {
+                    crate::Error::MalformedDocument(format!("invalid RTF ANSI code page {cp}"))
+                })?;
+                Self::Standard(Mbcs::new(page).ok_or(crate::Error::UnsupportedCodePage(page))?)
+            },
+            ControlWord::Mac => Self::Standard(Mbcs::MACINTOSH),
+            _ => self,
+        })
+    }
+
+    /// Decode an ordinary lexer token under its semantic run's font, retaining
+    /// the parser's exact charset precedence and finite transport budget.
+    pub(crate) fn decode_source_run(
+        self,
+        text: &str,
+        font: Option<&Font<'_>>,
+    ) -> crate::Result<String> {
+        let encoding = font
+            .and_then(|font| {
+                font.code_page
+                    .or_else(|| font.charset.and_then(FontCharset::page))
+            })
+            .map_or(self, Self::from_font_page);
+        if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(crate::Error::LimitExceeded {
+                resource: "RTF source-run text",
+                observed: text.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        let mut bytes = SmallVec::<[u8; 64]>::new();
+        bytes
+            .try_reserve_exact(text.len())
+            .map_err(|_| crate::Error::AllocationFailed {
+                resource: "RTF source-run text",
+                requested: text.len(),
+            })?;
+        append_transport_bytes(&mut bytes, text)?;
+        // Transport chars above ASCII occupy two UTF-8 bytes but represent
+        // one input byte. Use that byte count, as the parser does.
+        let worst_case = if bytes.is_ascii() {
+            bytes.len()
+        } else {
+            bytes.len().saturating_mul(4)
+        };
+        if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(crate::Error::LimitExceeded {
+                resource: "RTF decoded source-run text",
+                observed: worst_case,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        Ok(encoding
+            .decode_strict(&bytes, "source-run text")?
+            .into_owned())
+    }
     fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
         match self {
             Self::Standard(page) => page.decode_lossy(bytes),
@@ -234,6 +298,12 @@ impl RtfEncoding {
             FontPage::Cp437 => Self::Cp437,
             FontPage::Cp850 => Self::Cp850,
         }
+    }
+}
+
+impl Default for RtfEncoding {
+    fn default() -> Self {
+        Self::Standard(Mbcs::WINDOWS_1252)
     }
 }
 

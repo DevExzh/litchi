@@ -224,3 +224,10 @@ paragraph counts include secondary stories and table marks; they are distinct
 from the ordinary body paragraph view. No-op preservation and macro-stream
 retention do not establish typed coverage of every embedded feature. These
 tests do not claim a fresh Word reopen, macro execution or external refresh.
+
+The native font specimen additionally checks six font-table names, two exact
+`SttbTtmbd` descriptions, the DOP embedding flag and the sizes/hashes of the
+Cambria Math and Aptos blocks at the recorded `WordDocument` offsets. A body
+edit retains both descriptions and block bytes through reopen and inverse.
+The legacy programs remain opaque; these assertions do not interpret them as
+OOXML sfnt resources, install fonts or qualify legacy font-program authoring.
