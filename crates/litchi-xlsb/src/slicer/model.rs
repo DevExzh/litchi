@@ -202,6 +202,9 @@ pub struct PivotTable {
 /// A BIFF12 slicer cache definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cache {
+    /// Native alternate-content identity block preceding the definition.
+    /// Retained verbatim through metadata edits; empty for new caches.
+    pub alternate_content: Vec<u8>,
     /// Unique cache name.
     pub name: String,
     /// Cache field or MDX hierarchy name.
@@ -219,6 +222,7 @@ impl Cache {
         Self {
             name: name.into(),
             hierarchy: hierarchy.into(),
+            alternate_content: Vec::new(),
             pivot_tables: Vec::new(),
             source: Source::Native(source),
         }
@@ -230,6 +234,7 @@ impl Cache {
         Self {
             name: name.into(),
             hierarchy: hierarchy.into(),
+            alternate_content: Vec::new(),
             pivot_tables: Vec::new(),
             source: Source::Table(source),
         }
@@ -245,6 +250,7 @@ impl Cache {
         Self {
             name: name.into(),
             hierarchy: hierarchy.into(),
+            alternate_content: Vec::new(),
             pivot_tables: Vec::new(),
             source: Source::Olap(Olap { pivot_cache_id }),
         }

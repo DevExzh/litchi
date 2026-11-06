@@ -1,7 +1,129 @@
 //! Public operation contracts on native Microsoft Office specimens.
-#![cfg(any(feature = "doc", feature = "docx", feature = "pptx", feature = "xlsx"))]
+#![cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "xlsb"
+))]
 
 use litchi_ops::{OpenOptions, SourceMode, props};
+
+#[cfg(feature = "xlsb")]
+#[test]
+fn native_xlsb_formula_queries_and_scalar_crud_keep_stored_caches_on_both_owners() {
+    let bytes =
+        include_bytes!("../../../test-data/microsoft-office/excel/excel-formula-owners.xlsb");
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap();
+        let nodes = source
+            .query("cell[value=206]")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].path().to_string(), "/sheet[1]/D103");
+        assert_eq!(
+            source
+                .get("Sheet1!D103")
+                .unwrap()
+                .view()
+                .format()
+                .unwrap()
+                .find(|p| p.key() == "formula")
+                .unwrap()
+                .to_string(),
+            "(ROW()*2)"
+        );
+        let committed = source
+            .edit(|edit| {
+                edit.set("Sheet1!Z100", props! {"value"=>42})?;
+                edit.set("Sheet2!Z100", props! {"value"=>"=inert native text"})
+            })
+            .unwrap_or_else(|error| {
+                let mut detail = error.to_string();
+                let mut cause = std::error::Error::source(&error);
+                while let Some(value) = cause {
+                    detail.push_str(&format!("; {value}"));
+                    cause = value.source();
+                }
+                panic!("native XLSB {mode:?} edit failed: {detail}")
+            });
+        let after = committed.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(after, &options).unwrap();
+        for (path, expected) in [
+            ("Sheet1!Z100", "42"),
+            ("Sheet2!Z100", "=inert native text"),
+            ("Sheet1!D103", "206"),
+            ("Sheet2!F4", "50"),
+        ] {
+            assert_eq!(
+                reopened
+                    .get(path)
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some(expected)
+            );
+        }
+        let updated = reopened
+            .edit(|edit| edit.set("Sheet1!Z100", props! {"value"=>43}))
+            .unwrap();
+        assert_eq!(
+            updated
+                .file()
+                .get("Sheet1!Z100")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("43")
+        );
+        let removed = updated
+            .file()
+            .edit(|edit| edit.remove("Sheet1!Z100"))
+            .unwrap();
+        assert_eq!(
+            removed
+                .file()
+                .get("Sheet1!Z100")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("(empty)")
+        );
+        let removed_bytes = removed.file().to_bytes().unwrap();
+        let owner = litchi_xlsb::Package::from_bytes(&removed_bytes).unwrap();
+        assert!(
+            owner
+                .workbook()
+                .unwrap()
+                .grid(0_usize)
+                .unwrap()
+                .unwrap()
+                .worksheet()
+                .get_cell(99, 25)
+                .is_none()
+        );
+        assert!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == bytes
+        );
+        assert!(source.to_bytes().unwrap() == bytes);
+    }
+}
 
 #[cfg(feature = "pptx")]
 #[test]

@@ -2,7 +2,8 @@
 //!
 //! A binary index is only a directory of offsets.  The worksheet stream is
 //! authoritative: [`BinaryIndex::bind`] checks every indexed offset
-//! against actual row and cell record boundaries before exposing a lookup.
+//! against actual row/cell boundaries or a validated cell-metadata prefix
+//! before exposing a lookup at the actual cell record.
 //! This keeps a corrupt or stale index from turning an arbitrary payload byte
 //! into a cell value.
 
@@ -204,7 +205,8 @@ pub struct ColumnBlock {
     pub row: u32,
     /// Zero-based 1024-column block covered by this anchor.
     pub column_block: u8,
-    /// Absolute worksheet-part offset of the first cell in the block.
+    /// Absolute worksheet-part offset of the first cell in the block, or
+    /// its contiguous cell/value metadata prefix in native Excel indexes.
     pub offset: u64,
 }
 
@@ -215,7 +217,7 @@ pub struct RowBlock {
     pub row_mask: u32,
     /// Absolute worksheet-part offset of the first indexed cell.
     pub base_offset: u64,
-    /// First-cell anchors in row-major order.
+    /// First-cell (or native metadata-prefix) anchors in row-major order.
     pub columns: Vec<ColumnBlock>,
 }
 
@@ -424,6 +426,9 @@ pub struct WorksheetBinaryIndex {
 #[derive(Debug)]
 struct WorksheetScan {
     anchors: Vec<CellOffset>,
+    // Native Excel can index the first metadata record immediately before a
+    // bucket's first cell. Lookups still expose the actual cell boundary.
+    prefixed_anchors: Vec<CellOffset>,
     row_headers: Vec<u32>,
 }
 
@@ -596,7 +601,10 @@ pub(crate) fn maintain_index(
         };
     };
 
-    if before_geometry == after_geometry && row_headers_unchanged {
+    if before_geometry == after_geometry
+        && geometry(&before_scan.prefixed_anchors) == geometry(&after_scan.prefixed_anchors)
+        && row_headers_unchanged
+    {
         // The same source anchors remain valid even when a value or record
         // kind changed in place. Preserve the complete index byte-for-byte
         // without interpreting extension records that are irrelevant to the
@@ -646,6 +654,7 @@ fn bind_anchors(
     verify_offsets: bool,
 ) -> Result<WorksheetBinaryIndex> {
     let actual = geometry(&scan.anchors);
+    let prefixed = geometry(&scan.prefixed_anchors);
     let mut indexed = BTreeSet::new();
     let mut indexed_rows = BTreeSet::new();
     let mut expected_offsets = BTreeMap::new();
@@ -721,7 +730,7 @@ fn bind_anchors(
 
     if verify_offsets {
         for (key, offset) in &expected_offsets {
-            if actual.get(key) != Some(offset) {
+            if actual.get(key) != Some(offset) && prefixed.get(key) != Some(offset) {
                 return Err(invalid(
                     "index offset is not an exact first-cell record boundary",
                 ));
@@ -912,12 +921,15 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
         ));
     }
     let mut buckets = Vec::new();
+    let mut prefixed_buckets = Vec::new();
     let mut row_headers = Vec::new();
     let mut in_sheet_data = false;
     let mut seen_sheet_data = false;
     let mut current_row = None;
     let mut previous_row = None;
     let mut previous_column = None;
+    let mut metadata_start = None;
+    let mut metadata_flags = 0_u8;
     let mut cell_count = 0usize;
     let mut record_count = 0usize;
     for record_result in raw::Records::bounded(worksheet, limits.raw)? {
@@ -931,6 +943,12 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
                 record_count,
                 limits.max_records,
             ));
+        }
+        if !is_cell_kind(record.kind())
+            && !matches!(record.kind(), kind::CELL_META | kind::VALUE_META)
+        {
+            metadata_start = None;
+            metadata_flags = 0;
         }
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
@@ -972,6 +990,28 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
                     .map_err(|source| allocation("worksheet index row headers", source))?;
                 row_headers.push(row);
             },
+            kind::CELL_META | kind::VALUE_META if in_sheet_data => {
+                if current_row.is_none() || record.payload().len() != 4 {
+                    return Err(invalid("indexed cell metadata has invalid framing"));
+                }
+                let bit = if record.kind() == kind::CELL_META {
+                    1
+                } else {
+                    2
+                };
+                if metadata_flags & bit != 0 || (bit == 1 && metadata_flags != 0) {
+                    return Err(invalid(
+                        "indexed cell metadata is duplicated or out of order",
+                    ));
+                }
+                metadata_flags |= bit;
+                if metadata_start.is_none() {
+                    metadata_start = Some(
+                        u64::try_from(record.offset())
+                            .map_err(|_error| invalid("worksheet metadata offset overflows"))?,
+                    );
+                }
+            },
             cell_kind if in_sheet_data && is_cell_kind(cell_kind) => {
                 let row = current_row.ok_or_else(|| invalid("cell record has no row header"))?;
                 if record.payload().len() < 8 {
@@ -1011,7 +1051,16 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
                         .try_reserve(1)
                         .map_err(|source| allocation("worksheet index buckets", source))?;
                     buckets.push(anchor);
+                    prefixed_buckets
+                        .try_reserve(1)
+                        .map_err(|source| allocation("worksheet index metadata anchors", source))?;
+                    prefixed_buckets.push(CellOffset {
+                        offset: metadata_start.unwrap_or(anchor.offset),
+                        ..anchor
+                    });
                 }
+                metadata_start = None;
+                metadata_flags = 0;
             },
             _ => {},
         }
@@ -1021,6 +1070,7 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
     }
     Ok(WorksheetScan {
         anchors: buckets,
+        prefixed_anchors: prefixed_buckets,
         row_headers,
     })
 }
@@ -1806,6 +1856,72 @@ mod tests {
         assert_eq!(read_u32(first.payload(), 4).expect("row end"), 4);
         WorksheetBinaryIndex::from_parts(&maintained, &shifted, Limits::DEFAULT)
             .expect("patched native partition binds");
+    }
+
+    #[test]
+    fn metadata_prefixes_bind_exactly_and_prefix_only_changes_rewrite_the_index() {
+        let base = worksheet_with_cells(&[(0, 0)]);
+        let mut before = Vec::new();
+        let mut writer = raw::Encoder::new(&mut before, raw::Limits::DEFAULT);
+        for record in raw::Records::new(&base, raw::Limits::DEFAULT) {
+            let record = record.expect("record");
+            if is_cell_kind(record.kind()) {
+                writer
+                    .write_record(kind::CELL_META, &1_u32.to_le_bytes())
+                    .expect("metadata");
+                writer
+                    .write_record(kind::VALUE_META, &2_u32.to_le_bytes())
+                    .expect("value metadata");
+            }
+            writer
+                .write_record(record.kind(), record.payload())
+                .expect("copy");
+        }
+        let scan = scan_worksheet(&before, Limits::DEFAULT).expect("metadata scan");
+        let metadata_offset = scan.prefixed_anchors[0].offset;
+        let cell_offset = scan.anchors[0].offset;
+        assert_eq!(cell_offset - metadata_offset, 12);
+        let mut prefix_scan = scan;
+        prefix_scan.anchors = prefix_scan.prefixed_anchors.clone();
+        let original = encode_anchors(&prefix_scan, Limits::DEFAULT).expect("native-style index");
+        let bound = WorksheetBinaryIndex::from_parts(&original, &before, Limits::DEFAULT)
+            .expect("bind metadata");
+        assert_eq!(
+            bound
+                .start_offset(0, 0)
+                .expect("lookup")
+                .expect("cell")
+                .offset,
+            cell_offset
+        );
+
+        // Retain cell offsets but replace both metadata records with opaque
+        // records. The source metadata offsets are no longer valid anchors.
+        let mut after = Vec::new();
+        let mut writer = raw::Encoder::new(&mut after, raw::Limits::DEFAULT);
+        for record in raw::Records::new(&before, raw::Limits::DEFAULT) {
+            let record = record.expect("record");
+            let kind = if matches!(record.kind(), kind::CELL_META | kind::VALUE_META) {
+                raw::Kind::new(0x33).expect("opaque kind")
+            } else {
+                record.kind()
+            };
+            writer.write_record(kind, record.payload()).expect("copy");
+        }
+        assert_eq!(before.len(), after.len());
+        assert!(WorksheetBinaryIndex::from_parts(&original, &after, Limits::DEFAULT).is_err());
+        let maintained = maintain_index(Some(&original), &before, &after, Limits::DEFAULT)
+            .expect("maintain")
+            .expect("index");
+        assert_ne!(maintained, original);
+        WorksheetBinaryIndex::from_parts(&maintained, &after, Limits::DEFAULT)
+            .expect("rewritten index");
+
+        let mut duplicate = before.clone();
+        // A repeated CellMeta in the two-record prefix must not be accepted.
+        duplicate[usize::try_from(metadata_offset).expect("offset") + 6] =
+            u8::try_from(kind::CELL_META.get()).expect("one-byte record kind");
+        assert!(WorksheetBinaryIndex::from_parts(&original, &duplicate, Limits::DEFAULT).is_err());
     }
 
     #[test]

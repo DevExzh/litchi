@@ -2212,6 +2212,202 @@
         "Cache reordering finds the native mixed-case extension GUID, changes the workbook integration order, preserves other members and inverts exactly after reopen."
       ],
       "scope_limit": "Two existing cache references only; not a general refresh or pivot calculation claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_slicer_caches_keep_identity_bindings_and_selected_items",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-317"
+      ],
+      "assertions": [
+        "Two native caches: exact names, fields, internal cache ID, PivotTable bindings, sort/cross-filter flags and selected-item indices. Native identity blocks and complete cache bytes round-trip exactly."
+      ],
+      "scope_limit": "Inert cache metadata; no filter application, rendering or refresh."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_slicer_caption_edit_preserves_caches_identities_and_other_members",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-317",
+        "xlsb-335"
+      ],
+      "assertions": [
+        "Caption edit and typed readback on the worksheet after a chart tab; every unrelated member and retained view/cache identity is preserved; inverse after reopen restores all member bytes."
+      ],
+      "scope_limit": "One view caption operation, not active slicer filtering."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_pivot_cache_records_tables_and_view_bindings_keep_saved_values",
+      "fixtures": [
+        "excel/excel-visual-analytics.xlsb",
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-303",
+        "xlsb-314",
+        "xlsb-315"
+      ],
+      "assertions": [
+        "All eight decoded PivotCache source rows, including direct/shared date encodings, six field identities, cache/view bindings, source table captions/range/header and stored 175.5/9.5 totals."
+      ],
+      "scope_limit": "Pivot view identity/binding and stored data only; no full view-layout or aggregation execution claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_notes_read_and_edit_keep_other_note_vml_and_package_payloads",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-297"
+      ],
+      "assertions": [
+        "Two exact note texts/authors/runs on eager and source owners; text replacement resets only the changed note to the default font, preserving the other note, VML and every unrelated member; exact inverse."
+      ],
+      "scope_limit": "Classic notes; no threaded-comment or Office display claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_1904_layout_and_page_break_edit_preserve_serials_and_other_parts",
+      "fixtures": [
+        "excel/excel-date1904-breaks.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-280",
+        "xlsb-293",
+        "xlsb-304"
+      ],
+      "assertions": [
+        "1904 date flag and six exact stored serials, hidden rows/column and widths; exact row/column breaks, add/readback/inverse and all unrelated worksheet records and parts preserved."
+      ],
+      "scope_limit": "Print coverage is page-break metadata only. Worksheet page setup, margins and header/footer lack typed readers; chart-sheet print support is separate."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_array_shared_and_dynamic_groups_keep_ranges_tokens_and_all_caches",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-283",
+        "xlsb-282",
+        "xlsb-306"
+      ],
+      "assertions": [
+        "Five exact grouped ranges and wire payload round-trips; CSE text/range and four caches, all 100 copied/shared formulas, eleven dynamic/LET caches with explicit opaque Unsupported status and retained group token/ancillary data, twenty what-if outputs."
+      ],
+      "scope_limit": "Dynamic expressions remain opaque rather than evaluated/rendered. What-if results are stored scalars; data-table execution is not implemented."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_scenarios_retain_inputs_and_metadata_edits_do_not_apply_them",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-306"
+      ],
+      "assertions": [
+        "Two named scenarios with exact comments/input cells/values and locked/hidden/current/shown state; reversible comment edit preserves all non-scenario records, other parts and the original input/model cell values."
+      ],
+      "scope_limit": "Scenario metadata edits do not apply scenarios or recalculate cells."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_slicer_cache_identity_refuses_malformed_envelopes_and_limits",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-317"
+      ],
+      "assertions": [
+        "Derived native cache streams reject inconsistent product counts, short or duplicate UIDs, missing/nonempty ends, wrong record kinds and repeated blocks; writer and raw payload limits also refuse."
+      ],
+      "scope_limit": "Malformed derivatives are created only in memory; native bytes are immutable."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_slicer_cache_metadata_edit_keeps_parts_relationships_and_inverse",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-317",
+        "xlsb-335"
+      ],
+      "assertions": [
+        "Native sort-order metadata update preserves cache part names, relationship IDs, UIDs and every unrelated part; typed readback and inverse are exact."
+      ],
+      "scope_limit": "Sort metadata is stored only; no PivotCache computation or UI application."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_slicer_cache_reorder_and_add_remove_handle_sparse_relationship_ids",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-317",
+        "xlsb-335"
+      ],
+      "assertions": [
+        "Cache reordering changes only workbook integration bytes; add/remove handles occupied numeric relationship IDs without looping, and typed cache collections and inverse bytes are exact."
+      ],
+      "scope_limit": "New cache is inert and receives no copied native UID; no refresh or filter behavior claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_binary_index_binds_metadata_prefix_to_actual_formula_cell_only",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-277"
+      ],
+      "assertions": [
+        "The native 358-byte metadata anchor resolves to the actual 364-byte A4 formula; indexed cache reads return exact values. Interior, preceding, later-cell and foreign-record offsets are rejected."
+      ],
+      "scope_limit": "Only validated contiguous CellMeta/ValueMeta prefixes are recognized; arbitrary offsets and stale indexes are not accepted."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_xlsb_formula_queries_and_scalar_crud_keep_stored_caches_on_both_owners",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-277",
+        "xlsb-280",
+        "xlsb-282",
+        "xlsb-295"
+      ],
+      "assertions": [
+        "Auto/Eager routes query D103=206 and formula text, create/update/remove cells on both sheets, retain stored formula caches and inert formula-looking text, and invert to exact source bytes."
+      ],
+      "scope_limit": "Public query/scalar CRUD only; no evaluation, dynamic formula compilation or native Excel reopen.",
+      "required_features": [
+        "xlsb"
+      ]
     }
   ]
 }

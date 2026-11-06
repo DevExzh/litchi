@@ -451,7 +451,7 @@ pub(crate) fn store_caches(
 ) -> Result<()> {
     validate_cache_set(caches)?;
     crate::signature_policy::ensure_unsigned(package)?;
-    let _ = load_caches(package, workbook, limits)?;
+    let existing = load_caches(package, workbook, limits)?;
     let old_refs = load_cache_refs(package, workbook)?;
     let old_block = record_span(
         package.get_part(workbook)?.blob(),
@@ -459,8 +459,59 @@ pub(crate) fn store_caches(
         kind::END_SLICER_CACHE_IDS,
     )?;
     let mut workbook_blob = package.get_part(workbook)?.blob().to_vec();
+    // Metadata updates and reorderings keep the source graph identities.
+    // Recreating these parts needlessly changes relationships/content types
+    // and can collide with the sparse relationship IDs in native workbooks.
+    if !caches.is_empty()
+        && existing.len() == caches.len()
+        && caches.iter().all(|cache| {
+            existing
+                .iter()
+                .any(|old| old.cache.name.eq_ignore_ascii_case(&cache.name))
+        })
+    {
+        let targets = existing
+            .iter()
+            .map(|part| Ok((part.relationship_id.clone(), PackURI::new(&part.part_name)?)))
+            .collect::<Result<Vec<_>>>()?;
+        crate::package::owner_transaction::require_exclusive_inbound(
+            package,
+            workbook,
+            &targets,
+            "slicer cache",
+        )?;
+        let mut refs = Vec::with_capacity(caches.len());
+        for cache in caches {
+            let old = existing
+                .iter()
+                .find(|old| old.cache.name.eq_ignore_ascii_case(&cache.name))
+                .ok_or_else(|| invalid("slicer cache", "missing retained owner"))?;
+            refs.push(old.relationship_id.clone());
+            if old.cache != *cache {
+                package
+                    .get_part_mut(&PackURI::new(&old.part_name)?)?
+                    .set_blob(write_cache(cache, limits)?);
+            }
+        }
+        if refs != old_refs {
+            let replacement = write_collection_refs(
+                &refs,
+                kind::BEGIN_SLICER_CACHE_IDS,
+                kind::END_SLICER_CACHE_IDS,
+                kind::BEGIN_SLICER_CACHE_ID,
+                kind::END_SLICER_CACHE_ID,
+            )?;
+            workbook_blob = rewrite_block(
+                &workbook_blob,
+                old_block,
+                Some(&replacement),
+                kind::END_BOOK,
+            )?;
+            package.get_part_mut(workbook)?.set_blob(workbook_blob);
+        }
+        return Ok(());
+    }
     remove_cache_parts(package, workbook)?;
-    let _ = old_refs;
     if caches.is_empty() {
         workbook_blob = rewrite_block(&workbook_blob, old_block, None, kind::END_BOOK)?;
         package.get_part_mut(workbook)?.set_blob(workbook_blob);
@@ -476,12 +527,13 @@ pub(crate) fn store_caches(
         .collect();
     for cache in caches {
         let uri = next_part(package, "xl/slicerCaches", "slicerCache", "bin")?;
-        let relationship_id = loop {
-            let candidate = format!("rId{}", used_relationship_ids.len() + 1);
-            if used_relationship_ids.insert(candidate.clone()) {
-                break candidate;
-            }
-        };
+        // Among n+1 positive numeric IDs at least one is absent from a set
+        // containing n IDs, even when the existing IDs are sparse.
+        let relationship_id = (1..=used_relationship_ids.len() + 1)
+            .map(|index| format!("rId{index}"))
+            .find(|candidate| !used_relationship_ids.contains(candidate))
+            .ok_or_else(|| invalid("slicer cache relationships", "no free relationship ID"))?;
+        used_relationship_ids.insert(relationship_id.clone());
         let bytes = write_cache(cache, limits)?;
         package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),

@@ -208,6 +208,16 @@ pub fn parse_cache(data: &[u8], limits: crate::raw::Limits) -> Result<Cache> {
     }
     empty(begin, "BrtBeginSlicerCache")?;
     index += 1;
+    let mut alternate_content = Vec::new();
+    if records
+        .get(index)
+        .is_some_and(|record| record.kind() == kind::AC_BEGIN)
+    {
+        let start = records[index].offset();
+        index = cache_identity_end(&records, index)?;
+        let end = records.get(index).map_or(data.len(), Record::offset);
+        alternate_content.extend_from_slice(&data[start..end]);
+    }
     let definition = records
         .get(index)
         .ok_or(Error::UnexpectedEndOfStream("BrtBeginSlicerCacheDef"))?;
@@ -291,6 +301,7 @@ pub fn parse_cache(data: &[u8], limits: crate::raw::Limits) -> Result<Cache> {
         ));
     }
     let cache = Cache {
+        alternate_content,
         name,
         hierarchy,
         pivot_tables: pivot,
@@ -313,6 +324,16 @@ fn write_cache_inner(
     validate_cache(cache)?;
     let mut writer = Encoder::new(output, limits);
     writer.write_record(kind::BEGIN_SLICER_CACHE, &[])?;
+    if !cache.alternate_content.is_empty() {
+        let records = parse_all(&cache.alternate_content, limits)?;
+        if cache_identity_end(&records, 0)? != records.len() {
+            return Err(invalid(
+                "slicer cache identity",
+                "records follow the identity block",
+            ));
+        }
+        writer.write_encoded_records(&cache.alternate_content)?;
+    }
     let mut definition = Vec::new();
     write_wide(&mut definition, &cache.name, limits)?;
     write_wide(&mut definition, &cache.hierarchy, limits)?;
@@ -529,6 +550,22 @@ pub fn write_views(views: &Views, limits: crate::raw::Limits) -> Result<Vec<u8>>
         return Err(invalid("slicer views", "part exceeds byte limit"));
     }
     Ok(output)
+}
+
+fn cache_identity_end(records: &[Record<'_>], start: usize) -> Result<usize> {
+    let end = alternate_end(records, start)?;
+    // Native Excel emits the 16-byte UID as kind 0x0c00. The cache's ACUID
+    // slot holds exactly that record, not an arbitrary alternate collection.
+    if end != start + 3
+        || records[start + 1].kind().get() != 0x0c00
+        || records[start + 1].payload().len() != 16
+    {
+        return Err(invalid(
+            "slicer cache identity",
+            "expected one native UID record",
+        ));
+    }
+    Ok(end)
 }
 
 fn alternate_end(records: &[Record<'_>], start: usize) -> Result<usize> {

@@ -68,7 +68,7 @@ The deferred cell-value selector API is `Result<Edit>`; callers use
 | Sparklines | ✅ | ✅ | ✅ | `sparkline::{Snapshot, Edit, Commit}` strictly parses and emits the Worksheet ABNF (§2.1.7.62) block formed by `BrtBeginSparklineGroup` (§2.4.228), `BrtBeginSparklineGroups`/`BrtBeginSparklines` (§2.4.229-230), their end records (§2.4.581-583), and `BrtSparkline` (§2.4.806). Native FRT envelopes and AC identity prefixes before or inside each group survive edits; new worksheet blocks include the FRT envelope. The shared `SparklineType`, `AxisType`, and `EmptyCells` enums are owned by `litchi-sheet`; XLSB owns the bounded BIFF12 model and formula-shape checks. A source-bound `Commit` carries an exact before-image guarded patch, but its raw patch is deliberately not public or nameable: publish it atomically only through `Workbook::apply_sparklines`. `Workbook::{sparklines, edit_sparklines, apply_sparklines}` contextually validates names/XTI indexes only against already-loaded, bounded workbook metadata; it never follows targets. `Worksheet` exposes parsed groups and atomically replaces or clears authored groups, and the new-workbook writer emits supported groups after final context validation. Source `PtgNameX` groups are preserved inertly, but a new writer refuses them because it cannot author the required external-workbook `BrtExternSheet` entry. `Limits` bounds the complete worksheet source ingress (512 MiB by default), groups, per-group and aggregate items, formula token/ancillary bytes, record bytes, and total block bytes; zero bounds are rejected and the block bound cannot exceed the worksheet-source bound. There is no formula evaluation, external-name resolution, target fetch, DDE/OLE activation, macro/control execution, or rendering. |
 | AutoFilter, filter criteria, and sort state | 🟡 | ✅ | 🟡 | Worksheet AutoFilter and criteria metadata are modeled; the complete Excel filter UI and every producer extension are not a semantic engine. |
 | Structured tables | ✅ | ✅ | ✅ | List/table identity, ranges, columns, header/totals metadata, style IDs, typed totals functions, inert calculated-column formulas, and worksheet wiring are serialized. Resident and external structured-reference formula transfers remap XTI and table IDs by resolved table/column semantics, refusing missing or ambiguous targets. |
-| Page setup and print metadata | 🟡 | ✅ | 🟡 | Supported worksheet and chart-sheet page setup, margins, paper, scale/fit, orientation, print flags, and relationships are bounded; printer-driver/rendering behavior is not implemented. |
+| Page setup and print metadata | 🟡 | 🟡 | 🟡 | Worksheet manual row/column page breaks have typed reads and source-preserving edits. Chart-sheet page setup, margins, paper, orientation, print flags, and printer relationships have bounded typed support. Worksheet page setup, margins, print flags and header/footer records are retained as package bytes but currently lack typed readers and editors; preservation does not establish semantic support. Printer-driver/rendering behavior is not implemented. |
 | Sheet protection | 🟡 | ✅ | 🟡 | Worksheet and chart-sheet protection flags and the supported strong-protection metadata are typed. Protection is not a cryptographic authorization boundary. |
 | Scenarios and what-if analysis | 🟡 | ✅ | ✅ | `litchi_xlsb::scenarios` exposes bounded `BrtBeginScenMan`/`BrtBeginSct`/`BrtSlc` snapshots and source-checked worksheet replacement. Known metadata is typed; unknown records and source order are retained, unsafe or ambiguous edits are refused, and scenario values are never substituted or recalculated. |
 | Cell watches and phonetic metadata | ✅ | ✅ | ✅ | `[MS-XLSB]` 2.4.21, 2.4.331, 2.4.378, and 2.4.744 are exposed as typed worksheet cell-watch collections and worksheet-wide phonetic defaults with bounded, source-checked edits; watch-window monitoring, phonetic rendering, and language conversion are not performed. |
@@ -86,7 +86,7 @@ The deferred cell-value selector API is `Result<Edit>`; callers use
 | Pivot caches | ✅ | ✅ | ✅ | Typed inert PivotCache definitions cover refresh metadata, worksheet/consolidation sources, all shared-item value kinds, range/discrete grouping, OLAP hierarchies and tuple caches, calculated items/members with inert formula tokens, and supported Excel extensions. |
 | PivotTable views | ✅ | ✅ | ✅ | Pivot views, fields, items, layouts, data fields, filters, and workbook cache-ID wiring are read and serialized with lossless-or-refuse validation. No pivot refresh or calculation is performed. |
 | Pivot charts | 🟡 | ✅ | 🟡 | Pivot-chart resources and relationships are recognized through the chart package model; chart rendering and full pivot-chart authoring are bounded. |
-| Slicers and slicer caches | 🟡 | ✅ | ✅ | `slicer::{Edit, Commit, Patch}` provides bounded, source-checked inert cache/view CRUD over native/table BIFF12 definitions and workbook/sheet relationship wiring. Commits validate cache-name dependency closure, exact no-ops preserve source bytes and signatures, changed publication is clone-staged with typed readback, stale patches are refused, and inverse patches restore the exact package source, including signature state. Native per-view AC identity bytes follow their views through reorder and caption edits. OLAP item-range authoring and filter execution remain outside this slice. |
+| Slicers and slicer caches | 🟡 | ✅ | ✅ | `slicer::{Edit, Commit, Patch}` provides bounded, source-checked inert cache/view CRUD over native/table BIFF12 definitions and workbook/sheet relationship wiring. Commits validate cache-name dependency closure, exact no-ops preserve source bytes and signatures, changed publication is clone-staged with typed readback, stale patches are refused, and inverse patches restore the exact package source, including signature state. Native cache ACUID blocks and per-view AC identity bytes survive metadata edits. Updating or reordering the same cache names retains their part/relationship identities; add/remove allocates free IDs even when the numeric relationship sequence has gaps. OLAP item-range authoring and filter execution remain outside this slice. |
 | Timelines | 🟡 | ✅ | ✅ | `timeline::{Edit, Commit, Patch}` provides bounded, source-checked inert CRUD over compact cache/view XML and BIFF12 workbook/sheet relationship wiring. Commits validate cache-name dependency closure, exact no-ops preserve lexical XML and signatures, changed noncanonical XML is refused rather than normalized, changed publication is clone-staged with typed readback, stale patches are refused, and inverse patches restore the exact package source, including signature state. Native 2011 relationship types and lowercase MIME names are accepted and emitted; historical Litchi aliases remain readable. Namespace-verified MCE `Ignorable` directives are accepted. Extension payloads, active filtering, and refresh remain outside this slice. |
 
 ## External references, connections, and extensibility
@@ -119,3 +119,29 @@ The deferred cell-value selector API is `Result<Edit>`; callers use
 | ActiveX/form-control execution | ❌ | ❌ | ❌ | Drawing and embedded-object payloads are inert; controls are not instantiated, activated, or run. |
 | Macro execution and external-link/connection refresh | ❌ | ❌ | ❌ | VBA, DDE, OLE, URLs, commands, credentials, and cached external data are never executed, fetched, or refreshed. |
 | Certificate trust and revocation | ❌ | ❌ | ❌ | Signature verification is cryptographic integrity/signature verification only. |
+
+## Native fixture qualification
+
+`tests/microsoft_office_native_metadata.rs` adds exact native cache, table,
+pivot-binding, note, layout, page-break, scenario and formula-owner assertions.
+All eight pivot source rows, both direct/shared date encodings, five grouped
+formula ranges, 100 copied/shared cells, dynamic/LET caches and what-if outputs
+are checked. Unsupported dynamic expression rendering remains explicit while
+original formula and ancillary bytes remain accessible.
+
+Slicer caption, cache sort metadata and cache order edits, note replacement,
+page-break insertion and scenario-comment changes check unrelated member bytes,
+typed readback and inverse patches. Page-break/scenario edits also compare all
+worksheet records outside the changed collection. Cache add/remove exercises
+native sparse relationship IDs. The operations test adds native Auto/Eager
+formula queries and scalar cell CRUD.
+
+Native indexes can point at a contiguous `BrtCellMeta`/`BrtValueMeta` prefix
+before the first cell in a row/column bucket. Binding verifies that exact prefix
+and exposes the actual cell boundary for lookups; interior offsets and later
+cells remain invalid. Publication also detects prefix-only geometry changes.
+This is bounded index compatibility, not metadata evaluation.
+
+The assertion index is `tools/native_office_tests.json`. These tests establish
+only their listed scopes; no Excel reopen, calculation, rendering, refresh,
+macro/control execution or external access was performed.
