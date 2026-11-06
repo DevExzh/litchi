@@ -52,6 +52,8 @@ pub enum LimitKind {
 pub const MAX_HYPERLINKS: usize = 65_530;
 
 /// A staged hyperlink edit. Dropping it discards it.
+/// Each operation validates a detached candidate; a failed operation leaves
+/// the worksheet, relationships and all earlier staged edits unchanged.
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
@@ -217,6 +219,13 @@ impl Edit {
     /// target nor a location, more than [`MAX_HYPERLINKS`] links, or a
     /// changed edit of a signed workbook.
     pub fn add(&mut self, sheet: usize, link: Hyperlink) -> Result<usize> {
+        let mut candidate = self.clone();
+        let index = candidate.add_inner(sheet, link)?;
+        *self = candidate;
+        Ok(index)
+    }
+
+    fn add_inner(&mut self, sheet: usize, link: Hyperlink) -> Result<usize> {
         let (worksheet, links, layout) = self.sheet(sheet)?;
         if links.len() >= MAX_HYPERLINKS {
             return Err(invalid("the worksheet holds the most hyperlinks it can"));
@@ -238,6 +247,13 @@ impl Edit {
     ///
     /// The errors of [`Self::add`], and an error for a missing position.
     pub fn set(&mut self, sheet: usize, index: usize, link: Hyperlink) -> Result<bool> {
+        let mut candidate = self.clone();
+        let changed = candidate.set_inner(sheet, index, link)?;
+        *self = candidate;
+        Ok(changed)
+    }
+
+    fn set_inner(&mut self, sheet: usize, index: usize, link: Hyperlink) -> Result<bool> {
         let (worksheet, links, layout) = self.sheet(sheet)?;
         let old = links
             .get(index)
@@ -274,6 +290,13 @@ impl Edit {
     /// Returns an error for a missing position, a malformed stream or a
     /// changed edit of a signed workbook.
     pub fn remove(&mut self, sheet: usize, index: usize) -> Result<Hyperlink> {
+        let mut candidate = self.clone();
+        let removed = candidate.remove_inner(sheet, index)?;
+        *self = candidate;
+        Ok(removed)
+    }
+
+    fn remove_inner(&mut self, sheet: usize, index: usize) -> Result<Hyperlink> {
         let (worksheet, mut links, layout) = self.sheet(sheet)?;
         let span = layout
             .units_of(kind::H_LINK)

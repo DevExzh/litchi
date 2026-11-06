@@ -5729,7 +5729,8 @@
         "excel/excel-legacy-sheets.xls"
       ],
       "feature_rows": [
-        "xls-153"
+        "xls-153",
+        "xls-138"
       ],
       "assertions": [
         "Eager and source catalogs agree on visible Macro_016 at complete index 0 and ordinary Sheet1 at complete index 1/worksheet ordinal 0. Native macro BOF type 0x0040, 510-byte/38-record substream and three LabelSst references resolve to the exact inert macro labels; no formula record; ordinary worksheet values remain readable."
@@ -5744,7 +5745,8 @@
         "excel/excel-legacy-sheets.xls"
       ],
       "feature_rows": [
-        "xls-153"
+        "xls-153",
+        "xls-138"
       ],
       "assertions": [
         "An ordinary-sheet string insertion saves/reopens with the complete tab catalog, exact macro records, retained shared-string labels and valid INDEX targets for DefColWidth/DBCell, all unrelated CFB streams retained, and exact inverse."
@@ -6343,6 +6345,152 @@
         "Seven exact native paragraphs, including Arabic, Hebrew, Japanese and Chinese, feed a finite plain streaming writer one UTF-8 byte at a time. The reopened fresh derivative has exactly those paragraphs and no fields, tables or objects."
       ],
       "scope_limit": "Fresh plaintext derivative only. Native fonts, run formatting, layout and producer metadata are not copied, and this is not native Word authoring/reopen evidence."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_calculation_views",
+      "name": "native_calculation_windows_and_selections_retain_exact_saved_state",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-interaction-print.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-144",
+        "xls-145"
+      ],
+      "assertions": [
+        "Four native BIFF workbooks retain exact engine IDs 967461/977461, full precision, automatic threading and per-sheet mode/iterations/delta/reference/save settings.",
+        "Exact tab IDs, window geometry, active/visible/selected state and tab ratio are asserted, including complete-tab versus worksheet ordinals, all four frozen-pane selections and the B6 saved selection. No-op publication is byte-exact."
+      ],
+      "scope_limit": "Saved metadata only; no calculation/thread execution, view rendering or general settings/view mutation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_calculation_views",
+      "name": "native_cell_edit_preserves_calculation_view_records_and_other_cells",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls"
+      ],
+      "feature_rows": [
+        "xls-144",
+        "xls-145"
+      ],
+      "assertions": [
+        "Supported native numeric edit at Sheet1 B2 retains its storage family and reopens as 123. All other worksheet values/formulas and typed calculation/view models are unchanged.",
+        "Selected raw calculation/window/pane/selection records and other CFB streams remain exact; file save/reopen and byte-exact inverse pass."
+      ],
+      "scope_limit": "One ordinary numeric edit preserving metadata and inert formula caches; not calculation or view-setting CRUD."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_calculation_links",
+      "name": "native_calculation_properties_have_exact_flags_and_binary_payloads",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-date1904-breaks.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-285"
+      ],
+      "assertions": [
+        "Four native BrtCalcProp payloads retain engine ID 181029, automatic mode, 100 iterations, delta 0.001, stored thread count 8 and exactly A1/full-precision/recalculate-on-save/MTR flags. USER_THREADS is absent.",
+        "The checked typed codec reproduces each exact 26-byte native payload; package no-op bytes remain exact."
+      ],
+      "scope_limit": "Typed metadata/codec read-write only; stored thread count is not an execution claim, and calculation settings are not mutated through a native package API."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_calculation_links",
+      "name": "native_calculation_chain_removal_preserves_workbook_and_reopens_exact_inverse",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xlsb",
+        "excel/excel-date1904-breaks.xlsb",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-revisions.xlsb",
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-visual-analytics.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-288"
+      ],
+      "assertions": [
+        "Ten native calculation-chain parts have exact part/content-type identity, byte lengths, SHA-256 values and explicit generic framing counts. Exact no-op and idempotent staged removal are asserted.",
+        "Save/reopen removes only the chain and its two manifest entries; all remaining parts, including workbook/cells/caches/styles/embedded data, remain byte-exact. Reopened inverse restores every original member byte."
+      ],
+      "scope_limit": "Opaque optional-cache lifecycle only. Record counts are non-normative diagnostics; no typed chain cells/dependencies, replacement, evaluation or recalculation is claimed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_calculation_links",
+      "name": "native_chain_record_limit_does_not_block_opaque_removal",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-288"
+      ],
+      "assertions": [
+        "The native 246-byte chain admits as opaque data under a 17-record diagnostic ceiling. Counting its 18 records raises the exact CalculationChain Records limit; removal/inverse remain valid and restore original bytes."
+      ],
+      "scope_limit": "Explicit diagnostic budget versus owner admission/removal only; no unsupported binary grammar is inferred."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_calculation_links",
+      "name": "native_hyperlink_and_sheet_protection_agree_across_read_routes",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-296",
+        "xlsb-305"
+      ],
+      "assertions": [
+        "Native A10 rId2 external target and tooltip agree between the family edit inventory and source-backed selected-feature read; location/display fields are absent.",
+        "Sheet protection retains locked/no-password state, selection/sort/filter permissions and every prohibited operation flag; strong protection is absent and no-op bytes remain exact."
+      ],
+      "scope_limit": "Legacy worksheet protection metadata only, not cryptographic authorization or native UI permission enforcement. No strong-verifier specimen is qualified and URLs are not fetched."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_calculation_links",
+      "name": "native_hyperlink_retarget_add_remove_preserves_cells_protection_and_cache",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-296",
+        "xlsb-305"
+      ],
+      "assertions": [
+        "Retarget native A10, change its tooltip, add internal B10 and remove both links through supported part edits. Only sheet1.bin and its relationship member change; every non-hyperlink binary record remains exact.",
+        "File save/reopen and exact-member inverse preserve cells, protection and calculation-chain cache data; removal inverse on its retained owner restores bytes."
+      ],
+      "scope_limit": "Low-level hyperlink metadata lifecycle preserves protection records; it does not implement Excel UI permission enforcement, follow links or recalculate formulas. Reopened inverse guarantees member bytes, not original ZIP serialization."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_calculation_links",
+      "name": "native_invalid_hyperlink_replacement_preserves_the_staged_owner",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-296"
+      ],
+      "assertions": [
+        "Invalid native replacement range returns exact InvalidFormat without deleting the original relationship; the transaction remains readable and commits an exact no-op.",
+        "After a valid internal-link addition, external add/set operations with 257 UTF-16 tooltip units under a 256-unit ceiling raise typed StringLimit and preserve all earlier staged bytes. Missing-index removal is also atomic; no ghost relationships survive."
+      ],
+      "scope_limit": "Failure atomicity for range, string encoding and missing-index cases on the native owner; other limits/signature cases retain separate synthetic coverage."
     }
   ]
 }
