@@ -264,3 +264,22 @@ refused. Its presentation-structure dependency accepts all six container MIME
 types; native catalog tests bind exact IDs, part names and relationships and
 reject a non-presentation main-part content type. Extended guides and variant
 master/layout authoring need separate qualification.
+
+`tests/microsoft_office_native_ole.rs` qualifies the native `Excel.Sheet.12`
+frame, workbook payload and EMF preview. Package relationships retain the
+embedded file's declared MIME (XLSX in this specimen); binary OLE relationships
+still require the OLE-object MIME. Metadata and payload edits retain that MIME
+and the original Strict/Transitional relationship identity. The source editor
+uses the inventory's MCE choice policy, so it edits the active native object
+while keeping the inactive preview branch byte exact.
+
+Native tests cover metadata changes, opaque payload replacement, addition,
+removal/detach, invalid/shared-target rollback and inverse publication. The
+source shape-removal route additionally covers durable forward and inverse
+replay while retaining resource relationships by contract. Graph-owning
+removal collects the embedded workbook; the preview, which belongs to the
+inactive branch, remains outside the active object's resource ownership.
+Facade tests read the child chart/worksheet catalog, four formulas and stored
+caches, edit an unrelated child cell and put the changed workbook back while
+preserving all other parent members. OLE objects stay inert; no activation,
+formula calculation, preview regeneration or fresh Office validation occurs.

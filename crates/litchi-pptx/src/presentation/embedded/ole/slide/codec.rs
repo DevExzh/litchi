@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops::Range;
 
 use crate::presentation::embedded::{
@@ -75,7 +76,11 @@ pub(crate) fn locate(source: &[u8]) -> Result<Document> {
             "OLE slide spells the markup-compatibility namespace with references",
         ));
     }
-    let root = parse(source)?;
+    let mut root = parse(source)?;
+    // IDs in inactive alternatives still occupy source bytes and must not be
+    // reused by an added frame.
+    let max_shape_id = max_shape_id(&root)?;
+    select_compatibility_branches(source, &mut root)?;
     let insertion = find_shape_tree(&root)
         .and_then(|node| node.close_start)
         .ok_or_else(|| invalid("OLE slide has no non-empty shape tree"))?;
@@ -91,7 +96,7 @@ pub(crate) fn locate(source: &[u8]) -> Result<Document> {
     Ok(Document {
         frames,
         insertion,
-        max_shape_id: max_shape_id(&root)?,
+        max_shape_id,
     })
 }
 
@@ -369,27 +374,76 @@ fn descendant<'a>(node: &'a Node, local: &[u8]) -> Option<&'a Node> {
 }
 
 fn active_children(node: &Node) -> Vec<&Node> {
-    let mut result = Vec::new();
-    for child in &node.children {
-        if child.local.as_slice() == b"AlternateContent" && child.namespace.as_slice() == MC {
-            if let Some(fallback) = child
+    node.children.iter().collect()
+}
+
+/// Apply the inventory reader's MCE policy while keeping every selected node's
+/// original source spans. Assuming the fallback was active made metadata edits
+/// target the wrong native oleObj and fail publication readback.
+fn select_compatibility_branches(source: &[u8], root: &mut Node) -> Result<()> {
+    let mut offsets = Vec::new();
+    visit(root, &mut |node| {
+        if node.namespace == MC
+            && matches!(node.local.as_slice(), b"Choice" | b"Fallback")
+            && node.close_start.is_some()
+        {
+            offsets.push(
+                u32::try_from(node.open_end)
+                    .map_err(|_| invalid("OLE branch offset exceeds u32"))?,
+            );
+        }
+        Ok(())
+    })?;
+    if offsets.is_empty() {
+        return Ok(());
+    }
+    let processing = litchi_ooxml_common::mce::Limits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_XML_DEPTH,
+        max_namespace_bindings: 4096,
+        max_directive_tokens: 4096,
+        max_choices_per_alternate: 1024,
+        ..litchi_ooxml_common::mce::Limits::default()
+    };
+    let limits = litchi_ooxml_common::mce::OffsetLimits {
+        max_source_bytes: MAX_XML_BYTES,
+        max_offsets: crate::presentation::embedded::MAX_XML_NODES,
+        max_marked_bytes: MAX_XML_BYTES,
+        processing,
+    };
+    let active = litchi_ooxml_common::mce::active_offsets(
+        source,
+        &offsets,
+        &litchi_ooxml_common::mce::Capabilities::ooxml_baseline(),
+        &limits,
+    )?;
+    let active = active
+        .into_iter()
+        .map(|v| v as usize)
+        .collect::<HashSet<_>>();
+    project_children(root, &active);
+    Ok(())
+}
+
+fn project_children(node: &mut Node, active: &HashSet<usize>) {
+    let mut children = Vec::new();
+    for mut child in std::mem::take(&mut node.children) {
+        if child.namespace == MC && child.local.as_slice() == b"AlternateContent" {
+            if let Some(mut branch) = child
                 .children
-                .iter()
-                .find(|value| value.local.as_slice() == b"Fallback")
+                .into_iter()
+                .find(|branch| active.contains(&branch.open_end))
             {
-                result.extend(fallback.children.iter());
-            } else if let Some(choice) = child
-                .children
-                .iter()
-                .find(|value| value.local.as_slice() == b"Choice")
-            {
-                result.extend(choice.children.iter());
+                project_children(&mut branch, active);
+                children.extend(branch.children);
             }
         } else {
-            result.push(child);
+            project_children(&mut child, active);
+            children.push(child);
         }
     }
-    result
+    node.children = children;
 }
 
 fn attribute(node: &Node, local: &[u8], relationship: bool) -> Option<Vec<u8>> {

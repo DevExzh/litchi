@@ -653,7 +653,12 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
             object.relationship_id = Some(id.clone());
             id
         };
-        let relationship_type = relationship_type(kind).to_owned();
+        let relationship_type = source_object
+            .and_then(|object| object.target.as_ref())
+            .map_or_else(
+                || relationship_type(kind).to_owned(),
+                |target| target.relationship_type().to_owned(),
+            );
         let (target, target_ref, target_mode, part_name) = match object.mode {
             Mode::Embedded => {
                 let part_name = match object.target.as_ref() {
@@ -663,7 +668,14 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
                     },
                     None => next_part_name(&mut used_parts, kind)?,
                 };
-                let content_type = content_type(kind).to_owned();
+                // Existing package payloads retain the declared file MIME;
+                // metadata/payload edits must not replace an XLSX type with
+                // the generic package type. Fresh definitions use the
+                // historical generic default because they supply no MIME.
+                let content_type = match object.target.as_ref() {
+                    Some(Target::Internal { content_type, .. }) => content_type.clone(),
+                    _ => content_type(kind).to_owned(),
+                };
                 let target_ref = part_name.relative_ref(source.slide_part_name.base_uri());
                 let target = Target::Internal {
                     part_name: part_name.clone(),

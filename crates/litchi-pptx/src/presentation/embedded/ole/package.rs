@@ -135,13 +135,14 @@ fn resolve_target(package: &OpcPackage, slide: &dyn Part, id: &str) -> Result<(K
     }
     let part_name = relationship.target_partname()?;
     let part = package.get_part(&part_name)?;
-    let expected = match kind {
-        Kind::OleObject => ct::OFC_OLE_OBJECT,
-        Kind::Package => ct::OFC_PACKAGE,
-    };
-    if part.content_type() != expected {
+    // An embedded package keeps its registered file MIME (for example an
+    // XLSX workbook), not necessarily the generic package MIME. The package
+    // relationship identifies this inert payload family; do not infer its
+    // type from a filename or program ID. OLE binary parts have a fixed MIME.
+    // MS-OI29500 3.10 describes Office's registered content-type selection.
+    if kind == Kind::OleObject && part.content_type() != ct::OFC_OLE_OBJECT {
         return Err(Error::ContentType {
-            expected: expected.to_string(),
+            expected: ct::OFC_OLE_OBJECT.to_string(),
             actual: part.content_type().to_string(),
         });
     }

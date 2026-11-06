@@ -238,3 +238,122 @@ fn package_without_object() -> OpcPackage {
     package.remove_part(&PackURI::new(PREVIEW).unwrap());
     package
 }
+
+#[test]
+fn package_payload_declared_mime_survives_metadata_and_payload_edits() {
+    for content_type in [
+        ct::OFC_PACKAGE,
+        ct::SML_SHEET,
+        ct::WML_DOCUMENT,
+        "application/vnd.example.inert-package",
+    ] {
+        let mut package = package(false);
+        let owner = package.get_part_mut(&PackURI::new(SLIDE).unwrap()).unwrap();
+        owner.rels_mut().remove("rIdOle");
+        owner.rels_mut().add_relationship(
+            rt::PACKAGE.into(),
+            "../embeddings/oleObject1.bin".into(),
+            "rIdOle".into(),
+            false,
+        );
+        package
+            .get_part_mut(&PackURI::new(PAYLOAD).unwrap())
+            .unwrap()
+            .set_content_type(content_type.into())
+            .unwrap();
+        let source = snapshot(&package);
+        assert_eq!(source.objects()[0].kind(), Some(Kind::Package));
+        assert_eq!(
+            source.objects()[0].target().unwrap().content_type(),
+            Some(content_type)
+        );
+        let mut edit = source.edit();
+        edit.set_name(0, Some("Package label".into())).unwrap();
+        edit.replace_payload(0, b"opaque-replacement".to_vec())
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        apply_patch(&mut package, commit.patch()).unwrap();
+        assert_eq!(
+            package
+                .get_part(&PackURI::new(PAYLOAD).unwrap())
+                .unwrap()
+                .content_type(),
+            content_type
+        );
+        assert_eq!(
+            snapshot(&package).payload(0).unwrap(),
+            Some(b"opaque-replacement".as_slice())
+        );
+        apply_patch(&mut package, &commit.patch().inverse()).unwrap();
+        assert_eq!(snapshot(&package).objects(), source.objects());
+    }
+}
+
+#[test]
+fn ole_source_edits_follow_the_same_mce_choice_as_inventory() {
+    for uri in ["urn:schemas-microsoft-com:vml", "urn:unsupported"] {
+        let mut package = package(false);
+        let slide = package.get_part_mut(&PackURI::new(SLIDE).unwrap()).unwrap();
+        let source = std::str::from_utf8(slide.blob()).unwrap();
+        let start = source.find("<p:oleObj").unwrap();
+        let end = source.find("</p:oleObj>").unwrap() + "</p:oleObj>".len();
+        let object = &source[start..end];
+        let choice = object.replace("name=\"Old\"", "name=\"Choice\"");
+        let fallback = object.replace("name=\"Old\"", "name=\"Fallback\"");
+        let wrapper = format!(
+            r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:alias="{uri}"><mc:Choice Requires="alias">{choice}</mc:Choice><mc:Fallback>{fallback}</mc:Fallback></mc:AlternateContent>"#
+        );
+        let source = format!("{}{}{}", &source[..start], wrapper, &source[end..]);
+        slide.set_blob(source.as_bytes().to_vec());
+        let expected = if uri == "urn:unsupported" {
+            "Fallback"
+        } else {
+            "Choice"
+        };
+        let before = snapshot(&package);
+        assert_eq!(before.objects()[0].name(), Some(expected));
+        let mut edit = before.edit();
+        edit.set_name(0, Some("Chosen edit".into())).unwrap();
+        let commit = edit.commit().unwrap();
+        let changed = source.replacen(&format!("name=\"{expected}\""), "name=\"Chosen edit\"", 1);
+        assert!(commit.snapshot().source_xml() == changed.as_bytes());
+        apply_patch(&mut package, commit.patch()).unwrap();
+        assert_eq!(snapshot(&package).objects()[0].name(), Some("Chosen edit"));
+        apply_patch(&mut package, &commit.patch().inverse()).unwrap();
+        assert!(snapshot(&package).source_xml() == source.as_bytes());
+    }
+}
+
+#[test]
+fn strict_package_relationship_identity_is_retained_by_metadata_edits() {
+    let mut package = package(false);
+    let slide = package.get_part_mut(&PackURI::new(SLIDE).unwrap()).unwrap();
+    slide.rels_mut().remove("rIdOle");
+    slide.rels_mut().add_relationship(
+        rt::STRICT_PACKAGE.into(),
+        "../embeddings/oleObject1.bin".into(),
+        "rIdOle".into(),
+        false,
+    );
+    package
+        .get_part_mut(&PackURI::new(PAYLOAD).unwrap())
+        .unwrap()
+        .set_content_type(ct::SML_SHEET.into())
+        .unwrap();
+    let before = snapshot(&package);
+    let mut edit = before.edit();
+    edit.set_name(0, Some("Preserve Strict edge".into()))
+        .unwrap();
+    let committed = edit.commit().unwrap();
+    apply_patch(&mut package, committed.patch()).unwrap();
+    assert_eq!(
+        package
+            .get_part(&PackURI::new(SLIDE).unwrap())
+            .unwrap()
+            .rels()
+            .get("rIdOle")
+            .unwrap()
+            .reltype(),
+        rt::STRICT_PACKAGE
+    );
+}

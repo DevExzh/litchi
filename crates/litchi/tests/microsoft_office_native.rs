@@ -261,24 +261,25 @@ fn native_ppt_table_query_edit_reopen_and_inverse_preserve_neighbor_cells() {
     );
 }
 
+fn members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
+    let reader = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+        bytes.to_vec(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    reader
+        .member_names()
+        .unwrap()
+        .into_iter()
+        .map(|name| {
+            let bytes = reader.read_member(&name).unwrap();
+            (name, bytes)
+        })
+        .collect()
+}
+
 #[test]
 fn native_pptx_template_show_and_macro_variants_preserve_inert_members_on_public_edits() {
-    fn members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
-        let reader = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
-            bytes.to_vec(),
-            litchi_opc::SourceLimits::default(),
-        )
-        .unwrap();
-        reader
-            .member_names()
-            .unwrap()
-            .into_iter()
-            .map(|name| {
-                let bytes = reader.read_member(&name).unwrap();
-                (name, bytes)
-            })
-            .collect()
-    }
     for name in [
         "powerpoint-visual-objects.potx",
         "powerpoint-visual-objects.ppsx",
@@ -388,4 +389,110 @@ fn native_powerpoint_embedded_chart_workbook_exposes_exact_cells_through_facade(
         }
     }
     assert_eq!(child.to_bytes().unwrap(), part.blob());
+}
+
+#[test]
+fn native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_edit() {
+    use litchi::pptx::presentation::embedded::ole::slide;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/powerpoint");
+    let parent = litchi::pptx::Package::open(root.join("powerpoint-media-objects.pptx")).unwrap();
+    let before = parent.to_bytes().unwrap();
+    let uri = litchi::opc::PackURI::new("/ppt/slides/slide4.xml").unwrap();
+    let owner = slide::load(parent.opc().unwrap(), 3, &uri).unwrap();
+    let payload = owner.payload(0).unwrap().unwrap();
+    let child = litchi::open_bytes(payload.to_vec()).unwrap();
+    assert_eq!(child.format(), Some(FileFormat::Xlsx));
+    assert_eq!(
+        child.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sales chart", "Sheet1", "Sheet2"]
+    );
+    let check_formulas = |bytes: &[u8]| {
+        let workbook = litchi::xlsx::Package::from_bytes(bytes).unwrap();
+        let book = workbook.workbook();
+        assert_eq!(
+            book.sheets()
+                .map(|sheet| (sheet.name().to_owned(), sheet.kind()))
+                .collect::<Vec<_>>(),
+            [
+                ("Sales chart".into(), litchi::xlsx::WorksheetKind::Chart),
+                ("Sheet1".into(), litchi::xlsx::WorksheetKind::Worksheet),
+                ("Sheet2".into(), litchi::xlsx::WorksheetKind::Worksheet)
+            ]
+        );
+        for (name, address, formula, cache) in [
+            ("Sheet1", "B6", "SUM(B2:B5)", "14"),
+            ("Sheet1", "D6", "SUM(D2:D5)", "49.75"),
+            ("Sheet2", "B3", "Sheet1!D6", "49.75"),
+            ("Sheet2", "B4", "SUM(Table1[Quantity])", "14"),
+        ] {
+            let sheet = book.sheet(name).unwrap().unwrap();
+            let cell = sheet.cell(address).unwrap();
+            let Some(litchi::xlsx::Cell::Formula(value)) = cell.stored() else {
+                panic!("native formula {name}!{address}")
+            };
+            assert_eq!(value.text(), formula);
+            let cached = value.cached().unwrap();
+            let litchi::xlsx::Value::Number(number) = cached.value() else {
+                panic!("stored numeric cache")
+            };
+            assert_eq!(number.as_str(), cache);
+            assert_eq!(cached.origin(), litchi::xlsx::formula::Origin::Stored);
+        }
+    };
+    check_formulas(payload);
+    let edited = child
+        .set(
+            "Sheet2!Z100",
+            litchi::props! {"value"=>"Embedded child reviewed"},
+        )
+        .unwrap();
+    let edited_bytes = edited.to_bytes().unwrap();
+    check_formulas(&edited_bytes);
+    let mut edit = parent.edit_slide_ole_objects().unwrap();
+    edit.update(3_usize, |draft| {
+        draft.replace_payload(0, edited_bytes.clone())
+    })
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let after = commit.package().to_bytes().unwrap();
+    let reopened = litchi::pptx::Package::from_bytes(&after).unwrap();
+    let owner = slide::load(reopened.opc().unwrap(), 3, &uri).unwrap();
+    assert!(owner.payload(0).unwrap().unwrap() == edited_bytes);
+    assert_eq!(
+        owner.objects()[0].target().unwrap().content_type(),
+        Some(litchi::opc::constants::content_type::SML_SHEET)
+    );
+    let reread = litchi::open_bytes(owner.payload(0).unwrap().unwrap().to_vec()).unwrap();
+    assert_eq!(
+        reread
+            .get("Sheet2!Z100")
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .as_deref(),
+        Some("Embedded child reviewed")
+    );
+    check_formulas(owner.payload(0).unwrap().unwrap());
+    let a = members(&before);
+    let b = members(&after);
+    assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
+    for (name, data) in &a {
+        if name != "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx" {
+            assert!(data == &b[name], "changed {name}");
+        }
+    }
+    assert!(
+        commit
+            .package()
+            .apply_slide_ole_objects(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == before
+    );
+    assert!(child.to_bytes().unwrap() == payload);
+    assert!(parent.to_bytes().unwrap() == before);
 }

@@ -3208,6 +3208,137 @@
       "required_features": [
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_inventory_keeps_frame_payload_type_and_preview",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Exact slide3/index0/shape4 frame, Worksheet/Excel.Sheet.12 metadata, internal rId2 package target, XLSX MIME,18372-byte workbook SHA-256 and81992-byte EMF preview SHA-256; active branch has no picture reference."
+      ],
+      "scope_limit": "Inert metadata/payload ownership. The EMF belongs to the preserved inactive fallback; no OLE activation, image decoding or rendering."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_metadata_edit_keeps_inactive_branch_and_unrelated_members",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Native name/icon edit changes only slide4.xml; save/reopen keeps frame dimensions, payload bytes and XLSX MIME. The inactive preview branch and unrelated members are exact, as are source/inverse bytes."
+      ],
+      "scope_limit": "Scalar metadata edits only; fallback preview values are preserved instead of synchronized or rendered."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_payload_replacement_keeps_specific_mime_frame_and_preview",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx",
+        "excel/excel-values-formulas-chart.xlsx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Replace the PowerPoint-rewritten child with its original tracked native Excel source; only the embedded workbook member changes, all object metadata/MIME/preview/relationships remain exact and inverse restores source."
+      ],
+      "scope_limit": "Opaque payload replacement, without activation or preview regeneration."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_remove_and_detach_collect_payload_but_keep_unowned_preview",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Both graph-owning remove and detach delete exactly the native graphic frame/rId2 and collect only the workbook payload. The unowned fallback preview and other members remain exact; reopen and inverse validate the graph."
+      ],
+      "scope_limit": "The EMF relationship is retained because it was not owned by the active OLE projection; generic unused-resource cleanup is not claimed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_source_frame_removal_has_durable_forward_and_inverse",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Source shape removal deletes the native frame bytes only, retaining all relationships/payloads by contract. Durable forward replay and inverse after reopening restore exact member bytes; in-memory inverse restores native archive bytes."
+      ],
+      "scope_limit": "Whole-frame source removal only, distinct from graph-owning payload collection."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_invalid_and_shared_payload_edits_leave_source_unchanged",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "A name edit followed by empty-payload failure rolls back atomically; replacing a workbook with a second inbound reference is refused and leaves source bytes intact."
+      ],
+      "scope_limit": "Explicit invalid/shared-target guards; no shared-payload rewrite is performed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_ole",
+      "name": "native_excel_ole_addition_allocates_a_distinct_frame_relationship_and_payload",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Adds a second inert native workbook under shape5/rId4/package1 with exact bytes and requested metadata/bounds; original object/resources remain exact, fresh definition uses the API generic-package MIME, and inverse restores source."
+      ],
+      "scope_limit": "Fresh inert attachment on a native source; no supplied preview, inferred file MIME, native Office acceptance or OLE execution."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_edit",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-431"
+      ],
+      "assertions": [
+        "Public child detection as XLSX, exact Sales chart/Sheet1/Sheet2 catalog/kinds, four formula texts and stored14/49.75 caches; change Sheet2!Z100 through the facade, replace the inert child through the OLE owner, reopen exact child bytes/caches and preserve all parent members except the embedding."
+      ],
+      "scope_limit": "No formula evaluation or external refresh; the original EMF preview is preserved and may no longer depict the changed child. Parent inverse and immutable source are checked.",
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "ppt",
+        "pptx"
+      ]
     }
   ]
 }
