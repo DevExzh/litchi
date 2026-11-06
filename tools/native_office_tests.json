@@ -5657,6 +5657,250 @@
         "xlsx",
         "xlsb"
       ]
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_protection",
+      "name": "native_comments_protection_retains_settings_comment_range_and_noop_bytes",
+      "fixtures": [
+        "word/word-document-protection.doc"
+      ],
+      "feature_rows": [
+        "doc-053"
+      ],
+      "assertions": [
+        "Native Word2013 DOP comments/read-only flag, absent other protection flags, key zero, exact comment author/initials/tag/CP range/timestamp, seven paragraphs and exact no-op bytes."
+      ],
+      "scope_limit": "No native range-protection table or password hash is present; neither is qualified by this fixture."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_protection",
+      "name": "native_protection_default_refusal_is_atomic",
+      "fixtures": [
+        "word/word-document-protection.doc"
+      ],
+      "feature_rows": [
+        "doc-053"
+      ],
+      "assertions": [
+        "Default body edit reports Body(Invalid(ProtectionDenied(Document))); failed staging preserves the entire native artifact and original comment/body semantics."
+      ],
+      "scope_limit": "Library publication-policy enforcement only; no Word UI restriction or password authentication claim."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_protection",
+      "name": "authorized_native_body_edit_preserves_protection_and_requires_fresh_authority",
+      "fixtures": [
+        "word/word-document-protection.doc"
+      ],
+      "feature_rows": [
+        "doc-053"
+      ],
+      "assertions": [
+        "Explicit audited policy permits one same-length paragraph edit, preserves complete DOP bytes, comment metadata and unrelated CFB streams, saves/reopens, and supports exact inverse on the authorized package. A fresh reopen refuses inverse without destination authority."
+      ],
+      "scope_limit": "Caller-supplied authorization is a test capability, not password verification. Native protection is retained, not removed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_protection",
+      "name": "native_forms_protection_keeps_ffdata_when_an_unrelated_edit_is_authorized",
+      "fixtures": [
+        "word/word-legacy-form.doc"
+      ],
+      "feature_rows": [
+        "doc-053"
+      ],
+      "assertions": [
+        "Native forms-only DOP and key zero are enforced by default; an authorized unrelated paragraph edit preserves the 694-byte DOP, all three complete FFData field models and other CFB streams, then inverts exactly."
+      ],
+      "scope_limit": "No form filling, checkbox normalization, dropdown change, entry/exit macro execution, password authentication or protected-range authoring."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_legacy_sheets",
+      "name": "native_macro_catalog_retains_a_real_nonworksheet_substream",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xls"
+      ],
+      "feature_rows": [
+        "xls-153"
+      ],
+      "assertions": [
+        "Eager and source catalogs agree on visible Macro_016 at complete index 0 and ordinary Sheet1 at complete index 1/worksheet ordinal 0. Native macro BOF type 0x0040, 510-byte/38-record substream and three LabelSst references resolve to the exact inert macro labels; no formula record; ordinary worksheet values remain readable."
+      ],
+      "scope_limit": "Macro cells are outside ordinary worksheet APIs and remain opaque. Dialog sheets and macro execution are not evidenced."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_legacy_sheets",
+      "name": "native_ordinary_sheet_text_edit_preserves_macro_records_and_index_targets",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xls"
+      ],
+      "feature_rows": [
+        "xls-153"
+      ],
+      "assertions": [
+        "An ordinary-sheet string insertion saves/reopens with the complete tab catalog, exact macro records, retained shared-string labels and valid INDEX targets for DefColWidth/DBCell, all unrelated CFB streams retained, and exact inverse."
+      ],
+      "scope_limit": "No macro-sheet cell write or execution; this tests coexistence with an ordinary worksheet edit."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_legacy_sheets",
+      "name": "native_macro_tab_and_explicit_nonworksheet_access_boundary",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xlsm"
+      ],
+      "feature_rows": [
+        "xlsx-198"
+      ],
+      "assertions": [
+        "Native macro-workbook flavor, active Macro_016 tab, full catalog, exact macro XML hash, ordinary worksheet marker and typed NotWorksheet results for cell, extent and range access; no-op byte identity."
+      ],
+      "scope_limit": "Macro metadata only; no VBA project or dialog sheet is present and no macro payload interpretation is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_legacy_sheets",
+      "name": "native_ordinary_worksheet_edit_keeps_macro_part_and_workbook_kind",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xlsm"
+      ],
+      "feature_rows": [
+        "xlsx-198"
+      ],
+      "assertions": [
+        "Ordinary D4 text edit saves/reopens with macro flavor/active tab preserved. Only worksheet XML and expected calculation properties change; every macro part remains identical and inverse restores all package members."
+      ],
+      "scope_limit": "Calculation is marked dirty without evaluation. ZIP transport byte identity and macro-cell editing are outside this contract."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_legacy_sheets",
+      "name": "native_macro_catalog_and_index_presence_have_explicit_typed_boundaries",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-279",
+        "xlsb-277"
+      ],
+      "assertions": [
+        "Eager and source catalogs retain both tabs and active macro index 0 with no active worksheet ordinal. Exact native macro/index hashes and three binary-index record kinds are present; macro materialization/index access returns precise UnsupportedFeature errors."
+      ],
+      "scope_limit": "Index presence is not successful indexed macro-cell support. Ordinary worksheet filtering is explicit; no dialog sheet or execution claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_legacy_sheets",
+      "name": "native_ordinary_worksheet_edit_preserves_macro_body_and_binary_index",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-279",
+        "xlsb-295"
+      ],
+      "assertions": [
+        "Ordinary D4 text mutation changes only the ordinary worksheet and its binary index; native macro body/index/relationships and all other members remain byte-identical through save/reopen; indexed readback and exact inverse pass."
+      ],
+      "scope_limit": "No macro-sheet mutation or calculation. The macro tab remains metadata plus retained opaque payload."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_protection_catalog",
+      "name": "native_doc_protection_refuses_public_edits_and_preserves_readable_comments",
+      "fixtures": [
+        "word/word-document-protection.doc"
+      ],
+      "feature_rows": [
+        "doc-053"
+      ],
+      "assertions": [
+        "Auto/eager native DOC reads retain comment text; public paragraph mutation yields DocumentProtected and keeps source bytes/body unchanged."
+      ],
+      "scope_limit": "Default publication policy only; no unified protected-edit capability or Office UI enforcement claim.",
+      "required_features": [
+        "doc",
+        "xls",
+        "xlsx",
+        "xlsb"
+      ]
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_protection_catalog",
+      "name": "native_macro_tabs_remain_queryable_while_cell_access_refuses_explicitly",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xls",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-legacy-sheets.xlsb"
+      ],
+      "feature_rows": [
+        "xls-153",
+        "xlsx-198",
+        "xlsb-279"
+      ],
+      "assertions": [
+        "Auto/eager queries retain exactly two sheet nodes and one Macro_016 node with path round trips; ordinary cell text is exact. Macro cell selection reports UnsupportedCapability for XLS and UnsupportedType for XLSM/XLSB."
+      ],
+      "scope_limit": "Metadata query coverage does not imply macro-cell traversal, execution or dialog-sheet support.",
+      "required_features": [
+        "doc",
+        "xls",
+        "xlsx",
+        "xlsb"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_protection_catalog",
+      "name": "native_protected_word_reads_but_rejects_facade_body_mutation",
+      "fixtures": [
+        "word/word-document-protection.doc"
+      ],
+      "feature_rows": [
+        "doc-053"
+      ],
+      "assertions": [
+        "Public format detection and protected Word text remain readable; paragraph write returns DocumentProtected without changing source bytes."
+      ],
+      "scope_limit": "Facade default policy only; no password or native application behavior is inferred.",
+      "required_features": [
+        "doc",
+        "xls",
+        "xlsx",
+        "xlsb"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_protection_catalog",
+      "name": "native_macro_tabs_survive_facade_queries_and_ordinary_cell_edits",
+      "fixtures": [
+        "excel/excel-legacy-sheets.xls",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-legacy-sheets.xlsb"
+      ],
+      "feature_rows": [
+        "xls-153",
+        "xlsx-198",
+        "xlsb-279"
+      ],
+      "assertions": [
+        "Auto/eager facade sheet queries retain Macro_016 before and after ordinary D4 edits and reopen; explicit macro cell access keeps the typed format-specific refusal and the original files stay unchanged."
+      ],
+      "scope_limit": "Ordinary worksheet editing coexists with opaque macro tabs; no macro formula/code execution or macro-cell CRUD.",
+      "required_features": [
+        "doc",
+        "xls",
+        "xlsx",
+        "xlsb"
+      ]
     }
   ]
 }
