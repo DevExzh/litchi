@@ -67,7 +67,7 @@ fn reads_sheet_custom_views() {
         assert!(!begin.is_frozen());
         assert!(!begin.is_split_vertically());
         assert!(!begin.is_split_horizontally());
-        assert_eq!(begin.hidden_rows(), CustomViewHiddenRows::Present);
+        assert_eq!(begin.hidden_rows(), CustomViewHiddenRows::NotPresent);
         assert!(!begin.has_hidden_columns());
         assert!(!begin.is_page_break_preview());
         assert!(!begin.is_page_layout_view());

@@ -62,6 +62,54 @@ fn parses_resolves_and_round_trips_poi_simple_reference() {
 }
 
 #[test]
+fn native_empty_row_slots_are_zero_and_populated_rows_keep_exact_boundaries() {
+    let collect = |offsets: &[u16]| {
+        let mut collector = RowBlockIndexCollector::new(2_500, 1_450);
+        collector.feed_record(1_450, BOF_RECORD_TYPE, &[0; 16]);
+        let mut index = SIMPLE_INDEX;
+        index[8..12].copy_from_slice(&3_u32.to_le_bytes());
+        index[16..20].copy_from_slice(&1_750_u32.to_le_bytes());
+        collector.feed_record(1_470, INDEX_RECORD_TYPE, &index);
+        collector.feed_record(1_638, DEF_COL_WIDTH_RECORD_TYPE, &[8, 0]);
+        for row in 0..3_u16 {
+            let mut payload = SIMPLE_ROW;
+            payload[..2].copy_from_slice(&row.to_le_bytes());
+            if row == 1 {
+                payload[2..6].fill(0);
+            }
+            collector.feed_record(1_662 + u64::from(row) * 20, ROW_RECORD_TYPE, &payload);
+        }
+        collector.feed_record(1_722, 0x00fd, &SIMPLE_LABEL_SST);
+        let mut last = SIMPLE_LABEL_SST;
+        last[..2].copy_from_slice(&2_u16.to_le_bytes());
+        collector.feed_record(1_736, 0x00fd, &last);
+        let mut dbcell = 88_u32.to_le_bytes().to_vec();
+        for offset in offsets {
+            dbcell.extend_from_slice(&offset.to_le_bytes());
+        }
+        collector.feed_record(1_750, DBCELL_RECORD_TYPE, &dbcell);
+        collector.feed_record(1_800, EOF_RECORD_TYPE, &[]);
+        collector.finish()
+    };
+    for offsets in [&[40, 14][..], &[40, 14, 0][..]] {
+        let index = collect(offsets).unwrap().unwrap();
+        assert_eq!(index.first_cell_position(0), Some(1_722));
+        assert_eq!(index.first_cell_position(1), None);
+        assert_eq!(index.first_cell_position(2), Some(1_736));
+        assert_eq!(index.blocks()[0].dbcell().cell_offsets(), offsets);
+    }
+    for malformed in [
+        &[40, 14, 1][..],
+        &[40, 0, 14][..],
+        &[40, 0][..],
+        &[40, 13, 0][..],
+        &[40, 14, 0, 0][..],
+    ] {
+        assert!(collect(malformed).is_err(), "accepted {malformed:?}");
+    }
+}
+
+#[test]
 fn rejects_malformed_sizes_bounds_offsets_cardinality_and_targets() {
     assert!(WorksheetIndexRecord::parse_payload(&SIMPLE_INDEX[..19], 2_500).is_err());
     let mut bad = SIMPLE_INDEX;

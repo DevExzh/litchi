@@ -175,8 +175,11 @@ pub enum CustomViewHiddenRows {
 impl CustomViewHiddenRows {
     fn from_bits(bits: u32) -> Result<Self> {
         match bits {
-            0 => Ok(Self::Present),
-            1 => Ok(Self::NotPresent),
+            // Native Excel and the Excel97-2007 BIFF specification use 1
+            // for a defined hidden-row name. The later MS-XLS value table
+            // reverses these labels, contradicting its own Lbl requirement.
+            0 => Ok(Self::NotPresent),
+            1 => Ok(Self::Present),
             _ => Err(invalid(
                 USER_S_VIEW_BEGIN_RECORD_TYPE,
                 "UserSViewBegin.fHiddenRw must be 0 or 1",
@@ -536,7 +539,7 @@ impl SheetCustomViewBegin {
     /// Whether zero values are suppressed.
     #[must_use]
     pub const fn suppresses_zeros(&self) -> bool {
-        self.flags & DSP_ZEROS_SV != 0
+        self.flags & DSP_ZEROS_SV == 0
     }
     /// Whether the sheet is centered between the horizontal margins when printed.
     #[must_use]
@@ -874,8 +877,8 @@ mod tests {
         }
 
         for (bits, expected) in [
-            (0, CustomViewHiddenRows::Present),
-            (1, CustomViewHiddenRows::NotPresent),
+            (0, CustomViewHiddenRows::NotPresent),
+            (1, CustomViewHiddenRows::Present),
         ] {
             let mut payload = user_s_view_begin_payload();
             let flags = (read_u32(&payload, 32).unwrap() & !(HIDDEN_RW_MASK << HIDDEN_RW_SHIFT))
@@ -966,12 +969,12 @@ mod tests {
         assert!(!begin.shows_formulas());
         assert!(begin.shows_gridlines());
         assert!(begin.shows_headings());
-        assert!(!begin.suppresses_zeros());
+        assert!(begin.suppresses_zeros());
         assert!(begin.is_frozen());
         assert!(!begin.is_frozen_without_split());
         assert!(begin.is_split_vertically());
         assert!(!begin.is_split_horizontally());
-        assert_eq!(begin.hidden_rows(), CustomViewHiddenRows::NotPresent);
+        assert_eq!(begin.hidden_rows(), CustomViewHiddenRows::Present);
         assert!(begin.has_hidden_columns());
         assert!(begin.is_page_layout_view());
         assert!(!begin.is_page_break_preview());

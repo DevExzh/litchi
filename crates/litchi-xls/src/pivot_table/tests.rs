@@ -122,7 +122,7 @@ mod parse_tests {
     #[test]
     fn test_parse_sxvi_data_item() {
         let mut data = Vec::new();
-        data.extend_from_slice(&0x00FEu16.to_le_bytes()); // itmType = Data
+        data.extend_from_slice(&0x0000u16.to_le_bytes()); // itmType = Data
         data.extend_from_slice(&0u16.to_le_bytes()); // flags
         data.extend_from_slice(&3u16.to_le_bytes()); // iCache
         data.extend_from_slice(&0xFFFFu16.to_le_bytes()); // no name
@@ -131,5 +131,30 @@ mod parse_tests {
         assert_eq!(item.item_type, PivotItemType::Data);
         assert_eq!(item.cache_index, 3);
         assert!(item.name.is_none());
+    }
+
+    #[test]
+    fn sxvi_item_codes_follow_biff_item_types_not_aggregation_codes() {
+        use PivotItemType::*;
+        // MS-XLS SXVI/SXLI item types: COUNT precedes AVERAGE, unlike
+        // the independent SXDI aggregation-function enumeration.
+        for (code, expected) in [
+            Data, Default, Sum, CountA, Count, Average, Max, Min, Product, StdDev, StdDevP, Var,
+            VarP, Grand, Blank,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let code = u16::try_from(code).unwrap();
+            let mut payload = code.to_le_bytes().to_vec();
+            payload.extend_from_slice(&[0, 0, 0, 0, 0xff, 0xff]);
+            let parsed = parse_sxvi(&payload).unwrap();
+            assert_eq!(parsed.item_type, expected);
+            assert_eq!(parsed.item_type.code(), code);
+        }
+        for code in [0x000f, 0x00fe, 0x00ff, 0xffff] {
+            assert_eq!(PivotItemType::from_u16(code), Unknown(code));
+            assert_eq!(Unknown(code).code(), code);
+        }
     }
 }

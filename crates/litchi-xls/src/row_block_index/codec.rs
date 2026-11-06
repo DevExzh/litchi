@@ -481,18 +481,30 @@ impl RowBlockIndexCollector {
                     "DBCELL.dbRtrw does not reference the first ROW record",
                 ));
             }
-            if dbcell.cell_offsets.len() != expected_cells.len() {
+            let compact = dbcell.cell_offsets.len() == expected_cells.len();
+            let all_rows = dbcell.cell_offsets.len() == self.pending_rows.len();
+            if !compact && !all_rows {
                 return Err(invalid(
                     DBCELL_RECORD_TYPE,
                     "DBCELL rgdb count does not match rows containing cells",
                 ));
             }
             let resolved = dbcell.resolve_cell_positions(self.pending_rows[0].end_position)?;
-            let expected_positions = expected_cells
+            // Native Excel may pad the compact cell-row offsets with zero
+            // deltas until the slot count equals the ROW count. Padding is
+            // at the end, even when empty rows precede a populated row.
+            // It does not expose additional cell pointers.
+            let valid = resolved
                 .iter()
-                .map(|(_, position)| *position)
-                .collect::<Vec<_>>();
-            if resolved != expected_positions {
+                .take(expected_cells.len())
+                .copied()
+                .eq(expected_cells.iter().map(|(_, position)| *position))
+                && dbcell
+                    .cell_offsets
+                    .iter()
+                    .skip(expected_cells.len())
+                    .all(|delta| *delta == 0);
+            if !valid {
                 return Err(invalid(
                     DBCELL_RECORD_TYPE,
                     "DBCELL chained cell offsets do not match record boundaries",

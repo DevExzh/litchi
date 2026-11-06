@@ -2408,6 +2408,224 @@
       "required_features": [
         "xlsb"
       ]
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_pivot_items_distinguish_data_from_automatic_subtotals",
+      "fixtures": [
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-pivot-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-180"
+      ],
+      "assertions": [
+        "Native row/column field items decode as Data/Data/Default with exact cache ordinals, including reversed Product display order; row/column grand-total lines retain code13."
+      ],
+      "scope_limit": "Item-type semantics only; no pivot calculation or rendering."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_pivot_cache_rows_axes_and_aggregations_retain_saved_totals",
+      "fixtures": [
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-pivot-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-179",
+        "xls-180"
+      ],
+      "assertions": [
+        "All eight complete decoded source rows, field names, cache stream binding, output rectangle, row/column/page axes, Sum aggregation and exact filtered/unfiltered saved totals9.5/175.5."
+      ],
+      "scope_limit": "Saved cache/view metadata; no refresh or aggregation execution."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_formula_owners_keep_cse_shared_dynamic_and_data_table_storage",
+      "fixtures": [
+        "excel/excel-formula-owners.xls"
+      ],
+      "feature_rows": [
+        "xls-141",
+        "xls-142",
+        "xls-165"
+      ],
+      "assertions": [
+        "Exact CSE owner/tokens/PtgExp participants; all100 copied/shared expressions and caches; two data-table owner ranges/input bindings and20 saved outputs; ten dynamic-array caches preserve opaque formula ownership; native legacy LET stores #VALUE! tokens with cache50."
+      ],
+      "scope_limit": "No formula evaluation or dynamic-array expression rendering. The XLS-specific LET conversion is preserved rather than treated as XLSX semantic parity."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_scenarios_keep_inputs_current_selection_and_flags_inert",
+      "fixtures": [
+        "excel/excel-formula-owners.xls"
+      ],
+      "feature_rows": [
+        "xls-165"
+      ],
+      "assertions": [
+        "Both named scenarios retain exact author/comment/value pairs, locked/hidden flags and current/shown selection; live input/model cells remain10/2/25."
+      ],
+      "scope_limit": "Read-only Scenario Manager metadata; no scenario application or opened-workbook scenario mutation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_print_setup_notes_and_hyperlinks_retain_exact_metadata",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "feature_rows": [
+        "xls-168",
+        "xls-159",
+        "xls-158"
+      ],
+      "assertions": [
+        "Exact native header/footer control strings, margins, landscape/order/scale/page number, zero DPI markers and printer bytes; two full note texts/authors/object IDs; hyperlink target, tooltip, label and address range."
+      ],
+      "scope_limit": "Inert metadata; no printer rendering, hyperlink navigation or note activation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_scalar_crud_preserves_formula_records_macro_and_embedded_streams",
+      "fixtures": [
+        "excel/excel-formula-owners.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-links-objects.xls"
+      ],
+      "feature_rows": [
+        "xls-134",
+        "xls-139",
+        "xls-154"
+      ],
+      "assertions": [
+        "Create/update/remove native numeric cells on six XLS/XLT variants; source and inverse bytes exact; every non-Workbook CFB stream and all Formula/Array/ShrFmla/Table payloads survive insertion unchanged."
+      ],
+      "scope_limit": "Scalar CRUD plus inert stream preservation; macro/OLE parsing or execution is not qualified by these checks."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_custom_views_distinguish_saved_hidden_and_visible_rows",
+      "fixtures": [
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-177"
+      ],
+      "assertions": [
+        "BASE_PRINT_012/HIDDEN_DETAIL_012 names, exact GUID bindings, print/row-column inclusion, saved hidden-row/column state, zero-display state, page-break visibility and scale/tab ID."
+      ],
+      "scope_limit": "Saved state only; no custom-view application. Native XLS and paired XLSX agree with the older BIFF flag definitions despite inverted labels in newer MS-XLS prose."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_1904_layout_and_page_break_edits_keep_unrelated_biff_records",
+      "fixtures": [
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-155",
+        "xls-156",
+        "xls-167",
+        "xls-168"
+      ],
+      "assertions": [
+        "Six exact1904 serials with date-format typing (negative serial stays numeric), hidden rows/columns and widths, active B6 selection, manual page-break add/readback/inverse, and row/column unhide edits preserving unrelated streams and BIFF records."
+      ],
+      "scope_limit": "Page-break/visibility edits only. Related BoundSheet/Index offsets may change when a break record grows; print-driver/layout rendering is not executed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_protected_notes_allow_exact_noop_and_refuse_changed_text_atomically",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "feature_rows": [
+        "xls-159",
+        "xls-160"
+      ],
+      "assertions": [
+        "Native sheet protection is read; an identical note replacement is a no-op, changed text gives typed Protected refusal, and committing after refusal retains every source byte."
+      ],
+      "scope_limit": "Protected native source is never modified; this does not claim unprotected note CRUD coverage."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_conditional_formats_keep_legacy_links_priorities_and_visual_parameters",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xls"
+      ],
+      "feature_rows": [
+        "xls-162"
+      ],
+      "assertions": [
+        "Seven formats/eight rules across classic and CF12 families, exact ranges/types/priorities, CFEx links, native gradient bar parameters, color-scale thresholds/colors, icon thresholds and original relative-expression tokens."
+      ],
+      "scope_limit": "Public feature projection exposes the first rule per group; all rule counts and both legacy priorities are independently checked. Formula tokens can remain opaque; no condition evaluation/rendering."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_pivot_caption_edit_preserves_cache_streams_items_and_inverse",
+      "fixtures": [
+        "excel/excel-visual-analytics.xls"
+      ],
+      "feature_rows": [
+        "xls-180"
+      ],
+      "assertions": [
+        "Native data-item caption edit reopens to the complete expected PivotTable model, preserves all cache and other CFB streams, and applies an exact inverse after reopen."
+      ],
+      "scope_limit": "One supported caption operation; no arbitrary view authoring, refresh or recalculation."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_xls_formula_queries_and_cell_edits_keep_array_caches_on_both_owners",
+      "fixtures": [
+        "excel/excel-formula-owners.xls"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141",
+        "xls-154"
+      ],
+      "assertions": [
+        "Auto/Eager queries locate D103=206 with its formula, atomic two-sheet cell creation retains CSE/legacy LET caches and inert formula-looking text, and inverse restores exact source bytes."
+      ],
+      "scope_limit": "Public query/scalar edits only; no evaluation or native Excel reopen.",
+      "required_features": [
+        "xls"
+      ]
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_row_index_keeps_zero_offsets_for_empty_hidden_rows",
+      "fixtures": [
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-135"
+      ],
+      "assertions": [
+        "Native DBCELL retains11 offsets including two trailing zero slots for empty hidden rows, exposes only9 actual cell-row pointers including row20 after those empty rows, and re-encodes the original DBCELL payload exactly."
+      ],
+      "scope_limit": "Compact offsets or a zero-padded array sized to the observed ROW count only; padding never becomes a cell pointer. Synthetic negatives reject nonzero padding, misplaced zero slots, wrong boundaries and cardinalities."
     }
   ]
 }

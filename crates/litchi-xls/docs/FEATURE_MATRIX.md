@@ -74,7 +74,7 @@ rendering, external I/O, macro execution, or certificate trust.
 | Real-time data and RTD topics | 🟡 | ✅ | 🟡 | Contextual `real_time_data::{Snapshot, Transaction, Commit, Patch}` edits bounded BIFF8 RTD topics, shared-prefix framing, cells, and cached values; all ProgIDs, servers, and topics remain inert and no refresh or execution occurs. |
 | Revision log and shared-workbook collaboration | 🟡 | ✅ | 🟡 | `revision_records::{Snapshot, Transaction, Commit, Patch}` provides source-checked BIFF8 Revision Log edits for accepted/undo flags and selected header metadata while preserving unknown records; conflict resolution, shared locking, formula replay, and collaboration behavior are not implemented. |
 | User Names stream and shared-workbook user log | 🟡 | ✅ | 🟡 | `user_names::{Snapshot, Transaction, Commit, Patch}` and `user_names::publication` provide bounded stream and package metadata edits, exact no-ops, reversible source-checked patches, and `UsrInfo.guid` validation against the required Revision Log. Publication preserves unrelated CFB streams and directory metadata. Shared locking, revision replay, collaboration, and native-producer interoperability are not established; current coverage uses synthetic BIFF/CFB fixtures. |
-| Custom views and workbook environment options | 🟡 | ✅ | 🟡 | Custom views, link-update modes, object-display modes, access/write strings, backup flags, and related behavior options are exposed as metadata. They do not cause host actions. |
+| Custom views and workbook environment options | 🟡 | ✅ | 🟡 | Custom views, link-update modes, object-display modes, access/write strings, backup flags, and related behavior options are exposed as metadata. Native custom views interpret `fHiddenRw=1` as hidden rows present and `fDspZerosSv=1` as zero values displayed, matching native XLS/XLSX evidence and the Excel97–2007 BIFF definitions. Newer MS-XLS prose reverses these labels and contradicts its own hidden-row-name requirement. These snapshots do not apply a view or cause host actions. |
 | Office Toolbars stream (`XCB`) | 🟡 | ✅ | ✅ | `Workbook::toolbar` reads and `Builder::set_toolbar` emits typed `CTBWRAPPER`/`CTBS`/`CTB` metadata through the root `XCB` stream, preserving reserved fields, optional visual bytes, `TBCCmd`, and bounded shared `TBCGeneralInfo`/`TBCExtraInfo` payloads for non-ActiveX controls. Ambiguous or malformed variable boundaries are rejected, and macros/UI/ActiveX are never executed. |
 
 ## Pivots, charts, drawings, and external references
@@ -82,7 +82,7 @@ rendering, external I/O, macro execution, or certificate trust.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Pivot caches | ✅ | ✅ | ✅ | Typed PivotCache definitions include shared items, value types, grouping, worksheet/consolidation sources, OLAP hierarchies/tuples, calculated items/members, and supported extension records. |
-| PivotTable views | ✅ | ✅ | ✅ | Pivot fields/items, axes, page selections, data items, layouts, functions, view extensions, and the constrained pivot-view editor are available. The crate does not refresh or calculate a PivotTable. |
+| PivotTable views | ✅ | ✅ | ✅ | Pivot fields/items, axes, page selections, data items, layouts, functions, view extensions, and the constrained pivot-view editor are available. `SXVI` item types use the BIFF codes 0–14, distinct from aggregation-function codes; native data items and automatic subtotals retain their correct meaning. Unknown item codes remain opaque. The crate does not refresh or calculate a PivotTable. |
 | Pivot charts | 🟡 | ✅ | 🟡 | Pivot-chart links and related SXView/PivotChart records are recognized; chart rendering and complete pivot-chart authoring remain bounded by the chart graph support. |
 | BIFF charts and chart sheets | 🟡 | ✅ | 🟡 | litchi-xls::chart provides chart discovery, strict BOF/EOF framing, a typed fixed-point chart-area snapshot/transaction, bounded series formula/cache edits, byte-preserved unknown records, and exact-offset replay. The chart-area edit never resizes an embedded host object. Full chart grammar certification, fresh chart authoring, rendering, and unsafe graph edits are refused. |
 | OfficeArt drawings and shape groups | 🟡 | ✅ | 🟡 | Shape extraction exposes typed shape/group geometry, XLS `SheetAnchor` cell-relative endpoints, anchors, text, and selected drawing metadata. The complete OfficeArt drawing-group graph, renderer, and arbitrary shape mutation are not claimed. |
@@ -110,3 +110,33 @@ checks absent/wrong/correct passwords, the CryptoAPI RC4 128-bit source profile,
 Sheet1 markers and cached values 42/84, ordinary-publication refusal, and exact
 ciphertext retention through `to_encrypted_bytes`. It does not rekey, refresh
 formulas or reopen the result in Microsoft Excel.
+
+## Native fixture qualification
+
+`tests/microsoft_office_native_metadata.rs` checks native PivotCache rows,
+PivotTable item types/axes/aggregation metadata, CSE/shared/data-table owners,
+dynamic-array cache retention, Scenario Manager metadata, classic notes,
+hyperlinks, conditional formats, print setup, custom views and 1904 layout.
+Legacy XLS LET conversion is tested as its stored `#VALUE!` formula tokens and
+prior numeric cache; it is not presented as a reconstructed LET expression.
+
+Scalar create/update/remove covers six native XLS/XLT variants, including macro
+and embedded-object containers, with non-Workbook streams and formula-owner
+records preserved. Pivot-caption, row/column visibility and page-break edits
+check typed readback and exact inverse publication. The protected notes fixture
+checks exact no-op behavior and atomic Protected refusal. Public operations
+queries and two-sheet edits run on both Auto and Eager owners.
+
+The assertion index is `tools/native_office_tests.json`. These are bounded
+feature assertions, not full feature qualification. Opaque formula tokens and
+inert macro/OLE streams remain distinct from typed expression or payload
+semantics. No fresh Excel reopen, rendering, calculation, refresh, hyperlink
+navigation or macro/control execution was performed.
+
+Native `DBCELL` indexes may append zero deltas for empty rows after the offsets
+of populated rows. The reader accepts that padding only when the total slot
+count equals the observed `ROW` count, retains the original payload, and still
+checks every populated-row pointer against the actual cell record boundary.
+Padding does not create extra cell pointers. Layout edits may regenerate a
+compact `INDEX`/`DBCELL` pair; tests validate the rebuilt index and compare all
+records outside that related index and the requested row/column change.

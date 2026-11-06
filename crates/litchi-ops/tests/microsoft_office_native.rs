@@ -4,10 +4,69 @@
     feature = "docx",
     feature = "pptx",
     feature = "xlsx",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "xls"
 ))]
 
 use litchi_ops::{OpenOptions, SourceMode, props};
+
+#[cfg(feature = "xls")]
+#[test]
+fn native_xls_formula_queries_and_cell_edits_keep_array_caches_on_both_owners() {
+    let bytes =
+        include_bytes!("../../../test-data/microsoft-office/excel/excel-formula-owners.xls");
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap();
+        let matches = source
+            .query("cell[value=206]")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].path().to_string(), "/sheet[1]/D103");
+        assert_eq!(
+            source
+                .get("Sheet1!D103")
+                .unwrap()
+                .view()
+                .format()
+                .unwrap()
+                .find(|p| p.key() == "formula")
+                .unwrap()
+                .to_string(),
+            "(ROW()*2)"
+        );
+        let committed = source
+            .edit(|edit| {
+                edit.set("Sheet1!Z121", props! {"value"=>42})?;
+                edit.set("Sheet2!Z121", props! {"value"=>"=inert native text"})
+            })
+            .unwrap();
+        let after = committed.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(after, &options).unwrap();
+        for (path, text) in [
+            ("Sheet1!Z121", "42"),
+            ("Sheet2!Z121", "=inert native text"),
+            ("Sheet1!C7", "200"),
+            ("Sheet2!F4", "50"),
+        ] {
+            assert_eq!(
+                reopened
+                    .get(path)
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some(text)
+            );
+        }
+        let restored = committed.patch().inverse().apply(committed.file()).unwrap();
+        assert!(restored.to_bytes().unwrap() == bytes);
+        assert!(source.to_bytes().unwrap() == bytes);
+    }
+}
 
 #[cfg(feature = "xlsb")]
 #[test]

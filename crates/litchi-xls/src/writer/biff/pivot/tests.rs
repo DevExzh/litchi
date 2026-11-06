@@ -40,7 +40,7 @@ fn test_write_sxvi_data() {
     write_sxvi(
         &mut buf,
         &SxViConfig {
-            item_type: 0x00FE,
+            item_type: 0x0000,
             flags: 0,
             cache_index: 3,
             name: None,
@@ -48,6 +48,7 @@ fn test_write_sxvi_data() {
     )
     .unwrap();
     assert_eq!(&buf[0..2], &[0xB2, 0x00]);
+    assert_eq!(&buf[4..6], &[0x00, 0x00]);
 }
 
 #[test]
