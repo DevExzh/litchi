@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "52e4b427447ba1d55b0ec4bf0d02d21cd8ff266b",
+  "base_commit": "302bdbcd1d9e2cda6f8ebe87f0de34637b567440",
+  "problem": "Native XLSB cache reads rejected the ACUID identity prefix; cache edits could loop forever when rId(count+1) was occupied. Native dynamic-formula indexes also point to a CellMeta record immediately before the first cell, causing unrelated scalar insertion to fail with CorruptFile.",
+  "changes": [
+    "Retain Cache.alternate_content, validating exactly one native 0x0c00 16-byte UID inside a bounded alternate-content envelope before the cache definition. Constructors leave it empty. Reads, writes and edits preserve the original product-version framing and UID bytes.",
+    "Reuse existing cache part names and relationship IDs for updates/reorderings of the same cache-name set. Verify exclusive inbound ownership. Cache add/remove scans a bounded n+1 numeric ID range instead of repeatedly trying an occupied rId(count+1).",
+    "Bind native first-cell metadata prefixes after validating contiguous CellMeta/ValueMeta ordering and four-byte payloads. Expose the actual cell record for lookup. Require both actual-cell and prefix geometry to stay equal before preserving an index unchanged; rewrite prefix-only changes.",
+    "Add eleven owning-crate native tests and one operations test; expand the fixture/feature assertion index without promoting historical pending evidence.",
+    "Correct worksheet print capability claims: manual page breaks are typed, while worksheet setup, margins, print flags and header/footer remain opaque package records. Chart-sheet print metadata support is a separate existing family."
+  ],
+  "verification_scope": {
+    "slicer_read": "Two caches: exact names/hierarchies, internal cache ID2018148052, PivotTable1/sheet ID2 bindings, sort/cross-filter/custom-list flags and both selected-item pairs. Re-encoding both native cache parts is byte exact, including UID envelopes.",
+    "slicer_edits": "Caption edit changes only slicer1.bin; sort metadata changes only slicerCache1.bin; reordering changes only workbook.bin. Reopen/readback and inverse compare complete member payloads. Add/remove covers sparse numeric IDs and keeps new cache identity separate from native UIDs.",
+    "slicer_negatives": "In-memory native derivatives reject inconsistent product counts, short/duplicate UIDs, missing/nonempty AC ends, wrong record kinds and repeated prefixes; writer rejects doubled identity blocks and caller raw payload limits remain effective.",
+    "pivot_table": "Native visual-analytics/pivot-controls retain exact view names/cache IDs/catalog positions and Table1 range/header/column captions. All eight PivotCache records are decoded, including direct DateTime and shared-item DateTime variants, and exact cached totals175.5/9.5 are checked.",
+    "notes": "Native A2/A3 authors, complete text and three font runs agree on eager/source owners. Replacing A2 text retains the other note, VML and every unrelated member. The writer supplies its required default-font run for new plain text; inverse after reopen restores every original payload.",
+    "dates_layout_breaks": "Native1904 flag, six exact stored serials, hidden rows14/15, hidden J and A:B widths; row break19/column break6. Add/readback/inverse preserves all records outside the row-break block and all other members.",
+    "formula_groups": "Exact C4:C7, D5:D68, D69:D103, A4:B6 and D4:E5 group ranges and group payload round trips. All100 copied/shared expressions/caches, CSE expression/range/caches,11 dynamic/LET caches and20 what-if outputs are checked. Dynamic expressions retain explicit Opaque(Unsupported) status, original tokens/ancillary bytes and group binding rather than pretending to be rendered/evaluated formulas.",
+    "scenarios": "BASELINE_009 and ALTERNATE_009 retain comments, input-cell/value pairs, locked/hidden/current/shown state. Comment editing preserves all non-scenario worksheet records and other package parts, leaves inputs/model result10/2/25 intact and inverses exactly.",
+    "binary_index": "Native sheet2 index offset358 points to a six-byte CellMeta prefix before A4 at364. Bound lookup returns actual cell boundaries and exact caches. Preceding/interior/later-cell/foreign-record offsets fail. A unit test covers two metadata records, duplicate refusal and index rewriting when only prefix identity changes.",
+    "operations": "Auto/Eager routes query native D103=206 and its rendered formula, create number/text cells across two sheets, update/delete a stored record, keep dynamic/LET caches and inverse to exact original bytes. Virtual absent cells display (empty); owning readback confirms the record is absent.",
+    "validation_timing": "Full owning/operations/facade suites passed. The index unit was repeated after replacing its test-only numeric cast with a checked conversion; the native owner target was repeated on the committed source. Clippy warnings are pre-existing vendored zlib-rs warnings, not errors in changed crates.",
+    "provenance": "All139 fixtures and4 assets pass size/SHA integrity. Native bytes were not changed. No fresh Microsoft Office reopen, rendering, evaluation, refresh, macro/control execution or external fetch occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 2026,
+    "additional_focused_repeat_passes": 12,
+    "python_passed": 72,
+    "new_native_owner_tests": 11,
+    "new_native_ops_tests": 1,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 147,
+      "indexed_tests": 130,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 147,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 51,
+        "native_evidence_needs_semantic_tests": 100,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 69,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-owner-final.log",
+        "bytes": 140013,
+        "sha256": "3c96c4226d34fa699c9f1db8cbc0261c00d595b92bd7254c966a29cea7dc445d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-owner-final.log 2>&1",
+      "suites": 56,
+      "passed": 1353,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xlsb,encryption --lib --test 'xlsb_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-ops-final.log",
+        "bytes": 62286,
+        "sha256": "ad82754ae98da79e7db4d23e70df292db07648b16a55860ba75dbe0e36c0f969"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xlsb,encryption --lib --test 'xlsb_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-ops-final.log 2>&1",
+      "suites": 16,
+      "passed": 564,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-facade-final.log",
+        "bytes": 32507,
+        "sha256": "a1ccadd4e5150fe56fa5add8f78049f7619fca8a3990f4ee21fa9a2de0b351e6"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 109,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --lib binary_index::tests::metadata_prefixes_bind_exactly_and_prefix_only_changes_rewrite_the_index -- --exact",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-index-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-index-final.log",
+        "bytes": 17396,
+        "sha256": "ab69f8d32b8bf6ba42eb383d0cca761417f5e4c754ff5e51ae5058533c52abe2"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --lib binary_index::tests::metadata_prefixes_bind_exactly_and_prefix_only_changes_rewrite_the_index -- --exact > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-index-final.log 2>&1",
+      "suites": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --test microsoft_office_native_metadata",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-native-source.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-native-source.log",
+        "bytes": 18235,
+        "sha256": "be77bf3502113938b94c3a137199807207c57401288a214b957c7f72cd9989c4"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --test microsoft_office_native_metadata > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-native-source.log 2>&1",
+      "suites": 1,
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-xlsb -p litchi-ops --no-default-features --features litchi-xlsb/vba-inspection,litchi-ops/xlsb,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-clippy-final.log",
+        "bytes": 17222,
+        "sha256": "a7765b5be353fc7d44b004e88ac834c4dcfbf7c32944068cce440edf5d14a682"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-xlsb -p litchi-ops --no-default-features --features litchi-xlsb/vba-inspection,litchi-ops/xlsb,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-python.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-python.log",
+        "bytes": 664,
+        "sha256": "ee70adf4a786cabd369bdd994e28868126fc668b28c2e3d636ec6898c2b8deb4"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-gate.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-coverage.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-coverage.json",
+        "bytes": 643287,
+        "sha256": "1c87692bd26f95b4238fa0e659f8e8b417f7640f11f51cfe65f2f001bbf6792e"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-xlsb/src/binary_index.rs crates/litchi-xlsb/src/slicer/codec.rs crates/litchi-xlsb/src/slicer/model.rs crates/litchi-xlsb/src/slicer/package.rs crates/litchi-xlsb/tests/microsoft_office_native_metadata.rs crates/litchi-ops/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsb-metadata-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-xlsb/src/binary_index.rs crates/litchi-xlsb/src/slicer/codec.rs crates/litchi-xlsb/src/slicer/model.rs crates/litchi-xlsb/src/slicer/package.rs crates/litchi-xlsb/tests/microsoft_office_native_metadata.rs crates/litchi-ops/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/xlsb-metadata-format-final.log 2>&1"
+    }
+  ],
+  "additional_checks": [
+    {
+      "command": "git diff --cached --check",
+      "result": "pass"
+    },
+    {
+      "command": "AGENTS.md staged evidence-size and binaries-path guards",
+      "result": "both print nothing before each commit"
+    }
+  ],
+  "reproduction_artifacts": [
+    {
+      "artifact": {
+        "file_name": "xlsb-metadata-before.jsonl",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-before.jsonl",
+        "bytes": 33259,
+        "sha256": "9b4058a2f97da9f5625c4812df8345a4f0ee8da0ca319f67006a23921ac34f17"
+      },
+      "scope": "Read-only baseline over six native XLSB fixtures, exposing the slicer cache read failure and expected pivot/connection/note metadata."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsb-slicer-cache-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-slicer-cache-before.log",
+        "bytes": 18036,
+        "sha256": "b3aac945ee18f4b17271c13ad7e8cf6dd464d371bc6113c055e4a51c3b35cb92"
+      },
+      "scope": "Permanent native regression fails on missing BrtBeginSlicerCacheDef before identity-prefix support."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsb-cache-edit-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-cache-edit-before.log",
+        "bytes": 17233,
+        "sha256": "de912d5d810575fc4cd83b4dcff7998f23737ed359a012a7b8ef06753810b291"
+      },
+      "scope": "After identity parsing was repaired, the native cache metadata test entered the old allocator loop. The 20-second timeout exited124 after the test started. Source relationships rId1..rId12 minus6/7 leave10 IDs, including the repeatedly attempted rId11."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsb-metadata-ops-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsb-metadata-ops-before.log",
+        "bytes": 18091,
+        "sha256": "5af2f9627f250e0a673d981c3873ab2a7c04f0fac484f2732b327e6a319c597f"
+      },
+      "scope": "Public scalar insertion fails on item1 with CorruptFile / index offset is not an exact first-cell record boundary before metadata-prefix binding."
+    }
+  ],
+  "specification_references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/8a9089cf-a4e8-4873-a6a0-f25de9e19328",
+    "https://officeprotocoldoc.z19.web.core.windows.net/files/MS-XLSB/%5BMS-XLSB%5D-250916.pdf",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/30e2eaae-0b1e-4e8e-a465-e1ce5575868d",
+    "https://learn.microsoft.com/en-gb/openspecs/office_file_formats/ms-xlsb/24a15de8-d7fc-4ccd-a428-1ffc41f4bebb"
+  ],
+  "specification_limits": "Slicer cache ACUID grammar and16-byte UID payload are documented; numeric0x0c00 is observed in the native corpus and is kept as that explicit profile. The published by-number table does not list BrtUid. Metadata-prefix index anchoring is native compatibility evidence; arbitrary indexes are not accepted.",
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_metadata-fcb031adc2216ae4",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_metadata-fcb031adc2216ae4",
+      "bytes": 18945920,
+      "sha256": "910663a23043ddbb20248546603c0b97987bdb174f210e063c7fe4135b06e0af",
+      "source_commit": "52e4b427447ba1d55b0ec4bf0d02d21cd8ff266b",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --test microsoft_office_native_metadata"
+    }
+  ],
+  "remaining_scope": [
+    "The active goal remains incomplete.139/139 fixtures are indexed, but147/494 rows have only partial assertions across130 tests.",
+    "All252 historical pending statuses are unchanged. Unasserted gaps comprise100 native-evidence semantics,69 operations,51 bounded-evidence operations,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "Native XLSB chart/drawing/image/OLE, connections/query tables, macro metadata, shared strings/styles, package/raw codecs and other families still need current semantic/operation tests. Timeline native-source edits retain their documented noncanonical-XML restriction; isolated read/codec tests do not establish that operation.",
+    "The corrected worksheet print limitation is not resolved by raw-byte retention or page-break tests. No full worksheet print grammar, full PivotTable layout, dynamic formula compilation/evaluation or active slicer filtering is claimed.",
+    "Other Office formats and partial indexed rows still need row-by-row scope review and supported operation/preservation expansion before goal completion."
+  ]
+}
