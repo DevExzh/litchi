@@ -24,13 +24,19 @@ const MAX_DEPTH: usize = 128;
 const MAX_EVENTS: usize = 1_000_000;
 
 /// The effective flags from one worksheet `printOptions` element.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PrintOptions {
     horizontal_centered: bool,
     vertical_centered: bool,
     print_headings: bool,
     grid_lines: bool,
     grid_lines_set: bool,
+}
+
+impl Default for PrintOptions {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PrintOptions {
@@ -42,7 +48,8 @@ impl PrintOptions {
             vertical_centered: false,
             print_headings: false,
             grid_lines: false,
-            grid_lines_set: false,
+            // CT_PrintOptions defaults only this Boolean to true.
+            grid_lines_set: true,
         }
     }
 
@@ -94,7 +101,7 @@ impl PrintOptions {
         self.grid_lines
     }
 
-    /// Raw `gridLinesSet` flag.
+    /// Effective `gridLinesSet` flag, including its schema default of true.
     #[must_use]
     pub fn grid_lines_set(&self) -> bool {
         self.grid_lines_set
@@ -117,9 +124,26 @@ pub fn write_print_options(value: &PrintOptions) -> Vec<u8> {
 
 /// Replace, insert, or remove direct worksheet print properties.
 pub fn replace_print_options(xml: &[u8], value: Option<&PrintOptions>) -> Result<Vec<u8>> {
+    rewrite_print_options(xml, value, false)
+}
+
+fn splice_print_options(xml: &[u8], value: Option<&PrintOptions>) -> Result<Vec<u8>> {
+    rewrite_print_options(xml, value, true)
+}
+
+fn rewrite_print_options(
+    xml: &[u8],
+    value: Option<&PrintOptions>,
+    preserve_source: bool,
+) -> Result<Vec<u8>> {
     let _ = parse_print_options(xml)?;
     let attributes = value.map(print_option_attributes);
-    let output = crate::raw::worksheet_property::replace_direct_empty(
+    let rewrite = if preserve_source {
+        crate::raw::worksheet_property::splice_direct_empty
+    } else {
+        crate::raw::worksheet_property::replace_direct_empty
+    };
+    let output = rewrite(
         xml,
         "printOptions",
         attributes.as_deref(),
@@ -438,6 +462,54 @@ mod tests {
         assert_eq!(
             parse("<printOptions/>").unwrap().unwrap(),
             PrintOptions::default()
+        );
+    }
+
+    #[test]
+    fn omitted_grid_lines_set_uses_the_schema_default_in_both_dialects() {
+        for namespace in [CORE_STR, "http://purl.oclc.org/ooxml/spreadsheetml/main"] {
+            for (attributes, grid, known) in [
+                ("", false, true),
+                (r#" gridLines="1""#, true, true),
+                (r#" gridLines="1" gridLinesSet="0""#, true, false),
+                (r#" gridLines="0" gridLinesSet="1""#, false, true),
+            ] {
+                let xml = format!(
+                    r#"<worksheet xmlns="{namespace}"><printOptions{attributes}/></worksheet>"#
+                );
+                let value = parse_print_options(xml.as_bytes()).unwrap().unwrap();
+                assert_eq!(value.grid_lines(), grid);
+                assert_eq!(value.grid_lines_set(), known);
+                assert_eq!(value.prints_grid_lines(), grid && known);
+                let encoded = write_print_options(&value);
+                assert_eq!(
+                    parse(std::str::from_utf8(&encoded).unwrap()).unwrap(),
+                    Some(value)
+                );
+            }
+        }
+        assert_eq!(PrintOptions::new(), PrintOptions::default());
+        assert!(PrintOptions::default().grid_lines_set());
+        assert!(!PrintOptions::default().prints_grid_lines());
+    }
+
+    #[test]
+    fn source_print_splice_keeps_bom_whitespace_comments_and_cell_text() {
+        let xml = format!(
+            "\u{feff}<?xml version=\"1.0\"?>\r\n<worksheet xmlns=\"{CORE_STR}\">\n  <sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t xml:space=\"preserve\"> text </t></is></c></row></sheetData>\n  <printOptions gridLines=\"1\"/>\r\n  <!-- retained -->\n</worksheet>\n"
+        );
+        let mut options = parse_print_options(xml.as_bytes()).unwrap().unwrap();
+        options.set_vertical_centered(true);
+        let actual = splice_print_options(xml.as_bytes(), Some(&options)).unwrap();
+        let replacement = String::from_utf8(write_print_options(&options)).unwrap();
+        let expected = xml.replace("<printOptions gridLines=\"1\"/>", &replacement);
+        assert!(actual == expected.as_bytes());
+        let removed = splice_print_options(xml.as_bytes(), None).unwrap();
+        assert!(
+            removed
+                == xml
+                    .replace("<printOptions gridLines=\"1\"/>", "")
+                    .as_bytes()
         );
     }
 

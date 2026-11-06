@@ -4674,6 +4674,151 @@
         "An attached SVG can move to a new media part with unchanged indented asset bytes and PNG fallback; the obsolete SVG part is removed, relationship ID stays stable, and retained-source inverse restores the prior artifact."
       ],
       "scope_limit": "Empty relationship elements in the native noncanonical relationship stream; opaque child content is still refused and no native-app reopen is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_properties",
+      "name": "native_review_properties_keep_typed_values_and_exact_noop_members",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-079"
+      ],
+      "assertions": [
+        "Exact native core title/subject/author/keywords/category/revision/timestamps, saved application statistics and producer/template/company/manager metadata, and three custom Text/I32/Bool values with case-insensitive lookup; setting all current values is byte-exact no-op."
+      ],
+      "scope_limit": "Stored metadata only; saved page/word counts are not recalculated or independently validated by rendering."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_properties",
+      "name": "native_property_crud_preserves_unmodeled_app_vectors_and_reverses_after_reopen",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-079"
+      ],
+      "assertions": [
+        "One transaction updates core/app/custom properties, removes and inserts a custom value, preserves native HeadingPairs/TitlesOfParts bytes and every unrelated member, saves/reopens, and restores exact member bytes through the inverse."
+      ],
+      "scope_limit": "Only the represented scalar property edits; opaque application vectors are retained, not interpreted."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_properties",
+      "name": "native_property_family_removal_and_inverse_restore_relationships_and_parts",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-079"
+      ],
+      "assertions": [
+        "Remove all three property families, verify absent typed values and package members, then apply the inverse after reopen; all original part payloads and complete manifest/relationship element attributes return."
+      ],
+      "scope_limit": "Part-level patches can regenerate content-type and relationship XML; the test asserts graph equivalence there and exact bytes for every actual part, not archive-byte identity."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_properties",
+      "name": "native_word_variants_metadata_edit_keeps_template_and_inert_macro_parts",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-079"
+      ],
+      "assertions": [
+        "DOCX/DOTX/DOCM/DOTM expose exact native template names, author and saved word counts; title edits change only core.xml, preserve every template/macro/unrelated member, reopen and invert exactly at member level."
+      ],
+      "scope_limit": "Macros remain inert; no execution or fresh Word reopen."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_properties",
+      "name": "native_word_web_settings_read_and_screen_edit_preserve_other_source_xml",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-077"
+      ],
+      "assertions": [
+        "Native optimizeForBrowser/allowPNG flags, absent encoding/screen/frameset/divs, and Transitional ownership read correctly; equal put is exact no-op, screen insertion changes exactly its source element, survives temporary save/reopen and reverses to exact member bytes."
+      ],
+      "scope_limit": "Only native scalar settings and one screen-size edit; frameset, div, border and URL behavior remain outside these fixtures."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_properties",
+      "name": "native_word_web_settings_remove_and_restore_preserves_document_relationships",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-077"
+      ],
+      "assertions": [
+        "Remove web settings idempotently, verify typed absence after reopen, and restore the part payload plus all document relationship and content-type attributes through the inverse."
+      ],
+      "scope_limit": "Graph patch regenerates manifest/relationship lexical form when recreating parts; actual part bytes are exact, and no rendering occurs."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_print_views",
+      "name": "native_print_headers_footers_and_default_gridline_flag_are_typed",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-230",
+        "xlsx-232"
+      ],
+      "assertions": [
+        "Exact left/center/right native header/footer text, formatting controls and inert sheet/file/page fields; odd/even/first-page defaults; native centered/headings/grid flags with omitted gridLinesSet defaulting true; typed printer-setting absence and package reopen preservation."
+      ],
+      "scope_limit": "No printer-specific DEVMODE part is present. Header/footer field evaluation, printing and native application reopen are not claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_print_views",
+      "name": "native_print_option_edit_changes_only_its_element_and_restores_exact_source",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-230",
+        "xlsx-232"
+      ],
+      "assertions": [
+        "Source-backed print-option no-op is exact; disabling gridlines and enabling vertical centering replaces only the exact printOptions element, retaining every other worksheet byte and package member, survives temporary save/reopen and exact retained-source inverse."
+      ],
+      "scope_limit": "Header/footer content and all unrelated source bytes are preservation assertions, not header/footer editing or printing support."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_print_views",
+      "name": "native_frozen_panes_and_saved_selections_match_eager_and_source_readers",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-date1904-breaks.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-212"
+      ],
+      "assertions": [
+        "Native Sheet1 has frozen B2 panes with three exact pane selections; the other fixtures expose exact B2:I5/B6 selections, active cells, view/window/zoom/display defaults and tab selection. Eager and source views agree."
+      ],
+      "scope_limit": "Workbook custom views in date1904-breaks are a different family from namedSheetViews; named-sheet-view absence is not promoted to custom-view runtime parity. No view rendering or general view edit is claimed."
     }
   ]
 }

@@ -163,7 +163,7 @@ impl Edit {
             let patch = super::Patch::new(self.before.clone(), self.before);
             return commit_change(&self.workbook, patch);
         }
-        let output = super::replace_print_options(self.before.source_xml(), self.staged.as_ref())?;
+        let output = super::splice_print_options(self.before.source_xml(), self.staged.as_ref())?;
         let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
         snapshot.check_execution()?;
         if snapshot.print_options() != self.staged.as_ref() {

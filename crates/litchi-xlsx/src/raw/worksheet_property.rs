@@ -20,6 +20,29 @@ pub(crate) fn replace_direct_empty(
     successors: &[&[u8]],
     context: &'static str,
 ) -> Result<Vec<u8>> {
+    rewrite_direct_empty(xml, local, attributes, successors, context, false)
+}
+
+/// Source-backed publication authors only the selected property element;
+/// producer whitespace and unrelated lexical content remain source-owned.
+pub(crate) fn splice_direct_empty(
+    xml: &[u8],
+    local: &str,
+    attributes: Option<&str>,
+    successors: &[&[u8]],
+    context: &'static str,
+) -> Result<Vec<u8>> {
+    rewrite_direct_empty(xml, local, attributes, successors, context, true)
+}
+
+fn rewrite_direct_empty(
+    xml: &[u8],
+    local: &str,
+    attributes: Option<&str>,
+    successors: &[&[u8]],
+    context: &'static str,
+    preserve_source: bool,
+) -> Result<Vec<u8>> {
     let layout = scan(xml, local.as_bytes(), successors, context)?;
     // The scan recognizes markup-compatibility names on namespace values as
     // written; a declaration spelled with references binds the namespace for
@@ -52,7 +75,11 @@ pub(crate) fn replace_direct_empty(
     output.extend_from_slice(&xml[..span.start]);
     output.extend_from_slice(&replacement);
     output.extend_from_slice(&xml[span.end..]);
-    crate::raw::compact::changed(&output, context)
+    if preserve_source {
+        Ok(output)
+    } else {
+        crate::raw::compact::changed(&output, context)
+    }
 }
 
 struct Layout {
