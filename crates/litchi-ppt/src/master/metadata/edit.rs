@@ -228,8 +228,9 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error::Refused`] when the XML or the master cannot
-    /// carry the package, leaving the edit unchanged.
+    /// Returns a package validation error for malformed XML or embedded-package
+    /// content, or [`super::Error::Refused`] for a value the master cannot carry.
+    /// A failure leaves the edit unchanged.
     pub fn set_notes_styles_xml(&mut self, xml: impl AsRef<[u8]>) -> Result<()> {
         Ok(self
             .state_mut()?

@@ -5080,6 +5080,146 @@
         "Unchanged reference serialization returns the exact native compressed dir stream. Renaming the Office display reference source-bound preserves project name/code page, all module metadata, reference kinds and every other reference raw record after decode."
       ],
       "scope_limit": "Directory-stream serialization only; no containing-document publication, type-library resolution, macro execution or native acceptance."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_navigation",
+      "name": "native_ppt_hyperlink_definitions_keep_ids_targets_and_tooltips",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-365"
+      ],
+      "assertions": [
+        "Exact native hyperlink seed 37, ten retained definition IDs, duplicate old/current URL/slide/mail/relative-jump definitions, internal location 260,5,DESTINATION_003, screen tip and dialog/named-show flags."
+      ],
+      "scope_limit": "Inert definitions only; duplicate definitions are retained rather than treated as additional visible links."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_navigation",
+      "name": "native_ppt_text_clicks_and_mouse_over_keep_utf16_ranges_and_fields",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-365",
+        "ppt-366"
+      ],
+      "assertions": [
+        "Four click actions belong to shape 4098 at UTF-16 ranges 0..17,18..35,36..51,52..67; the mouse-over belongs to shape 9218 at 0..16. Exact IDs/actions/jumps/targets and all passive flags; codec read/write preserves fields and click resolution returns the saved URL, slide 5, email and next-slide targets."
+      ],
+      "scope_limit": "No actions are activated. Mouse-over metadata is preserved separately from the click-only resolver; the fixture does not evidence macro/program/OLE or named-show actions."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_navigation",
+      "name": "native_ppt_text_link_replace_remove_and_inverse_preserve_sibling_actions",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-365",
+        "ppt-366"
+      ],
+      "assertions": [
+        "Same URL is no-op; replacing the external URL/tip adds definition 38, overlapping-range refusal rolls back, removing the mailto action retains its unused definition, sibling actions and other slide/CFB data. Temporary save/reopen and exact inverse pass; deterministic durable replay/inverse restore the expected record semantics."
+      ],
+      "scope_limit": "Durable inverse uses append-only record publication, distinct from exact original-archive restoration by the retained native patch. Targets remain inert."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_navigation",
+      "name": "native_ppt_shape_link_add_remove_preserves_native_text_actions",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-365",
+        "ppt-366"
+      ],
+      "assertions": [
+        "Add a whole-shape internal-slide link with a tip to native title shape 3073, then remove it; all native text click and mouse-over actions, unchanged slides/streams and exact retained-source inverse remain intact."
+      ],
+      "scope_limit": "Bounded top-level shape click editing only; no rendering or active slide navigation."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_navigation",
+      "name": "native_ppt_click_addition_keeps_an_existing_mouse_over_action",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-366"
+      ],
+      "assertions": [
+        "Add and remove a click link over the same native text range as the first-slide mouse-over; the original hover action remains exactly equal throughout, with source-record and inverse preservation."
+      ],
+      "scope_limit": "Click and hover coexist as stored metadata; no host event dispatch or execution."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_navigation",
+      "name": "native_ppt_internal_link_uses_stable_slide_id_after_reorder",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-365"
+      ],
+      "assertions": [
+        "Moving destination ID 260 to position 0 leaves every slide record and hyperlink definition unchanged, including saved number 5, while the internal jump resolves by stable ID to its new position; reopen and exact inverse pass."
+      ],
+      "scope_limit": "Reordering an existing internal target only; deletion/fallback behavior and active navigation are outside the assertion."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_masters",
+      "name": "native_notes_and_handout_masters_resolve_exact_persist_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt"
+      ],
+      "feature_rows": [
+        "ppt-388"
+      ],
+      "assertions": [
+        "Native notes/handout masters resolve persist 2 with record types 1008/4041 and exact payload lengths; each deck has one main master and no title master. The native notes txStyles package has one part at /drs/slideMasters/slideMaster1.xml and exact 1,285-byte SHA-256."
+      ],
+      "scope_limit": "Contextual inventories and opaque validated style-package identity only; no title-master presence, drawing synthesis or effective style rendering is claimed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_masters",
+      "name": "native_notes_and_handout_master_name_edits_are_isolated_and_reversible",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt"
+      ],
+      "feature_rows": [
+        "ppt-388"
+      ],
+      "assertions": [
+        "Create master names, preserve all other master children/main masters/slides/CFB streams, save/reopen, verify exact no-op and idempotent removal, and restore the source archive through inverse. Notes styles on a handout return typed staging InvalidValue without losing the staged name."
+      ],
+      "scope_limit": "Existing notes/handout metadata only; no new master graph creation or native Office acceptance."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_masters",
+      "name": "native_notes_style_package_replacement_preserves_other_master_and_slide_records",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-388"
+      ],
+      "assertions": [
+        "The native notes-style package is a no-op when unchanged. Replacing it with a validated body-style XML containing sz=1800 survives temp save/reopen with exact stored XML; malformed-root refusal leaves the valid edit staged, all other records remain exact and inverse restores the source."
+      ],
+      "scope_limit": "OPC/style XML storage only; no font rendering, layout computation, master OfficeArt synthesis or native application reopen."
     }
   ]
 }
