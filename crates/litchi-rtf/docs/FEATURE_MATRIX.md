@@ -61,7 +61,7 @@ An unsupported semantic row therefore does not imply loss on an untouched save.
 | Form fields and editable/protected regions | ✅ | 🟡 | Inert control properties, protected users/ranges, and editable regions are modeled and retained. Native Word text defaults/help/max length, checkbox default/size, drop-down entries and undefined selections survive canonical writing with their result ranges and bookmarks. Default values are not substituted for absent results; controls never activate. `form_field_properties.rs`, `protection_ranges.rs`, `editable_regions.rs`, `microsoft_office_native.rs`. |
 | Math and equations | ✅ | 🟡 | Retained math trees/properties and writer support; no ordinary fresh math builder, evaluation, or layout. Native Word `mmath` envelopes, inline/display trees, character-format wrappers and both script-child orders are covered by `microsoft_office_native.rs`. Multiple equations in one display paragraph return typed `UnsupportedContent`; local run formatting and picture fallbacks remain source-owned. `math_zones.rs`, `math_properties.rs`. |
 | Pictures, drawings, shape groups, and text boxes | ✅ | 🟡 | Typed retained metadata and payloads, bounded picture edits, root-shape text transactions, and checked transfer. No visual renderer or arbitrary shape graph editor. `picture_properties.rs`, `shape_groups.rs`, `shape_text_frames.rs`, `legacy_drawings.rs`. |
-| OLE/embedded objects and Publisher objects | 🟡 | 🟡 | Inert object class/data/result metadata includes `ObjectKind::Publisher` (Macintosh Edition Manager). Checked passive transfer does not activate or convert objects. `objects.rs`, `src/drawing/object.rs`. |
+| OLE/embedded objects and Publisher objects | 🟡 | 🟡 | Inert object class/data/result metadata includes `ObjectKind::Publisher` (Macintosh Edition Manager). Nested result formatting groups retain scoped text decoding and preferred/fallback picture wrappers in `result_picture_wrappers`, distinct from body picture records. Canonical writing and passive transfer retain those wrappers and payloads; objects never activate or convert. `objects.rs`, `src/drawing/object.rs`, `microsoft_office_native_visuals.rs`. |
 | Document information and producer metadata | ✅ | 🟡 | Retained information, user properties, variables, generator, origin, file tables, themes, and XML namespace/data-store metadata. Empty `datastore` destinations emitted by native Word remain present through reads, exact-source edits and canonical writing. `document_info.rs`, `user_properties.rs`, `document_variables.rs`, `custom_xml.rs`, `data_store.rs`, `microsoft_office_native.rs`. |
 | Mail merge, external references, and XSL transforms | 🟡 | 🟡 | Metadata and cached values stay inert; native Word empty file tables, main/input type, destination, current record and error-mode metadata survive read/write, including unstarred query/source text groups. Retained write-back and explicit bounded external-reference redaction. No source access, transformation execution, or merge execution. `mail_merge.rs`, `external_references.rs`, `xsl_transform.rs`, `microsoft_office_native.rs`. |
 | Document layout/compatibility/view/print policies | 🟡 | 🟡 | Typed retained policy families have codec support, not host behavior or ordinary general policy CRUD. `document_compatibility_policy.rs`, `document_view.rs`, `document_output_settings.rs`. |
@@ -100,3 +100,19 @@ including multibyte escapes; physical CR/LF outside visible text stays intact.
 The public facade regression checks the native Aptos property and text edit
 without losing unrelated symbol text or font declarations. Registration,
 substitution, licensing and rendering remain outside this evidence.
+
+`tests/microsoft_office_native_visuals.rs` qualifies the native Word worksheet
+and chart OLE descriptors, complete objdata hashes, bounded OLE1 headers and
+embedded CFB bytes. Each object's preferred/fallback previews survive model
+writing and transfer into an ordinary generated receiver. Unknown result
+destinations retain their structural scope and block lossy canonical output.
+The native vector specimen's PNG bytes remain distinct from its declared
+`pngblip`/`wmetafile8` transport types. Its field-scoped `defshp` empty-picture
+metadata remains unmodeled: canonical rewriting refuses before output.
+
+Exact snapshot save/reopen retains both visual specimens byte for byte.
+Ordinary-run edits still refuse these dependent picture/object/field owners,
+and ordinary-root transfer refuses a native receiver with opaque destinations;
+both boundaries have typed refusal and unchanged-source assertions. No native
+visual edit, empty-default-shape authoring, rendering or object activation is
+inferred from the successful snapshot and transfer cases.

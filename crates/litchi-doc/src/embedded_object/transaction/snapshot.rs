@@ -136,6 +136,17 @@ impl Snapshot {
         self.editor.inventory()
     }
 
+    /// Borrow every discovered `ObjectPool` storage, including native Word
+    /// objects whose fields are outside the editor-managed field convention.
+    ///
+    /// Use [`super::super::Metadata::of`] to inspect a storage's passive DOC/OLE
+    /// metadata. This view does not infer field ownership or authorize managed
+    /// field edits, and never activates a server or follows a linked target.
+    #[must_use]
+    pub fn storages(&self) -> &super::super::Storages {
+        self.editor.package.objects()
+    }
+
     /// Returns managed references in DOC field order.
     ///
     /// # Errors

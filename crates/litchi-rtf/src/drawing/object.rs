@@ -135,6 +135,10 @@ pub struct EmbeddedObject<'a> {
     pub result_text: Cow<'a, str>,
     /// Indices into `Tree::pictures()` for rendered fallback images
     pub result_picture_indices: Vec<usize>,
+    /// Compatibility wrapper of each result picture, in the same order as
+    /// `result_picture_indices`. An empty vector means all pictures are bare.
+    /// These wrappers belong to the object result, not the body picture list.
+    pub result_picture_wrappers: Vec<Option<crate::PictureCompatibilityKind>>,
     /// Decoded `objdata`, including the OLE `ObjectHeader`
     pub data: Vec<u8>,
 }
@@ -171,6 +175,7 @@ impl EmbeddedObject<'_> {
             result_kind: None,
             result_text: Cow::Borrowed(""),
             result_picture_indices: Vec::new(),
+            result_picture_wrappers: Vec::new(),
             data: Vec::new(),
         }
     }
@@ -238,6 +243,13 @@ impl EmbeddedObject<'_> {
         {
             return Err(crate::Error::MalformedDocument(
                 "RTF embedded object references a missing result picture".to_string(),
+            ));
+        }
+        if !self.result_picture_wrappers.is_empty()
+            && self.result_picture_wrappers.len() != self.result_picture_indices.len()
+        {
+            return Err(crate::Error::MalformedDocument(
+                "RTF object result picture wrapper count does not match its pictures".into(),
             ));
         }
         Ok(())

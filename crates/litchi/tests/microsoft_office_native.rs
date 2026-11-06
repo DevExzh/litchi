@@ -494,6 +494,70 @@ fn native_word_ole_and_chart_children_expose_distinct_workbook_values() {
 }
 
 #[test]
+fn native_legacy_word_embedded_worksheets_open_as_inert_xlsx_children() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word");
+    let doc = litchi::doc::Package::open(root.join("word-visual-objects.doc")).unwrap();
+    let doc_bytes = doc.to_bytes().unwrap();
+    let snapshot = doc.embedded_objects().unwrap();
+    let doc_payload = snapshot
+        .storages()
+        .get("_1853584064")
+        .unwrap()
+        .stream(&["Package"])
+        .unwrap();
+    let rtf = litchi::rtf::Package::open(root.join("word-visual-objects.rtf")).unwrap();
+    let rtf_bytes = rtf.to_bytes().unwrap();
+    let header = rtf.raw().objects()[0].ole_header().unwrap();
+    let mut ole = litchi::cfb::OleFile::open(
+        std::io::Cursor::new(header.native_data),
+        litchi::cfb::OleFileLimits::default(),
+    )
+    .unwrap();
+    let rtf_payload = ole.open_stream(&["Package"]).unwrap();
+    for payload in [doc_payload, rtf_payload.as_slice()] {
+        let child = litchi::open_bytes(payload.to_vec()).unwrap();
+        assert_eq!(child.format(), Some(FileFormat::Xlsx));
+        assert_eq!(
+            child.workbook().unwrap().worksheet_names().unwrap(),
+            ["Sales chart", "Sheet1", "Sheet2"]
+        );
+        let check = |bytes: &[u8]| {
+            let package = litchi::xlsx::Package::from_bytes(bytes).unwrap();
+            let book = package.workbook();
+            for (sheet, address, formula, cache) in [
+                ("Sheet1", "B6", "SUM(B2:B5)", "14"),
+                ("Sheet2", "B3", "Sheet1!D6", "49.75"),
+            ] {
+                let sheet = book.sheet(sheet).unwrap().unwrap();
+                let cell = sheet.cell(address).unwrap();
+                let Some(litchi::xlsx::Cell::Formula(value)) = cell.stored() else {
+                    panic!("stored formula")
+                };
+                assert_eq!(value.text(), formula);
+                let cached = value.cached().unwrap();
+                let litchi::xlsx::Value::Number(number) = cached.value() else {
+                    panic!("numeric cache")
+                };
+                assert_eq!(number.as_str(), cache);
+                assert_eq!(cached.origin(), litchi::xlsx::formula::Origin::Stored);
+            }
+        };
+        check(payload);
+        let changed = child
+            .set(
+                "Sheet2!Z100",
+                litchi::props! {"value"=>"Legacy Word child reviewed"},
+            )
+            .unwrap();
+        check(&changed.to_bytes().unwrap());
+        assert!(child.to_bytes().unwrap() == payload);
+    }
+    assert!(doc.to_bytes().unwrap() == doc_bytes);
+    assert!(rtf.to_bytes().unwrap() == rtf_bytes);
+}
+
+#[test]
 fn native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_edit() {
     use litchi::pptx::presentation::embedded::ole::slide;
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

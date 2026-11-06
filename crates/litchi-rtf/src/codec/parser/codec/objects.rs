@@ -3,6 +3,13 @@ use super::{
     MAX_OBJECT_TEXT_BYTES, Parser, Token, control_symbol_text,
 };
 
+#[derive(Default)]
+struct ObjectResult {
+    text: String,
+    pictures: Vec<usize>,
+    wrappers: Vec<Option<crate::PictureCompatibilityKind>>,
+}
+
 impl<'a> Parser<'a> {
     /// Parse an `object` destination without activating or updating its content.
     pub(super) fn parse_object_destination(
@@ -172,9 +179,10 @@ impl<'a> Parser<'a> {
                             "invalid RTF object result destination placement".to_string(),
                         ));
                     }
-                    let (text, pictures) = self.parse_object_result_destination()?;
-                    object.result_text = Cow::Owned(text);
-                    object.result_picture_indices = pictures;
+                    let result = self.parse_object_result_destination()?;
+                    object.result_text = Cow::Owned(result.text);
+                    object.result_picture_indices = result.pictures;
+                    object.result_picture_wrappers = result.wrappers;
                     saw_result = true;
                 },
                 Token::OpenBrace
@@ -521,74 +529,202 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_object_result_destination(
-        &mut self,
-    ) -> crate::Result<(String, Vec<usize>)> {
-        let mut text = String::new();
-        let mut picture_indices = Vec::new();
+    fn parse_object_result_destination(&mut self) -> crate::Result<ObjectResult> {
         self.pos += 1; // opening brace
-        if matches!(
-            self.tokens.get(self.pos),
-            Some(Token::Control(ControlWord::IgnorableDestination))
-        ) {
-            self.pos += 1;
-        }
+        self.reject_nested_password_hash()?;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::Result))
         ) {
             return Err(crate::Error::MalformedDocument(
-                "invalid RTF object result destination".to_string(),
+                "invalid RTF object result destination".into(),
             ));
         }
         self.pos += 1;
+        let mut output = ObjectResult::default();
+        self.parse_object_result_group_contents(&mut output)?;
+        output.text = output.text.trim().to_owned();
+        if output.wrappers.iter().all(Option::is_none) {
+            output.wrappers.clear();
+        }
+        Ok(output)
+    }
 
+    fn parse_object_result_group_contents(
+        &mut self,
+        output: &mut ObjectResult,
+    ) -> crate::Result<()> {
+        if self.states.len() >= MAX_GROUP_NESTING_DEPTH {
+            return Err(crate::Error::MalformedDocument(
+                "RTF object-result nesting exceeds the safety limit".into(),
+            ));
+        }
+        let mut state = self.current_state()?.clone();
+        state.destination = Destination::Result;
+        self.states.push(state);
+        let result = self.parse_object_result_contents(output);
+        self.states.pop();
+        result
+    }
+
+    fn parse_object_result_contents(&mut self, output: &mut ObjectResult) -> crate::Result<()> {
         while let Some(token) = self.tokens.get(self.pos) {
             match token {
                 Token::CloseBrace => {
                     self.pos += 1;
-                    return Ok((text.trim().to_string(), picture_indices));
-                },
-                Token::OpenBrace if self.nested_control_word() == Some(ControlWord::Picture) => {
-                    let first_picture = self.pictures.len();
-                    self.parse_group()?;
-                    picture_indices.extend(first_picture..self.pictures.len());
+                    return Ok(());
                 },
                 Token::OpenBrace => {
-                    self.mark_unknown_syntax()?;
-                    self.skip_group()?
+                    match self.nested_control_word() {
+                        Some(ControlWord::Picture) => {
+                            let first = self.pictures.len();
+                            self.parse_group()?;
+                            for index in first..self.pictures.len() {
+                                output.pictures.push(index);
+                                output.wrappers.push(None);
+                            }
+                        },
+                        Some(ControlWord::ShapePicture(parameter)) => {
+                            self.parse_object_result_picture_wrapper(
+                                output,
+                                crate::PictureCompatibilityKind::ShapePicture,
+                                parameter,
+                            )?;
+                        },
+                        Some(ControlWord::NonShapePicture(parameter)) => {
+                            self.parse_object_result_picture_wrapper(
+                                output,
+                                crate::PictureCompatibilityKind::NonShapePicture,
+                                parameter,
+                            )?;
+                        },
+                        control => {
+                            self.pos += 1;
+                            self.reject_nested_password_hash()?;
+                            let starred = matches!(
+                                self.tokens.get(self.pos),
+                                Some(Token::Control(ControlWord::IgnorableDestination))
+                            );
+                            if starred
+                                || control
+                                    .as_ref()
+                                    .is_some_and(Self::forbidden_navigation_control)
+                            {
+                                self.preserve_unknown_destination_in(
+                                    crate::opaque::Context::Drawing,
+                                )?;
+                            } else {
+                                // Native Word wraps result pictures and text in
+                                // ordinary character-format groups. Preserve
+                                // decoding scope without emitting body content.
+                                self.parse_object_result_group_contents(output)?;
+                            }
+                        },
+                    }
                 },
-                Token::Control(ControlWord::Unicode(code)) => {
-                    text.push_str(&self.parse_destination_unicode_sequence(*code)?);
-                },
+                Token::Control(ControlWord::Unicode(code)) => output
+                    .text
+                    .push_str(&self.parse_destination_unicode_sequence_for_current_font(*code)?),
                 Token::Control(ControlWord::Par | ControlWord::Line) => {
-                    text.push('\n');
+                    output.text.push('\n');
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::Tab) => {
-                    text.push('\t');
+                    output.text.push('\t');
                     self.pos += 1;
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
-                    text.push_str(control_symbol_text(control).unwrap_or_default());
+                    output
+                        .text
+                        .push_str(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
                 Token::Text(value) => {
-                    text.push_str(&self.decode_transport_text(value)?);
+                    output
+                        .text
+                        .push_str(&self.decode_transport_text_for_current_font(value)?);
                     self.pos += 1;
                 },
+                Token::Control(control)
+                    if Self::default_character_property_key(control).is_some()
+                        || matches!(
+                            control,
+                            ControlWord::Plain
+                                | ControlWord::UnicodeSkip(_)
+                                | ControlWord::InsertRsid(_)
+                                | ControlWord::CharStyleRsid(_)
+                        ) =>
+                {
+                    let control = *control;
+                    self.pos += 1;
+                    self.apply_control_word(&control)?;
+                },
                 Token::Control(_) | Token::Binary(_) => {
-                    self.mark_unknown_syntax()?;
+                    self.preserve_unknown_control_in(self.pos, crate::opaque::Context::Drawing)?;
                     self.pos += 1;
                 },
             }
-            if text.len() > MAX_OBJECT_TEXT_BYTES {
+            if output.text.len() > MAX_OBJECT_TEXT_BYTES {
                 return Err(crate::Error::MalformedDocument(
-                    "RTF object result text exceeds the safety limit".to_string(),
+                    "RTF object result text exceeds the safety limit".into(),
                 ));
             }
         }
         Err(crate::Error::UnexpectedEof)
+    }
+
+    fn parse_object_result_picture_wrapper(
+        &mut self,
+        output: &mut ObjectResult,
+        kind: crate::PictureCompatibilityKind,
+        parameter: Option<i32>,
+    ) -> crate::Result<()> {
+        self.pos += 1; // opening brace
+        self.reject_nested_password_hash()?;
+        let starred = matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::IgnorableDestination))
+        );
+        if parameter.is_some() || starred != (kind == crate::PictureCompatibilityKind::ShapePicture)
+        {
+            return Err(crate::Error::MalformedDocument(
+                "invalid RTF object-result picture compatibility wrapper".into(),
+            ));
+        }
+        self.pos += if starred { 2 } else { 1 };
+        self.skip_object_result_whitespace();
+        if !matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([Token::OpenBrace, Token::Control(ControlWord::Picture)])
+        ) {
+            return Err(crate::Error::MalformedDocument(
+                "RTF object-result picture wrapper requires one pict".into(),
+            ));
+        }
+        let first = self.pictures.len();
+        self.parse_group()?;
+        if self.pictures.len() != first + 1 {
+            return Err(crate::Error::MalformedDocument(
+                "RTF object-result picture wrapper has no payload".into(),
+            ));
+        }
+        self.skip_object_result_whitespace();
+        if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
+            return Err(crate::Error::MalformedDocument(
+                "RTF object-result picture wrapper requires exactly one pict".into(),
+            ));
+        }
+        self.pos += 1;
+        output.pictures.push(first);
+        output.wrappers.push(Some(kind));
+        Ok(())
+    }
+
+    fn skip_object_result_whitespace(&mut self) {
+        while matches!(self.tokens.get(self.pos),Some(Token::Text(text)) if text.chars().all(char::is_whitespace))
+        {
+            self.pos += 1;
+        }
     }
 
     pub(super) fn parse_object_text_destination(&mut self) -> crate::Result<String> {

@@ -1633,14 +1633,31 @@ impl<W: Write> Writer<W> {
         if !object.result_text.is_empty() || !object.result_picture_indices.is_empty() {
             self.write_str("{\\result ")?;
             self.write_destination_text(object.result_text.as_ref())?;
-            for index in &object.result_picture_indices {
+            for (ordinal, index) in object.result_picture_indices.iter().enumerate() {
                 let picture = pictures.get(*index).ok_or_else(|| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "RTF embedded object references a missing result picture",
                     )
                 })?;
+                let wrapper = object
+                    .result_picture_wrappers
+                    .get(ordinal)
+                    .copied()
+                    .flatten();
+                match wrapper {
+                    Some(PictureCompatibilityKind::ShapePicture) => {
+                        self.write_str("{\\*\\shppict")?
+                    },
+                    Some(PictureCompatibilityKind::NonShapePicture) => {
+                        self.write_str("{\\nonshppict")?
+                    },
+                    None => {},
+                }
                 self.write_picture(picture)?;
+                if wrapper.is_some() {
+                    self.write_str("}")?;
+                }
             }
             self.write_str("\\par}")?;
         }

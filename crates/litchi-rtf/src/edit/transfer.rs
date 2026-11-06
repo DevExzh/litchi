@@ -1713,6 +1713,7 @@ fn owned_object(object: &crate::EmbeddedObject<'_>) -> crate::EmbeddedObject<'st
         result_kind: object.result_kind,
         result_text: Cow::Owned(object.result_text.to_string()),
         result_picture_indices: object.result_picture_indices.clone(),
+        result_picture_wrappers: object.result_picture_wrappers.clone(),
         data: object.data.clone(),
     }
 }

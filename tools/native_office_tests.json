@@ -3848,6 +3848,147 @@
         "Eager and pinned source-backed inventories agree: four exact visual-object names and three exact vector/diagram anchor names; WPS floating rounded-rectangle kind/preset/frame/two-paragraph text, and WPG outer inline frame as one Other entry without child preset/text conflation."
       ],
       "scope_limit": "Top-level drawing inventory only. Group children are not flattened or exposed as a typed hierarchy; offsets remain DrawingML transforms rather than resolved page positions. No renderer, host layout, generic group authoring or native Office reopen."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_binary_vector_group_exposes_all_three_children_without_flattening",
+      "fixtures": [
+        "word/word-vector-diagram.doc"
+      ],
+      "feature_rows": [
+        "doc-055",
+        "doc-057"
+      ],
+      "assertions": [
+        "Native OfficeArt group ID 1026/bounds and three child IDs 1027-1029, kinds, native presets, anchors, fill colors, textbox text, retained container sizes and 12 unknown root properties."
+      ],
+      "scope_limit": "Typed converted OfficeArt hierarchy only; no SVG/SmartArt parity, header drawings, layout or rendering."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_binary_ole_inventory_keeps_two_separate_storages_and_payloads",
+      "fixtures": [
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-029"
+      ],
+      "assertions": [
+        "Snapshot.storages exposes two native ObjectPool keys, typed worksheet/chart CompObj names and ObjInfo flags, exact 18372-byte XLSX hash and distinct 30785-byte chart Workbook stream."
+      ],
+      "scope_limit": "Read-only native storage view; managed field ownership is not inferred from the editor-owned field index. No native OLE field authoring or activation."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_binary_body_edit_preserves_all_object_storage_metadata_and_payloads",
+      "fixtures": [
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-029",
+        "doc-034"
+      ],
+      "assertions": [
+        "A first-paragraph edit saves/reopens with the complete typed/unknown object-storage metadata and payload inventory unchanged; inverse restores exact source bytes."
+      ],
+      "scope_limit": "Ordinary body edit only; embedded payloads remain inert and native field-to-storage editing is not qualified."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_rtf_ole_headers_payloads_and_previews_survive_model_writing",
+      "fixtures": [
+        "word/word-visual-objects.rtf"
+      ],
+      "feature_rows": [
+        "rtf-481",
+        "rtf-480"
+      ],
+      "assertions": [
+        "Two native object classes/extents, complete objdata SHA-256 values, OLE1 version/format/class/CFB bounds and hashes, two owned preferred/fallback previews per object, chart scale 96 and set-size flag; canonical writing retains all picture metadata/payloads and body text."
+      ],
+      "scope_limit": "Inert embedded data only. Result text remains a plain cache; original character-format group syntax is not reproduced, and no OLE server is activated."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_rtf_vector_picture_payloads_remain_distinct_from_declared_types",
+      "fixtures": [
+        "word/word-vector-diagram.rtf"
+      ],
+      "feature_rows": [
+        "rtf-480",
+        "rtf-482"
+      ],
+      "assertions": [
+        "Four exact PNG payloads in two preferred/fallback pairs retain declared Png/Wmf types, raw size controls and hashes. The sole structural opaque node is field-scoped defshp; canonical writing gives exact InvalidInput refusal before output."
+      ],
+      "scope_limit": "Native empty default-shape metadata is not modeled; canonical conversion of this specimen remains unsupported. Declared wmetafile8 is not treated as proof of a WMF payload."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_rtf_visual_snapshots_preserve_bytes_and_refuse_ordinary_run_edits",
+      "fixtures": [
+        "word/word-visual-objects.rtf",
+        "word/word-vector-diagram.rtf"
+      ],
+      "feature_rows": [
+        "rtf-455",
+        "rtf-457",
+        "rtf-482"
+      ],
+      "assertions": [
+        "Exact temporary-file snapshot save/reopen preserves visual bytes, pictures, object payloads and result wrapper ownership. Ordinary-run edit commit returns UnsupportedContent with the dependent-destination reason and leaves source unchanged."
+      ],
+      "scope_limit": "The ordinary run mapper does not admit dependent picture/object/field owners. No changed native visual-body publication is claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_rtf_object_transfer_preserves_payload_and_preview_wrappers",
+      "fixtures": [
+        "word/word-visual-objects.rtf",
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-481",
+        "rtf-457"
+      ],
+      "assertions": [
+        "Each native object transfers independently into an ordinary generated RTF receiver with exact payload/class/preview pictures and wrapper roles; readback and inverse preserve source/target bytes. Native minimal receiver with opaque destinations gives the documented UnsupportedContent refusal."
+      ],
+      "scope_limit": "The supported receiver is generated and ordinary. Transfer into the native opaque receiver is not qualified; no activation, conversion or external-link update occurs."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_legacy_word_embedded_worksheets_open_as_inert_xlsx_children",
+      "fixtures": [
+        "word/word-visual-objects.doc",
+        "word/word-visual-objects.rtf"
+      ],
+      "feature_rows": [
+        "doc-029",
+        "rtf-481"
+      ],
+      "assertions": [
+        "Explicit DOC ObjectPool and RTF OLE1/CFB extraction yields XLSX children with exact sheet catalog and stored SUM/Sheet1 reference caches; independent child edits retain those caches while both parents/original children remain unchanged."
+      ],
+      "scope_limit": "Explicit inert child opening only; no re-embedding, implicit host activation or formula refresh.",
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "ppt",
+        "pptx"
+      ]
     }
   ]
 }

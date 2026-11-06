@@ -31,7 +31,7 @@ impl<'a> Parser<'a> {
     /// destination.  A modern hash is legal only as a direct root-header
     /// group; accepting it through an opaque or specialized child parser
     /// would turn malformed data into an apparently valid document.
-    fn reject_nested_password_hash(&self) -> crate::Result<()> {
+    pub(super) fn reject_nested_password_hash(&self) -> crate::Result<()> {
         let is_direct_password_hash = matches!(
             self.tokens.get(self.pos..self.pos + 2),
             Some([

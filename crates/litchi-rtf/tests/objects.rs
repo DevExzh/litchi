@@ -96,6 +96,83 @@ fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
 }
 
 #[test]
+fn nested_object_result_groups_preserve_decoding_scope_and_picture_wrappers() {
+    use litchi_rtf::PictureCompatibilityKind::{NonShapePicture, ShapePicture};
+    let source = br"{\rtf1\ansi\deff0{\fonttbl{\f0\fcharset0 Arial;}{\f1\fcharset128 MS Gothic;}}A{\object\objemb{\*\objclass Package}{\*\objdata 00}{\result{\f1 \'82\'a0}\'e9{\uc0\u945}\u946?{\b {\*\shppict{\pict\pngblip 89504e470d0a1a0a}}{\nonshppict{\pict\wmetafile8 89504e470d0a1a0a}}}}}B}";
+    let package = litchi_rtf::Package::from_bytes(source).unwrap();
+    let document = package.raw();
+    assert_eq!(document.text(), "AB");
+    assert_eq!(document.objects().len(), 1);
+    let object = &document.objects()[0];
+    assert_eq!(object.result_text, "あéαβ");
+    assert_eq!(object.result_picture_indices, [0, 1]);
+    assert_eq!(
+        object.result_picture_wrappers,
+        [Some(ShapePicture), Some(NonShapePicture)]
+    );
+    assert!(document.picture_compatibility_records().is_empty());
+    let bytes = write(document);
+    let output = String::from_utf8(bytes.clone()).unwrap();
+    assert_eq!(output.matches("\\shppict").count(), 1);
+    assert_eq!(output.matches("\\nonshppict").count(), 1);
+    let reopened = litchi_rtf::Package::from_bytes(&bytes).unwrap();
+    assert_eq!(reopened.text(), "AB");
+    assert_eq!(reopened.raw().objects()[0].result_text, object.result_text);
+    assert_eq!(
+        reopened.raw().objects()[0].result_picture_wrappers,
+        object.result_picture_wrappers
+    );
+    assert_eq!(reopened.raw().pictures(), document.pictures());
+}
+
+#[test]
+fn unknown_object_result_destinations_remain_inert_and_block_lossy_writing() {
+    let package = litchi_rtf::Package::from_bytes(br"{\rtf1 A{\object\objemb{\*\objdata 00}{\result Visible{\*\unknownObjectResult never activate}}}B}").unwrap();
+    assert_eq!(package.text(), "AB");
+    assert_eq!(package.raw().objects()[0].result_text, "Visible");
+    let opaque = package.raw().opaque_nodes();
+    assert_eq!(opaque.len(), 1);
+    assert!(matches!(
+        opaque[0].anchor(),
+        litchi_rtf::opaque::Anchor::Structural {
+            context: litchi_rtf::opaque::Context::Drawing,
+            ..
+        }
+    ));
+    assert_eq!(
+        opaque[0].source(),
+        br"{\*\unknownObjectResult never activate}"
+    );
+    let mut output = Vec::new();
+    let error = Writer::new(&mut output)
+        .write_document(package.raw())
+        .unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(output.is_empty());
+}
+
+#[test]
+fn malformed_or_deep_object_result_wrappers_are_rejected() {
+    for result in [
+        r"{\shppict{\pict\pngblip 00}}".to_owned(),
+        r"{\*\nonshppict{\pict\pngblip 00}}".to_owned(),
+        r"{\*\shppict1{\pict\pngblip 00}}".to_owned(),
+        r"{\*\shppict{\pict\pngblip 00}{\pict\pngblip 00}}".to_owned(),
+        r"{\*\shppict{\pict\pngblip}}".to_owned(),
+        format!("{}text{}", r"{\b ".repeat(40), "}".repeat(40)),
+    ] {
+        let source = format!(r"{{\rtf1{{\object\objemb{{\*\objdata 00}}{{\result {result}}}}}}}");
+        assert!(
+            matches!(
+                litchi_rtf::Package::from_bytes(source.as_bytes()),
+                Err(litchi_rtf::Error::MalformedDocument(_))
+            ),
+            "accepted {result}"
+        );
+    }
+}
+
+#[test]
 fn typed_mutation_validates_positions_and_clear_keeps_shared_pictures() {
     let mut document = Tree::parse(
         r"{\rtf1 Body{\object\objemb{\*\objdata 00}{\result{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}}", litchi_rtf::read::OpenOptions::default()

@@ -680,6 +680,7 @@ impl<'a> Tree<'a> {
                 result_kind: object.result_kind,
                 result_text: Cow::Owned(object.result_text.into_owned()),
                 result_picture_indices: object.result_picture_indices,
+                result_picture_wrappers: object.result_picture_wrappers,
                 data: object.data,
             })
             .collect();
