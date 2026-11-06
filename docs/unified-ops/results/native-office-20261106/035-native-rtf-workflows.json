@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "1f2d9b47a50819ae33722803ea850de1dc36ecd3",
+  "base_commit": "c3f6115a1bed09de15363191dfffa2d7ee97be9e",
+  "problem": "Native workflow probes exposed two legacy-form defects. Starred bookmark names inside fldinst formatting groups were included in instruction text, producing FixtureText010 FORMTEXT and equivalent checkbox/dropdown strings classified as Unknown. Once instruction ownership was corrected, a stronger native model-write regression showed that fldpriv on checkbox/dropdown owners was discarded. Append, transfer, validation, streaming and transport rows also lacked explicit native-input operation scopes.",
+  "changes": [
+    "Parse starred main-body bookmark destinations inside field instructions as bookmark metadata, retaining their spans without contributing names to field-code text. Preserve non-body instruction bookmarks opaquely because the bookmark model owns body offsets only.",
+    "Retain field modifiers in a private table aligned with typed form owners from parsing through model publication. Fresh forms receive default modifiers; clearing form owners clears that table. Generic field projection changes do not discard modifiers of form owners that remain. Both ordered and positional writer paths use the owner index, avoiding ambiguous matching of adjacent empty forms.",
+    "Share field-modifier emission between generic and form writers so dirty, edited, locked and private flags all serialize consistently.",
+    "Add eight fixture-based native-input workflow regressions and two synthetic form regressions. Bind the existing native-object transfer regression to the cross-document transfer row as well.",
+    "Map five additional operation rows to partial assertions and document the exact derivative/refusal limits without modifying the historical authoring inventory."
+  ],
+  "verification_scope": {
+    "native_form_instructions": "word-legacy-form.rtf resolves FORMTEXT, FORMCHECKBOX and FORMDROPDOWN, with cached results FORM_VALUE_010/empty/empty and private flags false/true/true. FixtureText010, FixtureCheck010 and FixtureDropdown010 bookmarks retain UTF-8 body offsets 70/105/126 and exact spans. Canonical model writing/reopen retains field types, modifiers, form metadata, body text and bookmarks; unchanged snapshot publication retains native bytes.",
+    "form_ownership_edges": "Synthetic source covers a body bookmark spanning form result text and two opaque non-body instruction bookmark groups. Adjacent zero-width checkbox forms retain distinct dirty/private versus edited/locked modifiers, a newly authored third form uses defaults, clearing the separate generic projection retains the surviving form modifiers, and clearing/re-authoring form owners does not inherit stale flags.",
+    "logical_append": "Seven native ordinary-root sources (minimal, bidi/eastasia, table grid, tables/layout, write reservation, tracked moves and layout extensions) accept two plain paragraphs containing Unicode, braces, backslash and tab. Exact paragraph counts/text and unchanged source prefix/suffix around the root-close insertion are asserted. File save/reopen, retained data-store/write-reservation metadata, table counts, deterministic durable patch encoding, replay and reopened inverse pass.",
+    "source_backed_append": "Bidi/eastasia and table-grid specimens produce the exact same artifact through the source-backed path. A short-write sink verifies that no offered write exceeds the configured 17-byte cap under a 257-byte publication window. File publication, source preservation and inverse on an independently reopened owner pass with finite execution budgets.",
+    "append_boundaries": "Legacy-form and document-protection fixtures return Protected. Review-controls and visual-object fixtures return the exact dropped-unknown-syntax source-proof refusal. Mail-merge returns the external-document/transformation dependency refusal. Failed changes and no-op commits keep exact source bytes. These are append-profile boundaries, not proof that unmodeled syntax is supported or harmless.",
+    "transfer": "Native Apples from word-tables-layout.rtf replaces RTF_CELL_006 in word-rtf-table-grid.rtf. Only that recipient literal changes, adjacent 42 remains, both original snapshots stay exact, and file save/reopen/inverse pass. Existing OLE transfer tests separately qualify native object payload/preview transfer into a generated ordinary receiver and the native opaque-receiver refusal.",
+    "validation_redaction": "Six native fixtures have valid syntax/root/document provenance and exact generic field/object/picture/form counts. Opaque content keeps security, external-resolution and execution scope Unknown rather than clean. No native removable top-level template/next-file references are present for this redactor: strict plans return the documented UnsupportedContent diagnostic, while best-effort no-op plans explicitly remain incomplete and remove zero references. Mail-merge, object, protection, opaque and write-reservation exclusions remain visible.",
+    "streaming_derivative": "Seven exact native bidi/eastasia paragraphs, including Arabic, Hebrew, Japanese and Chinese, are authored into a fresh plain RTF stream one UTF-8 byte at a time under finite input/output/paragraph/run/scratch limits. Reopening preserves the exact paragraph values and introduces no fields, tables or objects. This copies plaintext only, not native formatting/layout/producer metadata.",
+    "transport_derivatives": "Minimal, bidi/eastasia and table-grid native byte payloads are wrapped by the library in LZFu and MELA frames. Tests assert magic, byte-exact decompression, exact finite output admission and one-byte-too-small refusal, CRC corruption rejection, semantic opening, exact file/no-op publication and changed-compressed-snapshot refusal. These frames are library-produced derivatives; the manifest has no Office-produced compressed-RTF transport specimen.",
+    "specification_basis": "Read-only research used the Bookmarks and Fields sections of the user-provided RTF 1.9.1 specification. Bookmarks are destination metadata; fldinst carries the field instruction. Code and tests have no runtime dependency on the research checkout.",
+    "limits": "No fresh native Word/Outlook reopen, layout/rendering, field calculation, object/control/macro execution or external resolution occurred. Full native compressed-transport evidence, complete external-content redaction, rich streaming authoring, non-body bookmark editing, general structure transfer and complete revision resolution remain outside these assertions."
+  },
+  "results": {
+    "new_fixture_based_tests": 8,
+    "new_synthetic_regression_tests": 2,
+    "rtf_all_features_passed": 1601,
+    "ops_passed": 193,
+    "facade_passed": 21,
+    "rust_passed": 1815,
+    "rust_ignored": 0,
+    "python_passed": 75,
+    "count_note": "The Rust total sums the full owner, operations and facade runs. The final six-test form rerun overlaps the full suite and is excluded; it verifies the final additional generic-projection clear assertion. All production code was unchanged after the full suite. Two indexed tests explicitly exercise library-created transport/plaintext derivatives of native inputs rather than native-produced output artifacts.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 272,
+      "indexed_tests": 368,
+      "reviewed_native_fixture_gaps": 4,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 272,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 42,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 49,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1,
+        "reviewed_native_fixture_gap_requires_followup": 4
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-rtf --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-full.log",
+        "bytes": 165461,
+        "sha256": "f4ef2ad6bfc0e67a3c33ea7bc1b44747b8bb9adc1bfccb0fb8299a0b9d620ff4"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-rtf --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-full.log 2>&1",
+      "suites": 191,
+      "passed": 1601,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'rtf_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-ops.log",
+        "bytes": 36563,
+        "sha256": "9f56c8a11a196687ef4e6a80b5c38420ba4573a489c5b6379eeed2e32f0d5fc3"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'rtf_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-ops.log 2>&1",
+      "suites": 22,
+      "passed": 193,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-facade.log",
+        "bytes": 19587,
+        "sha256": "8f286bc957dcfe07502cc2dadb66725c0c82232cc1a9188456d5c58d27b2cae1"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-rtf --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-clippy.log",
+        "bytes": 639,
+        "sha256": "40e69da22b4af86a6c675eb18e94634edc97b7981fe67c59e51c411aceffee04"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-rtf --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-clippy.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-rtf --all-features --test form_fields --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-form-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-form-final.log",
+        "bytes": 836,
+        "sha256": "8d628a0fede98effd3bffadc19798e6a6601ed6e5daef3b7de5da7843da34650"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-rtf --all-features --test form_fields --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-form-final.log 2>&1",
+      "suites": 1,
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "overlaps_full_suite": true
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-rtf --all-features --test form_fields --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-form-final-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-form-final-clippy.log",
+        "bytes": 135,
+        "sha256": "d02fc2a71bbc22bc3b25b2a3bf24627d91da06cc5b302a192c974d662c37e385"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-rtf --all-features --test form_fields --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-form-final-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-python.log",
+        "bytes": 667,
+        "sha256": "82cfb90c7658d30b2b57fc2ece5019354f3103920bf713aa7e97c64a084856bc"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-workflows-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-coverage.json",
+        "bytes": 923478,
+        "sha256": "a66251dcbe8926f61c2b30a71a3880b1d244f54c3e7a5638220d5dfedf1d768b"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-coverage.json 2>&1"
+    }
+  ],
+  "reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-rtf-workflows-probe2.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-workflows-probe2.log",
+        "bytes": 6327,
+        "sha256": "885880a4d166166a1fd1235bc46c30966f5bb0197a19ff8c599ecb67e98ca30b"
+      },
+      "note": "Current-code probe records all three generic legacy-form fields as Unknown with their bookmark names prepended to instruction text, despite three correctly parsed form metadata records."
+    },
+    {
+      "artifact": {
+        "file_name": "native-rtf-form-status-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-form-status-reproduction.log",
+        "bytes": 1265,
+        "sha256": "3a75ed998c7be1381f02f0ffa457ad6a0d9ef3077890782023ca9acc5e036562"
+      },
+      "note": "After the instruction fix, the permanent native regression fails because canonical writing changes a native private modifier from true to false. The final writer preserves it."
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 checks passed on the twelve changed Rust files; git diff --check and staged diff checks passed.",
+    "Both AGENTS.md staged size/binaries checks printed nothing before the source commit. No compiled binaries were staged.",
+    "All three pre-existing untracked file hashes remain unchanged; native fixture integrity tests passed.",
+    "RTF Clippy passed with -D warnings. Existing dependency warnings in combined format builds remain unrelated."
+  ],
+  "goal_status": "active; 272 of 494 rows have partial assertions, with operation/bounded/UI/external/unsupported and partial-scope reviews still required."
+}
