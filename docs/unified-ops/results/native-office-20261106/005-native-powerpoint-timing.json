@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "f0eb408fc0af5c1ef3f063ea51c17eb8a4422345",
+  "base_commit": "16e53d011ce819ffb9936c7b657c2c554b1973ef",
+  "problem": "The native PPT Fly In tree failed first on misclassified condition instances, then Unicode terminators in attribute names, empty optional keyframe formulas, and an expanded paragraph build with no templates. Native master/transition/chart/font semantics and supported source edits lacked indexed tests.",
+  "changes": [
+    "Use native TimeConditionContainer recInstance0..5 in reader and writer. Its documented container bounds and actual native values disagree with the separate one-based ConditionEnum table. Keep strict node-role/order/header validation; instance6 is refused instead of guessed as an overlapping legacy encoding.",
+    "Decode timing Unicode strings up to the optional NUL terminator, both in behavior values and node properties. Invalid UTF-16 before the terminator and invalid byte widths still fail. All behavior-string encoders are fallible and reject authored embedded NULs to prevent semantic truncation.",
+    "Retain an empty optional keyframe formula only beside an explicit value. Empty placeholders do not satisfy Formula calculation mode, and missing-value empty formulas remain invalid.",
+    "Accept and write an expanded native paragraph build without template levels once its effects have been expanded into the slide timing tree. Unexpanded empty builds, malformed pairs, duplicate identities and other level constraints remain refused.",
+    "Add seven PPT native regressions, one PPTX embedded-font regression and one public operations regression; extend the assertion index and document the exact scopes and remaining limitations."
+  ],
+  "verification_scope": {
+    "timing": "Eight native nodes; sequential Next/Previous conditions; two1250ms x/y behaviors targeting shape8193; all keyframe times/value expressions/empty formula fields; expanded AsAWhole build0/shape8193 with no templates. Semantic tree write/read is exact. No formula or animation is executed.",
+    "timing_edits": "Both1250ms leaves change to1500ms. Complete expected extension readback retains targets, build metadata, flags and hashes. All other slides, non-ProgTags records of the edited slide and unrelated CFB streams are byte exact; inverse/source packages are exact. Owned timing serialization can normalize optional terminators.",
+    "transitions": "Native Push/FromTop/Medium/Both/3000ms, saved AlphaFade fallback and hidden slide state. Cover/FromLeft/Fast/4500ms mutation retains sound/animation state and all other direct slide records, other slides and unrelated streams; inverse is exact.",
+    "masters": "Five exact main-master/persist IDs, notes-master2, all eight style atom types per master,17 embedded layouts and typed round-trip text-style/theme packages. Main-master design-name editing keeps all records except its CString instance2, every other master/slide and unrelated streams; inverse is exact.",
+    "theme_headers": "Exact Ion twelve-slot colors, Century Gothic major/minor fonts and inherited PPT_FOOTER_003/2026-01-15 display strings. This is stored metadata, not full visual inheritance or layout.",
+    "legacy_handout_fonts": "Handout persist2 with drawing/color-scheme/program-tag/theme/color-map record owners; three native font entities Aptos/Arial/Aptos Display; exact subset flags and no EOT payload. Absence is a documented legacy conversion boundary, not payload extraction success.",
+    "pptx_font": "The companion PPTX has one Cambria Math Regular face and an exact129261-byte EOT payload matching SHA-2564e9c7d3b3dc757b3f45eb6f7a902046ebabc9b5868c707aeaa4f1e6c42cccfc9 before/after package serialization. Fonts are not registered or rendered.",
+    "chart": "One Excel.Chart.8, object1/persist2, slide4/shape5122, no per-object failures, North/South/West series, bar group and all24 category/value cache cells. Title/layout completeness and arbitrary embedded chart mutation are not claimed.",
+    "operations": "File-backed Auto and byte Eager routes query the title as a semantic placeholder while retaining /slide[2]/shape[1]. Atomic title/visibility edits retain transition timing and the parsed native animation, leave the source file unchanged, and inverse to exact source bytes.",
+    "negative_tests": "Condition wire instance6, malformed UTF-16 before terminators, authored embedded NULs, empty formulas without values, empty placeholders used as Formula mode, and unexpanded builds without templates are refused. Existing ordering/duplicate/header checks remain active.",
+    "validation": "The complete PPT library/integration suite passes. PPTX changes are test-only and are checked by its native fixture and embedded-font targets. Selected operations and all eight Office facade features pass. Focused PPT tests were repeated after stronger edited-owner preservation assertions and final formatting.",
+    "environment": "All139 fixtures/four assets pass size/SHA integrity; original fixture bytes and the three pre-existing untracked files are unchanged. No fresh PowerPoint reopen, rendering, playback, macro/control execution, refresh or external resolution occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 2294,
+    "focused_repeat_passes": 7,
+    "rust_ignored": 3,
+    "python_passed": 72,
+    "new_native_ppt_tests": 7,
+    "new_native_pptx_tests": 1,
+    "new_native_ops_tests": 1,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 172,
+      "indexed_tests": 152,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 172,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 50,
+        "native_evidence_needs_semantic_tests": 82,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "ignored_tests": [
+    "package::tests::test_invalid_file (pre-existing: requires a test file)",
+    "generate_litchi_changed_artifact (pre-existing external harness output)",
+    "read_back_native_resaved_artifact (pre-existing external native-resave input)"
+  ],
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ppt --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-owner-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-owner-first.log",
+        "bytes": 156025,
+        "sha256": "391b0f2649366bcd6bb28d6cda570b2aec01a5186b4fa9ac8078a39de1801f19"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ppt --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/ppt-metadata-owner-first.log 2>&1",
+      "suites": 56,
+      "passed": 1598,
+      "failed": 0,
+      "ignored": 3
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-ops-final.log",
+        "bytes": 61573,
+        "sha256": "86ee3a97aa1198f7bd108441bf9092a1d53ac84b84929d90b50e1390e9b60d7e"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features ppt,pptx,encryption --lib --test 'ppt_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/ppt-metadata-ops-final.log 2>&1",
+      "suites": 10,
+      "passed": 565,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native --test pptx_embedded_fonts --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "pptx-metadata-native-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/pptx-metadata-native-final.log",
+        "bytes": 19622,
+        "sha256": "06a12dd07c769cea83848267d0ac035b7dcf89b56ab68645729ab17c21207e53"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native --test pptx_embedded_fonts --no-fail-fast > /tmp/litchi-native-office.GMvwp4/pptx-metadata-native-final.log 2>&1",
+      "suites": 2,
+      "passed": 22,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-facade-final.log",
+        "bytes": 32666,
+        "sha256": "12791a6cc35f4adff5d1f547eaf49df1a18ebcb7e3751029bfa8900358fa8974"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/ppt-metadata-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 109,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ppt --features encryption,vba-inspection --test microsoft_office_native_metadata",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-native-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-native-final.log",
+        "bytes": 17888,
+        "sha256": "7790fe06a5d7a38277d8987a4247595051c6060c6f4caa2ef1668f9699acf323"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ppt --features encryption,vba-inspection --test microsoft_office_native_metadata > /tmp/litchi-native-office.GMvwp4/ppt-metadata-native-final.log 2>&1",
+      "suites": 1,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-ppt -p litchi-pptx -p litchi-ops --no-default-features --features litchi-ppt/encryption,litchi-ppt/vba-inspection,litchi-pptx/encryption,litchi-pptx/vba-inspection,litchi-ops/ppt,litchi-ops/pptx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-clippy-final.log",
+        "bytes": 17090,
+        "sha256": "489659f734318ab57adc7cbde3b1b65103a6b816081fbc1608185f9cee84b914"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-ppt -p litchi-pptx -p litchi-ops --no-default-features --features litchi-ppt/encryption,litchi-ppt/vba-inspection,litchi-pptx/encryption,litchi-pptx/vba-inspection,litchi-ops/ppt,litchi-ops/pptx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/ppt-metadata-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-python-final.log",
+        "bytes": 664,
+        "sha256": "5fbb0c5ad94980758714468dd6f98b960d3777c710a47cfe69582f44328af85b"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/ppt-metadata-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/ppt-metadata-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-coverage-final.json",
+        "bytes": 667958,
+        "sha256": "f297dcd63113a524a9eb249a43f83da027ffbd50bdefb3d559e9e1e9fb249e68"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/ppt-metadata-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-ppt/src/animation/parser/behavior/model.rs crates/litchi-ppt/src/animation/parser/behavior/parser.rs crates/litchi-ppt/src/animation/parser/behavior/tests.rs crates/litchi-ppt/src/animation/parser/build.rs crates/litchi-ppt/src/animation/parser/tests/build.rs crates/litchi-ppt/src/animation/parser/tests/time_node.rs crates/litchi-ppt/src/animation/parser/time_node/properties.rs crates/litchi-ppt/src/animation/parser/timeline.rs crates/litchi-ppt/src/animation/writer/behavior.rs crates/litchi-ppt/src/animation/writer/build.rs crates/litchi-ppt/src/animation/writer/timeline.rs crates/litchi-ppt/tests/microsoft_office_native_metadata.rs crates/litchi-pptx/tests/microsoft_office_native.rs crates/litchi-ops/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "ppt-metadata-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-ppt/src/animation/parser/behavior/model.rs crates/litchi-ppt/src/animation/parser/behavior/parser.rs crates/litchi-ppt/src/animation/parser/behavior/tests.rs crates/litchi-ppt/src/animation/parser/build.rs crates/litchi-ppt/src/animation/parser/tests/build.rs crates/litchi-ppt/src/animation/parser/tests/time_node.rs crates/litchi-ppt/src/animation/parser/time_node/properties.rs crates/litchi-ppt/src/animation/parser/timeline.rs crates/litchi-ppt/src/animation/writer/behavior.rs crates/litchi-ppt/src/animation/writer/build.rs crates/litchi-ppt/src/animation/writer/timeline.rs crates/litchi-ppt/tests/microsoft_office_native_metadata.rs crates/litchi-pptx/tests/microsoft_office_native.rs crates/litchi-ops/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/ppt-metadata-format-final.log 2>&1"
+    }
+  ],
+  "additional_checks": [
+    {
+      "command": "git diff --cached --check",
+      "result": "pass"
+    },
+    {
+      "command": "AGENTS.md staged evidence-size and binaries-path guards",
+      "result": "both print nothing before each commit"
+    }
+  ],
+  "reproduction_artifacts": [
+    {
+      "artifact": {
+        "file_name": "ppt-metadata-before.jsonl",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-metadata-before.jsonl",
+        "bytes": 136305,
+        "sha256": "e4520e4e417a15354f32e68e3168df8d1d797724c5e28da99fa68927f5aed26a"
+      },
+      "scope": "Read-only baseline over five native PPTs; the legacy timing extension fails while the chart/master/font inventories are retained."
+    },
+    {
+      "artifact": {
+        "file_name": "ppt-animation-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-animation-before.log",
+        "bytes": 18040,
+        "sha256": "d60e0c4db804a80f1348fa7be862f41fbfb5688d7040ec494d4e93beeffe19a4"
+      },
+      "scope": "Permanent native regression reproduces the misleading canonical-child-order error caused by shifted condition roles."
+    },
+    {
+      "artifact": {
+        "file_name": "ppt-animation-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-animation-after.log",
+        "bytes": 18046,
+        "sha256": "898a0d255fd0877455ddc17774bc12e432c550a0238783e3e066fbaed0b253b5"
+      },
+      "scope": "After correcting instances, the native style.visibility Unicode terminator exposes the next refusal."
+    },
+    {
+      "artifact": {
+        "file_name": "ppt-animation-after-strings.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-animation-after-strings.log",
+        "bytes": 18027,
+        "sha256": "58017c1a99c6dd0b27959592a422980ba974dee72657666394593e90a6a28815"
+      },
+      "scope": "After Unicode handling, native empty optional keyframe formulas expose the next refusal."
+    },
+    {
+      "artifact": {
+        "file_name": "ppt-animation-after-keyframes.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/ppt-animation-after-keyframes.log",
+        "bytes": 18051,
+        "sha256": "06a1dbe94aec37dab07656d6087d4707c45ce45236b146396b148da761f35ac0"
+      },
+      "scope": "After keyframe handling, the native expanded ParaBuild without templates exposes the final refusal."
+    }
+  ],
+  "specification_references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/3b2ae2ff-52fc-405b-8c3a-fd0702f490d3",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/a6a1754c-4001-423a-8d0e-e62630705624",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/83d39c58-0d30-46a4-bffb-188d792cb5a7",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/c53f2602-3854-4924-9a63-49400ec6255c",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/069fadd9-4468-4ce2-8f0e-8b08d6e319ea",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/be583d68-11d7-43c2-a300-8ef2ffac7841",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/4bd5c65e-9134-45ee-ad0d-18b57d147c7e",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt/baa3c302-b96c-4f0b-8517-08c50c38952b"
+  ],
+  "specification_limits": "Native empty formula placeholders and expanded builds without templates are explicit compatibility evidence, not claims that the stricter formula/template prose permits every such representation. Condition roles follow observed native wire instances and container bounds; no ambiguous one-based decoding fallback is added.",
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_metadata-b25b6a63ae585585",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_metadata-b25b6a63ae585585",
+      "bytes": 15814312,
+      "sha256": "a3bc13d2c569bbdcd4a411dba951e2d77a44691dd7d82782e9ba6f36a715cc3f",
+      "source_commit": "f0eb408fc0af5c1ef3f063ea51c17eb8a4422345",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ppt --features encryption,vba-inspection --test microsoft_office_native_metadata"
+    },
+    {
+      "file_name": "microsoft_office_native-647472e426c960b8",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-647472e426c960b8",
+      "bytes": 25122536,
+      "sha256": "74816f1c388cea356fbca385e4cb0738a83500d9e2557d15adf7871fd0795bed",
+      "source_commit": "f0eb408fc0af5c1ef3f063ea51c17eb8a4422345",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-pptx --features encryption,vba-inspection --test microsoft_office_native --test pptx_embedded_fonts --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The goal remains incomplete:139/139 fixtures are indexed, but172/494 rows have partial assertions across152 tests. Partial rows still require scope review.",
+    "All252 historical pending statuses remain unchanged. Unasserted gaps:82 native-evidence semantic rows,63 operation rows,50 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "PPTX handout placeholder projection remains a concrete follow-up: the native handout has hdr/ftr/sldNum placeholder content without p:hf, while the current handout codec consumes p:hf and does not project those texts. Do not infer a six-slide layout from the canceled UI print choice: no prnPr preference was saved. This is not accepted as an unsupported exclusion.",
+    "PPT/PPTX chart titles/full chart layouts, diagrams, inherited shape/text styling, richer font operations, handout headers/footers and math/ink scopes still need semantic and preservation coverage.",
+    "The full DOC/DOCX/RTF/XLS/XLSX/XLSB/PPT/PPTX objective and all unsupported/external/UI reconciliation remain active; no renderer, playback, calculation, external refresh or native-app acceptance is claimed."
+  ]
+}
