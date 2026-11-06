@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "73e33157471eddcc186c2d05c2601f24fb884d4a",
+  "base_commit": "c8e7f0ed04765b4458ffa96e88cd06f354d60eb2",
+  "problem": "Native Word WPS/WPG drawing branches were discarded by the common document visibility profile. Merely enabling them let group-child geometry/text overwrite the outer flat inventory entry, and text-box paragraphs were concatenated without boundaries.",
+  "changes": [
+    "Declare WPS/WPG owner namespaces in the shared eager/source-backed document visibility profile, exposing supported DrawingML branches once while retaining original package XML and VML fallbacks.",
+    "Retain a group root as one Other inventory entry with its own properties. Skip direct child graphics with bounded nesting; nested drawing stories cannot replace an outer anchor. Prefer wp:extent frame dimensions over DrawingML transform extents.",
+    "Decode text-box text references and CDATA and retain whitespace, paragraph boundaries, tabs and breaks. Reject truncated or excessively deep drawing XML; remove an obsolete Clippy expectation.",
+    "Add one native cross-owner drawing regression and three unit regressions; strengthen the existing native text-box and operations tests, and reconcile their index/current matrix scopes."
+  ],
+  "verification_scope": {
+    "native_visuals": "Eager and pinned source-backed views expose Picture 1, Rounded Rectangle 3, Picture 2 and Chart 4 in order. The rounded rectangle is a floating WPS TextBox with RoundRect preset, 2984500x939800 frame and exact two-paragraph text. The text-box reader exposes native ID 1925752799 rather than the formerly selected VML anchor.",
+    "native_vector": "Both owner routes expose Graphic 1, Graphic 3 and Diagram 2 in order. Graphic 3 is one inline Other entry with 3048000x1714500 frame, no child preset and no flattened child text. Group-child semantics are not invented.",
+    "groups_and_nested_drawings": "Synthetic group root offset 50/60 and outer frame survive conflicting child offset 12/34, child extents/preset/text and group transform extents. A nested drawing in a text-box story cannot overwrite the outer name/extent. Truncated/deep group descendants fail rather than returning an empty success.",
+    "text": "Text-box inventory preserves literal leading/trailing spaces, an ampersand, numeric Unicode reference, tab, explicit line break, CDATA, empty paragraph and later paragraph in exact source order. Frame dimensions remain distinct from transform offsets and extents.",
+    "operations": "Existing Auto/eager SmartArt native-node edit and explicit process-layout rebuild now also assert that all three drawing anchors and the converted group frame remain readable after save/reopen. Existing exact group XML, unrelated parts and inverse/source checks remain in force.",
+    "validation": "Complete DOCX owner, affected DOCX operations and eight-format facade pass after the profile/parser changes. Final owner/operations/facade reruns include the stronger group-own-transform distinction. Clippy, targeted formatting, 72 Python tests, corpus integrity and CI configuration verification pass.",
+    "environment": "Original native fixtures and all three pre-existing untracked files remain unchanged. No native Office reopen, rendering, external refresh, host layout, macro/control activation or group-child authoring occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 3255,
+    "rust_ignored": 0,
+    "python_passed": 72,
+    "new_native_tests": 1,
+    "new_unit_tests": 3,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 202,
+      "indexed_tests": 216,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 202,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 56,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-owner-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-owner-verified.log",
+        "bytes": 240770,
+        "sha256": "eb9d314b75c4c23bed43fc20159cbba3c3d6ffc32b9327b7784660c9df712677"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-drawing-owner-verified.log 2>&1",
+      "suites": 83,
+      "passed": 2407,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-ops-final.log",
+        "bytes": 76287,
+        "sha256": "12b7d19458d877ade89249be17b0f5201f487a585c5d3eb6ed9f389b5af41345"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-drawing-ops-final.log 2>&1",
+      "suites": 20,
+      "passed": 735,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-facade-final.log",
+        "bytes": 32850,
+        "sha256": "91b4b39c885b6b0fca0020a3013ec1a331999f0789f36d6c5be3543395a9deb1"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/word-drawing-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 113,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-clippy-final.log",
+        "bytes": 17222,
+        "sha256": "4b70e1e58818d326fe1dfe054686d8f0590c7d0ab5411f4122b606a359ae4be1"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/word-drawing-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-python-final.log",
+        "bytes": 664,
+        "sha256": "98b455014f99c09cca3b4e704bc32110dc683545e1952dc27e14897a0a29d827"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/word-drawing-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/word-drawing-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-coverage-final.json",
+        "bytes": 740208,
+        "sha256": "d8f916a47f339bdaf4f524180439e971d61ef795e96e628f19c01f790791acc9"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/word-drawing-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-docx/src/drawing/codec.rs crates/litchi-docx/src/drawing/model.rs crates/litchi-docx/src/drawing/tests.rs crates/litchi-docx/src/parts/document_part.rs crates/litchi-docx/tests/microsoft_office_native_visuals.rs crates/litchi-ops/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-drawing-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-docx/src/drawing/codec.rs crates/litchi-docx/src/drawing/model.rs crates/litchi-docx/src/drawing/tests.rs crates/litchi-docx/src/parts/document_part.rs crates/litchi-docx/tests/microsoft_office_native_visuals.rs crates/litchi-ops/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/word-drawing-format-final.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "word-drawing-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-before.log",
+        "bytes": 18039,
+        "sha256": "527cb55686a7bcc9c4a4e57c96242f55293abef09758155a51bac61516480bd8"
+      },
+      "scope": "The native visual inventory omitted Rounded Rectangle 3; the same visibility profile also selected away the converted group.",
+      "regenerate": "Copy the native_wps_and_wpg_anchors_reach_both_drawing_inventories test from source_commit into microsoft_office_native_visuals.rs in a scratch checkout of base_commit; run CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_visuals native_wps_and_wpg"
+    },
+    {
+      "artifact": {
+        "file_name": "word-drawing-capability.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-drawing-capability.log",
+        "bytes": 18867,
+        "sha256": "fd184a51b898a6a2ced8ec1d91f000e4e03363b8ca47888da32024d64dbe1323"
+      },
+      "scope": "Enabling only the namespaces exposed WPS text with concatenated paragraphs; the previous VML-specific assertion correctly became Floating and was replaced by stronger native WPS identity/preset assertions. Group-child conflation is covered by the permanent synthetic regression.",
+      "regenerate": "On a scratch base_commit checkout apply only the two WPS/WPG capability declarations plus the new inventory test, then run the same native regression."
+    }
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/word/visual-objects-inspection.json",
+    "test-data/microsoft-office/word/vector-diagram-inspection.json",
+    "crates/litchi-docx/src/drawing/model.rs",
+    "crates/litchi-docx/src/parts/document_part.rs"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_visuals-08f94d1828a4479c",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_visuals-08f94d1828a4479c",
+      "bytes": 22508496,
+      "sha256": "e7a3810c3f94103dc9195e1f95c772bcf2ce99a27f0c05406d2bf39d15a241b5",
+      "source_commit": "73e33157471eddcc186c2d05c2601f24fb884d4a",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-9894bbaf11bd9512",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-9894bbaf11bd9512",
+      "bytes": 40627696,
+      "sha256": "8e69938137d43dc27237e78440947524d3a5168ad9d9fab50256d041858f0c4b",
+      "source_commit": "73e33157471eddcc186c2d05c2601f24fb884d4a",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The eight-format goal remains active: 139/139 fixtures indexed,202/494 rows have partial assertions across216 tests. No complete-row claim follows from this batch.",
+    "The 252 historical pending labels remain unchanged. Remaining unasserted scopes include 56 native-evidence semantic rows,63 operation rows,46 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "Top-level WPS/WPG visibility is repaired, but this flat inventory does not provide a group-child hierarchy, group editing, page-position resolution, geometry/layout execution or rendering.",
+    "The scanner retains its legacy local-name fragment admission and tolerant numeric/descriptive attribute rules. This batch does not claim complete namespace/schema validation for arbitrary drawing fragments.",
+    "Native DOC/RTF visual/OLE representations, remaining Word navigation/policy scopes, Excel/PowerPoint gaps and explicit external/UI classification review remain active."
+  ]
+}
