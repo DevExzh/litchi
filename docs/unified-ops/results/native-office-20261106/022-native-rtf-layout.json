@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "2e1f3f2886830617773a14a9eccfe0bfe2c37a09",
+  "base_commit": "6c8a95c4f93262dece02a76a906c83bdf1054c3b",
+  "problem": "Native Word RTF section geometry lost document margin defaults, sectdefaultcl incorrectly reset a two-column section, and a section break inside an ordinary formatting group disappeared from the body events. Native note edits rejected balanced fcs formatting groups, and section edits could select the wrong source region when breaks were grouped or inherited.",
+  "changes": [
+    "Separate document paper/margin/orientation controls from per-section controls. Retain document defaults and section override masks, restoring document geometry on sectd. Resolve unoverridden geometry once after parsing so repeated global controls do not repeatedly walk all prior sections.",
+    "Interpret sectdefaultcl as an explicit default document-grid marker, preserving columns and line pitch. Correct SectionDocumentGridType::Default serialization to sectdefaultcl and add SnapToGrid for the specification's literal sectspecifygenN, retaining sectspecifygen as an input alias.",
+    "Record main-story section breaks inside ordinary formatting groups and bind the next retained section definition. Non-body destinations cannot reset body section state; section breaks in table cells are refused.",
+    "Locate section-value edits through semantic section-definition identity and visible source boundaries, including inherited sections without their own definition. Destination groups remain excluded and count mismatches fail closed.",
+    "Admit fcs as character formatting only inside balanced selected groups for exact destination splicing. Retain conservative handling of state-changing controls outside those groups; existing clean-document canonical fallback remains separate.",
+    "Add nine native regressions and seven synthetic tests, update the existing grid expectations from source/spec evidence, and bind four previously unasserted RTF rows without changing historical native-evidence labels."
+  ],
+  "verification_scope": {
+    "geometry": "word-tables-layout.rtf exposes portrait12240x15840 and landscape15840x12240 with all document margins1440, two landscape columns, line pitch360 and explicit default grid. One grouped sect boundary binds section1 at the exact main-story position after Second section begins below. Document-default reset, explicit overrides, late root updates, inert headers and canonical geometry round trips have synthetic coverage.",
+    "headers": "Three physical section0 stories retain HeaderRight HEADER_DEFAULT_002 plus its empty paragraph, FooterLeft empty text and FooterRight FOOTER_PAGE_002. Two footer PAGE fields retain cached empty/2 results and exact story references. Section1 has no newly authored header/footer definitions; inherited rendering is not inferred.",
+    "notes": "The table-layout source has one endnote with ENDNOTE_TEXT_002; layout-extensions has one footnote with FOOTNOTE_COLUMN_016. Exact text, foot/end kind, default reference placeholders, main-story anchor and note-kind/placement flags are tested. Four separator destinations contain the exact separator/continuation marker plus paragraph-break sequence. Marker wording does not qualify footnote-area columns.",
+    "policies": "The minimal native RTF preserves PageLayout view100%, zero gutter, legacy footnote layout, validatexml1, note-kind/placement flags, effective section properties and body text through actual model writing. These controls remain passive metadata.",
+    "pages": "Visual-object and vector-diagram sources expose exact page-break byte positions [96,115] and [75,97], with no explicit column/soft breaks. Source reopen preserves event order. Model writing of the visual-object source preserves the full body-event order, positions and text; the vector source retains its separately qualified structural-opaque writer boundary.",
+    "edits": "A running-header replacement is exactly one source-text substitution. Footnote/endnote edits preserve every byte outside their selected groups, all chftn markers, note identity, main text and sections through temporary save/reopen. The landscape edit changes exactly cols2 to cols3 and inserts marglsxn1000 at section1, leaving section0 and auxiliary stories intact. All edit inverses restore the original RTF bytes.",
+    "limitations": "No Word reopen, pagination, rendering, shaping, page/note-number evaluation, field refresh or active content execution. General policy/section lifecycle, full rich note editing and footnote-area columns remain unqualified. Existing source-splice versus canonical-publication boundaries are retained."
+  },
+  "results": {
+    "main_rust_suite_passes": 2279,
+    "final_focused_rust_passes": 16,
+    "rust_ignored": 0,
+    "python_passed": 72,
+    "new_native_tests": 9,
+    "new_synthetic_tests": 7,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 226,
+      "indexed_tests": 260,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 226,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 32,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-owner-accepted.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-owner-accepted.log",
+        "bytes": 161374,
+        "sha256": "d4f6521088caa9992d0e7aa94164f9316b9de5a717c447715fb35c8a6f4757eb"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/rtf-layout-owner-accepted.log 2>&1",
+      "suites": 189,
+      "passed": 1591,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features rtf --lib --test 'rtf_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-ops-final.log",
+        "bytes": 63595,
+        "sha256": "5c1ef8b497d0f8452f53c93726a3c1d9bed1de401b66426cdba3eb370f7acc43"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features rtf --lib --test 'rtf_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/rtf-layout-ops-final.log 2>&1",
+      "suites": 22,
+      "passed": 573,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-facade-final.log",
+        "bytes": 33354,
+        "sha256": "4eed9be3e359ec3011c61be0e02e7f2ca7f57b0ceb37ce31654068829ebf9408"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/rtf-layout-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 115,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf -p litchi-ops --no-default-features --features litchi-ops/rtf --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-clippy-accepted.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-clippy-accepted.log",
+        "bytes": 17220,
+        "sha256": "5cff035e433f3cab00227c93c9dcbbd8288d46560fa92e1ce50275ca694ad341"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf -p litchi-ops --no-default-features --features litchi-ops/rtf --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/rtf-layout-clippy-accepted.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-python-final.log",
+        "bytes": 664,
+        "sha256": "11e2e4f8973f8025946b998fc09e0306ff904d6461d3b3a510356393b986f165"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/rtf-layout-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/rtf-layout-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-coverage-final.json",
+        "bytes": 789500,
+        "sha256": "b2629993151fcd4672e9db8df1810ba0bcb7813339dc9d75fc47230118229eda"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/rtf-layout-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs crates/litchi-rtf/src/codec/parser/codec/api.rs crates/litchi-rtf/src/codec/parser/codec/mod.rs crates/litchi-rtf/src/codec/parser/codec/section.rs crates/litchi-rtf/src/content/section.rs crates/litchi-rtf/src/edit/destination_splice.rs crates/litchi-rtf/src/edit/marks.rs crates/litchi-rtf/src/edit/producer_paragraphs.rs crates/litchi-rtf/tests/section_document_grid.rs crates/litchi-rtf/tests/microsoft_office_native_layout.rs crates/litchi-rtf/tests/section_page_defaults.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs crates/litchi-rtf/src/codec/parser/codec/api.rs crates/litchi-rtf/src/codec/parser/codec/mod.rs crates/litchi-rtf/src/codec/parser/codec/section.rs crates/litchi-rtf/src/content/section.rs crates/litchi-rtf/src/edit/destination_splice.rs crates/litchi-rtf/src/edit/marks.rs crates/litchi-rtf/src/edit/producer_paragraphs.rs crates/litchi-rtf/tests/section_document_grid.rs crates/litchi-rtf/tests/microsoft_office_native_layout.rs crates/litchi-rtf/tests/section_page_defaults.rs > /tmp/litchi-native-office.GMvwp4/rtf-layout-format-final.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native_layout --test section_page_defaults -- --nocapture",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "rtf-layout-native-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-native-final.log",
+        "bytes": 1893,
+        "sha256": "40dcc6dc97c3a94e49063d9099c1ca50d2d96bb1098cee4dbd494043dc268088"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native_layout --test section_page_defaults -- --nocapture > /tmp/litchi-native-office.GMvwp4/rtf-layout-native-final.log 2>&1",
+      "suites": 2,
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "rtf-layout-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-probe.log",
+        "bytes": 5058,
+        "sha256": "2511e01181332b1ab6e169fd1c271dce0a33716fc464e48e37ba9966b00e7988"
+      },
+      "scope": "At base_commit, both native sections had left/right margins1800 instead of1440; the landscape section had one column despite cols2; the body event list omitted the grouped section break. Notes and view metadata were already readable after earlier reader fixes.",
+      "regenerate": "At base_commit open word-tables-layout.rtf with Package::open and print only section geometry/columns and raw().section_breaks(). Assert margins1440, landscape columns2 and one section boundary. Use CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native_layout -- --nocapture."
+    },
+    {
+      "artifact": {
+        "file_name": "rtf-layout-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-before.log",
+        "bytes": 1348,
+        "sha256": "fb5c446401c48ed62bf658dd97a920b71b4acc2519f9dc6ceee30a803ede2150"
+      },
+      "scope": "Permanent native margin and grouped-boundary assertions fail on the baseline.",
+      "regenerate": "Copy the two initial native read tests to a scratch checkout of base_commit and run the native layout target. The initial probe independently records the column mismatch as well."
+    },
+    {
+      "artifact": {
+        "file_name": "rtf-layout-edit-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-edit-probe.log",
+        "bytes": 1710,
+        "sha256": "3b71ab7a40e7d0525719f2442fcba11b9ca1e44befaebd5a11c72eaddeb17267"
+      },
+      "scope": "Native note text publication refused fcs1 at depth1 inside the selected balanced formatting groups; the recorded source range excludes the note-reference group.",
+      "regenerate": "At base_commit open word-tables-layout.rtf and call edit.set_note_text(0,\"NATIVE_NOTE_CHANGED_022\"); commit. To isolate the reason, temporarily log only the rejected control and depth in destination_splice::validate_range."
+    },
+    {
+      "artifact": {
+        "file_name": "rtf-layout-section-edit-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-section-edit-before.log",
+        "bytes": 1117,
+        "sha256": "96ed3fc752689a1c92f46f0e8b4a81309ebeb078646c3ef0b2eaeba3cd718196"
+      },
+      "scope": "After read fixes, setting section1 columns3 plus margin-left1000 failed readback because the old source scanner saw only root-level sect markers and fell back to the whole document region.",
+      "regenerate": "In a scratch checkout of source_commit restore edit::marks section-boundary discovery/region selection from base_commit, keep the reader fixes, and run native_landscape_section_edit_preserves_the_first_section_and_auxiliary_stories."
+    },
+    {
+      "artifact": {
+        "file_name": "rtf-layout-page-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/rtf-layout-page-probe.log",
+        "bytes": 897,
+        "sha256": "832531b86429df2afe6ddae8e570ccad64a13f4b0ed6247995824a7e84feff0d"
+      },
+      "scope": "Read-only inventory establishes the exact native visual page offsets used in the permanent test.",
+      "regenerate": "Open word-visual-objects.rtf and word-vector-diagram.rtf and print Package::text plus raw().page_breaks(). The permanent native page test asserts both arrays and canonical visual event order."
+    }
+  ],
+  "specification": {
+    "title": "Rich Text Format (RTF) Specification 1.9.1, supplied local PDF",
+    "sections": [
+      "Document Formatting Properties: paper sizes and margins",
+      "Section Formatting Properties: document defaults, section page geometry and line/character grid",
+      "Associated Character Properties: fcs"
+    ],
+    "extraction": {
+      "file_name": "rtf-specs-1.9.1.txt",
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-specs-1.9.1.txt",
+      "bytes": 1028536,
+      "sha256": "b7cf6a860bfda62a8883a6c60dbbb94592b92f007fcc552f11573f55956bbffa"
+    },
+    "regenerate": "pdftotext -layout 3rdparty/specs/rtf-specs-1.9.1.pdf /tmp/litchi-native-office.GMvwp4/rtf-specs-1.9.1.txt",
+    "scope": "Read-only research input. Compiled code and tests depend only on tracked fixtures, not on the local specification tree."
+  },
+  "evidence_sources": [
+    "test-data/microsoft-office/word/tables-layout-inspection.json",
+    "test-data/microsoft-office/word/layout-extensions-inspection.json",
+    "test-data/microsoft-office/word/visual-objects-inspection.json",
+    "test-data/microsoft-office/word/vector-diagram-inspection.json"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_layout-aa72e6ddd1ed4bcb",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_layout-aa72e6ddd1ed4bcb",
+      "bytes": 14019520,
+      "sha256": "01be9c4a482d003174cea28ccbd07600126c84510cdb19da6463496d2cedc50a",
+      "source_commit": "2e1f3f2886830617773a14a9eccfe0bfe2c37a09",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native_layout --test section_page_defaults -- --nocapture"
+    },
+    {
+      "file_name": "section_page_defaults-df23f3aebc8b1fce",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/section_page_defaults-df23f3aebc8b1fce",
+      "bytes": 12784592,
+      "sha256": "1a249341c463eb2fcaf0532f241f6cfea113e2fc214a9db7b12681a16eb3c917",
+      "source_commit": "2e1f3f2886830617773a14a9eccfe0bfe2c37a09",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native_layout --test section_page_defaults -- --nocapture"
+    }
+  ],
+  "remaining_scope": [
+    "The full eight-format goal remains active: 139/139 fixtures indexed, 226/494 rows with partial assertions across 260 tests; no complete-row claim follows.",
+    "All 252 historical pending labels remain unchanged. Unasserted scope includes 32 native-evidence semantic rows, 63 operation rows, 46 bounded-native operation rows, 58 native UI reviews, 27 external handoffs, 41 unsupported-boundary reviews and one historical not-applicable row.",
+    "Remaining Word/Excel/PowerPoint semantics, general native-source operation scope, unsupported/external/UI dispositions and whole-feature completion review remain active."
+  ],
+  "environment": {
+    "validation_order": "Full RTF owner tests were rerun after finalizing document defaults in one pass. Affected RTF operations and the eight-format facade passed with the same semantics; native/layout targets were rerun after strengthening the canonical event-order assertion. Final formatting and Clippy pass.",
+    "unrelated_files_preserved": [
+      "crates/litchi/examples/bench_word_parse.rs",
+      "docs/adr/0033-unified-api-glossary-and-default-policies.md",
+      "perf.data"
+    ],
+    "warnings": "77 pre-existing vendor/zlib-rs warnings remain outside changed workspace code."
+  }
+}
