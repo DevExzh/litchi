@@ -74,6 +74,7 @@ fn parse_time_node_property(record: &Record) -> Result<TimeNodeProperty> {
                 .0
                 .iter()
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                .take_while(|unit| *unit != 0)
                 .collect::<Vec<_>>(),
         )
         .map_err(|_err| Error::InvalidFormat("invalid UTF-16 time variant".to_string()))

@@ -2626,6 +2626,150 @@
         "Native DBCELL retains11 offsets including two trailing zero slots for empty hidden rows, exposes only9 actual cell-row pointers including row20 after those empty rows, and re-encodes the original DBCELL payload exactly."
       ],
       "scope_limit": "Compact offsets or a zero-padded array sized to the observed ROW count only; padding never becomes a cell pointer. Synthetic negatives reject nonzero padding, misplaced zero slots, wrong boundaries and cardinalities."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_fly_in_timing_tree_keeps_conditions_behaviors_and_duration",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-370"
+      ],
+      "assertions": [
+        "Eight timing nodes, native Next/Previous condition roles, two1250ms x/y behaviors targeting8193, all keyframe values/times/empty formula fields, expanded AsAWhole build identity and semantic timing-tree write/read. Formula calculation cannot be satisfied by empty placeholders."
+      ],
+      "scope_limit": "Stored timing metadata only; no execution/playback. Native expanded builds can omit templates; unexpanded empty builds remain invalid."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_transitions_and_advance_edits_preserve_other_slides_and_resources",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-371"
+      ],
+      "assertions": [
+        "Native Push/FromTop/Medium/Both/3000ms plus the saved AlphaFade fallback; reversible Cover/FromLeft/Fast/4500ms mutation retains sound and animation state, all other slide records and unrelated CFB streams."
+      ],
+      "scope_limit": "Fixed-width transition/timing edits only. Legacy fallback is not Morph playback or native-app validation."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_master_inventory_styles_and_theme_keep_exact_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-349",
+        "ppt-350",
+        "ppt-361",
+        "ppt-373"
+      ],
+      "assertions": [
+        "Five exact master/persist IDs, notes-master owner, eight text-style types per main master,17 embedded layouts, round-trip text-style/theme packages, exact Ion12-color palette/major/minor fonts, and inherited footer/date text."
+      ],
+      "scope_limit": "Contextual inventory and bounded parsed metadata, not full visual inheritance, layout rendering or general title-master authoring."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_master_design_name_edit_preserves_slide_and_other_master_records",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-349"
+      ],
+      "assertions": [
+        "Main-master design-name change reopens with the requested text and stable master IDs; every slide, other master and unrelated CFB stream is exact, and inverse restores source bytes."
+      ],
+      "scope_limit": "One main-master metadata operation; no new master/drawing synthesis."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_handout_context_and_legacy_font_conversion_are_explicit",
+      "fixtures": [
+        "powerpoint/powerpoint-fonts-math-handout.ppt"
+      ],
+      "feature_rows": [
+        "ppt-350",
+        "ppt-378"
+      ],
+      "assertions": [
+        "Handout persist ID2 and exact direct record families, three exact legacy font names, subset flags and absence of embedded fonts. Native source no-op bytes are exact."
+      ],
+      "scope_limit": "The PPT conversion has no EOT payload; absence is explicitly not font-extraction coverage. Handout placeholder text/formatting is still outside these assertions."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_excel_chart_inventory_keeps_frame_series_and_all_cached_points",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-362"
+      ],
+      "assertions": [
+        "Exactly one Excel.Chart.8 with no per-object failures, exact object/persist/slide/frame IDs, North/South/West series, bar group and all24 category/value cache cells."
+      ],
+      "scope_limit": "Inert embedded chart snapshot; title/layout completeness, general authoring and calculation/rendering are not claimed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_animation_duration_edit_preserves_targets_builds_and_other_slides",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-370"
+      ],
+      "assertions": [
+        "Native duration edit changes both1250ms behaviors to1500ms, reopens to the full expected animation extension with original targets/builds, preserves other slides/non-tag records/resources and restores exact source via inverse."
+      ],
+      "scope_limit": "Related PP10 timing bytes can normalize Unicode terminators during changed publication; no-op/source and inverse retain original bytes. No playback."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_font_payload_and_face_metadata_remain_inert",
+      "fixtures": [
+        "powerpoint/powerpoint-fonts-math-handout.pptx"
+      ],
+      "feature_rows": [
+        "pptx-433"
+      ],
+      "assertions": [
+        "One Cambria Math Regular face, exact129261-byte EOT payload SHA-256 and byte preservation after package serialization/reopen."
+      ],
+      "scope_limit": "Inert payload/name/style read only; no glyph coverage, font registration, rendering or font mutation."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_ppt_queries_and_atomic_title_visibility_edits_preserve_timing",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-348",
+        "ppt-353",
+        "ppt-371"
+      ],
+      "assertions": [
+        "File-backed Auto and byte Eager routes query the native title as a semantic placeholder with a physical shape path, atomically edit title/hidden state, retain timing/animation metadata and inverse/source bytes."
+      ],
+      "scope_limit": "Public query/text/visibility edits only; no action or slideshow execution.",
+      "required_features": [
+        "ppt"
+      ]
     }
   ]
 }

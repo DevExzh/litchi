@@ -114,7 +114,7 @@ pub fn write_time_set_behavior(set: &TimeSetBehavior) -> Result<Vec<u8>> {
     validate_set_behavior(set)?;
     let mut children = write_time_set_behavior_atom(&set.atom);
     if let Some(value) = &set.to {
-        append_time_variant(&mut children, 1, encode_time_variant_string(value))?;
+        append_time_variant(&mut children, 1, encode_time_variant_string(value)?)?;
     }
     children.extend(write_time_behavior(&set.behavior)?);
     wrap_record(RecordType::TimeSetBehaviorContainer, 0x0F, 0, children)
@@ -223,7 +223,7 @@ pub fn write_time_command_behavior(behavior: &TimeCommandBehavior) -> Result<Vec
     }
     let mut children = write_time_command_behavior_atom(&behavior.atom);
     if let Some(command) = &behavior.command {
-        let data = encode_time_variant_string(command);
+        let data = encode_time_variant_string(command)?;
         let length = u32::try_from(data.len())
             .map_err(|_err| Error::InvalidFormat("time command exceeds 4 GiB".to_string()))?;
         children.extend(create_record_header(RecordType::TimeVariant, 0, 1, length));
@@ -361,12 +361,12 @@ pub fn write_time_condition(condition: &TimeCondition) -> Result<Vec<u8>> {
         children.extend(write_time_visual_element(target)?);
     }
     let instance = match condition.condition_type {
-        TimeConditionType::None => 1,
-        TimeConditionType::Begin => 2,
-        TimeConditionType::End => 3,
-        TimeConditionType::Next => 4,
-        TimeConditionType::Previous => 5,
-        TimeConditionType::EndSync => 6,
+        TimeConditionType::None => 0,
+        TimeConditionType::Begin => 1,
+        TimeConditionType::End => 2,
+        TimeConditionType::Next => 3,
+        TimeConditionType::Previous => 4,
+        TimeConditionType::EndSync => 5,
     };
     wrap_record(RecordType::TimeConditionContainer, 0x0F, instance, children)
 }

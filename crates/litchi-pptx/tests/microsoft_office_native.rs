@@ -12,6 +12,37 @@ fn native(name: &str) -> Package {
 }
 
 #[test]
+fn native_powerpoint_font_payload_and_face_metadata_remain_inert() {
+    use litchi_pptx::font::{self, Style};
+    let package = native("powerpoint-fonts-math-handout.pptx");
+    let fonts = font::load(package.opc().unwrap()).unwrap().unwrap();
+    assert_eq!(fonts.len(), 1);
+    let font = fonts.get("Cambria Math").unwrap();
+    assert_eq!(font.name(), "Cambria Math");
+    assert_eq!(font.faces().len(), 1);
+    let face = &font.faces()[0];
+    assert_eq!(face.style(), Style::Regular);
+    assert_eq!(face.data().bytes().len(), 129261);
+    assert_eq!(
+        sha256(face.data().bytes()),
+        "4e9c7d3b3dc757b3f45eb6f7a902046ebabc9b5868c707aeaa4f1e6c42cccfc9"
+    );
+    let original = package.to_bytes().unwrap();
+    let reopened = Package::from_bytes(&original).unwrap();
+    assert_eq!(
+        font::load(reopened.opc().unwrap())
+            .unwrap()
+            .unwrap()
+            .get("Cambria Math")
+            .unwrap()
+            .faces()[0]
+            .data()
+            .bytes(),
+        face.data().bytes()
+    );
+}
+
+#[test]
 fn native_powerpoint_slide_master_and_layout_root_properties_are_readable() {
     let package = native("powerpoint-master-motion.pptx");
     let presentation = package.presentation().unwrap();

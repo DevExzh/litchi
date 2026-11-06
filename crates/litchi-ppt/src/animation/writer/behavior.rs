@@ -67,7 +67,7 @@ pub fn write_time_animate_behavior(animate: &TimeAnimateBehavior) -> Result<Vec<
     }
     for (instance, value) in [(1, &animate.by), (2, &animate.from), (3, &animate.to)] {
         if let Some(text) = value {
-            append_time_variant(&mut children, instance, encode_time_variant_string(text))?;
+            append_time_variant(&mut children, instance, encode_time_variant_string(text)?)?;
         }
     }
     children.extend(write_time_behavior(&animate.behavior)?);
@@ -110,15 +110,15 @@ pub fn write_time_animation_value_list(list: &TimeAnimationValueList) -> Result<
     for entry in &list.entries {
         children.extend(write_time_animation_value_atom(entry.time)?);
         if let Some(value) = &entry.value {
-            append_time_variant(&mut children, 0, encode_generic_time_variant(value))?;
+            append_time_variant(&mut children, 0, encode_generic_time_variant(value)?)?;
         }
         if let Some(formula) = &entry.formula {
-            if !is_valid_time_formula(formula) {
+            if (!formula.is_empty() || entry.value.is_none()) && !is_valid_time_formula(formula) {
                 return Err(Error::InvalidFormat(
                     "invalid animation keyframe formula".to_string(),
                 ));
             }
-            append_time_variant(&mut children, 1, encode_time_variant_string(formula))?;
+            append_time_variant(&mut children, 1, encode_time_variant_string(formula)?)?;
         }
     }
     wrap_record(RecordType::TimeAnimationValueList, 0x0F, 0, children)
@@ -140,8 +140,8 @@ pub fn write_time_animation_value_atom(time: i32) -> Result<Vec<u8>> {
     Ok(result)
 }
 
-fn encode_generic_time_variant(value: &TimeVariantValue) -> Vec<u8> {
-    match value {
+fn encode_generic_time_variant(value: &TimeVariantValue) -> Result<Vec<u8>> {
+    Ok(match value {
         TimeVariantValue::Boolean(flag) => vec![0, u8::from(*flag)],
         TimeVariantValue::Integer(integer) => {
             let mut data = vec![1];
@@ -153,8 +153,8 @@ fn encode_generic_time_variant(value: &TimeVariantValue) -> Vec<u8> {
             data.extend(float.to_le_bytes());
             data
         },
-        TimeVariantValue::String(text) => encode_time_variant_string(text),
-    }
+        TimeVariantValue::String(text) => encode_time_variant_string(text)?,
+    })
 }
 
 fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
@@ -216,10 +216,14 @@ fn validate_animate_behavior(animate: &TimeAnimateBehavior) -> Result<()> {
         ));
     }
     if animate.atom.calculation_mode == Some(TimeAnimateCalculationMode::Formula)
-        && !animate
-            .values
-            .as_ref()
-            .is_some_and(|list| list.entries.iter().any(|entry| entry.formula.is_some()))
+        && !animate.values.as_ref().is_some_and(|list| {
+            list.entries.iter().any(|entry| {
+                entry
+                    .formula
+                    .as_ref()
+                    .is_some_and(|formula| !formula.is_empty())
+            })
+        })
     {
         return Err(Error::InvalidFormat(
             "formula calculation mode requires a keyframe formula".to_string(),
@@ -400,7 +404,7 @@ pub fn write_time_effect_behavior(effect: &TimeEffectBehavior) -> Result<Vec<u8>
         append_time_variant(
             &mut children,
             1,
-            encode_time_variant_string(filter.as_str()),
+            encode_time_variant_string(filter.as_str())?,
         )?;
     }
     if let Some(progress) = effect.progress {
@@ -412,7 +416,7 @@ pub fn write_time_effect_behavior(effect: &TimeEffectBehavior) -> Result<Vec<u8>
         append_time_variant(
             &mut children,
             3,
-            encode_time_variant_string(runtime_context),
+            encode_time_variant_string(runtime_context)?,
         )?;
     }
     children.extend(write_time_behavior(&effect.behavior)?);
@@ -481,7 +485,7 @@ pub fn write_time_motion_behavior(motion: &TimeMotionBehavior) -> Result<Vec<u8>
     validate_motion_behavior(motion)?;
     let mut children = write_time_motion_behavior_atom(&motion.atom)?;
     if let Some(path) = &motion.path {
-        append_time_variant(&mut children, 1, encode_time_variant_string(path))?;
+        append_time_variant(&mut children, 1, encode_time_variant_string(path)?)?;
     }
     if let Some(reserved) = motion.reserved {
         let mut data = vec![1];
@@ -660,14 +664,14 @@ fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16
     };
     let string = |value: &str| encode_time_variant_string(value);
     Ok(match property {
-        TimeBehaviorProperty::UnknownPropertyList(value) => (0x01, string(value)),
+        TimeBehaviorProperty::UnknownPropertyList(value) => (0x01, string(value)?),
         TimeBehaviorProperty::RuntimeContext(value) => {
             if !is_valid_runtime_context(value) {
                 return Err(Error::InvalidFormat(
                     "invalid time runtime context".to_string(),
                 ));
             }
-            (0x02, string(value))
+            (0x02, string(value)?)
         },
         TimeBehaviorProperty::MotionPathEditRelative(value) => (0x03, vec![0, u8::from(*value)]),
         TimeBehaviorProperty::ColorModel(value) => (
@@ -695,7 +699,7 @@ fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16
                     "invalid time path point types".to_string(),
                 ));
             }
-            (0x0A, string(value))
+            (0x0A, string(value)?)
         },
     })
 }
@@ -703,7 +707,7 @@ fn encode_time_behavior_property(property: &TimeBehaviorProperty) -> Result<(u16
 fn write_time_string_list(names: &[String]) -> Result<Vec<u8>> {
     let mut children = Vec::new();
     for name in names {
-        let data = encode_time_variant_string(name);
+        let data = encode_time_variant_string(name)?;
         let length = u32::try_from(data.len()).map_err(|_err| {
             Error::InvalidFormat("time attribute name exceeds 4 GiB".to_string())
         })?;
@@ -713,11 +717,16 @@ fn write_time_string_list(names: &[String]) -> Result<Vec<u8>> {
     wrap_record(RecordType::TimeVariantList, 0x0F, 1, children)
 }
 
-pub(super) fn encode_time_variant_string(value: &str) -> Vec<u8> {
+pub(super) fn encode_time_variant_string(value: &str) -> Result<Vec<u8>> {
+    if value.contains('\0') {
+        return Err(Error::InvalidFormat(
+            "authored time strings cannot contain a Unicode terminator".into(),
+        ));
+    }
     let mut data = Vec::with_capacity(1 + value.len().saturating_mul(2));
     data.push(3);
     data.extend(value.encode_utf16().flat_map(u16::to_le_bytes));
-    data
+    Ok(data)
 }
 
 /// Serialize a `ClientVisualElementContainer` animation target.

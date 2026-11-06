@@ -567,12 +567,15 @@ pub fn parse_time_condition(record: &Record) -> Result<TimeCondition> {
         "TimeConditionContainer",
     )?;
     let condition_type = match record.instance {
-        1 => TimeConditionType::None,
-        2 => TimeConditionType::Begin,
-        3 => TimeConditionType::End,
-        4 => TimeConditionType::Next,
-        5 => TimeConditionType::Previous,
-        6 => TimeConditionType::EndSync,
+        // TimeConditionContainer constrains recInstance to 0..=5, as
+        // native PowerPoint writes it. The separate ConditionEnum table
+        // numbers its labels 1..=6; those are not the wire instances.
+        0 => TimeConditionType::None,
+        1 => TimeConditionType::Begin,
+        2 => TimeConditionType::End,
+        3 => TimeConditionType::Next,
+        4 => TimeConditionType::Previous,
+        5 => TimeConditionType::EndSync,
         value => {
             return Err(Error::InvalidFormat(format!(
                 "invalid time condition type {value}"

@@ -168,3 +168,9 @@ notes and comment replies. Native Zoom, 3D and macro-variant text edits are reop
 and inverted with unrelated content checked; Agile AES-256/SHA-512 input is rekeyed
 without changing clear member payloads. No Office application, macro, model, media
 player, external target or animation is executed.
+
+The native `powerpoint-fonts-math-handout.pptx` regression checks the single
+Cambria Math Regular face and the exact 129261-byte EOT payload/SHA-256 before
+and after package serialization. Font bytes remain inert; this is not glyph
+coverage, registration, rendering or font-edit evidence. The native handout
+placeholder projection remains a separate coverage gap.

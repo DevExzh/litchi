@@ -210,7 +210,11 @@ fn write_build_atom(atom: &BuildAtom, kind: BuildKind) -> Vec<u8> {
 }
 
 fn write_paragraph_build(build: &ParagraphBuild) -> Result<Vec<u8>> {
-    validate_paragraph_levels(&build.paragraph.build_type, &build.levels)?;
+    // Native expanded builds can omit templates once their effects live in
+    // the slide timing tree. Unexpanded/new templates retain strict checks.
+    if !build.atom.expanded || !build.levels.is_empty() {
+        validate_paragraph_levels(&build.paragraph.build_type, &build.levels)?;
+    }
     let mut children = write_build_atom(&build.atom, BuildKind::Paragraph);
     let mut atom = Vec::with_capacity(16);
     atom.extend(build.paragraph.build_type.as_u32().to_le_bytes());

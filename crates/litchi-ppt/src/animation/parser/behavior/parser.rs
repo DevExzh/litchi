@@ -277,7 +277,12 @@ pub fn parse_time_animation_value_list(record: &Record) -> Result<TimeAnimationV
             child.record_type == RecordType::TimeVariant && child.instance == 1
         }) {
             let formula = parse_time_variant_string(&record.children[index])?;
-            validate_time_formula(&formula)?;
+            // Native PowerPoint writes an empty optional formula beside an
+            // explicit keyframe value. Retain its presence, but never accept
+            // an empty formula as the keyframe's only value.
+            if !formula.is_empty() || value.is_none() {
+                validate_time_formula(&formula)?;
+            }
             index += 1;
             Some(formula)
         } else {

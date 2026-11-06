@@ -12,6 +12,65 @@ use crate::consts::RecordType;
 use crate::records::Record;
 
 #[test]
+fn unicode_terminators_and_empty_formula_placeholders_keep_their_boundaries() {
+    fn variant(units: &[u16]) -> Record {
+        let mut payload = vec![3];
+        payload.extend(units.iter().flat_map(|u| u.to_le_bytes()));
+        Record {
+            record_type: RecordType::TimeVariant,
+            record_type_raw: RecordType::TimeVariant.as_u16(),
+            version: 0,
+            instance: 0,
+            data_length: u32::try_from(payload.len()).unwrap(),
+            data: payload.into(),
+            children: Vec::new(),
+        }
+    }
+    let mut units = "style.visibility".encode_utf16().collect::<Vec<_>>();
+    assert_eq!(
+        super::model::parse_time_variant_string(&variant(&units)).unwrap(),
+        "style.visibility"
+    );
+    units.extend([0, 0xd800]); // The optional terminator ends the string.
+    assert_eq!(
+        super::model::parse_time_variant_string(&variant(&units)).unwrap(),
+        "style.visibility"
+    );
+    assert!(super::model::parse_time_variant_string(&variant(&[0xd800, 0])).is_err());
+    let list = TimeAnimationValueList {
+        entries: vec![TimeAnimationValue {
+            time: 0,
+            value: Some(TimeVariantValue::String("#ppt_x".into())),
+            formula: Some(String::new()),
+        }],
+    };
+    let wire = write_time_animation_value_list(&list).unwrap();
+    let (record, _) = Record::parse(&wire, 0, &crate::SourceLimits::default()).unwrap();
+    assert_eq!(parse_time_animation_value_list(&record).unwrap(), list);
+    let mut invalid = list.clone();
+    invalid.entries[0].value = None;
+    assert!(write_time_animation_value_list(&invalid).is_err());
+    let mut invalid = list.clone();
+    invalid.entries[0].value = Some(TimeVariantValue::String("value\0suffix".into()));
+    assert!(write_time_animation_value_list(&invalid).is_err());
+    let invalid = TimeBehaviorPropertyList {
+        properties: vec![TimeBehaviorProperty::UnknownPropertyList(
+            "vendor\0suffix".into(),
+        )],
+    };
+    assert!(write_time_behavior_property_list(&invalid).is_err());
+    let mut invalid = record;
+    let removed = invalid.children.remove(1);
+    // Remove the value from both projections, retaining valid outer framing.
+    let start = 8 + invalid.children[0].data.len();
+    let mut body = invalid.data.to_vec();
+    body.drain(start..start + 8 + removed.data.len());
+    invalid.data_length = u32::try_from(body.len()).unwrap();
+    invalid.data = body.into();
+    assert!(parse_time_animation_value_list(&invalid).is_err());
+}
+
+#[test]
 fn round_trips_shared_time_behaviors_and_all_properties() {
     assert_eq!(RecordType::TimeBehaviorContainer.as_u16(), 0xF12A);
     assert_eq!(RecordType::TimeBehavior.as_u16(), 0xF133);

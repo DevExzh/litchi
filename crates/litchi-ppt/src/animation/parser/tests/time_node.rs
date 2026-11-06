@@ -523,7 +523,7 @@ fn round_trips_time_conditions_and_modifiers() {
         TimeConditionType::Previous,
         TimeConditionType::EndSync,
     ];
-    for condition_type in condition_types {
+    for (instance, condition_type) in condition_types.into_iter().enumerate() {
         let expected = TimeCondition {
             condition_type,
             atom: TimeConditionAtom {
@@ -537,7 +537,11 @@ fn round_trips_time_conditions_and_modifiers() {
         let bytes = write_time_condition(&expected).unwrap();
         let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
+        assert_eq!(record.instance, u16::try_from(instance).unwrap());
         assert_eq!(parse_time_condition(&record).unwrap(), expected);
+        let mut invalid = record.clone();
+        invalid.instance = 6;
+        assert!(parse_time_condition(&invalid).is_err());
     }
 
     for trigger_event in [

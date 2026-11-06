@@ -141,3 +141,38 @@ refresh targets, render slides, or establish a fresh native-app reopen.
 FBSE pixel-data identifiers and BLIP file-data identifiers remain distinct values;
 image resolution follows slot offsets, kinds and lengths and retains both UIDs.
 No equality between those two identifier fields is inferred.
+
+## Native timing and master qualification
+
+`tests/microsoft_office_native_metadata.rs` checks the saved native Fly In tree,
+its eight nodes, 1.25-second x/y behaviors, shape target, keyframes, sequence
+conditions and expanded paragraph build. The binary condition instance is 0–5,
+as required by `TimeConditionContainer` and emitted by native PowerPoint; the
+separate `ConditionEnum` table labels the same roles 1–6. Unicode timing strings
+stop at their optional terminator. Authored strings with an embedded terminator
+are refused because they cannot round-trip as a complete semantic string.
+
+Native keyframes may store an empty optional formula beside an explicit value;
+the codec retains that presence. It does not accept an empty formula as the
+only value or as satisfying Formula calculation mode. Native expanded paragraph
+builds may omit templates whose effects already live in the timing tree;
+unexpanded empty builds and malformed level/node pairs remain errors.
+
+The same target qualifies five main-master/persist identities, all eight master
+text-style types, 17 embedded layout packages, Ion colors/typefaces, inherited
+footer/date text, the handout master context and the legacy font-conversion
+boundary. The legacy font specimen has three font entities and no EOT payload;
+that absence is not font-extraction evidence. The PPTX companion separately
+checks the exact embedded Cambria Math Regular payload.
+
+Native duration, transition/advance and master design-name edits reopen to the
+expected typed state, preserve unrelated slide/master records and CFB streams,
+and invert exactly. Changed timing serialization can normalize optional string
+terminators within the owned timing tree. The native Excel.Chart.8 inventory
+checks its frame, series and all 24 category/value cache entries. Public operations
+query the semantic title placeholder on file-backed Auto and byte Eager routes
+while retaining its physical shape path through text/visibility edits.
+
+These bounded assertions are indexed in `tools/native_office_tests.json`. They
+do not establish full master inheritance/layout, arbitrary chart authoring,
+rendering, calculation, slideshow playback or fresh PowerPoint acceptance.

@@ -87,7 +87,7 @@ fn parse_build_atom(record: &Record, expected: BuildKind) -> Result<BuildAtom> {
 
 fn parse_paragraph_build(record: &Record) -> Result<ParagraphBuild> {
     require_container(record, RecordType::ParaBuild, 0, "ParaBuild")?;
-    if record.children.len() < 4 || !(record.children.len() - 2).is_multiple_of(2) {
+    if record.children.len() < 2 || !(record.children.len() - 2).is_multiple_of(2) {
         return Err(Error::Corrupted(
             "ParaBuild requires two atoms followed by level/time-node pairs".to_string(),
         ));
@@ -108,7 +108,15 @@ fn parse_paragraph_build(record: &Record) -> Result<ParagraphBuild> {
         }
         levels.push(ParagraphBuildLevel { level, time_node });
     }
-    if paragraph.build_type == ParagraphBuildType::AsAWhole && levels.len() != 1 {
+    if levels.is_empty() && !atom.expanded {
+        return Err(Error::InvalidFormat(
+            "unexpanded ParaBuild requires at least one template level".to_string(),
+        ));
+    }
+    if paragraph.build_type == ParagraphBuildType::AsAWhole
+        && levels.len() != 1
+        && !(atom.expanded && levels.is_empty())
+    {
         return Err(Error::InvalidFormat(
             "AsAWhole ParaBuild requires exactly one level".to_string(),
         ));

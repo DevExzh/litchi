@@ -9,6 +9,27 @@ use super::super::*;
 use super::support::*;
 
 #[test]
+fn expanded_native_paragraph_build_can_omit_templates_but_unexpanded_cannot() {
+    let mut build = sample_build_list();
+    let BuildListEntry::Paragraph(paragraph) = &mut build.builds[0] else {
+        panic!("paragraph")
+    };
+    paragraph.atom.expanded = true;
+    paragraph.levels.clear();
+    let bytes = write_build_list(&build).unwrap();
+    let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
+    assert_eq!(parse_build_list(&record).unwrap(), build);
+    let BuildListEntry::Paragraph(paragraph) = &mut build.builds[0] else {
+        panic!("paragraph")
+    };
+    paragraph.atom.expanded = false;
+    assert!(write_build_list(&build).is_err());
+    let mut invalid = record;
+    invalid.children[0].children[0].data[12] = 0;
+    assert!(parse_build_list(&invalid).is_err());
+}
+
+#[test]
 fn round_trips_exact_powerpoint_2002_build_lists() {
     assert_eq!(RecordType::BuildList.as_u16(), 0x2B02);
     assert_eq!(RecordType::LevelInfoAtom.as_u16(), 0x2B0A);

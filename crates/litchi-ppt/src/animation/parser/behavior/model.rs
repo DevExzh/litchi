@@ -145,6 +145,7 @@ pub(crate) fn parse_time_variant_string(record: &Record) -> Result<String> {
             .0
             .iter()
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .take_while(|unit| *unit != 0)
             .collect::<Vec<_>>(),
     )
     .map_err(|_err| Error::InvalidFormat("invalid UTF-16 time variant".to_string()))

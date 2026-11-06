@@ -3,12 +3,91 @@
     feature = "doc",
     feature = "docx",
     feature = "pptx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "xlsb",
     feature = "xls"
 ))]
 
 use litchi_ops::{OpenOptions, SourceMode, props};
+
+#[cfg(feature = "ppt")]
+#[test]
+fn native_ppt_queries_and_atomic_title_visibility_edits_preserve_timing() {
+    let bytes = include_bytes!(
+        "../../../test-data/microsoft-office/powerpoint/powerpoint-master-motion.ppt"
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("native.ppt");
+    std::fs::write(&path, bytes).unwrap();
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = if mode == SourceMode::Auto {
+            litchi_ops::open_with(&path, &options).unwrap()
+        } else {
+            litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap()
+        };
+        let found = source
+            .query("placeholder[text=PPT_MASTER_MOTION_006]")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(found.len(), 1);
+        let title = found[0].path().to_string();
+        assert_eq!(title, "/slide[2]/shape[1]");
+        let committed = source
+            .edit(|edit| {
+                edit.set(title.as_str(), props! {"text"=>"Reviewed native title"})?;
+                edit.set("/slide[4]", props! {"hidden"=>false})
+            })
+            .unwrap();
+        let after = committed.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(after.clone(), &options).unwrap();
+        assert_eq!(
+            reopened
+                .get(title.as_str())
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("Reviewed native title")
+        );
+        let owner = litchi_ppt::Package::from_bytes(&after).unwrap();
+        let p = owner.presentation().unwrap();
+        assert!(!p.slide_at(3).unwrap().unwrap().timing().unwrap().hidden);
+        assert_eq!(
+            p.slide_at(1)
+                .unwrap()
+                .unwrap()
+                .transition()
+                .unwrap()
+                .unwrap()
+                .advance_time_ms,
+            Some(3000)
+        );
+        assert!(
+            p.slide_at(1)
+                .unwrap()
+                .unwrap()
+                .animation_extension()
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == bytes
+        );
+        assert!(source.to_bytes().unwrap() == bytes);
+    }
+    assert!(std::fs::read(path).unwrap() == bytes);
+}
 
 #[cfg(feature = "xls")]
 #[test]
