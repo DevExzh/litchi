@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "21412244705c7f80dc7fea164f9f78e41f21be90",
+  "base_commit": "b62b20ad48ad0f680b8a9f3167bf100f9da7d400",
+  "problem": "Native DOCX visual fixtures lacked typed/resource/edit coverage. SmartArt frame dimensions disappeared because MCE expanded empty wp:extent elements while the reader handled only Empty events. Chart-only metadata edits rebuilt unchanged relationships and lost native relative-target spellings and member XML.",
+  "changes": [
+    "Read both XML event forms of exact-namespace direct wp:inline/wp:anchor extents, scoped by owner depth. A prior drawing, nested extent or foreign namespace lookalike cannot supply another diagram frame.",
+    "Update existing chart/companion/workbook payloads in place, preserve unchanged relationship collections and native relative references, and leave main-document chart edges untouched when their ID/target mapping is unchanged. Explicit graph changes retain the existing checked publication path.",
+    "Add six native DOCX tests, one operations test, one facade test and one synthetic extent/scoping test. Bind four previously unasserted feature rows without changing historical status labels."
+  ],
+  "verification_scope": {
+    "pictures_and_ole": "Two DrawingML images have exact IDs, EMU extents, alt text and native JPEG/PNG hashes. A separate Excel.Sheet.12 OLE descriptor resolves an EMF preview and a 18372-byte embedded XLSX with exact identities; the preview is read through EmbeddedObject rather than counted as a DrawingML image.",
+    "charts": "The classic graph exposes one doughnut chart, style/color companions and a separate 9894-byte chart workbook with exact hashes. Typed reads verify hole75, category/value caches and formulas, title reference, and 5486400x3200400 inline extent. A hole75->55 edit preserves every other ZIP member and inverts exact member bytes.",
+    "smartart": "Native Basic Process exposes ACQUIRE_013/TRANSFORM_013/VERIFY_013,18 points/18 connections, known layout/style/colors URIs, data/drawing part identities and 5486400x3200400 frame. Synthetic Transitional/Strict cases cover both XML forms, absent extent after a preceding owner, nested geometry and foreign namespace lookalikes.",
+    "textbox": "The active native VML fallback exposes exactly one two-paragraph rounded-rectangle text box with its name, VML anchor and absent WordArt flag. This does not qualify the inactive WPS branch in general drawing_objects.",
+    "svg": "The direct inline SVG and PNG fallback have exact original identities/hashes. Detach and subsequent reattach of changed SVG are separate supported transactions because the attachment API refuses an occupied owner or a second operation for the same selector in one batch. Publication/reopen retains raster and diagram parts; inverse of the composed steps restores the complete native archive.",
+    "operations": "Auto/eager query finds /smartart[1]. A native /node[2] text edit preserves the main XML, layout/style/color parts and other visuals. Explicit whole-outline process-layout rebuild is tested separately and can regenerate diagram definition/drawing parts. Both retain native frame extent and exact converted-group XML, save/reopen and invert exactly.",
+    "facade": "Explicitly extracted OLE XLSX has Sales chart/Sheet1/Sheet2 and stored SUM(B2:B5)=14 / Sheet1!D6=49.75 caches; independent child editing retains them. Separate chart XLSX has Sales, four quarter labels and exact numeric lexemes including 8.1999999999999993. Parent/original children remain unchanged; no re-embedding or refresh is claimed.",
+    "validation": "Full DOCX owner, affected DOCX operations and eight-format facade suites pass. Final focused reruns cover equivalent f64 spelling after Clippy and the added native-node versus explicit-rebuild preservation assertions. Clippy, targeted formatting, 72 Python tests, corpus integrity and CI gate configuration verification pass.",
+    "environment": "Original fixture bytes and the three pre-existing untracked files are unchanged. No rendering, proprietary/native layout engine, native application reopen, OLE/control activation, macro execution, external fetch or formula/chart refresh occurred."
+  },
+  "results": {
+    "main_rust_suite_passes": 3251,
+    "additional_focused_passes": 7,
+    "rust_ignored": 0,
+    "python_passed": 72,
+    "new_native_tests": 8,
+    "new_unit_tests": 1,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 202,
+      "indexed_tests": 215,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 202,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 56,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-owner-final.log",
+        "bytes": 240455,
+        "sha256": "d71e9038bd843d896baaf274815b4d2f34a94f478d4185daeafcb2fa5984696c"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-visuals-owner-final.log 2>&1",
+      "suites": 83,
+      "passed": 2403,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-ops-final.log",
+        "bytes": 76287,
+        "sha256": "25a8bd9e4ebf6881f49aabfa959facd4c679ba8cd3e23a9b8e3a4a451aa81a9a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/word-visuals-ops-final.log 2>&1",
+      "suites": 20,
+      "passed": 735,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-facade-final.log",
+        "bytes": 32907,
+        "sha256": "7a3abef77784cfd6292519da8bd9f29bf21d9e4564318906c028eb860a82f0e5"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/word-visuals-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 113,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_visuals",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-owner-focused.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-owner-focused.log",
+        "bytes": 17801,
+        "sha256": "2405c38391358522ca14e917b26f695d07a10acc7ca2408736140851f2f44876"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_visuals > /tmp/litchi-native-office.GMvwp4/word-visuals-owner-focused.log 2>&1",
+      "suites": 1,
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --test microsoft_office_native native_word_smartart_outline_edits_preserve_extent_and_other_visuals",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-ops-focused.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-ops-focused.log",
+        "bytes": 17390,
+        "sha256": "c0b172a037dcd85aa613d2dd92af5ce878f0f1135db498d8c06c433f35faf843"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --test microsoft_office_native native_word_smartart_outline_edits_preserve_extent_and_other_visuals > /tmp/litchi-native-office.GMvwp4/word-visuals-ops-focused.log 2>&1",
+      "suites": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-ops -p litchi --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-clippy-final.log",
+        "bytes": 17168,
+        "sha256": "35876193772df858d8c9d0fb06436bdd98900cf1e1977ed8a145079a0127651c"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-ops -p litchi --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption,litchi/doc,litchi/docx,litchi/rtf,litchi/xls,litchi/xlsx,litchi/xlsb,litchi/ppt,litchi/pptx,litchi/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/word-visuals-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-python-final.log",
+        "bytes": 664,
+        "sha256": "14feea6ed645e93d86f1d8757b4babf133ad54f53b50ce5ac8e3f944effb0c40"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/word-visuals-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/word-visuals-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-coverage-final.json",
+        "bytes": 738543,
+        "sha256": "4ef28dcf584a1abb0fa6a07bc8e8c8f45d86d3a4e74aa6136d0529e5db41f5a6"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/word-visuals-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-docx/src/smartart.rs crates/litchi-docx/src/chart/package.rs crates/litchi-docx/tests/microsoft_office_native_visuals.rs crates/litchi-ops/tests/microsoft_office_native.rs crates/litchi/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "word-visuals-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-docx/src/smartart.rs crates/litchi-docx/src/chart/package.rs crates/litchi-docx/tests/microsoft_office_native_visuals.rs crates/litchi-ops/tests/microsoft_office_native.rs crates/litchi/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/word-visuals-format-final.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "word-visuals-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-before.log",
+        "bytes": 18960,
+        "sha256": "60ca4901a227bf2d5eb5f338b0bd8d7cac37dea6ce6e313b19156e64c22a5e89"
+      },
+      "scope": "Native SmartArt typed extent was None instead of 5486400x3200400. Initial assumptions about image counts and the inactive WPS branch were corrected using API contracts and native XML, not treated as passing library defects.",
+      "regenerate": "Copy microsoft_office_native_visuals.rs from source_commit into crates/litchi-docx/tests/ in a scratch checkout of base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_visuals native_smartart_process_retains_nodes_and_definition_identities"
+    },
+    {
+      "artifact": {
+        "file_name": "word-visuals-focused.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/word-visuals-focused.log",
+        "bytes": 19353,
+        "sha256": "cea4cc01fcdcf2107d5d96ce162741f82ee0c2ff9f373b5e27bcb3e64e83a833"
+      },
+      "scope": "A hole-size-only chart edit changed word/charts/_rels/chart1.xml.rels. The final test requires every unrelated member to remain exact. Other initial failures in this log were a transcribed hash typo and an unsupported attempt to attach over an occupied SVG owner; final tests use the recorded 64-digit hash and supported detach/reattach sequence.",
+      "regenerate": "Copy microsoft_office_native_visuals.rs from source_commit into crates/litchi-docx/tests/ in a scratch checkout of base_commit, then CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_visuals native_chart_hole_edit_preserves_cached_data_workbooks_and_companions"
+    }
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/word/visual-objects-inspection.json",
+    "test-data/microsoft-office/word/vector-diagram-inspection.json",
+    "crates/litchi-docx/src/source_backed/svg_lifecycle.rs",
+    "crates/litchi-ops/src/format/docx/smartart.rs"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_visuals-08f94d1828a4479c",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_visuals-08f94d1828a4479c",
+      "bytes": 22165720,
+      "sha256": "58fcc2952617cdc41e69e43bc7c11ddaec1484252304d0cf59ea965eacdb621c",
+      "source_commit": "21412244705c7f80dc7fea164f9f78e41f21be90",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_visuals"
+    },
+    {
+      "file_name": "microsoft_office_native-9894bbaf11bd9512",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-9894bbaf11bd9512",
+      "bytes": 40549624,
+      "sha256": "0e982ee64cd17599861d15743b71bd68890100ac2e2db3af1ef86e90479b28ba",
+      "source_commit": "21412244705c7f80dc7fea164f9f78e41f21be90",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --test microsoft_office_native native_word_smartart_outline_edits_preserve_extent_and_other_visuals"
+    },
+    {
+      "file_name": "microsoft_office_native-14834ce69a321400",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-14834ce69a321400",
+      "bytes": 145766160,
+      "sha256": "c445ce45cc3114cea75fe0c4830ae6240c0f89df42b2bce03a3e0c3440c712a3",
+      "source_commit": "21412244705c7f80dc7fea164f9f78e41f21be90",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1"
+    }
+  ],
+  "remaining_scope": [
+    "The full eight-format goal remains active: 139/139 fixtures indexed,202/494 rows with partial assertions across215 tests; no complete-row claim follows.",
+    "All 252 historical pending labels remain unchanged. Remaining unasserted scopes include 56 native-evidence semantic rows,63 operation rows,46 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "General DOCX drawing_objects still omits the alternate WPS/WPG branches selected away by its MCE profile. The VML text-box and SVG/SmartArt tests do not close complete shape/group inventory or geometry semantics.",
+    "Native DOC/RTF picture/OLE/vector/SmartArt payload semantics, other Word navigation/policy scopes, remaining Excel/PowerPoint rows and external/UI classification reconciliation remain active.",
+    "Chart type conversion, workbook synchronization, rendering/layout parity, direct occupied-SVG replacement, OLE parent reinsertion through a dedicated owner and host execution remain outside these native assertions."
+  ]
+}
