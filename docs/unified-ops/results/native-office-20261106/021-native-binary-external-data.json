@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "1987207bc4d5e2507b581bca137d3f67ea22f714",
+  "base_commit": "76509436feb3ab15b071f4279c7fe67e786b8c16",
+  "problem": "Native XLSB text-import properties were skipped, and source-bound connection edits appended retained unknown records after the part end instead of preserving their owner/ordinal. Canonical serialization also changed an ignored password byte in an untouched Text connection. Native XLS external-cache semantics had no targeted regression.",
+  "changes": [
+    "Add classic BrtBeginECTxtWiz text properties, encoding selectors, delimiters, qualifiers, first row, separators, source path, optional field-list presence and all ten field types. Read/write bounds and malformed count/collection checks are shared with authoring. Must-ignore flag bits and both None qualifier spellings remain representable.",
+    "Retain opaque records in their source owner and modeled-record ordinal. Known record kinds inside ignored collections remain opaque, so nested future content cannot create phantom connections or change scope. Unmatched positions are errors.",
+    "Preserve complete unchanged connection collections and an original common header when its typed header is unchanged. Update the existing connections part without deleting/recreating its OPC relationship or part identity.",
+    "Refuse modeled-layout changes in scopes constrained by opaque records and connection removal while query-table parts remain. Update the matrix to bounded support; these guards do not claim complete dependency teardown or Text15 support.",
+    "Add four native XLSB regressions and one native XLS cache regression, plus five synthetic tests. The previous malformed-classic-text skip test now uses the deliberately unmodeled Text15 collection; a separate negative test requires malformed classic text to fail."
+  ],
+  "verification_scope": {
+    "text": "Native connection1 carries classic text metadata: fallback WindowsAnsi selector1, overriding application selector45, delimited/comma/prompt true, tab/space/semicolon/consecutive/custom false, double-quote qualifier, first row1, decimal46, thousands44, delimiter0 and ignored bit20. The source path is exact and all three fields are General/start0. Application selector45 is not exposed as a numeric Windows code page. Outer data_file/connection_file are correctly absent because the path belongs to the inner text-import block.",
+    "database": "Native connection2 preserves its Query - native-query-010 identity, Microsoft.Mashup.OleDb.1 provider string and SELECT command as inert data.",
+    "source": "Six AC/UID wrapper records retain root ordinals1 and2. Changing connection2 description alters only its common header; all other record payloads/order and package members are exact. The untouched Text header retains its ignored pc=2 byte. Temporary save/reopen and inverse preserve original members and the source Package remains byte-identical.",
+    "text_edits": "Comma-to-semicolon and Category-to-Text edits change exactly record positions5 and8 in the native 21-record part. Query tables, worksheet caches, tables and DataMashup remain byte-identical. Adding/removing a fourth Skip field is reversible after reopen. Reordering around opaque identities and removal of one/all query-dependent connections give precise UnsupportedFeature refusals.",
+    "xls": "The native XLS has an external supporting book followed by a self reference, exact encoded virtual path, source sheets Sales chart/Sheet1/Sheet2, three sheet references and no external names. Source caches retain Sheet1 D6=49.75 and Sheet2 B4=14 with exact zero-based coordinates. Host Sheet1 is visible. This is a public read assertion; the internal external-link transaction module is not exposed as a Package editor.",
+    "guards": "Synthetic cases cover all qualifier/encoding-category combinations, absent versus empty field lists, all field types, must-ignore flags, Unicode paths, row/path/count bounds, malformed/truncated classic text, duplicate collections, opaque root/local/trailing positions and known record kinds inside ignored collections.",
+    "limitations": "No external file decoding, query/provider activation, refresh, credentials use, formula evaluation, macro execution or native Office reopen. Text15/model-data-source properties and query-table binary payloads remain opaque. Part/member identity is tested separately from whole-ZIP compression identity. The local specification references a separate ABNF file; these tests do not claim full External Data Connections grammar coverage."
+  },
+  "results": {
+    "main_rust_suite_passes": 4104,
+    "final_focused_rust_passes": 21,
+    "rust_ignored": 1,
+    "ignored_tests": [
+      {
+        "crate": "litchi-xls",
+        "target": "sheet_features",
+        "name": "write_every_feature",
+        "reason": "Pre-existing evidence generator requires LITCHI_XLS_FEATURES_OUT; no external application probe was performed."
+      }
+    ],
+    "python_passed": 72,
+    "new_native_tests": 5,
+    "new_synthetic_tests": 5,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 222,
+      "indexed_tests": 251,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 222,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 36,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xls -p litchi-xlsb --features litchi-xlsb/vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-owners-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-owners-final.log",
+        "bytes": 309818,
+        "sha256": "1574b0cb5b8aa113975abae3ae69940265488952c946f7f820a077d1f03cf670"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xls -p litchi-xlsb --features litchi-xlsb/vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/binary-external-owners-final.log 2>&1",
+      "suites": 145,
+      "passed": 3283,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xls,xlsb,encryption --lib --test 'xls_*' --test 'xlsb_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-ops-final.log",
+        "bytes": 74813,
+        "sha256": "3cdd6117eb6cfee4960135bff16b0aa3b2f98595a03ff6dedba97f3e084108c3"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xls,xlsb,encryption --lib --test 'xls_*' --test 'xlsb_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/binary-external-ops-final.log 2>&1",
+      "suites": 27,
+      "passed": 706,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-facade-final.log",
+        "bytes": 33279,
+        "sha256": "77c91eb27794356a5a7efd586ab2f739dcfb714c1ee8badc02d75d55df66dfd1"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/binary-external-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 115,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-xls -p litchi-xlsb -p litchi-ops --no-default-features --features litchi-xlsb/vba-inspection,litchi-ops/xls,litchi-ops/xlsb,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-clippy-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-clippy-verified.log",
+        "bytes": 17222,
+        "sha256": "e8677be1448d8c972b7194148e7d3bc7ba3e2c4e1918d62e93b7356540dce260"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-xls -p litchi-xlsb -p litchi-ops --no-default-features --features litchi-xlsb/vba-inspection,litchi-ops/xls,litchi-ops/xlsb,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/binary-external-clippy-verified.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-python-final.log",
+        "bytes": 664,
+        "sha256": "05bc8c1eb5e06d2bf46135f8ec1a610063a024793de797cd68589eb028bb8c38"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/binary-external-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/binary-external-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-coverage-final.json",
+        "bytes": 780109,
+        "sha256": "70b44fffdd3b7ad96cff5b6e81d24775438c7bd0b6e22695eda1c910a7a682bc"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/binary-external-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-xls/tests/microsoft_office_native_metadata.rs crates/litchi-xlsb/src/host/connections/codec.rs crates/litchi-xlsb/src/host/connections/mod.rs crates/litchi-xlsb/src/host/connections/model.rs crates/litchi-xlsb/src/host/connections/package.rs crates/litchi-xlsb/src/host/connections/parse.rs crates/litchi-xlsb/src/host/connections/tests.rs crates/litchi-xlsb/src/host/connections/validation.rs crates/litchi-xlsb/src/host/connections/write.rs crates/litchi-xlsb/src/host/walker.rs crates/litchi-xlsb/src/raw/kind.rs crates/litchi-xlsb/src/host/connections/text.rs crates/litchi-xlsb/tests/microsoft_office_native_external_data.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-xls/tests/microsoft_office_native_metadata.rs crates/litchi-xlsb/src/host/connections/codec.rs crates/litchi-xlsb/src/host/connections/mod.rs crates/litchi-xlsb/src/host/connections/model.rs crates/litchi-xlsb/src/host/connections/package.rs crates/litchi-xlsb/src/host/connections/parse.rs crates/litchi-xlsb/src/host/connections/tests.rs crates/litchi-xlsb/src/host/connections/validation.rs crates/litchi-xlsb/src/host/connections/write.rs crates/litchi-xlsb/src/host/walker.rs crates/litchi-xlsb/src/raw/kind.rs crates/litchi-xlsb/src/host/connections/text.rs crates/litchi-xlsb/tests/microsoft_office_native_external_data.rs > /tmp/litchi-native-office.GMvwp4/binary-external-format-final.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --lib connections:: -- --nocapture",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-unit-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-unit-verified.log",
+        "bytes": 18974,
+        "sha256": "8e637cec16e0be6674c6c4ca4619b481a438a024c67b4162a1681b75c32efac8"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --lib connections:: -- --nocapture > /tmp/litchi-native-office.GMvwp4/binary-external-unit-verified.log 2>&1",
+      "suites": 1,
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --test microsoft_office_native_external_data -- --nocapture",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "binary-external-native-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-native-verified.log",
+        "bytes": 17738,
+        "sha256": "effc5a39efb344b4def77835b0ba5d7138e75804d623ad8bdd2c600aecc0739b"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --test microsoft_office_native_external_data -- --nocapture > /tmp/litchi-native-office.GMvwp4/binary-external-native-verified.log 2>&1",
+      "suites": 1,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "binary-external-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-before.log",
+        "bytes": 18322,
+        "sha256": "b676c74c18222bcb78f7d50e5a96eaaa6a2df61c24217a7bbb91325096bc9507"
+      },
+      "scope": "At base_commit the native Text connection is Properties::None despite record538, and editing only connection2 description changes the order/bytes of unrelated records.",
+      "regenerate": "At base_commit add a temporary integration test that opens excel-connections.xlsb, asserts connection1 properties are not None, edits connection2 description, and compares connections.bin records other than BrtBeginExtConnection id2. Run CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --test microsoft_office_native_external_data -- --nocapture."
+    },
+    {
+      "artifact": {
+        "file_name": "binary-external-record-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-record-probe.log",
+        "bytes": 18341,
+        "sha256": "8f1ef58e43104556f62e959147fb38d23d392a2c358df3dc2628585d9557b6e9"
+      },
+      "scope": "After restoring opaque record positions, the remaining mismatch was connection1 common-header byte2: source pc=2 had become0. The field is ignored for Text, so typed credentials remain absent; retaining untouched source records fixes byte preservation without inventing active password metadata.",
+      "regenerate": "Temporarily bypass retain_unchanged_connections in a scratch checkout of source_commit while keeping typed text and opaque-position fixes. Run the native description test and compare ordered kind/payload pairs excluding connection2 header. Print only differing byte offsets and short prefixes."
+    },
+    {
+      "artifact": {
+        "file_name": "binary-external-xls-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/binary-external-xls-probe.log",
+        "bytes": 616,
+        "sha256": "f0f0249445ba844d088326892e9f85a4415e42b468e0d9e179f7368a1b582f8b"
+      },
+      "scope": "The raw SUPBOOK prefixes confirm the external book precedes the self-reference record. An initial opposite-order test assumption was corrected from raw fixture evidence; this was not a reader defect.",
+      "regenerate": "Open the native XLS Workbook CFB stream, iterate BIFF records and print the first ten payload bytes of records0x01ae alongside the typed supporting-book kinds. The permanent XLS test asserts the observed exact order."
+    }
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/excel/connections-inspection.json",
+    "test-data/microsoft-office/excel/links-objects-inspection.json",
+    "User-provided local MS-XLSB specification: sections2.1.7.24,2.3,2.4.65/67/69,2.5.40/41; field and count definitions checked in the local specification tree.",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/52fe3e78-f97e-4f13-9b3c-24a79db755ec",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/9b3f4689-9004-4d29-bfe0-de7fc4ff6805",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/3792a0bc-bff2-471f-8ea1-dd6d85538759",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/6e683fa7-ee3a-43a2-8368-9ac7620022ce"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_metadata-96bb665ef8b7ada7",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_metadata-96bb665ef8b7ada7",
+      "bytes": 18635048,
+      "sha256": "d25021dac9f72c00973969168516cd381a78358bc2c76cb66941e2df96a005d3",
+      "source_commit": "1987207bc4d5e2507b581bca137d3f67ea22f714",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xls -p litchi-xlsb --features litchi-xlsb/vba-inspection --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native_metadata-47d790f1b92d7f71",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_metadata-47d790f1b92d7f71",
+      "bytes": 20303920,
+      "sha256": "852ec25c5641df4e59db41ae9be4ff56614f6fbe571c477d85702a00663dfe51",
+      "source_commit": "1987207bc4d5e2507b581bca137d3f67ea22f714",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xls -p litchi-xlsb --features litchi-xlsb/vba-inspection --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native_external_data-a77b06bcfd35d859",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_external_data-a77b06bcfd35d859",
+      "bytes": 15367376,
+      "sha256": "1c14aee370496f9286bcfd71bebd260ad1a79b38aea3bb1bc63a42a5b3345667",
+      "source_commit": "1987207bc4d5e2507b581bca137d3f67ea22f714",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsb --features vba-inspection --test microsoft_office_native_external_data -- --nocapture"
+    }
+  ],
+  "remaining_scope": [
+    "The full eight-format goal remains active: 139/139 fixtures indexed, 222/494 rows with partial assertions across 251 tests; no complete-row claim follows.",
+    "All 252 historical pending labels remain unchanged. Unasserted scope includes 36 native-evidence semantic rows, 63 operation rows, 46 bounded-native operation rows, 58 native UI reviews, 27 external handoffs, 41 unsupported-boundary reviews and one historical not-applicable row.",
+    "Native XLSB query-table semantic inventory, Text15 profiles, coordinated dependency teardown and structural edits across opaque record scopes remain open. Other Word/PowerPoint/Excel gaps and unsupported/external/UI disposition review remain active."
+  ],
+  "environment": {
+    "validation_order": "Broad XLS/XLSB owner, affected operations and eight-format facade suites passed. Final connection unit/native tests and Clippy were rerun after strengthening query-dependent removal guards.",
+    "unrelated_files_preserved": [
+      "crates/litchi/examples/bench_word_parse.rs",
+      "docs/adr/0033-unified-api-glossary-and-default-policies.md",
+      "perf.data"
+    ],
+    "warnings": "77 pre-existing vendor/zlib-rs warnings remain outside changed workspace code."
+  }
+}
