@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "0c592475aaf4c784fb0a27e15de048f2acb1a212",
+  "base_commit": "5848a8656ff136deadeb2e15ea3dfddbaf66989b",
+  "problem": "Native mail-merge/form fixtures lacked typed semantic coverage. Updating DOCX mail-merge record/error settings renamed an unchanged external source edge and replaced the entire settings part, revoking the original relationship-member bytes even after inverse replay.",
+  "changes": [
+    "Reuse an existing external source relationship only when its target, relationship type/dialect and unused ID match; keep URI validation and explicit changed-target/dialect behavior.",
+    "Update an existing settings owner payload in place, changing its relationships only when their semantic entries differ. Preserve OPC source relationship tokens for settings-only edits.",
+    "Add five DOCX native tests, one DOC native test, one RTF native test and one operations test. Index five previously unasserted feature rows with bounded scopes, keeping historical statuses unchanged."
+  ],
+  "verification_scope": {
+    "docx_mail_merge": "Exact formLetters/textFile/newDocument settings, external rId1 URI, query, active_record1/check_errors2, absent ODSO/recipient data; seven fields including four MERGEFIELDs, the outer IF with stored operand Alex and MATCH_009 cache, and two counter placeholder caches. The nested simple MERGEFIELD has no w:t cache.",
+    "source_table": "Direct opening of the tracked source DOCX checks all 42 cells: 14 column names and two records Alex Fixture/42.50 and Blair Sample/84.00 with the exact company marker and empty other cells. No external target is followed.",
+    "mail_merge_edit": "Record/error updates save/reopen with the original rId1 and exact relationship bytes, preserving every other member except settings.xml. Inverse restores every member. Clear removes settings and all source edges, retains unrelated members and is invertible; OPC may keep a valid empty relationship member. Changed URI and Strict relationship dialect are independently checked.",
+    "doc": "Pms main/data-source flags, None merge type/destination, current_record1, DataFile descriptor and SttbFnm stored DOCX path are exact; four merge-field caches and two counter caches survive no-op reopen. The historical missing-source prompt cause remains unresolved.",
+    "forms": "DOCX protected/unprotected forms expose exact stored field kinds/caches and bookmark IDs/names, without ffData interpretation. RTF exposes text default/cache/maxlen24/help, default-checked size28 checkbox, two drop-down choices/default0, undefined result25 for both choice fields, absent status/macros and exact result ranges. Canonical writing preserves complete form metadata including opaque data plus bookmark names/content.",
+    "operations": "Auto/eager public title edits of mail-merge and unprotected-form DOCX save/reopen with exact other document XML, including nested instructions, ffData, caches and bookmarks. Unrelated part payloads and original source bytes remain unchanged.",
+    "validation": "Full DOCX, DOC and RTF owner suites, affected DOCX operations, and the eight-format facade pass. A final focused rerun covers the strengthened clear/inverse assertions and consolidated external-URI validation. Clippy, targeted formatting, 72 Python checks, corpus integrity and CI configuration verification pass.",
+    "environment": "Original fixtures and three pre-existing untracked files remain unchanged. No fresh native application reopen, source lookup, merge, SQL execution, field evaluation, form activation or macro execution."
+  },
+  "results": {
+    "main_rust_suite_passes": 6289,
+    "additional_focused_passes": 10,
+    "rust_ignored": 2,
+    "ignored_tests": [
+      {
+        "crate": "litchi-doc",
+        "name": "package::tests::test_open_package",
+        "reason": "Pre-existing ignored unit test expects external test.doc in the working directory; tracked native opening is covered by the passing integration suite."
+      },
+      {
+        "crate": "litchi-doc",
+        "name": "package::tests::test_invalid_file",
+        "reason": "Pre-existing ignored unit test declares requires an external DOC fixture; not changed in this batch."
+      }
+    ],
+    "python_passed": 72,
+    "new_native_tests": 8,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 198,
+      "indexed_tests": 207,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 198,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 60,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-docx-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-docx-verified.log",
+        "bytes": 239620,
+        "sha256": "b58b8fb1250d5b1daa5f60248514b4b4758563beefa74ef308db3fd659f51ca5"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/mail-merge-docx-verified.log 2>&1",
+      "suites": 82,
+      "passed": 2396,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-rtf --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-legacy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-legacy-final.log",
+        "bytes": 307128,
+        "sha256": "6c7e63f89f72a1a21114ef719c23eca9967756c27370094312efb65365efdcb8"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-rtf --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/mail-merge-legacy-final.log 2>&1",
+      "suites": 237,
+      "passed": 3047,
+      "failed": 0,
+      "ignored": 2
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-ops-final.log",
+        "bytes": 76206,
+        "sha256": "c7bc75e2525e4228e68936698b773607c3bd1ce09c54476d36da4591ff43d78d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/mail-merge-ops-final.log 2>&1",
+      "suites": 20,
+      "passed": 734,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-facade-final.log",
+        "bytes": 32828,
+        "sha256": "e3d93fcb2a788a3c55211980954512fbad81803777bf9661d0061d8a5d132dc4"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/mail-merge-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 112,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_mail_merge --test mail_merge_authoring",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-final-focused.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-final-focused.log",
+        "bytes": 18387,
+        "sha256": "9b15daff59066304c465ae3b8268fdd23ebcb2dff1d56e69ebcf62314f5db307"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_mail_merge --test mail_merge_authoring > /tmp/litchi-native-office.GMvwp4/mail-merge-final-focused.log 2>&1",
+      "suites": 2,
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-doc -p litchi-rtf -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-clippy-final.log",
+        "bytes": 17168,
+        "sha256": "6cd5693e017ea607ef37605b6ee202130bd218b4157191a1ab9afff3cc59b7f8"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-doc -p litchi-rtf -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/mail-merge-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-python-final.log",
+        "bytes": 664,
+        "sha256": "f2d3e973ae62f08e63159f01f3e0860491c342e1c4788596976649b3d4323082"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/mail-merge-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/mail-merge-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-coverage-final.json",
+        "bytes": 730281,
+        "sha256": "a2e89420c375f9e743b45c7f408efceb9f5eee03dc3273620ad05382bd333cbb"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/mail-merge-coverage-final.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-docx/src/package/package/merge.rs crates/litchi-docx/src/package/package/parts.rs crates/litchi-docx/tests/microsoft_office_native_mail_merge.rs crates/litchi-doc/tests/microsoft_office_native.rs crates/litchi-rtf/tests/microsoft_office_native.rs crates/litchi-ops/tests/microsoft_office_native.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "mail-merge-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-docx/src/package/package/merge.rs crates/litchi-docx/src/package/package/parts.rs crates/litchi-docx/tests/microsoft_office_native_mail_merge.rs crates/litchi-doc/tests/microsoft_office_native.rs crates/litchi-rtf/tests/microsoft_office_native.rs crates/litchi-ops/tests/microsoft_office_native.rs > /tmp/litchi-native-office.GMvwp4/mail-merge-format-final.log 2>&1"
+    }
+  ],
+  "reproduction": [
+    {
+      "artifact": {
+        "file_name": "mail-merge-probe.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/mail-merge-probe.log",
+        "bytes": 23103,
+        "sha256": "dd95d736300ec5a7669f057d2731ce5a532d891f4671121e66e36a84a0bb6b34"
+      },
+      "scope": "Before the repair, source metadata was replaced and inverse publication normalized the original settings relationship XML, removing its CRLF. The final regression additionally requires the update itself to retain rId1 and exact relationship bytes.",
+      "regenerate": "Copy tests/microsoft_office_native_mail_merge.rs from source_commit into crates/litchi-docx/tests/ in a scratch checkout of base_commit; run CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --test microsoft_office_native_mail_merge native_mail_merge_update_clear_and_replay_preserve_body_and_other_parts"
+    }
+  ],
+  "evidence_sources": [
+    "test-data/microsoft-office/word/mailmerge-inspection.json",
+    "test-data/microsoft-office/word/legacy-form-inspection.json",
+    "crates/litchi-opc/src/pkgwriter.rs"
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_mail_merge-5272dcd4ab366349",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native_mail_merge-5272dcd4ab366349",
+      "bytes": 14130616,
+      "sha256": "410506cda4554e558e59ba4b0904d3e0f2ec7dbe835a65165432f8af84e8af86",
+      "source_commit": "0c592475aaf4c784fb0a27e15de048f2acb1a212",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --test microsoft_office_native_mail_merge --test mail_merge_authoring"
+    },
+    {
+      "file_name": "microsoft_office_native-0aa72016d15e3429",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-0aa72016d15e3429",
+      "bytes": 13385096,
+      "sha256": "ca4aa86a5a2f6175e159760af4443483fed80dc03bace15c8fd1e6750a8da7ca",
+      "source_commit": "0c592475aaf4c784fb0a27e15de048f2acb1a212",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-rtf --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-83fcdd5f33aacac0",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-83fcdd5f33aacac0",
+      "bytes": 13860392,
+      "sha256": "aef1210292e4b9349fae02c6c1623e271aa6e50b6536c7eb2dc4306ea594e79a",
+      "source_commit": "0c592475aaf4c784fb0a27e15de048f2acb1a212",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc -p litchi-rtf --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-9894bbaf11bd9512",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-9894bbaf11bd9512",
+      "bytes": 40469096,
+      "sha256": "0c3316f3ce7cf53688824ee1db6bd751a5bac5e4d7a277277f05baca5c3173b2",
+      "source_commit": "0c592475aaf4c784fb0a27e15de048f2acb1a212",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption --lib --test 'docx_*' --test microsoft_office_native --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The eight-format goal remains active:139/139 fixtures indexed,198/494 feature rows with partial assertions across207 tests. No row is declared complete by this index.",
+    "All252 historical pending labels remain unchanged. Remaining unasserted scopes include60 native-evidence semantic rows,63 operation rows,46 bounded-evidence operation rows,58 UI-route reviews,27 external handoffs,41 unsupported-boundary reviews and one historical not-applicable row.",
+    "Native mail-merge fixtures do not contain recipient/ODSO payloads. These checks do not qualify authoring those families, actual merge output, data-source availability, external resolution or the historical Word missing-source prompt.",
+    "DOCX legacy ffData remains opaque to the field API. The stored status-text UI input is absent from the native payloads. No form interaction, protection authoring, macro invocation or host behavior is inferred.",
+    "Mail-merge graph updates can add modeled ODSO metadata. Unchanged external-edge preservation is qualified here; internal source/resource editing and lexical inverse of genuinely changed relationship sets remain outside this native test.",
+    "The broader Word drawing/navigation, remaining Excel and PowerPoint scopes, and external/UI classification reconciliation remain active."
+  ]
+}
