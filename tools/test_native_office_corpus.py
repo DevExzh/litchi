@@ -6,13 +6,14 @@ separately establish the behavior of the current library.
 """
 
 from collections import Counter
+import copy
 import hashlib
 import json
 from pathlib import Path
 import unittest
 import zipfile
 
-from tools.native_office_coverage import report
+from tools.native_office_coverage import EVIDENCE_REVIEWS, evidence_reviews, report
 from tools.non_iwork_gate import FACADE_FORMAT_TEST_FEATURES
 
 
@@ -140,11 +141,64 @@ class NativeOfficeCorpus(unittest.TestCase):
             with self.subTest(row=row["id"]):
                 if row["tests"]:
                     self.assertEqual(row["verification_gap"], "partial_assertions_require_scope_review")
+                elif "evidence_review" in row:
+                    self.assertEqual(row["verification_gap"], "reviewed_native_fixture_gap_requires_followup")
                 elif row["native_fixture_status"] == "verified_native_fixture":
                     self.assertEqual(row["verification_gap"], "native_evidence_needs_semantic_tests")
                 elif row["native_fixture_status"] == "pending":
                     self.assertTrue(row["historical_evidence_refs"])
                     self.assertNotIn(row["verification_gap"], {"not_applicable", "complete"})
+
+    def test_evidence_reviews_never_count_absence_as_semantic_coverage(self) -> None:
+        coverage = report()
+        reviewed = [row for row in coverage["feature_rows"] if "evidence_review" in row]
+        self.assertEqual({row["id"] for row in reviewed}, {"xlsx-240", "xlsx-245", "xlsx-266", "ppt-363"})
+        self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed))
+        for row in reviewed:
+            with self.subTest(row=row["id"]):
+                self.assertEqual(row["automated_coverage"], "uncovered")
+                self.assertEqual(row["tests"], [])
+                self.assertEqual(row["native_fixture_status"], "verified_native_fixture")
+                self.assertTrue(row["evidence_review"]["checks"])
+
+    def test_evidence_review_validation_rejects_unknown_or_unsubstantiated_claims(self) -> None:
+        original = json.loads(EVIDENCE_REVIEWS.read_text())
+        rows = {item["id"]: [] for item in document("coverage.json")["feature_inventory"]}
+        fixtures = {item["path"]: [] for item in document("manifest.json")["files"]}
+        for case in ("duplicate", "unknown_row", "unknown_fixture", "empty_reason", "missing_check", "missing_source", "completion_claim"):
+            with self.subTest(case=case):
+                candidate = copy.deepcopy(original)
+                review = candidate["reviews"][0]
+                if case == "duplicate":
+                    candidate["reviews"].append(copy.deepcopy(review))
+                elif case == "unknown_row":
+                    review["feature_row"] = "xlsx-999"
+                elif case == "unknown_fixture":
+                    review["fixtures"] = ["excel/not-a-native-fixture.xlsx"]
+                elif case == "empty_reason":
+                    review["reason"] = " "
+                elif case == "missing_check":
+                    review["checks"][0]["name"] = "missing_evidence_check"
+                elif case == "missing_source":
+                    review["evidence_refs"] = ["missing-evidence.json"]
+                else:
+                    review["classification"] = "complete"
+                with self.assertRaises(ValueError):
+                    evidence_reviews(candidate, rows, fixtures)
+
+    def test_fixture_gap_cannot_gain_semantic_credit_without_reconciliation(self) -> None:
+        import tempfile
+        from unittest.mock import patch
+        from tools.native_office_coverage import INDEX
+
+        index = json.loads(INDEX.read_text())
+        index["tests"][0]["feature_rows"].append("xlsx-240")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "index.json"
+            path.write_text(json.dumps(index))
+            with patch("tools.native_office_coverage.INDEX", path):
+                with self.assertRaisesRegex(ValueError, "fixture-gap review conflicts"):
+                    report()
 
 
 if __name__ == "__main__":

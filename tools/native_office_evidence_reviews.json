@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "scope": "Current evidence corrections are separate from historical authoring status and positive semantic test coverage. These fixture gaps remain unresolved follow-up work.",
+  "reviews": [
+    {
+      "feature_row": "xlsx-240",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-encrypted.xlsx"
+      ],
+      "reason": "Pictures and rounded rectangles are worksheet drawing objects, but they do not establish a core xdr:contentPart owner.",
+      "required_evidence": "A direct core xdr:contentPart in a supported anchor and its customXml relationship/target closure.",
+      "observed_evidence": "All 19 XLSX-family manifest fixtures, including the explicitly decrypted encrypted workbook, lack core contentPart elements. The neighboring picture and rounded rectangle are positively present in excel-conditional-drawings.xlsx.",
+      "checks": [
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_excel_corpus_does_not_evidence_content_parts_pivot_data_or_feature_bags",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/excel/conditional-drawings-inspection.json",
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "This is a corpus evidence correction, not a passing semantic feature test or an unsupported-library claim. The historical authoring inventory stays unchanged; a native specimen of this specific feature is still needed."
+    },
+    {
+      "feature_row": "xlsx-245",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-encrypted.xlsx"
+      ],
+      "reason": "Ordinary worksheet PivotTable totals and data-field captions are not the C444 pivotTableData extension for a non-worksheet PivotTable.",
+      "required_evidence": "The {44433962-1CF7-4059-B4EE-95C3D5FFCF73} extension and pivotTableData payload with the required non-worksheet PivotTable/cache closure.",
+      "observed_evidence": "All 19 XLSX-family fixtures lack pivotTableData elements and the C444 URI. The visual-analytics fixture positively contains ordinary pivotTableDefinition records; their worksheet totals are covered by separate native tests.",
+      "checks": [
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_excel_corpus_does_not_evidence_content_parts_pivot_data_or_feature_bags",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/excel/visual-analytics-inspection.json",
+        "test-data/microsoft-office/excel/pivot-controls-inspection.json",
+        "crates/litchi-xlsx/src/pivot/server_formats/mod.rs"
+      ],
+      "scope_limit": "This is a corpus evidence correction, not a passing semantic feature test or an unsupported-library claim. The historical authoring inventory stays unchanged; a native specimen of this specific feature is still needed."
+    },
+    {
+      "feature_row": "xlsx-266",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-encrypted.xlsx"
+      ],
+      "reason": "Legacy form controls, x14 control properties and linked-cell values do not establish feature property bags or XF-control cell-checkbox extensions.",
+      "required_evidence": "FeaturePropertyBag relationship/content type or the featurepropertybag namespace and associated XF-control/complement elements.",
+      "observed_evidence": "All 19 XLSX-family fixtures lack the FeaturePropertyBag relationship/content type, featurepropertybag namespace and XF-control/complement elements. The form-controls fixture positively contains legacy control elements.",
+      "checks": [
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_excel_corpus_does_not_evidence_content_parts_pivot_data_or_feature_bags",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/excel/form-controls-inspection.json",
+        "crates/litchi-xlsx/src/rich_values/package/model.rs"
+      ],
+      "scope_limit": "This is a corpus evidence correction, not a passing semantic feature test or an unsupported-library claim. The historical authoring inventory stays unchanged; a native specimen of this specific feature is still needed."
+    },
+    {
+      "feature_row": "ppt-363",
+      "classification": "native_derivative_outside_semantic_profile",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot"
+      ],
+      "reason": "Native legacy visual retention does not prove the build-based diagram/SmartArt semantic inventory is exercised.",
+      "required_evidence": "An editable DiagramBuildContainer/DiagramBuildAtom owner with its associated OfficeArt shape references in the legacy slide.",
+      "observed_evidence": "The SMARTART_PROCESS_002 slide has placeholder 4097 and picture 4098. Its 47633-byte PNG hashes to a018e672221c348c6b90c9ed6611f42e2a2333f5b668a3425843bdf2cf348ca7. The PPT file has only SlideTime10Atom in PPT10 metadata; its PPS/POT derivatives have no PPT10 records, and diagram projection returns Refused(UnsupportedTarget).",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_smartart_derivatives_have_a_picture_without_editable_diagram_builds"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/visual-objects-inspection.json",
+        "crates/litchi-ppt/src/diagram/codec.rs",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "This proves the saved picture representation and absence of the supported build owner; it does not claim every possible opaque SmartArt compatibility record is absent, or that a picture/empty inventory qualifies diagram semantics. A native build-bearing legacy specimen remains needed."
+    }
+  ]
+}

@@ -5,6 +5,8 @@ The index points to real Rust tests. Presence in the index means only that the
 listed assertions exist, not that an entire feature row is complete or that a
 test passed in this checkout. Run the referenced Cargo targets to establish that.
 Unmapped fixtures and rows remain visible in every generated report.
+Evidence-only checks live in a separate review index. They can correct a
+historical fixture claim, but never count as semantic feature coverage.
 """
 
 from __future__ import annotations
@@ -19,12 +21,57 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "test-data/microsoft-office"
 INDEX = ROOT / "tools/native_office_tests.json"
+EVIDENCE_REVIEWS = ROOT / "tools/native_office_evidence_reviews.json"
 
 
-def verification_gap(item: dict, tests: list[str], disposition: dict | None) -> str:
+def test_identity(test: dict) -> str:
+    """Validate a Rust check reference without treating its existence as a pass."""
+    identity = f"{test['crate']}::{test['target']}::{test['name']}"
+    for component in (test["crate"], test["target"], test["name"]):
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", component):
+            raise ValueError(f"invalid Rust test identity: {identity}")
+    source = ROOT / "crates" / test["crate"] / "tests" / f"{test['target']}.rs"
+    if not re.search(r"#\[test\]\s*fn\s+" + re.escape(test["name"]) + r"\s*\(", source.read_text()):
+        raise ValueError(f"missing test: {identity} in {source}")
+    return identity
+
+
+def evidence_reviews(document: dict, rows: dict, fixtures: dict) -> dict:
+    """Validate evidence corrections separately from positive semantic assertions."""
+    if document.get("schema_version") != 1:
+        raise ValueError("unsupported native evidence review schema")
+    reviewed = {}
+    for review in document["reviews"]:
+        row = review["feature_row"]
+        if row not in rows or row in reviewed:
+            raise ValueError(f"unknown or duplicate evidence review row: {row}")
+        if review["classification"] not in {
+            "fixture_feature_mismatch", "native_derivative_outside_semantic_profile"
+        }:
+            raise ValueError(f"unknown evidence review classification: {row}")
+        for field in ("reason", "required_evidence", "observed_evidence", "scope_limit"):
+            if not isinstance(review.get(field), str) or not review[field].strip():
+                raise ValueError(f"missing evidence review {field}: {row}")
+        if not review["fixtures"] or not review["checks"] or not review["evidence_refs"]:
+            raise ValueError(f"evidence review requires fixtures, checks and sources: {row}")
+        for fixture in review["fixtures"]:
+            if fixture not in fixtures:
+                raise ValueError(f"unknown evidence review fixture: {fixture}")
+        for reference in review["evidence_refs"]:
+            if not (ROOT / reference).is_file():
+                raise ValueError(f"missing evidence review source: {reference}")
+        for check in review["checks"]:
+            test_identity(check)
+        reviewed[row] = review
+    return reviewed
+
+
+def verification_gap(item: dict, tests: list[str], disposition: dict | None, evidence: dict | None = None) -> str:
     """Classify the next review, never infer completion from fixture presence."""
     if tests:
         return "partial_assertions_require_scope_review"
+    if evidence is not None:
+        return "reviewed_native_fixture_gap_requires_followup"
     status = item["fixture_status"]
     if status == "verified_native_fixture":
         return "native_evidence_needs_semantic_tests"
@@ -49,20 +96,14 @@ def report() -> dict:
     index = json.loads(INDEX.read_text())
     fixtures = {item["path"]: [] for item in manifest["files"]}
     rows = {item["id"]: [] for item in inventory["feature_inventory"]}
+    reviewed = evidence_reviews(json.loads(EVIDENCE_REVIEWS.read_text()), rows, fixtures)
     dispositions = {item["id"]: item for item in review["pending_rows"]}
     test_ids = set()
     for test in index["tests"]:
-        identity = f"{test['crate']}::{test['target']}::{test['name']}"
+        identity = test_identity(test)
         if identity in test_ids:
             raise ValueError(f"duplicate test: {identity}")
         test_ids.add(identity)
-        for component in (test["crate"], test["target"], test["name"]):
-            if not re.fullmatch(r"[a-z][a-z0-9_-]*", component):
-                raise ValueError(f"invalid Rust test identity: {identity}")
-        source = ROOT / "crates" / test["crate"] / "tests" / f"{test['target']}.rs"
-        text = source.read_text()
-        if not re.search(r"#\[test\]\s*fn\s+" + re.escape(test["name"]) + r"\s*\(", text):
-            raise ValueError(f"missing test: {identity} in {source}")
         if not test["assertions"] or not test["scope_limit"]:
             raise ValueError(f"assertions and scope limit are required: {identity}")
         if not test["fixtures"] or not test["feature_rows"]:
@@ -78,6 +119,9 @@ def report() -> dict:
 
     feature_rows = []
     for item in inventory["feature_inventory"]:
+        evidence = reviewed.get(item["id"])
+        if evidence is not None and rows[item["id"]]:
+            raise ValueError(f"fixture-gap review conflicts with semantic assertions: {item['id']}; reconcile the review first")
         row = {
             "id": item["id"],
             "format": item["format"],
@@ -85,10 +129,12 @@ def report() -> dict:
             "native_fixture_status": item["fixture_status"],
             "automated_coverage": "partial" if rows[item["id"]] else "uncovered",
             "tests": rows[item["id"]],
-            "verification_gap": verification_gap(item, rows[item["id"]], dispositions.get(item["id"])),
+            "verification_gap": verification_gap(item, rows[item["id"]], dispositions.get(item["id"]), evidence),
             "historical_support_note": item.get("support_note", ""),
             "source_matrix": item["source_matrix"],
         }
+        if evidence is not None:
+            row["evidence_review"] = evidence
         if item["id"] in dispositions:
             disposition = dispositions[item["id"]]
             row["native_pending_classification"] = disposition["classification"]
@@ -97,13 +143,14 @@ def report() -> dict:
         feature_rows.append(row)
     return {
         "schema_version": 1,
-        "scope": "Test assertions indexed, not whole-feature completion or an execution receipt.",
+        "scope": "Semantic assertions and reviewed fixture gaps are separate from historical authoring evidence; neither implies whole-feature completion or a test execution receipt.",
         "summary": {
             "fixtures": len(fixtures),
             "fixtures_with_tests": sum(bool(tests) for tests in fixtures.values()),
             "feature_rows": len(rows),
             "feature_rows_with_partial_tests": sum(bool(tests) for tests in rows.values()),
             "indexed_tests": len(test_ids),
+            "reviewed_native_fixture_gaps": len(reviewed),
             "native_fixture_statuses": dict(Counter(item["fixture_status"] for item in inventory["feature_inventory"])),
             "verification_gaps": dict(Counter(row["verification_gap"] for row in feature_rows)),
         },

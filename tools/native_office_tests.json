@@ -4375,7 +4375,8 @@
         "excel/excel-connections.xlsb"
       ],
       "feature_rows": [
-        "xlsb-322"
+        "xlsb-322",
+        "xlsb-323"
       ],
       "assertions": [
         "Edit only connection2 description; every record except its common header remains byte-exact and in order, including connection1 ignored password byte and UID wrappers. Temporary save/reopen and inverse retain every package member and original source bytes."
@@ -4405,7 +4406,8 @@
         "excel/excel-connections.xlsb"
       ],
       "feature_rows": [
-        "xlsb-322"
+        "xlsb-322",
+        "xlsb-323"
       ],
       "assertions": [
         "Add a fourth Skip field, reopen, remove it and recover the original members; inverse also restores them. Reordering connections around opaque root identities and removing connections with query-table dependencies return precise UnsupportedFeature errors without source mutation."
@@ -5901,6 +5903,36 @@
         "xlsx",
         "xlsb"
       ]
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_query_tables",
+      "name": "native_query_table_metadata_and_relationship_owners_match_saved_imports",
+      "fixtures": [
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-323"
+      ],
+      "assertions": [
+        "The native query ListObject has exact name/range, QueryTable type, three column query-field IDs and matching eager/source table metadata. Table and direct-worksheet queryTable relationships resolve the two exact hashed binary parts; both imported data regions retain all nine saved values."
+      ],
+      "scope_limit": "The table dwConnID is zero and remains None; QSI connection/name/refresh fields in queryTable*.bin remain opaque. This does not qualify a missing public query-table decoder or refresh/web-import runtime."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_query_tables",
+      "name": "native_ordinary_cell_edit_keeps_query_parts_bindings_and_import_caches",
+      "fixtures": [
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-323"
+      ],
+      "assertions": [
+        "An ordinary scalar edit saves/reopens while preserving typed query table metadata, both imported data regions, both query-table parts and all other members; only the selected worksheet and binary index change, and inverse restores the native source."
+      ],
+      "scope_limit": "Source preservation of inert query dependencies only. No query is run, refreshed or reconstructed."
     }
   ]
 }
