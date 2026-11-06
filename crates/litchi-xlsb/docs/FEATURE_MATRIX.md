@@ -152,3 +152,8 @@ compatibility graphic frames and exact DrawingML/VML bytes; it has no
 or shape identity. A linked-cache cell edit preserves all other package members.
 Cell-value publication and patch application retain the exact admitted archive
 image so that save/reopen and inverse use the patch's actual after-image.
+
+The native conditional-drawings fixture additionally qualifies two eager
+anchors, the exact resolved PNG and its name/alt text, and the named rounded
+rectangle with `CF_SHAPE_005` text. This floating-picture inventory does not
+establish in-cell rich-value bindings, SVG editing or rendering.

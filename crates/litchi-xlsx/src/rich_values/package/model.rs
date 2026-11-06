@@ -82,19 +82,22 @@ impl Kind {
     /// Classify an OPC content type without inspecting its payload.
     #[must_use]
     pub fn from_content_type(content_type: &str) -> Option<Self> {
-        match content_type {
-            RICH_VALUE_DATA_CONTENT_TYPE => Some(Self::Data),
-            RICH_VALUE_STRUCTURE_CONTENT_TYPE => Some(Self::Structures),
-            RICH_VALUE_ARRAY_CONTENT_TYPE => Some(Self::Arrays),
-            RICH_STYLE_CONTENT_TYPE => Some(Self::Styles),
-            SUPPORTING_PROPERTY_BAG_CONTENT_TYPE => Some(Self::SupportingData),
-            SUPPORTING_PROPERTY_BAG_STRUCTURE_CONTENT_TYPE => Some(Self::SupportingStructures),
-            RICH_VALUE_TYPES_CONTENT_TYPE => Some(Self::Types),
-            WEB_IMAGE_CONTENT_TYPE => Some(Self::WebImages),
-            RICH_VALUE_RELATIONSHIPS_CONTENT_TYPE => Some(Self::Relationships),
-            FEATURE_PROPERTY_BAG_CONTENT_TYPE => Some(Self::FeatureBags),
-            _ => None,
-        }
+        // MIME type/subtype names are ASCII case-insensitive (RFC 2045 §5.1).
+        // Retain producer spelling in the package; only classification folds it.
+        [
+            Self::Data,
+            Self::Structures,
+            Self::Arrays,
+            Self::Styles,
+            Self::SupportingData,
+            Self::SupportingStructures,
+            Self::Types,
+            Self::WebImages,
+            Self::Relationships,
+            Self::FeatureBags,
+        ]
+        .into_iter()
+        .find(|kind| content_type.eq_ignore_ascii_case(kind.content_type()))
     }
 
     /// Return this kind's OPC content type.

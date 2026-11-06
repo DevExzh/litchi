@@ -155,3 +155,8 @@ widget placement. Continued fragments retain their header and partial state;
 full continuation-chain aggregation remains outside this qualification.
 Boolean/error records and formula caches expose the standard Excel error
 spellings, including the mixed checkbox's stored `#N/A` cell.
+
+Native drawing assertions additionally distinguish picture id 1025 from
+rectangle id 1026, read `CF_SHAPE_005`, and verify A12:B17/F16:H20 cell anchors
+with their stored move/resize behavior. This is a shape projection; payload
+resolution and full OfficeArt geometry or authoring are separate scopes.

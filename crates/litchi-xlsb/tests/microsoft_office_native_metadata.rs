@@ -886,3 +886,51 @@ fn native_binary_index_binds_metadata_prefix_to_actual_formula_cell_only() {
     wrong_prefix[358] = 0x33; // A different record cannot stand in for cell metadata.
     assert!(parsed.bind(&wrong_prefix, Limits::default()).is_err());
 }
+
+#[test]
+fn native_drawing_picture_and_rectangle_keep_resolved_payload_and_anchors() {
+    use litchi_xlsb::package::drawing::AnchorKind;
+    let bytes = native("excel-conditional-drawings.xlsb");
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    assert!(workbook.drawings_parsed());
+    let drawing = workbook.sheet_drawing(0).unwrap();
+    assert_eq!(drawing.drawing.anchors.len(), 2);
+    assert_eq!(drawing.images.len(), 1);
+    assert!(drawing.charts.is_empty());
+    let picture = &drawing.images[0];
+    assert_eq!(picture.picture_name, "Picture 2");
+    assert_eq!(picture.rel_id, "rId1");
+    assert_eq!(
+        picture.description.as_deref(),
+        Some("CF_PICTURE_005: synthetic blue and yellow stripes anchored over worksheet cells.")
+    );
+    use sha2::{Digest, Sha256};
+    assert_eq!(
+        Sha256::digest(picture.data.as_ref())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>(),
+        "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+    );
+    for (anchor, expected) in drawing
+        .drawing
+        .anchors
+        .iter()
+        .zip([(0, 11, 1, 16), (5, 15, 7, 19)])
+    {
+        let AnchorKind::TwoCell { from, to, .. } = &anchor.anchor else {
+            panic!("native two-cell anchor")
+        };
+        assert_eq!((from.column, from.row, to.column, to.row), expected);
+    }
+    assert_eq!(drawing.shapes.len(), 1);
+    let litchi_xlsb::shapes::Object::Shape(shape) = &drawing.shapes[0].object else {
+        panic!("rounded rectangle")
+    };
+    assert_eq!(
+        shape.non_visual.name.as_deref(),
+        Some("Rounded Rectangle 3")
+    );
+    assert_eq!(shape.preset(), Some(litchi_xlsb::shapes::Preset::RoundRect));
+    assert_eq!(shape.text_body.as_ref().unwrap().text(), "CF_SHAPE_005");
+}

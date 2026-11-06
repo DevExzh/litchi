@@ -407,3 +407,56 @@ fn cloned_source_records_keep_the_member_borrowed() {
     );
     assert!(owner.is_refused() || owner.owner().is_some() || matches!(owner, SvgOwnerState::None));
 }
+
+#[test]
+fn non_picture_anchor_objects_do_not_hide_or_capture_neighbor_pictures() {
+    for strict in [false, true] {
+        for object in ["sp", "cxnSp", "graphicFrame"] {
+            for anchored in [two_cell(8, "", ""), one_cell(8), absolute(8)] {
+                let nested = picture(99, "", "");
+                let replacement = format!("<xdr:{object}>{nested}</xdr:{object}>");
+                let other = anchored.replace(&picture(8, "", ""), &replacement);
+                let body = format!("{}{other}{}", two_cell(1, "", ""), two_cell(2, "", ""));
+                let bytes = if strict {
+                    strict_drawing(&body)
+                } else {
+                    transitional_drawing(&body)
+                };
+                let scan = SourceDrawing::scan(&bytes, 0, ScanLimits::default()).unwrap();
+                assert_eq!(scan.pictures().len(), 2);
+                assert_eq!(scan.pictures()[0].c_nv_pr_id(), Some("1"));
+                assert_eq!(scan.pictures()[1].c_nv_pr_id(), Some("2"));
+            }
+        }
+    }
+}
+
+#[test]
+fn non_picture_objects_still_require_the_unique_ordered_anchor_slot() {
+    for object in ["sp", "cxnSp", "graphicFrame"] {
+        let object = format!("<xdr:{object}/>");
+        for children in [
+            format!(
+                "{object}{}{}<xdr:clientData/>",
+                marker("from", 0, 0),
+                marker("to", 2, 2)
+            ),
+            format!(
+                "{}{}{object}{object}<xdr:clientData/>",
+                marker("from", 0, 0),
+                marker("to", 2, 2)
+            ),
+            format!("{}{}{object}", marker("from", 0, 0), marker("to", 2, 2)),
+            format!(
+                "{}{}<xdr:clientData/>{object}",
+                marker("from", 0, 0),
+                marker("to", 2, 2)
+            ),
+        ] {
+            let bytes = transitional_drawing(&format!(
+                "<xdr:twoCellAnchor>{children}</xdr:twoCellAnchor>"
+            ));
+            assert!(SourceDrawing::scan(&bytes, 0, ScanLimits::default()).is_err());
+        }
+    }
+}

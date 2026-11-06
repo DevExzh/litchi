@@ -428,3 +428,40 @@ fn package_without_extension_owner() -> OpcPackage {
 
 #[allow(dead_code)]
 fn _public_shape(_: &TypeRefreshIntervals) {}
+
+#[test]
+fn root_ignorable_prefixes_are_resolved_without_promoting_foreign_owners() {
+    let original = String::from_utf8(types_xml()).unwrap();
+    let declared=original.replace("<rd2:rvTypesInfo ",r#"<rd2:rvTypesInfo xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x v" "#);
+    let hidden = declared.replace(
+        "<rd2:types>",
+        "<v:wrapper><rd2:types><rd2:type name=\"hidden\"/></rd2:types></v:wrapper><rd2:types>",
+    );
+    let snapshot =
+        load_rich_value_refresh_raw(&package_from_xml(hidden.clone()), &SourceLimits::default())
+            .unwrap();
+    assert_eq!(
+        snapshot
+            .types()
+            .iter()
+            .map(|t| t.name())
+            .collect::<Vec<_>>(),
+        ["entity", "empty"]
+    );
+    assert_eq!(snapshot.source_xml().unwrap(), hidden.as_bytes());
+    for value in ["missing", "x:y", "1bad"] {
+        let invalid =
+            declared.replace("mc:Ignorable=\"x v\"", &format!("mc:Ignorable=\"{value}\""));
+        assert!(
+            load_rich_value_refresh_raw(&package_from_xml(invalid), &SourceLimits::default())
+                .is_err()
+        );
+    }
+    let foreign = declared.replace(
+        "http://schemas.openxmlformats.org/markup-compatibility/2006",
+        "urn:foreign",
+    );
+    assert!(
+        load_rich_value_refresh_raw(&package_from_xml(foreign), &SourceLimits::default()).is_err()
+    );
+}

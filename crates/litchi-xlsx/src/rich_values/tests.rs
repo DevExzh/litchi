@@ -175,3 +175,63 @@ fn package_snapshot_preserves_typed_parts_and_relationship_topology() {
             && link.resolved_target.as_deref() == Some("/xl/richData.xml")
     }));
 }
+
+#[test]
+fn rich_part_content_types_fold_ascii_case_without_widening_the_profile() {
+    for kind in [
+        Kind::Data,
+        Kind::Structures,
+        Kind::Arrays,
+        Kind::Styles,
+        Kind::SupportingData,
+        Kind::SupportingStructures,
+        Kind::Types,
+        Kind::WebImages,
+        Kind::Relationships,
+        Kind::FeatureBags,
+    ] {
+        for value in [
+            kind.content_type().to_owned(),
+            kind.content_type().to_ascii_lowercase(),
+            kind.content_type().to_ascii_uppercase(),
+        ] {
+            assert_eq!(Kind::from_content_type(&value), Some(kind));
+        }
+        for invalid in [
+            format!(" {}", kind.content_type()),
+            format!("{};charset=utf-8", kind.content_type()),
+            format!("{}x", kind.content_type()),
+        ] {
+            assert_eq!(Kind::from_content_type(&invalid), None);
+        }
+    }
+}
+
+#[test]
+fn rich_relationship_and_style_fragment_writers_close_their_start_tags() {
+    use super::codec::{
+        parse_dxf_complement, parse_rich_value_rels, parse_xf_complement, write_dxf_complement,
+        write_rich_value_rels, write_xf_complement,
+    };
+    let rels = super::RichValueRels {
+        ids: vec!["rId&quoted\"".into()],
+        extension_list: None,
+        opaque: Vec::new(),
+    };
+    assert_eq!(
+        parse_rich_value_rels(&write_rich_value_rels(&rels).unwrap()).unwrap(),
+        rels
+    );
+    let xf=parse_xf_complement(format!(r#"<f:xfComplement xmlns:f="{FEATURE_BAG}" i="2"><v:keep xmlns:v="urn:vendor">payload</v:keep></f:xfComplement>"#).as_bytes()).unwrap();
+    let dxf=parse_dxf_complement(format!(r#"<f:DXFComplement xmlns:f="{FEATURE_BAG}" i="3"><v:keep xmlns:v="urn:vendor">payload</v:keep></f:DXFComplement>"#).as_bytes()).unwrap();
+    assert_eq!(xf.index, 2);
+    assert_eq!(dxf.index, 3);
+    assert_eq!(
+        parse_xf_complement(&write_xf_complement(&xf).unwrap()).unwrap(),
+        xf
+    );
+    assert_eq!(
+        parse_dxf_complement(&write_dxf_complement(&dxf).unwrap()).unwrap(),
+        dxf
+    );
+}

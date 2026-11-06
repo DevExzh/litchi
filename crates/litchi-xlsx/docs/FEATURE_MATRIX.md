@@ -173,3 +173,22 @@ property attribute and VML mirror, preserving all other members and the
 unchanged linked-cell cache, with exact inverse publication. These assertions
 cover form controls; they do not qualify ActiveX, control execution, linked-cell
 synchronization or native Excel acceptance of the edit.
+
+Native image regressions now pair the direct picture and rounded rectangle in
+`excel-conditional-drawings.xlsx`, checking raster hash, alt text, full marker
+offsets, edit behavior and shape text. The source scanner recognizes shapes,
+connectors and graphic frames as anchor objects while keeping their descendants
+outside the direct-picture inventory; order and cardinality remain checked.
+`excel-chart-families.xlsx` qualifies an existing SVG/raster pair and a bounded
+SVG detach/attach replacement with unrelated chart parts preserved and exact
+inverse after save/reopen. It does not establish rendering or Office acceptance.
+
+`excel-links-objects.xlsx` qualifies the four rich-value parts, the `_localImage`
+structure, stored integer values, inert image relation and exact PNG payload.
+Content-type classification is ASCII case-insensitive and retains the producer's
+original spelling. The refresh view also recognizes the native types part and
+retains its root `mc:Ignorable` declaration after checking bound prefixes; foreign
+subtrees do not acquire typed refresh ownership. The fixture has no refresh
+intervals. Public relationship and style-complement writers now produce complete
+XML start tags; typed native data/structures/relationships pass codec round trips.
+This does not qualify rich-value cell binding, evaluation or service refresh.

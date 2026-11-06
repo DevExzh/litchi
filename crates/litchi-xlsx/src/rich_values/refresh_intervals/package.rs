@@ -28,7 +28,7 @@ impl Snapshot {
     pub fn load(package: &OpcPackage, limits: &SourceLimits) -> Result<Self> {
         let mut owner = None;
         for part in package.iter_parts() {
-            if part.content_type() == TYPES_CONTENT_TYPE {
+            if part.content_type().eq_ignore_ascii_case(TYPES_CONTENT_TYPE) {
                 if owner.is_some() {
                     return Err(invalid("package contains multiple rich-value types parts"));
                 }

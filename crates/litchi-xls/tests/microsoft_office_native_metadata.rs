@@ -931,3 +931,38 @@ fn native_row_index_keeps_zero_offsets_for_empty_hidden_rows() {
         .1;
     assert_eq!(&first.to_record_bytes().unwrap()[4..], source_dbcell);
 }
+
+#[test]
+fn native_officeart_picture_and_rectangle_keep_ids_text_and_cell_anchors() {
+    let bytes = native("excel-conditional-drawings.xls");
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
+    let stream = ole.open_stream(&["Workbook"]).unwrap();
+    let shapes = litchi_xls::shapes::extract_shapes_from_workbook(&stream).unwrap();
+    assert_eq!(shapes.len(), 2);
+    assert_eq!(shapes[0].shape_id, 1025);
+    assert_eq!(shapes[0].shape_type, litchi_odraw::shape::Kind::Picture);
+    assert_eq!(shapes[1].shape_id, 1026);
+    assert_eq!(shapes[1].shape_type, litchi_odraw::shape::Kind::AutoShape);
+    assert_eq!(shapes[1].text.as_deref(), Some("CF_SHAPE_005"));
+    for (shape, expected) in shapes.iter().zip([(0, 11, 1, 16), (5, 15, 7, 19)]) {
+        assert!(!shape.is_group);
+        assert!(shape.children.is_empty());
+        let anchor = shape.sheet_anchor.unwrap();
+        let (from, to) = (anchor.top_left(), anchor.bottom_right());
+        assert_eq!((from.column(), from.row(), to.column(), to.row()), expected);
+    }
+    assert_eq!(
+        shapes[0].sheet_anchor.unwrap().behavior(),
+        litchi_xls::drawing_metadata::AnchorBehavior::MoveWithoutResize
+    );
+    assert_eq!(
+        shapes[1].sheet_anchor.unwrap().behavior(),
+        litchi_xls::drawing_metadata::AnchorBehavior::MoveAndResize
+    );
+    assert_eq!(
+        litchi_xls::shapes::extract_shape_text_from_workbook(&stream).unwrap(),
+        "CF_SHAPE_005"
+    );
+}

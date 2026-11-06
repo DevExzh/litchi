@@ -1000,6 +1000,7 @@ impl Marker {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ObjectKind {
+    Other,
     Picture,
     Group,
     ContentPart,
@@ -1145,6 +1146,7 @@ enum Kind {
     OpaqueExt,
     SvgBlip,
     Group,
+    OtherObject,
     ContentPart,
     Mce,
     Unknown,
@@ -1914,6 +1916,21 @@ impl<'a> Scanner<'a> {
                 self.anchor_mut()?.content_part_index = Some(index);
                 picture_index = None;
             },
+            Kind::OtherObject => {
+                // Shapes, connectors and chart frames occupy the same single
+                // anchor object slot as pictures. Their descendants stay
+                // outside the direct-picture inventory.
+                self.anchor_mut()?.take_child(AnchorChild::Object)?;
+                if self
+                    .anchor_mut()?
+                    .object_kind
+                    .replace(ObjectKind::Other)
+                    .is_some()
+                {
+                    return Err(invalid("drawing anchor has duplicate objects"));
+                }
+                picture_index = None;
+            },
             Kind::Group => {
                 if parent == Some(Kind::Anchor(AnchorKind::TwoCell))
                     || parent == Some(Kind::Anchor(AnchorKind::OneCell))
@@ -2257,6 +2274,7 @@ impl<'a> Scanner<'a> {
             | Kind::Position
             | Kind::Extent
             | Kind::Group
+            | Kind::OtherObject
             | Kind::Mce
             | Kind::ClientData
             | Kind::Unknown => {},
@@ -2531,6 +2549,17 @@ fn classify(namespace: Option<&[u8]>, name: QName<'_>, parent: Option<Kind>) -> 
         && is_spreadsheet(namespace, name, b"grpSp")
     {
         return Kind::Group;
+    }
+    if matches!(parent, Some(Kind::Anchor(_)))
+        && [
+            b"sp".as_slice(),
+            b"cxnSp".as_slice(),
+            b"graphicFrame".as_slice(),
+        ]
+        .iter()
+        .any(|local| is_spreadsheet(namespace, name, local))
+    {
+        return Kind::OtherObject;
     }
     if parent == Some(Kind::Picture) && is_spreadsheet(namespace, name, b"nvPicPr") {
         return Kind::PictureNvPr;

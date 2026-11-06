@@ -4144,6 +4144,103 @@
         "ppt",
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_picture_and_shape_share_a_drawing_without_losing_anchor_geometry",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-237",
+        "xlsx-238"
+      ],
+      "assertions": [
+        "Native picture and rectangle coexist in one drawing: two typed objects, one direct picture, exact raster relationship/type/hash, alt text, both complete two-cell marker/offset geometries and edit behavior, and named rounded rectangle CF_SHAPE_005."
+      ],
+      "scope_limit": "Stored drawing metadata and payload only; absence of contentPart does not qualify that feature. No rendering, raster replacement or unrestricted shape editing."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_in_cell_image_rich_values_resolve_the_actual_lowercase_parts",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-265",
+        "xlsx-238"
+      ],
+      "assertions": [
+        "All four native lowercase rich-value parts are recognized. Typed _localImage structure/keys, values [0,5], rId1 image relationship and PNG hash are exact. Native types metadata is retained with zero refresh types; data, structures and relationships round-trip through public codecs."
+      ],
+      "scope_limit": "Rich-value owner and inert relationship metadata only; the cell-to-metadata binding, image rendering, refresh execution, dynamic rich data and semantic rich-value edits remain unqualified."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_svg_picture_keeps_its_vector_and_raster_fallback",
+      "fixtures": [
+        "excel/excel-chart-families.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-239",
+        "xlsx-238",
+        "xlsx-237"
+      ],
+      "assertions": [
+        "Direct SVG descriptor resolves image2.svg with its exact hash and image1.png raster fallback hash; worksheet facade and source drawing scan expose matching anchor geometry, with source archive unchanged."
+      ],
+      "scope_limit": "Existing direct SVG owner only; no renderer or native-app acceptance. The source scan is distinct from the legacy SourceBackedWorkbook API, which does not expose this picture method."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_svg_replacement_preserves_the_raster_geometry_and_all_chart_parts",
+      "fixtures": [
+        "excel/excel-chart-families.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-239",
+        "xlsx-237",
+        "xlsx-238"
+      ],
+      "assertions": [
+        "An explicit detach/attach replaces SVG_MARKER_007 with SVG_EDIT_019 and survives temporary save/reopen. Raster, alt text, anchors and all unrelated parts including seventeen chart resources remain exact; durable inverse from reopened bytes restores the native archive."
+      ],
+      "scope_limit": "Existing SVG attachment lifecycle only; no new picture or chart authoring, raster synchronization, rendering or Office reopen."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_officeart_picture_and_rectangle_keep_ids_text_and_cell_anchors",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xls"
+      ],
+      "feature_rows": [
+        "xls-183"
+      ],
+      "assertions": [
+        "Exactly two native OfficeArt shapes: picture id1025 and AutoShape id1026, rectangle text CF_SHAPE_005, A12:B17/F16:H20 anchors and move/resize behavior; no invented group children."
+      ],
+      "scope_limit": "BIFF drawing shape projection only; this test does not resolve image payloads, preserve full OfficeArt geometry or author shapes."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_drawing_picture_and_rectangle_keep_resolved_payload_and_anchors",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-311",
+        "xlsb-312"
+      ],
+      "assertions": [
+        "Two anchored objects, one resolved PNG with exact hash and native name/alt text/rId1, exact cell anchor endpoints, and one named RoundRect with CF_SHAPE_005 text; drawings_parsed confirms the eager inventory."
+      ],
+      "scope_limit": "Floating drawing image scope only; in-cell rich-value bindings and SVG lifecycle are not inferred. No rendering, external resolution or shape editing."
     }
   ]
 }

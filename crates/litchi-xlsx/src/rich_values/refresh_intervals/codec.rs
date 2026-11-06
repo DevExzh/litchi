@@ -980,6 +980,34 @@ fn no_non_namespace_attributes(
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = resolve_namespace(namespace)?;
+        if owner == "rvTypesInfo"
+            && namespace == "http://schemas.openxmlformats.org/markup-compatibility/2006"
+            && local.as_ref() == b"Ignorable"
+        {
+            // Root compatibility declarations do not change direct-path
+            // ownership. Unknown subtrees remain opaque; never promote their
+            // descendants into the typed refresh inventory.
+            let prefixes = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(super::super::xml_error)?;
+            for prefix in prefixes
+                .split([' ', '\t', '\r', '\n'])
+                .filter(|p| !p.is_empty())
+            {
+                if !litchi_ooxml_common::xml_name::is_ncname(prefix) {
+                    return Err(invalid("rvTypesInfo Ignorable contains an invalid prefix"));
+                }
+                let name = format!("{prefix}:_");
+                let resolved = reader
+                    .resolver()
+                    .resolve_element(quick_xml::name::QName(name.as_bytes()))
+                    .0;
+                if resolve_namespace(resolved)?.is_empty() {
+                    return Err(invalid("rvTypesInfo Ignorable contains an unbound prefix"));
+                }
+            }
+            continue;
+        }
         return Err(invalid(format!(
             "{owner} has unexpected {}attribute '{}'",
             if namespace.is_empty() {

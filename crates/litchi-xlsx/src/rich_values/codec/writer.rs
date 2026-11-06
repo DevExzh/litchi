@@ -128,7 +128,7 @@ pub fn write_rich_value_rels(value: &RichValueRels) -> Result<Vec<u8>> {
     escape_attr(&mut output, RELATIONSHIPS);
     output.extend_from_slice(b"\" xmlns:x=\"");
     escape_attr(&mut output, SPREADSHEETML);
-    output.push(b'>');
+    output.extend_from_slice(b"\">");
     for id in &value.ids {
         output.extend_from_slice(b"<rvr:rel");
         output.extend_from_slice(b" r:id=\"");
@@ -150,7 +150,9 @@ pub fn write_xf_complement(value: &XfComplement) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output.extend_from_slice(b"<fpb:xfComplement xmlns:fpb=\"");
     escape_attr(&mut output, FEATURE_BAG);
+    output.push(b'"');
     attr(&mut output, "i", &value.index.to_string());
+    output.push(b'>');
     write_opaque_children(&mut output, &value.opaque);
     output.extend_from_slice(b"</fpb:xfComplement>");
     finish(output)
@@ -161,7 +163,9 @@ pub fn write_dxf_complement(value: &DxfComplement) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output.extend_from_slice(b"<fpb:DXFComplement xmlns:fpb=\"");
     escape_attr(&mut output, FEATURE_BAG);
+    output.push(b'"');
     attr(&mut output, "i", &value.index.to_string());
+    output.push(b'>');
     write_opaque_children(&mut output, &value.opaque);
     output.extend_from_slice(b"</fpb:DXFComplement>");
     finish(output)
