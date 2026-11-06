@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "8d8af93f242e13d1d9159bae3329c5f340b0b201",
+  "base_commit": "5fa6141b1f64cf21f96b1b5ab88b04a8f451e7f5",
+  "problem": "Native Excel analytics parts exposed case-sensitive slicer-owner GUID matching, unsupported timeline relationship/MIME spellings and MCE directives, dropped sparkline identities, and unrecognized direct table sort states. A full-suite regression also exposed saved sort extents beyond current table bounds.",
+  "changes": [
+    "Match slicer integration GUIDs case-insensitively in reads and both rewrite paths, retaining namespace/ownership checks and duplicate-owner refusals.",
+    "Use native 2011/lowercase timeline relationship and content types for new authoring; accept exact documented 2010/capitalized aliases throughout graph validation, including orphan and wrong-owner checks.",
+    "Project timeline payload MCE with timeline/revision namespaces understood and opaque extension lists preserved. Check original and projected XML against caller limits; package integration scans keep original offsets.",
+    "Recognize direct table sortState. Retain exact, individually bounded saved ranges even when stale relative to current table extents. Authoring remains owner-bounded and accepts native full-column keys outside the selected sort-state rows; no sort is executed.",
+    "Preserve sparkline revision2 identities through MCE and standalone fragment writing. Resolve UID namespace aliases to the declared canonical prefix; refuse duplicate identities and unignorable foreign bindings of xr2:uid.",
+    "Add seven native analytics tests and targeted compatibility/negative cases; strengthen existing source/eager table assertions for stale sort metadata.",
+    "Add per-row verification-gap categories, historical support/evidence references and a --gaps report. Historical fixture evidence and pending classifications are not promoted to passing operations or accepted exclusions."
+  ],
+  "verification_scope": {
+    "pivots_tables": "Four native XLSX/XLTX/Strict/control variants: exact Table1 columns/ranges/direct sort metadata, all eight decoded PivotCache rows, row/column/page field bindings, Sum aggregation, locations and stored filtered/unfiltered totals.",
+    "slicers": "Two caches and two views: exact names, source fields, revision GUIDs, table bindings, captions, row heights and column counts. Selected-item indices/flags are asserted in retained XML, not interpreted as executed UI filtering.",
+    "timelines": "Native graph identity, internal cache ID, DateBetween filter, February 2026 selection, year bounds and Month view level. Documented legacy graph aliases remain readable and cannot bypass ownership checks.",
+    "sparklines": "Four native variants: both groups, all four series/destinations, types, hidden-data/high/low flags, series colors and native GUIDs survive fragment serialization. Alias/MCE regression and foreign/duplicate negatives are separate synthetic cases.",
+    "conditional_formatting": "All eight core rules plus the x14 data-bar enhancement: exact ranges/priorities/types, source-order priorities, DXF/formula references, thresholds/colors/icon settings and GUID association.",
+    "edits": "Slicer and timeline caption edits plus slicer-cache reordering reopen to the expected typed models; unrelated member payloads and retained-owner inverses are byte exact. Filter application returns its explicit typed Unsupported error.",
+    "table_compatibility": "The existing ConditionalFormattingSamples.xlsx retains Table1 sort A3:E24/key A2:A24 and Table3 sort A2:G22/key A1:A22 through both source and eager readers despite their current A3:E25/A2:F21 table bounds. Invalid/out-of-sheet ranges and duplicate owners still fail; authoring rejects outside-owner keys.",
+    "provenance": "Tracked fixture bytes are unchanged. No new upstream fixtures, executables or large evidence are committed. No Office UI/reopen, calculation, rendering, refresh, macros or external connections were executed."
+  },
+  "results": {
+    "rust_passed_across_final_suites": 3377,
+    "python_passed": 72,
+    "native_xlsx_owner_tests": 15,
+    "new_native_xlsx_tests": 7,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 137,
+      "indexed_tests": 118,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 137,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 51,
+        "native_evidence_needs_semantic_tests": 108,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 71,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsx-analytics-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-owner-final.log",
+        "bytes": 272140,
+        "sha256": "bd3b38cadec601e85d5d6e0bab6d8fac549030286962a4aa81f18225a3fa4f2f"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/xlsx-analytics-owner-final.log 2>&1",
+      "suites": 82,
+      "passed": 2584,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xlsx,encryption --lib --test 'xlsx_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsx-analytics-ops-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-ops-final.log",
+        "bytes": 71618,
+        "sha256": "f44817fa5992b505937ff23ae5cf8cff34cf0fc84bcc6877ce58354d747b6146"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xlsx,encryption --lib --test 'xlsx_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/xlsx-analytics-ops-final.log 2>&1",
+      "suites": 15,
+      "passed": 684,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsx-analytics-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-facade-final.log",
+        "bytes": 32668,
+        "sha256": "0586aad6039dccf7a4c1a0986a6f5f71fe9c57bf5ff1d240cdb373ea4f8b2f3f"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/xlsx-analytics-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 109,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-xlsx -p litchi-ops --no-default-features --features litchi-xlsx/encryption,litchi-xlsx/vba-inspection,litchi-ops/xlsx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "xlsx-analytics-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-clippy-final.log",
+        "bytes": 17222,
+        "sha256": "0e78f01e97f5ab2d93d19b846d39a84832179f39477708453393716c79cf6538"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-xlsx -p litchi-ops --no-default-features --features litchi-xlsx/encryption,litchi-xlsx/vba-inspection,litchi-ops/xlsx,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/xlsx-analytics-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "analytics-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/analytics-python-final.log",
+        "bytes": 664,
+        "sha256": "e25c2c0810d1c9264cbbd50705321e59946cc2a84c68ca1d0b7ac49757738e2e"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/analytics-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "analytics-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/analytics-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/analytics-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "analytics-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/analytics-coverage-final.json",
+        "bytes": 630238,
+        "sha256": "c8f4eb1e4fd73abbf947b9ef6ff0e7d8d70629cb651bd605565efc1f585c0177"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/analytics-coverage-final.json 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py --gaps",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "analytics-gaps.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/analytics-gaps.json",
+        "bytes": 339311,
+        "sha256": "abea9f68d2f4ab2c10e9c7925ddb808032e309fe3e30400df144132bd72dde02"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py --gaps > /tmp/litchi-native-office.GMvwp4/analytics-gaps.json 2>&1"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "analytics-format-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/analytics-format-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "cargo fmt --all -- --check > /tmp/litchi-native-office.GMvwp4/analytics-format-final.log 2>&1"
+    }
+  ],
+  "additional_checks": [
+    {
+      "command": "git diff --cached --check",
+      "result": "pass"
+    },
+    {
+      "command": "AGENTS.md staged evidence-size and binaries-path guards",
+      "result": "both print nothing before each commit"
+    }
+  ],
+  "specification_references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/e29966e2-5baa-4fcf-84c9-082025e1be13",
+    "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/bde74e41-9603-4a13-989b-d778c33b941d",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/a256b911-a91b-497f-9f9c-402e4e7bab47",
+    "https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.linq.x.sortstate?view=openxml-3.0.1"
+  ],
+  "reproduction_artifacts": [
+    {
+      "artifact": {
+        "file_name": "xlsx-analytics-before.jsonl",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-before.jsonl",
+        "bytes": 20774,
+        "sha256": "838f52d56bc0c76cd4c5f6325d6026f82bdbd07ad5fddb006dfe6f8718c29792"
+      },
+      "scope": "Read-only baseline on five native files; slicer/timeline refusals and missing direct sort/UID fields."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsx-slicer-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-slicer-before.log",
+        "bytes": 18035,
+        "sha256": "481ac910f972365cc2c205563f943c0495d8faa7e354adea127f4a8400c695d4"
+      },
+      "scope": "Native permanent slicer regression fails on unreferenced rId7 before GUID matching fix."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsx-timeline-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-timeline-before.log",
+        "bytes": 17939,
+        "sha256": "184b81d4e3398486159507ae70b15586a43f5b8e3388977621638fc3e85391f4"
+      },
+      "scope": "Native timeline regression rejects actual 2011 relationship profile before compatibility fix."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsx-timeline-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-timeline-after.log",
+        "bytes": 17923,
+        "sha256": "96f0c7f65bb280934c67138c957c0fdd1236c64ed9c1388da917b3c8122b8200"
+      },
+      "scope": "After graph-profile repair, timeline payload still rejects native mc:Ignorable before MCE handling."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsx-analytics-native.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-native.log",
+        "bytes": 24534,
+        "sha256": "7fa56e58f5a22c59549c657d7e81129ead2aa55245bb1d7220711f08466397be"
+      },
+      "scope": "Permanent regressions expose missing direct sort state and lost sparkline GUIDs."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsx-analytics-native2.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-native2.log",
+        "bytes": 18896,
+        "sha256": "6029bb0c8ed5c4ce729d85835252a375e9b22baffee80dc73e6d820389229f9e"
+      },
+      "scope": "Native full-column key D1:D9 rejected against selected sort rows A2:F8 before range compatibility."
+    },
+    {
+      "artifact": {
+        "file_name": "xlsx-analytics-owner-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/xlsx-analytics-owner-first.log",
+        "bytes": 272725,
+        "sha256": "ade0123cda035f74a7d0bbd4c3e8fca6e00bdc99414e54e6f2d61aa96bd98a76"
+      },
+      "scope": "First full owner suite exposes stale sort extents in existing ConditionalFormattingSamples.xlsx; resolved with exact source/eager assertions rather than skipping the test."
+    }
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native-16434811ed646cd5",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-16434811ed646cd5",
+      "bytes": 35807320,
+      "sha256": "69aeb50a75e4462d5834a388f091bb5e9720189400d9f63fbd8d30c077323f3e",
+      "source_commit": "8d8af93f242e13d1d9159bae3329c5f340b0b201",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xlsx --features encryption,vba-inspection --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-46073eb1f7cdf898",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-46073eb1f7cdf898",
+      "bytes": 45012368,
+      "sha256": "73612db65979bc9da4e09e31c36a86955dd1ba913a45b3b1d30f119e23407775",
+      "source_commit": "8d8af93f242e13d1d9159bae3329c5f340b0b201",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features xlsx,encryption --lib --test 'xlsx_*' --test microsoft_office_native --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The active goal remains incomplete: all 139 fixtures have indexed bounded tests, but only 137 of 494 feature rows have partial assertions. Every indexed row still requires scope review.",
+    "Unasserted rows: 108 native-evidence semantic gaps, 71 operation gaps, 51 bounded-evidence operation gaps, 58 UI-limit reviews, 27 external-handoff reviews, 41 unsupported-boundary reviews and one historically not-applicable row. These are review tasks, not accepted exclusions.",
+    "All 252 historical pending statuses are unchanged. Candidate-cluster planned filenames are not treated as actual manifest fixtures; unsupported/external/UI dispositions still need current-code reconciliation.",
+    "Native chart/drawing/media, data-model/rich-data, connections, revisions and other typed families across DOC/DOCX/RTF/XLS/XLSX/XLSB/PPT/PPTX need further semantic, operation and preservation coverage.",
+    "No fresh Microsoft Office reopen, rendering, calculation, refresh, macro/ActiveX execution or external-service validation was performed."
+  ]
+}
