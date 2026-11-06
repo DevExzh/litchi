@@ -6110,6 +6110,90 @@
         "Supported native A2-to-Z100 copy retains all shared-string models/fonts, original and copied cell values; only the SST part, sheet1 and its binary index change; file save/reopen and exact inverse pass."
       ],
       "scope_limit": "Same-workbook rich-string copy; no cross-workbook font remapping, arbitrary shared/inline conversion, phonetics or native application validation."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_review",
+      "name": "native_inline_revision_dispositions_preserve_property_changes_and_review_parts",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-112"
+      ],
+      "assertions": [
+        "All four accept/reject combinations for native paragraph 3 insertion/deletion produce exact expected text; two pre-existing formatting revisions retain IDs 0/1, author and local/UTC timestamps.",
+        "File save/reopen changes only document.xml; every byte outside the selected paragraph and all review/relationship/package members remain exact; inverse restores original members."
+      ],
+      "scope_limit": "Direct main-body inline revisions only. Property and complete paragraph-move resolution are outside this owner; no native Word reopen or rendering."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_review",
+      "name": "native_property_and_paragraph_move_owners_expose_their_operation_boundary",
+      "fixtures": [
+        "word/word-review-controls.docx",
+        "word/word-tracked-moves.docx"
+      ],
+      "feature_rows": [
+        "docx-112"
+      ],
+      "assertions": [
+        "The semantic reader recognizes four revisions in each native file. The family snapshot and accept-all/reject-all paths return the exact documented InvalidFormat diagnostics for property changes or paragraph/property move owners; failed staging commits an exact no-op."
+      ],
+      "scope_limit": "Intentional whole-family operation boundary, not evidence of general accept/reject support. The native inputs remain valid reader inputs; direct inline application is covered separately."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_source_edits",
+      "name": "native_hyperlink_detachment_retains_text_relationship_and_all_other_members",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-122"
+      ],
+      "assertions": [
+        "Native detachment reports one wrapper and one retained external relationship; Reference link remains visible. Only the exact hyperlink opening/closing tags change in document.xml; all other bytes and package members remain exact.",
+        "Detached no-op publication is byte-exact; reopened inverse restores all original members; original source bytes are unchanged."
+      ],
+      "scope_limit": "Main-document external hyperlink detachment only; relationship is intentionally retained and the target is never fetched."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_source_edits",
+      "name": "native_hyperlink_redaction_removes_only_the_selected_relationship_and_wrapper",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-122",
+        "docx-071"
+      ],
+      "assertions": [
+        "Native rId11 targets https://example.com/litchi-fixture; selected redaction unwraps one hyperlink and removes exactly that relationship. Root compatibility metadata and all other document bytes remain exact, and remaining relationship attributes are semantically identical.",
+        "Empty selection is an exact no-op; retained-owner inverse restores source bytes, while inverse on a reopened package returns UnsupportedOperation. All unrelated parts and visible Reference link text are retained."
+      ],
+      "scope_limit": "Bounded root Ignorable admission and inert main-story redaction only. No general MCE branch selection, encoded MCE namespace redaction, remote access or portable inverse of removed relationships."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_source_edits",
+      "name": "native_secondary_story_text_edits_preserve_anchors_siblings_and_other_parts",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-075",
+        "docx-071"
+      ],
+      "assertions": [
+        "Native footnote 1 (42 to 43), endnote 1 (84 to 85), header 0 and comment 5 text edits survive file save/reopen. Exact native text selectors are asserted before editing.",
+        "Only the selected owning part changes; every XML byte outside its owned text slots remains exact, including note definition markers, paragraph/run properties, separator siblings, reply text, review metadata and root compatibility attributes. Reopened inverses restore all source members."
+      ],
+      "scope_limit": "Four native selected-story edits under the shared source/projection agreement proof. No branch selection, general multi-story batch, footer fields, glossary CRUD, rendering or fresh native application validation."
     }
   ]
 }

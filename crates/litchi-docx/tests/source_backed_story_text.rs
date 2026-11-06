@@ -953,3 +953,66 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
         })
     ));
 }
+
+#[test]
+fn ignorable_metadata_preserves_source_and_hidden_word_content_still_refuses() {
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    for namespace in [
+        MC,
+        "http://schemas.openxmlformats.org/markup-compatibility/200&#x36;",
+    ] {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:compat="{namespace}" xmlns:x="urn:opaque" compat:Ignorable="x"><w:body><w:p x:identity="keep"><x:opaque x:value="retained"/><w:r><w:t>before</w:t></w:r></w:p></w:body></w:document>"#
+        );
+        let original = main_only_fixture(&xml);
+        let package = open(&original);
+        let source = package
+            .story_text_snapshot(story_text::Selector::Main)
+            .unwrap();
+        assert_eq!(source.paragraph_text(0).unwrap().as_deref(), Some("before"));
+        let mut edit = package.edit_story_text(story_text::Selector::Main).unwrap();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let mut output = Vec::new();
+        commit.package().write_to(&mut output).unwrap();
+        let opc = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
+        assert_eq!(
+            opc.get_part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .blob(),
+            xml.replace("before", "after").as_bytes()
+        );
+    }
+    for (directive, body) in [
+        (
+            "compat:Ignorable=\"unbound\"",
+            "<w:p><w:r><w:t>visible</w:t></w:r></w:p>",
+        ),
+        (
+            "compat:Ignorable=\"x\"",
+            "<x:hidden><w:p><w:r><w:t>hidden</w:t></w:r></w:p></x:hidden>",
+        ),
+        (
+            "compat:Ignorable=\"x\" compat:ProcessContent=\"x:hidden\"",
+            "<x:hidden><w:p/></x:hidden>",
+        ),
+        (
+            "compat:Ignorable=\"x\"",
+            "<w:p compat:Ignorable=\"y\"><w:r><w:t>visible</w:t></w:r></w:p>",
+        ),
+    ] {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:compat="{MC}" xmlns:x="urn:opaque" xmlns:y="urn:nested" {directive}><w:body>{body}</w:body></w:document>"#
+        );
+        let original = main_only_fixture(&xml);
+        let package = open(&original);
+        assert!(
+            matches!(package.story_text_snapshot(story_text::Selector::Main),
+            Err(story_text::Error::Document(Error::Refused(r))) if r.kind()==litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
+        let mut output = Vec::new();
+        package.write_to(&mut output).unwrap();
+        assert_eq!(output, original);
+    }
+}

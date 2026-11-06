@@ -2576,11 +2576,6 @@ impl NamespaceContext {
                     LimitKind::NamespaceAttributeValue,
                 )?;
                 let decoded_value = decode_attribute_value(value)?;
-                if decoded_value.as_slice() == MCE_NAMESPACE {
-                    return Err(unsupported_xml(
-                        "markup-compatibility namespace declarations are not accepted in a source-bound story",
-                    ));
-                }
                 if context.bindings.len() >= max_bindings {
                     return Err(Error::Limit {
                         kind: LimitKind::NamespaceBindings,
@@ -2638,20 +2633,20 @@ impl NamespaceContext {
                 return Err(unsupported_xml("undeclared attribute namespace prefix"));
             }
             if !is_namespace_declaration(key) {
-                let mce_attribute = is_mce_attribute_name(key)
-                    || context
-                        .resolve_attribute(key)
-                        .is_some_and(|namespace| namespace == MCE_NAMESPACE)
-                    || value == MCE_NAMESPACE;
+                let mce_attribute = context
+                    .resolve_attribute(key)
+                    .is_some_and(|namespace| namespace == MCE_NAMESPACE);
                 if mce_attribute {
                     preflight_attribute_value(
                         value,
                         max_namespace_bytes,
                         LimitKind::AttributeValue,
                     )?;
-                    return Err(unsupported_xml(
-                        "markup-compatibility attributes are not accepted in a source-bound story",
-                    ));
+                    if key.local_name().as_ref() != b"Ignorable" {
+                        return Err(unsupported_xml(
+                            "markup-compatibility branch directives are not accepted in a source-bound story",
+                        ));
+                    }
                 }
             }
         }
@@ -3763,6 +3758,7 @@ fn scan_glossary_many(
         layouts.push(layout);
     }
     check_execution_context(execution)?;
+    admit_story_compatibility(xml, limits, execution)?;
     Ok(layouts)
 }
 
@@ -4290,6 +4286,7 @@ fn scan_story(
         has_w_namespace = selected_entry_has_w_namespace;
     }
     check_execution_context(execution)?;
+    admit_story_compatibility(xml, limits, execution)?;
     paragraphs.sort_by_key(|range| range.start);
     Ok(Layout {
         paragraphs: paragraphs.into(),
@@ -4449,11 +4446,39 @@ fn namespace_declared_prefix<'a>(key: QName<'a>) -> Option<&'a [u8]> {
     key.into_inner().strip_prefix(b"xmlns:")
 }
 
-fn is_mce_attribute_name(key: QName<'_>) -> bool {
-    key.prefix()
-        .as_ref()
-        .is_some_and(|prefix| prefix.as_ref() == b"mc")
-        || key.as_ref() == b"mc:Ignorable"
+/// Source edits keep raw bytes. Prove that their Word content agrees with
+/// the reader's MCE projection instead of removing compatibility markup.
+/// Run after the lexical scan has enforced the caller's namespace, XML,
+/// event and entry bounds. The proof builds no projected document.
+fn admit_story_compatibility(
+    xml: &[u8],
+    limits: Limits,
+    execution: Option<&ExecutionContext>,
+) -> Result<()> {
+    use litchi_ooxml_common::mce;
+    if !mce::mentions_namespace(xml) {
+        return Ok(());
+    }
+    let proof_limits = mce::Limits {
+        max_input_bytes: limits.max_xml_bytes,
+        // The proof checks a conservative serialization bound, but emits
+        // no bytes; this is not the story's caller-owned text-output budget.
+        max_output_bytes: limits.max_xml_bytes.saturating_mul(8),
+        max_depth: limits.max_depth,
+        max_namespace_bindings: limits.max_namespace_bindings,
+        ..mce::Limits::default()
+    };
+    let verdict = mce::admission::admit_with(
+        xml,
+        &crate::parts::document_part::visible_document_capabilities(),
+        &proof_limits,
+        |_| check_execution_context(execution),
+    )?;
+    verdict.map(|_| ()).map_err(|_| {
+        unsupported_xml(
+            "markup-compatibility processing would change the selected story's understood content",
+        )
+    })
 }
 
 fn is_word_element(

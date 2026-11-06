@@ -635,6 +635,27 @@ fn validate_main_document_closure(closure: &sanitize::Snapshot) -> Result<()> {
             "markup-compatibility owner syntax is outside the redaction closure",
         );
     }
+    // Native Word commonly declares mc:Ignorable on the document root.
+    // Retain it only when the shared proof establishes that no understood
+    // content is hidden or selected. Never publish a normalized projection.
+    let limits = closure.limits();
+    let proof_limits = litchi_ooxml_common::mce::Limits {
+        max_input_bytes: limits.max_document_bytes(),
+        max_output_bytes: limits.max_document_bytes().saturating_mul(8),
+        max_depth: limits.max_depth(),
+        ..litchi_ooxml_common::mce::Limits::default()
+    };
+    if litchi_ooxml_common::mce::admission::admit(
+        closure.xml_bytes(),
+        &crate::parts::document_part::visible_document_capabilities(),
+        &proof_limits,
+    )
+    .is_err()
+    {
+        return unsafe_closure(
+            "markup-compatibility processing changes content outside the redaction closure",
+        );
+    }
     let mut reader = NsReader::from_reader(closure.xml_bytes());
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -723,7 +744,7 @@ fn inspect_owner_element(
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (attribute_namespace, attribute_local) = resolver.resolve_attribute(attribute.key);
-        if is_mce_namespace(&attribute_namespace) {
+        if is_mce_namespace(&attribute_namespace) && attribute_local.as_ref() != b"Ignorable" {
             return unsafe_closure(
                 "markup-compatibility attributes are outside the redaction closure",
             );

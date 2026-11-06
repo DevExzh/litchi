@@ -493,3 +493,87 @@ impl Write for FailingSink {
         Ok(())
     }
 }
+
+#[test]
+fn ignorable_metadata_redaction_preserves_opaque_xml_and_refuses_hidden_owners() {
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let link = Link {
+        id: "rLink".into(),
+        target: "https://one.invalid/".into(),
+    };
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:compat="{MC}" xmlns:x="urn:opaque" compat:Ignorable="x"><w:body><w:p x:identity="keep"><x:opaque x:value="retained"/><w:hyperlink r:id="rLink"><w:r><w:t>visible</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#
+    );
+    let package = open(fixture(
+        xml.as_bytes().to_vec(),
+        vec![link.clone()],
+        false,
+        false,
+    ));
+    let commit = package
+        .edit_external_hyperlink_redaction(&["https://one.invalid/"])
+        .unwrap()
+        .commit()
+        .unwrap();
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    let opc = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    assert_eq!(
+        opc.get_part(&PackURI::new(MAIN).unwrap()).unwrap().blob(),
+        xml.replace("<w:hyperlink r:id=\"rLink\">", "")
+            .replace("</w:hyperlink>", "")
+            .as_bytes()
+    );
+    for (directive, body) in [
+        (
+            "compat:Ignorable=\"unbound\"",
+            "<w:p><w:hyperlink r:id=\"rLink\"><w:r><w:t>visible</w:t></w:r></w:hyperlink></w:p>",
+        ),
+        (
+            "compat:Ignorable=\"x\"",
+            "<x:hidden><w:p><w:hyperlink r:id=\"rLink\"><w:r><w:t>hidden</w:t></w:r></w:hyperlink></w:p></x:hidden>",
+        ),
+        (
+            "compat:Ignorable=\"x\" compat:ProcessContent=\"x:hidden\"",
+            "<x:hidden><w:p/></x:hidden>",
+        ),
+        (
+            "compat:Ignorable=\"x\"",
+            "<w:p compat:Ignorable=\"y\"><w:hyperlink r:id=\"rLink\"><w:r><w:t>visible</w:t></w:r></w:hyperlink></w:p>",
+        ),
+    ] {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:compat="{MC}" xmlns:x="urn:opaque" xmlns:y="urn:nested" {directive}><w:body>{body}</w:body></w:document>"#
+        );
+        // Exercise the record owner directly, so the package's earlier MCE
+        // gate cannot mask a regression in the redaction closure proof.
+        let raw = litchi_docx::redact::Snapshot::from_xml(
+            xml.as_bytes().to_vec(),
+            vec![litchi_docx::sanitize::raw::Relationship::new(
+                "rLink",
+                rt::HYPERLINK,
+                "https://one.invalid/",
+                true,
+            )],
+            litchi_docx::sanitize::Limits::default(),
+        );
+        assert!(
+            matches!(raw,Err(Error::Refused(r)) if r.kind()==litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
+        let original = fixture(xml.into_bytes(), vec![link.clone()], false, false);
+        let package = open(original.clone());
+        let result = package.external_hyperlink_redaction_snapshot();
+        if directive.contains("unbound") {
+            assert!(
+                matches!(result,Err(Error::Mce(litchi_ooxml_common::mce::Error::NonConformant(reason))) if reason=="unbound Ignorable unbound")
+            );
+        } else {
+            assert!(
+                matches!(result,Err(Error::Refused(r)) if r.kind()==litchi_core::edit::RefusalKind::UnsupportedContent)
+            );
+        }
+        let mut output = Vec::new();
+        package.write_to(&mut output).unwrap();
+        assert_eq!(output, original);
+    }
+}
