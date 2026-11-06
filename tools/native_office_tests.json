@@ -4566,6 +4566,114 @@
         "Exact page-break byte positions [96,115] and [75,97], absent column/soft breaks and unchanged event order on source reopen. Actual model writing of the visual-object source also preserves the full body-event order, page positions and body text."
       ],
       "scope_limit": "Explicit stored page breaks only; no computed pagination. The vector fixture retains its separately tested structural-opaque canonical-writer boundary."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_placeholders_resolve_slide_layout_and_master_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-402",
+        "pptx-412"
+      ],
+      "assertions": [
+        "Exact title/subtitle/date/footer/slide-number indices resolve from the native slide to its named layout and master; layout/master marker shapes retain IDs and explicit bounds, while the slide scene stays unflattened."
+      ],
+      "scope_limit": "Declared metadata and relationship ownership only; no effective rendering, text-style cascade or geometry synthesis."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_layout_retarget_preserves_shapes_and_other_package_members",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-402",
+        "pptx-412"
+      ],
+      "assertions": [
+        "Layout retarget changes only slide7 relationships, retains every shape/member, survives temporary save/reopen, rejects a missing name without losing the staged edit, and reverses to exact member bytes."
+      ],
+      "scope_limit": "Retargeting does not rewrite existing placeholder types or compute inherited rendering."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_placeholder_recreation_keeps_title_and_subtitle_layout_indices",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-412"
+      ],
+      "assertions": [
+        "Retarget slide7 to the native title layout, remove the old title/content, recreate title/subtitle, update title and refuse its duplicate; save/reopen retains ctrTitle index0 and subTitle index1 with inherited geometry, unchanged date/footer/number, and exact-member inverse."
+      ],
+      "scope_limit": "Uses an unambiguous direct shape owner; native Zoom/MCE removal on slide2 remains outside the removal profile."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_png_media_pictures_attach_replace_and_detach_svg_without_changing_playback",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-414"
+      ],
+      "assertions": [
+        "Attach the tracked SVG asset unchanged to both native PNG video-poster/audio-icon pictures, save/reopen, replace SVG bytes and detach; original PNGs, all original relationship targets, complete nvPicPr/timing XML and unrelated members remain intact. Retained-source inverse restores the exact archive."
+      ],
+      "scope_limit": "Direct PNG media pictures only; no playback, rasterization, picture creation, fresh PowerPoint validation or durable cross-process inverse."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_svg_attachment_rejects_non_png_fallbacks_without_staging_changes",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-414"
+      ],
+      "assertions": [
+        "Native vector-only SVG and JPEG pictures return exact expected/actual ContentType errors for PNG attachment requests; commit remains a no-op with exact source bytes."
+      ],
+      "scope_limit": "This is the PNG-only attachment profile boundary; native SVG-only reads are covered separately."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_svg_import_rejects_malformed_or_dtd_payloads_before_output",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-414"
+      ],
+      "assertions": [
+        "Malformed, DTD-bearing and multiple-root SVG attachment requests fail XML publication before writing any output bytes, preserving the original native package."
+      ],
+      "scope_limit": "Invalid imported requests are derived operations on an immutable native source; XML validation occurs at publication, not initial staging."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_placeholders_svg",
+      "name": "native_svg_replacement_can_import_a_new_media_part_without_normalization",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-414"
+      ],
+      "assertions": [
+        "An attached SVG can move to a new media part with unchanged indented asset bytes and PNG fallback; the obsolete SVG part is removed, relationship ID stays stable, and retained-source inverse restores the prior artifact."
+      ],
+      "scope_limit": "Empty relationship elements in the native noncanonical relationship stream; opaque child content is still refused and no native-app reopen is claimed."
     }
   ]
 }

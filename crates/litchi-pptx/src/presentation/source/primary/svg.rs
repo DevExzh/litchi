@@ -306,8 +306,9 @@ impl Edit<'_> {
     }
 
     /// Attach a native SVG to the raster picture `image` on the slide
-    /// `slide`, or replace its attached SVG. Returns whether anything
-    /// changed.
+    /// `slide`. The picture must not already have an SVG attachment;
+    /// use [`Self::replace`] to replace an existing one. Returns whether
+    /// anything changed.
     ///
     /// # Errors
     ///

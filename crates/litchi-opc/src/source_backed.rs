@@ -231,9 +231,9 @@ struct TopologyPartAddition {
     partname: PackURI,
     content_type: ContentType,
     payload: TopologyPartPayload,
-    /// The payload restores bytes another producer wrote, so XML is held to
+    /// The payload imports or restores producer bytes, so XML is held to
     /// the source policy instead of the authored compact contract.
-    restored: bool,
+    producer_bytes: bool,
 }
 
 #[derive(Debug)]
@@ -1702,6 +1702,36 @@ where
     })
 }
 
+/// Replacing an empty relationship may rewrite that selected edge. Preserve
+/// all surrounding source bytes, and refuse children whose opaque contents
+/// a generated relationship would discard. The parser has already rejected
+/// unknown relationship attributes and validated the element namespace.
+fn replaceable_relationship_range(
+    parsed: &ParsedSourceRelationshipDocument,
+    source: &[u8],
+    id: &str,
+) -> Result<Range<usize>> {
+    let range = parsed.relationship_ranges.get(id).cloned().ok_or_else(|| {
+        overlay_unavailable("replacement relationship source range is unavailable")
+    })?;
+    let fragment = source.get(range.clone()).ok_or_else(|| {
+        overlay_unavailable("replacement relationship range is outside the source")
+    })?;
+    let mut reader = quick_xml::Reader::from_reader(fragment);
+    loop {
+        match reader.read_event()? {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {},
+            Event::Text(text) if relationship_xml_whitespace(text.as_ref()) => {},
+            Event::Eof => return Ok(range),
+            _ => {
+                return Err(overlay_unavailable(
+                    "noncanonical relationship replacement contains opaque child content",
+                ));
+            },
+        }
+    }
+}
+
 /// Parse a relationship image with the source-splice grammar and reject the
 /// small set of ingress repairs that would otherwise be invisible in the
 /// typed [`Relationships`] value.  The ordinary package reader intentionally
@@ -2310,7 +2340,7 @@ impl SourceTopologyPlan {
             partname,
             content_type,
             payload: TopologyPartPayload::SourceXml(Arc::new(source_xml)),
-            restored: false,
+            producer_bytes: false,
         });
         Ok(())
     }
@@ -2347,7 +2377,7 @@ impl SourceTopologyPlan {
             partname,
             content_type,
             payload: TopologyPartPayload::Precompressed(Box::new(payload)),
-            restored: false,
+            producer_bytes: false,
         });
         Ok(())
     }
@@ -2371,9 +2401,31 @@ impl SourceTopologyPlan {
         content_type: impl Into<String>,
         payload: Arc<Vec<u8>>,
     ) -> Result<()> {
+        self.try_add_imported_part_shared(partname, content_type, payload)
+    }
+
+    /// Add exact caller-supplied producer bytes, such as an imported SVG.
+    ///
+    /// This route does not serialize or normalize the payload. At publication,
+    /// XML-classified parts receive the same source audit as restored parts:
+    /// bounded, well-formed UTF-8 XML with one root and no DTD or DOCTYPE.
+    /// Producer indentation is preserved. Use [`Self::try_add_part_shared`]
+    /// for library-authored XML, which must satisfy the compactness contract.
+    /// Every other URI, content-type, topology and publication check remains.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::try_add_part_shared`]. XML validation
+    /// is deferred until the plan is validated or published.
+    pub fn try_add_imported_part_shared(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<()> {
         self.try_add_part_with_payload(partname, content_type, || payload)?;
         if let Some(addition) = self.additions.last_mut() {
-            addition.restored = true;
+            addition.producer_bytes = true;
         }
         Ok(())
     }
@@ -2399,7 +2451,7 @@ impl SourceTopologyPlan {
             partname,
             content_type,
             payload: TopologyPartPayload::Decoded(payload()),
-            restored: false,
+            producer_bytes: false,
         });
         Ok(())
     }
@@ -10537,7 +10589,7 @@ impl SourceBackedPackage {
                         (xml, Some(source_event_count), memory_reservations)
                     } else {
                         // A noncanonical relationship member can be composed
-                        // with both removals and additions. Keep its source
+                        // with removals, additions and empty-edge replacements. Keep its source
                         // bytes lossless by compacting removed child ranges
                         // first and appending only the authored additions.
                         let mut removed_ranges = Vec::new();
@@ -10567,7 +10619,20 @@ impl SourceBackedPackage {
                                         })?;
                                     removed_ranges.push(range.clone());
                                 },
-                                TopologyRelationshipOperation::Add { reltype, target } => {
+                                TopologyRelationshipOperation::Add { reltype, target }
+                                | TopologyRelationshipOperation::Replace {
+                                    reltype, target, ..
+                                } => {
+                                    if matches!(
+                                        &change.operation,
+                                        TopologyRelationshipOperation::Replace { .. }
+                                    ) {
+                                        removed_ranges.push(replaceable_relationship_range(
+                                            &parsed,
+                                            &original,
+                                            &change.r_id,
+                                        )?);
+                                    }
                                     let (target_ref, target_mode) =
                                         Self::topology_relationship_target_ref(
                                             target,
@@ -10591,11 +10656,6 @@ impl SourceBackedPackage {
                                                 "relationship append XML length overflows usize",
                                             )
                                         })?;
-                                },
-                                TopologyRelationshipOperation::Replace { .. } => {
-                                    return Err(overlay_unavailable(
-                                        "noncanonical relationship replacement is not source-spliceable",
-                                    ));
                                 },
                             }
                         }
@@ -10662,8 +10722,10 @@ impl SourceBackedPackage {
                             if index & 0x3f == 0 {
                                 self.check_topology_progress()?;
                             }
-                            let TopologyRelationshipOperation::Add { reltype, target } =
-                                &change.operation
+                            let (TopologyRelationshipOperation::Add { reltype, target }
+                            | TopologyRelationshipOperation::Replace {
+                                reltype, target, ..
+                            }) = &change.operation
                             else {
                                 continue;
                             };
@@ -11703,8 +11765,8 @@ impl SourceBackedPackage {
                         addition.partname.as_str(),
                         addition.content_type.as_str(),
                     ) {
-                        if addition.restored {
-                            validate_restored_xml(addition.partname.as_str(), payload)?;
+                        if addition.producer_bytes {
+                            validate_imported_xml(addition.partname.as_str(), payload)?;
                         } else {
                             validate_overlay_xml(addition.partname.as_str(), payload)?;
                         }
@@ -15896,9 +15958,9 @@ fn strict_content_type_mapping_key(
     Ok(qualified)
 }
 
-/// Audit restored producer bytes with the source policy (see
-/// [`SourceTopologyPlan::try_add_restored_part_shared`]).
-fn validate_restored_xml(part: &str, bytes: &[u8]) -> Result<()> {
+/// Audit imported or restored producer bytes with the source policy (see
+/// [`SourceTopologyPlan::try_add_imported_part_shared`]).
+fn validate_imported_xml(part: &str, bytes: &[u8]) -> Result<()> {
     xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
         .map(|_report| ())
         .map_err(|source| OpcError::XmlPublication {
@@ -19901,8 +19963,14 @@ mod tests {
     }
 
     #[test]
-    fn topology_noncanonical_relationship_replace_refuses_before_output() {
-        let source = topology_relationship_archive(noncanonical_document_relationships());
+    fn topology_noncanonical_relationship_replace_refuses_opaque_children_before_output() {
+        let relationships = std::str::from_utf8(noncanonical_document_relationships())
+            .unwrap()
+            .replace(
+                "Id='rExisting'></r:Relationship>",
+                "Id='rExisting'><!--opaque--></r:Relationship>",
+            );
+        let source = topology_relationship_archive(relationships.as_bytes());
         let owner = PackURI::new("/word/document.xml").unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_external_relationship(
@@ -19927,6 +19995,115 @@ mod tests {
         assert!(matches!(
             error,
             OpcError::SourceBackedOverlayUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_replace_preserves_unselected_source_bytes() {
+        for self_closing in [false, true] {
+            let mut xml = String::from("\u{feff}");
+            xml.push_str(std::str::from_utf8(noncanonical_document_relationships()).unwrap());
+            if self_closing {
+                xml = xml.replace("Id='rExisting'></r:Relationship>", "Id='rExisting'/>");
+            }
+            let start = xml.find("<r:Relationship TargetMode").unwrap();
+            let end = if self_closing {
+                start + xml[start..].find("/>").unwrap() + 2
+            } else {
+                start + xml[start..].find("</r:Relationship>").unwrap() + "</r:Relationship>".len()
+            };
+            let mut expected = xml.clone();
+            expected.replace_range(start..end, "");
+            let insertion = expected.find("</r:Relationships>").unwrap();
+            expected.insert_str(insertion, r#"<r:Relationship Id="rExisting" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://replacement.invalid/?a=1&amp;b=2" TargetMode="External"/>"#);
+            let package = SourceBackedPackage::from_read_at(
+                Arc::new(CountingSource::new(topology_relationship_archive(
+                    xml.as_bytes(),
+                ))),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .unwrap();
+            let owner = PackURI::new("/word/document.xml").unwrap();
+            let mut plan = SourceTopologyPlan::new();
+            plan.try_replace_external_relationship(
+                owner.clone(),
+                "rExisting",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+                "https://replacement.invalid/?a=1&b=2",
+            )
+            .unwrap();
+            let mut output = Vec::new();
+            package.write_topology_to_stream(&mut output, plan).unwrap();
+            let archive = soapberry_zip::office::ArchiveReader::new(
+                &output,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .unwrap();
+            assert_eq!(
+                archive.read("word/_rels/document.xml.rels").unwrap(),
+                expected.as_bytes()
+            );
+            let reopened = SourceBackedPackage::from_read_at(
+                Arc::new(CountingSource::new(output)),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .unwrap();
+            let part = reopened.part(&owner).unwrap();
+            assert_eq!(part.rels().len(), 2);
+            assert_eq!(
+                part.rels().get("rExisting").unwrap().target_ref(),
+                "https://replacement.invalid/?a=1&b=2"
+            );
+            assert_eq!(
+                part.rels().get("rInternal").unwrap().target_ref(),
+                "./target.xml"
+            );
+        }
+    }
+
+    #[test]
+    fn topology_noncanonical_relationship_replace_honors_byte_limit_before_output() {
+        let relationships = noncanonical_document_relationships();
+        let limits = SourceLimits::builder()
+            .max_relationship_xml_bytes(relationships.len().max(root_relationships().len()))
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(topology_relationship_archive(
+                relationships,
+            ))),
+            limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_external_relationship(
+            PackURI::new("/word/document.xml").unwrap(),
+            "rExisting",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            format!("https://replacement.invalid/?q={}", "x".repeat(1024)),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Limit {
+                kind: SourceLimitKind::RelationshipXmlBytes,
+                ..
+            }
         ));
         assert!(output.is_empty());
     }

@@ -793,7 +793,7 @@ fn noncanonical_existing_relationships_allow_append_preserving_source() {
 }
 
 #[test]
-fn noncanonical_existing_relationship_replacements_are_refused_before_output() {
+fn noncanonical_existing_relationship_replacements_preserve_source_context() {
     let source = source_bytes(false, true, true);
     let mut plan = SourceTopologyPlan::new();
     plan.try_replace_internal_relationship(
@@ -806,14 +806,31 @@ fn noncanonical_existing_relationship_replacements_are_refused_before_output() {
 
     let package = open(&source);
     let mut output = Vec::new();
-    let error = package
-        .write_topology_to_stream(&mut output, plan)
-        .unwrap_err();
-    assert!(matches!(
-        error,
-        OpcError::SourceBackedOverlayUnavailable { .. }
-    ));
-    assert!(output.is_empty());
+    package.write_topology_to_stream(&mut output, plan).unwrap();
+    let original = zip_member(&source, "word/_rels/document.xml.rels");
+    let expected = std::str::from_utf8(&original)
+        .unwrap()
+        .replace("../custom/existing.xml", "../custom/untouched.xml");
+    assert_eq!(
+        zip_member(&output, "word/_rels/document.xml.rels"),
+        expected.as_bytes()
+    );
+    for name in [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "word/document.xml",
+        "custom/existing.xml",
+        "custom/untouched.xml",
+    ] {
+        assert_eq!(zip_member(&source, name), zip_member(&output, name));
+    }
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
+    let owner = reopened.get_part(&pack("/word/document.xml")).unwrap();
+    assert_eq!(owner.rels().len(), 1);
+    assert_eq!(
+        owner.rels().get("rId1").unwrap().target_partname().unwrap(),
+        pack("/custom/untouched.xml")
+    );
 }
 
 #[test]

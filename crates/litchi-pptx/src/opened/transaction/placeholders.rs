@@ -226,12 +226,6 @@ impl Edit {
                 Some(index),
                 slots.iter().any(|(_, slot)| *slot == index),
             )
-        } else if kind == PlaceholderKind::Subtitle {
-            (
-                kind,
-                None,
-                slots.iter().any(|(found, _)| *found == Some(kind)),
-            )
         } else if let Some((_, slot)) = slots
             .iter()
             .find(|(found, slot)| *found == Some(kind) && *slot != 0)

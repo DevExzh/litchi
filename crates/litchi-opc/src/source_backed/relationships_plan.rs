@@ -443,7 +443,32 @@ fn plan_relationship_publications_inner(
                                 super::overlay_unavailable("relationship event count overflows")
                             })?;
                     },
-                    TopologyRelationshipOperation::Add { reltype, target } => {
+                    TopologyRelationshipOperation::Add { reltype, target }
+                    | TopologyRelationshipOperation::Replace {
+                        reltype, target, ..
+                    } => {
+                        if matches!(
+                            &change.operation,
+                            TopologyRelationshipOperation::Replace { .. }
+                        ) {
+                            ranges.push(super::replaceable_relationship_range(
+                                &parsed,
+                                &original,
+                                &change.r_id,
+                            )?);
+                            let removed = parsed
+                                .relationship_event_counts
+                                .get(&change.r_id)
+                                .ok_or_else(|| {
+                                    super::overlay_unavailable(
+                                        "replacement relationship event count is unavailable",
+                                    )
+                                })?;
+                            removed_events =
+                                removed_events.checked_add(*removed).ok_or_else(|| {
+                                    super::overlay_unavailable("relationship event count overflows")
+                                })?;
+                        }
                         let (target_ref, target_mode) =
                             SourceBackedPackage::topology_relationship_target_ref(
                                 target,
@@ -463,11 +488,6 @@ fn plan_relationship_publications_inner(
                         added_count = added_count.checked_add(1).ok_or_else(|| {
                             super::overlay_unavailable("relationship count overflows")
                         })?;
-                    },
-                    TopologyRelationshipOperation::Replace { .. } => {
-                        return Err(super::overlay_unavailable(
-                            "noncanonical relationship replacement is not source-spliceable",
-                        ));
                     },
                 }
             }

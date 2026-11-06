@@ -1,13 +1,13 @@
 //! Change 0750: every XML member of every OPC package and every loose OOXML
 //! XML part in the repository's `test-data` passes the source publication
-//! audit, except a pinned list of members that are not well-formed XML.
+//! audit, except pinned malformed members and encodings outside its UTF-8 profile.
 //!
 //! A member is audited when publication would audit it:
 //! `xml_minifier::audit::package::is_xml_part(name, media_type)`, with the
 //! media type taken from the package's own content-type map. A new refusal
 //! of a fixture here means either a real producer writes a spelling the audit
 //! should accept, or a fixture is not well-formed; the pinned list says which
-//! members are known to be the latter.
+//! members are known to be malformed or outside the audit's encoding profile.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -25,6 +25,20 @@ use xml_minifier::audit::{self, Limits, package};
 /// Members the source audit refuses, with the refusal, as `(file, member,
 /// error)`. `member` is empty for a loose XML part.
 const REFUSED: &[(&str, &str, &str)] = &[
+    // Native Excel stores its identical DataMashup item as UTF-16LE with
+    // BOM (11,106 bytes, SHA-256 b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9).
+    // This is valid producer XML outside this audit's UTF-8 publication
+    // profile. Source packages retain it without rewriting or refreshing it.
+    (
+        "microsoft-office/excel/excel-connections.xlsx",
+        "customXml/item1.xml",
+        "XML is not UTF-8 at byte 0",
+    ),
+    (
+        "microsoft-office/excel/excel-connections.xlsb",
+        "customXml/item1.xml",
+        "XML is not UTF-8 at byte 0",
+    ),
     // Not UTF-8: a UTF-16 custom XML item and two embedded packages that
     // declare an XML media type.
     (

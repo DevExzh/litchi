@@ -4274,7 +4274,15 @@ fn stage_svg_media_part(
             if target_uri == current_uri {
                 return Err(Error::PartNotFound(target_uri.to_string()));
             }
-            plan.try_add_part(target_uri.clone(), content_type, payload.to_vec())?;
+            if svg {
+                plan.try_add_imported_part_shared(
+                    target_uri.clone(),
+                    content_type,
+                    Arc::new(payload.to_vec()),
+                )?;
+            } else {
+                plan.try_add_part(target_uri.clone(), content_type, payload.to_vec())?;
+            }
         },
         Err(error) => return Err(error.into()),
     }

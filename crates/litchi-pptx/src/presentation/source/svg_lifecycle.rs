@@ -1458,7 +1458,9 @@ fn build_attachment_topology_plan(
                     svg.part_uri.as_str()
                 )));
             }
-            plan.try_add_part_shared(
+            // These bytes come from the caller's image asset, not our XML
+            // serializer. Preserve producer whitespace under the source audit.
+            plan.try_add_imported_part_shared(
                 svg.part_uri.clone(),
                 "image/svg+xml".to_owned(),
                 match &svg.payload {
