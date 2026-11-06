@@ -127,6 +127,10 @@ check typed readback and exact inverse publication. The protected notes fixture
 checks exact no-op behavior and atomic Protected refusal. Public operations
 queries and two-sheet edits run on both Auto and Eager owners.
 
+The public facade adapts the leaf BIFF coordinates to the generic worksheet
+trait: cells and dimensions are one-based, while row iteration stays zero-based.
+Native XLS/XLSX/XLSB tests verify Auto/Eager agreement and grid refusals.
+
 The assertion index is `tools/native_office_tests.json`. These are bounded
 feature assertions, not full feature qualification. Opaque formula tokens and
 inert macro/OLE streams remain distinct from typed expression or payload
@@ -140,3 +144,14 @@ checks every populated-row pointer against the actual cell record boundary.
 Padding does not create extra cell pointers. Layout edits may regenerate a
 compact `INDEX`/`DBCELL` pair; tests validate the rebuilt index and compare all
 records outside that related index and the requested row/column change.
+
+Native form-control tests additionally inventory all eleven BIFF8 controls,
+including the button and the list/dropdown records whose terminal `FtLbsData`
+uses `cbFContinued` rather than an ordinary exact subrecord length. Native
+framing, range-formula tokens, selections, radio groups and control states
+round-trip exactly. Appending checkbox OBJ metadata preserves all eleven
+original records and inverts after save/reopen; it does not author OfficeArt
+widget placement. Continued fragments retain their header and partial state;
+full continuation-chain aggregation remains outside this qualification.
+Boolean/error records and formula caches expose the standard Excel error
+spellings, including the mixed checkbox's stored `#N/A` cell.

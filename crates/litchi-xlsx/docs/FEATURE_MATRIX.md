@@ -164,3 +164,12 @@ unrelated package member and invert after reopen. Filter application is tested
 as an explicit Unsupported result; no refresh or rendering occurs. Selection
 items in slicer cache data remain a retained XML scope, distinct from the
 typed cache/view identities and timeline state.
+
+The native form-controls fixture checks eleven typed controls across eager and
+source-backed readers: identities, stored/default properties, links, ranges,
+selections and spinner/scroll settings. Existing unproven mirror diagnostics
+remain visible. A checked-to-unchecked edit changes exactly the selected
+property attribute and VML mirror, preserving all other members and the
+unchanged linked-cell cache, with exact inverse publication. These assertions
+cover form controls; they do not qualify ActiveX, control execution, linked-cell
+synchronization or native Excel acceptance of the edit.

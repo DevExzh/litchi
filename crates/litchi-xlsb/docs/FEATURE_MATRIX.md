@@ -145,3 +145,10 @@ This is bounded index compatibility, not metadata evaluation.
 The assertion index is `tools/native_office_tests.json`. These tests establish
 only their listed scopes; no Excel reopen, calculation, rendering, refresh,
 macro/control execution or external access was performed.
+
+The native form-controls Save As fixture retains eleven opaque MCE
+compatibility graphic frames and exact DrawingML/VML bytes; it has no
+`ctrlProps` parts. This is pass-through coverage, not typed control properties
+or shape identity. A linked-cache cell edit preserves all other package members.
+Cell-value publication and patch application retain the exact admitted archive
+image so that save/reopen and inverse use the patch's actual after-image.

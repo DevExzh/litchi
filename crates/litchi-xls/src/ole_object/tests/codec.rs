@@ -10,6 +10,72 @@ fn subrecord(kind: u16, body: &[u8]) -> Vec<u8> {
     output
 }
 
+fn terminal_list(header: u16, body: &[u8]) -> Vec<u8> {
+    let mut common = [0; 18];
+    common[..2].copy_from_slice(&ObjectType::List.code().to_le_bytes());
+    common[2..4].copy_from_slice(&7u16.to_le_bytes());
+    let mut data = subrecord(FT_CMO, &common);
+    data.extend_from_slice(&FT_LBS_DATA.to_le_bytes());
+    data.extend_from_slice(&header.to_le_bytes());
+    data.extend_from_slice(body);
+    data
+}
+
+#[test]
+fn lbs_continuation_header_can_exceed_the_terminal_payload_length() {
+    let data = terminal_list(0x1fde, &[0, 0, 3, 0, 2, 0, 0, 0, 0, 0]);
+    let control = FormControl::parse(&data, None).unwrap();
+    let list = control.list_box_data().unwrap();
+    assert_eq!((list.entry_count, list.selected_index), (3, 2));
+    assert_eq!(list.cb_f_continued(), Some(0x1fde));
+    assert!(matches!(
+        control.subrecords.last(),
+        Some(ObjSubrecord::ListBoxData(_))
+    ));
+    assert_eq!(&control.to_record_bytes().unwrap()[4..], data);
+}
+
+#[test]
+fn lbs_partial_framing_and_unmodeled_payloads_keep_their_original_headers() {
+    let mut body = vec![0, 0, 2, 0, 1, 0, 2, 0, 0, 0];
+    body.extend_from_slice(&[1, 0, 0, b'A']);
+    let header = u16::try_from(body.len() - 1).unwrap();
+    let data = terminal_list(header, &body);
+    let control = FormControl::parse(&data, None).unwrap();
+    assert!(control.list_box_data().unwrap().partial);
+    assert_eq!(
+        control.list_box_data().unwrap().cb_f_continued(),
+        Some(header)
+    );
+    assert_eq!(&control.to_record_bytes().unwrap()[4..], data);
+    let raw = terminal_list(0x1fde, &[0xff]);
+    let control = FormControl::parse(&raw, None).unwrap();
+    assert!(control.list_box_data().is_none());
+    assert!(
+        matches!(control.subrecords.last(),Some(ObjSubrecord::RawListBoxData { cb_f_continued:0x1fde,data }) if data==&[0xff])
+    );
+    assert_eq!(&control.to_record_bytes().unwrap()[4..], raw);
+    assert!(control.validate().is_err());
+}
+
+#[test]
+fn empty_lbs_payload_and_present_zero_fields_remain_distinct() {
+    for data in [terminal_list(0, &[]), terminal_list(10, &[0; 10])] {
+        let control = FormControl::parse(&data, None).unwrap();
+        assert_eq!(&control.to_record_bytes().unwrap()[4..], data);
+    }
+}
+
+#[test]
+fn legacy_length_framed_lbs_with_explicit_end_stays_readable() {
+    let mut data = terminal_list(10, &[0, 0, 3, 0, 2, 0, 0, 0, 0, 0]);
+    data.extend(subrecord(FT_END, &[]));
+    let control = FormControl::parse(&data, None).unwrap();
+    assert_eq!(control.list_box_data().unwrap().selected_index, 2);
+    assert!(matches!(control.subrecords.last(), Some(ObjSubrecord::End)));
+    assert_eq!(&control.to_record_bytes().unwrap()[4..], data);
+}
+
 #[test]
 fn ole_obj_round_trip_retains_unknown_and_reserved_bytes() {
     let value = OleObjectRecord {

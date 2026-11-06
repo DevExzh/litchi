@@ -53,57 +53,87 @@ pub(crate) fn parse_subrecords(data: &[u8]) -> Result<Vec<ObjSubrecord>> {
             .get(offset..offset + 4)
             .ok_or_else(|| invalid(OBJ, "truncated Obj subrecord header"))?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
-        let len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        let header_value = u16::from_le_bytes([header[2], header[3]]);
+        let declared = usize::from(header_value);
         offset += 4;
+        // FtLbsData uses cbFContinued, not cb. A complete terminal structure
+        // may advertise more bytes than it occupies; a continued fragment
+        // advertises one less than its current payload size (MS-XLS 2.5.147).
+        // Keep exact-length legacy subrecord framing readable as well.
+        let remaining = data.len() - offset;
+        let terminal_list = kind == FT_LBS_DATA
+            && (declared >= remaining || declared.checked_add(1) == Some(remaining));
+        let len = if terminal_list { remaining } else { declared };
         let end = offset
             .checked_add(len)
             .ok_or_else(|| invalid(OBJ, "Obj subrecord overflow"))?;
         let body = data
             .get(offset..end)
             .ok_or_else(|| invalid(OBJ, "truncated Obj subrecord"))?;
-        let value =
-            match (kind, len) {
-                (FT_CMO, 18) => ObjSubrecord::Common(FtCmo {
-                    object_type: u16::from_le_bytes([body[0], body[1]]),
-                    object_id: u16::from_le_bytes([body[2], body[3]]),
-                    flags: u16::from_le_bytes([body[4], body[5]]),
-                    reserved: array_at(body, 6)
-                        .ok_or_else(|| invalid(OBJ, "FtCmo reserved bytes are truncated"))?,
-                }),
-                (FT_CMO, _) => return Err(invalid(OBJ, "FtCmo must contain 18 bytes")),
-                (FT_CF, 2) => {
-                    let format =
-                        u16_at(body, 0).ok_or_else(|| invalid(OBJ, "FtCf format is truncated"))?;
-                    let value = FtCf::new(format).ok_or_else(|| {
-                        invalid(OBJ, format!("unsupported FtCf format 0x{format:04X}"))
-                    })?;
-                    ObjSubrecord::PictureFormat(value)
-                },
-                (FT_CF, _) => ObjSubrecord::ClipboardFormat(body.to_vec()),
-                (FT_PIO, 2) => ObjSubrecord::PictureFlags(FtPioGrbit {
-                    raw: u16::from_le_bytes([body[0], body[1]]),
-                }),
-                (FT_PIO, _) => return Err(invalid(OBJ, "FtPioGrbit must contain 2 bytes")),
-                (FT_PICT_FMLA, _) => ObjSubrecord::PictureFormula(parse_formula(body)?),
-                // Form-control data subrecords fall back to raw preservation when
-                // their contents do not match the MS-XLS layout.
-                (FT_CBLS_DATA, _) => parse_cbls_data(body)
-                    .map_or_else(|| unknown(kind, body), ObjSubrecord::CheckBoxData),
-                (FT_RBO_DATA, _) => parse_rbo_data(body)
-                    .map_or_else(|| unknown(kind, body), ObjSubrecord::RadioButtonData),
-                (FT_EDO_DATA, _) => parse_edo_data(body)
-                    .map_or_else(|| unknown(kind, body), ObjSubrecord::EditBoxData),
-                (FT_GBO_DATA, _) => parse_gbo_data(body)
-                    .map_or_else(|| unknown(kind, body), ObjSubrecord::GroupBoxData),
-                (FT_SBS, _) => {
-                    parse_sbs(body).map_or_else(|| unknown(kind, body), ObjSubrecord::ScrollBarData)
-                },
-                (FT_LBS_DATA, _) => parse_lbs_data(body, control_type)
-                    .map_or_else(|| unknown(kind, body), ObjSubrecord::ListBoxData),
-                (FT_END, 0) => ObjSubrecord::End,
-                (FT_END, _) => return Err(invalid(OBJ, "FtEnd must be empty")),
-                _ => unknown(kind, body),
-            };
+        let value = match (kind, len) {
+            (FT_CMO, 18) => ObjSubrecord::Common(FtCmo {
+                object_type: u16::from_le_bytes([body[0], body[1]]),
+                object_id: u16::from_le_bytes([body[2], body[3]]),
+                flags: u16::from_le_bytes([body[4], body[5]]),
+                reserved: array_at(body, 6)
+                    .ok_or_else(|| invalid(OBJ, "FtCmo reserved bytes are truncated"))?,
+            }),
+            (FT_CMO, _) => return Err(invalid(OBJ, "FtCmo must contain 18 bytes")),
+            (FT_CF, 2) => {
+                let format =
+                    u16_at(body, 0).ok_or_else(|| invalid(OBJ, "FtCf format is truncated"))?;
+                let value = FtCf::new(format).ok_or_else(|| {
+                    invalid(OBJ, format!("unsupported FtCf format 0x{format:04X}"))
+                })?;
+                ObjSubrecord::PictureFormat(value)
+            },
+            (FT_CF, _) => ObjSubrecord::ClipboardFormat(body.to_vec()),
+            (FT_PIO, 2) => ObjSubrecord::PictureFlags(FtPioGrbit {
+                raw: u16::from_le_bytes([body[0], body[1]]),
+            }),
+            (FT_PIO, _) => return Err(invalid(OBJ, "FtPioGrbit must contain 2 bytes")),
+            (FT_PICT_FMLA, _) => ObjSubrecord::PictureFormula(parse_formula(body)?),
+            // Form-control data subrecords fall back to raw preservation when
+            // their contents do not match the MS-XLS layout.
+            (FT_CBLS_DATA, _) => parse_cbls_data(body)
+                .map_or_else(|| unknown(kind, body), ObjSubrecord::CheckBoxData),
+            (FT_RBO_DATA, _) => parse_rbo_data(body)
+                .map_or_else(|| unknown(kind, body), ObjSubrecord::RadioButtonData),
+            (FT_EDO_DATA, _) => {
+                parse_edo_data(body).map_or_else(|| unknown(kind, body), ObjSubrecord::EditBoxData)
+            },
+            (FT_GBO_DATA, _) => {
+                parse_gbo_data(body).map_or_else(|| unknown(kind, body), ObjSubrecord::GroupBoxData)
+            },
+            (FT_SBS, _) => {
+                parse_sbs(body).map_or_else(|| unknown(kind, body), ObjSubrecord::ScrollBarData)
+            },
+            (FT_LBS_DATA, _) => {
+                let parsed = if body.is_empty() && header_value != 0 {
+                    None
+                } else {
+                    parse_lbs_data(body, control_type)
+                };
+                match parsed {
+                    Some(mut value) => {
+                        if terminal_list && (declared != len || (len > 0 && value.is_vacant())) {
+                            let continued = declared < len;
+                            value.source_header = Some((header_value, continued));
+                            value.partial |= continued;
+                        }
+                        ObjSubrecord::ListBoxData(value)
+                    },
+                    None if terminal_list => ObjSubrecord::RawListBoxData {
+                        cb_f_continued: header_value,
+                        data: body.to_vec(),
+                    },
+                    None => unknown(kind, body),
+                }
+            },
+            (FT_END, 0) => ObjSubrecord::End,
+            (FT_END, _) => return Err(invalid(OBJ, "FtEnd must be empty")),
+            _ => unknown(kind, body),
+        };
         if let ObjSubrecord::Common(common) = &value {
             control_type = Some(common.object_type);
         }
@@ -378,8 +408,19 @@ pub(super) fn serialize_subrecords(subrecords: &[ObjSubrecord]) -> Result<Vec<u8
     let mut output = Vec::new();
     for value in subrecords {
         let (kind, body) = serialize_subrecord(value)?;
-        let len = u16::try_from(body.len())
+        let body_len = u16::try_from(body.len())
             .map_err(|_error| invalid(kind, "Obj subrecord exceeds u16"))?;
+        let len = match value {
+            ObjSubrecord::ListBoxData(value) => match value.source_header {
+                Some((_, true)) => body_len
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid(kind, "continued FtLbsData has no payload"))?,
+                Some((source, false)) => source.max(body_len),
+                None => body_len,
+            },
+            ObjSubrecord::RawListBoxData { cb_f_continued, .. } => *cb_f_continued,
+            _ => body_len,
+        };
         output.extend_from_slice(&kind.to_le_bytes());
         output.extend_from_slice(&len.to_le_bytes());
         output.extend_from_slice(&body);
@@ -506,6 +547,7 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
                 (FT_LBS_DATA, body)
             }
         },
+        ObjSubrecord::RawListBoxData { data, .. } => (FT_LBS_DATA, data.clone()),
         ObjSubrecord::Unknown { kind, data } => (*kind, data.clone()),
         ObjSubrecord::End => (FT_END, Vec::new()),
     })

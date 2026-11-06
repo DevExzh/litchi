@@ -343,7 +343,7 @@ fn typed_node_coordinates_are_zero_based_against_one_based_paths() {
     use litchi_core::sheet::WorkbookTrait;
 
     let files = both(&fixture("xlsb/Simple.xlsb"));
-    for (owner, file) in files.iter().enumerate() {
+    for file in &files {
         let workbook = file.workbook().expect("workbook view");
         let worksheet = WorkbookTrait::worksheet_by_index(&workbook, 0).expect("first sheet");
 
@@ -358,12 +358,11 @@ fn typed_node_coordinates_are_zero_based_against_one_based_paths() {
             _ => panic!("XLSB path returned a different node variant"),
         };
         assert_eq!(typed_b2, (1, 1));
-        // The compatibility trait still exposes the legacy source/eager
-        // coordinate split; the unified node above has one stable basis.
+        // The generic worksheet trait has the same one-based contract for
+        // both owner states; typed node coordinates remain zero-based.
         assert_eq!(
-            worksheet.cell_value(0, 0).is_err(),
-            owner == 0,
-            "legacy worksheet coordinate policy differs by owner"
+            worksheet.cell_value(0, 0).unwrap_err().code(),
+            Code::OutOfRange
         );
         assert_eq!(a1.path().to_string(), "/sheet[1]/A1");
         assert_eq!(b2.path().to_string(), "/sheet[1]/B2");

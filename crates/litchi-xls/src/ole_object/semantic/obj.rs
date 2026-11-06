@@ -124,7 +124,8 @@ impl ObjectType {
     pub const fn is_form_control(self) -> bool {
         matches!(
             self,
-            Self::CheckBox
+            Self::Button
+                | Self::CheckBox
                 | Self::RadioButton
                 | Self::EditBox
                 | Self::Label
@@ -220,6 +221,12 @@ pub enum ObjSubrecord {
     GroupBoxData(FtGboData),
     ScrollBarData(FtSbs),
     ListBoxData(FtLbsData),
+    /// A terminal FtLbsData payload outside the typed profile. Its second
+    /// header field is continuation metadata, not an ordinary body length.
+    RawListBoxData {
+        cb_f_continued: u16,
+        data: Vec<u8>,
+    },
     /// A record kind not modeled by this crate; its bytes remain untouched.
     Unknown {
         kind: u16,

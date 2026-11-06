@@ -240,15 +240,7 @@ fn workbook_trait_surface_matches_across_owner_states() {
             (Some(left), Some(right)) => {
                 let (left, right) = (left.unwrap(), right.unwrap());
                 assert_eq!(left.name(), right.name());
-                // Carried over verbatim from the facade: the source-backed
-                // adapter reports one-based bounds and takes one-based cell
-                // coordinates, while the eager leaf owner is zero-based.
-                assert_eq!(
-                    left.dimensions(),
-                    right
-                        .dimensions()
-                        .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1))
-                );
+                assert_eq!(left.dimensions(), right.dimensions());
                 assert_eq!(left.row_count(), right.row_count());
                 for row in 0..right.row_count() {
                     assert_eq!(left.row(row).unwrap(), right.row(row).unwrap());
@@ -257,11 +249,11 @@ fn workbook_trait_surface_matches_across_owner_states() {
                 for right in right.cells() {
                     let (left, right) = (left_cells.next().unwrap().unwrap(), right.unwrap());
                     assert_eq!(left.value(), right.value());
-                    assert_eq!(left.row(), right.row() + 1);
+                    assert_eq!(left.row(), right.row());
                 }
                 assert_eq!(
                     left.cell_value(1, 1).unwrap(),
-                    right.cell_value(0, 0).unwrap()
+                    right.cell_value(1, 1).unwrap()
                 );
             },
             _ => panic!("worksheet iterators differ in length"),

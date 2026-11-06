@@ -41,16 +41,52 @@ impl FormControl {
         {
             return Err(invalid(OBJ, "form-control Obj requires exactly one FtCmo"));
         }
-        if self
+        let end_count = self
             .subrecords
             .iter()
             .filter(|value| matches!(value, ObjSubrecord::End))
-            .count()
-            != 1
-        {
-            return Err(invalid(OBJ, "form-control Obj requires exactly one FtEnd"));
+            .count();
+        let list_terminated = matches!(object_type, ObjectType::List | ObjectType::DropDown)
+            && matches!(
+                self.subrecords.last(),
+                Some(ObjSubrecord::ListBoxData(_) | ObjSubrecord::RawListBoxData { .. })
+            );
+        if matches!(object_type, ObjectType::List | ObjectType::DropDown) && !list_terminated {
+            let legacy_end = matches!(self.subrecords.last(), Some(ObjSubrecord::End))
+                && self
+                    .subrecords
+                    .len()
+                    .checked_sub(2)
+                    .and_then(|i| self.subrecords.get(i))
+                    .is_some_and(|record| {
+                        matches!(
+                            record,
+                            ObjSubrecord::ListBoxData(_)
+                                | ObjSubrecord::RawListBoxData { .. }
+                                | ObjSubrecord::Unknown {
+                                    kind: FT_LBS_DATA,
+                                    ..
+                                }
+                        )
+                    });
+            if !legacy_end {
+                return Err(invalid(
+                    OBJ,
+                    "list/dropdown Obj requires terminal FtLbsData",
+                ));
+            }
         }
-        if !matches!(self.subrecords.last(), Some(ObjSubrecord::End)) {
+        if end_count != usize::from(!list_terminated) {
+            return Err(invalid(
+                OBJ,
+                if list_terminated {
+                    "terminal FtLbsData cannot follow FtEnd"
+                } else {
+                    "form-control Obj requires exactly one FtEnd"
+                },
+            ));
+        }
+        if !list_terminated && !matches!(self.subrecords.last(), Some(ObjSubrecord::End)) {
             return Err(invalid(OBJ, "form-control Obj must end with FtEnd"));
         }
 
@@ -140,7 +176,7 @@ impl FormControl {
                     ObjectType::List if data.drop_down.is_some() => {
                         return Err(invalid(OBJ, "list Obj cannot contain LbsDropData"));
                     },
-                    ObjectType::DropDown if data.drop_down.is_none() => {
+                    ObjectType::DropDown if data.drop_down.is_none() && !data.is_vacant() => {
                         return Err(invalid(OBJ, "dropdown Obj requires LbsDropData"));
                     },
                     _ => {},
@@ -151,7 +187,7 @@ impl FormControl {
                     return Err(invalid(OBJ, "group-box Obj requires exactly one FtGboData"));
                 }
             },
-            ObjectType::Label | ObjectType::DialogBox => {},
+            ObjectType::Button | ObjectType::Label | ObjectType::DialogBox => {},
             _ => return Err(invalid(OBJ, "unsupported worksheet form-control type")),
         }
         Ok(())

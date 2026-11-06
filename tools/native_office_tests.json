@@ -4037,6 +4037,113 @@
         "Changed first-paragraph text saves/reopens with the same PICF hints, floating shape identities, resource kinds/hashes and explicit empty descriptor, and inverts to exact original bytes."
       ],
       "scope_limit": "Body text edit and correct anchor relocation only; no native image replacement or group-child resource editing."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_controls",
+      "name": "native_excel_form_controls_include_all_eleven_obj_records",
+      "fixtures": [
+        "excel/excel-form-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-184"
+      ],
+      "assertions": [
+        "All eleven native control IDs and exact OBJ record bytes; checkbox/radio states and radio ring, list/drop selections and range tokens, cbFContinued=0x1fde, native dropdown padding, spinner/scroll settings, and button admission."
+      ],
+      "scope_limit": "Inert BIFF control metadata only; list formulas remain tokens. No widget placement, linked-cell evaluation, continuation-chain aggregation or control activation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_controls",
+      "name": "native_control_metadata_append_preserves_all_original_obj_bytes",
+      "fixtures": [
+        "excel/excel-form-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-184"
+      ],
+      "assertions": [
+        "Append checkbox OBJ metadata, save/reopen twelve controls, retain all eleven original OBJ records byte for byte, and restore the exact original archive through the inverse."
+      ],
+      "scope_limit": "Metadata append does not author an OfficeArt widget placement or establish native Excel acceptance."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_controls",
+      "name": "native_form_control_owners_expose_all_eleven_stored_states_and_bindings",
+      "fixtures": [
+        "excel/excel-form-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-256",
+        "xlsx-258"
+      ],
+      "assertions": [
+        "Eager/source inventories agree on eleven names, shape IDs, types, stored checkbox/radio states, links/ranges, range-backed absent item lists, spinner/scroll limits/defaults and label binding; individual unproven mirror diagnostics remain visible."
+      ],
+      "scope_limit": "Form controls only; no ActiveX payload evidence. Properties/defaults are metadata, not live control behavior or calculated linked values."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_controls",
+      "name": "native_checkbox_scalar_edit_preserves_cells_and_unrelated_controls",
+      "fixtures": [
+        "excel/excel-form-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-256",
+        "xlsx-258"
+      ],
+      "assertions": [
+        "Checked-to-unchecked edit changes exactly one property attribute and its VML Checked mirror, survives temporary save/reopen, preserves all other members including worksheet caches, and inverts to the exact source archive."
+      ],
+      "scope_limit": "One supported scalar on one control; no linked-cell synchronization, new controls, multi-control editing, ActiveX or native application reopen."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_form_control_drawing_mirrors_survive_inert_cell_edits",
+      "fixtures": [
+        "excel/excel-form-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-311",
+        "xlsb-280"
+      ],
+      "assertions": [
+        "Eleven opaque compatibility drawing wrappers and exact drawing/VML hashes, absent ctrlProps/ActiveX, B5 cache edit 5 to 9 changes only sheet1.bin, and patch images match serialized archives before exact inverse after reopen."
+      ],
+      "scope_limit": "XLSB Save As uses compatibility graphic frames; typed control identity/properties are not claimed. Drawing/VML pass-through is inert and linked controls are not refreshed."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_excel_form_link_cells_keep_cached_values_across_all_three_formats",
+      "fixtures": [
+        "excel/excel-form-controls.xls",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-form-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xlsx-202",
+        "xlsb-280"
+      ],
+      "assertions": [
+        "Auto/Eager facade views read exact native boolean, five numeric and #N/A linked caches; one-based direct/A1/iterator cell coordinates and dimensions agree, invalid coordinates fail, D10 query resolves OPTION_B_008 and no-op archives remain intact."
+      ],
+      "scope_limit": "Stored caches only; no control or formula evaluation. Leaf BIFF APIs retain their existing zero-based coordinates; this qualifies the generic facade adapter.",
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "ppt",
+        "pptx"
+      ]
     }
   ]
 }

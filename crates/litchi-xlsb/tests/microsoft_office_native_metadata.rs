@@ -13,6 +13,72 @@ fn native(name: &str) -> Vec<u8> {
     .unwrap()
 }
 
+#[test]
+fn native_form_control_drawing_mirrors_survive_inert_cell_edits() {
+    let bytes = native("excel-form-controls.xlsb");
+    let package = Package::from_bytes(&bytes).unwrap();
+    let elements = package.workbook().unwrap().drawing_elements(0).unwrap();
+    assert_eq!(elements.len(), 11);
+    // Excel's XLSB derivative carries MCE compatibility graphic frames,
+    // not the XLSX xdr:sp controls. The generic drawing owner retains each
+    // wrapper as opaque rather than inventing a selected shape identity.
+    assert!(
+        elements
+            .iter()
+            .all(|e| e.kind == litchi_xlsb::drawing::edit::ElementKind::Other
+                && e.id.is_none()
+                && e.name.is_none())
+    );
+    let parts = members(&bytes);
+    use sha2::{Digest, Sha256};
+    let digest = |data: &[u8]| {
+        Sha256::digest(data)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    };
+    assert_eq!(
+        digest(&parts["xl/drawings/drawing1.xml"]),
+        "031fc3826b614f6df90b7b20f665ae974589c163f832af370bb6ad233a22d49c"
+    );
+    assert_eq!(
+        digest(&parts["xl/drawings/vmlDrawing1.vml"]),
+        "622a97e86fcb0abed36496f4ed67f46ca361194f50c032d12003f318a7032215"
+    );
+    // Native XLSB keeps drawing/VML mirrors but does not carry x14 ctrlProps.
+    assert!(
+        members(&bytes)
+            .keys()
+            .all(|name| !name.starts_with("xl/ctrlProps/") && !name.starts_with("xl/activeX/"))
+    );
+    let mut edit = package.edit_cell_values("Sheet1").unwrap();
+    edit.set_number(litchi_xlsb::cell_values::Reference::new(4, 1).unwrap(), 9.0)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let output = commit.package().to_bytes().unwrap();
+    assert_preserved_except(&bytes, &output, &["xl/worksheets/sheet1.bin"]);
+    let reopened = Package::from_bytes(&output).unwrap();
+    assert!(commit.patch().before() == bytes);
+    assert!(commit.patch().after() == output);
+    let after = reopened.workbook().unwrap().drawing_elements(0).unwrap();
+    assert_eq!(after, elements);
+    let workbook = Workbook::new(Cursor::new(output)).unwrap();
+    assert_eq!(
+        cached_number(workbook.worksheet(0).unwrap().get_cell(4, 1).unwrap()),
+        9.0
+    );
+    assert!(
+        reopened
+            .apply_cell_values(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == bytes
+    );
+    assert!(package.to_bytes().unwrap() == bytes);
+}
+
 fn members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
     let reader = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
         bytes.to_vec(),

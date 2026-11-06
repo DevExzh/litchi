@@ -342,9 +342,18 @@ pub struct FtLbsData {
     /// This is deliberately not public: authored values must be complete, but
     /// parsed values retain enough state to round-trip a partial wire payload.
     pub(crate) partial: bool,
+    /// Source framing needed for lossless publication and whether it announces
+    /// more bytes in a Continue record. Inferred canonical framing needs no tag.
+    pub(crate) source_header: Option<(u16, bool)>,
 }
 
 impl FtLbsData {
+    /// Original continuation header when source framing needs explicit retention.
+    #[must_use]
+    pub fn cb_f_continued(&self) -> Option<u16> {
+        self.source_header.map(|v| v.0)
+    }
+
     /// Creates complete list metadata from already encoded item values.
     /// # Errors
     ///
@@ -447,6 +456,9 @@ impl FtLbsData {
         self.flags |= super::super::LBS_VALID_PLEX;
         self.items = replacement.items;
         self.partial = false;
+        if self.source_header.is_some_and(|(_, continued)| continued) {
+            self.source_header = None;
+        }
         self.trailing.clear();
         if self.selection_type() == ListSelectionType::Single {
             self.multi_selection.clear();
@@ -484,6 +496,7 @@ impl FtLbsData {
             && self.multi_selection.is_empty()
             && self.trailing.is_empty()
             && !self.partial
+            && self.source_header.is_none_or(|(value, _)| value == 0)
     }
 }
 
@@ -512,7 +525,15 @@ impl FormControl {
             reserved: [0; 12],
         }));
         subrecords.extend(payload);
-        if !matches!(subrecords.last(), Some(super::obj::ObjSubrecord::End)) {
+        if matches!(
+            object_type,
+            super::obj::ObjectType::List | super::obj::ObjectType::DropDown
+        ) {
+            // FtLbsData is terminal for these two control families.
+            if matches!(subrecords.last(), Some(super::obj::ObjSubrecord::End)) {
+                subrecords.pop();
+            }
+        } else if !matches!(subrecords.last(), Some(super::obj::ObjSubrecord::End)) {
             subrecords.push(super::obj::ObjSubrecord::End);
         }
         Self {

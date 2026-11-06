@@ -252,7 +252,7 @@ fn assert_workbook_trait_surface(workbook: &impl WorkbookTrait<Error = Error>) {
 
     assert_eq!(by_name.row_count(), 2);
     assert_eq!(by_name.column_count(), 2);
-    assert_eq!(by_name.dimensions(), Some((0, 0, 1, 1)));
+    assert_eq!(by_name.dimensions(), Some((1, 1, 2, 2)));
     assert_eq!(
         by_name.cell_value(1, 1).unwrap().as_ref(),
         &CellValue::Int(7)

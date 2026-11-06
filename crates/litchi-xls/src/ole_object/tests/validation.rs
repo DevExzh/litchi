@@ -116,12 +116,39 @@ fn ole_obj_rejects_all_control_specific_subrecords() {
         }),
         ObjSubrecord::ScrollBarData(valid_sbs()),
         ObjSubrecord::ListBoxData(FtLbsData::default()),
+        ObjSubrecord::RawListBoxData {
+            cb_f_continued: 0x1fde,
+            data: vec![0xff],
+        },
     ];
     for control_subrecord in control_subrecords {
         let mut value = embedded_object(embedded_formula(), Some(1), None);
         value.subrecords.insert(3, control_subrecord);
         assert!(value.validate().is_err());
     }
+}
+
+#[test]
+fn list_authoring_uses_its_terminal_data_and_button_metadata_is_admitted() {
+    let list = FormControl::new(
+        ObjectType::List,
+        42,
+        [
+            ObjSubrecord::ScrollBarData(valid_sbs()),
+            ObjSubrecord::ListBoxData(FtLbsData::from_texts(["one"]).unwrap()),
+        ],
+    );
+    list.validate().unwrap();
+    assert!(matches!(
+        list.subrecords.last(),
+        Some(ObjSubrecord::ListBoxData(_))
+    ));
+    let button = FormControl::new(ObjectType::Button, 43, []);
+    button.validate().unwrap();
+    assert_eq!(
+        FormControl::parse(&button.to_record_bytes().unwrap()[4..], None).unwrap(),
+        button
+    );
 }
 
 #[test]

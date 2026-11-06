@@ -910,7 +910,10 @@ impl Patch {
             return Ok(package.clone());
         }
         crate::signature_policy::ensure_unsigned(package.opc_package())?;
-        let candidate = OpcPackage::from_bytes(&self.after, package.opc_package().read_limits())?;
+        // The patch owns an exact archive image. Retain that archive at
+        // ingress so subsequent save/reopen and inverse use the same bytes.
+        let candidate =
+            OpcPackage::from_vec(self.after.to_vec(), package.opc_package().read_limits())?;
         let workbook = package.project_candidate(candidate)?;
         super::structure::validate_all_worksheets(&workbook)?;
         Ok(Package::from_validated_workbook(workbook))
@@ -1113,7 +1116,7 @@ fn publish_validated_workbook(
     // package retains it, so a consuming projection never points at the
     // pre-admission OPC graph.
     let after = serialize_opc_package(&workbook.package, image_budget)?;
-    let admitted = OpcPackage::from_bytes(&after, base.opc_package().read_limits())?;
+    let admitted = OpcPackage::from_vec(after.clone(), base.opc_package().read_limits())?;
     workbook.package = admitted;
     Ok((Package::from_validated_workbook(workbook), after))
 }

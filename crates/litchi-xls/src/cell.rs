@@ -9,6 +9,19 @@ use crate::utils;
 use litchi_core::sheet::{Cell as CellTrait, CellValue};
 use std::sync::Arc;
 
+fn error_text(code: u8) -> String {
+    match code {
+        0x00 => "#NULL!".into(),
+        0x07 => "#DIV/0!".into(),
+        0x0f => "#VALUE!".into(),
+        0x17 => "#REF!".into(),
+        0x1d => "#NAME?".into(),
+        0x24 => "#NUM!".into(),
+        0x2a => "#N/A".into(),
+        _ => format!("Error {code}"),
+    }
+}
+
 /// XLS cell implementation
 #[derive(Debug, Clone)]
 pub struct Cell {
@@ -113,7 +126,7 @@ impl Cell {
             } => {
                 let cell_value = match value {
                     BoolErrValue::Bool(b) => CellValue::Bool(*b),
-                    BoolErrValue::Error(e) => CellValue::Error(format!("Error {e}")),
+                    BoolErrValue::Error(e) => CellValue::Error(error_text(*e)),
                 };
                 (u32::from(*row), u32::from(*col), cell_value, None, None)
             },
@@ -160,7 +173,7 @@ impl Cell {
                     FormulaValue::StringPending => CellValue::Empty,
                     FormulaValue::String(s) => CellValue::String(s.clone()),
                     FormulaValue::Bool(b) => CellValue::Bool(*b),
-                    FormulaValue::Error(e) => CellValue::Error(format!("Error {e}")),
+                    FormulaValue::Error(e) => CellValue::Error(error_text(*e)),
                     FormulaValue::Empty => CellValue::Empty,
                 };
 
@@ -322,6 +335,42 @@ mod tests {
     use super::*;
     use crate::formula::FormulaContext;
     use crate::records::{BoolErrValue, CellRecord, FormulaValue};
+
+    #[test]
+    fn error_records_and_formula_caches_use_excel_spellings() {
+        for (code, expected) in [
+            (0, "#NULL!"),
+            (7, "#DIV/0!"),
+            (15, "#VALUE!"),
+            (23, "#REF!"),
+            (29, "#NAME?"),
+            (36, "#NUM!"),
+            (42, "#N/A"),
+            (255, "Error 255"),
+        ] {
+            for record in [
+                CellRecord::BoolErr {
+                    row: 1,
+                    col: 1,
+                    xf_index: 0,
+                    value: BoolErrValue::Error(code),
+                },
+                CellRecord::Formula {
+                    row: 1,
+                    col: 1,
+                    xf_index: 0,
+                    value: FormulaValue::Error(code),
+                    metadata: Metadata::default(),
+                    formula: vec![0x1c, code],
+                },
+            ] {
+                assert_eq!(
+                    Cell::from_record(&record, None).unwrap().value(),
+                    &CellValue::Error(expected.into())
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_new_cell() {

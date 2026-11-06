@@ -64,6 +64,9 @@ macro_rules! each {
 }
 
 /// One worksheet of a workbook, borrowed from its handle for `'a`.
+///
+/// Cell positions and dimension bounds are one-based across formats and owner
+/// states. Row indices for `row()` remain zero-based as the generic trait defines.
 pub struct Worksheet<'a>(SheetInner<'a>);
 
 enum SheetInner<'a> {
@@ -244,8 +247,8 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
     #[inline]
     fn column(&self) -> u32 {
         match self {
-            Self::Cell(cell) => cell.column(),
-            Self::Absent { column, .. } => *column,
+            Self::Cell(cell) => cell.column() + 1,
+            Self::Absent { column, .. } => *column + 1,
         }
     }
 
@@ -284,8 +287,8 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
     #[inline]
     fn row(&self) -> u32 {
         match self {
-            Self::Cell(cell) => cell.row(),
-            Self::Absent { row, .. } => *row,
+            Self::Cell(cell) => cell.row() + 1,
+            Self::Absent { row, .. } => *row + 1,
         }
     }
 
@@ -375,6 +378,25 @@ impl<'a> Iterator for Rows<'a> {
     }
 }
 
+// Leaf BIFF APIs retain zero-based coordinates; the generic worksheet
+// contract uses one-based cells. Validate before subtracting or reading.
+#[cfg(any(feature = "xls", feature = "xlsb"))]
+fn biff_cell(row: u32, column: u32, format: litchi_core::FileFormat) -> Result<(u32, u32)> {
+    let (rows, columns) = if format == litchi_core::FileFormat::Xls {
+        (65_536, 256)
+    } else {
+        (1_048_576, 16_384)
+    };
+    if !(1..=rows).contains(&row) || !(1..=columns).contains(&column) {
+        return Err(crate::Error::new(
+            crate::Code::OutOfRange,
+            "worksheet cell coordinates are outside the one-based grid",
+        )
+        .with_format(format));
+    }
+    Ok((row - 1, column - 1))
+}
+
 impl CoreWorksheet for Worksheet<'_> {
     type Error = crate::Error;
     type Cell<'b>
@@ -399,10 +421,12 @@ impl CoreWorksheet for Worksheet<'_> {
             SheetInner::XlsbSource(sheet) => CellInner::XlsbSource(sheet.cell(row, column)?),
             #[cfg(feature = "xlsb")]
             SheetInner::XlsbEager(sheet) => {
+                let (row, column) = biff_cell(row, column, litchi_core::FileFormat::Xlsb)?;
                 CellInner::XlsbEager(Stored::at(sheet.get_cell(row, column), row, column))
             },
             #[cfg(feature = "xls")]
             SheetInner::Xls(sheet) => {
+                let (row, column) = biff_cell(row, column, litchi_core::FileFormat::Xls)?;
                 CellInner::Xls(Stored::at(sheet.get_cell(row, column), row, column))
             },
             SheetInner::Never(never, _) => match *never {},
@@ -437,7 +461,23 @@ impl CoreWorksheet for Worksheet<'_> {
     )]
     #[inline]
     fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
-        each!(SheetInner, &self.0, sheet => sheet.cell_value(row, column).map_err(Into::into), SheetInner::Never(never, _) => match *never {})
+        match &self.0 {
+            #[cfg(feature = "xlsx")]
+            SheetInner::Xlsx(sheet) => sheet.cell_value(row, column),
+            #[cfg(feature = "xlsb")]
+            SheetInner::XlsbSource(sheet) => sheet.cell_value(row, column),
+            #[cfg(feature = "xlsb")]
+            SheetInner::XlsbEager(sheet) => {
+                let (row, column) = biff_cell(row, column, litchi_core::FileFormat::Xlsb)?;
+                sheet.cell_value(row, column).map_err(Into::into)
+            },
+            #[cfg(feature = "xls")]
+            SheetInner::Xls(sheet) => {
+                let (row, column) = biff_cell(row, column, litchi_core::FileFormat::Xls)?;
+                sheet.cell_value(row, column).map_err(Into::into)
+            },
+            SheetInner::Never(never, _) => match *never {},
+        }
     }
 
     fn cells(&self) -> Cells<'_> {
@@ -459,7 +499,23 @@ impl CoreWorksheet for Worksheet<'_> {
     }
 
     fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
-        each!(SheetInner, &self.0, sheet => sheet.dimensions(), SheetInner::Never(never, _) => match *never {})
+        match &self.0 {
+            #[cfg(feature = "xlsx")]
+            SheetInner::Xlsx(sheet) => sheet
+                .dimensions()
+                .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1)),
+            #[cfg(feature = "xlsb")]
+            SheetInner::XlsbSource(sheet) => sheet.dimensions(),
+            #[cfg(feature = "xlsb")]
+            SheetInner::XlsbEager(sheet) => sheet
+                .dimensions()
+                .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1)),
+            #[cfg(feature = "xls")]
+            SheetInner::Xls(sheet) => sheet
+                .dimensions()
+                .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1)),
+            SheetInner::Never(never, _) => match *never {},
+        }
     }
 
     fn name(&self) -> &str {

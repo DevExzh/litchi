@@ -128,6 +128,7 @@ fn validate_subrecord_owner(value: &ObjSubrecord, object_type: u16) -> Result<()
             "FtSbs",
         ),
         ObjSubrecord::ListBoxData(_)
+        | ObjSubrecord::RawListBoxData { .. }
         | ObjSubrecord::Unknown {
             kind: FT_LBS_DATA, ..
         } => (matches!(object_type, 0x0012 | 0x0014), "FtLbsData"),

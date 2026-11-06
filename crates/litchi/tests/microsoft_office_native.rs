@@ -558,6 +558,104 @@ fn native_legacy_word_embedded_worksheets_open_as_inert_xlsx_children() {
 }
 
 #[test]
+fn native_excel_form_link_cells_keep_cached_values_across_all_three_formats() {
+    use litchi::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
+    for (name, format) in [
+        ("excel/excel-form-controls.xls", FileFormat::Xls),
+        ("excel/excel-form-controls.xlsx", FileFormat::Xlsx),
+        ("excel/excel-form-controls.xlsb", FileFormat::Xlsb),
+    ] {
+        for mode in [litchi::SourceMode::Auto, litchi::SourceMode::Eager] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/microsoft-office")
+                .join(name);
+            let file =
+                litchi::open_with(path, &litchi::OpenOptions::new().source_mode(mode)).unwrap();
+            assert_eq!(file.format(), Some(format));
+            let before = file.to_bytes().unwrap();
+            let book = file.workbook().unwrap();
+            assert_eq!(book.worksheet_names().unwrap(), ["Sheet1"]);
+            let sheet = WorkbookTrait::worksheet_by_index(&book, 0).unwrap();
+            assert_eq!(sheet.dimensions(), Some((1, 1, 12, 4)));
+            assert_eq!(
+                sheet.cell_value(2, 2).unwrap().as_ref(),
+                &CellValue::Bool(true),
+                "{name} {mode:?}"
+            );
+            for (row, value) in [(3, 2), (4, 3), (5, 5), (6, 10), (7, 2)] {
+                match sheet.cell_value(row, 2).unwrap().as_ref() {
+                    CellValue::Float(number) => assert_eq!(*number, f64::from(value)),
+                    CellValue::Int(number) => assert_eq!(*number, i64::from(value)),
+                    other => panic!("unexpected linked value in {name}: {other:?}"),
+                }
+            }
+            assert_eq!(
+                sheet.cell_value(12, 2).unwrap().as_ref(),
+                &CellValue::Error("#N/A".into())
+            );
+            for cell in [
+                sheet.cell(2, 2).unwrap(),
+                sheet.cell_by_coordinate("B2").unwrap(),
+            ] {
+                assert_eq!(
+                    (cell.row(), cell.column(), cell.coordinate()),
+                    (2, 2, "B2".into())
+                );
+                assert_eq!(cell.value(), &CellValue::Bool(true));
+            }
+            let empty = sheet.cell(8, 3).unwrap();
+            assert_eq!(
+                (empty.row(), empty.column(), empty.coordinate()),
+                (8, 3, "C8".into())
+            );
+            assert!(empty.is_empty());
+            for cell in sheet.cells() {
+                let cell = cell.unwrap();
+                assert_eq!(
+                    sheet
+                        .cell_value(cell.row(), cell.column())
+                        .unwrap()
+                        .as_ref(),
+                    cell.value()
+                );
+                assert_eq!(
+                    sheet
+                        .cell_by_coordinate(&cell.coordinate())
+                        .unwrap()
+                        .value(),
+                    cell.value()
+                );
+            }
+            let (rows, columns) = if format == FileFormat::Xls {
+                (65_536, 256)
+            } else {
+                (1_048_576, 16_384)
+            };
+            for (row, col) in [(0, 1), (1, 0), (rows + 1, 1), (1, columns + 1)] {
+                assert_eq!(
+                    sheet.cell(row, col).unwrap_err().code(),
+                    litchi::Code::OutOfRange
+                );
+                assert_eq!(
+                    sheet.cell_value(row, col).unwrap_err().code(),
+                    litchi::Code::OutOfRange
+                );
+            }
+            assert_eq!(
+                file.get("Sheet1!D10")
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some("OPTION_B_008")
+            );
+            assert!(file.to_bytes().unwrap() == before);
+        }
+    }
+}
+
+#[test]
 fn native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_edit() {
     use litchi::pptx::presentation::embedded::ole::slide;
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
