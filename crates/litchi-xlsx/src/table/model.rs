@@ -440,7 +440,7 @@ pub fn validate_table(table: &Table) -> Result<()> {
         bounded_text(&sort_state.ref_range, "table sortState reference")?;
         for condition in &sort_state.conditions {
             ensure_range_contains(
-                &sort_state.ref_range,
+                auto_filter_range,
                 &condition.ref_range,
                 "table sort condition reference",
             )?;

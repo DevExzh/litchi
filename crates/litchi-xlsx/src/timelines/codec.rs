@@ -242,7 +242,10 @@ pub(super) struct Node {
 
 /// Parse one MS-XLSX View Cache part.
 pub fn parse_timeline_cache_definition(xml: &[u8]) -> Result<CacheDefinition> {
-    let root = parse_document(xml)?;
+    parse_timeline_cache_definition_limited(xml, &litchi_opc::SourceLimits::default())
+}
+
+fn parse_cache_root(root: Node) -> Result<CacheDefinition> {
     require(&root, X15, "timelineCacheDefinition")?;
     whitespace(&root)?;
     no_attributes(&root, &[("", "name"), ("", "sourceName"), (XR10, "uid")])?;
@@ -305,8 +308,7 @@ pub(crate) fn parse_timeline_cache_definition_limited(
     xml: &[u8],
     limits: &litchi_opc::SourceLimits,
 ) -> Result<CacheDefinition> {
-    crate::raw::check_xml_limits(xml, limits)?;
-    parse_timeline_cache_definition(xml)
+    parse_cache_root(parse_timeline_document(xml, limits)?)
 }
 
 fn parse_pivot_tables(node: &Node, output: &mut Vec<CachePivotTable>) -> Result<()> {
@@ -402,7 +404,10 @@ pub(super) fn preflight_cache_definition_limited(
 
 /// Parse one worksheet-scoped Views part.
 pub fn parse_timelines(xml: &[u8]) -> Result<Views> {
-    let root = parse_document(xml)?;
+    parse_timelines_limited(xml, &litchi_opc::SourceLimits::default())
+}
+
+fn parse_views_root(root: Node) -> Result<Views> {
     require(&root, X15, "timelines")?;
     no_attributes(&root, &[])?;
     whitespace(&root)?;
@@ -425,8 +430,39 @@ pub(crate) fn parse_timelines_limited(
     xml: &[u8],
     limits: &litchi_opc::SourceLimits,
 ) -> Result<Views> {
-    crate::raw::check_xml_limits(xml, limits)?;
-    parse_timelines(xml)
+    parse_views_root(parse_timeline_document(xml, limits)?)
+}
+
+/// Select active compatibility branches with the timeline and revision-UID
+/// namespaces understood. This projection is only for cache/view payloads;
+/// package-integration scans still retain their original source coordinates.
+fn parse_timeline_document(xml: &[u8], source: &litchi_opc::SourceLimits) -> Result<Node> {
+    use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
+    crate::raw::check_xml_limits(xml, source)?;
+    let bytes = source
+        .max_part_bytes()
+        .min(source.max_entry_bytes())
+        .min(MAX_XML_BYTES as u64);
+    let maximum = usize::try_from(bytes).map_err(|_source| limit("XML bytes"))?;
+    let limits = Limits {
+        max_input_bytes: maximum,
+        max_output_bytes: maximum,
+        max_depth: source.max_depth().min(MAX_DEPTH),
+        ..Limits::default()
+    };
+    let mut capabilities = Capabilities::default();
+    capabilities
+        .understand_namespace(X15)
+        .understand_namespace(XR10);
+    for namespace in [X15, SML, STRICT_SML] {
+        capabilities.preserve_extension_element(Name {
+            namespace: namespace.into(),
+            local_name: "extLst".into(),
+        });
+    }
+    let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
+    crate::raw::check_xml_limits(processed.xml.as_ref(), source)?;
+    parse_document(processed.xml.as_ref())
 }
 
 fn parse_timeline(node: &Node) -> Result<View> {

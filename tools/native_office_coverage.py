@@ -21,6 +21,27 @@ CORPUS = ROOT / "test-data/microsoft-office"
 INDEX = ROOT / "tools/native_office_tests.json"
 
 
+def verification_gap(item: dict, tests: list[str], disposition: dict | None) -> str:
+    """Classify the next review, never infer completion from fixture presence."""
+    if tests:
+        return "partial_assertions_require_scope_review"
+    status = item["fixture_status"]
+    if status == "verified_native_fixture":
+        return "native_evidence_needs_semantic_tests"
+    if status == "library_boundary":
+        return "unsupported_boundary_needs_review"
+    if status == "not_applicable":
+        return "not_applicable"
+    if status == "pending" and disposition is not None:
+        return {
+            "operation_only": "operation_needs_verification",
+            "native_bounded_evidence_operation_unverified": "bounded_native_evidence_needs_verification",
+            "observed_native_ui_limitation": "native_ui_limitation_needs_review",
+            "external_handoff": "external_fixture_handoff_needs_review",
+        }[disposition["classification"]]
+    raise ValueError(f"unclassified native row: {item['id']}")
+
+
 def report() -> dict:
     manifest = json.loads((CORPUS / "manifest.json").read_text())
     inventory = json.loads((CORPUS / "coverage.json").read_text())
@@ -64,11 +85,15 @@ def report() -> dict:
             "native_fixture_status": item["fixture_status"],
             "automated_coverage": "partial" if rows[item["id"]] else "uncovered",
             "tests": rows[item["id"]],
+            "verification_gap": verification_gap(item, rows[item["id"]], dispositions.get(item["id"])),
+            "historical_support_note": item.get("support_note", ""),
+            "source_matrix": item["source_matrix"],
         }
         if item["id"] in dispositions:
             disposition = dispositions[item["id"]]
             row["native_pending_classification"] = disposition["classification"]
             row["native_pending_rationale"] = disposition["rationale"]
+            row["historical_evidence_refs"] = disposition["evidence_refs"]
         feature_rows.append(row)
     return {
         "schema_version": 1,
@@ -80,6 +105,7 @@ def report() -> dict:
             "feature_rows_with_partial_tests": sum(bool(tests) for tests in rows.values()),
             "indexed_tests": len(test_ids),
             "native_fixture_statuses": dict(Counter(item["fixture_status"] for item in inventory["feature_inventory"])),
+            "verification_gaps": dict(Counter(row["verification_gap"] for row in feature_rows)),
         },
         "fixtures": [{"path": path, "tests": tests} for path, tests in fixtures.items()],
         "feature_rows": feature_rows,
@@ -89,10 +115,15 @@ def report() -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--summary", action="store_true", help="print counts instead of the complete inventory")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--summary", action="store_true", help="print counts instead of the complete inventory")
+    mode.add_argument("--gaps", action="store_true", help="print unasserted feature rows and their historical evidence; these are review tasks, not accepted exclusions")
     args = parser.parse_args()
     result = report()
-    print(json.dumps(result["summary"] if args.summary else result, indent=2))
+    output = result["summary"] if args.summary else result
+    if args.gaps:
+        output = [row for row in result["feature_rows"] if not row["tests"]]
+    print(json.dumps(output, indent=2))
 
 
 if __name__ == "__main__":

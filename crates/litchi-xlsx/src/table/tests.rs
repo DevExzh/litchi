@@ -389,6 +389,37 @@ fn rejects_invalid_writable_table_models() {
     assert!(serialize_table(&table).is_err());
 }
 
+#[test]
+fn native_direct_sort_state_allows_owner_bounded_full_column_keys() {
+    let xml = r#"<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="T" displayName="T" ref="A1:B5"><autoFilter ref="A1:B5"/><sortState ref="A2:B4"><sortCondition ref="B1:B5" descending="1"/></sortState><tableColumns count="2"><tableColumn id="1" name="A"/><tableColumn id="2" name="B"/></tableColumns></table>"#;
+    let table = parse_table_xml(xml).unwrap().unwrap();
+    let sort = table.sort_state.as_ref().unwrap();
+    assert_eq!(sort.ref_range, "A2:B4");
+    assert_eq!(sort.conditions[0].ref_range, "B1:B5");
+    let emitted = serialize_table(&table).unwrap();
+    assert_eq!(
+        parse_table_xml(&emitted).unwrap().unwrap().sort_state,
+        table.sort_state
+    );
+    for invalid in [
+        xml.replace("ref=\"B1:B5\"", "ref=\"B5:B1\""),
+        xml.replace("ref=\"B1:B5\"", "ref=\"XFE1:XFE5\""),
+        xml.replace(
+            "<autoFilter ref=\"A1:B5\"/>",
+            "<autoFilter ref=\"A1:B5\"><sortState ref=\"A2:B4\"/></autoFilter>",
+        ),
+    ] {
+        assert!(parse_table_xml(invalid).is_err());
+    }
+    let outside_owner = xml.replace("ref=\"B1:B5\"", "ref=\"C1:C5\"");
+    let retained = parse_table_xml(outside_owner).unwrap().unwrap();
+    assert_eq!(
+        retained.sort_state.as_ref().unwrap().conditions[0].ref_range,
+        "C1:C5"
+    );
+    assert!(serialize_table(&retained).is_err());
+}
+
 fn rect(reference: &str) -> litchi_sheet::Rect {
     litchi_sheet::Rect::from_a1(reference).expect("test range")
 }

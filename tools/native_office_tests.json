@@ -2096,6 +2096,122 @@
       "required_features": [
         "xlsx"
       ]
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_slicer_cache_and_view_graph_keep_names_bindings_and_selections",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-248"
+      ],
+      "assertions": [
+        "Two native slicer caches with exact names, source fields, revision GUIDs and pivot-table bindings; tabular data discriminator and retained raw selection indices/flags; two worksheet views with captions, heights and column counts."
+      ],
+      "scope_limit": "Selection items remain inert retained XML; no UI or filtering is applied."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_timeline_cache_and_view_keep_selected_month_window",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-249"
+      ],
+      "assertions": [
+        "Native 2011 timeline graph, exact cache/source/GUID, table binding and internal cache ID, February 2026 selection/year bounds and month-level view."
+      ],
+      "scope_limit": "Stored ranges and control metadata only; no refresh, UI rendering or live filtering."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_pivots_and_structured_tables_retain_records_axes_and_cached_totals",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx"
+      ],
+      "feature_rows": [
+        "xlsx-224",
+        "xlsx-225",
+        "xlsx-242",
+        "xlsx-243"
+      ],
+      "assertions": [
+        "Across XLSX, XLTX, Strict XLSX and pivot-controls: Table1 range/columns/filter bounds, native direct sort-state/key spans, all eight decoded cache rows, field roles and Sum aggregation metadata, and exact stored filtered/unfiltered totals."
+      ],
+      "scope_limit": "Reads cached source data; no pivot calculation, table-filter execution or arbitrary PivotTable authoring."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_sparkline_groups_keep_series_destinations_flags_and_colors",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx"
+      ],
+      "feature_rows": [
+        "xlsx-235"
+      ],
+      "assertions": [
+        "Across four native variants: line/column groups, all four formulas/destinations, hidden-data/high/low flags, series color and exact revision GUIDs. Native models serialize and reparse without losing identity."
+      ],
+      "scope_limit": "Metadata/fragment round trip only; no sparkline calculation or rendering."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_slicer_and_timeline_caption_edits_preserve_other_parts_and_invert",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-248",
+        "xlsx-249",
+        "xlsx-268"
+      ],
+      "assertions": [
+        "Native caption edits preserve every unrelated OPC member, retain complete readback models and invert after reopen; filter-application methods give explicit Unsupported errors."
+      ],
+      "scope_limit": "Caption changes only, with metadata/UI boundaries kept separate; no native Excel reopen."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_conditional_rules_keep_priority_thresholds_and_extension_association",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-223"
+      ],
+      "assertions": [
+        "Eight core rules plus the Office 2010 data-bar enhancement: exact ranges/priorities/kinds, source-order priorities, DXF references/formulas, color scale and icon thresholds, colors, GUID association and solid/automatic extension flags."
+      ],
+      "scope_limit": "Stored conditional-format declarations only; no condition evaluation or rendering."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native",
+      "name": "native_excel_slicer_cache_order_edits_find_mixed_case_owner_and_invert",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-248"
+      ],
+      "assertions": [
+        "Cache reordering finds the native mixed-case extension GUID, changes the workbook integration order, preserves other members and inverts exactly after reopen."
+      ],
+      "scope_limit": "Two existing cache references only; not a general refresh or pivot calculation claim."
     }
   ]
 }

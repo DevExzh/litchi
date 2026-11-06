@@ -9,7 +9,7 @@ use litchi_core::{id::generate_guid_braced, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use ryu::Buffer as RyuBuffer;
 use std::fmt::Write as FmtWrite;
@@ -195,8 +195,14 @@ impl Group {
 }
 
 pub fn parse_groups(content: &str) -> SheetResult<Vec<Group>> {
-    let content = litchi_ooxml_common::mce::process_str(content)?;
-    Parser::parse(content.as_ref())
+    use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+    let mut capabilities = Capabilities::default();
+    capabilities
+        .understand_namespace("http://schemas.microsoft.com/office/spreadsheetml/2009/9/main")
+        .understand_namespace("http://schemas.microsoft.com/office/spreadsheetml/2015/revision2");
+    let processed =
+        process_markup_compatibility(content.as_bytes(), &capabilities, &Limits::default())?;
+    Parser::parse(std::str::from_utf8(processed.xml.as_ref()).map_err(malformed)?)
 }
 
 pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
@@ -206,7 +212,7 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
 
     xml.push_str(r#"<ext uri="{05C60535-1F16-4fd2-B633-F4F36F0B64E0}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main">"#);
     xml.push_str(
-        r#"<x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">"#,
+        r#"<x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2">"#,
     );
 
     if groups.len() >= 231 {
@@ -535,14 +541,14 @@ impl Parser {
                     let parent = *stack
                         .last()
                         .ok_or_else(|| invalid("sparkline parser is missing its root context"))?;
-                    let context = parser.start(parent, &namespace, &element, decoder)?;
+                    let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
                     stack.push(context);
                 },
                 Event::Empty(element) => {
                     let parent = *stack
                         .last()
                         .ok_or_else(|| invalid("sparkline parser is missing its root context"))?;
-                    let context = parser.start(parent, &namespace, &element, decoder)?;
+                    let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
                     parser.finish(context)?;
                 },
                 Event::Text(text) => {
@@ -592,6 +598,7 @@ impl Parser {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
+        resolver: &NamespaceResolver,
     ) -> SheetResult<Context> {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"extLst")
@@ -637,7 +644,7 @@ impl Parser {
                 SPARKLINE_NAMESPACE,
             )
         {
-            self.start_group(element, decoder)?;
+            self.start_group(element, decoder, resolver)?;
             return Ok(Context::Group);
         }
         if parent == Context::Group {
@@ -702,7 +709,12 @@ impl Parser {
         Ok(Context::Other)
     }
 
-    fn start_group(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> SheetResult<()> {
+    fn start_group(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> SheetResult<()> {
         if self.group.is_some() {
             return Err(invalid("nested sparkline group"));
         }
@@ -760,7 +772,7 @@ impl Parser {
         group.options.manual_min = sparkline_f64(element, b"manualMin", decoder)?;
         group.options.manual_max = sparkline_f64(element, b"manualMax", decoder)?;
         group.options.line_weight = sparkline_f64(element, b"lineWeight", decoder)?;
-        group.extra_attributes = extra_group_attributes(element, decoder)?;
+        group.extra_attributes = extra_group_attributes(element, decoder, resolver)?;
         self.group = Some(group);
         self.group_saw_sparklines = false;
         self.seen_colors = 0;
@@ -1035,6 +1047,7 @@ fn validate_group_options(options: &GroupOptions) -> SheetResult<()> {
 fn extra_group_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
+    resolver: &NamespaceResolver,
 ) -> SheetResult<Vec<(String, String)>> {
     const KNOWN: &[&[u8]] = &[
         b"type",
@@ -1065,7 +1078,25 @@ fn extra_group_attributes(
         if !key.contains(&b':') && KNOWN.contains(&key) {
             continue;
         }
-        let name = std::str::from_utf8(key).map_err(malformed)?.to_string();
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        let revision_uid = local.as_ref() == b"uid"
+            && matches!(namespace, ResolveResult::Bound(Namespace(value))
+                if value == b"http://schemas.microsoft.com/office/spreadsheetml/2015/revision2");
+        let name = if revision_uid {
+            // The standalone fragment declares this canonical prefix; preserve
+            // the identity even when the source uses a different prefix.
+            "xr2:uid".to_string()
+        } else {
+            if key == b"xr2:uid" {
+                return Err(invalid("sparkline revision UID has a foreign namespace"));
+            }
+            std::str::from_utf8(key).map_err(malformed)?.to_string()
+        };
+        if extra.iter().any(|(existing, _)| existing == &name) {
+            return Err(invalid(format!(
+                "duplicate sparkline group attribute '{name}'"
+            )));
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(malformed)?
@@ -1085,7 +1116,7 @@ mod tests {
         format!(
             r#"<s:worksheet xmlns:s="{STRICT_S}"
                     xmlns:sl="{x14}" xmlns:m="{xm}"
-                    xmlns:f="urn:foreign" xmlns:xr2="urn:revision">
+                    xmlns:f="urn:foreign" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2">
                 <f:extLst><s:ext uri="{uri}"><sl:sparklineGroups/></s:ext></f:extLst>
                 <s:extLst><s:ext uri="{uri}">{extension_contents}</s:ext></s:extLst>
             </s:worksheet>"#,
@@ -1214,6 +1245,34 @@ mod tests {
             String::from_utf8_lossy(EXCEL_MAIN_NAMESPACE),
         );
         assert!(parse_groups(&duplicate_extension).is_err());
+    }
+
+    #[test]
+    fn revision_identity_uses_its_namespace_and_survives_ignorable_aliases() {
+        let xml = group_xml(r#"xr2:uid="{ABC}""#, &sparkline_xml("Sheet1!A1:A3", "B2"));
+        let expected = parse_groups(&xml).unwrap();
+        let aliased = xml.replace("xr2", "revision").replace(
+            "<s:worksheet ",
+            r#"<s:worksheet xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="revision" "#,
+        );
+        let actual = parse_groups(&aliased).unwrap();
+        assert_eq!(actual, expected);
+        let mut fragment = String::new();
+        write_groups_ext(&mut fragment, &actual).unwrap();
+        let emitted = format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><extLst>{fragment}</extLst></worksheet>"#
+        );
+        assert_eq!(parse_groups(&emitted).unwrap(), expected);
+        let foreign = xml.replace(
+            "http://schemas.microsoft.com/office/spreadsheetml/2015/revision2",
+            "urn:foreign-revision",
+        );
+        assert!(parse_groups(&foreign).is_err());
+        let duplicate = xml.replace(
+            r#"xr2:uid="{ABC}""#,
+            r#"xmlns:revision="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" xr2:uid="{ABC}" revision:uid="{DEF}""#,
+        );
+        assert!(parse_groups(&duplicate).is_err());
     }
 
     #[test]

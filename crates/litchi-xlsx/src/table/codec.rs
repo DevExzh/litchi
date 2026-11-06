@@ -253,7 +253,7 @@ impl TableParser {
             self.table.auto_filter_range = Some(range);
             return Ok(TableContext::AutoFilter);
         }
-        if parent == TableContext::AutoFilter
+        if matches!(parent, TableContext::Root | TableContext::AutoFilter)
             && is_spreadsheetml_name(namespace, element.name(), b"sortState")
         {
             mark_once(&mut self.saw_sort_state, "table sortState")?;
@@ -468,25 +468,10 @@ impl TableParser {
                 "table autoFilter reference",
             )?;
         }
-        if let Some(sort_state) = self.table.sort_state.as_ref() {
-            let container = self
-                .table
-                .auto_filter_range
-                .as_deref()
-                .unwrap_or(&self.table.ref_range);
-            ensure_range_contains(
-                container,
-                &sort_state.ref_range,
-                "table sortState reference",
-            )?;
-            for condition in &sort_state.conditions {
-                ensure_range_contains(
-                    &sort_state.ref_range,
-                    &condition.ref_range,
-                    "table sort condition reference",
-                )?;
-            }
-        }
+        // Saved sort metadata may describe a previous table extent. Retain its
+        // exact, individually validated worksheet ranges without applying the
+        // sort or requiring containment in the current table. Authoring keeps
+        // its stricter owner checks in validate_table.
         Ok(())
     }
 }

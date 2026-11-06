@@ -1162,7 +1162,8 @@ fn rewrite_integration_refs(
                 if depth == 2
                     && is_core_namespace(&namespace, core)
                     && element.local_name().as_ref() == b"ext"
-                    && attribute_value(&element, "uri", reader.decoder())?.as_deref() == Some(uri)
+                    && attribute_value(&element, "uri", reader.decoder())?
+                        .is_some_and(|value| value.eq_ignore_ascii_case(uri))
                 {
                     if open.is_some() || target.is_some() {
                         return Err(invalid("duplicate integration extension"));
@@ -1178,8 +1179,8 @@ fn rewrite_integration_refs(
                 if depth == 2
                     && is_core_namespace(&namespace, core)
                     && element.local_name().as_ref() == b"ext"
-                    && attribute_value(&element, "uri", reader.decoder())?.as_deref()
-                        == Some(uri) =>
+                    && attribute_value(&element, "uri", reader.decoder())?
+                        .is_some_and(|value| value.eq_ignore_ascii_case(uri)) =>
             {
                 if target.is_some() || open.is_some() {
                     return Err(invalid("duplicate integration extension"));

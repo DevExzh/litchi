@@ -89,7 +89,7 @@ pub(crate) fn load_timeline_caches_limited(
     workbook_name: &PackURI,
     limits: &SourceLimits,
 ) -> Result<Vec<Cache>> {
-    reject_root_relationships(package, TIMELINE_CACHE_RELATIONSHIP_TYPE, "View Cache")?;
+    reject_root_relationships(package, super::is_cache_relationship, "View Cache")?;
     let workbook = package.get_part(workbook_name)?;
     let workbook_root = super::codec::parse_document_limited(workbook.blob(), limits)?;
     let (core, rel) = source_namespaces(&workbook_root, "workbook")?;
@@ -110,7 +110,7 @@ pub(crate) fn load_timeline_caches_limited(
             && part
                 .rels()
                 .iter()
-                .any(|relationship| relationship.reltype() == TIMELINE_CACHE_RELATIONSHIP_TYPE)
+                .any(|relationship| super::is_cache_relationship(relationship.reltype()))
         {
             return Err(invalid(format!(
                 "non-workbook part '{}' sources a View Cache relationship",
@@ -130,8 +130,7 @@ pub(crate) fn load_timeline_caches_limited(
             .rels()
             .get(&id)
             .ok_or_else(|| invalid(format!("missing View Cache relationship '{id}'")))?;
-        if relationship.reltype() != TIMELINE_CACHE_RELATIONSHIP_TYPE || relationship.is_external()
-        {
+        if !super::is_cache_relationship(relationship.reltype()) || relationship.is_external() {
             return Err(invalid(format!(
                 "View Cache reference '{id}' must target an internal View Cache relationship"
             )));
@@ -143,7 +142,7 @@ pub(crate) fn load_timeline_caches_limited(
             )));
         }
         let part = package.get_part(&target)?;
-        if part.content_type() != TIMELINE_CACHE_CONTENT_TYPE {
+        if !super::is_cache_content(part.content_type()) {
             return Err(invalid(format!(
                 "View Cache part '{target}' has content type '{}'",
                 part.content_type()
@@ -163,7 +162,7 @@ pub(crate) fn load_timeline_caches_limited(
     for relationship in workbook
         .rels()
         .iter()
-        .filter(|relationship| relationship.reltype() == TIMELINE_CACHE_RELATIONSHIP_TYPE)
+        .filter(|relationship| super::is_cache_relationship(relationship.reltype()))
     {
         if !ids.contains(relationship.r_id()) {
             return Err(invalid(format!(
@@ -174,7 +173,7 @@ pub(crate) fn load_timeline_caches_limited(
     }
     for part in package
         .iter_parts()
-        .filter(|part| part.content_type() == TIMELINE_CACHE_CONTENT_TYPE)
+        .filter(|part| super::is_cache_content(part.content_type()))
     {
         if !targets.contains(part.partname().as_str()) {
             return Err(invalid(format!(
@@ -451,7 +450,7 @@ pub(crate) fn load_timelines_limited(
     workbook_name: &PackURI,
     limits: &SourceLimits,
 ) -> Result<Vec<Part>> {
-    reject_root_relationships(package, TIMELINES_RELATIONSHIP_TYPE, "Views")?;
+    reject_root_relationships(package, super::is_views_relationship, "Views")?;
     let caches = load_timeline_caches_limited(package, workbook_name, limits)?;
     let cache_names: HashSet<String> = caches
         .iter()
@@ -463,7 +462,7 @@ pub(crate) fn load_timelines_limited(
         let timeline_relationships: Vec<_> = part
             .rels()
             .iter()
-            .filter(|relationship| relationship.reltype() == TIMELINES_RELATIONSHIP_TYPE)
+            .filter(|relationship| super::is_views_relationship(relationship.reltype()))
             .collect();
         if part.content_type() != ct::SML_WORKSHEET {
             if !timeline_relationships.is_empty() {
@@ -508,7 +507,7 @@ pub(crate) fn load_timelines_limited(
             .rels()
             .get(&id)
             .ok_or_else(|| invalid(format!("missing Views relationship '{id}'")))?;
-        if relationship.reltype() != TIMELINES_RELATIONSHIP_TYPE || relationship.is_external() {
+        if !super::is_views_relationship(relationship.reltype()) || relationship.is_external() {
             return Err(invalid(format!(
                 "Views reference '{id}' must target an internal Views relationship"
             )));
@@ -526,7 +525,7 @@ pub(crate) fn load_timelines_limited(
             )));
         }
         let timeline_part = package.get_part(&target)?;
-        if timeline_part.content_type() != TIMELINES_CONTENT_TYPE {
+        if !super::is_views_content(timeline_part.content_type()) {
             return Err(invalid(format!(
                 "Views part '{target}' has content type '{}'",
                 timeline_part.content_type()
@@ -555,7 +554,7 @@ pub(crate) fn load_timelines_limited(
     }
     for part in package
         .iter_parts()
-        .filter(|part| part.content_type() == TIMELINES_CONTENT_TYPE)
+        .filter(|part| super::is_views_content(part.content_type()))
     {
         if !targets.contains(part.partname().as_str()) {
             return Err(invalid(format!("orphan Views part '{}'", part.partname())));
@@ -1011,11 +1010,15 @@ fn source_namespaces<'a>(root: &'a Node, name: &str) -> Result<(&'a str, &'stati
         _ => Err(invalid(format!("unsupported {name} namespace"))),
     }
 }
-fn reject_root_relationships(package: &OpcPackage, kind: &str, name: &str) -> Result<()> {
+fn reject_root_relationships(
+    package: &OpcPackage,
+    matches_kind: fn(&str) -> bool,
+    name: &str,
+) -> Result<()> {
     if package
         .rels()
         .iter()
-        .any(|relationship| relationship.reltype() == kind)
+        .any(|relationship| matches_kind(relationship.reltype()))
     {
         Err(invalid(format!(
             "package root cannot source {name} relationships"

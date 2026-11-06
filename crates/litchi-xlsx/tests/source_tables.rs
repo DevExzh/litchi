@@ -182,6 +182,23 @@ fn workbook_lookup_searches_every_worksheet_in_order() {
     }
     assert_eq!(seen, 9);
     assert!(source.table("missing").unwrap().is_none());
+    // These saved sort extents predate the current table bounds. Both readers
+    // retain them as metadata; reading a table does not execute its sort.
+    for (name, table_range, sort_range, key_range) in [
+        ("Table1", "A3:E25", "A3:E24", "A2:A24"),
+        ("Table3", "A2:F21", "A2:G22", "A1:A22"),
+    ] {
+        for table in [
+            source.table(name).unwrap().unwrap().1,
+            eager.workbook_ref().table(name).unwrap().unwrap().1,
+        ] {
+            assert_eq!(table.table().ref_range, table_range);
+            let sort = table.table().sort_state.as_ref().unwrap();
+            assert_eq!(sort.ref_range, sort_range);
+            assert_eq!(sort.conditions.len(), 1);
+            assert_eq!(sort.conditions[0].ref_range, key_range);
+        }
+    }
 }
 
 #[test]

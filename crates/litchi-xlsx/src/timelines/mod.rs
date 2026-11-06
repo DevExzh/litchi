@@ -21,12 +21,41 @@ pub(super) const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/r
 pub(super) const X15: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
 pub(super) const XR10: &str = "http://schemas.microsoft.com/office/spreadsheetml/2016/revision10";
 
-pub const TIMELINE_CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.TimelineCache+xml";
+pub const TIMELINE_CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.timelineCache+xml";
 pub const TIMELINE_CACHE_RELATIONSHIP_TYPE: &str =
-    "http://schemas.microsoft.com/office/2010/relationships/TimelineCache";
-pub const TIMELINES_CONTENT_TYPE: &str = "application/vnd.ms-excel.Timeline+xml";
+    "http://schemas.microsoft.com/office/2011/relationships/timelineCache";
+pub const TIMELINES_CONTENT_TYPE: &str = "application/vnd.ms-excel.timeline+xml";
 pub const TIMELINES_RELATIONSHIP_TYPE: &str =
-    "http://schemas.microsoft.com/office/2010/relationships/Timeline";
+    "http://schemas.microsoft.com/office/2011/relationships/timeline";
+
+// Native Excel uses the 2011/lowercase spellings. Keep the documented 2010
+// spellings, also emitted by earlier Litchi versions, as exact read aliases.
+fn is_cache_relationship(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINE_CACHE_RELATIONSHIP_TYPE
+            | "http://schemas.microsoft.com/office/2010/relationships/TimelineCache"
+    )
+}
+fn is_views_relationship(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINES_RELATIONSHIP_TYPE
+            | "http://schemas.microsoft.com/office/2010/relationships/Timeline"
+    )
+}
+fn is_cache_content(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINE_CACHE_CONTENT_TYPE | "application/vnd.ms-excel.TimelineCache+xml"
+    )
+}
+fn is_views_content(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINES_CONTENT_TYPE | "application/vnd.ms-excel.Timeline+xml"
+    )
+}
 pub const TIMELINE_CACHE_EXTENSION_URI: &str = "{D0CA8CA8-9F24-4464-BF8E-62219DCF47F9}";
 pub const TIMELINES_EXTENSION_URI: &str = "{7E03D99C-DC04-49d9-9315-930204A7B6E9}";
 

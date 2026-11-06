@@ -131,6 +131,21 @@ class NativeOfficeCorpus(unittest.TestCase):
         for test in tests:
             self.assertTrue(set(test["required_features"]) <= set(FACADE_FORMAT_TEST_FEATURES), test["name"])
 
+    def test_gap_report_does_not_promote_native_evidence_or_pending_exclusions(self) -> None:
+        coverage = report()
+        counts = Counter(row["verification_gap"] for row in coverage["feature_rows"])
+        self.assertEqual(sum(counts.values()), 494)
+        self.assertEqual(dict(counts), coverage["summary"]["verification_gaps"])
+        for row in coverage["feature_rows"]:
+            with self.subTest(row=row["id"]):
+                if row["tests"]:
+                    self.assertEqual(row["verification_gap"], "partial_assertions_require_scope_review")
+                elif row["native_fixture_status"] == "verified_native_fixture":
+                    self.assertEqual(row["verification_gap"], "native_evidence_needs_semantic_tests")
+                elif row["native_fixture_status"] == "pending":
+                    self.assertTrue(row["historical_evidence_refs"])
+                    self.assertNotIn(row["verification_gap"], {"not_applicable", "complete"})
+
 
 if __name__ == "__main__":
     unittest.main()

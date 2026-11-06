@@ -369,7 +369,8 @@ fn integration_ids(xml: &[u8]) -> Result<(&'static str, &'static str, Vec<String
                 if depth == 2
                     && exact(&namespace, core)
                     && element.local_name().as_ref() == b"ext"
-                    && attribute(&element, b"uri", decoder)?.as_deref() == Some(INTEGRATION_URI)
+                    && attribute(&element, b"uri", decoder)?
+                        .is_some_and(|value| value.eq_ignore_ascii_case(INTEGRATION_URI))
                 {
                     if extension_seen {
                         return Err(invalid("duplicate Slicer Cache integration extension"));
@@ -476,7 +477,8 @@ fn rewrite_or_insert(
                 if depth == 2
                     && exact(&namespace, core)
                     && element.local_name().as_ref() == b"ext"
-                    && attribute(&element, b"uri", decoder)?.as_deref() == Some(uri) =>
+                    && attribute(&element, b"uri", decoder)?
+                        .is_some_and(|value| value.eq_ignore_ascii_case(uri)) =>
             {
                 if start.is_some() {
                     return Err(invalid("duplicate integration extension"));
@@ -488,7 +490,8 @@ fn rewrite_or_insert(
                 if depth == 2
                     && exact(&namespace, core)
                     && element.local_name().as_ref() == b"ext"
-                    && attribute(&element, b"uri", decoder)?.as_deref() == Some(uri) =>
+                    && attribute(&element, b"uri", decoder)?
+                        .is_some_and(|value| value.eq_ignore_ascii_case(uri)) =>
             {
                 if start.is_some() {
                     return Err(invalid("duplicate integration extension"));
@@ -681,4 +684,40 @@ fn validate_relationship_id(value: &str) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod native_guid_tests {
+    use super::*;
+
+    #[test]
+    fn mixed_case_guid_is_one_integration_owner_for_reads_and_rewrites() {
+        for uri in [
+            INTEGRATION_URI.to_owned(),
+            INTEGRATION_URI.to_ascii_lowercase(),
+            "{BBE1A952-AA13-448e-AADC-164F8A28A991}".into(),
+        ] {
+            let extension = format!(
+                r#"<ext uri="{uri}"><x14:slicerCaches xmlns:x14="{X14}"><x14:slicerCache r:id="one"/></x14:slicerCaches></ext>"#
+            );
+            let xml = format!(
+                r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><sheets/><extLst>{extension}</extLst></workbook>"#
+            );
+            assert_eq!(integration_ids(xml.as_bytes()).unwrap().2, ["one"]);
+            let rewritten = rewrite_or_insert(
+                xml.as_bytes(),
+                &["two".into()],
+                INTEGRATION_URI,
+                "slicerCaches",
+                "slicerCache",
+                X14,
+                &SourceLimits::default(),
+                |_| Ok(()),
+            )
+            .unwrap();
+            assert_eq!(integration_ids(&rewritten).unwrap().2, ["two"]);
+            let duplicate = xml.replace("</extLst>", &format!("{extension}</extLst>"));
+            assert!(integration_ids(duplicate.as_bytes()).is_err());
+        }
+    }
 }

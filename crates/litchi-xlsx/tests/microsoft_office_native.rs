@@ -759,3 +759,612 @@ fn native_excel_validation_notes_names_and_print_settings_are_typed() {
     formula(&sheet, "B6", "SUM(B2:B5)", "14");
     formula(&sheet, "E6", "SUM(E2:E5)", "95");
 }
+
+#[test]
+fn native_excel_slicer_cache_and_view_graph_keep_names_bindings_and_selections() {
+    use litchi_xlsx::slicer;
+    let package = native("excel-pivot-controls.xlsx");
+    let opc = package.clone().into_plain_opc();
+    let caches = slicer::load_caches(&opc).unwrap();
+    assert_eq!(caches.len(), 2);
+    for (cache, (name, source, uid)) in caches.iter().zip([
+        (
+            "Slicer_Region",
+            "Region",
+            "{467C1D31-B55C-B845-9810-5E25C4EC5640}",
+        ),
+        (
+            "Slicer_Product",
+            "Product",
+            "{3309B01A-9F8C-5D4C-BC2C-3005F0F3632A}",
+        ),
+    ]) {
+        let definition = &cache.definition;
+        assert_eq!(definition.name, name);
+        assert_eq!(definition.source_name, source);
+        assert_eq!(definition.uid.as_deref(), Some(uid));
+        assert_eq!(definition.pivot_tables.len(), 1);
+        assert_eq!(definition.pivot_tables[0].tab_id, 2);
+        assert_eq!(definition.pivot_tables[0].name, "PivotTable1");
+        assert_eq!(
+            definition.data.as_ref().unwrap().kind(),
+            slicer::DataKind::Tabular
+        );
+        let data = definition.data.as_ref().unwrap().xml();
+        let mut reader = quick_xml::Reader::from_reader(data);
+        let mut selections = Vec::new();
+        loop {
+            match reader.read_event().unwrap() {
+                quick_xml::events::Event::Empty(element)
+                    if element.local_name().as_ref() == b"i" =>
+                {
+                    let attributes = element
+                        .attributes()
+                        .map(|a| {
+                            let a = a.unwrap();
+                            (a.key.as_ref().to_vec(), a.value.into_owned())
+                        })
+                        .collect::<std::collections::BTreeMap<_, _>>();
+                    selections.push((
+                        String::from_utf8(attributes[b"x".as_slice()].clone()).unwrap(),
+                        attributes.get(b"s".as_slice()).is_some_and(|s| s == b"1"),
+                    ));
+                },
+                quick_xml::events::Event::Eof => break,
+                _ => {},
+            }
+        }
+        let expected = if source == "Region" {
+            vec![("0".into(), true), ("1".into(), false)]
+        } else {
+            vec![("1".into(), true), ("0".into(), true)]
+        };
+        assert_eq!(selections, expected);
+    }
+    let parts = slicer::load_parts(
+        &opc,
+        &litchi_opc::PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(parts.len(), 1);
+    let views = &parts[0].slicers.slicers;
+    assert_eq!(views.len(), 2);
+    for (view, cache) in views.iter().zip(["Slicer_Region", "Slicer_Product"]) {
+        assert_eq!(view.cache, cache);
+        assert_eq!(view.row_height, 251883);
+        assert_eq!(view.column_count, 1);
+        assert!(view.show_caption);
+        assert_eq!(view.caption.as_deref(), Some(view.name.as_str()));
+    }
+}
+
+#[test]
+fn native_excel_timeline_cache_and_view_keep_selected_month_window() {
+    use litchi_xlsx::timeline;
+    let package = native("excel-pivot-controls.xlsx");
+    let opc = package.into_plain_opc();
+    let workbook = opc.main_document_part().unwrap().partname();
+    let caches = timeline::load_caches(&opc, workbook).unwrap();
+    assert_eq!(caches.len(), 1);
+    let cache = &caches[0].definition;
+    assert_eq!(cache.name, "NativeTimeline_Date");
+    assert_eq!(cache.source_name, "Date");
+    assert_eq!(
+        cache.uid.as_deref(),
+        Some("{AE7083C3-0CBF-954C-824C-1CBA773C7841}")
+    );
+    assert_eq!(cache.pivot_tables.len(), 1);
+    assert_eq!(cache.pivot_tables[0].name, "PivotTable1");
+    assert_eq!(cache.pivot_tables[0].tab_id, 2);
+    assert_eq!(cache.state.pivot_cache_id, 2018148052);
+    assert_eq!(cache.state.filter_type, timeline::FilterType::DateBetween);
+    assert_eq!(
+        cache.state.selection.as_ref().unwrap(),
+        &timeline::Range::new("2026-02-01T00:00:00", "2026-02-28T00:00:00").unwrap()
+    );
+    assert_eq!(
+        cache.state.bounds,
+        timeline::Range::new("2026-01-01T00:00:00", "2027-01-01T00:00:00").unwrap()
+    );
+    let parts = timeline::load_parts(&opc, workbook).unwrap();
+    assert_eq!(parts.len(), 1);
+    let views = &parts[0].timelines.timelines;
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].cache, "NativeTimeline_Date");
+    assert_eq!(views[0].level, timeline::Level::Month);
+    assert_eq!(views[0].selection_level, timeline::Level::Month);
+}
+
+#[test]
+fn native_excel_pivots_and_structured_tables_retain_records_axes_and_cached_totals() {
+    use litchi_xlsx::pivot::{self, PivotAxis, PivotValueFunction, cache::Item};
+    for name in [
+        "excel-visual-analytics.xlsx",
+        "excel-visual-analytics.xltx",
+        "excel-visual-analytics-strict.xlsx",
+        "excel-pivot-controls.xlsx",
+    ] {
+        let package = native(name);
+        let workbook = package.workbook();
+        let opc = package.clone().into_plain_opc();
+        let (owner, part) = workbook.table("Table1").unwrap().unwrap();
+        assert_eq!(owner.name(), "Sheet1");
+        let table = part.table();
+        assert_eq!(table.ref_range, "A1:F9");
+        assert_eq!(table.display_name, "Table1");
+        assert_eq!(
+            table.column_names(),
+            ["Date", "Region", "Product", "Revenue", "Units", "Status"]
+        );
+        assert_eq!(table.header_row_count, Some(1));
+        assert_eq!(table.auto_filter_range.as_deref(), Some("A1:F9"));
+        let sort = table.sort_state.as_ref().unwrap();
+        assert_eq!(sort.ref_range, "A2:F8");
+        assert_eq!(sort.conditions.len(), 1);
+        assert_eq!(sort.conditions[0].ref_range, "D1:D9");
+        assert_eq!(sort.conditions[0].descending, Some(true));
+        assert_eq!(workbook.pivot_caches().len(), 1);
+        let cache_part = opc
+            .get_part(
+                &litchi_opc::PackURI::new("/xl/pivotCache/pivotCacheDefinition1.xml").unwrap(),
+            )
+            .unwrap();
+        let cache =
+            pivot::read_pivot_cache_definition(std::str::from_utf8(cache_part.blob()).unwrap())
+                .unwrap()
+                .unwrap();
+        assert_eq!(cache.source_type, "worksheet");
+        assert_eq!(cache.source_name.as_deref(), Some("Table1"));
+        assert_eq!(cache.record_count, Some(8));
+        assert_eq!(
+            cache
+                .cache_fields
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>(),
+            table.column_names()
+        );
+        let records_part = opc
+            .get_part(&litchi_opc::PackURI::new("/xl/pivotCache/pivotCacheRecords1.xml").unwrap())
+            .unwrap();
+        let records =
+            pivot::read_pivot_cache_records(std::str::from_utf8(records_part.blob()).unwrap())
+                .unwrap()
+                .unwrap();
+        assert_eq!(records.records.len(), 8);
+        let decoded: Vec<Vec<String>> = records
+            .records
+            .iter()
+            .map(|record| {
+                assert_eq!(record.values.len(), 6);
+                record
+                    .values
+                    .iter()
+                    .enumerate()
+                    .map(|(field, value)| match value {
+                        Item::Index(index) => {
+                            cache.cache_fields[field].shared_items[*index as usize].as_string()
+                        },
+                        value => value.as_string(),
+                    })
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            decoded,
+            [
+                [
+                    "2026-01-15T00:00:00",
+                    "North",
+                    "Widget",
+                    "12.5",
+                    "3",
+                    "Open"
+                ],
+                [
+                    "2026-01-20T00:00:00",
+                    "South",
+                    "Widget",
+                    "25",
+                    "5",
+                    "Closed"
+                ],
+                ["2026-02-10T00:00:00", "North", "Gadget", "9.5", "2", "Open"],
+                ["2026-02-18T00:00:00", "South", "Gadget", "48", "4", "Hold"],
+                [
+                    "2026-03-03T00:00:00",
+                    "North",
+                    "Widget",
+                    "16.5",
+                    "3",
+                    "Open"
+                ],
+                [
+                    "2026-03-21T00:00:00",
+                    "South",
+                    "Gadget",
+                    "20",
+                    "4",
+                    "Closed"
+                ],
+                ["2026-04-02T00:00:00", "North", "Gadget", "14", "2", "Hold"],
+                ["2026-04-18T00:00:00", "South", "Widget", "30", "6", "Open"],
+            ],
+            "{name}"
+        );
+        let pivots = pivot::read_pivot_tables(&opc).unwrap();
+        assert_eq!(pivots.len(), 1);
+        let pivot = &pivots[0];
+        assert_eq!(pivot.name, "PivotTable1");
+        assert_eq!(pivot.sheet_name, "Sheet2");
+        for (axis, field) in [
+            (PivotAxis::Row, "Region"),
+            (PivotAxis::Column, "Product"),
+            (PivotAxis::Filter, "Status"),
+        ] {
+            let roles = pivot.fields_by_axis(axis);
+            assert_eq!(roles.len(), 1);
+            assert_eq!(roles[0].field_name, field);
+            assert_eq!(roles[0].position, 0);
+        }
+        assert_eq!(pivot.data_fields.len(), 1);
+        assert_eq!(pivot.data_fields[0].field_name, "Revenue");
+        assert_eq!(pivot.data_fields[0].function, PivotValueFunction::Sum);
+        assert_eq!(
+            pivot.data_fields[0].display_name.as_deref(),
+            Some("Sum of Revenue")
+        );
+        let sheet = workbook.sheet("Sheet2").unwrap().unwrap();
+        if name == "excel-pivot-controls.xlsx" {
+            assert_eq!(pivot.cache_id, 1);
+            assert_eq!(pivot.location_ref, "A3:C6");
+            scalar_number(&sheet, "C6", "9.5");
+        } else {
+            assert_eq!(pivot.cache_id, 5);
+            assert_eq!(pivot.location_ref, "A3:D7");
+            for (at, value) in [("D5", "52.5"), ("D6", "123"), ("D7", "175.5")] {
+                scalar_number(&sheet, at, value);
+            }
+        }
+    }
+}
+
+#[test]
+fn native_excel_sparkline_groups_keep_series_destinations_flags_and_colors() {
+    use litchi_xlsx::sheet::sparklines::{self, SparklineType};
+    for name in [
+        "excel-visual-analytics.xlsx",
+        "excel-visual-analytics.xltx",
+        "excel-visual-analytics-strict.xlsx",
+        "excel-pivot-controls.xlsx",
+    ] {
+        let package = native(name);
+        let opc = package.into_plain_opc();
+        let part = opc
+            .get_part(&litchi_opc::PackURI::new("/xl/worksheets/sheet3.xml").unwrap())
+            .unwrap();
+        let groups = sparklines::parse_groups(std::str::from_utf8(part.blob()).unwrap()).unwrap();
+        assert_eq!(groups.len(), 2);
+        assert!(groups.iter().all(|g| {
+            g.extra_attributes
+                .iter()
+                .any(|(key, value)| key == "xr2:uid" && value.len() == 38)
+        }));
+        for (kind, locations) in [
+            (SparklineType::Line, ["F2", "F3"]),
+            (SparklineType::Column, ["G2", "G3"]),
+        ] {
+            let group = groups.iter().find(|g| g.sparkline_type == kind).unwrap();
+            assert_eq!(group.sparklines.len(), 2);
+            assert!(group.options.display_hidden);
+            assert_eq!(group.options.high, kind == SparklineType::Line);
+            assert_eq!(group.options.low, kind == SparklineType::Line);
+            assert_eq!(group.colors.series.as_ref().unwrap().rgb, "FF376092");
+            let uid = if kind == SparklineType::Line {
+                "{0DD3A345-0208-414F-BC9F-3C939707BEB5}"
+            } else {
+                "{1C132269-8538-A04B-BD9E-C7D203363ECA}"
+            };
+            assert_eq!(
+                group
+                    .extra_attributes
+                    .iter()
+                    .find(|(key, _)| key == "xr2:uid")
+                    .unwrap()
+                    .1,
+                uid
+            );
+            for (item, (location, data)) in group
+                .sparklines
+                .iter()
+                .zip(locations.into_iter().zip(["Sheet3!B2:E2", "Sheet3!B3:E3"]))
+            {
+                assert_eq!(item.location, location);
+                assert_eq!(item.data_range, data);
+            }
+        }
+        let mut extension = String::new();
+        sparklines::write_groups_ext(&mut extension, &groups).unwrap();
+        let xml = format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><extLst>{extension}</extLst></worksheet>"#
+        );
+        let reopened = sparklines::parse_groups(&xml).unwrap();
+        assert_eq!(reopened, groups);
+    }
+}
+
+#[test]
+fn native_excel_slicer_and_timeline_caption_edits_preserve_other_parts_and_invert() {
+    let source = native("excel-pivot-controls.xlsx");
+    let before = source.to_bytes().unwrap();
+    let originals = members(&before);
+    let worksheet = litchi_opc::PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    let mut slicer_edit = source.edit_slicers().unwrap();
+    assert!(matches!(
+        slicer_edit.apply_filter(),
+        Err(litchi_xlsx::Error::Unsupported {
+            feature: "slicer UI, refresh, and filter application"
+        })
+    ));
+    let mut expected = slicer_edit.view(&worksheet, "Region").unwrap().unwrap();
+    expected.caption = Some("Native region caption edited".into());
+    assert!(
+        slicer_edit
+            .replace_view(&worksheet, "Region", expected.clone())
+            .unwrap()
+    );
+    let slicer_commit = slicer_edit.commit().unwrap();
+    let after = slicer_commit.package().to_bytes().unwrap();
+    let reopened = Package::from_bytes(&after).unwrap();
+    assert_eq!(
+        reopened
+            .edit_slicers()
+            .unwrap()
+            .view(&worksheet, "Region")
+            .unwrap(),
+        Some(expected)
+    );
+    let changed = members(&after);
+    assert_eq!(
+        originals.keys().collect::<Vec<_>>(),
+        changed.keys().collect::<Vec<_>>()
+    );
+    for (name, bytes) in &originals {
+        if name != "xl/slicers/slicer1.xml" {
+            assert!(changed[name] == *bytes, "slicer changed {name}");
+        }
+    }
+    assert_members_equal(
+        &reopened
+            .apply_slicers(&slicer_commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        &before,
+    );
+
+    let mut timeline_edit = source.edit_timelines().unwrap();
+    assert!(matches!(
+        timeline_edit.apply_filter(),
+        Err(litchi_xlsx::Error::Unsupported {
+            feature: "timeline UI, refresh, and filter application"
+        })
+    ));
+    let mut expected = timeline_edit.view(&worksheet, "Date").unwrap().unwrap();
+    expected.caption = Some("Native date caption edited".into());
+    assert!(
+        timeline_edit
+            .replace_view(&worksheet, "Date", expected.clone())
+            .unwrap()
+    );
+    let timeline_commit = timeline_edit.commit().unwrap();
+    let after = timeline_commit.package().to_bytes().unwrap();
+    let reopened = Package::from_bytes(&after).unwrap();
+    assert_eq!(
+        reopened
+            .edit_timelines()
+            .unwrap()
+            .view(&worksheet, "Date")
+            .unwrap(),
+        Some(expected)
+    );
+    let changed = members(&after);
+    assert_eq!(
+        originals.keys().collect::<Vec<_>>(),
+        changed.keys().collect::<Vec<_>>()
+    );
+    for (name, bytes) in &originals {
+        if name != "xl/timelines/timeline1.xml" {
+            assert!(changed[name] == *bytes, "timeline changed {name}");
+        }
+    }
+    assert_members_equal(
+        &reopened
+            .apply_timelines(&timeline_commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        &before,
+    );
+    assert!(source.to_bytes().unwrap() == before);
+}
+
+#[test]
+fn native_excel_conditional_rules_keep_priority_thresholds_and_extension_association() {
+    use litchi_xlsx::conditional_formatting::{Association, DifferentialRef, Payload, Source};
+    let package = native("excel-conditional-drawings.xlsx");
+    let sheet = package.workbook().sheet("Sheet1").unwrap().unwrap();
+    let formats = sheet.conditional_formattings().unwrap();
+    assert_eq!(formats.len(), 8);
+    let core = formats
+        .iter()
+        .flat_map(|f| {
+            f.rules
+                .iter()
+                .filter(|r| r.source == Source::Core)
+                .map(move |r| (f, r))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(core.len(), 8);
+    for (range, priority, kind) in [
+        ("B3:B8", 8, "dataBar"),
+        ("C3:C8", 7, "colorScale"),
+        ("D3:D8", 6, "iconSet"),
+        ("E3:E8", 5, "expression"),
+        ("F3:F8", 4, "duplicateValues"),
+        ("H3:H8", 3, "colorScale"),
+        ("I3:I8", 2, "expression"),
+        ("I3:I8", 1, "expression"),
+    ] {
+        let (owner, rule) = core
+            .iter()
+            .find(|(_, rule)| rule.priority == Some(priority))
+            .unwrap();
+        assert_eq!(owner.ranges.len(), 1);
+        assert_eq!(owner.ranges[0].as_str(), range);
+        assert_eq!(rule.rule_type.unwrap().as_str(), kind);
+        assert!(!rule.stop_if_true);
+    }
+    let color = core.iter().find(|(_, r)| r.priority == Some(7)).unwrap().1;
+    let Some(Payload::ColorScale(scale)) = &color.payload else {
+        panic!("color scale")
+    };
+    assert_eq!(
+        scale
+            .thresholds
+            .iter()
+            .map(|v| v.kind.as_str())
+            .collect::<Vec<_>>(),
+        ["min", "percentile", "max"]
+    );
+    assert_eq!(scale.thresholds[1].value.as_deref(), Some("50"));
+    assert_eq!(
+        scale
+            .colors
+            .iter()
+            .map(|c| c.rgb.unwrap().to_string())
+            .collect::<Vec<_>>(),
+        ["FFF8696B", "FFFFEB84", "FF63BE7B"]
+    );
+    let icons = core.iter().find(|(_, r)| r.priority == Some(6)).unwrap().1;
+    let Some(Payload::IconSet(icons)) = &icons.payload else {
+        panic!("icon set")
+    };
+    assert_eq!(icons.set.as_str(), "3Arrows");
+    assert!(icons.show_value);
+    assert!(!icons.reverse);
+    assert_eq!(
+        icons
+            .thresholds
+            .iter()
+            .map(|v| v.value.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("0"), Some("33"), Some("67")]
+    );
+    for (priority, dxf, formula) in [
+        (5, 7, "AND($E3>=50,$E3<100)"),
+        (2, 5, "$I3>=50"),
+        (1, 4, "$I3>=75"),
+    ] {
+        let rule = core
+            .iter()
+            .find(|(_, r)| r.priority == Some(priority))
+            .unwrap()
+            .1;
+        assert_eq!(
+            rule.differential_format,
+            Some(DifferentialRef::StylesIndex(dxf))
+        );
+        assert_eq!(rule.formulas.as_slice(), [formula]);
+    }
+    let priorities = formats
+        .iter()
+        .find(|f| f.ranges[0].as_str() == "I3:I8")
+        .unwrap()
+        .rules
+        .iter()
+        .map(|r| r.priority)
+        .collect::<Vec<_>>();
+    assert_eq!(priorities, [Some(2), Some(1)]);
+    let extended = formats
+        .iter()
+        .flat_map(|f| &f.rules)
+        .filter(|r| r.source == Source::Office2010)
+        .collect::<Vec<_>>();
+    assert_eq!(extended.len(), 1);
+    assert_eq!(
+        extended[0].extension_association,
+        Association::EnhancesCore { priority: 8 }
+    );
+    assert_eq!(
+        extended[0].extension_id.as_deref(),
+        Some("{ECB0A437-79F1-4B45-BC65-239A77CC427B}")
+    );
+    let Some(Payload::DataBar(bar)) = &extended[0].payload else {
+        panic!("extended data bar")
+    };
+    assert!(!bar.gradient);
+    assert_eq!((bar.min_length, bar.max_length), (0, 100));
+    assert_eq!(
+        bar.thresholds
+            .iter()
+            .map(|v| v.kind.as_str())
+            .collect::<Vec<_>>(),
+        ["autoMin", "autoMax"]
+    );
+    assert!(
+        bar.colors
+            .iter()
+            .any(|c| c.color.rgb.is_some_and(|rgb| rgb.to_string() == "FFFF0000"))
+    );
+}
+
+#[test]
+fn native_excel_slicer_cache_order_edits_find_mixed_case_owner_and_invert() {
+    let source = native("excel-pivot-controls.xlsx");
+    let before = source.to_bytes().unwrap();
+    let mut edit = source.edit_slicers().unwrap();
+    let expected = ["Slicer_Product".to_owned(), "Slicer_Region".to_owned()];
+    let staged = edit.reorder_caches(&expected).unwrap();
+    assert_eq!(
+        staged
+            .iter()
+            .map(|cache| cache.definition.name.as_str())
+            .collect::<Vec<_>>(),
+        expected
+    );
+    let commit = edit.commit().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
+    let caches = litchi_xlsx::slicer::load_caches(&reopened.clone().into_plain_opc()).unwrap();
+    assert_eq!(
+        caches
+            .iter()
+            .map(|cache| cache.definition.name.as_str())
+            .collect::<Vec<_>>(),
+        expected
+    );
+    let old = members(&before);
+    let after = members(&bytes);
+    assert_eq!(
+        old.keys().collect::<Vec<_>>(),
+        after.keys().collect::<Vec<_>>()
+    );
+    for (name, data) in old {
+        if name != "xl/workbook.xml" {
+            assert!(after[&name] == data, "changed {name}");
+        }
+    }
+    assert_members_equal(
+        &reopened
+            .apply_slicers(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        &before,
+    );
+    assert!(source.to_bytes().unwrap() == before);
+}

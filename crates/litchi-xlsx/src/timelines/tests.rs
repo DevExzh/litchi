@@ -88,6 +88,90 @@ mod tests {
     }
 
     #[test]
+    fn compatibility_directives_keep_known_revision_ids_and_reject_unknown_requirements() {
+        let value = cache().definition;
+        let xml = String::from_utf8(write_timeline_cache_definition(&value).unwrap()).unwrap();
+        let with_mce = xml.replace(
+            "<x15:timelineCacheDefinition ",
+            r#"<x15:timelineCacheDefinition xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="xr10" "#,
+        );
+        assert_eq!(
+            parse_timeline_cache_definition(with_mce.as_bytes()).unwrap(),
+            value
+        );
+        let required = with_mce.replace(
+            "mc:Ignorable=\"xr10\"",
+            r#"xmlns:future="urn:future" mc:MustUnderstand="future""#,
+        );
+        assert!(parse_timeline_cache_definition(required.as_bytes()).is_err());
+        let undeclared = with_mce.replace("mc:Ignorable=\"xr10\"", "mc:Ignorable=\"missing\"");
+        assert!(parse_timeline_cache_definition(undeclared.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn documented_2010_timeline_graph_aliases_remain_readable_and_owned() {
+        let (mut package, workbook) = package();
+        let cache = cache();
+        store_timeline_caches(&mut package, &workbook, std::slice::from_ref(&cache)).unwrap();
+        let view = Part {
+            worksheet_part_name: "/xl/worksheets/sheet1.xml".into(),
+            relationship_id: "rIdView1".into(),
+            part_name: "/xl/timelines/timeline1.xml".into(),
+            timelines: views(),
+        };
+        store_worksheet_timelines(&mut package, &workbook, &view).unwrap();
+        for (owner, id, target, content_type, relationship_type) in [
+            (
+                "/xl/workbook.xml",
+                "rIdViewCache1",
+                "/xl/timelineCaches/timelineCache1.xml",
+                "application/vnd.ms-excel.TimelineCache+xml",
+                "http://schemas.microsoft.com/office/2010/relationships/TimelineCache",
+            ),
+            (
+                "/xl/worksheets/sheet1.xml",
+                "rIdView1",
+                "/xl/timelines/timeline1.xml",
+                "application/vnd.ms-excel.Timeline+xml",
+                "http://schemas.microsoft.com/office/2010/relationships/Timeline",
+            ),
+        ] {
+            let target = PackURI::new(target).unwrap();
+            let owner = PackURI::new(owner).unwrap();
+            let bytes = package.get_part(&target).unwrap().blob().to_vec();
+            assert!(package.remove_part(&target));
+            package
+                .try_add_part(Box::new(BlobPart::new(
+                    target.clone(),
+                    content_type.into(),
+                    bytes,
+                )))
+                .unwrap();
+            let rels = package.get_part_mut(&owner).unwrap().rels_mut();
+            rels.remove(id).unwrap();
+            rels.try_add_relationship(
+                relationship_type.into(),
+                target.relative_ref(owner.base_uri()),
+                id.into(),
+                litchi_opc::TargetMode::Internal,
+            )
+            .unwrap();
+        }
+        assert_eq!(load_timeline_caches(&package, &workbook).unwrap(), [cache]);
+        assert_eq!(load_timelines(&package, &workbook).unwrap(), [view]);
+        package
+            .rels_mut()
+            .try_add_relationship(
+                "http://schemas.microsoft.com/office/2010/relationships/TimelineCache".into(),
+                "xl/timelineCaches/timelineCache1.xml".into(),
+                "orphanAlias".into(),
+                litchi_opc::TargetMode::Internal,
+            )
+            .unwrap();
+        assert!(load_timeline_caches(&package, &workbook).is_err());
+    }
+
+    #[test]
     fn typed_state_pivot_filter_and_all_filter_types_round_trip() {
         let tokens = [
             "unknown",
