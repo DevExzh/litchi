@@ -235,6 +235,56 @@ fn parses_nested_textbox_text_in_source_order() {
     assert!(!drawing.is_inline());
 }
 
+#[test]
+fn group_children_cannot_overwrite_the_outer_anchor() {
+    let xml = br#"<w:p><w:r><w:drawing><wp:inline>
+        <wp:extent cx="3000000" cy="1700000"/><wp:docPr name="group"/>
+        <a:graphic><a:graphicData><wpg:wgp><wpg:grpSpPr><a:xfrm>
+        <a:off x="50" y="60"/><a:ext cx="700" cy="800"/></a:xfrm></wpg:grpSpPr>
+        <wps:wsp><wps:spPr><a:xfrm><a:off x="12" y="34"/>
+        <a:ext cx="100" cy="200"/></a:xfrm><a:prstGeom prst="ellipse"/></wps:spPr>
+        <wps:txbx><w:txbxContent><w:p><w:r><w:t>child</w:t></w:r></w:p></w:txbxContent></wps:txbx>
+        </wps:wsp></wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#;
+    let objects = parse(xml).unwrap();
+    assert_eq!(objects.len(), 1);
+    let group = &objects[0];
+    assert_eq!((group.name(), group.kind()), ("group", Kind::Other));
+    assert_eq!((group.width_emu(), group.height_emu()), (3000000, 1700000));
+    assert_eq!((group.x_emu(), group.y_emu()), (50, 60));
+    assert_eq!(group.preset(), None);
+    assert_eq!(group.unknown_preset(), None);
+    assert!(group.text().is_empty());
+}
+
+#[test]
+fn frame_extent_and_textbox_text_keep_their_own_scopes() {
+    let xml = br#"<w:drawing><wp:anchor><wp:extent cx="1000" cy="2000"/><wp:docPr name="outer"/>
+        <wps:wsp><wps:spPr><a:xfrm><a:off x="12" y="34"/><a:ext cx="99" cy="88"/></a:xfrm>
+        <a:prstGeom prst="rect"/></wps:spPr><wps:txbx><w:txbxContent>
+        <w:p><w:r><w:t xml:space="preserve"> A &amp; B </w:t><w:tab/><w:t>&#x1f600;</w:t><w:br/><w:t><![CDATA[<C>]]></w:t></w:r></w:p>
+        <w:p/><w:p><w:r><w:t>last</w:t><w:drawing><wp:inline><wp:docPr name="nested"/><wp:extent cx="7" cy="8"/></wp:inline></w:drawing></w:r></w:p>
+        </w:txbxContent></wps:txbx></wps:wsp></wp:anchor></w:drawing>"#;
+    let objects = parse(xml).unwrap();
+    assert_eq!(objects.len(), 1);
+    let shape = &objects[0];
+    assert_eq!(shape.name(), "outer");
+    assert_eq!(shape.kind(), Kind::TextBox);
+    assert_eq!((shape.width_emu(), shape.height_emu()), (1000, 2000));
+    assert_eq!((shape.x_emu(), shape.y_emu()), (12, 34));
+    assert_eq!(shape.text(), " A & B \t😀\n<C>\n\nlast");
+    assert_eq!(shape.preset(), Some(Preset::Rect));
+}
+
+#[test]
+fn truncated_or_excessively_nested_drawing_children_are_errors() {
+    assert!(parse(b"<w:drawing><wp:inline><wpg:wgp>").is_err());
+    let xml = format!(
+        "<w:drawing><wp:inline><wpg:wgp>{}</wpg:wgp></wp:inline></w:drawing>",
+        "<x:group>".repeat(129) + &"</x:group>".repeat(129)
+    );
+    assert!(parse(xml.as_bytes()).is_err());
+}
+
 /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a tag
 /// quick-xml's checked iterator reads in `O(n²)` when every item is read.
 fn repeated_attributes() -> String {

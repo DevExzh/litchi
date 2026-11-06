@@ -3751,9 +3751,9 @@
         "docx-118"
       ],
       "assertions": [
-        "One active VML text-box story with exact two-paragraph text, shape name, VML anchor and absent WordArt styling."
+        "One active WPS text-box story with exact two-paragraph text, native ID 1925752799, Rounded Rectangle 3 name, RoundRect preset, floating anchor and absent WordArt styling; source VML fallback remains retained."
       ],
-      "scope_limit": "The text-box MCE profile selects the native VML fallback. General drawing_objects still omits the WPS branch; no positive general drawing-inventory claim is made."
+      "scope_limit": "The document visibility profile selects supported WPS markup; no shape rendering, wrapping/layout enforcement or VML conversion is performed."
     },
     {
       "crate": "litchi-docx",
@@ -3798,7 +3798,8 @@
         "docx-082"
       ],
       "assertions": [
-        "Auto/eager public SmartArt query/path, native node-text edit and explicit process-layout outline rebuild; save/reopen keeps native extent, exact converted-group XML and unrelated parts. Node text editing also preserves layout/style/colors/main XML; both edits invert exactly."
+        "Auto/eager public SmartArt query/path, native node-text edit and explicit process-layout outline rebuild; save/reopen keeps native extent, exact converted-group XML and unrelated parts. Node text editing also preserves layout/style/colors/main XML; both edits invert exactly.",
+        "After both native node editing and explicit outline rebuild, all three drawing anchors remain visible and the converted group retains its outer 3048000x1714500 frame as Other."
       ],
       "scope_limit": "Native node-text mutation and explicit bounded layout authoring are separate operations. No native/proprietary layout engine, rendering or fresh native-app validation.",
       "required_features": [
@@ -3830,6 +3831,23 @@
         "ppt",
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_visuals",
+      "name": "native_wps_and_wpg_anchors_reach_both_drawing_inventories",
+      "fixtures": [
+        "word/word-visual-objects.docx",
+        "word/word-vector-diagram.docx"
+      ],
+      "feature_rows": [
+        "docx-082",
+        "docx-118"
+      ],
+      "assertions": [
+        "Eager and pinned source-backed inventories agree: four exact visual-object names and three exact vector/diagram anchor names; WPS floating rounded-rectangle kind/preset/frame/two-paragraph text, and WPG outer inline frame as one Other entry without child preset/text conflation."
+      ],
+      "scope_limit": "Top-level drawing inventory only. Group children are not flattened or exposed as a typed hierarchy; offsets remain DrawingML transforms rather than resolved page positions. No renderer, host layout, generic group authoring or native Office reopen."
     }
   ]
 }

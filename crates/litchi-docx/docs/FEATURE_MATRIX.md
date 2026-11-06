@@ -283,8 +283,8 @@ lookup, merge, field evaluation, form activation or fresh Word reopen occurs.
 `tests/microsoft_office_native_visuals.rs` qualifies the native Word visual and
 vector/diagram specimens. Picture metadata and JPEG/PNG/EMF identities, inert
 Excel OLE payloads, the separate doughnut chart workbook and cached data,
-SmartArt process nodes/definition identities, and the active VML text-box
-fallback have explicit assertions. SmartArt frame extents survive MCE's
+SmartArt process nodes/definition identities, and the active WPS text-box
+story have explicit assertions. SmartArt frame extents survive MCE's
 empty-element expansion and stay scoped to their inline/floating owner.
 
 A hole-size edit preserves chart companions, workbooks and exact unchanged
@@ -293,6 +293,16 @@ detach and subsequent reattach preserve the raster fallback and SmartArt
 parts; inverse restores the original archive. Public SmartArt outline edits
 retain the native frame extent and other visual payloads. The facade opens
 both embedded XLSX children independently and checks stored values/formulas.
-These tests do not render or refresh anything. The general drawing inventory
-still omits the alternate WPS/WPG branches selected away by its current MCE
-profile; the tested VML text-box fallback does not close that gap.
+These tests do not render or refresh anything. The shared document visibility
+profile understands WPS/WPG owners, so eager and pinned drawing inventories
+retain all four visual-object anchors and all three vector/diagram anchors.
+The native rounded rectangle exposes its floating WPS frame and two-paragraph
+story; its VML fallback remains in the unchanged source. A group is one `Other`
+entry with its outer frame and own transform. Children are opaque, so the last
+child cannot overwrite the group's preset, text, offset or dimensions.
+
+Frame extents take precedence over drawing-transform extents. Text-box
+inventory retains paragraph boundaries, whitespace, tabs, breaks, references
+and CDATA while excluding nested drawing stories. Drawing scans reject
+truncated/deep children. This remains a flat inventory: it does not establish
+group-child hierarchy/editing, page-position resolution or rendering coverage.

@@ -624,6 +624,13 @@ pub(crate) fn visible_document_capabilities() -> litchi_ooxml_common::mce::Capab
     capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
     capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
     capabilities.understand_namespace("http://schemas.microsoft.com/office/word/2012/wordml");
+    // The text and drawing inventories understand these owners. Selecting
+    // their VML fallbacks would hide the supported DrawingML anchor metadata.
+    // The flat drawing inventory retains group roots without flattening children.
+    capabilities
+        .understand_namespace("http://schemas.microsoft.com/office/word/2010/wordprocessingShape");
+    capabilities
+        .understand_namespace("http://schemas.microsoft.com/office/word/2010/wordprocessingGroup");
     capabilities
 }
 

@@ -1,8 +1,4 @@
 #![expect(
-    clippy::match_same_arms,
-    reason = "separate arms document distinct OOXML grammar cases"
-)]
-#![expect(
     clippy::option_option,
     reason = "nested options distinguish omitted, present-empty, and present-valued XML"
 )]
@@ -41,15 +37,21 @@ use smallvec::SmallVec;
 /// Parse drawing objects from a paragraph XML slice.
 pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
     let mut reader = Reader::from_reader(xml_bytes);
-    reader.config_mut().trim_text(true);
-
+    reader.config_mut().trim_text(false);
     let mut objects = SmallVec::new();
-    let mut in_drawing = false;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut skipped = None;
+    let mut drawing_depth = None;
+    let mut group_depth = None;
+    let mut anchor_depth = None;
+    let mut frame_extent = false;
     let mut in_shape = false;
     let mut has_shape = false;
     let mut in_text_box = false;
     let mut in_text_content = false;
-
+    let mut in_text = false;
+    let mut text_paragraphs = 0usize;
     let mut width_emu = EMUS_PER_INCH;
     let mut height_emu = EMUS_PER_INCH;
     let mut x_emu = 0;
@@ -64,12 +66,70 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
     let mut text_content = String::new();
 
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(element) | Event::Empty(element)) => {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let empty = matches!(event, Event::Empty(_));
+        if matches!(event, Event::Start(_)) {
+            depth = depth
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("drawing nesting overflow".into()))?;
+        }
+        let element_depth = depth + usize::from(empty);
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            nodes += 1;
+            if element_depth > 128 || nodes > 1_000_000 {
+                return Err(Error::InvalidFormat(
+                    "drawing inventory exceeds XML structure limits".into(),
+                ));
+            }
+        }
+        if let Some(skip_depth) = skipped {
+            match event {
+                Event::End(_) => {
+                    if depth == skip_depth {
+                        skipped = None;
+                    }
+                    depth -= 1;
+                },
+                Event::Eof => {
+                    return Err(Error::InvalidFormat("unterminated drawing child".into()));
+                },
+                _ => {},
+            }
+            continue;
+        }
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
                 let local = element.local_name();
+                let in_drawing = drawing_depth.is_some();
+                if group_depth == Some(element_depth - 1)
+                    && !matches!(local.as_ref(), b"grpSpPr" | b"cNvGrpSpPr")
+                {
+                    // Keep only the group's own properties. Child drawings
+                    // are opaque to this flat inventory, even when they use
+                    // familiar shape, picture or nested-group element names.
+                    if !empty {
+                        skipped = Some(element_depth);
+                    }
+                    continue;
+                }
                 match local.as_ref() {
+                    b"drawing" if in_drawing => {
+                        // A nested drawing belongs to a subsidiary text-box
+                        // story; it cannot overwrite the outer anchor.
+                        if !empty {
+                            skipped = Some(element_depth);
+                        }
+                    },
                     b"drawing" => {
-                        in_drawing = true;
+                        if empty {
+                            continue;
+                        }
+                        drawing_depth = Some(element_depth);
+                        group_depth = None;
+                        anchor_depth = None;
+                        frame_extent = false;
                         width_emu = EMUS_PER_INCH;
                         height_emu = EMUS_PER_INCH;
                         x_emu = 0;
@@ -80,27 +140,38 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         unknown_preset = None;
                         has_text_box = false;
                         has_shape = false;
+                        in_shape = false;
+                        in_text_box = false;
+                        in_text_content = false;
+                        in_text = false;
+                        text_paragraphs = 0;
                         is_inline = true;
                         anchor_id = None;
                         text_content.clear();
                     },
-                    b"inline" if in_drawing => {
-                        is_inline = true;
+                    b"inline" | b"anchor" if in_drawing => {
+                        is_inline = local.as_ref() == b"inline";
                         anchor_id = parse_anchor_id(&element)?;
+                        anchor_depth = Some(element_depth);
                     },
-                    b"anchor" if in_drawing => {
-                        is_inline = false;
-                        anchor_id = parse_anchor_id(&element)?;
-                    },
-                    b"extent" if in_drawing => {
+                    b"extent" if in_drawing && anchor_depth == Some(element_depth - 1) => {
                         width_emu = number_attribute(&element, b"cx", EMUS_PER_INCH)?;
                         height_emu = number_attribute(&element, b"cy", EMUS_PER_INCH)?;
+                        frame_extent = true;
+                    },
+                    b"wgp" | b"grpSp" if in_drawing => {
+                        // The flat inventory has no group-child model. Keep
+                        // the outer drawing as Other, without mistaking its
+                        // last child for the group's geometry or text.
+                        if !empty {
+                            group_depth = Some(element_depth);
+                        }
                     },
                     b"off" if in_drawing => {
                         x_emu = number_attribute(&element, b"x", 0)?;
                         y_emu = number_attribute(&element, b"y", 0)?;
                     },
-                    b"ext" if in_drawing => {
+                    b"ext" if in_drawing && !frame_extent => {
                         width_emu = number_attribute(&element, b"cx", EMUS_PER_INCH)?;
                         height_emu = number_attribute(&element, b"cy", EMUS_PER_INCH)?;
                     },
@@ -113,7 +184,7 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         }
                     },
                     b"wsp" if in_drawing => {
-                        in_shape = true;
+                        in_shape = !empty;
                         has_shape = true;
                     },
                     b"prstGeom" if in_shape => match parse_preset(&element)? {
@@ -127,76 +198,105 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         },
                     },
                     b"txbx" if in_shape => {
-                        in_text_box = true;
+                        in_text_box = !empty;
                         has_text_box = true;
                     },
                     b"txbxContent" if in_text_box => {
-                        in_text_content = true;
+                        in_text_content = !empty;
                     },
-                    b"t" if in_text_content => {},
+                    b"p" if in_text_content => {
+                        if text_paragraphs > 0 {
+                            text_content.push('\n');
+                        }
+                        text_paragraphs += 1;
+                    },
+                    b"t" if in_text_content => {
+                        in_text = !empty;
+                    },
+                    b"tab" if in_text_content => text_content.push('\t'),
+                    b"br" | b"cr" if in_text_content => text_content.push('\n'),
                     _ => {},
                 }
             },
-            Ok(Event::Text(text)) if in_text_content => {
-                // Keep the legacy inventory behavior: malformed text bytes
-                // are inert and do not prevent the surrounding drawing from
-                // being discovered. The full Word story parser owns strict
-                // text decoding elsewhere.
-                if let Ok(value) = std::str::from_utf8(text.as_ref()) {
-                    text_content.push_str(value);
-                }
+            Event::Text(text) if in_text => {
+                let decoded = text
+                    .xml_content(quick_xml::XmlVersion::Explicit1_0)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                let value = quick_xml::escape::unescape(&decoded)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                text_content.push_str(&value);
             },
-            Ok(Event::End(element)) => {
-                let local = element.local_name();
-                match local.as_ref() {
-                    b"drawing" => {
-                        in_drawing = false;
-                        let kind = if has_text_box {
-                            Kind::TextBox
-                        } else if has_shape {
-                            Kind::Shape
-                        } else {
-                            Kind::Other
-                        };
-                        objects.push(
-                            Object::from_inventory(
-                                name.clone(),
-                                description.clone(),
-                                width_emu,
-                                height_emu,
-                                x_emu,
-                                y_emu,
-                                preset,
-                                kind,
-                                if is_inline {
-                                    Anchor::Inline
-                                } else {
-                                    Anchor::Floating
-                                },
-                                anchor_id,
-                                text_content.clone(),
-                            )
-                            .with_unknown_preset(unknown_preset.take()),
-                        );
-                    },
-                    b"wsp" => {
-                        in_shape = false;
-                    },
-                    b"txbx" => {
-                        in_text_box = false;
-                    },
-                    b"txbxContent" => {
-                        in_text_content = false;
-                    },
-                    _ => {},
-                }
+            Event::CData(text) if in_text => {
+                let value = text
+                    .xml_content(quick_xml::XmlVersion::Explicit1_0)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                text_content.push_str(&value);
             },
-            Ok(Event::Eof) => break,
-            Err(error) => return Err(Error::Xml(error.to_string())),
+            Event::GeneralRef(reference) if in_text => {
+                let value = litchi_ooxml_common::xml::decode_xml_reference(&reference)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                text_content.push_str(&value);
+            },
+            Event::End(element) => {
+                if group_depth == Some(depth) {
+                    group_depth = None;
+                }
+                if drawing_depth == Some(depth) {
+                    drawing_depth = None;
+                    let kind = if has_text_box {
+                        Kind::TextBox
+                    } else if has_shape {
+                        Kind::Shape
+                    } else {
+                        Kind::Other
+                    };
+                    objects.push(
+                        Object::from_inventory(
+                            std::mem::take(&mut name),
+                            std::mem::take(&mut description),
+                            width_emu,
+                            height_emu,
+                            x_emu,
+                            y_emu,
+                            preset,
+                            kind,
+                            if is_inline {
+                                Anchor::Inline
+                            } else {
+                                Anchor::Floating
+                            },
+                            anchor_id,
+                            std::mem::take(&mut text_content),
+                        )
+                        .with_unknown_preset(unknown_preset.take()),
+                    );
+                } else {
+                    match element.local_name().as_ref() {
+                        b"wsp" => in_shape = false,
+                        b"txbx" => in_text_box = false,
+                        b"txbxContent" => {
+                            in_text_content = false;
+                            in_text = false;
+                        },
+                        b"t" => in_text = false,
+                        _ => {},
+                    }
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("invalid drawing XML nesting".into()))?;
+            },
+            Event::Eof => {
+                if depth != 0 || drawing_depth.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "unterminated drawing inventory".into(),
+                    ));
+                }
+                break;
+            },
             _ => {},
         }
     }
-
     Ok(objects)
 }
 

@@ -960,6 +960,16 @@ fn native_word_smartart_outline_edits_preserve_extent_and_other_visuals() {
             "ACQUIRE_013\nTRANSFORM_REVIEWED\nVERIFY_013"
         );
         assert_eq!(diagrams[0].extent, Some((5486400, 3200400)));
+        let drawings = reopened.document().unwrap().drawing_objects().unwrap();
+        assert_eq!(
+            drawings.iter().map(|d| d.name()).collect::<Vec<_>>(),
+            ["Graphic 1", "Graphic 3", "Diagram 2"]
+        );
+        assert_eq!(drawings[1].kind(), litchi_docx::drawing::Kind::Other);
+        assert_eq!(
+            (drawings[1].width_emu(), drawings[1].height_emu()),
+            (3048000, 1714500)
+        );
         assert_eq!(
             diagrams[0].diagram_type(),
             litchi_drawingml::diagram::DiagramType::Process

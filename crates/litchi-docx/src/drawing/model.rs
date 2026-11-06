@@ -88,7 +88,8 @@ pub enum Kind {
     Shape,
     /// A shape containing a Word text-box story (`wps:txbx`).
     TextBox,
-    /// An unknown or non-shape `DrawingML` object retained as inert inventory.
+    /// An unknown or non-shape `DrawingML` object retained as inert inventory,
+    /// including a group root. Group children are not flattened into this entry.
     Other,
 }
 
@@ -204,7 +205,8 @@ impl Object {
         &self.description
     }
 
-    /// Return the text collected from the nested text-box story.
+    /// Return the text collected from the nested text-box story, with paragraph
+    /// boundaries, tabs and breaks retained. Nested drawing stories are excluded.
     #[inline]
     #[must_use]
     pub fn text(&self) -> &str {
@@ -217,14 +219,16 @@ impl Object {
         self.text = text;
     }
 
-    /// Return the width in EMUs.
+    /// Return the anchor frame width in EMUs, falling back to the drawing
+    /// transform width when no frame extent was authored.
     #[inline]
     #[must_use]
     pub fn width_emu(&self) -> i64 {
         self.width_emu
     }
 
-    /// Return the height in EMUs.
+    /// Return the anchor frame height in EMUs, falling back to the drawing
+    /// transform height when no frame extent was authored.
     #[inline]
     #[must_use]
     pub fn height_emu(&self) -> i64 {

@@ -255,9 +255,17 @@ fn native_rounded_rectangle_exposes_one_active_textbox_story() {
     );
     assert_eq!(boxes[0].name.as_deref(), Some("Rounded Rectangle 3"));
     assert!(!boxes[0].is_word_art());
-    assert_eq!(boxes[0].anchor, litchi_docx::textbox::TextBoxAnchor::Vml);
-    // This reader's MCE profile selects the native VML fallback. It does not
-    // qualify the separate general drawing inventory's missing WPS branch.
+    assert_eq!(
+        boxes[0].anchor,
+        litchi_docx::textbox::TextBoxAnchor::Floating
+    );
+    assert_eq!(boxes[0].id, Some(1925752799));
+    assert_eq!(
+        boxes[0].preset,
+        Some(litchi_drawingml::geom::Preset::RoundRect)
+    );
+    // The supported WPS choice is visible once; the source VML fallback is
+    // still retained in the package for other consumers.
     assert!(
         package
             .opc_package()
@@ -267,6 +275,49 @@ fn native_rounded_rectangle_exposes_one_active_textbox_story() {
             .windows(11)
             .any(|v| v == b"v:roundrect")
     );
+}
+
+#[test]
+fn native_wps_and_wpg_anchors_reach_both_drawing_inventories() {
+    use litchi_docx::drawing::{Anchor, Kind};
+    for (name, expected_names) in [
+        (
+            "word-visual-objects.docx",
+            vec!["Picture 1", "Rounded Rectangle 3", "Picture 2", "Chart 4"],
+        ),
+        (
+            "word-vector-diagram.docx",
+            vec!["Graphic 1", "Graphic 3", "Diagram 2"],
+        ),
+    ] {
+        let package = native(name);
+        let source = litchi_docx::source_backed::Package::open(path(name)).unwrap();
+        let eager = package.document().unwrap().drawing_objects().unwrap();
+        let pinned = source.document().unwrap().drawing_objects().unwrap();
+        assert_eq!(eager, pinned);
+        assert_eq!(
+            eager.iter().map(|d| d.name()).collect::<Vec<_>>(),
+            expected_names
+        );
+        if name == "word-visual-objects.docx" {
+            let shape = &eager[1];
+            assert_eq!(shape.kind(), Kind::TextBox);
+            assert_eq!(shape.anchor(), Anchor::Floating);
+            assert_eq!(
+                shape.preset(),
+                Some(litchi_drawingml::geom::Preset::RoundRect)
+            );
+            assert_eq!((shape.width_emu(), shape.height_emu()), (2984500, 939800));
+            assert_eq!(shape.text(), "SHAPE_TEXTBOX_007\nNative rounded rectangle");
+        } else {
+            let group = &eager[1];
+            assert_eq!(group.kind(), Kind::Other);
+            assert_eq!(group.anchor(), Anchor::Inline);
+            assert_eq!((group.width_emu(), group.height_emu()), (3048000, 1714500));
+            assert_eq!(group.preset(), None);
+            assert!(group.text().is_empty());
+        }
+    }
 }
 
 #[test]
