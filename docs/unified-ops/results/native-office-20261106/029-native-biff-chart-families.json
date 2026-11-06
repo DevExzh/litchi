@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "3968af5f0751cf2ccbf80711fab0ba455b9de8d4",
+  "base_commit": "01e34bf5685cb06d5726f4850b7b1e20c6fb5458",
+  "problem": "Native OfPie BIFF charts silently inherited the XLS default Line family, while the shared Graph semantic reader rejected the same native BopPop record before CrtLink. The prior receipt also identified a possible stock classification gap that needed specification-based reconciliation.",
+  "changes": [
+    "Add one shared checked BopPop codec and expose OfPie options in XLS GroupKind/Kind and the shared Graph Family; use the codec for both parsing and group emission.",
+    "Preserve all 22 source payload bytes, including ignored split fields and reserved bits. Validate active split fields and Xnum restrictions, with producer-specific Excel and standalone Graph position/gap limits.",
+    "Add OfPie subtypes to the PowerPoint operations chartType projection (pieOfPie/barOfPie) so the new shared family is handled exhaustively.",
+    "Clarify that XLS Kind::Stock is the existing structural convenience for Line plus high-low lines and up/down bars. High/low/close without up/down bars retains its actual Line wire family, rather than misclassifying arbitrary high-low line charts.",
+    "Add five native regressions, extend the geometry regression to every one of the 17 native embedded charts, and add six record/group codec tests."
+  ],
+  "stock_finding_reconciliation": {
+    "prior_receipt": "028-native-excel-charts.json described the native high/low/close Line result as a possible classification gap.",
+    "new_evidence": "MS-XLS 2.2.3.7 identifies the group by its Line record and has no distinct stock-family record. MS-XLS 2.4.68 permits high-low lines for both line and stock groups. The native Stock_013 stream has Line flags 0, exactly one CrtLine HighLow, and no DropBar.",
+    "decision": "Keep the truthful BIFF family and document the convenience heuristic. Qualify the actual native stock series, date category format, source values and high-low styling. Do not infer the native UI chart selection from high-low lines alone.",
+    "semantics": "High_013, Low_013 and Close_013 each reference five points on ExternSheet 16, with categories A2:A6 using format 14. Source cells contain DateTime serials 46296..46300 and high [15,16,18,17,20], low [10,11,13,12,14], close [12,14,15,16,18]."
+  },
+  "verification_scope": {
+    "native_of_pie": "Pie subtype, automatic split, secondary size 75, gap 150, shadow false, one SERIES_A_013 series, ExternSheet 15 references, no axes and one Series connecting-line record. The original native BopPop payload is 22 bytes: 01010000000000004b00960000000000000000000000.",
+    "shared_models": "All 17 native streams parse through the shared Graph model with exact group families and axis counts and replay byte-for-byte. Line has three regular series, six error-bar auxiliaries and one trend; Scatter has one regular series, four error auxiliaries and one trend. Combo regular series owners are 0,0,1 across two axis parents.",
+    "scatter_cache": "Ten exact cached custom Y error values bind to auxiliary columns 1 and 2: plus [0.5,1,1.5,2,2.5], minus [0.25,0.5,0.75,1,1.25]. All four error auxiliaries and the linear trend point to regular series one. Trend equation/R-squared flags remain set.",
+    "source_edits": "For each of the 17 embedded charts, increasing width by 65536 raw units (1.0 in 16.16 fixed-point) modifies exactly one Chart record. Every other BIFF record and CFB stream stays identical, other chart models are unchanged, and inverse application restores the original complete package. Host drawing bounds are not resized.",
+    "codec_domains": "Both subtypes and all fixed-record split discriminants round-trip. Inactive fields and reserved bits retain exact bytes. Invalid length/subtype/Boolean/active split/position/secondary size/gap and non-Xnum values (NaN, infinity, subnormal, negative zero) are rejected. Excel permits position 0 and gap through 500; standalone Graph requires active position greater than zero and gap through 200.",
+    "authoring_boundary": "The existing native full-model reauthoring boundary is tested as Refused(UnsupportedContent), because arbitrary model emission cannot place opaque source records losslessly. Native automatic-split reading and fixed-record transactions are qualified; complete custom-split membership handling and general OfPie reauthoring are not claimed.",
+    "limits": "No formula evaluation, error calculation, trend fitting, rendering, macro execution, external refresh or fresh Office reopen. No whole-feature completion is inferred from these scoped assertions."
+  },
+  "results": {
+    "main_rust_suite_passes": 5922,
+    "rust_ignored": 7,
+    "ignored_tests": [
+      "test package::tests::test_invalid_file ... ignored, requires an external DOC fixture",
+      "test package::tests::test_open_package ... ignored, requires an external DOC fixture",
+      "test package::tests::test_invalid_file ... ignored, requires a test file",
+      "test generate_litchi_changed_artifact ... ignored, writes the Litchi-generated artifact path requested by an external harness",
+      "test read_back_native_resaved_artifact ... ignored, reads a native-resaved artifact supplied by an external harness",
+      "test write_every_feature ... ignored, writes an evidence workbook",
+      "test libreoffice_probe_files ... ignored, writes LibreOffice probe files to DOC_WRITE_DIR"
+    ],
+    "python_passed": 72,
+    "new_native_tests": 5,
+    "expanded_native_tests": 1,
+    "new_codec_tests": 6,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 247,
+      "indexed_tests": 317,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 247,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 46,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 63,
+        "unsupported_boundary_needs_review": 41,
+        "native_evidence_needs_semantic_tests": 11,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ograph -p litchi-xls -p litchi-doc -p litchi-ppt --features litchi-ppt/encryption,litchi-ppt/sign,litchi-ppt/vba-inspection,litchi-ppt/formula --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-owner.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-owner.log",
+        "bytes": 471628,
+        "sha256": "5a5e3c01f0c3c52fd0569a50b9eced57b28758c4bb26f2462f3c8db8ed6ab82a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ograph -p litchi-xls -p litchi-doc -p litchi-ppt --features litchi-ppt/encryption,litchi-ppt/sign,litchi-ppt/vba-inspection,litchi-ppt/formula --lib --tests --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-owner.log 2>&1",
+      "suites": 205,
+      "passed": 5119,
+      "failed": 0,
+      "ignored": 6
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,ppt,xls,encryption --lib --test 'doc_*' --test 'ppt_*' --test 'xls_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-ops.log",
+        "bytes": 71885,
+        "sha256": "18626f3ff59a97474862a3da44de836aa62ce3342f45ab0f02199ac71f53f442"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,ppt,xls,encryption --lib --test 'doc_*' --test 'ppt_*' --test 'xls_*' --test microsoft_office_native --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-ops.log 2>&1",
+      "suites": 24,
+      "passed": 683,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-facade.log",
+        "bytes": 33664,
+        "sha256": "a79b7ebc559614888343bad4dd7786f130d3d4a9359efe62cc1a681ab00bf07a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-facade.log 2>&1",
+      "suites": 30,
+      "passed": 120,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-ograph -p litchi-xls -p litchi-ops --no-default-features --features litchi-ops/doc,litchi-ops/ppt,litchi-ops/xls,litchi-ops/encryption --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-clippy.log",
+        "bytes": 17502,
+        "sha256": "17652ebbc08500690c10695e981b42beaf72bc2f60322526cc1236ab53a34ea3"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-ograph -p litchi-xls -p litchi-ops --no-default-features --features litchi-ops/doc,litchi-ops/ppt,litchi-ops/xls,litchi-ops/encryption --lib --tests --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-python.log",
+        "bytes": 664,
+        "sha256": "574a29f278094434446e89d34d5840d50330076e926c2ead375f44d4748dd88a"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-coverage.json",
+        "bytes": 852047,
+        "sha256": "f504e54a87ddcf30904a977f95c0a42f02c04eaf8ca7473fab2837773b72f666"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 crates/litchi-ograph/src/chart/codec/records/encode.rs crates/litchi-ograph/src/chart/codec/records/parse.rs crates/litchi-ograph/src/chart/codec/records/validate.rs crates/litchi-ograph/src/chart/codec/records/wire.rs crates/litchi-ograph/src/chart/model/aggregate/semantic.rs crates/litchi-ograph/src/chart/model/groups.rs crates/litchi-ograph/src/record/mod.rs crates/litchi-ops/src/format/ppt/elements.rs crates/litchi-xls/src/chart/codec.rs crates/litchi-xls/src/chart/model.rs crates/litchi-xls/src/chart/wire.rs crates/litchi-xls/tests/microsoft_office_native_charts.rs crates/litchi-ograph/src/record/of_pie.rs crates/litchi-ograph/tests/microsoft_office_native_charts.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-format.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --check --edition 2024 crates/litchi-ograph/src/chart/codec/records/encode.rs crates/litchi-ograph/src/chart/codec/records/parse.rs crates/litchi-ograph/src/chart/codec/records/validate.rs crates/litchi-ograph/src/chart/codec/records/wire.rs crates/litchi-ograph/src/chart/model/aggregate/semantic.rs crates/litchi-ograph/src/chart/model/groups.rs crates/litchi-ograph/src/record/mod.rs crates/litchi-ops/src/format/ppt/elements.rs crates/litchi-xls/src/chart/codec.rs crates/litchi-xls/src/chart/model.rs crates/litchi-xls/src/chart/wire.rs crates/litchi-xls/tests/microsoft_office_native_charts.rs crates/litchi-ograph/src/record/of_pie.rs crates/litchi-ograph/tests/microsoft_office_native_charts.rs > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-format.log 2>&1"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "biff-families-diff-check.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-diff-check.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "git diff --check > /home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-diff-check.log 2>&1"
+    }
+  ],
+  "diagnostic_notes": {
+    "before_fix": {
+      "file_name": "biff-families-before.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-before.log",
+      "bytes": 5744,
+      "sha256": "6ef9e90ed85241218c8212fe3910b3cc4053ac7e15251fcf33da1a5ed9fea6ae"
+    },
+    "after_fix_probe": {
+      "file_name": "biff-families-after-probe.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-after-probe.log",
+      "bytes": 5615,
+      "sha256": "a95ce81bce34d92c8b925f89329547acdfe47a57b7d35161724c0610c95924af"
+    },
+    "shared_chart_probe": {
+      "file_name": "biff-shared-probe.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-shared-probe.log",
+      "bytes": 4433,
+      "sha256": "d1f56ee2904d200fc782ad69db4fadaa1d5e950daa14944ae836152be51fa63c"
+    },
+    "focused_final": {
+      "file_name": "biff-families-focused-final.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/biff-families-focused-final.log",
+      "bytes": 1491,
+      "sha256": "0e54430b38fb1153b8762edb2dcffbe1a17a6ac67d2c2e137ab1839d409ff400"
+    },
+    "observations": "The unmodified source reproduced XLS Kind::Line for BopPop and a shared InvalidChart error at offset 6224 (ChartFormat Begin not followed by a chart family). The new decoder resolves both. During test development, the native date cell expectation was corrected to the documented typed DateTime projection with its original serial after confirming category format 14; no fixture bytes were changed."
+  },
+  "specification": {
+    "references": [
+      "[MS-XLS] 2.2.3.7 Chart Group",
+      "[MS-XLS] 2.4.25 BopPop",
+      "[MS-XLS] 2.4.68 CrtLine",
+      "[MS-XLS] 2.5.342 Xnum",
+      "[MS-OGRAPH] 2.4.15 BopPop",
+      "[MS-OGRAPH] 2.5.33 Xnum"
+    ],
+    "local_sources": [
+      {
+        "file_name": "2.2 Conceptual Overview.md",
+        "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-XLS]/2 Structures/2.2 Conceptual Overview.md",
+        "bytes": 277899,
+        "sha256": "679180930b445b861ae6bc4176a13d9f14a4769dd069277eda8fe369f929e457"
+      },
+      {
+        "file_name": "2.4 Records.md",
+        "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-XLS]/2 Structures/2.4 Records.md",
+        "bytes": 1470047,
+        "sha256": "48608c9c506abfb00c13f29c6c856875201bc5d1d313ff33f8dc6f3c2db26572"
+      },
+      {
+        "file_name": "2.5 Structures.md",
+        "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-XLS]/2 Structures/2.5 Structures.md",
+        "bytes": 1165265,
+        "sha256": "cc97a37981f84bc979fbac7eff9da71560b239b4a3c3b8b57ce04827158ab0f1"
+      },
+      {
+        "file_name": "2.4 Records.md",
+        "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-OGRAPH]/2 Structures/2.4 Records.md",
+        "bytes": 336689,
+        "sha256": "2d334c7985dd3cf809b7fed85705a1b3361d603485cfd96240b599d739764ca8"
+      },
+      {
+        "file_name": "2.5 Structures.md",
+        "path": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-OGRAPH]/2 Structures/2.5 Structures.md",
+        "bytes": 67490,
+        "sha256": "dabc3220d36bee9a94f2d55dc7351578b42fd77459c56bb4c24c58b855bc05a2"
+      }
+    ],
+    "usage": "Read-only specification research; no runtime/test/tool dependency on untracked specifications."
+  },
+  "evidence_sources": [
+    {
+      "file_name": "excel-chart-families.xls",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/excel/excel-chart-families.xls",
+      "bytes": 253952,
+      "sha256": "94aed9811a45661ee033e79738b46f0b98d8c89a76b7f2f5913ea01cd6ff5097"
+    },
+    {
+      "file_name": "chart-families-inspection.json",
+      "path": "/home/zhuhe/code/litchi/test-data/microsoft-office/excel/chart-families-inspection.json",
+      "bytes": 69098,
+      "sha256": "84359d69afe9d39808803ab454a2c31b7d10e7a5897dcbcb46587074fcfac4fb"
+    }
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native_charts-67da310a5d1a6a07",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/target/debug/deps/microsoft_office_native_charts-67da310a5d1a6a07",
+      "bytes": 2727432,
+      "sha256": "fbcdc093dcf90f583e585f1731b2aa163130250bec1ae650d06596e54c712f67",
+      "source_commit": "3968af5f0751cf2ccbf80711fab0ba455b9de8d4",
+      "build_command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ograph -p litchi-xls -p litchi-doc -p litchi-ppt --features litchi-ppt/encryption,litchi-ppt/sign,litchi-ppt/vba-inspection,litchi-ppt/formula --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native_charts-4e3a4125d534a7ee",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/target/debug/deps/microsoft_office_native_charts-4e3a4125d534a7ee",
+      "bytes": 14021432,
+      "sha256": "9409709703a6a842f913d4d8dc2ec7764946fc0a78dd1f7d2ce102191d48f55d",
+      "source_commit": "3968af5f0751cf2ccbf80711fab0ba455b9de8d4",
+      "build_command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ograph -p litchi-xls -p litchi-doc -p litchi-ppt --features litchi-ppt/encryption,litchi-ppt/sign,litchi-ppt/vba-inspection,litchi-ppt/formula --lib --tests --no-fail-fast"
+    }
+  ],
+  "remaining_scope": "The goal remains active. All 139 fixtures are indexed; 247 of 494 rows have scoped partial assertions. The additional tests deepen XLS chart coverage without increasing that row count. Eleven native-evidence semantic rows and the pending operation, bounded-operation, external/UI and unsupported reviews still need work.",
+  "environment": {
+    "artifact_directory": "/home/zhuhe/.cache/litchi-native-office.V1L32Z",
+    "warnings": "77 existing vendor/zlib-rs warnings; no new Clippy warnings.",
+    "preserved_untracked_files": [
+      "crates/litchi/examples/bench_word_parse.rs",
+      "docs/adr/0033-unified-api-glossary-and-default-policies.md",
+      "perf.data"
+    ]
+  }
+}
