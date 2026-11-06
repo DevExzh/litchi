@@ -4,9 +4,7 @@
 //! the one relationship graph permitted by MS-XLSB 2.1.7.24.
 
 use super::{Connections, parse_connections_part};
-use crate::package::connections::write::{
-    write_connections_part, write_connections_part_with_unknown,
-};
+use crate::package::connections::write::write_connections_part;
 use crate::package::error::{Error, Result};
 use litchi_opc::constants::content_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -122,29 +120,54 @@ pub(crate) fn store_on_workbook(
     let payload = if let Some(graph) = existing.as_ref() {
         let source =
             super::codec::parse_source(package.get_part(&graph.part_name)?.blob(), raw_limits)?;
-        write_connections_part_with_unknown(connections, &source.unknown_records, raw_limits)?
+        let before =
+            parse_connections_part(package.get_part(&graph.part_name)?.blob(), raw_limits)?;
+        if has_query_tables(package)
+            && before
+                .connections
+                .iter()
+                .any(|old| connections.by_id(old.connection_id).is_none())
+        {
+            return Err(Error::UnsupportedFeature(
+                "removing connections with query-table dependencies",
+            ));
+        }
+        let canonical = write_connections_part(connections, raw_limits)?;
+        super::codec::check_opaque_layout(
+            package.get_part(&graph.part_name)?.blob(),
+            &canonical,
+            &source.unknown_records,
+            raw_limits,
+        )?;
+        let (preserved, retained) = super::codec::retain_unchanged_connections(
+            package.get_part(&graph.part_name)?.blob(),
+            &before,
+            connections,
+            &canonical,
+            raw_limits,
+        )?;
+        let remaining = source
+            .unknown_records
+            .into_iter()
+            .filter(|r| r.connection_id().is_none_or(|id| !retained.contains(&id)))
+            .collect::<Vec<_>>();
+        super::codec::restore_opaque_positions(&preserved, &remaining, raw_limits)?
     } else {
         write_connections_part(connections, raw_limits)?
     };
     // Treat the reader as a post-serialization grammar oracle before mutation.
     let canonical_model = parse_connections_part(&payload, raw_limits)?;
+    if let Some(graph) = existing.as_ref() {
+        crate::signature_policy::ensure_unsigned(package)?;
+        package.get_part_mut(&graph.part_name)?.set_blob(payload);
+        load_from_workbook(package, workbook_uri, raw_limits)?
+            .ok_or_else(|| invalid("stored connections graph was not discoverable"))?;
+        return Ok(canonical_model);
+    }
     let canonical_part = PackURI::new(CONNECTIONS_PART_NAME)?;
-    if existing
-        .as_ref()
-        .is_none_or(|graph| !graph.part_name.is_equivalent_to(&canonical_part))
-    {
-        package.validate_new_part_name(&canonical_part)?;
-        ensure_no_inbound_relationship(package, &canonical_part)?;
-    }
-
+    package.validate_new_part_name(&canonical_part)?;
+    ensure_no_inbound_relationship(package, &canonical_part)?;
     crate::signature_policy::ensure_unsigned(package)?;
-    if let Some(graph) = existing {
-        package
-            .get_part_mut(workbook_uri)?
-            .rels_mut()
-            .remove(&graph.relationship_id);
-        package.remove_part(&graph.part_name);
-    }
     package.try_add_part(Box::new(BlobPart::new(
         canonical_part.clone(),
         CONNECTIONS_CONTENT_TYPE.to_string(),
@@ -160,6 +183,13 @@ pub(crate) fn store_on_workbook(
     Ok(canonical_model)
 }
 
+fn has_query_tables(package: &OpcPackage) -> bool {
+    package.iter_parts().any(|part| {
+        part.content_type()
+            .eq_ignore_ascii_case("application/vnd.ms-excel.queryTable")
+    })
+}
+
 pub(crate) fn remove_from_workbook(
     package: &mut OpcPackage,
     workbook_uri: &PackURI,
@@ -167,6 +197,11 @@ pub(crate) fn remove_from_workbook(
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(false);
     };
+    if has_query_tables(package) {
+        return Err(Error::UnsupportedFeature(
+            "removing connections with query-table dependencies",
+        ));
+    }
     crate::signature_policy::ensure_unsigned(package)?;
     package
         .get_part_mut(workbook_uri)?

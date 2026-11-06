@@ -147,6 +147,15 @@ pub(crate) fn validate_connections(connections: &Connections) -> Result<()> {
             ));
         }
         match &connection.properties {
+            Properties::Text(properties) => {
+                if connection.source_type != SourceType::Text {
+                    return Err(malformed(
+                        "BrtBeginECTxtWiz",
+                        "classic text properties require a Text connection",
+                    ));
+                }
+                super::text::validate(properties)?;
+            },
             Properties::Database(properties) => {
                 validate_string(
                     &properties.connection_string,
@@ -535,6 +544,22 @@ pub(crate) fn write_connections_part_with_unknown(
             &ext_connection_payload(connection),
         )?;
         match &connection.properties {
+            Properties::Text(props) => {
+                writer.write_record(rt::BEGIN_EC_TXT_WIZ, &super::text::payload(props)?)?;
+                if let Some(fields) = &props.fields {
+                    writer.write_record(
+                        rt::BEGIN_EC_TW_FLD_INFO_LIST,
+                        &(fields.len() as u32).to_le_bytes(),
+                    )?;
+                    for field in fields {
+                        let mut payload = (field.field_type as u32).to_le_bytes().to_vec();
+                        payload.extend_from_slice(&field.start.to_le_bytes());
+                        writer.write_record(rt::BEGIN_EC_TW_FLD_INFO, &payload)?;
+                    }
+                    writer.write_record(rt::END_EC_TW_FLD_INFO_LIST, &[])?;
+                }
+                writer.write_record(rt::END_EC_TXT_WIZ, &[])?;
+            },
             Properties::Database(props) => {
                 writer.write_record(rt::BEGIN_EC_DB_PROPS, &db_props_payload(props))?;
                 writer.write_record(rt::END_EC_DB_PROPS, &[])?;
@@ -597,7 +622,7 @@ pub(crate) fn write_connections_part_with_unknown(
         )?;
         if header_len.checked_add(header.len()) != Some(record.bytes().len())
             || u16::from(header.kind()) != record.kind()
-            || super::codec::is_modeled_record(header.kind())
+            || (super::codec::is_modeled_record(header.kind()) && !record.opaque_context)
         {
             return Err(malformed(
                 "ExternalDataConnections",
@@ -613,8 +638,8 @@ pub(crate) fn write_connections_part_with_unknown(
                 "opaque byte limit exceeded",
             ));
         }
-        data.extend_from_slice(record.bytes());
     }
+    data = super::codec::restore_opaque_positions(&data, unknown_records, raw_limits)?;
     if data.len() > MAX_CONNECTIONS_PART_BYTES {
         return Err(malformed(
             "ExternalDataConnections",

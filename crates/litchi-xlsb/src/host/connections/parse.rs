@@ -8,8 +8,7 @@
 //!
 //! The parser is strict about record payloads it fully understands and
 //! tolerant about everything else: unknown record types are ignored, and
-//! known begin/end record pairs that carry no modelled data (text-import
-//! wizards, Excel 2010/15 extensions, model data source extensions) are
+//! known begin/end record pairs that carry no modelled data (Excel 2010/15 extensions, model data source extensions) are
 //! skipped as balanced collections.
 
 use crate::package::connections::model::*;
@@ -129,6 +128,16 @@ fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
                 super::write::validate_connections(&connections)?;
                 return Ok(connections);
             },
+            rt::BEGIN_EC_TXT_WIZ
+            | rt::END_EC_TXT_WIZ
+            | rt::BEGIN_EC_TW_FLD_INFO_LIST
+            | rt::END_EC_TW_FLD_INFO_LIST
+            | rt::BEGIN_EC_TW_FLD_INFO => {
+                return Err(malformed(
+                    CONTEXT,
+                    "text import properties are outside a connection",
+                ));
+            },
             other => walker.skip_unhandled(other, CONTEXT)?,
         }
     }
@@ -140,7 +149,28 @@ fn parse_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Co
     let mut connection = parse_ext_connection(walker, data)?;
     loop {
         let record = walker.required(CONTEXT)?;
+        if matches!(connection.properties, Properties::Text(_))
+            && matches!(
+                record.kind(),
+                rt::BEGIN_EC_DB_PROPS | rt::BEGIN_EC_OLAP_PROPS | rt::BEGIN_EC_WEB_PROPS
+            )
+        {
+            return Err(malformed(
+                CONTEXT,
+                "text import has conflicting property blocks",
+            ));
+        }
         match record.kind() {
+            rt::BEGIN_EC_TXT_WIZ => {
+                if !matches!(connection.properties, Properties::None) {
+                    return Err(malformed(
+                        CONTEXT,
+                        "duplicate or conflicting text import properties",
+                    ));
+                }
+                connection.properties =
+                    Properties::Text(super::text::parse(walker, record.payload())?);
+            },
             rt::BEGIN_EC_DB_PROPS => {
                 connection.properties =
                     Properties::Database(parse_db_props(walker, record.payload())?);
@@ -162,6 +192,15 @@ fn parse_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Co
                 parse_web_tables(walker, &mut connection)?;
             },
             rt::END_EXT_CONNECTION => return Ok(connection),
+            rt::END_EC_TXT_WIZ
+            | rt::BEGIN_EC_TW_FLD_INFO_LIST
+            | rt::END_EC_TW_FLD_INFO_LIST
+            | rt::BEGIN_EC_TW_FLD_INFO => {
+                return Err(malformed(
+                    CONTEXT,
+                    "text fields are outside a text-import block",
+                ));
+            },
             other => walker.skip_unhandled(other, CONTEXT)?,
         }
     }

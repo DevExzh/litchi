@@ -4348,6 +4348,81 @@
         "Copy inert typed Text connection metadata into a native workbook with no connection owner, save/reopen id7, remove the last connection, and invert both lifecycle patches with every original member byte restored, including content types and workbook relationships."
       ],
       "scope_limit": "The original external links, rich values, embedded document and caches remain inert. No query execution, target access, native Office reopen or whole-ZIP byte identity claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_text_import_connection_exposes_the_stored_property_block",
+      "fixtures": [
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-322"
+      ],
+      "assertions": [
+        "Exact classic text-import path, encoding selectors (fallback WindowsAnsi/app45), delimiter/qualifier/prompt flags, first row, separators, ignored bit and three General fields; six opaque UID-wrapper records retain their root positions. OleDb provider/command metadata is exact."
+      ],
+      "scope_limit": "Encoding selectors are stored values, not an executed decoder. Classic text metadata only; model-data-source Text15 and query-table payloads remain opaque. Common data_file/connection_file are correctly absent; the path belongs to text-import properties."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_connection_description_edit_keeps_text_records_in_their_original_scope",
+      "fixtures": [
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-322"
+      ],
+      "assertions": [
+        "Edit only connection2 description; every record except its common header remains byte-exact and in order, including connection1 ignored password byte and UID wrappers. Temporary save/reopen and inverse retain every package member and original source bytes."
+      ],
+      "scope_limit": "Inert metadata only; no refresh or target access. Package-member restoration does not claim identical ZIP compression."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_text_options_and_fields_edit_without_changing_cached_import_rows",
+      "fixtures": [
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-322"
+      ],
+      "assertions": [
+        "Change comma to semicolon and Category field type to Text. Exactly the text-import header and second field record change; all query, worksheet, table and DataMashup members remain exact. Reopen reads the new options and inverse restores all original members."
+      ],
+      "scope_limit": "Stored import instructions only; cached imported rows are not recalculated, decoded again or refreshed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_external_data",
+      "name": "native_text_field_add_remove_is_reversible_and_root_identity_order_is_guarded",
+      "fixtures": [
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-322"
+      ],
+      "assertions": [
+        "Add a fourth Skip field, reopen, remove it and recover the original members; inverse also restores them. Reordering connections around opaque root identities and removing connections with query-table dependencies return precise UnsupportedFeature errors without source mutation."
+      ],
+      "scope_limit": "Field-list metadata lifecycle only; source topology changes around opaque records and query dependency teardown remain unsupported. Query-table parts themselves are not typed by this test."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_external_workbook_cache_exposes_both_source_cells_without_accessing_target",
+      "fixtures": [
+        "excel/excel-links-objects.xls"
+      ],
+      "feature_rows": [
+        "xls-186"
+      ],
+      "assertions": [
+        "External then self supporting books, exact encoded virtual path, three source sheet names, three references, absent external names and exact Sheet1 D6=49.75/Sheet2 B4=14 caches with zero-based row/column coordinates; Sheet1 remains visible."
+      ],
+      "scope_limit": "Read-only external metadata/cache projection. No external target access, refresh, formula evaluation or public external-link transaction claim."
     }
   ]
 }

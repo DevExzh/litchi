@@ -292,9 +292,9 @@ fn skips_unknown_records_and_extension_collections() {
             rt::BEGIN_EXT_CONNECTION,
             &ExtConnectionBuilder::new(6, 1, "T").payload(),
         ),
-        // Text-import wizard collection: skipped as a balanced collection.
-        record(rt::BEGIN_EC_TXT_WIZ, &[0xAA, 0xBB]),
-        record(rt::END_EC_TXT_WIZ, &[]),
+        // The model-data-source text extension remains an opaque collection.
+        record(rt::BEGIN_EC_TXT_WIZ15, &[0xAA, 0xBB]),
+        record(rt::END_EC_TXT_WIZ15, &[]),
         // Excel 2014 extension collection with unknown children inside.
         record(rt::BEGIN_EXT_CONN14, &[0x01]),
         record(Kind::new(0x3FFE).unwrap(), &[0x00, 0x00]),
@@ -502,4 +502,313 @@ fn source_checked_transaction_rejects_stale_patch_and_supports_noop() {
     if let Ok(stale) = stale {
         assert!(stale.package().apply_connections(changed.patch()).is_err());
     }
+}
+
+fn text_model(properties: TextImportProperties) -> Connections {
+    let bytes = build(&[
+        record(rt::BEGIN_EXT_CONNECTIONS, &[]),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(6, 1, "Text").payload(),
+        ),
+        record(rt::END_EXT_CONNECTION, &[]),
+        record(rt::END_EXT_CONNECTIONS, &[]),
+    ]);
+    let mut model = parse_connections_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
+    model.connections[0].properties = Properties::Text(properties);
+    model
+}
+
+#[test]
+fn classic_text_flags_fields_and_ignored_bits_round_trip() {
+    for code_page in [
+        TextCodePage::Macintosh,
+        TextCodePage::WindowsAnsi,
+        TextCodePage::Dos,
+    ] {
+        for qualifier in [
+            TextQualifier::DoubleQuote,
+            TextQualifier::SingleQuote,
+            TextQualifier::None,
+            TextQualifier::NoneAlternate,
+        ] {
+            for fields in [
+                None,
+                Some(Vec::new()),
+                Some(
+                    [
+                        TextFieldType::General,
+                        TextFieldType::Text,
+                        TextFieldType::Mdy,
+                        TextFieldType::Dmy,
+                        TextFieldType::Ymd,
+                        TextFieldType::Myd,
+                        TextFieldType::Dym,
+                        TextFieldType::Ydm,
+                        TextFieldType::Skip,
+                        TextFieldType::Emd,
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, field_type)| TextField {
+                        field_type,
+                        start: i as u32 * 7,
+                    })
+                    .collect(),
+                ),
+            ] {
+                let properties = TextImportProperties {
+                    code_page,
+                    qualifier,
+                    application_code_page: 1023,
+                    delimited: false,
+                    tab: true,
+                    space: true,
+                    comma: true,
+                    semicolon: true,
+                    consecutive: true,
+                    prompt_for_file: false,
+                    custom_delimiter: true,
+                    delimiter: 0x00a7,
+                    first_row: 99_999_999,
+                    decimal_separator: 0xb7,
+                    thousands_separator: 0xa0,
+                    source_file: "source-é-😀.csv".into(),
+                    fields,
+                    ignored_flags: 0xff90_0000,
+                };
+                let model = text_model(properties);
+                let bytes =
+                    super::write::write_connections_part(&model, crate::raw::Limits::DEFAULT)
+                        .unwrap();
+                assert_eq!(
+                    parse_connections_part(&bytes, crate::raw::Limits::DEFAULT).unwrap(),
+                    model
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn malformed_text_fields_and_boundaries_do_not_become_empty_properties() {
+    let base = TextImportProperties::default();
+    let payload = super::text::payload(&base).unwrap();
+    let stream = |body: Vec<(Kind, Vec<u8>)>| {
+        let mut records = vec![
+            record(rt::BEGIN_EXT_CONNECTIONS, &[]),
+            record(
+                rt::BEGIN_EXT_CONNECTION,
+                &ExtConnectionBuilder::new(6, 1, "Text").payload(),
+            ),
+        ];
+        records.extend(body);
+        records.extend([
+            record(rt::END_EXT_CONNECTION, &[]),
+            record(rt::END_EXT_CONNECTIONS, &[]),
+        ]);
+        build(&records)
+    };
+    for body in [
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &[0xaa, 0xbb]),
+            record(rt::END_EC_TXT_WIZ, &[]),
+        ],
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::BEGIN_EC_TW_FLD_INFO_LIST, &1u32.to_le_bytes()),
+            record(rt::END_EC_TW_FLD_INFO_LIST, &[]),
+            record(rt::END_EC_TXT_WIZ, &[]),
+        ],
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::BEGIN_EC_TW_FLD_INFO_LIST, &0u32.to_le_bytes()),
+            record(rt::BEGIN_EC_TW_FLD_INFO, &[0; 8]),
+            record(rt::END_EC_TW_FLD_INFO_LIST, &[]),
+            record(rt::END_EC_TXT_WIZ, &[]),
+        ],
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::BEGIN_EC_TW_FLD_INFO_LIST, &16_385u32.to_le_bytes()),
+        ],
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::BEGIN_EC_TW_FLD_INFO, &[0; 8]),
+            record(rt::END_EC_TXT_WIZ, &[]),
+        ],
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::BEGIN_EC_TW_FLD_INFO_LIST, &1u32.to_le_bytes()),
+            record(rt::BEGIN_EC_TW_FLD_INFO, &[10, 0, 0, 0, 0, 0, 0, 0]),
+            record(rt::END_EC_TW_FLD_INFO_LIST, &[]),
+            record(rt::END_EC_TXT_WIZ, &[]),
+        ],
+        vec![
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::END_EC_TXT_WIZ, &[]),
+            record(rt::BEGIN_EC_TXT_WIZ, &payload),
+            record(rt::END_EC_TXT_WIZ, &[]),
+        ],
+    ] {
+        assert!(parse_connections_part(&stream(body), crate::raw::Limits::DEFAULT).is_err());
+    }
+    for mutate in [0, 1, 2] {
+        let mut invalid = payload.clone();
+        match mutate {
+            0 => invalid[0] |= 3,
+            1 => invalid[6..10].fill(0),
+            _ => invalid[2] &= !0x20,
+        }
+        assert!(
+            parse_connections_part(
+                &stream(vec![
+                    record(rt::BEGIN_EC_TXT_WIZ, &invalid),
+                    record(rt::END_EC_TXT_WIZ, &[])
+                ]),
+                crate::raw::Limits::DEFAULT
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn text_authoring_checks_path_row_and_field_limits_before_writing() {
+    for invalid in [
+        TextImportProperties {
+            source_file: "a".repeat(219),
+            ..Default::default()
+        },
+        TextImportProperties {
+            first_row: 0,
+            ..Default::default()
+        },
+        TextImportProperties {
+            first_row: 100_000_000,
+            ..Default::default()
+        },
+        TextImportProperties {
+            application_code_page: 1024,
+            ..Default::default()
+        },
+        TextImportProperties {
+            prompt_for_file: false,
+            ..Default::default()
+        },
+        TextImportProperties {
+            ignored_flags: 1,
+            ..Default::default()
+        },
+        TextImportProperties {
+            fields: Some(vec![
+                TextField {
+                    field_type: TextFieldType::General,
+                    start: 0
+                };
+                16_385
+            ]),
+            ..Default::default()
+        },
+    ] {
+        assert!(
+            super::write::write_connections_part(&text_model(invalid), crate::raw::Limits::DEFAULT)
+                .is_err()
+        );
+    }
+    let valid = text_model(TextImportProperties {
+        source_file: "a".repeat(218),
+        ..Default::default()
+    });
+    assert!(super::write::write_connections_part(&valid, crate::raw::Limits::DEFAULT).is_ok());
+}
+
+#[test]
+fn opaque_records_keep_root_local_and_trailing_positions() {
+    let unknown = Kind::new(0x3ffd).unwrap();
+    let bytes = build(&[
+        record(rt::BEGIN_EXT_CONNECTIONS, &[]),
+        record(unknown, b"root"),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(1, 1, "Before").payload(),
+        ),
+        record(unknown, b"local"),
+        record(rt::END_EXT_CONNECTION, &[]),
+        record(rt::END_EXT_CONNECTIONS, &[]),
+        record(unknown, b"tail"),
+    ]);
+    let source = super::codec::parse_source(&bytes, crate::raw::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        source
+            .unknown_records
+            .iter()
+            .map(|r| (r.connection_id(), r.after_known()))
+            .collect::<Vec<_>>(),
+        [(None, 1), (Some(1), 0), (None, 3)]
+    );
+    let mut model = parse_connections_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
+    model.connections[0].name = "After".into();
+    let changed = super::write::write_connections_part_with_unknown(
+        &model,
+        &source.unknown_records,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
+    let after = super::codec::parse_source(&changed, crate::raw::Limits::DEFAULT).unwrap();
+    assert_eq!(after.unknown_records, source.unknown_records);
+    assert_eq!(
+        parse_connections_part(&changed, crate::raw::Limits::DEFAULT)
+            .unwrap()
+            .connections[0]
+            .name,
+        "After"
+    );
+}
+
+#[test]
+fn ignored_collections_keep_known_record_kinds_opaque_and_do_not_create_connections() {
+    let bytes = build(&[
+        record(rt::BEGIN_EXT_CONNECTIONS, &[]),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(1, 1, "Before").payload(),
+        ),
+        record(rt::FRT_BEGIN, &[0; 4]),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(1, 99, "Hidden").payload(),
+        ),
+        record(rt::END_EXT_CONNECTION, &[]),
+        record(rt::FRT_END, &[]),
+        record(rt::END_EXT_CONNECTION, &[]),
+        record(rt::END_EXT_CONNECTIONS, &[]),
+    ]);
+    let source = super::codec::parse_source(&bytes, crate::raw::Limits::DEFAULT).unwrap();
+    assert_eq!(source.unknown_records.len(), 4);
+    assert!(
+        source
+            .unknown_records
+            .iter()
+            .all(|r| r.connection_id() == Some(1) && r.after_known() == 0)
+    );
+    super::validation::unknown_records(&source.unknown_records).unwrap();
+    let mut model = parse_connections_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
+    assert_eq!(model.connections.len(), 1);
+    model.connections[0].name = "After".into();
+    let changed = super::write::write_connections_part_with_unknown(
+        &model,
+        &source.unknown_records,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(
+        parse_connections_part(&changed, crate::raw::Limits::DEFAULT).unwrap(),
+        model
+    );
+    assert_eq!(
+        super::codec::parse_source(&changed, crate::raw::Limits::DEFAULT)
+            .unwrap()
+            .unknown_records,
+        source.unknown_records
+    );
 }

@@ -217,16 +217,108 @@ pub struct WebProperties {
     pub edit_web_page: Option<String>,
 }
 
+/// Legacy character-set category; the application code-page value can override it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TextCodePage {
+    Macintosh = 0,
+    WindowsAnsi = 1,
+    Dos = 2,
+}
+/// Stored text qualifier, including the two equivalent wire spellings of None.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TextQualifier {
+    DoubleQuote = 0,
+    SingleQuote = 1,
+    None = 2,
+    NoneAlternate = 3,
+}
+/// Field interpretation for text import (MS-XLSB ECTwFldInfoData).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum TextFieldType {
+    General = 0,
+    Text = 1,
+    Mdy = 2,
+    Dmy = 3,
+    Ymd = 4,
+    Myd = 5,
+    Dym = 6,
+    Ydm = 7,
+    Skip = 8,
+    Emd = 9,
+}
+/// One imported column's stored type and fixed-width start position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextField {
+    pub field_type: TextFieldType,
+    pub start: u32,
+}
+/// Inert classic text-import options and optional field-list presence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextImportProperties {
+    /// Fallback category used only when application_code_page is less than 3.
+    pub code_page: TextCodePage,
+    /// Application-specific 10-bit encoding selector, not a numeric Windows code page.
+    pub application_code_page: u16,
+    pub delimited: bool,
+    pub tab: bool,
+    pub space: bool,
+    pub comma: bool,
+    pub semicolon: bool,
+    pub consecutive: bool,
+    pub qualifier: TextQualifier,
+    pub prompt_for_file: bool,
+    pub custom_delimiter: bool,
+    /// Stored UTF-16 delimiter value; inert when custom_delimiter is false.
+    pub delimiter: u16,
+    pub first_row: u32,
+    /// Stored ISO-8859-1 separator bytes.
+    pub decimal_separator: u8,
+    pub thousands_separator: u8,
+    pub source_file: String,
+    pub fields: Option<Vec<TextField>>,
+    /// Retained must-ignore bits (bit20 and bits23..31); modeled bits are forbidden here.
+    pub ignored_flags: u32,
+}
+impl Default for TextImportProperties {
+    fn default() -> Self {
+        Self {
+            code_page: TextCodePage::WindowsAnsi,
+            application_code_page: 1,
+            delimited: true,
+            tab: true,
+            space: false,
+            comma: false,
+            semicolon: false,
+            consecutive: false,
+            qualifier: TextQualifier::DoubleQuote,
+            prompt_for_file: true,
+            custom_delimiter: false,
+            delimiter: 0,
+            first_row: 1,
+            decimal_separator: b'.',
+            thousands_separator: b',',
+            source_file: String::new(),
+            fields: None,
+            ignored_flags: 1 << 20,
+        }
+    }
+}
+
 /// The source-specific property block of a connection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Properties {
+    /// Classic text-import options, source path and field definitions.
+    Text(TextImportProperties),
     /// ODBC or OLE DB command properties.
     Database(DbProperties),
     /// OLAP connection properties.
     Olap(OlapProperties),
     /// Web connection properties.
     Web(WebProperties),
-    /// No property block was stored (other or deleted connection kinds).
+    /// No modeled property block was projected; unmodeled extensions can still be retained.
     #[default]
     None,
 }
@@ -357,6 +449,7 @@ pub struct UnknownRecord {
     after_known: usize,
     bytes: Arc<[u8]>,
     payload_start: usize,
+    pub(crate) opaque_context: bool,
 }
 
 impl UnknownRecord {
@@ -366,6 +459,7 @@ impl UnknownRecord {
         after_known: usize,
         bytes: Arc<[u8]>,
         payload_start: usize,
+        opaque_context: bool,
     ) -> Self {
         Self {
             kind,
@@ -373,6 +467,7 @@ impl UnknownRecord {
             after_known,
             bytes,
             payload_start,
+            opaque_context,
         }
     }
 

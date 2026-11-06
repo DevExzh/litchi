@@ -966,3 +966,45 @@ fn native_officeart_picture_and_rectangle_keep_ids_text_and_cell_anchors() {
         "CF_SHAPE_005"
     );
 }
+
+#[test]
+fn native_external_workbook_cache_exposes_both_source_cells_without_accessing_target() {
+    use litchi_core::sheet::WorkbookTrait as _;
+    use litchi_xls::{CachedValue, SupportingBook};
+    let bytes = native("excel-links-objects.xls");
+    let book = Reader::new(Cursor::new(&bytes)).unwrap();
+    assert_eq!(book.worksheet_names(), ["Sheet1"]);
+    let links = book.external_links();
+    assert_eq!(links.supporting_books().len(), 2);
+    assert!(matches!(
+        links.supporting_books()[0],
+        SupportingBook::ExternalWorkbook(_)
+    ));
+    assert!(matches!(
+        links.supporting_books()[1],
+        SupportingBook::SelfReference
+    ));
+    assert!(links.external_names().is_empty());
+    assert_eq!(links.sheet_references().len(), 3);
+    let external = links.external_workbooks().next().unwrap();
+    assert_eq!(
+        external.encoded_virtual_path(),
+        "\u{1}excel-values-formulas-chart.xlsx"
+    );
+    assert_eq!(
+        external
+            .sheets()
+            .iter()
+            .map(|s| s.name())
+            .collect::<Vec<_>>(),
+        ["Sales chart", "Sheet1", "Sheet2"]
+    );
+    assert!(external.sheets().iter().all(|s| s.cache_valid()));
+    assert!(external.sheets()[0].cache_rows().is_empty());
+    for (sheet, row, column, value) in [(1, 5, 3, 49.75), (2, 3, 1, 14.0)] {
+        let rows = external.sheets()[sheet].cache_rows();
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].row(), rows[0].first_column()), (row, column));
+        assert_eq!(rows[0].values(), [CachedValue::Number(value)]);
+    }
+}

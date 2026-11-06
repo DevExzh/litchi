@@ -160,3 +160,9 @@ Native drawing assertions additionally distinguish picture id 1025 from
 rectangle id 1026, read `CF_SHAPE_005`, and verify A12:B17/F16:H20 cell anchors
 with their stored move/resize behavior. This is a shape projection; payload
 resolution and full OfficeArt geometry or authoring are separate scopes.
+
+The native external-workbook regression reads the encoded supporting-book path,
+three sheet names and the exact D6/B4 cached values (49.75 and 14) while retaining
+the host Sheet1 catalog. Public `Workbook::external_links` provides this read
+view. The internal external-link transaction module is not exposed as a public
+Package editor; this regression does not claim target/cache mutation support.

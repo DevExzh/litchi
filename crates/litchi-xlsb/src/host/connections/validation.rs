@@ -21,7 +21,7 @@ pub(crate) fn unknown_records(records: &[UnknownRecord]) -> Result<()> {
         )?;
         if header_len.checked_add(header.len()) != Some(record.bytes().len())
             || u16::from(header.kind()) != record.kind()
-            || super::codec::is_modeled_record(header.kind())
+            || (super::codec::is_modeled_record(header.kind()) && !record.opaque_context)
         {
             return Err(super::invalid("invalid opaque record envelope"));
         }

@@ -187,7 +187,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
 /// then skips as single records. This is the union of the record families
 /// the XLSB part parsers understand; begin types are unique across families,
 /// so the union cannot mis-pair a record.
-fn paired_end(record_type: Kind) -> Option<Kind> {
+pub(crate) fn paired_end(record_type: Kind) -> Option<Kind> {
     Some(match record_type {
         // PivotCache definition stream (2.1.7.38).
         rt::BEGIN_PCD_SOURCE => rt::END_PCD_SOURCE,
@@ -265,6 +265,7 @@ fn paired_end(record_type: Kind) -> Option<Kind> {
         rt::BEGIN_EC_PARAMS => rt::END_EC_PARAMS,
         rt::BEGIN_EC_PARAM => rt::END_EC_PARAM,
         rt::BEGIN_EC_TXT_WIZ => rt::END_EC_TXT_WIZ,
+        rt::BEGIN_EC_TW_FLD_INFO_LIST => rt::END_EC_TW_FLD_INFO_LIST,
         rt::BEGIN_EXT_CONN14 => rt::END_EXT_CONN14,
         rt::BEGIN_EXT_CONN15 => rt::END_EXT_CONN15,
         rt::BEGIN_EC_TXT_WIZ15 => rt::END_EC_TXT_WIZ15,
