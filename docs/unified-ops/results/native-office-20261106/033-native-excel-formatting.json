@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "source_commit": "90189e28543dc171aa542ccf6065f133f733b2e9",
+  "base_commit": "01f54710c4b4b953550b4219abe84f102f4d1064",
+  "problem": "Native style, rich-string and merge rows lacked operation assertions. A supported alignment edit of excel-values-formulas-chart.xls appended a 70th XF but retained XFCRC.cxfs=69, causing commit readback to fail with InvalidRecord(0x087c). The fresh XLS writer also emitted a fixed checksum unrelated to its actual XF payloads.",
+  "changes": [
+    "Update an existing XFCRC count and actual MS-OSHARED checksum after XF insertion/removal, preserving its header/reserved bytes and all native XFExt records. Validate the source checksum before the edit and refuse a stale one rather than falsely validating its retained extensions. Enforce the 4050-XF limit before mutation.",
+    "Replace the fresh writer constant checksum with a checksum over the actual emitted 20-byte XF payloads, excluding BIFF record headers.",
+    "Add eleven semantic native tests across XLS/XLSX/XLSB for style resolution, rich runs, merge reads/lifecycle, supported publication and precise preservation/inverse scopes. Add an independent checksum regression for fresh output and a unit regression for stale-source/limit refusals.",
+    "Map nine additional feature rows to partial native assertions; clarify XLS merge editing and palette-based FormatChange limits in the existing feature matrix."
+  ],
+  "verification_scope": {
+    "xls_styles": "Sheet2 A1:C1 and Native workbook summary anchor; Aptos Narrow 12pt bold/center. Native formats B13/C13=14, B14=18, C14=21, B15=9, C15=10, and B20 quote-prefixed 00123. Shared rich text has UTF-16 boundaries 14/18/19 and logical font IDs 8/0/7; index 4 is reserved.",
+    "xls_publication": "Sheet2 A2 right/wrap edit has an independently verified 69-to-70 XF summary; native checksum is 0x82cdd373. Original XF payload prefix and all XFExt bytes remain exact; all ordinary-sheet values/formulas, merges, fonts and other CFB streams are retained. File save/reopen and byte-exact source inverse pass.",
+    "xls_checksum": "Oracle uses an independent bit-at-a-time MS-OSHARED 2.4.3 computation. Fresh 21-XF and 22-XF outputs with extensions verify against it. The unit test proves a stale CRC and a 4051st XF refuse before mutating the stream. Normative local research: MS-XLS 2.4.354 and MS-OSHARED 2.4.3; no runtime spec or 3rdparty dependency.",
+    "xlsx_styles_rich_text": "Native local font/alignment/date/percentage/quote-prefix semantics and four rich runs are asserted. The unformatted prefix is distinguished from explicit Aptos Narrow 12pt run properties. Editing bold to BOLD retains the complete rich model; calculation-chain removal, manifest updates and dirty calculation properties follow the existing value-edit contract. All unrelated members are exact; reopened inverse permits only semantically identical workbook relationship reserialization.",
+    "xlsx_merges": "Remove native Sheet2 A1:C1, create A10:C10, save/reopen and invert. Anchor value is retained; sheet2.xml is the only changed part and inverse restores all original member bytes.",
+    "xlsb_styles_rich_text": "Binary style font/alignment and six number-format IDs are asserted. Shared-string offsets 14/18/19 map to font IDs 4/0/3. The inline rich-string setter refuses a native shared-string cell with UnsupportedContent and a no-op commit. Supported native A2-to-Z100 copy retains all typed shared strings and fonts, changes only sharedStrings.bin, sheet1.bin and binaryIndex1.bin, and inverts byte-exactly after file publication.",
+    "xlsb_merges": "Remove native Sheet2 A1:C1, create A10:C10, and refuse an overlapping rectangle with InvalidValue. Only sheet2.bin changes; every non-MERGE_CELL binary record remains exact. File save/reopen and exact source inverse pass.",
+    "limits": "No native Office reopen, rendering, recalculation, macro/control execution or external refresh occurred. XLS source-bound add_merged_cells is create-only and precisely refuses mutation. FormatChange continues to clear fHasXFExt on its new palette-based XF; retained source extension records are not cloned onto that style, so extension/theme appearance fidelity is not claimed. XLS rich strings are read-only in this batch. Other palette/theme, phonetic, inline-rich and cross-workbook transfer cases remain open."
+  },
+  "results": {
+    "new_semantic_native_tests": 11,
+    "new_fresh_writer_checksum_tests": 1,
+    "new_unit_tests": 1,
+    "xls_full_passed": 1941,
+    "xls_full_ignored": 1,
+    "ignored_reason": "Existing write_every_feature test intentionally writes an evidence workbook; it remains ignored.",
+    "native_owner_passed": 137,
+    "ops_passed": 107,
+    "facade_passed": 21,
+    "python_passed": 75,
+    "count_note": "Counts describe each command, not unique tests: XLS native tests also appear in the complete XLS suite. The native owner target includes the fresh checksum test and the existing XLSX evidence audit, neither of which receives new semantic coverage credit. A final owner rerun covers the final explicit palette-based XF assertion.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 263,
+      "indexed_tests": 355,
+      "reviewed_native_fixture_gaps": 4,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 263,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 43,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 57,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1,
+        "reviewed_native_fixture_gap_requires_followup": 4
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-xls-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-xls-full.log",
+        "bytes": 172553,
+        "sha256": "902c10af3193deaaf5f763a310dc18f25a5d76454a1f11f6b51d7b08f82ae6fd"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-xls-full.log 2>&1",
+      "suites": 93,
+      "passed": 1941,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-owners.log",
+        "bytes": 36407,
+        "sha256": "c217d42941e90fbdbd76119c6c660bc003f60f18c3bed9620d96eea72a4029c0"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-owners.log 2>&1",
+      "suites": 29,
+      "passed": 137,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,ppt,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-ops.log",
+        "bytes": 27596,
+        "sha256": "d72eb147017fddbd2fb066699e4d1addb5d338dc47b11732b63de082cb6b624d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,ppt,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-ops.log 2>&1",
+      "suites": 13,
+      "passed": 107,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-facade.log",
+        "bytes": 19587,
+        "sha256": "4625426d0aa1ebcc79a486680e3a468ffd2c3aa68fa786d013e629a6e7f57b64"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --lib --test 'microsoft_office_native*' --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-clippy.log",
+        "bytes": 17245,
+        "sha256": "d22f6001a8befb4d55661d50e5ee001bc19c3443a26bfe89ad8d930a10a66674"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --lib --test 'microsoft_office_native*' --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-python.log",
+        "bytes": 667,
+        "sha256": "4ad4a722393c2600073caa17e1d52d1fbdcc36466d5b01018d0714d60a1a6aa9"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-formatting-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-coverage.json",
+        "bytes": 903220,
+        "sha256": "f2d5c3501889bed3a80d275fb4a59eb31d0417c8b547faa161bb680761214a38"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "rustfmt --edition 2024 --check on the seven changed Rust files passed.",
+    "git diff --check and git diff --cached --check passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit; no executables were staged.",
+    "SHA-256 values of the three pre-existing untracked files remain unchanged.",
+    "The 77 existing vendor/zlib-rs warnings remain; Clippy reports no new owner warnings."
+  ],
+  "initial_reproduction": {
+    "artifact": {
+      "file_name": "native-formatting-first.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-formatting-first.log",
+      "bytes": 20857,
+      "sha256": "8fbf821873de62b1eecccc5574a7f6c6a6d83a1e4bb43fd9fdd3462b944788a0"
+    },
+    "note": "The first native prototype run reproduced XLS InvalidRecord: XFCRC declares 69 XF records but 70 were parsed. Its other two failures were corrected test assumptions: XLSB storage-family preservation and XLSX calculation-chain invalidation. No native fixture bytes were modified to make tests pass."
+  },
+  "goal_status": "active; nine rows gain partial assertions, but remaining operation/bounded/UI/external/unsupported gaps and partial-scope review remain open."
+}
