@@ -150,6 +150,8 @@ fn conventional_prefixes_read_the_same_from_either_accessor() {
     let from_restored = Table::from_graphic_frame(restored.as_ref()).unwrap();
     assert_eq!(from_borrowed.row_count().unwrap(), 1);
     assert_eq!(from_borrowed.column_count().unwrap(), 1);
+    assert_eq!(from_borrowed.grid_columns().unwrap(), [100]);
+    assert_eq!(from_restored.grid_columns().unwrap(), [100]);
     assert_eq!(
         from_borrowed.cell(0, 0).unwrap().unwrap().text().unwrap(),
         "Cell"
@@ -188,5 +190,64 @@ fn unconventional_prefixes_need_the_self_contained_accessor() {
     let restored = frame.self_contained_xml().unwrap();
     let table = Table::from_graphic_frame(restored.as_ref()).unwrap();
     assert_eq!(table.row_count().unwrap(), 1);
+    assert_eq!(table.grid_columns().unwrap(), [100]);
     assert_eq!(table.cell(0, 0).unwrap().unwrap().text().unwrap(), "Cell");
+    let owned = litchi_pptx::shape::owned::Scene::read(
+        xml.into_bytes(),
+        litchi_pptx::shape::Limits::DEFAULT,
+    )
+    .unwrap();
+    let frame = owned.shape("Grid").unwrap().unwrap();
+    assert_eq!(frame.table().unwrap().grid_columns().unwrap(), [100]);
+}
+
+#[test]
+fn grid_widths_keep_standalone_aliases_and_foreign_namespace_boundaries() {
+    for (prefix, binding) in [
+        ("a:", format!("xmlns:a=\"{DML}\"")),
+        ("d:", format!("xmlns:d=\"{DML}\"")),
+        (
+            "d:",
+            "xmlns:d=\"http://purl.oclc.org/ooxml/drawingml/main\"".into(),
+        ),
+        ("", format!("xmlns=\"{DML}\"")),
+        ("a:", String::new()),
+        ("", String::new()),
+    ] {
+        let xml = format!(
+            r#"<{prefix}tbl {binding}><{prefix}tblGrid><{prefix}gridCol w="100"/><f:gridCol xmlns:f="urn:foreign" w="999"/><{prefix}gridCol w="200"/></{prefix}tblGrid></{prefix}tbl>"#
+        );
+        assert_eq!(
+            Table::from_xml(xml.as_bytes())
+                .unwrap()
+                .grid_columns()
+                .unwrap(),
+            [100, 200]
+        );
+        for bad in ["-1", "bad"] {
+            let invalid = xml.replace("w=\"100\"", &format!("w=\"{bad}\""));
+            assert!(
+                Table::from_xml(invalid.as_bytes())
+                    .unwrap()
+                    .grid_columns()
+                    .is_err()
+            );
+        }
+    }
+    let xml = format!(
+        r#"<a:tbl xmlns:a="{DML}"><a:tblGrid><a:gridCol w="100"/><a:gridCol xmlns:a="urn:foreign" w="999"/></a:tblGrid></a:tbl>"#
+    );
+    assert_eq!(
+        Table::from_xml(xml.as_bytes())
+            .unwrap()
+            .grid_columns()
+            .unwrap(),
+        [100]
+    );
+    assert!(
+        Table::from_xml(
+            br#"<a:tbl xmlns:a="urn:foreign"><a:tblGrid><a:gridCol w="1"/></a:tblGrid></a:tbl>"#
+        )
+        .is_err()
+    );
 }

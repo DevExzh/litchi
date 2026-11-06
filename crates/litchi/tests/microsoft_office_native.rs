@@ -345,3 +345,47 @@ fn native_pptx_template_show_and_macro_variants_preserve_inert_members_on_public
         );
     }
 }
+
+#[test]
+fn native_powerpoint_embedded_chart_workbook_exposes_exact_cells_through_facade() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/powerpoint");
+    let parent = litchi::pptx::Package::open(root.join("powerpoint-visual-objects.pptx")).unwrap();
+    let part = parent
+        .opc()
+        .unwrap()
+        .get_part(
+            &litchi::opc::PackURI::new("/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx").unwrap(),
+        )
+        .unwrap();
+    let child = litchi::open_bytes(part.blob().to_vec()).unwrap();
+    assert_eq!(child.format(), Some(FileFormat::Xlsx));
+    assert_eq!(
+        child.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sheet1"]
+    );
+    let expected = [
+        ["Quarter", "North", "South", "West"],
+        ["Q1", "10", "15", "8"],
+        ["Q2", "20", "18", "12"],
+        ["Q3", "30", "21", "16"],
+        ["Q4", "40", "24", "20"],
+    ];
+    for (row, values) in expected.into_iter().enumerate() {
+        for (column, value) in ["A", "B", "C", "D"].into_iter().zip(values) {
+            let path = format!("Sheet1!{column}{}", row + 1);
+            assert_eq!(
+                child
+                    .get(path.as_str())
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some(value),
+                "{path}"
+            );
+        }
+    }
+    assert_eq!(child.to_bytes().unwrap(), part.blob());
+}

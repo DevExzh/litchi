@@ -341,6 +341,14 @@ pub(crate) fn attribute_value(tag: &[u8], name: &[u8]) -> Option<Range<usize>> {
 }
 
 fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
+    read_grid_with_fragment_fallback(xml, frame, false)
+}
+
+fn read_grid_with_fragment_fallback(
+    xml: &[u8],
+    frame: Range<usize>,
+    allow_fragment_fallback: bool,
+) -> Result<Grid> {
     let origin = ReaderOrigin::of(xml);
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
@@ -348,6 +356,9 @@ fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
     // is DrawingML, is PresentationML).
     let mut stack: Vec<(Vec<u8>, usize, bool, bool)> = Vec::new();
     let mut grid = Grid::default();
+    // Only the standalone table projection may inherit an undeclared prefix
+    // from its admitted table root. Source edits always require real bindings.
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     loop {
         let before = origin
             .offset(reader.buffer_position())
@@ -355,7 +366,22 @@ fn read_grid(xml: &[u8], frame: Range<usize>) -> Result<Grid> {
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let dml = is_ns(&namespace, [DML, STRICT_DML]);
+        if allow_fragment_fallback
+            && before == frame.start
+            && !matches!(namespace, ResolveResult::Bound(_))
+            && let Event::Start(element) | Event::Empty(element) = &event
+            && element.local_name().as_ref() == b"tbl"
+        {
+            fragment_prefix = Some(element.name().prefix().map(|p| p.into_inner().to_vec()));
+        }
+        let dml = is_ns(&namespace, [DML, STRICT_DML])
+            || match &namespace {
+                ResolveResult::Unknown(prefix) => {
+                    fragment_prefix.as_ref().and_then(Option::as_deref) == Some(prefix.as_slice())
+                },
+                ResolveResult::Unbound => fragment_prefix == Some(None),
+                ResolveResult::Bound(_) => false,
+            };
         let pml = is_ns(&namespace, [PML, STRICT_PML]);
         let after = origin
             .offset(reader.buffer_position())
@@ -913,8 +939,12 @@ pub(crate) fn change(
 
 /// The widths of the grid columns of the table element at `table` in `xml`,
 /// in EMU.
-pub(crate) fn widths(xml: &[u8], table: Range<usize>) -> Result<Vec<i64>> {
-    let grid = read_grid(xml, table)?;
+pub(crate) fn widths(
+    xml: &[u8],
+    table: Range<usize>,
+    allow_fragment_fallback: bool,
+) -> Result<Vec<i64>> {
+    let grid = read_grid_with_fragment_fallback(xml, table, allow_fragment_fallback)?;
     grid.columns
         .iter()
         .map(|(_, width)| parse_width(xml, width))
@@ -940,6 +970,24 @@ mod tests {
         r#"<a:tc><a:txBody><a:bodyPr/><a:p/></a:txBody></a:tc></a:tr>"#,
         r#"</a:tbl></a:graphicData></a:graphic></p:graphicFrame>"#
     );
+
+    #[test]
+    fn fragment_width_fallback_does_not_admit_unbound_or_foreign_source_edits() {
+        for xml in [
+            FRAME.replace(
+                r#" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main""#,
+                "",
+            ),
+            FRAME.replace(
+                "http://schemas.openxmlformats.org/drawingml/2006/main",
+                "urn:foreign",
+            ),
+        ] {
+            assert!(
+                matches!(change(xml.as_bytes(), 0..xml.len(), Change::Width { column: 0, width: 200 }), Err(Error::Invalid(message)) if message.contains("no table grid"))
+            );
+        }
+    }
 
     #[test]
     fn width_insert_and_remove_keep_the_frame_in_step() {
@@ -986,7 +1034,7 @@ mod tests {
         assert!(inserted_text.contains("x &amp; y"));
         assert!(inserted_text.contains(r#"cx="300""#));
         assert_eq!(
-            widths(&inserted, 0..inserted.len()).unwrap(),
+            widths(&inserted, 0..inserted.len(), false).unwrap(),
             vec![100, 100, 100]
         );
         let removed = change(&inserted, 0..inserted.len(), Change::Remove { column: 1 })

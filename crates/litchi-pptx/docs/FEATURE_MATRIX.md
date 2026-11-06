@@ -197,3 +197,24 @@ cover Push/Up/Medium with 3000ms automatic advance, Morph/ByObject with a saved
 The Push part has no explicit duration despite the historical UI observation.
 These tests do not qualify every transition extension, source transition edits
 beside unrelated Zoom MCE, theme overrides or native playback.
+
+`tests/microsoft_office_native_visual.rs` checks all twelve native table cells,
+grid widths, row heights and style switches. Column-width reads retain the
+graphic frame's namespace declarations and the admitted standalone table's
+fragment prefix; source edits still require actual namespace bindings. Native
+row/column insertion, removal, width and style-switch edits preserve unrelated
+package members, synchronize the frame extent and reopen with the expected
+values. Public operations cover table queries, cell text and row height on
+file-backed Auto and eager inputs.
+
+The visual-object PPTX/POTX/PPSX charts expose their exact clustered-column
+family, title, series formulas and all cached values. A typed chart-title edit
+keeps the workbook, slide and companion parts unchanged; the public facade
+also reads all twenty cells of the embedded workbook. Native BasicProcess
+SmartArt tests bind the exact document/content IDs to the three labels and
+update both a content node and its cached drawing while retaining layout,
+style, color and relationship parts. Grouped-shape tests cover child order,
+IDs, bounds, coordinate transforms and a source-preserving child-text edit.
+These are inert data and mutation checks, not chart refresh, SmartArt layout,
+rendering or native-app reopen evidence. Merged-table examples, connector
+endpoint binding and broader visual inheritance remain separate gaps.

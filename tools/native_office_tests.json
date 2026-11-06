@@ -2833,6 +2833,141 @@
         "Exact Ion twelve-slot RGB/system palette and Century Gothic major/minor fonts, internal master theme relationship, exact7010-byte theme part and SHA-256."
       ],
       "scope_limit": "Native theme summary and owner identity only; override mutation, inherited visual resolution and native rendering remain unqualified."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_visual",
+      "name": "native_table_reads_every_cell_dimension_and_style_switch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx"
+      ],
+      "feature_rows": [
+        "pptx-415"
+      ],
+      "assertions": [
+        "All12 exact native cells, four row heights, three grid widths, absent cell-local properties, exact style GUID/name and first-row/row-banding flags."
+      ],
+      "scope_limit": "Local stored table/grid/style values only; effective rendered styling and merged-cell native examples remain unqualified."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_visual",
+      "name": "native_table_row_column_and_style_edits_reopen_and_preserve_other_parts",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx"
+      ],
+      "feature_rows": [
+        "pptx-415"
+      ],
+      "assertions": [
+        "Add/remove rows and columns, change a column width and style switches, save/reopen every value, exact grid/row dimensions and synchronized frame extent; only slide3 changes, inverse/source bytes exact."
+      ],
+      "scope_limit": "Rectangular native table edits and local switches; general merge edits and style-catalog replacement remain outside this assertion."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_visual",
+      "name": "native_classic_chart_reads_exact_series_caches_formulas_and_owner",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx"
+      ],
+      "feature_rows": [
+        "pptx-418"
+      ],
+      "assertions": [
+        "Exact clustered-column family/title/legend, three series ordinals/title formulas/category formulas/value formulas and all12 cached values; internal relationship to the saved embedded workbook across presentation/template/show variants."
+      ],
+      "scope_limit": "Stored chart metadata and caches; no calculation, refresh, chart rendering or complete formatting qualification."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_visual",
+      "name": "native_chart_title_edit_retains_series_workbook_relationships_and_slide",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-418"
+      ],
+      "assertions": [
+        "Typed chart-title edit reopens with unchanged three-series caches/formulas. Only chart1.xml changes; workbook, chart styles/colors/relationships and slide remain exact, inverse restores original package."
+      ],
+      "scope_limit": "Source-preserving chart-title edit only; series/workbook data changes and native Office rendering remain unqualified."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_visual",
+      "name": "native_smartart_outline_and_text_edit_keep_cached_drawing_and_companions",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-420"
+      ],
+      "assertions": [
+        "Exact BasicProcess layout/document ID and Acquire/Transform/Verify content IDs/parents/depths; coordinated native data/cached-drawing text edit reopens with stable outline identity, exact companions and inverse/source bytes."
+      ],
+      "scope_limit": "Text edits to this mapped native data/drawing pair only; layout algorithms and arbitrary SmartArt reconstruction/rendering remain unqualified."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_visual",
+      "name": "native_group_preserves_order_ids_transforms_and_source_text_edit",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-411"
+      ],
+      "assertions": [
+        "Exact Group6/ID7 children4/5/6, Source/Target labels, connector kind, child bounds and matching parent/child coordinate transforms; one child text edit keeps sibling XML and every other part exact, inverse restores source."
+      ],
+      "scope_limit": "Stored group hierarchy/bounds and text edits; the native connector has no saved endpoint binding, and full geometry/rendering are not claimed."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_pptx_table_queries_and_cell_row_edits_preserve_other_slides",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx"
+      ],
+      "feature_rows": [
+        "pptx-415"
+      ],
+      "assertions": [
+        "File Auto and byte Eager routes find the exact table path, atomically change Apples to Oranges and row height to0.5in, reopen with12.50 neighbor intact and canonical1.27cm property; other slides/table styles and inverse/source bytes stay exact."
+      ],
+      "scope_limit": "Public table query/cell-text/row-height operations only; no style rendering.",
+      "required_features": [
+        "pptx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_embedded_chart_workbook_exposes_exact_cells_through_facade",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-418"
+      ],
+      "assertions": [
+        "Public child-format detection, exact Sheet1 inventory and all20 native A1:D5 values, including series headers; embedded XLSX no-op publication is byte exact."
+      ],
+      "scope_limit": "Inert embedded workbook extraction/read only; chart refresh, formula calculation and embedded-child mutation are not covered.",
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "ppt",
+        "pptx"
+      ]
     }
   ]
 }

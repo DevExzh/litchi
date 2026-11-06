@@ -540,3 +540,99 @@ fn native_excel_formula_queries_and_atomic_scalar_edits_work_on_both_owners() {
         );
     }
 }
+
+#[cfg(feature = "pptx")]
+#[test]
+fn native_pptx_table_queries_and_cell_row_edits_preserve_other_slides() {
+    let bytes =
+        include_bytes!("../../../test-data/microsoft-office/powerpoint/powerpoint-text-table.pptx");
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("native.pptx");
+    std::fs::write(&path, bytes).unwrap();
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = if mode == SourceMode::Auto {
+            litchi_ops::open_with(&path, &options).unwrap()
+        } else {
+            litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap()
+        };
+        let tables = source
+            .query("table")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].path().to_string(), "/slide[3]/table[1]");
+        let cell = "/slide[3]/table[1]/tr[2]/tc[1]";
+        assert_eq!(
+            source.get(cell).unwrap().view().text().unwrap().as_deref(),
+            Some("Apples")
+        );
+        let changed = source
+            .edit(|edit| {
+                edit.set(cell, props! {"text"=>"Oranges"})?;
+                edit.set("/slide[3]/table[1]/tr[2]", props! {"height"=>"0.5in"})
+            })
+            .unwrap();
+        let after = changed.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(after.clone(), &options).unwrap();
+        assert_eq!(
+            reopened
+                .get(cell)
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("Oranges")
+        );
+        assert_eq!(
+            reopened
+                .get("/slide[3]/table[1]/tr[3]/tc[3]")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("12.50")
+        );
+        assert_eq!(
+            reopened
+                .get("/slide[3]/table[1]/tr[2]")
+                .unwrap()
+                .view()
+                .format()
+                .unwrap()
+                .find(|p| p.key() == "height")
+                .unwrap()
+                .value()
+                .to_string(),
+            "1.27cm"
+        );
+        let before_owner = litchi_pptx::Package::from_bytes(bytes).unwrap();
+        let after_owner = litchi_pptx::Package::from_bytes(&after).unwrap();
+        for uri in [
+            "/ppt/slides/slide1.xml",
+            "/ppt/slides/slide2.xml",
+            "/ppt/tableStyles.xml",
+        ] {
+            let uri = litchi_opc::PackURI::new(uri).unwrap();
+            assert_eq!(
+                before_owner.opc().unwrap().get_part(&uri).unwrap().blob(),
+                after_owner.opc().unwrap().get_part(&uri).unwrap().blob()
+            );
+        }
+        assert_eq!(
+            changed
+                .patch()
+                .inverse()
+                .apply(changed.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(source.to_bytes().unwrap(), bytes);
+    }
+    assert_eq!(std::fs::read(path).unwrap(), bytes);
+}

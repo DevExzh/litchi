@@ -411,9 +411,12 @@ impl<'a> Table<'a> {
                     .offset
                     .checked_add(table.len())
                     .ok_or_else(|| invalid("table XML span overflows usize"))?;
-                super::columns::widths(context.owner, context.offset..end)
+                super::columns::widths(context.owner, context.offset..end, false)
             },
-            None => super::columns::widths(table, 0..table.len()),
+            // Retain declarations on the graphic frame as well as the table.
+            // Bare admitted table fragments keep the same prefix fallback as
+            // rows/cells; explicitly foreign bindings are never reinterpreted.
+            None => super::columns::widths(self.xml, self.span.start..self.span.end, true),
         }
     }
 
