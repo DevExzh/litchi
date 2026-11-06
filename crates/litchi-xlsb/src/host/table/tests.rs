@@ -100,6 +100,199 @@ fn minimal_table_records() -> Vec<(Kind, Vec<u8>)> {
     ]
 }
 
+fn filter_records(column: u32, value: &str) -> Vec<(Kind, Vec<u8>)> {
+    let range = [0_u32, 9, 0, 1]
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect();
+    let mut column_payload = column.to_le_bytes().to_vec();
+    column_payload.extend_from_slice(&0_u16.to_le_bytes());
+    vec![
+        (rt::BEGIN_A_FILTER, range),
+        (rt::BEGIN_FILTER_COLUMN, column_payload),
+        (rt::BEGIN_FILTERS, vec![0; 8]),
+        (rt::FILTER, wide_string(value)),
+        (rt::END_FILTERS, Vec::new()),
+        (rt::END_FILTER_COLUMN, Vec::new()),
+        (rt::END_A_FILTER, Vec::new()),
+    ]
+}
+
+fn table_with_filter(records: Vec<(Kind, Vec<u8>)>) -> Vec<(Kind, Vec<u8>)> {
+    let mut table = minimal_table_records();
+    table.splice(1..1, records);
+    table
+}
+
+#[test]
+fn table_filter_snapshots_keep_ignored_bits_and_do_not_read_opaque_children_as_criteria() {
+    let mut records = filter_records(1, "North");
+    records[1].1[4..6].copy_from_slice(&0x8003_u16.to_le_bytes());
+    records[2].1[..4].copy_from_slice(&1_u32.to_le_bytes());
+    records[2].1[4..].copy_from_slice(&0xDEAD_BEEF_u32.to_le_bytes());
+    records.splice(
+        4..4,
+        [
+            (rt::FRT_BEGIN, vec![0; 4]),
+            (rt::FILTER, wide_string("Hidden criterion")),
+            (rt::LIST14, vec![255]),
+            (rt::FRT_END, Vec::new()),
+        ],
+    );
+    let table = parse(&table_with_filter(records.clone())).unwrap();
+    let filter = table.auto_filter.as_ref().unwrap();
+    let column = &filter.columns()[0];
+    assert!(column.hide_button() && column.button_in_next_column());
+    assert!(column.values().unwrap().include_blank());
+    assert_eq!(column.values().unwrap().values(), ["North"]);
+    assert!(filter.has_unmodeled_records());
+    assert!(table.alternate_text.is_none());
+    assert_eq!(filter.source_records(), stream(&records));
+    let encoded = super::write::write_table_part(&table).unwrap();
+    assert_eq!(
+        parse_table_part(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+        table
+    );
+}
+
+#[test]
+fn table_filter_rejects_duplicate_out_of_range_and_misclosed_columns() {
+    let mut duplicate = filter_records(1, "North");
+    let column = duplicate[1..6].to_vec();
+    duplicate.splice(6..6, column);
+    for records in [duplicate, filter_records(2, "North")] {
+        assert!(matches!(
+            parse(&table_with_filter(records)),
+            Err(Error::Unrecognized {
+                typ: "BrtBeginFilterColumn",
+                ..
+            })
+        ));
+    }
+    let mut records = filter_records(1, "North");
+    records.remove(5); // Missing BrtEndFilterColumn before BrtEndAFilter.
+    assert!(matches!(
+        parse(&table_with_filter(records)),
+        Err(Error::Unrecognized {
+            typ: "table filter/sort metadata",
+            ..
+        })
+    ));
+    for text in [String::new(), "x".repeat(256)] {
+        assert!(matches!(
+            parse(&table_with_filter(filter_records(1, &text))),
+            Err(Error::Unrecognized {
+                typ: "BrtFilter",
+                ..
+            })
+        ));
+    }
+}
+
+#[test]
+fn table_filter_strings_obey_the_callers_wire_limit() {
+    let table = Table {
+        id: 1,
+        display_name: Some("X".into()),
+        header_row_count: 1,
+        range: Range {
+            first_row: 0,
+            last_row: 9,
+            first_column: 0,
+            last_column: 1,
+        },
+        ..Table::default()
+    };
+    let base = super::write::write_table_part(&table).unwrap();
+    let mut records: Vec<_> = crate::raw::Records::new(&base, crate::raw::Limits::DEFAULT)
+        .map(|r| {
+            let r = r.unwrap();
+            (r.kind(), r.payload().to_vec())
+        })
+        .collect();
+    records.splice(1..1, filter_records(1, "NorthWest"));
+    let data = stream(&records);
+    assert!(matches!(
+        parse_table_part(&data, crate::raw::Limits::new(4096, 8)),
+        Err(Error::Wire(WireError::StringLimit {
+            units: 9,
+            limit: 8,
+            ..
+        }))
+    ));
+    assert!(parse_table_part(&data, crate::raw::Limits::new(4096, 9)).is_ok());
+}
+
+#[test]
+fn table_sort_snapshots_decode_classic_comparisons_and_preserve_ignored_payloads() {
+    use super::SortOn;
+    for (selector, first, second, expected) in [
+        (0_u16, 123_u32, 456_u32, SortOn::Value),
+        (1, 17, u32::MAX, SortOn::CellColor(17)),
+        (2, 19, u32::MAX, SortOn::FontColor(19)),
+        (3, 2, 1, SortOn::Icon { set: 2, icon: 1 }),
+    ] {
+        let range: Vec<u8> = [0_u32, 9, 0, 1]
+            .into_iter()
+            .flat_map(u32::to_le_bytes)
+            .collect();
+        let mut state = 0x8006_u16.to_le_bytes().to_vec();
+        state.extend_from_slice(&range);
+        let mut condition = (0x8001 | (selector << 1)).to_le_bytes().to_vec();
+        condition.extend([0_u32, 9, 1, 1].into_iter().flat_map(u32::to_le_bytes));
+        condition.extend_from_slice(&first.to_le_bytes());
+        condition.extend_from_slice(&second.to_le_bytes());
+        condition.extend(nullable_wide_string(Some("Z,A")));
+        let records = vec![
+            (rt::BEGIN_SORT_STATE, state),
+            (rt::BEGIN_SORT_COND, condition),
+            (rt::END_SORT_COND, Vec::new()),
+            (rt::END_SORT_STATE, Vec::new()),
+        ];
+        let table = parse(&table_with_filter(records.clone())).unwrap();
+        let state = table.sort_state.as_ref().unwrap();
+        assert!(!state.by_columns());
+        assert!(state.case_sensitive() && state.alternate_method());
+        assert!(!state.has_unmodeled_records());
+        let condition = &state.conditions()[0];
+        assert!(condition.descending());
+        assert_eq!(condition.sort_on(), expected);
+        assert_eq!(
+            condition.custom_list(),
+            if selector == 0 { Some("Z,A") } else { None }
+        );
+        assert_eq!(state.source_records(), stream(&records));
+        let encoded = super::write::write_table_part(&table).unwrap();
+        assert_eq!(
+            parse_table_part(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+            table
+        );
+    }
+}
+
+#[test]
+fn table_future_sort_conditions_remain_explicitly_opaque_and_source_preserved() {
+    let mut state = vec![0, 0];
+    state.extend([0_u32, 9, 0, 1].into_iter().flat_map(u32::to_le_bytes));
+    let records = vec![
+        (rt::BEGIN_SORT_STATE, state),
+        (rt::BEGIN_SORT_COND14, vec![0; 8]),
+        (rt::LIST14, vec![255]),
+        (rt::END_SORT_COND14, Vec::new()),
+        (rt::END_SORT_STATE, Vec::new()),
+    ];
+    let table = parse(&table_with_filter(records.clone())).unwrap();
+    assert!(table.alternate_text.is_none());
+    let state = table.sort_state.as_ref().unwrap();
+    assert!(state.conditions().is_empty() && state.has_unmodeled_records());
+    assert_eq!(state.source_records(), stream(&records));
+    let encoded = super::write::write_table_part(&table).unwrap();
+    assert_eq!(
+        parse_table_part(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+        table
+    );
+}
+
 #[test]
 fn parses_minimal_table_with_columns() {
     let table = parse(&minimal_table_records()).unwrap();

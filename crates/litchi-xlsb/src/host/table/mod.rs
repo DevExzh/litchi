@@ -4,7 +4,9 @@
 //! covering the table identity and range, header/total row and insert-row
 //! metadata, differential-formatting references, table columns with their
 //! total-row functions and formulas, the applied table style, and alternate
-//! text.
+//! text, plus saved table filters and classic sort metadata. Filter/sort
+//! snapshots retain their complete source collections, with unmodeled
+//! criteria and extensions reported explicitly.
 //!
 //! Everything parsed here is an inert data snapshot: relationship
 //! identifiers, external connection identifiers, differential-formatting
@@ -12,13 +14,15 @@
 //! dereferenced, contacted, or evaluated. Display names are preserved exactly
 //! as stored — no Excel display-name validation or sanitization is applied.
 //!
-//! The parser tolerates unknown record types (they are skipped) and rejects
+//! Outside filter/sort snapshots, unknown record types are skipped. It rejects
 //! structurally malformed payloads for the records it understands.
 
+mod filters;
 mod model;
 mod parse;
 pub(crate) mod write;
 
+pub use filters::{Filter, FilterColumn, SortCondition, SortOn, SortState, ValueFilter};
 pub use model::*;
 pub use parse::{parse_table_part, parse_table_part_rel_ids};
 pub(crate) use parse::{parse_table_part_recording, parse_table_part_rel_ids_recording};

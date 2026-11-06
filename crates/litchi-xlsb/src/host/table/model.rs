@@ -68,6 +68,11 @@ pub struct Table {
     pub totals_style: Option<String>,
     /// Table columns in column index order (`BrtBeginListCols` collection).
     pub columns: Vec<Column>,
+    /// Saved table AutoFilter range, columns and known string criteria.
+    /// Unmodeled records remain explicit and are retained by the writer.
+    pub auto_filter: Option<super::Filter>,
+    /// Saved classic sort metadata. No rows or columns are reordered.
+    pub sort_state: Option<super::SortState>,
     /// Table style information (`BrtTableStyleClient`, MS-XLSB 2.4.847).
     pub style_info: Option<StyleInfo>,
     /// Alternate text of the table (`stAltText` of `BrtList14`,

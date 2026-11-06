@@ -64,7 +64,7 @@ const FRT_BLANK_LEN: usize = 4;
 /// This standalone parser cannot report repairs, so it refuses every defect
 /// an opened workbook repairs and records (see [`crate::leniency`]).
 pub fn parse_table_part(data: &[u8], limits: crate::raw::Limits) -> Result<Table> {
-    parse_table(RecordWalker::new(data, limits))
+    parse_table(data, RecordWalker::new(data, limits))
 }
 
 /// Parse a Table part, recording Excel-compatible repairs into `report`.
@@ -73,16 +73,38 @@ pub(crate) fn parse_table_part_recording(
     report: &mut crate::leniency::ToleranceReport,
     limits: crate::raw::Limits,
 ) -> Result<Table> {
-    parse_table(RecordWalker::recording(data, report, limits))
+    parse_table(data, RecordWalker::recording(data, report, limits))
 }
 
-fn parse_table(mut walker: RecordWalker<'_, '_>) -> Result<Table> {
+fn parse_table(data: &[u8], mut walker: RecordWalker<'_, '_>) -> Result<Table> {
     let walker = &mut walker;
     let first = walker.required_begin(rt::BEGIN_LIST, "BrtBeginList")?;
     let mut table = parse_list_payload(walker, first.payload())?;
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_LIST => return Ok(table),
+            rt::BEGIN_A_FILTER => {
+                if table.auto_filter.is_some() {
+                    return Err(malformed("Table stream", "duplicate AutoFilter"));
+                }
+                table.auto_filter = Some(super::filters::read_filter(
+                    data,
+                    walker,
+                    record,
+                    table.range,
+                )?);
+            },
+            rt::BEGIN_SORT_STATE => {
+                if table.sort_state.is_some() {
+                    return Err(malformed("Table stream", "duplicate sort state"));
+                }
+                table.sort_state = Some(super::filters::read_sort(
+                    data,
+                    walker,
+                    record,
+                    table.range,
+                )?);
+            },
             rt::BEGIN_LIST_COLS => parse_columns(walker, record.payload(), &mut table)?,
             rt::TABLE_STYLE_CLIENT => {
                 table.style_info = Some(parse_style_client(walker, record.payload())?);

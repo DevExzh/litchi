@@ -68,6 +68,11 @@ impl<'a, 't> RecordWalker<'a, 't> {
         self.limits
     }
 
+    /// The next record boundary in the original part stream.
+    pub(crate) const fn offset(&self) -> usize {
+        self.iter.offset()
+    }
+
     pub(crate) fn next(&mut self) -> Result<Option<Record<'a>>> {
         let record = self.iter.next().transpose()?;
         if let Some(record) = &record {
@@ -189,6 +194,13 @@ impl<'a, 't> RecordWalker<'a, 't> {
 /// so the union cannot mis-pair a record.
 pub(crate) fn paired_end(record_type: Kind) -> Option<Kind> {
     Some(match record_type {
+        rt::BEGIN_A_FILTER => rt::END_A_FILTER,
+        rt::BEGIN_FILTER_COLUMN => rt::END_FILTER_COLUMN,
+        rt::BEGIN_FILTERS => rt::END_FILTERS,
+        rt::BEGIN_CUSTOM_FILTERS => rt::END_CUSTOM_FILTERS,
+        rt::BEGIN_SORT_STATE => rt::END_SORT_STATE,
+        rt::BEGIN_SORT_COND => rt::END_SORT_COND,
+        rt::BEGIN_SORT_COND14 => rt::END_SORT_COND14,
         // PivotCache definition stream (2.1.7.38).
         rt::BEGIN_PCD_SOURCE => rt::END_PCD_SOURCE,
         rt::BEGIN_PCDS_RANGE => rt::END_PCDS_RANGE,

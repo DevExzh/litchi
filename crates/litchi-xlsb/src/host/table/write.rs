@@ -168,6 +168,15 @@ pub(crate) fn write_table_part(table: &Table) -> Result<Vec<u8>> {
     let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_record(rt::BEGIN_LIST, &list_payload(table))?;
 
+    if let Some(filter) = &table.auto_filter {
+        filter.check_owner(table.range)?;
+        writer.write_encoded_records(filter.source_records())?;
+    }
+    if let Some(sort) = &table.sort_state {
+        sort.check_owner(table.range)?;
+        writer.write_encoded_records(sort.source_records())?;
+    }
+
     if !table.columns.is_empty() {
         let declared = u32::try_from(table.columns.len())
             .map_err(|_| malformed("BrtBeginListCols", "column count overflow"))?;

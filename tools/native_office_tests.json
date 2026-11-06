@@ -4819,6 +4819,75 @@
         "Native Sheet1 has frozen B2 panes with three exact pane selections; the other fixtures expose exact B2:I5/B6 selections, active cells, view/window/zoom/display defaults and tab selection. Eager and source views agree."
       ],
       "scope_limit": "Workbook custom views in date1904-breaks are a different family from namedSheetViews; named-sheet-view absence is not promoted to custom-view runtime parity. No view rendering or general view edit is claimed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_filters",
+      "name": "native_table_model_publication_retains_filter_and_sort_records",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-visual-analytics.xlsb",
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-connections.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-302",
+        "xlsb-303"
+      ],
+      "assertions": [
+        "Read native table models and publish them into a fresh workbook; every filter/sort record payload and complete retained snapshot survives, including empty filter collections."
+      ],
+      "scope_limit": "This is table-model republication into a new workbook, not an original-workbook round trip; other opaque table records and general filter authoring remain outside the assertion."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_filters",
+      "name": "native_table_filter_and_sort_owners_agree_across_eager_and_source_readers",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-visual-analytics.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-302",
+        "xlsb-303"
+      ],
+      "assertions": [
+        "Native Table1 owns A1:F9 filtering with relative Region column1, visible button flags, blank exclusion and exact North criterion. Saved sort state A2:F8 has a descending value condition on D1:D9 with no custom list. Eager and source table models agree; worksheet-range AutoFilter is absent at the correct complete-catalog position."
+      ],
+      "scope_limit": "Literal saved ranges only: the native condition range is wider than the sort state. Structured-table owners use worksheet ordinals; cell editors use the complete catalog. No filtering/sorting or effective-range normalization occurs."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_filters",
+      "name": "native_cell_edit_preserves_table_filter_sort_and_unrelated_package_members",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-visual-analytics.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-302",
+        "xlsb-303"
+      ],
+      "assertions": [
+        "Assign D2=321.5 through the Sheet1 scalar editor, save/reopen and verify eager/indexed reads. Only the selected worksheet and its binary index change; all table filter/sort bytes and other package members remain exact, and inverse restores the source archive."
+      ],
+      "scope_limit": "The edit does not reevaluate filters, sort rows, refresh pivots or claim fresh Excel acceptance."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_filters",
+      "name": "native_table_range_change_requires_explicit_filter_sort_rebinding",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-302",
+        "xlsb-303"
+      ],
+      "assertions": [
+        "Moving the native table range while retaining its filter and/or sort snapshot returns the typed table filter/sort metadata refusal before a package is built."
+      ],
+      "scope_limit": "This guards against silently rebinding retained metadata. General filter/sort range editing is not implemented by these immutable snapshots."
     }
   ]
 }
