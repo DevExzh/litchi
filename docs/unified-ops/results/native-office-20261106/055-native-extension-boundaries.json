@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "fc0d33c34706d4b48597bc224783deea99767aa2",
+  "base_commit": "8c47ff9ae15d63e494717d3f393e4348f9f5f958",
+  "problem": "Five operation rows remained unclassified by current tests. Two require native records absent from the corpus; three are broad compatibility limits already explicit in the owner matrices. Treating either kind as a completed semantic feature would inflate coverage.",
+  "changes": [
+    "Add two binary PowerPoint evidence audits using every manifest PPT/PPS/POT file, including password-backed encrypted ingress. Scan exact record envelopes and explicitly enter OfficeArt client-data and binary-tag payloads.",
+    "Record ppt-343 and ppt-364 as missing native specimens. Record doc-068, docx-133 and pptx-451 as explicit scope boundaries with separately required supported_scope and unsupported_scope text, current matrix references and existing native check identities.",
+    "Extend the coverage report with reviewed_explicit_scope_boundaries and reviewed_explicit_scope_boundary. Keep those rows uncovered with no positive semantic test credit, count them separately from fixture gaps, and preserve all historical statuses.",
+    "Add a Python guard rejecting missing/empty scope-contract fields and expand the semantic-credit conflict test to cover both fixture gaps and scope boundaries. Re-run all cited native check targets."
+  ],
+  "verification_scope": {
+    "wmf_recolor": "All eleven binary presentations expose 32 nonempty images: 26 PNG, four JPEG and two EMF, with no WMF. Exact framing scans find no RecolorInfoAtom in all 49 slide drawings and all ten complete unencrypted PowerPoint Document streams. The latter include historical/master/notes records. The encrypted file contributes its decrypted slide and image catalog; a scan of every encrypted persisted record is not claimed.",
+    "diagram_builds": "All 49 slides lack DiagramBuild and DiagramBuildAtom in both the typed PP10 record inventory and independent exact framing walk. One ParaBuild exists and remains distinct. Of 48 unencrypted slides, six have empty typed diagram catalogs and 42 refuse UnsupportedTarget for the absent supported BuildList owner. Encrypted publication remains refused by the existing policy.",
+    "doc_boundary": "Existing native structure tests pin four specimens with base nFib 00C1, 183 table pointers, cswNew 5/nFibNew 0112, Dop2013 and exact producer-saved counters. Native metadata CRUD on six DOC/DOT sources preserves all non-property stream bytes, including macro payloads, through reopen and inverse. This is bounded profile evidence, not complete future Word compatibility.",
+    "docx_boundary": "Existing settings-owner edits on four native DOCX/DOTX/DOCM/DOTM sources retain compatibility/math XML and all unrelated members through reopen/inverse. They do not establish arbitrary unsupported namespace semantics or every mutation guarantee.",
+    "pptx_boundary": "Existing chart-slide p14 identifier edits change exactly two attribute strings and preserve all other XML bytes, opaque a16 GUIDs and the complete chart/style/color/embedded-workbook graph. Reopen and inverse check that profile only; universal extension-schema conformance is outside the declared contract.",
+    "accounting": "The final five operation_needs_verification rows now have explicit evidence dispositions. Positive totals remain 341 partially asserted rows and 491 indexed tests. There are 23 reviewed native fixture gaps and three separate explicit scope boundaries. Neither review kind may receive semantic credit without reconciling the review first.",
+    "limits": "No new positive feature qualification, production format behavior, WMF rasterization, SmartArt authoring, animation execution, arbitrary future-extension compatibility or fresh Microsoft Office validation is claimed. Missing native specimens remain follow-up work."
+  },
+  "specification_evidence": [
+    {
+      "reference": "[MS-PPT] 2.7.9 RecolorInfoAtom",
+      "source": "User-supplied local full specification",
+      "finding": "RecolorInfoAtom is shape client-data metadata containing WMF recolor mappings, associated with the shape Blip. PNG/EMF payload presence does not establish this owner."
+    },
+    {
+      "reference": "[MS-PPT] 2.8.13 DiagramBuildContainer",
+      "source": "User-supplied local full specification",
+      "finding": "DiagramBuildContainer is a specific BuildListSubContainer member. Paragraph build records and flattened SmartArt images are distinct evidence."
+    },
+    {
+      "reference": "[MS-DOC] 2.5 File Information Block and 2.7 Document Properties",
+      "source": "User-supplied local full specification",
+      "finding": "FibBase.nFib is superseded by FibRgCswNew.nFibNew when present, and versioned document-property structures have distinct profiles. The cited existing native test checks both compatibility-base and extension bytes rather than inferring a whole application version from the base field."
+    }
+  ],
+  "results": {
+    "new_evidence_audits": 2,
+    "new_positive_semantic_tests": 0,
+    "new_python_guard_tests": 1,
+    "distinct_rust_tests_passed": 33,
+    "rust_suites": 6,
+    "rust_failed": 0,
+    "rust_ignored": 0,
+    "python_tests_passed": 76,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 341,
+      "indexed_tests": 491,
+      "reviewed_native_fixture_gaps": 21,
+      "reviewed_explicit_scope_boundaries": 0,
+      "operation_needs_verification": 5
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 341,
+      "indexed_tests": 491,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 3,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 341,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 27,
+        "reviewed_native_fixture_gap_requires_followup": 23,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_explicit_scope_boundary": 3,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx --all-features --test microsoft_office_native_missing_owners --test microsoft_office_native_structure --test microsoft_office_native_metadata --test microsoft_office_native_extensions --test microsoft_office_native_copy --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-extension-boundaries-owner.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-owner.log",
+        "bytes": 22783,
+        "sha256": "e073d664e2dfa2bc6f2014bfd5442e47e8d56621cf35da64ea050873f212b643"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx --all-features --test microsoft_office_native_missing_owners --test microsoft_office_native_structure --test microsoft_office_native_metadata --test microsoft_office_native_extensions --test microsoft_office_native_copy --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-owner.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ppt --all-features --test microsoft_office_native_missing_owners --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-extension-boundaries-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-clippy.log",
+        "bytes": 18953,
+        "sha256": "7f717f7775d586b051a5972acaccecd63bdcc643dc6b9d2e1b9ce96e9f87549f"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ppt --all-features --test microsoft_office_native_missing_owners --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-extension-boundaries-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-python.log",
+        "bytes": 668,
+        "sha256": "11c010b72c2a4493fe33210fe906553688f76b043cb351d57951d40a4bc4af63"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-extension-boundaries-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-extension-boundaries-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-coverage.json",
+        "bytes": 1146612,
+        "sha256": "89994275b7783d18ac17eca432a82fc67589a703755413e4259976b6da5654f2"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-extension-boundaries-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-ppt/tests/microsoft_office_native_missing_owners.rs",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --cached --check and both AGENTS.md staged evidence/binaries guards",
+      "result": "No output before source commit. No binaries or large evidence are committed."
+    }
+  ],
+  "validation_limits": "Test/data-report/documentation changes only. All directly cited native targets were executed; unrelated full-owner, operations and facade suites were not repeated. Existing vendor warnings remain unchanged.",
+  "remaining_work": "The goal remains active. There are 341 partially asserted rows requiring scope review, 23 reviewed fixture gaps, 58 native-UI limitations, 27 external handoffs and 41 unsupported-boundary rows requiring explicit reconciliation. Three broad compatibility boundaries are now reviewed without declaring complete support. Zero operation-only gaps is not proof of goal completion."
+}
