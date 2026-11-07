@@ -587,6 +587,228 @@
         "crates/litchi-xls/src/toolbar/mod.rs"
       ],
       "scope_limit": "Evidence-only gap; absence does not qualify WebPub/toolbar semantics or mark the implemented metadata codecs unsupported. No publishing, toolbar execution or source/historical-status modification occurs."
+    },
+    {
+      "feature_row": "ppt-377",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "Custom XML storage is a specific MsoDataStore CFB owner; ordinary metadata and embedded packages do not establish it.",
+      "required_evidence": "A native MsoDataStore storage with Item/Properties streams and known item GUID/schema references for lossless bounded reads and edits.",
+      "observed_evidence": "All 11 PPT/PPS/POT files, including the encrypted presentation, lack MsoDataStore and both promotion-marker storages. The shared typed inspector returns None, and the ordinary presentation body remains readable.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_missing_owners",
+          "name": "native_binary_powerpoint_corpus_has_no_custom_xml_data_store",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
+    },
+    {
+      "feature_row": "ppt-383",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "The native review presentation contains comments, which are distinct from a reviewer comparison tree.",
+      "required_evidence": "A live PP10 DiffTree10Container with reviewer name, document-diff flags and associated comparison metadata; comparison generation is separate from inert metadata codecs.",
+      "observed_evidence": "All 11 binary presentations lack DiffTree10 and reviewing-toolbar state in their live PP10 Document owner. The audit decodes BinaryTagData instead of relying on the ordinary child tree; 12 PP10 records are inventoried. All 10 unencrypted sources refuse a reviewer-name edit at absent index 0 with NotFound and preserve exact no-op bytes.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_missing_owners",
+          "name": "native_binary_powerpoint_corpus_has_no_reviewer_trees_or_modify_password_atoms",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
+    },
+    {
+      "feature_row": "ppt-384",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "Password-to-open encryption does not establish a modify-password atom or document modification policy.",
+      "required_evidence": "A native PP10 ModifyPasswordAtom, the CString record with instance 3, with a recorded modify-password behavior distinct from opening/decryption.",
+      "observed_evidence": "All 11 binary presentations return no typed modify password and contain no CString instance 3 in the live PP10 document extension, including the encrypted fixture opened with its recorded password.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_missing_owners",
+          "name": "native_binary_powerpoint_corpus_has_no_reviewer_trees_or_modify_password_atoms",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
+    },
+    {
+      "feature_row": "pptx-432",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx",
+        "powerpoint/powerpoint-encrypted.pptx"
+      ],
+      "reason": "Embedded Excel OLE objects are not ActiveX/OCX controls.",
+      "required_evidence": "A native control anchor and control-descriptor/binary relationship closure suitable for bounded inert metadata and payload tests.",
+      "observed_evidence": "All 15 PPTX-family files, including the decrypted encrypted presentation, have empty typed slide-control catalogs, no control/ActiveX relationship or content type, and no control element or ActiveX namespace in any XML branch. Four OLE anchors are positively present across the two media presentations, including compatibility alternatives.",
+      "checks": [
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_powerpoint_corpus_has_ole_but_no_activex_controls",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-pptx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
+    },
+    {
+      "feature_row": "pptx-435",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx",
+        "powerpoint/powerpoint-encrypted.pptx"
+      ],
+      "reason": "Modern comment threads do not establish Revision Information or Changes Information package owners.",
+      "required_evidence": "A native revInfo or chgInfo owner with its matching relationship/content type and known revision/change metadata suitable for bounded lifecycle assertions.",
+      "observed_evidence": "All 15 PPTX-family files have no typed revision/change information and no associated parts, relationships or revInfo/chgInfo elements, including inactive XML branches and orphan parts. Two modern comment parts remain positively present as distinct evidence.",
+      "checks": [
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_powerpoint_corpus_has_comments_but_no_revision_or_changes_information",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-pptx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
+    },
+    {
+      "feature_row": "pptx-449",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx",
+        "powerpoint/powerpoint-encrypted.pptx"
+      ],
+      "reason": "The finalized corpus includes native InkML content-part anchors, but those are not non-Ink content parts.",
+      "required_evidence": "A native p:contentPart with a non-Ink payload and matching relationship/target closure; generic content-part edits of Ink do not supply this specimen.",
+      "observed_evidence": "All 15 PPTX-family files contain exactly two contentPart anchors, one each in ink-stroke and ink-replay. Typed discovery and an all-XML-branches scan agree; both target the 2424-byte /ppt/ink/ink1.xml InkML payload via rId2. No inactive/orphan or external non-Ink anchor is present.",
+      "checks": [
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_powerpoint_corpus_content_parts_are_ink_only",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-pptx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
     }
   ]
 }

@@ -321,3 +321,14 @@ Tests preserve existing creation IDs, shape content and media, retain a prior la
 check exact replacement/empty-event refusals without losing staged work. The
 corpus specimens do not supply native-authored laser/event data for these tests.
 No fresh PowerPoint reopen, playback, rendering or macro execution is claimed.
+
+`tests/microsoft_office_native_evidence_review.rs` audits all 15 native
+PresentationML files, including the explicitly decrypted encrypted fixture.
+Typed catalogs and all-part XML/relationship inventories find no ActiveX control,
+Revision Information or Changes Information owner. The two modern comment parts
+and four OLE anchors (including compatibility alternatives) are distinct evidence.
+The only two `contentPart` anchors belong to the Ink fixtures and target their
+2424-byte InkML payloads; inactive branches and orphan XML parts add no other
+anchors. Non-Ink content parts still need a native specimen. These three gaps
+are recorded separately from positive semantic coverage, without changing the
+historical native-authoring inventory or claiming fresh PowerPoint validation.

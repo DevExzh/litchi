@@ -40,6 +40,7 @@ unicode-normalization = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
+serde_json = { workspace = true }
 soapberry-zip = { workspace = true }
 tempfile = { workspace = true }
 

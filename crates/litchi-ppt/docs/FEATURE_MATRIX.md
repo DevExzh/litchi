@@ -176,3 +176,13 @@ while retaining its physical shape path through text/visibility edits.
 These bounded assertions are indexed in `tools/native_office_tests.json`. They
 do not establish full master inheritance/layout, arbitrary chart authoring,
 rendering, calculation, slideshow playback or fresh PowerPoint acceptance.
+
+`tests/microsoft_office_native_missing_owners.rs` audits all 11 native binary
+presentations, including password-backed encrypted ingress. None has an
+`MsoDataStore` or promotion-marker storage, a live PP10 reviewer tree, a reviewing
+toolbar state, or a modify-password atom. It decodes the live document's
+`BinaryTagData` payloads explicitly, inventories 12 PP10 records, and checks
+`NotFound` plus exact no-op preservation for absent reviewer edits on the ten
+unencrypted files. Open encryption is distinct from a modify password. These
+are fixture gaps in `tools/native_office_evidence_reviews.json`; they do not
+count as passing custom-XML, comparison or modify-password semantics.
