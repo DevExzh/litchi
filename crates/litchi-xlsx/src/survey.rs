@@ -1833,6 +1833,31 @@ pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<
             limits.max_surveys(),
         ));
     }
+    // Validate advertised Survey edges before selecting payloads by content
+    // type. Otherwise a wrongly typed target silently looks like no Survey.
+    for table in package
+        .iter_parts()
+        .filter(|part| part.content_type() == ct::SML_TABLE)
+    {
+        for relationship in table
+            .rels()
+            .iter()
+            .filter(|relationship| relationship.reltype() == RELATIONSHIP_TYPE)
+        {
+            if relationship.is_external() {
+                return Err(invalid("Survey relationship must be internal"));
+            }
+            let target = relationship.target_partname()?;
+            let metadata = package
+                .part_metadata(&target)
+                .ok_or_else(|| invalid("Survey relationship target is absent"))?;
+            if metadata.content_type() != CONTENT_TYPE {
+                return Err(invalid(
+                    "Survey relationship target has invalid content type",
+                ));
+            }
+        }
+    }
     for part in survey_parts {
         // The survey payload is read, so it is decoded here (ADR 0030).
         let part = package.get_part(part.partname())?;
@@ -3691,7 +3716,21 @@ impl Edit {
         if !snapshot.same_semantics(&draft) {
             return Err(invalid("Survey publication changed the staged semantics"));
         }
-        let patch = Patch::new(before, snapshot.clone());
+        // A newly attached table has no entry in the before catalog. Retain
+        // its source bytes and relationship-member presence independently so
+        // the inverse can restore an absent member as well as an empty one.
+        let mut owners = HashSet::new();
+        let mut tables_before = Vec::new();
+        let mut tables_after = Vec::new();
+        for entry in before.entries().iter().chain(snapshot.entries()) {
+            if owners.insert(entry.table_part_name.as_str().to_ascii_lowercase()) {
+                tables_before.push(TableSource::read(&self.target, &entry.table_part_name)?);
+                tables_after.push(TableSource::read(&candidate, &entry.table_part_name)?);
+            }
+        }
+        let mut patch = Patch::new(before, snapshot.clone());
+        patch.tables_before = tables_before.into();
+        patch.tables_after = tables_after.into();
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -3757,11 +3796,41 @@ mod lazy_entry_tests {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    tables_before: Arc<[TableSource]>,
+    tables_after: Arc<[TableSource]>,
+}
+
+#[derive(Clone, Debug)]
+struct TableSource {
+    name: PackURI,
+    xml: Arc<Vec<u8>>,
+    relationships: OwnedRelationships,
+}
+
+impl TableSource {
+    fn read(package: &OpcPackage, name: &PackURI) -> Result<Self> {
+        Ok(Self {
+            name: name.clone(),
+            xml: package.get_part(name)?.blob_arc(),
+            relationships: package.source_relationships(name, package.read_limits())?,
+        })
+    }
+
+    fn matches(&self, package: &OpcPackage) -> Result<bool> {
+        Ok(package.get_part(&self.name)?.blob() == self.xml.as_slice()
+            && package.source_relationships(&self.name, package.read_limits())?
+                == self.relationships)
+    }
 }
 
 impl Patch {
     fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+        Self {
+            before,
+            after,
+            tables_before: Arc::from([]),
+            tables_after: Arc::from([]),
+        }
     }
 
     /// Source state required before application.
@@ -3788,6 +3857,8 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            tables_before: Arc::clone(&self.tables_after),
+            tables_after: Arc::clone(&self.tables_before),
         }
     }
 
@@ -3798,6 +3869,13 @@ impl Patch {
             return Err(Error::PatchConflict {
                 part: "Survey catalog".into(),
             });
+        }
+        for table in self.tables_before.iter() {
+            if !table.matches(target)? {
+                return Err(Error::PatchConflict {
+                    part: "Survey owner table".into(),
+                });
+            }
         }
         if self.is_noop() {
             return Ok(());
@@ -3814,6 +3892,14 @@ impl Patch {
             &self.after.source_content_types,
         )?;
         restore_relationship_provenance(&mut candidate, &self.after)?;
+        for table in self.tables_after.iter() {
+            let current = candidate.source_relationships(&table.name, candidate.read_limits())?;
+            candidate.try_replace_relationships(
+                &current,
+                &table.relationships,
+                candidate.read_limits(),
+            )?;
+        }
         let resulting = Snapshot::load_with_limits(&candidate, &self.after.limits)?;
         if !resulting.same_semantics(self.after.entries()) {
             return Err(invalid("Survey patch publication changed its target state"));

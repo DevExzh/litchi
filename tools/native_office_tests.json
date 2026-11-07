@@ -11321,6 +11321,120 @@
         "Malformed native-parent derivatives with an invalid StdDocumentName, an incomplete declared cache or an operand split across records produce exact InvalidRecord errors through the full workbook reader. The native source remains unchanged."
       ],
       "scope_limit": "Reader validation of explicit malformed metadata derivatives; no runtime DDE/OLE behavior or metadata-part authoring completeness is inferred."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_surveys_resolve_columns_and_preserve_tables_through_lifecycle",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "Survey attachment resolves native table/column names to exact UIDs across Transitional, Strict, template and query-table parents. Creation, no-op, edits, failure-atomic invalid bindings/decimal places and removal preserve native table XML, other parts and complete inverse package membership."
+      ],
+      "scope_limit": "Explicit library-authored Survey derivatives; native survey producer data, UI rendering, answer validation and submission are not claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_survey_scalar_edits_preserve_namespaces_comments_and_exact_unowned_xml",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "Source-preserving title/question changes have exact expected XML substitutions with ST_Xstring decoding/escaping. Prefixed survey elements, a foreign default namespace, opaque attributes/extensions, comments and all unrelated package members remain exact; stale replay is rejected."
+      ],
+      "scope_limit": "Independent authored Survey XML on native table owners; no survey service or browser execution."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_survey_question_structure_retains_opaque_source_fragments",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "Question insertion and reordering retain exact column bindings, properties and source fragments for unchanged questions. Foreign namespace payloads, sibling comments and bytes outside the questions owner survive save/reopen/replay/inverse."
+      ],
+      "scope_limit": "Bounded Survey document structure and storage only; no rendering or answer processing."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_survey_patch_checks_owner_table_bytes_even_when_survey_is_unchanged",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "A lexical owner-table change leaves the parsed Survey unchanged but causes the existing Survey patch to fail with the exact catalog conflict. The original package remains immutable."
+      ],
+      "scope_limit": "Source-closure checking of an authored Survey attached to a real query table; no external query or survey refresh."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_survey_relationship_targets_cannot_silently_disappear_from_the_catalog",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "Advertised Survey relationships with a wrong content type, external mode or missing target return precise errors. A wrongly typed target is rejected by both package and workbook Survey reads instead of becoming an empty catalog."
+      ],
+      "scope_limit": "Malformed graph derivatives test typed read validation; no remote target is opened."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_survey_question_limits_and_duplicate_ids_leave_staging_intact",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "A one-question budget rejects a two-question insertion with exact limit fields and a no-op commit. Duplicate Survey IDs preserve a previously staged valid title edit and the original query-table graph."
+      ],
+      "scope_limit": "Local catalog constraints and resource limits only."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_surveys",
+      "name": "native_xlsx_survey_creation_restores_explicit_empty_relationships_and_checks_new_owner",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-226"
+      ],
+      "assertions": [
+        "An explicitly empty table relationship member and its comment are restored exactly after creation/save/reopen/inverse. A creation patch also rejects changed table bytes while its before catalog still has no Survey entries."
+      ],
+      "scope_limit": "An explicit empty-relationship derivative tests publication provenance on a native table; no Office application validation is claimed."
     }
   ]
 }
