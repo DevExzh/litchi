@@ -9889,6 +9889,175 @@
         "Asumyi changes are confined to its 12-byte DOP span, the PlcfAsumy pointer pair and appended selected-table bytes. Every other stream and CFB directory metadata remains exact. File reopen, public CFB patch replay and exact artifact inverse pass at every stage."
       ],
       "scope_limit": "The additions use detached typed record codecs and public CFB publication; there is no dedicated AutoSummary package editor and no summarization, native UI state application or fresh Word validation is inferred."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_table_character_caches_retain_exact_sentinels_and_flags",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "feature_rows": [
+        "doc-008"
+      ],
+      "assertions": [
+        "All 20 native DOC/DOT sources retain the exact pinned main-story character count, two cache entries (0/known and ccpText/unknown), terminal ccpText+2 and a 20-byte PlcfTch. A direct little-endian expected vector matches typed encoding and, for unencrypted sources, the original table bytes. Password-backed encrypted reads retain the encrypted source bytes."
+      ],
+      "scope_limit": "Deprecated saved cache metadata only; no table-cache regeneration or use in document interpretation is inferred."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_revision_thread_tables_keep_empty_message_and_style_slots",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "feature_rows": [
+        "doc-009"
+      ],
+      "assertions": [
+        "Every native file has a mandatory RmdThreading table with one empty message/style slot, or two for review-controls and tracked-moves. Message IDs are empty, display metadata absent, author catalogs exact, and lengths 48/60 bytes. Sources stay exact."
+      ],
+      "scope_limit": "This qualifies native empty author-parallel STTB slots, not nonempty message identities, email-thread semantics or mail transport."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_language_and_smart_tag_states_keep_distinct_saved_ranges",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-007",
+        "doc-046"
+      ],
+      "assertions": [
+        "Exact native CP ranges and state codes agree with independently assembled PLC byte vectors. East Asian NoLad ranges differ from smart-tag Dirty ranges, and template recognizer subdivisions differ from language subdivisions. No bookmark/property-bag tables are present; source files remain unchanged."
+      ],
+      "scope_limit": "Saved proofing/recognizer metadata only. No language detection, recognizer execution, smart-tag property-bag semantics or native UI behavior is claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_recognizer_transaction_changes_only_its_owned_range_and_inverts",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-046"
+      ],
+      "assertions": [
+        "Native recognizer-only snapshots now open and preserve their final producer sentinel. A state edit commits through the public snapshot transaction; disconnected ranges refuse precisely without losing valid staging. No-op, stale patch, exact semantic replay/inverse and unchanged FIB are checked.",
+        "Public CFB publication changes only the declared recognizer table range; every other stream byte, directory metadata and document text is exact. File reopen and exact artifact inverse pass, and language proofing state is unchanged."
+      ],
+      "scope_limit": "The typed smart-tag transaction owns FIB/table metadata; publication uses the public CFB owner. It does not imply a high-level smart-tag package mutator, recognition or fresh Word acceptance."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_language_codec_edits_leave_other_proofing_and_recognizer_state_exact",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-bidi-eastasia.doc"
+      ],
+      "feature_rows": [
+        "doc-007"
+      ],
+      "assertions": [
+        "A checked detached LanguageAutoDetect table update sets only the first saved state to Clean. The selected native PLC is published through the public CFB owner with exact unaffected spelling/grammar/recognizer metadata, other streams/directory state and source bytes. File reopen/replay/inverse and detached language-table removal preserve the distinct owner scopes."
+      ],
+      "scope_limit": "Detached record editing and explicit CFB publication only; the metadata does not execute language detection or claim a dedicated proofing package editor."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_recognizer_catalog_accepts_absent_and_state_only_graphs",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "feature_rows": [
+        "doc-046"
+      ],
+      "assertions": [
+        "The full corpus has exactly nine recognizer tables with pinned record counts and no factoid bookmarks/property stores. The other eleven return no smart-tag metadata. All 19 unencrypted sources admit exact no-op snapshots, including absent and recognizer-only graphs; the encrypted source remains read-only in this test."
+      ],
+      "scope_limit": "This corrects the old UI-only evidence classification for the saved recognizer state. It does not qualify absent bookmark/property-bag semantics."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auxiliary_tables",
+      "name": "native_word_recognizer_point_ranges_preserve_the_source_terminal",
+      "fixtures": [
+        "word/word-text-structure.doc"
+      ],
+      "feature_rows": [
+        "doc-046"
+      ],
+      "assertions": [
+        "A duplicate-CP point range remains valid. Moving the native terminal sentinel or an actual range start outside counted document positions returns the precise Invalid reason and preserves staging. Publication/reopen and exact snapshot/CFB inverses retain the original terminal."
+      ],
+      "scope_limit": "The source terminal may be preserved past the counted stories as already admitted by the reader; edits cannot invent or retarget that sentinel. Other range boundaries and continuity remain checked."
     }
   ]
 }

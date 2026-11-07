@@ -157,3 +157,40 @@ fn native_binary_word_math_has_emf_fallbacks_without_equation_native_storage() {
     assert!(math);
     assert_eq!(workbook_storages, 2);
 }
+
+#[test]
+fn native_binary_word_corpus_lacks_seven_auxiliary_table_families() {
+    let names = files();
+    assert_eq!(names.len(), 20);
+    let mut encrypted = 0;
+    for name in names {
+        let bytes = std::fs::read(root().join(&name)).unwrap();
+        let p = open(&name, &bytes);
+        let d = p.document();
+        encrypted += usize::from(d.fib().is_encrypted());
+        // Hplxsdr; SDT; format checker; text services; grammar cookies/data;
+        // repair bookmarks; paragraph groups. A nonzero offset with length zero
+        // is undefined, not evidence of a present record.
+        for i in [
+            136, 137, 138, 139, 120, 121, 122, 110, 111, 62, 101, 116, 123, 124, 125, 109,
+        ] {
+            assert_eq!(
+                d.fib().get_table_pointer(i).unwrap().1,
+                0,
+                "{name}: FIB {i}"
+            );
+        }
+        assert!(d.xml_schemas().is_none());
+        assert!(d.structured_tags().is_none());
+        assert!(d.format_consistency_marks().is_none());
+        let services = d.text_services_tables().unwrap();
+        assert!(services.records().is_none() && services.guids().is_none());
+        let cookies = d.grammar_cookie_tables().unwrap();
+        assert!(cookies.current().is_none() && cookies.legacy().is_none());
+        assert!(d.repair_bookmarks().unwrap().is_none());
+        assert!(d.paragraph_groups().unwrap().is_none());
+        assert!(!d.text().unwrap().is_empty());
+        assert!(p.to_bytes().unwrap() == bytes);
+    }
+    assert_eq!(encrypted, 1);
+}

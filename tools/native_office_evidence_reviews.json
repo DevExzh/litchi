@@ -3042,6 +3042,293 @@
         "crates/litchi-ops/src/format/ppt/spec.rs"
       ],
       "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "doc-002",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist XML schema references; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty Hplxsdr at FIB slot 136, with XSDR schema/name references, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for Hplxsdr at FIB slot 136, with XSDR schema/name references. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/xml_schemas/codec.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-003",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist structured document tag bookmarks; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty SttbfBkmkSdt and its two companion PLCs at FIB slots 137/138/139, with SDTI/placeholder/schema metadata, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for SttbfBkmkSdt and its two companion PLCs at FIB slots 137/138/139, with SDTI/placeholder/schema metadata. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/structured_tags.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-004",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist format consistency checker marks; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty SttbfBkmkFcc and its two companion PLCs at FIB slots 120/121/122, with DPCID range metadata, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for SttbfBkmkFcc and its two companion PLCs at FIB slots 120/121/122, with DPCID range metadata. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/format_consistency.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-005",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist Text Services Framework records; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty Plcfuim and PlfguidUim at FIB slots 110/111, including UIM values and GUID references, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for Plcfuim and PlfguidUim at FIB slots 110/111, including UIM values and GUID references. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/text_services.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-006",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist grammar checker cookies; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty current/legacy cookie PLCs at FIB slots 116/101 and associated cookie data at slot 62, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for current/legacy cookie PLCs at FIB slots 116/101 and associated cookie data at slot 62. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/grammar_cookies.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-010",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist repair bookmarks; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty SttbfBkmkBPRepairs and its start/end PLCs at FIB slots 123/124/125, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for SttbfBkmkBPRepairs and its start/end PLCs at FIB slots 123/124/125. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/repair_bookmarks.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-015",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current native DOC/DOT corpus does not persist paragraph-group properties; neighboring text, review or proofing features do not establish this distinct binary owner.",
+      "required_evidence": "A native-produced DOC/DOT carrying nonempty PGPArray at FIB slot 109, including PGPInfo/PGPOptions metadata, with provenance and expected typed values suitable for reader/codec tests.",
+      "observed_evidence": "All 20 native DOC/DOT files, including the encrypted specimen opened with its known fixture password, have zero lengths for PGPArray at FIB slot 109, including PGPInfo/PGPOptions metadata. The corresponding public accessor returns an absent table/collection without a parse error.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_lacks_seven_auxiliary_table_families"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/parts/paragraph_groups.rs",
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
     }
   ]
 }

@@ -159,7 +159,7 @@ execution remain outside the DOC package API.
 | PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ | Bounded auxiliary tables and state are read and mutated with mandatory/optional emission rules where required |
 | Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ | `Dop97::auto_summary` and `Document::auto_summary()` expose typed state and checked `PlcfAsumy` ranges. Detached `DocumentAutoSummary` edits and `Dop97::write_into` provide bounded record authoring; there is no dedicated AutoSummary package editor. Native-parent tests use the public CFB owner to publish explicit derivatives. Word’s summary algorithm remains inert |
 | Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Edit, Commit, Patch}` and `captions::record::{Snapshot, Edit}` own bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic template package CRUD. The editor requires `fDot`; ordinary DOC edits refuse, and native DOT test derivatives do not establish the host-specific Normal-template role. Edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Automatic caption insertion, host activation and macro execution remain outside this metadata owner; bounded operations-layer SEQ refresh is separate |
-| Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | `parts::smart_tags::{Snapshot, Transaction, Commit, Patch}` adds source-checked bookmark, property-bag, and recognizer-range edits while preserving opaque FIB/table bytes; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
+| Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | `parts::smart_tags::{Snapshot, Edit, Commit, Patch}` adds source-checked bookmark, property-bag, and recognizer-range edits while preserving opaque FIB/table bytes; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
 | Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 | `parts::subdocuments::{Snapshot, Transaction, TablePatch}` owns source-checked, failure-atomic semantic edits, exact table encoders, and package publication with checked FIB pointer relocation for `PlcfWKB`/`SttbFnm`; unrelated table bytes and undefined FNIF/WKB bits remain preserved. Referenced files remain inert and are never opened or followed |
 | Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior; `tracked_revision::{Snapshot, Transaction, Commit, Patch}` adds source-checked binary story edits with reversible snapshots. Native 0x80/0x81 revision toggles share the semantic reader’s flag resolution; valid toggles are not Bool8 repair cases. Native move pairs retain exact CP ranges, author, timestamp and RSID, and both accept/reject routes invert exactly. |
 | Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ | Stored settings and relationship-like metadata are available where exposed; templates and web targets are not loaded and web layout is not generated |
@@ -379,3 +379,20 @@ stream bytes and directory metadata and pass file reopen/replay/exact inverse.
 Only the selected FIB pairs, appended table ranges and the declared Asumyi
 fields may change. No caption insertion, summarization, mail/attachment action or
 fresh Word validation is performed.
+
+The full 20-file native DOC/DOT audit finds PlcfTch caches and empty
+author-parallel RmdThreading slots in every file, plus language/recognizer state
+in nine files. These values now have direct typed/byte-level assertions. Native
+recognizer transactions accept absent bookmark tables and retain the producer's
+final terminator; noncontiguous range edits and sentinel retargeting refuse
+before changing staging, while duplicate-CP point ranges remain valid. Typed
+record edits published through the public CFB owner preserve all unowned stream
+bytes/directory metadata and exactly invert. No recognizer or language service
+runs, and empty review slots do not establish email-thread behavior.
+
+The same corpus has zero-length XML-schema, SDT, format-consistency, text-service,
+grammar-cookie, repair-bookmark and paragraph-group tables; public accessors
+confirm absence, including after opening the encrypted specimen. doc-002 through
+doc-006, doc-010 and doc-015 are recorded as native fixture gaps, without positive
+payload credit or an unsupported-library claim. Native specimens of those exact
+record families remain required. Historical authoring statuses are unchanged.

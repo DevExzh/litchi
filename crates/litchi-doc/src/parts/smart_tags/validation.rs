@@ -41,6 +41,16 @@ pub(super) fn candidate(
             "smart-tag recognizer range count changes would alter FIB/table topology",
         ));
     }
+    if let (Some(before), Some(after)) = (
+        source.recognizer_ranges.last(),
+        metadata.recognizer_ranges.last(),
+    ) && before.end != after.end
+        && (before.end > topology.document_end() || after.end > topology.document_end())
+    {
+        return Err(corrupted(
+            "Plcffactoid terminal sentinel must remain unchanged",
+        ));
+    }
     validate_metadata(metadata, topology.document_end(), links, limits)
 }
 
@@ -61,6 +71,11 @@ fn validate_presence(topology: &Topology, metadata: &DocumentSmartTags) -> Resul
     if !bookmark_present[0] && !metadata.tags.is_empty() {
         return Err(corrupted(
             "smart-tag bookmarks are present without their FIB tables",
+        ));
+    }
+    if topology.range(TableKind::Recognizer).is_none() && !metadata.recognizer_ranges.is_empty() {
+        return Err(corrupted(
+            "smart-tag recognizer ranges are present without their FIB table",
         ));
     }
     if topology.range(TableKind::PropertyBags).is_some() != metadata.store.is_some() {
@@ -179,37 +194,43 @@ fn validate_ranges(
     limits: Limits,
 ) -> Result<()> {
     let count = metadata.tags.len();
-    check_length(
-        topology,
-        table_stream,
-        TableKind::BookmarkInfo,
-        6usize
-            .checked_add(
-                count
-                    .checked_mul(14)
-                    .ok_or_else(|| corrupted("SttbfBkmkFactoid size overflows"))?,
-            )
-            .ok_or_else(|| corrupted("SttbfBkmkFactoid size overflows"))?,
-    )?;
-    check_length(
-        topology,
-        table_stream,
-        TableKind::BookmarkStarts,
-        plc_length(count, 6, "PlcfBkfFactoid")?,
-    )?;
-    check_length(
-        topology,
-        table_stream,
-        TableKind::BookmarkEnds,
-        plc_length(count, 4, "PlcfBklFactoid")?,
-    )?;
+    // The three bookmark tables may all be absent when only recognizer state
+    // exists. Presence validation already rejects a partial bookmark group.
+    if topology.range(TableKind::BookmarkInfo).is_some() {
+        check_length(
+            topology,
+            table_stream,
+            TableKind::BookmarkInfo,
+            6usize
+                .checked_add(
+                    count
+                        .checked_mul(14)
+                        .ok_or_else(|| corrupted("SttbfBkmkFactoid size overflows"))?,
+                )
+                .ok_or_else(|| corrupted("SttbfBkmkFactoid size overflows"))?,
+        )?;
+        check_length(
+            topology,
+            table_stream,
+            TableKind::BookmarkStarts,
+            plc_length(count, 6, "PlcfBkfFactoid")?,
+        )?;
+        check_length(
+            topology,
+            table_stream,
+            TableKind::BookmarkEnds,
+            plc_length(count, 4, "PlcfBklFactoid")?,
+        )?;
+    }
     let recognizer_count = metadata.recognizer_ranges.len();
-    check_length(
-        topology,
-        table_stream,
-        TableKind::Recognizer,
-        plc_length(recognizer_count, 2, "Plcffactoid")?,
-    )?;
+    if topology.range(TableKind::Recognizer).is_some() {
+        check_length(
+            topology,
+            table_stream,
+            TableKind::Recognizer,
+            plc_length(recognizer_count, 2, "Plcffactoid")?,
+        )?;
+    }
 
     if let Some(data) = topology.range_bytes(table_stream, TableKind::PropertyBags)? {
         let store = metadata
@@ -239,8 +260,19 @@ fn validate_ranges(
 }
 
 fn validate_recognizer_ranges(ranges: &[SmartTagRecognizerRange], document_end: u32) -> Result<()> {
-    for range in ranges {
-        if range.start > range.end || range.start > document_end || range.end > document_end {
+    if ranges.windows(2).any(|pair| pair[0].end != pair[1].start) {
+        return Err(corrupted(
+            "Plcffactoid ranges must form one contiguous CP sequence",
+        ));
+    }
+    for (index, range) in ranges.iter().enumerate() {
+        // Match the reader: native producers can retain a final terminator past
+        // the counted stories. It is not another range start, and candidate()
+        // prevents an edit from inventing or retargeting that sentinel.
+        if range.start > range.end
+            || range.start > document_end
+            || (index + 1 < ranges.len() && range.end > document_end)
+        {
             return Err(corrupted("Plcffactoid range is outside the document parts"));
         }
     }
