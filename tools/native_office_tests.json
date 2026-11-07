@@ -7514,6 +7514,156 @@
         "Native Excel and PowerPoint reserved lists retain all target/location strings, raw producer hashes/flags and duplicate order. Byte-exact vector re-encoding, a single outer VT_BLOB length, generic property-stream reopen and distinct blob/link-count limits are asserted."
       ],
       "scope_limit": "Shared property-set wire semantics only. Excel/PPT application fields remain uninterpreted; URLs, mail targets and slide references are never executed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_records_preserve_history_fields_changes_and_header_dates",
+      "fixtures": [
+        "excel/excel-revisions.xls"
+      ],
+      "feature_rows": [
+        "xls-175"
+      ],
+      "assertions": [
+        "Native RRDInfo exposes BIFF marker 6, shared/tracked/history flags, revision 6, version 2 and 30-day retention. Five RRDHead records retain exact names/code pages/local timestamps. Five cell-change records plus one sheet insertion preserve IDs, positions, content kinds and exact saved value/string tails, including the compressed old-string size descriptor."
+      ],
+      "scope_limit": "Individual native record semantics only. Variable formula/string bodies remain opaque; full Revision Log projection and mutation refuse the separate duplicate-ID maps in this legacy-exported specimen."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_legacy_history_with_duplicate_sheet_ids_refuses_typed_publication_without_repair",
+      "fixtures": [
+        "excel/excel-revisions.xls"
+      ],
+      "feature_rows": [
+        "xls-175"
+      ],
+      "assertions": [
+        "Pin all five native RRTabId byte arrays, including the two duplicate-zero maps. Strict full log/user-package admission returns the precise InvalidRecord error; workbook sheets, B2=25 and cached B3=75 remain readable and unchanged through exact save/reopen."
+      ],
+      "scope_limit": "This verifies a specific malformed-history boundary and source preservation alongside positive record tests. It does not count the invalid User Names stream as supported user-log coverage or repair the native artifact."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_catalog_retains_headers_user_framing_and_six_record_envelopes",
+      "fixtures": [
+        "excel/excel-revisions.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-308"
+      ],
+      "assertions": [
+        "Native BrtInfo/header GUIDs, local dates, sheet maps, retention flags, three log identities and empty count/begin/EOF user framing are exact. Real wire IDs expose six reviewable RRd envelopes and two non-reviewable custom-view envelopes; source part bytes and no-op ZIP publication remain exact."
+      ],
+      "scope_limit": "Typed shared-workbook metadata and common envelopes only; revision bodies remain inert raw records and no change is replayed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_current_user_crud_keeps_revision_parts_and_places_users_before_eof",
+      "fixtures": [
+        "excel/excel-revisions.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-308"
+      ],
+      "assertions": [
+        "Add/update/remove a user on the native closed workbook with a real header GUID dependency. Invalid GUID calls preserve staged work. New BrtUsr records precede EOF; file reopen, forward/stale/inverse checks retain revision data and every unrelated payload."
+      ],
+      "scope_limit": "Users are Litchi-authored native-source derivatives, not evidence of live users or collaboration. Equivalent relationship XML may be reserialized, with all attributes checked."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_header_append_keeps_a_valid_latest_header_identity",
+      "fixtures": [
+        "excel/excel-revisions.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-308"
+      ],
+      "assertions": [
+        "Native retention/header-name edits preserve logs and workbook data. Append/remove a header plus empty log atomically while maintaining current/saved GUID closure and keeping new header records before EOF. Invalid settings retain staged work; save/reopen and inverses preserve owned data/topology."
+      ],
+      "scope_limit": "Inert revision catalog lifecycle only. Removing a header referenced by current users or removing the final header through the single-header operation remains a validated refusal."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_owner_removal_and_inverse_preserve_saved_workbook_values",
+      "fixtures": [
+        "excel/excel-revisions.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-308"
+      ],
+      "assertions": [
+        "Remove and recreate the complete native revision owner, checking orphan collection, exact binary payload restoration, relationship/content-type equivalence and unchanged sheet values/formula cache."
+      ],
+      "scope_limit": "Library metadata graph operations; no native Excel reopen, revision resolution, recalculation or locking is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_graph_retains_exact_headers_cells_formulas_and_custom_views",
+      "fixtures": [
+        "excel/excel-revisions.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-234"
+      ],
+      "assertions": [
+        "Three native headers, exact GUIDs/local timestamps/relationship IDs, six ordered revisions, numeric/string before/after values, old/new formula text, inserted-sheet metadata and custom-view delete/add entries are projected. The stored B3 cache remains 75; the transient History sheet is absent and no-op output is exact."
+      ],
+      "scope_limit": "Saved inert revision metadata. No historical formula cache is invented where the log stores formula text only; no history is applied."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_user_and_header_edits_preserve_logs_values_and_staged_work",
+      "fixtures": [
+        "excel/excel-revisions.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-234"
+      ],
+      "assertions": [
+        "User CRUD and header/retention changes on the native graph retain failed-call atomicity, unchanged logs, workbook members and stored values. File reopen, forward replay, stale rejection and exact payload/graph inverses pass."
+      ],
+      "scope_limit": "The native current-user list is empty; added users are library-authored metadata. Live coauthoring and authentication are not exercised."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_header_log_pairs_append_remove_and_restore_graph_ownership",
+      "fixtures": [
+        "excel/excel-revisions.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-234"
+      ],
+      "assertions": [
+        "Append/remove a matching header and empty log while retaining all original revision records. Mismatched relationship IDs fail without staging. Current-header GUIDs, part cleanup, save/reopen and inverse graph ownership are checked."
+      ],
+      "scope_limit": "Inert metadata edits only; no new native Excel history event or user action is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_revisions",
+      "name": "native_revision_owner_removal_and_recreation_keep_workbook_payloads",
+      "fixtures": [
+        "excel/excel-revisions.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-234"
+      ],
+      "assertions": [
+        "Remove/recreate the complete revision package, check all owned parts are collected/recreated, compare full typed state with XML attribute order normalized, and preserve all unowned workbook payloads and the saved formula cache. Inverse patches restore exact prior payloads and graph."
+      ],
+      "scope_limit": "New owner XML is canonical: attribute order may differ while child/record order, namespaces, values and text remain exact. No fresh native-app acceptance is claimed."
     }
   ]
 }

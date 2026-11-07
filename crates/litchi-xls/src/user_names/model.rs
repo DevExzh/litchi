@@ -9,9 +9,9 @@ pub type UserGuid = [u8; 16];
 
 /// The `UsrChk` version record (MS-XLS 2.4.338).
 ///
-/// The version and reserved words are retained as raw values.  This keeps
-/// forward-compatible producer values observable while the stream owner
-/// remains inert.
+/// The admitted version and reserved word are retained as stored. Stream
+/// parsing requires the documented BIFF version codes; constructing this
+/// value does not relax that validation. The owner remains inert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UserCheck {
     version: u16,

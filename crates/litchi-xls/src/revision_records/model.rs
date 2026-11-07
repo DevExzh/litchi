@@ -186,9 +186,10 @@ pub enum RevisionCellContent {
 ///
 /// The variable tail — optional DXFN differential formats followed by the old
 /// and new cell values (RK numbers, Xnum doubles, rich extended strings,
-/// Boolean/error values, or parsed formulas) — is preserved raw. `cbOldVal`
-/// is validated against the MS-XLS size table, but the values themselves are
-/// not decoded: rich strings and `CellParsedFormula` token arrays are
+/// Boolean/error values, or parsed formulas) — is preserved raw. Fixed-value
+/// `cbOldVal` rules and the formula minimum are checked; variable-value size
+/// descriptors are retained and are not used as physical tail offsets. The
+/// values themselves are not decoded: rich strings and `CellParsedFormula` token arrays are
 /// variable-length structures specified outside the revision record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RrdChgCell {

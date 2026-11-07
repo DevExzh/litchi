@@ -289,21 +289,24 @@ impl Edit {
         self.apply_candidate(candidate)
     }
 
-    /// Add a revision header and its opaque log at the end of the owner.
+    /// Add a revision header and its opaque log at the end of the owner,
+    /// advancing the current-header GUID while retaining the saved root.
     pub fn push_revision(&mut self, header: Header, log: RevisionLog) -> Result<()> {
         self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
-        candidate
+        let headers = candidate
             .headers
             .as_mut()
-            .ok_or_else(|| super::invalid("cannot add a revision without headers"))?
-            .headers
-            .push(header);
+            .ok_or_else(|| super::invalid("cannot add a revision without headers"))?;
+        headers.info.guid = header.guid;
+        headers.headers.push(header);
         candidate.logs.push(log);
         self.apply_candidate(candidate)
     }
 
-    /// Remove one revision header and its corresponding log.
+    /// Remove one revision header and its corresponding log. Current/saved
+    /// header pointers to it move to the remaining latest header. Referencing
+    /// users and removal of the final header still refuse atomically.
     pub fn remove_revision(&mut self, index: usize) -> Result<Option<(Header, RevisionLog)>> {
         self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
@@ -316,6 +319,14 @@ impl Edit {
         }
         let header = headers.headers.remove(index);
         let log = candidate.logs.remove(index);
+        if let Some(latest) = headers.headers.last() {
+            if headers.info.guid == header.guid {
+                headers.info.guid = latest.guid;
+            }
+            if headers.info.root_guid == header.guid {
+                headers.info.root_guid = latest.guid;
+            }
+        }
         self.apply_candidate(candidate)?;
         Ok(Some((header, log)))
     }

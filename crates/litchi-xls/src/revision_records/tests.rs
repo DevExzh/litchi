@@ -144,7 +144,7 @@ fn rrd_info_payload() -> Vec<u8> {
     data[22] = 0xBB; // guidRoot marker
     data[38..42].copy_from_slice(&7i32.to_le_bytes()); // revid
     data[42..46].copy_from_slice(&1u32.to_le_bytes()); // version
-    data[46..48].copy_from_slice(&30u16.to_le_bytes()); // interval
+    data[48..50].copy_from_slice(&30u16.to_le_bytes()); // interval
     data
 }
 
@@ -167,12 +167,25 @@ fn rrd_info_parses_flags_and_guids() {
 }
 
 #[test]
+fn rrd_info_history_fields_follow_the_complete_version_dword() {
+    let mut bytes = rrd_info_payload();
+    bytes[42..46].copy_from_slice(&0xaabb_ccddu32.to_le_bytes());
+    bytes[46..48].copy_from_slice(&2u16.to_le_bytes());
+    bytes[48..50].copy_from_slice(&123u16.to_le_bytes());
+    let info = RrdInfo::parse_payload(&bytes).unwrap();
+    assert_eq!(info.version(), 0xaabb_ccdd);
+    assert!(info.history_protected());
+    assert!(!info.history_disabled());
+    assert_eq!(info.history_interval_days(), 123);
+}
+
+#[test]
 fn rrd_info_enforces_flag_consistency() {
     let assert_flag_error = |flags: u16, flags2: u16, interval: u16| {
         let mut data = rrd_info_payload();
         data[4..6].copy_from_slice(&flags.to_le_bytes());
-        data[44..46].copy_from_slice(&flags2.to_le_bytes());
-        data[46..48].copy_from_slice(&interval.to_le_bytes());
+        data[46..48].copy_from_slice(&flags2.to_le_bytes());
+        data[48..50].copy_from_slice(&interval.to_le_bytes());
         assert!(
             RrdInfo::parse_payload(&data).is_err(),
             "flags {flags:#06X} flags2 {flags2:#06X} interval {interval} must fail"
@@ -200,7 +213,7 @@ fn rrd_info_enforces_flag_consistency() {
     // Exclusive workbooks ignore the history interval entirely.
     let mut exclusive = rrd_info_payload();
     exclusive[4..6].copy_from_slice(&0x0010u16.to_le_bytes());
-    exclusive[46..48].copy_from_slice(&0u16.to_le_bytes());
+    exclusive[48..50].copy_from_slice(&0u16.to_le_bytes());
     assert!(RrdInfo::parse_payload(&exclusive).unwrap().is_exclusive());
 }
 
@@ -548,6 +561,30 @@ fn chg_cell_validates_old_value_size_table() {
     let mut unknown = data;
     unknown[14..18].copy_from_slice(&7u32.to_le_bytes());
     assert!(RrdChgCell::parse_payload(&unknown).is_err());
+}
+
+#[test]
+fn variable_old_value_descriptors_are_not_physical_tail_lengths() {
+    for (kind, descriptor, tail) in [
+        (3u32, 11u32, vec![4, 0, 0, b't', b'e', b's', b't']),
+        (5, 24, vec![3, 0, 0x1e, 1, 0]),
+    ] {
+        let mut data = chg_cell_payload()[..RRD_CHG_CELL_FIXED_LEN].to_vec();
+        data[14..18].copy_from_slice(&(kind << 3).to_le_bytes());
+        data[22..26].copy_from_slice(&descriptor.to_le_bytes());
+        data[26..28].copy_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&tail);
+        let cell = RrdChgCell::parse_payload(&data).unwrap();
+        assert_eq!(cell.old_value_size(), descriptor);
+        assert_eq!(cell.tail(), tail);
+        assert_eq!(RrdChgCell::validate_payload_borrowed(&data).unwrap(), 0);
+    }
+    let mut fixed = chg_cell_payload()[..RRD_CHG_CELL_FIXED_LEN].to_vec();
+    fixed[14..18].copy_from_slice(&(2u32 << 3).to_le_bytes());
+    fixed[22..26].copy_from_slice(&8u32.to_le_bytes());
+    fixed.extend_from_slice(&[0; 7]);
+    assert!(RrdChgCell::parse_payload(&fixed).is_err());
+    assert!(RrdChgCell::validate_payload_borrowed(&fixed).is_err());
 }
 
 #[test]

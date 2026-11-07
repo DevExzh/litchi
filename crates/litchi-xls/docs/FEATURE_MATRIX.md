@@ -72,8 +72,8 @@ rendering, external I/O, macro execution, or certificate trust.
 | Data consolidation | 🟡 | ✅ | 🟡 | Consolidation directories and source metadata are available as inert typed records; consolidation is not executed. |
 | Web publishing | 🟡 | ✅ | 🟡 | Web publication destinations, ranges, source types, and page metadata are modeled; publishing and network I/O are not performed. |
 | Real-time data and RTD topics | 🟡 | ✅ | 🟡 | Contextual `real_time_data::{Snapshot, Transaction, Commit, Patch}` edits bounded BIFF8 RTD topics, shared-prefix framing, cells, and cached values; all ProgIDs, servers, and topics remain inert and no refresh or execution occurs. |
-| Revision log and shared-workbook collaboration | 🟡 | ✅ | 🟡 | `revision_records::{Snapshot, Transaction, Commit, Patch}` provides source-checked BIFF8 Revision Log edits for accepted/undo flags and selected header metadata while preserving unknown records; conflict resolution, shared locking, formula replay, and collaboration behavior are not implemented. |
-| User Names stream and shared-workbook user log | 🟡 | ✅ | 🟡 | `user_names::{Snapshot, Transaction, Commit, Patch}` and `user_names::publication` provide bounded stream and package metadata edits, exact no-ops, reversible source-checked patches, and `UsrInfo.guid` validation against the required Revision Log. Publication preserves unrelated CFB streams and directory metadata. Shared locking, revision replay, collaboration, and native-producer interoperability are not established; current coverage uses synthetic BIFF/CFB fixtures. |
+| Revision log and shared-workbook collaboration | 🟡 | ✅ | 🟡 | `revision_records::{Snapshot, Edit, Commit, Patch}` provides source-checked BIFF8 Revision Log edits for accepted/undo flags and selected header metadata while preserving unknown records; conflict resolution, shared locking, formula replay, and collaboration behavior are not implemented. |
+| User Names stream and shared-workbook user log | 🟡 | ✅ | 🟡 | `user_names::{Snapshot, Edit, Commit, Patch}` and `user_names::publication` provide bounded stream and package metadata edits, exact no-ops, reversible source-checked patches, and `UsrInfo.guid` validation against the required Revision Log. Publication preserves unrelated CFB streams and directory metadata. Shared locking, revision replay, collaboration, and native-producer interoperability are not established; positive package CRUD coverage uses synthetic BIFF/CFB fixtures; the native legacy specimen has a noncanonical `UsrChk` version and invalid historical tab maps, documented below. |
 | Custom views and workbook environment options | 🟡 | ✅ | 🟡 | Custom views, link-update modes, object-display modes, access/write strings, backup flags, and related behavior options are exposed as metadata. Native custom views interpret `fHiddenRw=1` as hidden rows present and `fDspZerosSv=1` as zero values displayed, matching native XLS/XLSX evidence and the Excel97–2007 BIFF definitions. Newer MS-XLS prose reverses these labels and contradicts its own hidden-row-name requirement. These snapshots do not apply a view or cause host actions. |
 | Office Toolbars stream (`XCB`) | 🟡 | ✅ | ✅ | `Workbook::toolbar` reads and `Builder::set_toolbar` emits typed `CTBWRAPPER`/`CTBS`/`CTB` metadata through the root `XCB` stream, preserving reserved fields, optional visual bytes, `TBCCmd`, and bounded shared `TBCGeneralInfo`/`TBCExtraInfo` payloads for non-ActiveX controls. Ambiguous or malformed variable boundaries are rejected, and macros/UI/ActiveX are never executed. |
 
@@ -166,3 +166,22 @@ three sheet names and the exact D6/B4 cached values (49.75 and 14) while retaini
 the host Sheet1 catalog. Public `Workbook::external_links` provides this read
 view. The internal external-link transaction module is not exposed as a public
 Package editor; this regression does not claim target/cache mutation support.
+
+
+## Native shared-workbook revision qualification
+
+`tests/microsoft_office_native_revisions.rs` reads the native legacy revision
+fixture at the record layer. `RRDInfo` history flags/interval follow the complete
+four-byte version at offsets 46/48. Earlier tab maps belong to earlier saved
+sets; current BoundSheet8 count checks apply to the latest map. Fixed-size old
+cell values retain wire-length checks, while variable string/formula size
+descriptors are not physical offsets into their encoded/continued tails.
+Tests pin five headers, six cell/sheet changes and exact source value bytes.
+
+The XLS compatibility export is not a conforming full revision/user-log example.
+Two historical RRTabId arrays contain duplicate zero IDs, and its closed User
+Names stream stores UsrChk version `0006` instead of a documented version such
+as `0600`. Strict errors and byte-exact preservation are asserted; body values
+B2=25 and cached B3=75 still read and save unchanged. The User Names row remains
+a reviewed fixture gap, not positive user-log coverage. No bytes are corrected
+to manufacture a passing artifact, and no history is replayed or merged.

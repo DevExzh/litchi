@@ -202,3 +202,26 @@ is checked byte-for-byte; graph comparisons check relationship attributes and
 effective content types because equivalent defaults/overrides and XML whitespace
 can differ between writers. These are library operations on immutable native
 inputs, without fresh Excel reopen, rendering, refresh or macro execution.
+
+
+## Native shared-workbook revision qualification
+
+`tests/microsoft_office_native_revisions.rs` covers the native three-header,
+three-log owner, six reviewable changes, two custom-view envelopes and empty
+current-user list. Common RRd views use actual BIFF12 record IDs, independently
+of specification subsection numbers. The native user framing is CUsr, BeginUsers,
+entries, then the [BrtEOF end marker](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/d0b57914-519a-4455-a035-cf61b72f4286).
+New user/header records are inserted before an existing EOF; new typed owners
+emit EOF. Previously bounded unterminated sources and opaque trailing records
+remain retained, while typed owners after an explicit EOF are refused. The
+published User Names ABNF currently contains a build-path placeholder, so this
+qualification does not claim complete ABNF conformance.
+
+Native-source tests cover user CRUD, header/retention edits, header/log append
+and removal, and complete-owner removal/recreation with file reopen and inverse
+checks. Appending updates the current-header GUID; removal repairs current/saved
+pointers to the removed header, while referenced-user and final-header deletion
+remain refusals. Revision payloads and workbook cells/caches stay inert. All
+unrelated package payloads remain exact; equivalent relationship XML is checked
+by its attributes. Added users and history metadata are Litchi derivatives,
+without live collaboration, locks, revision replay or fresh Excel reopen.

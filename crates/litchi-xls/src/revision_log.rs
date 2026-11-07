@@ -157,6 +157,7 @@ fn scan_revision_header_counts(
 ) -> Result<(usize, usize)> {
     let mut scan = RevisionScan::new(data, max_records);
     let mut header_count = 0usize;
+    let mut latest_sheet_identifiers = None;
     let (record_type, payload) = scan.next()?;
     if record_type != RRD_INFO_RECORD_TYPE {
         return Err(invalid(record_type, "revision log must start with RRDInfo"));
@@ -196,6 +197,24 @@ fn scan_revision_header_counts(
                         "revision log must contain RRDInfo, FileLock, UsrExcl, and EOF",
                     ));
                 }
+                // Earlier maps belong to earlier saved revision sets: sheets
+                // can have been inserted since then. Only the latest map is
+                // constrained by the containing workbook's current catalog.
+                if header_count != 0 && workbook_sheet_count != 0 {
+                    if workbook_sheet_count > MAX_RRTABID_SHEETS {
+                        if latest_sheet_identifiers.is_some() {
+                            return Err(invalid(
+                                RR_TAB_ID_RECORD_TYPE,
+                                "latest RRTabId must be absent when the workbook has more than 4112 sheets",
+                            ));
+                        }
+                    } else if latest_sheet_identifiers != Some(workbook_sheet_count) {
+                        return Err(invalid(
+                            RR_TAB_ID_RECORD_TYPE,
+                            "latest RRTabId does not match the workbook BoundSheet8 count",
+                        ));
+                    }
+                }
                 return Ok((scan.record_count(), header_count));
             },
             RRD_HEAD_RECORD_TYPE => {
@@ -215,28 +234,16 @@ fn scan_revision_header_counts(
                     .peek_type()?
                     .is_some_and(|kind| kind == RR_TAB_ID_RECORD_TYPE)
                 {
-                    if workbook_sheet_count > MAX_RRTABID_SHEETS {
-                        return Err(invalid(
-                            RR_TAB_ID_RECORD_TYPE,
-                            "RRTabId must be absent when the workbook has more than 4112 sheets",
-                        ));
-                    }
                     let (_, payload) = scan.next()?;
                     RrTabId::validate_payload_borrowed(payload)?;
-                    let identifiers = payload.len() / 2;
-                    if workbook_sheet_count != 0 && identifiers != workbook_sheet_count {
-                        return Err(invalid(
-                            RR_TAB_ID_RECORD_TYPE,
-                            format!(
-                                "RRTabId contains {identifiers} sheet identifiers; workbook has {workbook_sheet_count} BoundSheet8 records"
-                            ),
-                        ));
-                    }
+                    latest_sheet_identifiers = Some(payload.len() / 2);
                 } else if workbook_sheet_count <= MAX_RRTABID_SHEETS {
                     return Err(invalid(
                         RRD_HEAD_RECORD_TYPE,
                         "RRDHead must be followed by RRTabId unless the workbook has more than 4112 sheets",
                     ));
+                } else {
+                    latest_sheet_identifiers = None;
                 }
                 while let Some(kind) = scan.peek_type()? {
                     if matches!(kind, EOF_RECORD_TYPE | RRD_HEAD_RECORD_TYPE) {
@@ -963,12 +970,6 @@ pub fn parse_revision_log_stream_with_sheet_count(
             .get(cursor)
             .is_some_and(|next| next.record_type == RR_TAB_ID_RECORD_TYPE)
         {
-            if workbook_sheet_count > MAX_RRTABID_SHEETS {
-                return Err(invalid(
-                    RR_TAB_ID_RECORD_TYPE,
-                    "RRTabId must be absent when the workbook has more than 4112 sheets",
-                ));
-            }
             Some(RrTabId::parse_payload(expect_framed_record(
                 &stream,
                 &mut cursor,
@@ -1058,7 +1059,7 @@ mod tests {
         data[4..6].copy_from_slice(&0x000Bu16.to_le_bytes());
         data[38..42].copy_from_slice(&99i32.to_le_bytes());
         data[42..46].copy_from_slice(&4u32.to_le_bytes());
-        data[46..48].copy_from_slice(&45u16.to_le_bytes());
+        data[48..50].copy_from_slice(&45u16.to_le_bytes());
         record(RRD_INFO_RECORD_TYPE, &data)
     }
 
@@ -1463,6 +1464,45 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn historical_sheet_maps_do_not_use_the_current_workbook_count() {
+        let mut stream = rrd_info();
+        stream.extend_from_slice(&rrd_head("Earlier", 0x31));
+        stream.extend_from_slice(&rr_tab_id(&[1]));
+        stream.extend_from_slice(&rrd_head("Current", 0x32));
+        stream.extend_from_slice(&rr_tab_id(&[1, 2]));
+        stream.extend_from_slice(&eof());
+        let log = parse_revision_log_stream_with_sheet_count(&stream, 2).unwrap();
+        assert_eq!(log.headers()[0].sheet_ids().unwrap().sheet_ids(), &[1]);
+        assert_eq!(log.headers()[1].sheet_ids().unwrap().sheet_ids(), &[1, 2]);
+        assert!(
+            scan_revision_header_guids_with_sheet_count(&stream, 64 * 1024 * 1024, 100, 100, 2)
+                .is_ok()
+        );
+        assert!(parse_revision_log_stream_with_sheet_count(&stream, 1).is_err());
+        assert!(
+            scan_revision_header_guids_with_sheet_count(&stream, 64 * 1024 * 1024, 100, 100, 1)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn earlier_small_sheet_maps_survive_the_large_workbook_exception() {
+        let mut stream = rrd_info();
+        stream.extend_from_slice(&rrd_head("EarlierSmall", 0x41));
+        stream.extend_from_slice(&rr_tab_id(&[1]));
+        stream.extend_from_slice(&rrd_head_with_next_tab("CurrentLarge", 0x42, 4114));
+        stream.extend_from_slice(&eof());
+        let log = parse_revision_log_stream_with_sheet_count(&stream, 4113).unwrap();
+        assert_eq!(log.headers()[0].sheet_ids().unwrap().sheet_ids(), &[1]);
+        assert!(log.headers()[1].sheet_ids().is_none());
+        assert!(
+            scan_revision_header_guids_with_sheet_count(&stream, 64 * 1024 * 1024, 100, 100, 4113)
+                .is_ok()
+        );
+        assert!(parse_revision_log_stream_with_sheet_count(&stream, 1).is_err());
     }
 
     #[test]

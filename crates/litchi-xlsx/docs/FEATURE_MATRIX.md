@@ -69,7 +69,7 @@ query, macro, chart, pivot, or external content is executed.
 | Row and column page breaks | ✅ | ✅ | ✅ | The `page_breaks` owner provides checked horizontal/vertical collections, Office count and grid bounds, Strict/Transitional reads, byte-minimal source-preserving rewrites, and exact-source-checked `Snapshot`/`Transaction`/`Commit`/`Patch` package CRUD. Ordinary workbook transactions can atomically copy or move owned page-break state between dependency-checked worksheets. It does not paginate or infer automatic breaks. |
 | Headers, footers, and printer settings | ✅ | ✅ | ✅ | Header/footer sections, odd/even/first-page settings, pictures/relationships, and supported printer-setting parts are typed; printing is not performed. |
 | Worksheet and workbook protection | ✅ | ✅ | ✅ | Sheet/workbook protection flags, legacy hashes, and supported modern hash/salt/spin metadata are validated and writable. Protection is not encryption or authorization. |
-| Revisions and collaboration metadata | 🟡 | ✅ | 🟡 | `revisions::{Snapshot, Transaction, Commit, Patch}` provides source-checked package CRUD for revision users, headers, and inert logs with relationship/orphan validation and exact no-op preservation; live coauthoring, conflict resolution, locking, and recalculation are not implemented. |
+| Revisions and collaboration metadata | 🟡 | ✅ | 🟡 | `revisions::{Snapshot, Edit, Commit, Patch}` provides source-checked package CRUD for revision users, headers, and inert logs with relationship/orphan validation and exact no-op preservation; live coauthoring, conflict resolution, locking, and recalculation are not implemented. |
 | Sparkline groups | 🟡 | ✅ | 🟡 | Supported sparkline group and worksheet relationships are bounded; native revision2 identities survive compatibility processing and fragment writing. The crate does not render sparklines or calculate their source values. |
 
 ## Charts, drawings, pivots, and external references
@@ -210,3 +210,20 @@ parts and restore original relationship/manifest member bytes through inverse.
 Native save/reopen inverses restore exact package-member bytes; identical ZIP
 compression is outside the part-level patch contract. No external target,
 provider, macro, query or refresh was executed.
+
+
+## Native shared-workbook revision qualification
+
+`tests/microsoft_office_native_revisions.rs` pins the native three-header graph,
+six tracked cell/sheet changes, custom-view delete/add records, exact local
+header timestamps and an empty current-user list. Formula text is read from
+revision records without inventing absent historical caches; the current B3
+cache is independently read as 75 and remains unchanged during edits.
+
+User CRUD, header settings, matching header/log append/removal, complete owner
+removal/recreation, invalid-call atomicity, stale checks and file reopen/inverse
+publication are covered on the native input. Unrelated workbook payloads stay
+exact. Recreated owner XML is canonical, so semantic comparisons ignore only
+attribute order and retain every namespace/value/text and child/record order.
+The revisions are inert metadata; these tests do not execute collaboration,
+recalculation, native history UI or fresh Excel reopen.

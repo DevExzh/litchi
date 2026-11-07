@@ -90,7 +90,7 @@ fn revision_log_stream_with_tab_ids(
     let mut info = vec![0u8; 50];
     info[..2].copy_from_slice(&8u16.to_le_bytes());
     info[4..6].copy_from_slice(&0x000Bu16.to_le_bytes());
-    info[46..48].copy_from_slice(&60u16.to_le_bytes());
+    info[48..50].copy_from_slice(&60u16.to_le_bytes());
     let mut head = vec![0u8; 158];
     head[..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
     head[8..10].copy_from_slice(&0x0020u16.to_le_bytes());

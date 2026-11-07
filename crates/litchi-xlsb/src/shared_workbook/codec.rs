@@ -19,10 +19,24 @@ const COUNT_USERS: u16 = 399;
 const USER: u16 = 400;
 const INFO: u16 = 398;
 const HEADER: u16 = 411;
+const EOF: u16 = 403;
+
+// Retain opaque records, including the historical trailing-record profile,
+// but never treat a typed owner after an explicit end marker as active.
+fn end_slot(records: &[RawRecord]) -> Result<Option<usize>> {
+    let mut end = None;
+    for (index, record) in records.iter().enumerate() {
+        if record.kind == EOF && (end.replace(index).is_some() || !record.payload.is_empty()) {
+            return Err(invalid("invalid or duplicate BrtEOF record"));
+        }
+    }
+    Ok(end)
+}
 
 /// Parse the complete BIFF12 record stream for a user-names part.
 pub fn parse_users(data: &[u8], limits: Limits) -> Result<UserNames> {
     let records = parse_records(data, "user-names", limits)?;
+    let end = end_slot(&records)?;
     let mut count_slot = None;
     let mut user_slots = Vec::new();
     let mut users = Vec::new();
@@ -61,7 +75,10 @@ pub fn parse_users(data: &[u8], limits: Limits) -> Result<UserNames> {
     let Some(count_slot_value) = count_slot else {
         return Err(invalid("user-names part lacks BrtCUsr"));
     };
-    if begin_slot > count_slot_value || user_slots.iter().any(|slot| *slot <= count_slot_value) {
+    if count_slot_value > begin_slot
+        || user_slots.iter().any(|slot| *slot <= begin_slot)
+        || end.is_some_and(|end| begin_slot >= end || user_slots.iter().any(|slot| *slot >= end))
+    {
         return Err(invalid("user-names records are out of order"));
     }
     let expected = usize::from(u16::from_le_bytes([
@@ -90,8 +107,7 @@ pub fn parse_users(data: &[u8], limits: Limits) -> Result<UserNames> {
 pub fn write_users(value: &UserNames, limits: Limits) -> Result<Vec<u8>> {
     super::validation::validate_users(value)?;
     let records = if value.records.is_empty() {
-        let mut records = Vec::with_capacity(value.users.len().saturating_add(2));
-        records.push(RawRecord::new(BEGIN_USERS, Vec::new()));
+        let mut records = Vec::with_capacity(value.users.len().saturating_add(3));
         records.push(RawRecord::new(
             COUNT_USERS,
             (u16::try_from(value.users.len())
@@ -99,6 +115,7 @@ pub fn write_users(value: &UserNames, limits: Limits) -> Result<Vec<u8>> {
             .to_le_bytes()
             .to_vec(),
         ));
+        records.push(RawRecord::new(BEGIN_USERS, Vec::new()));
         records.extend(
             value
                 .users
@@ -106,6 +123,7 @@ pub fn write_users(value: &UserNames, limits: Limits) -> Result<Vec<u8>> {
                 .map(|user| encode_user(user).map(|payload| RawRecord::new(USER, payload)))
                 .collect::<Result<Vec<_>>>()?,
         );
+        records.push(RawRecord::new(EOF, Vec::new()));
         records
     } else {
         let Some(count_slot) = value.count_slot else {
@@ -122,6 +140,12 @@ pub fn write_users(value: &UserNames, limits: Limits) -> Result<Vec<u8>> {
         );
         let mut user_index = 0usize;
         for (index, record) in value.records.iter().enumerate() {
+            if record.kind == EOF {
+                while let Some(user) = value.users.get(user_index) {
+                    output.push(RawRecord::new(USER, encode_user(user)?));
+                    user_index += 1;
+                }
+            }
             if index == count_slot {
                 let count = u16::try_from(value.users.len())
                     .map_err(|_| invalid("too many users for BrtCUsr"))?;
@@ -147,6 +171,7 @@ pub fn write_users(value: &UserNames, limits: Limits) -> Result<Vec<u8>> {
 /// Parse a revision-headers part, retaining unknown records in source order.
 pub fn parse_headers(data: &[u8], limits: Limits) -> Result<RevisionHeaders> {
     let records = parse_records(data, "revision-headers", limits)?;
+    let end = end_slot(&records)?;
     let mut info = None;
     let mut info_slot = None;
     let mut headers = Vec::new();
@@ -172,6 +197,14 @@ pub fn parse_headers(data: &[u8], limits: Limits) -> Result<RevisionHeaders> {
     if headers.is_empty() {
         return Err(invalid("revision-headers part has no BrtRRHeader records"));
     }
+    if info_slot.is_some_and(|info| header_slots.iter().any(|slot| *slot < info))
+        || end.is_some_and(|end| {
+            info_slot.is_some_and(|slot| slot >= end)
+                || header_slots.iter().any(|slot| *slot >= end)
+        })
+    {
+        return Err(invalid("revision-header records are out of order"));
+    }
     Ok(RevisionHeaders {
         relationship_id: String::new(),
         relationship_type: String::new(),
@@ -188,7 +221,7 @@ pub fn parse_headers(data: &[u8], limits: Limits) -> Result<RevisionHeaders> {
 pub fn write_headers(value: &RevisionHeaders, limits: Limits) -> Result<Vec<u8>> {
     super::validation::validate_headers(value)?;
     let records = if value.records.is_empty() {
-        let mut records = Vec::with_capacity(value.headers.len().saturating_add(1));
+        let mut records = Vec::with_capacity(value.headers.len().saturating_add(2));
         records.push(RawRecord::new(INFO, encode_info(&value.info)?));
         records.extend(
             value
@@ -197,6 +230,7 @@ pub fn write_headers(value: &RevisionHeaders, limits: Limits) -> Result<Vec<u8>>
                 .map(|header| encode_header(header).map(|payload| RawRecord::new(HEADER, payload)))
                 .collect::<Result<Vec<_>>>()?,
         );
+        records.push(RawRecord::new(EOF, Vec::new()));
         records
     } else {
         let Some(info_slot) = value.info_slot else {
@@ -210,6 +244,12 @@ pub fn write_headers(value: &RevisionHeaders, limits: Limits) -> Result<Vec<u8>>
         );
         let mut header_index = 0usize;
         for (index, record) in value.records.iter().enumerate() {
+            if record.kind == EOF {
+                while let Some(header) = value.headers.get(header_index) {
+                    output.push(RawRecord::new(HEADER, encode_header(header)?));
+                    header_index += 1;
+                }
+            }
             if index == info_slot {
                 output.push(RawRecord::new(INFO, encode_info(&value.info)?));
             } else if value.header_slots.contains(&index) {
@@ -266,9 +306,10 @@ pub(crate) fn revision_envelope(kind: u16, payload: &[u8]) -> Option<RevisionEnv
 }
 
 fn is_enveloped_kind(kind: u16) -> bool {
+    // MS-XLSB 2.3 record IDs, not the 2.4 subsection numbers for these types.
     matches!(
         kind,
-        771 | 772 | 773 | 774 | 779 | 781 | 782 | 783 | 784 | 785 | 787 | 788
+        405 | 407 | 409 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 419 | 421
     )
 }
 

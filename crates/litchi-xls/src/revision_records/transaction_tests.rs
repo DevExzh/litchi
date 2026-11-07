@@ -39,7 +39,7 @@ fn revision_info() -> Vec<u8> {
     payload[4..6].copy_from_slice(&0x000Bu16.to_le_bytes());
     payload[38..42].copy_from_slice(&99i32.to_le_bytes());
     payload[42..46].copy_from_slice(&4u32.to_le_bytes());
-    payload[46..48].copy_from_slice(&45u16.to_le_bytes());
+    payload[48..50].copy_from_slice(&45u16.to_le_bytes());
     record(RRD_INFO_RECORD_TYPE, &payload)
 }
 

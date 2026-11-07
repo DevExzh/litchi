@@ -617,7 +617,8 @@ impl RrdInfo {
                 "RRDInfo contains reserved flag bits",
             ));
         }
-        let flags2 = read_u16(data, 44);
+        // The four-byte version occupies 42..46; history follows it.
+        let flags2 = read_u16(data, 46);
         if flags2 & 0xFFFC != 0 {
             return Err(invalid(
                 RRD_INFO_RECORD_TYPE,
@@ -641,7 +642,7 @@ impl RrdInfo {
             version: read_u32(data, 42),
             history_preserved_off: flags2 & 0x0001 != 0,
             history_protected: flags2 & 0x0002 != 0,
-            history_interval_days: read_u16(data, 46),
+            history_interval_days: read_u16(data, 48),
         };
         value.validate()?;
         Ok(value)
@@ -1786,7 +1787,9 @@ impl RrdChgCell {
             )
         })?;
         let tail_len = data.len() - RRD_CHG_CELL_FIXED_LEN;
-        if old_value_size_usize > tail_len {
+        // cbOldVal uses normalized size rules for strings/formulas, not a
+        // physical span in this record (variable values may also continue).
+        if expected_old_size.is_some() && old_value_size_usize > tail_len {
             return Err(invalid(
                 RRD_CHG_CELL_RECORD_TYPE,
                 "RRDChgCell old value extends past the record payload",
@@ -1867,7 +1870,8 @@ impl RrdChgCell {
                 "RRDChgCell cbOldVal overflows usize",
             )
         })?;
-        if old_value_size_usize > tail.len() {
+        // Only fixed-size old values have a directly comparable wire size.
+        if expected_old_size.is_some() && old_value_size_usize > tail.len() {
             return Err(invalid(
                 RRD_CHG_CELL_RECORD_TYPE,
                 "RRDChgCell old value extends past the record payload",
@@ -1960,7 +1964,9 @@ impl RrdChgCell {
     pub fn location(&self) -> RevisionCellLocation {
         self.location
     }
-    /// Byte size of the old cell contents (`cbOldVal`).
+    /// Stored size descriptor for the old cell contents (`cbOldVal`).
+    /// Variable strings/formulas use normalized size rules; this is not a
+    /// byte offset into [`Self::tail`].
     #[must_use]
     pub fn old_value_size(&self) -> u32 {
         self.old_value_size

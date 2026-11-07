@@ -326,6 +326,28 @@
         "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Corpus evidence correction only, not positive semantic coverage or a library-unsupported claim. Historical authoring status is unchanged; direct native specimens of these features remain required."
+    },
+    {
+      "feature_row": "xls-176",
+      "classification": "native_derivative_outside_semantic_profile",
+      "fixtures": [
+        "excel/excel-revisions.xls"
+      ],
+      "reason": "The closed native legacy export has a User Names stream, but its UsrChk version is outside the documented BIFF2-BIFF8 enumeration; presence alone does not establish a typed user-log or publication success.",
+      "required_evidence": "A native XLS User Names stream with a documented UsrChk version (0200/0300/0400/0500/0600), valid Revision Log dependencies and, for nonempty user reads, at least one retained UsrInfo entry.",
+      "observed_evidence": "The 536-byte stream has CUsr=0, UsrChk bytes 06 00 00 00, a 512-byte CbUsr table whose inactive first size slot is 41, and BCUsrs=0. Snapshot::parse reports InvalidRecord 0x0198 for version 0x0006. The associated legacy Revision Log also contains duplicate-zero RRTabId maps; the final workbook values remain readable.",
+      "checks": [
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_revisions",
+          "name": "native_user_names_version_is_outside_the_typed_profile"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/excel/revisions-inspection.json",
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Fixture-profile evidence only, never positive semantic coverage or a claim that User Names is generally unsupported. Native bytes and historical authoring classifications remain unchanged; a conforming native user-log specimen remains required."
     }
   ]
 }

@@ -65,7 +65,7 @@ fn rrd_info() -> Vec<u8> {
     data[4..6].copy_from_slice(&INFO_SHARED_AND_TRACKED.to_le_bytes());
     data[38..42].copy_from_slice(&41i32.to_le_bytes()); // revid
     data[42..46].copy_from_slice(&2u32.to_le_bytes()); // version
-    data[46..48].copy_from_slice(&HISTORY_INTERVAL_DAYS.to_le_bytes());
+    data[48..50].copy_from_slice(&HISTORY_INTERVAL_DAYS.to_le_bytes());
     record(RRD_INFO_RECORD_TYPE, &data)
 }
 
