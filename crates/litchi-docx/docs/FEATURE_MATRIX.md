@@ -1,421 +1,89 @@
 # WordprocessingML (DOCX) Feature Matrix
 
-This document tracks the public feature support of litchi-docx for WordprocessingML
-packages (.docx, and the related .docm, .dotx, and .dotm package profiles where
-the API explicitly exposes them). It is a compatibility matrix, not a claim of complete
-ISO/IEC 29500 conformance or rendering fidelity.
-
-## Scope, status, and specification references
-
-| Mark | Meaning |
-|------|---------|
-| ✅ | Typed public support for the scope in Notes |
-| 🟡 | Bounded, partial, metadata-only, pass-through, or inert support |
-| ❌ | No public typed support currently available |
-| N/A | The concept does not apply to the format or direction |
-
-Read and Write describe the public direction independently. A typed row can still be
-inert: reading or writing field instructions, macros, links, or embedded payloads does not
-evaluate, execute, fetch, or render them. Generic OPC part access and preservation of an
-unmodified XML part are not counted as typed support for the XML feature inside that part.
-
-The primary audit sources are [MS-DOCX] ToC.md, Front Matter.md, and 2 Structures:
-2.1 Part Enumerations, 2.2 Extensions, 2.3 compatSetting elements, 2.4 numFmt
-Extensions, and the Word 2010, 2012, 2015, 2016, 2018, 2020, 2023, and 2024 extension
-namespace documents. The base WordprocessingML vocabulary is the ISO/IEC 29500 / ECMA-376
-model referenced by [MS-DOCX].
-
-Related package and payload references used for this matrix are [MS-CFB] and [MS-OLEPS]
-for compound files and property sets, [MS-OFFCRYPTO] for OOXML encryption and IRM
-DataSpaces, [MS-OWEXML] for web extensions, [MS-OREACTXML] for comment reactions,
-[MS-OVBA] for VBA projects, and [MS-ODRAWXML] for WordprocessingML DrawingML.
-The implementation owner is crates/litchi-docx/src/; shared OPC, signature, crypto,
-embedded-object, web-extension, and common OOXML models are called out where they affect
-DOCX behavior.
-
-## Owned document projection
-
-`Package::document()` returns an owned, read-only `Document`. It retains the
-physical snapshot used for related-part resolution and remains readable after
-package drop or later edits. Secondary style and raw-part views borrow this
-projection. Eager `Package` is cheaply cloneable and `apply(&patch)` returns a new package
-without changing the source. Primary `edit().commit()` retains the source and returns a complete package
-through `Commit::{package,into_package,into_parts}`. Other eager mutation APIs
-are still being migrated to the immutable package/commit contract; an owned projection does not imply that
-migration is complete.
-
-Source-backed `Package` clones retain the same source lineage, lazy caches and
-repair report. Stream publication borrows the source, which stays readable and
-can publish again after success or a sink failure. Retained caches keep their
-execution reservations until the last retaining owner drops; cloning does not
-reserve the same payload again. The package-bound source commit contract remains
-under migration.
-
-## Core WordprocessingML document model
-
-## Shared specification map
-
-The protocol ToCs and front matter of the Microsoft Open Specifications ([MS-DOCX], [MS-OI29500] and their dependencies) and ECMA-376 are the audit input. A detailed matrix
-must use the most specific format specification available and then account for shared dependencies.
-
-| Family | Role in the audit |
-|--------|-------------------|
-| `[MS-DOC]`, `[MS-DOCX]` | Word binary and WordprocessingML feature families |
-| `[MS-XLS]`, `[MS-XLSB]`, `[MS-XLSX]` | Excel BIFF, binary OOXML, and SpreadsheetML feature families |
-| `[MS-PPT]`, `[MS-PPTX]` | PowerPoint binary and PresentationML feature families |
-| `[MS-CFB]`, `[MS-OLEPS]`, `[MS-OLEDS]` | Compound File Binary, property sets, and embedded OLE data |
-| `[MS-ODRAW]`, `[MS-ODRAWXML]`, `[MS-OGRAPH]`, `[MS-WMF]`, `[MS-EMF]`, `[MS-EMFPLUS]` | OfficeArt, DrawingML, graph, and drawing payloads |
-| `[MS-OE376]`, `[MS-OI29500]`, `[MS-OWEXML]` | Shared OOXML relationships, package, and compatibility behavior |
-| `[MS-OFFCRYPTO]` | Office encryption and password-protection envelopes |
-| `[MS-OVBA]`, `[MS-VBAL]` | Macro project/module streams and VBA codec boundaries |
-| `[MS-OSHARED]`, `[MS-DTYP]`, `[MS-LCID]`, `[MS-UCODEREF]` | Shared Office types, code pages, locale identifiers, and Unicode references |
-
-The specifications describe what a producer or consumer may encounter. They do not by themselves
-prove that Litchi implements a feature. Each row must be grounded in the public API and its tests,
-with an honest boundary in `Notes`.
-
-## Audit and maintenance rules
-
-1. Keep one row per meaningful public feature family, not one row per protocol paragraph.
-2. Include `Status`, `Read`, `Write`, and `Notes` columns in every detailed matrix.
-3. Use `🟡` for bounded, metadata-only, inert, pass-through, or lossless-but-untyped behavior.
-4. Record important protocol feature families that are not implemented as `❌`; do not silently omit
-   them merely because the current API has no type for them.
-5. State whether external targets, scripts, macros, database connections, embedded payloads,
-   formulas, signatures, and encryption are resolved, executed, verified, or only preserved.
-6. Keep package-level support separate from semantic support. A valid container or relationship
-   graph does not imply support for every part carried by that graph.
-7. When implementation changes, update the affected detailed matrix in the same change. Update
-   this index only when ownership, shared semantics, or the supported format set changes.
-8. Do not claim complete standards or application compatibility. Cite the relevant `[MS-*]` family
-   or ISO/IEC structure in the detailed document's section or Notes cell when it helps delimit scope.
-
-## Project-wide boundaries
-
-Feature-gated families require the corresponding Cargo feature. Optional ODF, formula, RTF, iWork,
-font, image-conversion, and related stacks are not implied by the default umbrella build. Public
-APIs generally support in-memory and path-based workflows, but streaming, lazy loading, zero-copy
-parsing, and rendering fidelity vary by crate. Typed errors and resource bounds are part of the
-support claim where the detailed matrix says so.
-
-The project treats untrusted Office and ODF content as data: external references are not fetched,
-macros are not executed, and embedded objects are not activated. Formula evaluation and conversion
-must describe their supported function/AST subset and any caller-provided capabilities. Signature
-verification is integrity-oriented and does not establish certificate trust.
-
-## Source map
-
-- Shared package and signature infrastructure: `crates/litchi-opc/`, `crates/litchi-cfb/`, `crates/litchi-ole-common/`, `crates/litchi-sign/`, and `crates/litchi-crypto/`
-- OOXML shared models and drawings: `crates/litchi-ooxml-common/`, `crates/litchi-drawingml/`, and `crates/litchi-fonts/`
-- Legacy Office infrastructure: `crates/litchi-codepage/`, `crates/litchi-odraw/`, and `crates/litchi-ograph/`
-- VBA project codec: `crates/litchi-vba/`
-- OpenDocument shared models: `crates/litchi-odf/`, `crates/litchi-odf-common/`, and `crates/litchi-odf-formula/`
-- Unified facades and conversion APIs: `crates/litchi/`, `crates/litchi-core/`, `crates/litchi-formula/`, `crates/litchi-eval/`, `crates/litchi-markdown/`, and `crates/litchi-sheet/`
-
+Feature checklist. ✅ Supported · 🟡 Partial · ❌ Unsupported · N/A Not applicable.
 
 ## Package graph and shared Office features
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| OPC parts, relationships, and content types | ✅ | ✅ | ✅ | Package owns a validated OPC graph with transactional relationship and part edits; internal targets, content types, and graph cardinality are checked rather than treated as arbitrary ZIP entries |
-| Transitional and Strict package forms | ✅ | ✅ | ✅ | DOCX package and WordprocessingML readers accept the supported Transitional and Strict namespaces; writers select the conformance form for owned parts, while unsupported strict-only extension semantics are not silently reinterpreted |
-| Markup Compatibility (mc:Ignorable, AlternateContent) | 🟡 | ✅ | ✅ | MCE-aware readers select active branches for supported models and preserve bounded raw or opaque branches where possible; inactive or foreign content is not thereby semantically implemented |
-| Main document, settings, styles, numbering, theme, font table, comments, notes, headers, footers, glossary, and properties parts | ✅ | ✅ | ✅ | The package graph covers the standard Word part families needed by the typed document model, including relationship and content-type maintenance; new comments omit the optional timestamp deterministically unless the caller supplies a validated `writer::comment::Date`, and owned comments XML is emitted without formatting whitespace; `glossary::{Snapshot, Transaction, Commit, Patch}` adds source-checked catalog and auxiliary-part CRUD with orphan-safe publication, while `variables::{Snapshot, Transaction, Commit, Patch}` owns bounded `docVar` edits |
-| Main-document source-preserving transactions | 🟡 | ✅ | 🟡 | The ordinary eager root is `Package::edit()` followed by `Edit::commit()` and `Commit::into_package()`, or immutable `Package::apply(&patch)`. Root `document::{Edit, Commit}` retain a complete package; standalone XML uses the mutable `document::raw::Tree` with required caller-selected limits, while bounded planning uses `document::composition::{Prepared, Composition, History}` and owner publication uses `Package::apply_composition`. Typed `format_run`/`format_paragraph` edits splice direct properties while retaining unrelated markup; typed paragraph/run insertion, removal and paragraph moves record exact reversible structural operations. These formatting/structure routes refuse managed snapshots; package transactions retain the hard format ceilings and raw trees additionally enforce the caller-selected XML and operation limits. Checked operations also cover multi-run paragraphs, individual runs inside rich paragraphs, direct hyperlinks, simple- and run-delimited complex-field result text, tracked insertion/deletion text, direct and path-addressed nested inline content controls, path-addressed block-control paragraphs, basic cells, selected paragraphs in rich/multi-paragraph cells, path-addressed nested-table cells, direct hyperlinks inside each of those path-addressed owners, and compact paragraph insertion. Composite selectors include bounded direct-child paths ending at one direct hyperlink plus atomic, canonically ordered direct-hyperlink batches across multiple paragraphs in the body, one path-addressed block control, or one path-addressed nested-table cell. Empty, duplicate, or non-canonical batches fail closed, and direct-child leaves cannot cross ownership or relationship scopes. Native tab, break, carriage-return, nonbreaking-hyphen, and soft-hyphen run content is read and emitted structurally; formatting, field instructions and markers, revision/control metadata, relationship IDs, table/control ancestors, and opaque XML outside the selected text owner are retained. Changed WordprocessingML is compacted with entity- and `xml:space`-sensitive semantics before commit, except transactions containing explicit revision dispositions, which retain their projected bytes to preserve opaque whitespace and attribute spelling. Each batch expands to existing exact-source leaf operations, so durable semantic JSON retains exact stale/target hashes, bounded canonical selector paths, bounded transfer blobs, and byte-exact inverse restoration; independent joins feed recoverable non-mutating three-way plans, while package-coupled bounded history publishes document XML and dependency-graph commit/undo/redo atomically. Dependency-aware paragraph transfer reuses one exact equivalent receiver closure or copies the complete bounded internal part/relationship subgraph and external edges under deterministic receiver-local names; graph publication, history, durable replay/inverse, and package reopen share the same exact dependency digests. Crossing-range, cross-owner/cross-story, and arbitrary descendant selectors remain outside this bounded root |
-| Cross-story hyperlink batches | ✅ | ✅ | ✅ | `Package::edit_stories().replace_hyperlink_texts` stages canonically ordered exact selectors across the main document and relationship-reachable header/footer stories; `commit()` publishes them and `Package::apply_stories` replays the source-checked patch. Every story is staged before publication; each root prolog, root attributes, unrelated XML, relationship graph, and story topology remains exact. Empty, duplicate, non-canonical, unreachable, or late-failing selections leave every story unchanged. Native main-story edits and three-story library derivatives cover save/reopen, byte-exact unselected XML, topology, prior-staging retention and inverse; the native corpus has no header/footer hyperlink specimen. |
-| Source-backed secondary-story text | 🟡 | ✅ | 🟡 | Bounded source-backed selectors cover individual footnote, endnote, comment, and glossary entries. Native root `mc:Ignorable` metadata is admitted through the shared bounded source/projection agreement proof; retained opaque markup cannot hide understood content, and all original XML outside the owned text slots remains exact. Glossary selection supports unique Unicode-caseless name, canonical ID, combined name-and-ID, and checked source-order index identities; it binds one exact part/body span and fingerprint before editing rather than re-resolving during publication. A general nonempty caller-bounded batch within one glossary performs one topology resolution/materialization and one inventory pass, resolves canonical source-order semantic selectors, refuses alias duplicates/overlaps and duplicate paragraph intents, stages selected-only paragraphs under aggregate selector, entry, replacement, and output limits, measures all replacement sizes before materialization, and uses one temporary wrapper at a time. Cancellation-atomic staging and exact one-Part publication preserve glossary root, properties, sibling entries, opaque XML, and source-bound inverse/no-op behavior. Relationship/content-type ownership, inbound closure, package/XML dialect, namespace, entry, output, freshness, signature, and failure-atomicity fences fail closed. Managed entry editing, glossary create/delete/rename/reorder, metadata/background editing, cross-part/general-story batching, durable patch wire, MCE branch selection, fields, revisions, controls, and rendering remain outside this row. |
-| Ordered paragraph and run content projection | 🟡 | ✅ | N/A | `Paragraph::inlines` preserves direct child order with exact inert unknown fallbacks, each classified by namespace and local name as an `InlineKind` (`OpaqueInline::kind`); `inlines_with_relationships` additionally groups resolved hyperlinks without exposing relationship IDs; effective source-owner relationship integration remains pending. `Paragraph::addressable_runs` returns the run set a positional `r[N]` address counts (OfficeCLI's navigation set: descendant runs minus comment-reference runs and runs inside inline content controls, simple fields, text boxes and markup-compatibility alternatives), while `Paragraph::runs` keeps its outermost-run set. `Run::contents` preserves order for text, tabs, breaks, carriage returns, hyphens, inline images, footnote/endnote references and definition markers, with exact unknown run-child fallbacks. Fields, revisions, controls, nested hyperlink content other than direct runs, and rendering semantics remain unmodeled |
-| Web settings part | ✅ | ✅ | ✅ | `web::{Snapshot, Transaction, Commit, Patch}` owns bounded frameset, layout, screen, and border edits with source-preserving opaque XML, graph/content-type validation, and atomic package publication; URLs and rendering remain inert |
-| stylesWithEffects part | 🟡 | ✅ | 🟡 | [MS-DOCX] 2.1.1: `styles::effects` owns independent optional main-document and glossary resources with shared source XML and a bounded read-only style projection. `Package::{styles_with_effects, put_styles_with_effects, remove_styles_with_effects}` and source-checked edit/patch APIs support whole-resource replacement, explicit addition, removal, exact no-ops, and inverse restoration of source metadata. Publication enforces caller XML/package/relationship/graph limits and signature policy; it does not create a missing glossary owner. Unknown effect markup is retained. Complete typed visual-effects modeling, individual style rewriting through this owner, rendering, and cascade evaluation remain outside this resource API. |
-| Core, extended, and custom properties | ✅ | ✅ | ✅ | Bounded typed CRUD with deterministic package graph updates and preservation of unrelated parts |
-| Embedded OLE and package objects | ✅ | ✅ | ✅ | Relationship inventory and inert object authoring preserve validated ProgIDs, embedding parts, content types, optional previews, and payload bytes; payloads and external targets are never opened |
-| Embedded fonts | ✅ | ✅ | ✅ | Bounded Strict/Transitional font-table XML and OPC topology with typed add/replace/remove/reorder, obfuscation, licensing checks, and orphan-safe media cleanup; `fonts` enables glyph collection and caller-supplied preparation, `font-subset` and `font-discovery` add only their named capability, and `automatic-fonts` enables save-time system resolution plus subsetting; font programs remain inert |
-| Images, charts, and DrawingML/VML relationships | ✅ | ✅ | ✅ | Resources and relationship graphs are authored and preserved; contextual `chart::{Snapshot, Transaction, Commit, Patch}` edits chart and embedded-workbook graph metadata with source checks; chart calculation, image rendering, and shape layout are outside the library |
-| Main-story source SVG picture inventory | 🟡 | ✅ | ❌ | `drawing::SourceDrawing` borrows complete `w:document` XML and records direct inline/floating picture placement, raster relationship attributes, raw source ranges, and admitted SVG owners. Strict/Transitional namespaces, encoded aliases, bounded shared namespace contexts, and explicit standalone fragment completion are supported. Foreign, legacy, grouped, and MCE ownership boundaries remain opaque or refused. This source scanner does not validate package media closure, attach/detach SVG, inspect subsidiary story roots, or establish rendering/native Word acceptance. |
-| Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC XMLDSig verification, signing, re-signing, and recognized-graph clearing; strict verification is the safe default and certificate trust/revocation is not established. The generic candidate helper preserves exact signed no-ops and requires explicit disposition for changes, including whole-candidate replacement. Opaque non-Part signature-directory entries permit exact no-op publication only through this helper; complete opaque stripping and legacy owner migration remain separate work |
-| Password encryption | ✅ | ✅ | ✅ | Supported Standard and Agile compatibility profiles are AES-128/SHA-1; unsupported AES-192/256 and SHA-2 Agile profiles are typed as unsupported rather than misread. Encrypted provenance refuses raw or semantic OPC mutation and never implicitly downgrades on ordinary save; callers must explicitly `save_plain`, reopen the plaintext artifact, perform edits, and select `save_encrypted` when a decrypted source must be transformed and encrypted again |
-| Information Rights Management and protected content | 🟡 | ✅ | 🟡 | [MS-OFFCRYPTO] DataSpaces, publishing-license, certificate, sensitivity-label, and integrity metadata have bounded shared codecs; rights services, license evaluation, protected-content decryption, and access enforcement are never performed |
-| VBA projects in DOCM/DOTM | 🟡 | 🟡 | 🟡 | Bounded vbaProject.bin CFB/MS-OVBA project/module metadata and cache-free source payload authoring are available with package/content-type graph maintenance; VBA is never compiled or executed |
-| Web extensions and Office Add-ins | 🟡 | ✅ | 🟡 | Typed task-pane/web-extension graph editing with bounded links, bindings, snapshots, extension lists, and shared payloads; callbacks, commands, remote services, and add-in code are inert |
-| Mail-merge settings and recipient metadata | ✅ | ✅ | ✅ | `mail_merge::{Snapshot, Transaction, Commit, Patch}` provides bounded source-checked settings, recipient, and field-map edits with opaque XML preservation and reversible atomic publication; data sources are never contacted and no merge is run |
-| External relationships and linked content | 🟡 | ✅ | ✅ | Relationship targets and link metadata can be inspected or authored, but Litchi does not fetch, resolve, open, refresh, or execute external targets |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| OPC parts, relationships, and content types | ✅ | ✅ | ✅ |
+| Transitional and Strict package forms | ✅ | ✅ | ✅ |
+| Markup Compatibility (mc:Ignorable, AlternateContent) | 🟡 | ✅ | ✅ |
+| Main document, settings, styles, numbering, theme, font table, comments, notes, headers, footers, glossary, and properties parts | ✅ | ✅ | ✅ |
+| Main-document source-preserving transactions | 🟡 | ✅ | 🟡 |
+| Cross-story hyperlink batches | ✅ | ✅ | ✅ |
+| Source-backed secondary-story text | 🟡 | ✅ | 🟡 |
+| Ordered paragraph and run content projection | 🟡 | ✅ | N/A |
+| Web settings part | ✅ | ✅ | ✅ |
+| stylesWithEffects part | 🟡 | ✅ | 🟡 |
+| Core, extended, and custom properties | ✅ | ✅ | ✅ |
+| Embedded OLE and package objects | ✅ | ✅ | ✅ |
+| Embedded fonts | ✅ | ✅ | ✅ |
+| Images, charts, and DrawingML/VML relationships | ✅ | ✅ | ✅ |
+| Main-story source SVG picture inventory | 🟡 | ✅ | ❌ |
+| Digital signatures | ✅ | ✅ | ✅ |
+| Password encryption | ✅ | ✅ | ✅ |
+| Information Rights Management and protected content | 🟡 | ✅ | 🟡 |
+| VBA projects in DOCM/DOTM | 🟡 | 🟡 | 🟡 |
+| Web extensions and Office Add-ins | 🟡 | ✅ | 🟡 |
+| Mail-merge settings and recipient metadata | ✅ | ✅ | ✅ |
+| External relationships and linked content | 🟡 | ✅ | ✅ |
 
-## [MS-DOCX] part and extension audit
+## [MS-DOCX] part and extension
 
-These rows make the extension specification explicit. A ❌ row means that the extension
-family has no typed model even if an untouched part can remain in a package-preserving edit.
-
-| Feature family | Status | Read | Write | Notes |
-|----------------|--------|------|-------|-------|
-| commentsExtended, people, commentsIds, and commentsExtensible parts | ✅ | ✅ | ✅ | [MS-DOCX] 2.1.2-2.1.5 are represented by bounded modern-comment metadata, people/presence, paragraph-to-durable-ID mappings, extension lists, UTC strings, and relationship/content-type maintenance. Native ignorable w14 paragraph IDs survive comment projection and retain root/reply associations. |
-| Modern comment reactions and extension lists | ✅ | ✅ | ✅ | `commentsExtensible` reaction metadata follows [MS-OREACTXML], including typed reaction kinds, `cr:reactionInfo` UTC timestamps, users, unknown reaction entries, and ordered OEXTXML extension lists; native durable-ID/time/parent graphs are pinned, and detached reaction/extension derivatives round-trip in both conformance modes. The raw OPC store creates absent metadata parts and refuses existing ones; an existing-package reaction editor is not exposed by this owner. Native fixtures have no reaction payloads. The library does not contact collaboration services or interpret reaction policy |
-| rPr extension effects (glow, shadow, reflection, textOutline, textFill, scene3d, props3d) | ✅ | ✅ | ✅ | [MS-DOCX] 2.2.1 and 2.6 expose the seven Word 2010 visual effects through `Run::effects`, cached `RunProperties::effects`, and writer `MutableRun::{effects, effects_mut, set_effects}`. The typed model validates schema domains, preserves ordered bounded unknown direct children byte-for-byte, and does not render or evaluate effects. The current 24-file native Word OOXML corpus contains none of these seven elements; namespace declarations and drawing graphics do not qualify this row |
-| rPr OpenType extensions (ligatures, numForm, numSpacing, stylisticSets, cntxtAlts) | ✅ | ✅ | ✅ | `Run::open_type` and `font::open_type::Snapshot` expose bounded Word 2010 properties; detached `Run::set_open_type` preserves unowned XML with absent-versus-authored semantics. Native DOCM/DOTM runs retain explicit no-ligature settings through detached edits. Managed runs refuse this detached mutation; no package-level OpenType transaction is exposed. Font shaping and rendering remain outside the crate |
-| Settings extension elements (chartTrackingRefBased, docId, conflictMode, discardImageEditingData, defaultImageDpi) | ✅ | ✅ | ✅ | [MS-DOCX] 2.2.2 Word 2010/2012 settings extensions expose `settings::extensions::{Snapshot, Edit, Commit, Patch}` with typed absent/default-on/explicit On/Off semantics, bounded MCE-aware source-preserving edits, ordered opaque direct-child preservation, stale/atomic validation, and malformed/round-trip coverage. Native DOCX/DOTX/DOCM/DOTM tests cover both ID forms, chart-tracking defaults, edit/removal/reset, inert macro-member retention and inverse after file reopen. Serialized extension siblings each bind their own namespaces |
-| Generic compatSetting records and compatibility mode | ✅ | ✅ | ✅ | Settings expose known compatibility flags, compatibilityMode, and bounded arbitrary name/URI/value records. Native tests assert six ordered triples and mode 15, plus detached typed-codec create/update/delete and escaped values. This records compatibility intent; it does not implement Word layout algorithms |
-| SDT extension controls (entityPicker, checkbox, repeatingSection, repeatingSectionItem, appearance, color, dataBinding) | 🟡 | 🟡 | 🟡 | Core and observed Word 2012 `dataBinding` forms have bounded MCE-aware read/write ownership across every relationship-reachable main, header, footer, note, comment, and glossary story, including Strict and DOCM/DOTX/DOTM packages; missing and duplicate producer IDs remain distinct source-order occurrences. `appearance` is typed as boundingBox/tags/hidden and `color` as automatic or sRGB, with compact canonical property authoring. Checkbox, entity-picker, repeating-control contextual semantics, broader MCE enforcement, and layout remain incomplete. XPath, entity lookup, repetition, host selection, controls, actions, macros, and bound-data evaluation are inert and are never executed. The current native Word OOXML corpus has none of the reviewed SDT extension/dataBinding elements; its legacy FFData controls are separate evidence |
-| SDT web-extension links (webExtensionsLinked, webExtensionCreated) | 🟡 | ✅ | 🟡 | Bounded typed `CT_OnOff` metadata preserves absence and explicit values; `webExtensionCreated` precedence is exposed without resolving, loading, calling, or executing any add-in relationship. Source-bound package mutation and contextual add-in behavior remain unavailable |
-| Paragraph and table-row extension identifiers (paraId, textId) and paragraph noSpellErr | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.2.4 and 2.6.2 are modeled by `paragraph::extensions::{Id, Ids, Extensions}`. Paragraphs and table rows expose checked eight-digit `ST_LongHexNumber` values; paragraph `noSpellErr` preserves absent versus explicit `0`/`1`, and writers emit local `w14` plus `mc:Ignorable` declarations. `textId` requires `paraId`; document-wide uniqueness policy, spelling detection, comments synchronization, and rendering remain outside this bounded owner |
-| W14 conflict revision markup (conflictIns, conflictDel, and custom XML conflict ranges) | 🟡 | ✅ | 🟡 | `[MS-DOCX]` 2.2.5 and 2.6.1.3-11 are read through a bounded namespace-aware, MCE-aware model across all supported story parts. Typed conflict records and custom-XML conflict ranges retain their contextual placement and source order. Source-preserving snapshots, transactions, patches, and atomic package publication validate ownership, ranges, and resource limits; an exact no-op leaves the original package and existing signatures untouched, while changed signed publication is refused until the caller explicitly invokes `Package::unsign`. New-document writers support non-nested inline and range conflict markup and table-row property conflicts. Paragraph-mark `rPr`, numbering `numPr`, and math `ctrlPr` conflict-property authoring, nested tracked/conflict wrapper authoring, arbitrary crossing or cross-paragraph custom-XML conflict-range coordination, and accept/reject resolution remain unavailable. Conflict content is inert data: revisions are never applied, macros/actions/controls are never activated, and no embedded code is executed. |
-| anchorId on object and pict | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.2.6 legacy-anchor inventories distinguish `w:object` and `w:pict` and validate the Word 2010 `AnchorId` range shared with `[MS-DOCX]` 2.6.2.1 and `[MS-ODRAWXML]` 2.18.2.1; `builder::OleObject` and `builder::VmlShape` author checked `w14:anchorId` values with a local `mc:Ignorable` declaration. Paragraph inventories inherit document namespace bindings in eager and source-backed views while honoring local rebinding. Native OLE anchor reads, unrelated text-edit preservation and fresh builder derivatives reusing the native workbook/preview are qualified; opened-object anchor CRUD and native w:pict anchor interoperability remain open. OLE, VML, image payloads, layout, and rendering remain inert |
-| Um Al-Qura umalqura calendar extension | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.2.7 is represented by the lossless `content_control::Calendar` vocabulary. Namespace-aware reads select the active MCE branch, unknown calendar tokens remain typed and lossless, and authoring emits compact `mc:AlternateContent` with the required `w14` Um Al-Qura choice and `hijri` fallback. Calendar values remain inert metadata; no date conversion or rendering is performed. |
-| sectPr footnoteColumns | ✅ | ✅ | ✅ | `[MS-DOCX]` Word 2012 `w12:footnoteColumns` is exposed through `section::footnote_columns::{Layout, Snapshot, Transaction}` and `Section` read/edit helpers; absence and explicit zero remain distinct, inherited package namespaces and `mc:Ignorable` are retained out-of-band, value edits preserve authored attributes/lexical source, and patches are source-checked and atomic; layout/pagination are not implemented |
-| pPr collapsed | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.5.1.3 `w12:collapsed` is exposed as the typed `Collapsed` value with paragraph read/replace, authoring helpers, and atomic body-paragraph edits; explicit true/false remains distinct from absence, unknown `pPr` content is preserved, and display/layout behavior is not implemented |
-| Numbering restartNumberingAfterBreak | ✅ | ✅ | ✅ | `[MS-DOCX]` Word 2012 `w12:restartNumberingAfterBreak` is exposed on contextual numbering definitions with namespace-aware parsing, absent-versus-explicit state, bounded source-preserving transactions, and package publication; numbering behavior itself remains inert |
-| Run symEx symbol extension | ✅ | ✅ | ✅ | [MS-DOCX] 2.2.11 and 2.7 expose ordered `run_symbols::{Symbol, Symbols}` values, optional `font`/Unicode-scalar `char` state, bounded validation, immutable run snapshots, detached raw `Run` edit helpers, and ergonomic mutable-run authoring; no package-level symEx transaction is exposed. Main and secondary story MCE profiles retain this supported namespace when it is declared ignorable; unknown run content remains inert and byte-preserved |
-| Data-binding storeItemChecksum | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.11 normatively defines the checksum attribute on core `w:dataBinding`, strict Base64 storage, `MsoCrc32Compute`, and exact uncompressed, unencrypted Custom XML part input. Litchi documents zero seeding and little-endian DWORD-to-Base64 as the observed Word interoperability convention, not as seed or byte-order requirements stated by that section; observed Word `w15:dataBinding` checksum use is accepted as compatibility behavior rather than claimed as the normative owner. Typed reports distinguish absent, malformed, missing store, match, and mismatch states; duplicate store ownership is refused before reporting or mutation. Source-bound reversible transactions and managed Custom XML updates refresh every already-declared active checksum across reachable stories, preserve absence, reject stale or duplicate-owner edits atomically, preserve signed exact no-ops, and refuse changed signed publication without altering the logical OPC graph. Callers must explicitly invoke `Package::unsign` before a real mutation. CRC equality is advisory corruption detection, never authentication or trust |
-| Word 2024 formattingAllowed | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.13 is modeled as absent versus explicit `ST_OnOff` state on `contentLocked` or `sdtContentLocked`; all six lexical forms are accepted, invalid lock combinations are rejected, fresh authoring maintains namespace and `mc:Ignorable` declarations, and source-bound transactions preserve unrelated bytes |
-| Word 2023 dateUtc | 🟡 | ✅ | ✅ | `[MS-DOCX]` 2.12 `w16du:dateUtc` is namespace-bound and validated as a bounded UTC `xsd:dateTime`, retaining its lexical value on recognized tracked revision metadata. Authoring emits a local `mc:Ignorable` declaration; DOCX main-document and header/footer/note/comment/glossary MCE profiles retain the supported namespace. Header/footer and main-document save/reopen paths have package evidence. Inline, paragraph-mark/numbering, row/cell, and modeled property-history metadata are projected contextually. Complete revision-owner authoring and resolution remain partial. Modern comment and reaction timestamps retain their separate owners. |
-| Extended note/list number formats from [MS-DOCX] 2.4 | 🟡 | ✅ | 🟡 | Common note and numbering formats have typed enums and serialization; the full Microsoft extension enumeration is not a layout/numbering engine |
+| Feature family | Status | Read | Write |
+| --- | --- | --- | --- |
+| commentsExtended, people, commentsIds, and commentsExtensible parts | ✅ | ✅ | ✅ |
+| Modern comment reactions and extension lists | ✅ | ✅ | ✅ |
+| rPr extension effects (glow, shadow, reflection, textOutline, textFill, scene3d, props3d) | ✅ | ✅ | ✅ |
+| rPr OpenType extensions (ligatures, numForm, numSpacing, stylisticSets, cntxtAlts) | ✅ | ✅ | ✅ |
+| Settings extension elements (chartTrackingRefBased, docId, conflictMode, discardImageEditingData, defaultImageDpi) | ✅ | ✅ | ✅ |
+| Generic compatSetting records and compatibility mode | ✅ | ✅ | ✅ |
+| SDT extension controls (entityPicker, checkbox, repeatingSection, repeatingSectionItem, appearance, color, dataBinding) | 🟡 | 🟡 | 🟡 |
+| SDT web-extension links (webExtensionsLinked, webExtensionCreated) | 🟡 | ✅ | 🟡 |
+| Paragraph and table-row extension identifiers (paraId, textId) and paragraph noSpellErr | ✅ | ✅ | ✅ |
+| W14 conflict revision markup (conflictIns, conflictDel, and custom XML conflict ranges) | 🟡 | ✅ | 🟡 |
+| anchorId on object and pict | ✅ | ✅ | ✅ |
+| Um Al-Qura umalqura calendar extension | ✅ | ✅ | ✅ |
+| sectPr footnoteColumns | ✅ | ✅ | ✅ |
+| pPr collapsed | ✅ | ✅ | ✅ |
+| Numbering restartNumberingAfterBreak | ✅ | ✅ | ✅ |
+| Run symEx symbol extension | ✅ | ✅ | ✅ |
+| Data-binding storeItemChecksum | ✅ | ✅ | ✅ |
+| Word 2024 formattingAllowed | ✅ | ✅ | ✅ |
+| Word 2023 dateUtc | 🟡 | ✅ | ✅ |
+| Extended note/list number formats from [MS-DOCX] 2.4 | 🟡 | ✅ | 🟡 |
 
 ## Base WordprocessingML typed owners and operations
 
-These rows cover implemented source owners that sit outside the Microsoft extension
-namespace rows above. A typed or source-preserving owner remains inert unless its Notes
-cell says otherwise: fields are not refreshed, links are not fetched, and XML payloads
-are not executed.
-
-| Feature family | Status | Read | Write | Notes |
-|----------------|--------|------|-------|-------|
-| Tracked revision metadata and property changes | 🟡 | ✅ | 🟡 | `Document`, `DocumentPart`, pinned `source_backed::Document`, `Paragraph`, `Table`, `Row`, and `Cell` expose bounded `revisions`; the document reads honor `SemanticLimits::revisions` from `OpenOptions`, and `revision::Reader` reads any of them under explicit budgets (record 0355a). Document queries include body-final section and table metadata. `Revision::author()` is optional because table-grid history has only an identifier; Transitional numbering history exposes `original_numbering()`. Nested inline annotations retain separate metadata in source order and charge every retained text copy; XML references, CDATA, edge whitespace, line endings, and run controls are handled. Paragraph-mark, numbering, row, cell, and property-history metadata are distinguished from inline text. Writers emit non-nested inline wrappers and modeled property/row/cell markers. `MutableTable::set_row_revisions` checks one explicit metadata record per existing row atomically; WML has no whole-table insertion/deletion element. Section/table-grid/table-property-exception and Transitional numbering-history revisions are projected with namespace-bound owner, metadata, snapshot, and ordering checks. Complete property leaf and legacy property-envelope schema validation remain open; ordinary inline/move owner authoring is available through `revision::authoring`. |
-| Revision application and accept/reject | 🟡 | ✅ | 🟡 | `document::Edit::{apply_revision,accept_revision,reject_revision}` applies an explicit action to one direct inline insertion/deletion in a selected body paragraph. `revision::authoring::{Snapshot,Edit,Commit,Patch}` and `Package::{tracked_revisions,edit_tracked_revisions,apply_tracked_revisions}` additionally provide bounded main-document ownership for inline `w:ins`/`w:del` and complete paired `w:moveFrom`/`w:moveTo` wrappers and range markers. Accept/reject preserves opaque payload bytes and required namespace/scope bindings, groups exact move metadata, reparses every candidate, and provides source-bound exact inverse/no-op/stale/limit and atomic package publication behavior. Unsupported nested, move-range ambiguity, property, paragraph/table, field, control, markup-compatibility, and other dependency-bearing owners are refused atomically; secondary-story actions and general property resolution remain unavailable. |
-| Fields and cached field results | 🟡 | ✅ | ✅ | `field::Field`/`writer::field::MutableField` and the field model cover typed instruction/result metadata, including building-block, mail-merge, layout, automation, bibliography, and index families where documented; instructions are preserved or authored as text and no field is recalculated, refreshed, or executed. |
-| Office Math (OMML) fragments | 🟡 | ✅ | ✅ | `OfficeMath` and `OfficeMathParagraph` validate and retain OMML fragments and support bounded fresh text/display authoring; native DOCX/DOTX reads distinguish inline `oMath` from display equations inside `oMathPara`. Inline authoring emits a direct paragraph child; typed reads retain inherited namespace bindings, while raw getters preserve exact XML. Equation layout, rendering, and evaluation remain outside the crate. |
-| Bibliography source stores | 🟡 | ✅ | ✅ | `bibliography::{BibliographySourceStore,SourceStore}` and package data-store operations read and mutate bounded Custom XML `Sources`/`Source` records with typed source kinds and contributor values; style resolution, citation matching, XSLT, and bibliography regeneration are inert. |
-| Smart tags | 🟡 | ✅ | ✅ | `smart_tag::SmartTag` parses run-level `smartTag` metadata and retains nested content as raw XML/text; `writer::MutableSmartTag` supports bounded nested-content authoring and round-trip tests; smart-tag services and host actions are never invoked. |
-| Bookmarks and bookmark anchors | 🟡 | ✅ | ✅ | `Bookmark`/`MutableBookmark` expose basic `bookmarkStart`/`bookmarkEnd` IDs and names and writer paragraph helpers; cross-story coordination, repair records, and bookmark-driven field/navigation behavior remain outside the owner. |
-| Text boxes and WordArt inventory | 🟡 | ✅ | ✅ | `textbox::{TextBox,load_text_boxes}` inventories bounded DrawingML text boxes and VML fallbacks with text-body properties and observed WordArt metadata; `writer::MutableTextBox` authors bounded DrawingML text boxes, while VML fallback and WordArt metadata remain read-only in this owner; linked payloads, shape layout, and rendering are inert. |
-| Custom XML data stores and content-control bindings | 🟡 | ✅ | ✅ | Package data-store APIs provide bounded Custom XML item/properties CRUD, source-order SDT binding inventories, and checksum-aware updates with relationship/content-type maintenance. Arbitrary application schemas and bound-data evaluation remain opaque/inert. |
-| Streaming document authoring | ✅ | N/A | ✅ | `StreamingDocumentWriter` emits a bounded forward-only transitional package containing plain paragraphs and runs; it owns no revisable document model and cannot seek or revisit flushed content. Native Unicode text projections cover scalar-sized input chunks, short sink writes, exact input limits, cancellation/progress and save/reopen. This is fresh plaintext authoring; source formatting, stories and package resources are not transferred. |
-| Validation and document statistics | 🟡 | ✅ | N/A | `validate_read_at` performs bounded non-mutating package/main-document/MCE/security checks, while `Statistics` exposes text/structure counts and approximate lines/pages; validation reports external/macro/signature presence without fetching or executing, does not cryptographically verify signatures or establish certificate trust, and does not render layout. Native checks cover valid SVG image targets, inert security observations, exact byte limits and content-free diagnostics. Word counts use whitespace boundaries within each projected paragraph, including table cells; characters are Unicode scalars without synthesized paragraph separators. Image and drawing inventories may overlap, and lines/pages remain estimates. |
-| Direct (local) formatting properties | 🟡 | ✅ | N/A | `Run::direct_properties`, `Paragraph::direct_properties`, `Table::properties`, `Row::properties` and `Cell::properties` return typed `properties::{Run, Paragraph, Table, Row, Cell}` values for the element's own `w:rPr`, `w:pPr` (with the paragraph mark's `w:rPr`), `w:tblPr`/`w:tblGrid`, `w:trPr` and `w:tcPr`: on/off flags, closed vocabularies, measures in their stored units (universal measures converted exactly, then rounded to the unit), colours with theme references, fonts, languages, shading, borders, spacing, indentation, numbering, tabs, widths, margins, merges and spans. Names are namespace- and depth-checked, so revision snapshots, nested text-box runs and nested-table cells are never read; values outside their schema domain are left unset and listed by `invalid_properties()`. Values are local, not style-resolved; East Asian layout, frames, floating-table position, conditional-format stamps and revision attribution are not typed. The single-property run readers and `Cell::{grid_span, v_merge}` are confined to the element's own properties in the same way |
-| Source-bound sanitization and external-hyperlink redaction | 🟡 | ✅ | ✅ | `sanitize` detaches selected main-document external-hyperlink wrappers through a bounded, source-checked reversible patch while retaining relationship records; `redact` provides bounded, source-checked forward-only removal of selected wrappers and relationship records. Redaction admits native root `mc:Ignorable` metadata only after the shared source/projection agreement proof; branch directives, hidden understood owners, and encoded MCE namespace bindings remain refused. Both are inert: external targets are inventoried but never fetched. |
+| Feature family | Status | Read | Write |
+| --- | --- | --- | --- |
+| Tracked revision metadata and property changes | 🟡 | ✅ | 🟡 |
+| Revision application and accept/reject | 🟡 | ✅ | 🟡 |
+| Fields and cached field results | 🟡 | ✅ | ✅ |
+| Office Math (OMML) fragments | 🟡 | ✅ | ✅ |
+| Bibliography source stores | 🟡 | ✅ | ✅ |
+| Smart tags | 🟡 | ✅ | ✅ |
+| Bookmarks and bookmark anchors | 🟡 | ✅ | ✅ |
+| Text boxes and WordArt inventory | 🟡 | ✅ | ✅ |
+| Custom XML data stores and content-control bindings | 🟡 | ✅ | ✅ |
+| Streaming document authoring | ✅ | N/A | ✅ |
+| Validation and document statistics | 🟡 | ✅ | N/A |
+| Direct (local) formatting properties | 🟡 | ✅ | N/A |
+| Source-bound sanitization and external-hyperlink redaction | 🟡 | ✅ | ✅ |
 
 ## Explicit semantic gaps
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Pagination, line breaking, page fields, and rendering | ❌ | ❌ | ❌ | Section/page properties are data models only; there is no Word layout engine or renderer |
-| Field calculation and refresh | 🟡 | 🟡 | 🟡 | `litchi-ops::File::refresh` provides bounded main-story TOC/SEQ/REF, property/statistics and explicit-clock refresh over the native result editor. It preserves or refuses unknown TOC pages according to policy, retains layout-dependent caches, and skips locked, nested or unsupported fields. This is not a complete Word field engine or external-data runtime. |
-| Mail-merge execution | ❌ | ❌ | ❌ | Mail-merge settings, recipients, filters, and source targets are typed bounded metadata; no data source is opened or contacted and no merge output is generated |
-| AltChunk import and foreign-content conversion | ❌ | ❌ | ❌ | AltChunk anchors and payloads have bounded opaque CRUD; source-backed publication can replace one existing inert payload when its active relationship closure, direct `/word/` target, media type, and extension are exact, preserving every other ZIP member. HTML, XHTML, RTF, text, XML, and MIME payloads are never imported or rendered |
-| Macro, ActiveX, form-control, and add-in execution | ❌ | ❌ | ❌ | VBA projects, OLE payloads, legacy form state, web extensions, and control metadata are inert; code, callbacks, events, and host UI are never executed |
-| Ink / inkML model | 🟡 | 🟡 | 🟡 owning authoring and durable replay | Owning and source-backed packages expose bounded immutable annotation metadata across reachable stories, sharing payload storage and retaining managed reservations. Detached `ink::builder::Draft`/`ink::Prepared` build a restricted X/Y integer InkML profile with checked local identities, references and brush values; bounded `Prepared::from_bytes(bytes, ink::builder::AuthoringLimits)` admits exact canonical output for that profile and has no `_with_limits` twin. Owning `Package::{edit_ink,apply_ink}` supports semantic paragraph insertion, selected replacement and admitted complete-host removal. Base authoring supports both dialects; new Transitional Drawing, single-slot Canvas and canonical Group hosts support inline/anchored placement with explicit PNG/JPEG fallbacks. Replacement preserves host/fallback geometry and lexical XML while allocating fresh resources; shared/inactive references retain old targets. Unknown metadata and multi-object dependencies refuse for the affected host. Mixed edits, exact no-ops, signatures, stale sources, finite budgets and inverse restoration after save/reopen have synthetic coverage. `ink::Patch::to_durable` exports the common deterministic patch envelope; `Package::apply_durable_ink_with_options` returns the shared Commit with its checked in-memory patch and diagnostics, replays typed intent, verifies logical OPC source/target identity and restores exact member bytes through a checked inverse. Caller payload/topology/relationship/staging limits and adversarial replay regressions cover this boundary. Non-part raw ZIP bytes are preserved but remain outside the logical fingerprint. Source-backed reads reuse unmanaged OPC decoder sessions; managed decoding retains its reservation policy. Strict extension drawings, general multi-slot CRUD, source-backed writing, full Ink semantics and native/live Word acceptance remain open. See `docs/report/spec-gap-validation-evidence/docx-ink-durable/implementation.md` and its receipt. |
-| MS-OWEXML custom-function payloads | 🟡 | 🟡 | 🟡 | Public `web_extensions` reexports shared typed `CT_ContainsCustomFunctions`, `CT_BackgroundAppData`, and `CT_CustomFunctionList` models. Coherent package task-pane planning/application supports bounded custom edits, signed no-ops, explicit unsigned disposition, lexical source conflicts and exact member inverses. Focused public tests cover source preservation, XML value semantics, deterministic durable export/replay and exact reopened inverses. Shared-consumer gates and independent review passed. Synthetic performance evidence is recorded separately; native producer acceptance remains open. Runtime IDs and function IDs remain inert |
-| Chart, SmartArt, DrawingML, VML, and embedded-workbook rendering | ❌ | ❌ | ❌ | Graphs and definition parts are typed or preserved, but geometry, chart calculation, SmartArt layout, and rasterization are renderer responsibilities |
-| Protection enforcement | 🟡 | ✅ | ✅ | Protection modes, hashes/settings, and document state can be read or written; the library does not prevent edits or enforce a Word editing policy |
-| Signature trust and certificate status | 🟡 | ✅ | ✅ | Integrity/signature operations are available, but certificate-chain trust, revocation, identity, and enterprise policy are outside the API |
-| Unsupported Word extension namespace content | 🟡 | 🟡 | 🟡 | Unknown extension parts or XML may survive bounded package-preserving operations, but no semantic behavior or round-trip guarantee is claimed for unmodeled markup |
-
-## Implementation map
-
-- crates/litchi-docx/src/package.rs owns package graphs, parts, relationships, properties, mail merge, custom XML, glossary, web settings, encryption, and save modes.
-- crates/litchi-docx/src/document.rs, paragraph.rs, table.rs, section.rs, styles.rs, and numbering/ own the main typed WordprocessingML model.
-- crates/litchi-docx/src/field/, content_control.rs, revision.rs, comment.rs, modern_comments/, custom_xml.rs, alt/, drawing/, textbox.rs, chart.rs, smartart.rs, math.rs, font/, and writer/ provide feature-specific APIs and bounded codecs.
-
-## Native Microsoft Word regression scope
-
-`tests/microsoft_office_native.rs` uses the unmodified specimens in
-`test-data/microsoft-office/word/`. It checks 24 unencrypted DOCX, DOTX, DOCM,
-DOTM and extensionless child packages for body catalogs and no-op preservation
-of every OPC member. Targeted assertions cover nested and merged tables,
-section geometry, secondary stories, modern comment replies, both revision
-timestamps, tracked moves, inline/display math and reuse in a new package.
-
-Native title edits cover 13 source packages, preserve other member payloads,
-and restore every member through inverse patches. Protection and tracked
-revision policy refusals leave the source intact; an unprotected form accepts
-a title edit. The master/child fixture retains its external subdocument reference
-without fetching or merging the child. With `vba-inspection`, DOCM/DOTM
-project graphs, module source markers and payload hashes are checked inertly.
-With `encryption`, the native Agile AES-256/SHA-512 DOCX exercises
-absent/wrong/correct passwords and rekeying with clear-member preservation.
-The operations suite also checks nested table paths and atomic edits on eager
-and source-backed owners.
-
-The machine-readable scope is `tools/native_office_tests.json`. Package
-preservation does not establish typed coverage of every embedded feature, and
-these Litchi round trips do not claim a fresh Microsoft Word reopen. Historical
-fixture statuses in `coverage.json` remain separate from test assertions.
-
-`tests/microsoft_office_native_fonts.rs` checks the full and save-subset native
-font specimens: three font-table names, six versus two faces, exact keys,
-obfuscated payload hashes and deobfuscated sfnt hashes. The global save-subset
-setting is distinct from absent per-face `subsetted` attributes; the two Aptos
-clear programs are identical in these files. Replacing one face under a new
-obfuscation key and removing unused Times New Roman faces preserves the
-remaining resources and unrelated body/settings/style parts, with save/reopen
-and exact inverse checks. No font installation, glyph coverage, subset-algorithm,
-licensing-policy or rendering conclusion follows from these tests.
-
-`tests/microsoft_office_native_layout.rs` qualifies the native Word layout
-DOCX/DOTX pair. Main-document visibility retains Word 2012 metadata, exposing
-the collapsed heading and two-column footnote-area setting. Detached section
-views select active source owners and nested compatibility branches, carry
-inherited namespace/`Ignorable` context, and validate the extension without
-inventing a missing requirement. Their XML is a contextual semantic fragment;
-compatibility projection can normalize it, while package source bytes remain
-unchanged. Borrowed paragraph setters retain inherited namespace bindings when
-a changed view detaches, avoiding an unbound or duplicated collapse marker.
-
-Native checks cover detached collapse/footnote-column changes, explicit zero
-versus absence, preservation through source title edits and exact unrelated
-package members/inverse bytes. Public operations check the heading path and
-title edits on file-backed Auto and eager inputs. The same fixtures have two
-exact SEQ Figure/Table fields with cached result 1 and a four-cell AutoCaption
-table. These tests do not calculate fields, enforce UI collapse, lay out notes,
-author package-level extension transactions or claim a fresh Word reopen.
-
-`tests/microsoft_office_native_mail_merge.rs` checks the stored Word mail-merge
-settings, external source URI, nested field/counter caches and the separate
-14-column, two-record source table. Updating record/error settings retains an
-unchanged source relationship's ID and XML; save/reopen, inverse and removal
-preserve the body and unrelated members. Changed targets and relationship
-dialects remain explicit edits. The native file has no recipients part or
-ODSO payload, so it does not qualify those authoring families.
-
-Native protected/unprotected legacy forms expose three inert field codes,
-their actual caches and bookmark identities. The DOCX field view does not
-interpret `ffData`; the operations title-edit regression preserves that XML
-and all field/bookmark content exactly on Auto and eager routes. No source
-lookup, merge, field evaluation, form activation or fresh Word reopen occurs.
-
-`tests/microsoft_office_native_visuals.rs` qualifies the native Word visual and
-vector/diagram specimens. Picture metadata and JPEG/PNG/EMF identities, inert
-Excel OLE payloads, the separate doughnut chart workbook and cached data,
-SmartArt process nodes/definition identities, and the active WPS text-box
-story have explicit assertions. SmartArt frame extents survive MCE's
-empty-element expansion and stay scoped to their inline/floating owner.
-
-A hole-size edit preserves chart companions, workbooks and exact unchanged
-relationship members, including Word's relative target spelling. Source SVG
-detach and subsequent reattach preserve the raster fallback and SmartArt
-parts; inverse restores the original archive. Public SmartArt outline edits
-retain the native frame extent and other visual payloads. The facade opens
-both embedded XLSX children independently and checks stored values/formulas.
-These tests do not render or refresh anything. The shared document visibility
-profile understands WPS/WPG owners, so eager and pinned drawing inventories
-retain all four visual-object anchors and all three vector/diagram anchors.
-The native rounded rectangle exposes its floating WPS frame and two-paragraph
-story; its VML fallback remains in the unchanged source. A group is one `Other`
-entry with its outer frame and own transform. Children are opaque, so the last
-child cannot overwrite the group's preset, text, offset or dimensions.
-
-Frame extents take precedence over drawing-transform extents. Text-box
-inventory retains paragraph boundaries, whitespace, tabs, breaks, references
-and CDATA while excluding nested drawing stories. Drawing scans reject
-truncated/deep children. This remains a flat inventory: it does not establish
-group-child hierarchy/editing, page-position resolution or rendering coverage.
-
-## Native numbering and data-store qualification
-
-`tests/microsoft_office_native_numbering_stores.rs` covers the native text
-structure DOCX and math/navigation DOCX/DOTX. Numbering assertions pin all nine
-saved decimal/bullet levels, their paragraph bindings and the explicit false
-Word 2012 restart policy. Policy updates, clearing to absence, recreation,
-failure atomicity, file reopen and inverse preserve all unrelated bytes.
-Clearing the attribute includes its closing quote; focused tests also cover
-both quote styles, neighboring attributes and multiple definition edits. Common
-formats here do not establish the full Microsoft extended-format enumeration or
-computed numbering behavior.
-
-The two math/navigation files contain empty APA bibliography stores with distinct
-item GUIDs, an inert selected-style path, Version 6 metadata and one bibliography
-schema reference. Native tests verify those stored values and graph identities;
-positive source-entry CRUD adds Litchi-authored book/person/report/corporate data.
-Duplicate tags preserve staged work, root metadata survives canonical XML output,
-and inverse patches restore original source payloads. Canonical output can omit
-redundant namespace declarations; this is not native citation authoring or field
-refresh evidence.
-
-Custom XML tests add/update/replace/remove a second unbound item and remove the
-native unbound store, checking orphan collection, case-insensitive identities,
-failed-call atomicity, file reopen and graph-aware inverses. Native bibliography,
-document, numbering and cached field data remain unchanged outside the intended
-owner. Relationship XML may be reserialized with equivalent attributes. These
-assertions do not claim native SDT bindings, schema/style execution, bibliography
-regeneration or fresh Word reopen.
-
-The generic unsupported-extension namespace row is recorded as an explicit
-scope boundary in `tools/native_office_evidence_reviews.json`. The settings
-extension tests retain compatibility/math XML and every unrelated member in
-four native DOCX/DOTX/DOCM/DOTM inputs through bounded metadata edits, file reopen
-and inverse. Retention at those owners does not establish semantics or a
-round-trip guarantee for every unmodeled namespace and mutation. Concrete
-extension profiles keep their own tests; this boundary receives no positive
-semantic credit and does not alter historical native-authoring status.
-
-The runtime boundaries `docx-123`, `docx-125`, `docx-130`
-are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
-The operations test `microsoft_office_native_runtime_boundaries` checks all 139
-Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
-PDF requests return the advertised refusal through string, JSON and sink APIs,
-without writing to the sink. Locked files first require a password; supported
-unlocks still refuse visual output, and encrypted XLSB retains its separate
-unsupported-decryption boundary. Reads preserve publication bytes and all input
-files. Cited owner tests qualify saved data and bounded edits, not the excluded
-application rendering, layout or execution.
-Native math/layout/mail-merge inputs also refuse the worksheet evaluator;
-saved field results remain unchanged. RTF field results use separate story
-owners and are checked in the field inventory rather than paragraph text.
-
-`microsoft_office_native_signature_boundary` authors disposable XML signatures
-over seven native Office parents. These are Litchi derivatives, not native
-Office signatures. Mathematical validity, resource coverage and signature
-presence remain distinct from `Trust::NotChecked`. Workbook cases also check
-outer/inner signed-handle edit refusals, explicit unsign, complete graph/data
-equivalence to an ordinary scalar edit, and invalid-payload detection. The
-shared verifier's older Microsoft-signed certificate fixtures explicitly retain
-unchecked trust too. These tests do not claim native application acceptance,
-legacy CryptoAPI signature authoring, trust-chain validation or revocation.
-Native signed-fixture handoffs remain open despite this bounded operation
-coverage; historical authoring statuses are unchanged.
-
-The worksheet evaluator's refusal on Word inputs does not imply absence of
-field refresh. `microsoft_office_native_refresh` qualifies the separate
-`File::refresh` operation: native DOC/DOT and DOCX/DOTX SEQ cache correction,
-DOCX TOC updates with bookmark/page-cache reuse, explicit missing-page refusal,
-file reopen and exact inverse. The earlier blanket field-execution exclusions
-are replaced by partial, scoped operation coverage; native mail merge still
-reports unsupported fields and remains inert.
-
-`docx-127` and `docx-126` are reviewed in
-`tools/native_office_evidence_reviews.json`. Native tests cover macro graph/source
-reads and saved legacy form state. `microsoft_office_native_alt_chunks.rs` adds
-library-authored AltChunk payloads to native DOCX/DOCM parents and checks lifecycle
-edits, source-bound replacement, save/reopen and inverse patches while preserving
-native body and macro data. Foreign-content conversion, external-target retrieval,
-rendering and macro/control execution remain outside the supported API. These
-derivatives do not supply native-authored AltChunk evidence.
-
-Native-parent extension regressions now cover optional main/glossary
-`stylesWithEffects` resource lifecycle, cross-story Custom XML checksum refresh,
-Word 2024 formatting flags, inert web-link/calendar metadata and ordered `symEx`
-symbols. The parents are native DOCX/DOCM/DOTX files; the extension additions are
-explicit library derivatives and do not replace missing native-authored evidence.
-Unselected bytes/graphs, macro payloads, save/reopen, inverses and applicable
-resource/stale-source guards are checked. No calendar conversion, XPath, add-in,
-formatting enforcement or visual rendering is performed.
-
-Word's SDT identifiers are signed Int32 values. The native tables/layout footer
-contains `-1419789921`; treating it as malformed previously blocked unrelated
-Custom XML edits. Content-control models, authoring constructors, snapshots and
-binding/checksum reports now use `i32`, matching the existing block-identity API.
-Callers holding unsigned IDs must use a checked conversion when passing them to
-these constructors. Signed boundaries and out-of-range wire values are covered.
-
-The `symEx` namespace is now understood by the Word-owned MCE profiles for the
-main document, headers/footers, notes, comments, glossary and validation. Its
-required `mc:Ignorable` declaration previously caused supported symbols to be
-removed from semantic projections. Native-parent regressions retain these symbols
-while foreign-namespace lookalikes remain unmodeled. Detached `Run` setters leave
-the containing package unchanged.
-
-Native-parent task-pane tests qualify the public package owner on ordinary and
-macro-enabled sources: two-pane lifecycle, inert provider/binding/custom-function
-metadata, shared snapshot bytes, opaque extension retention, semantic no-op and
-stale/resource-collision refusals. File reopen/replay/inverse retains all data
-parts and complete effective graphs; owned root-relationship/content-type XML may
-normalize during generic replay. Additions are explicit library derivatives, with
-no add-in activation, worksheet binding resolution or fresh Office validation.
-A two-pane budget also proves that a rejected third pane leaves valid staging intact.
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| Pagination, line breaking, page fields, and rendering | ❌ | ❌ | ❌ |
+| Field calculation and refresh | 🟡 | 🟡 | 🟡 |
+| Mail-merge execution | ❌ | ❌ | ❌ |
+| AltChunk import and foreign-content conversion | ❌ | ❌ | ❌ |
+| Macro, ActiveX, form-control, and add-in execution | ❌ | ❌ | ❌ |
+| Ink / inkML model | 🟡 | 🟡 | 🟡 owning authoring and durable replay |
+| MS-OWEXML custom-function payloads | 🟡 | 🟡 | 🟡 |
+| Chart, SmartArt, DrawingML, VML, and embedded-workbook rendering | ❌ | ❌ | ❌ |
+| Protection enforcement | 🟡 | ✅ | ✅ |
+| Signature trust and certificate status | 🟡 | ✅ | ✅ |
+| Unsupported Word extension namespace content | 🟡 | 🟡 | 🟡 |

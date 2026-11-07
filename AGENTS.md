@@ -1,5 +1,16 @@
 # Agent instructions
 
+## Documentation and commit messages
+
+- **`FEATURE_MATRIX.md` files are feature checklists only.** Keep feature names
+  and support/read/write status. Never add implementation details, API inventories,
+  test details, validation results, progress notes, or verification narratives.
+- **Never commit verification-process documents.** Do not add test reports,
+  command logs, validation receipts, evidence summaries, or procedural write-ups.
+  Keep verification artifacts and working notes outside the repository.
+- **Briefly describe changes in commit messages.** Do not create verification
+  documents or append implementation/test narratives to feature matrices.
+
 ## Repository size restrictions
 
 GitHub blocks any file larger than 100 MiB, warns above 50 MiB, and rejects
@@ -19,14 +30,14 @@ branch, worktree and agent.
   logs, and source tarballs.
 - **Benchmark or harness binaries, of any size.** Do not commit anything under
   a `binaries/` directory, or any other compiled executable. Record the source
-  commit, the build command and the binary's SHA-256 instead.
+  commit, the build command and the binary's SHA-256 outside the repository instead.
 
 ### Keeping large evidence
 
-Keep artifacts of 1 MiB or more outside the repository, for example in the
-session scratchpad or a directory outside the checkout. A change record that
-relies on one commits a reduced summary smaller than 1 MiB and cites the
-artifact's file name, size, SHA-256 and the command that regenerates it.
+Keep verification artifacts and working notes outside the repository regardless
+of size, for example in the session scratchpad or another directory outside the
+checkout. Do not commit verification summaries or receipts; briefly describe
+changes in commit messages.
 
 ### Check before every commit
 

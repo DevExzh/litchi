@@ -1,398 +1,101 @@
 # Word Binary (DOC) Feature Matrix
 
-This document tracks the public feature support of litchi-doc for the Word binary
-.doc format described by [MS-DOC] and stored in an OLE2 Compound File Binary
-container. It is a compatibility matrix, not a claim of complete Word-version,
-rendering, or legacy-application conformance.
+Feature checklist. ✅ Supported · 🟡 Partial · ❌ Unsupported · N/A Not applicable.
 
-## Scope, status, and specification references
+## Auxiliary structures
 
-| Mark | Meaning |
-|------|---------|
-| ✅ | Typed public support for the scope in Notes |
-| 🟡 | Bounded, partial, metadata-only, pass-through, or inert support |
-| ❌ | No public typed support currently available |
-| N/A | The concept does not apply to the format or direction |
-
-Read and Write describe the public direction independently. A row can be supported as
-inert metadata or a preserved payload without opening external data, executing macros,
-evaluating fields, or rendering OfficeArt. Generic CFB/OLE stream access is not counted as
-typed support for every structure in a stream.
-
-The primary audit sources are [MS-DOC] ToC.md, Front Matter.md, and 2 Structures:
-2.1 File Structure, 2.2 Fundamental Concepts, 2.3 Document Parts, 2.4 Document
-Content, 2.5 The File Information Block, 2.6 Single Property Modifiers, 2.7
-Document Properties, 2.8 PLCs, and 2.9 Basic Types.
-
-Related references are [MS-CFB] for the compound-file container, [MS-OLEPS] for
-property sets, [MS-OFFCRYPTO] for encryption and IRM DataSpaces, [MS-OVBA] for VBA
-projects, [MS-OSHARED] for shared Office metadata, and [MS-ODRAW] for binary OfficeArt.
-The implementation owner is crates/litchi-doc/src/; litchi-cfb, litchi-sign, and
-shared Office codecs are counted only where the DOC API exposes them.
-
-## Read limits and defaults
-
-`Package::open`, `Package::from_reader`, and `Package::from_ole_file` use
-`Limits::default()`: 128 MiB for the outer CFB package, 64 MiB for each
-DOC-owned input stream, and 96 MiB for the aggregate of `WordDocument`, the
-selected table stream, and optional `Data` stream. Separate 1 GiB/512 MiB/768
-MiB hard ceilings bound explicitly requested values accepted by
-`Limits::try_new` and its checked builder methods.
-
-`Package::open` uses those finite defaults; `Package::open_with_options` accepts
-the merged `OpenOptions` envelope for explicit limits and password/leniency
-policy. The raw cursor owner is available under `litchi_doc::raw::Package` for
-format-specific consumers; its explicit limit methods remain physical-reader
-helpers. Limit failures are structured `Error::ResourceLimit` values with
-the exceeded resource kind, observed size, configured limit, and a stream path
-when applicable. These limits govern package and main DOC-stream ingestion;
-individual typed codecs can impose additional format-specific bounds.
-
-Password-to-open input is owned by non-cloneable, zeroizing `Password` and is
-supplied through `OpenOptions::with_password`; it is redacted in diagnostics.
-`Document::text` preserves stored source text. `body_text::Snapshot` also
-projects ordinary main-story paragraphs as stored, accepted, or rejected text,
-and selects paragraphs in every story, simple table cells, simple cached field
-results, revision marks, and passive embedded-object display metadata. Its
-bounded source-checked transaction supports modeled main-story length changes,
-equal-length Unicode overwrites in auxiliary stories, direct
-bold/italic/underline, non-destructive revision-mark disposition, and passive
-`ObjInfo` display changes atomically. It appends Unicode pieces, rebuilds
-CLX/CHPX data, shifts modeled CP/PLCF tables, updates story counts, delegates
-`ObjectPool` metadata to its dedicated owner, and performs both CFB and full
-DOC reopen validation before publication. Managed embedded add/remove/transfer
-also closes the field PLCF, CHPX picture reference, exact preview PICF/Data
-block, standalone bounded object CFB, regenerated receiver FC/CP offsets, and
-storage-ID collision check. Structural table edits, field nesting or
-delimiter changes, destructive revision dispositions, auxiliary-story length
-changes, mixed character formatting, interior modeled CP boundaries, and known
-unmodeled CP-indexed structures are typed refusals. The same semantic changes
-drive source-checked reversible patches, deterministic durable patches,
-disjoint composition, three-way planning, inert text and managed-resource
-transfer, and bounded undo/redo history. Canonical native inline/floating
-pictures and floating pictures inside a closed single-child nested group chain
-can be re-homed after proving the selected PICF/Data and, when floating, its
-complete SPA/shape/group/`pib`/BStore binary identity; unrelated bounded
-main/header-story shapes, groups, textboxes, and shared BStore resources remain
-outside the copied closure. Multi-child, multi-image, active, or complex-BLIP
-drawing graphs and producer-defined object controls receive specific typed
-refusals rather than partial copying. Selection uses the
-format-neutral `litchi_core::Position`, with collection resolution returning a
-typed not-found refusal. Closure evidence includes full reopen plus durable
-replay/inversion into a checked-in genuine DOC receiver and typed fail-closed
-coverage of a genuine Word 97 floating-picture donor whose producer graph is
-outside the canonical slice. The suite does not claim a native Word or
-LibreOffice changed-save result.
-
-## Auxiliary structures: explicit public coverage
-
-These rows expand the aggregate auxiliary-table entries below. A public binary
-codec does not by itself provide package-level CRUD; the Notes column names
-that boundary. Record names refer to the checked-in [MS-DOC] structures.
-
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| AutoText and attached glossary (`PlcfGlsy`, `SttbfGlsy`, `SttbGlsyStyle`, `LEGOXTR_V11`) | 🟡 | ✅ | 🟡 | `Document::{glossary_metadata,glossary_item_text,attached_glossary}` exposes metadata and selected content, including the secondary FIB. `Writer` can set/clear glossary metadata and attached glossary documents; `GlossaryMetadata::to_table_bytes` encodes tables. Native DOT coverage includes the ignored end sentinel at `ccpText`, a record-aligned stylesheet at an odd stream offset, and preservation of the attached glossary during main-body edits by synchronizing both FIBs’ shared formatting pointers and size. Arbitrary opened-template glossary editing remains outside this slice. |
-| Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`) | 🟡 | ✅ | ❌ | `Document::xml_schemas()` returns typed schema and name references through `parts::xml_schemas`; schema URIs remain inert. No semantic schema-table writer or external schema resolver. |
-| Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`) | 🟡 | ✅ | ❌ | `Document::structured_tags()` exposes the checked `parts::structured_tags` projection; no general tag authoring or binding evaluation. |
-| Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`) | 🟡 | ✅ | ❌ | `Document::format_consistency_marks()` returns typed ranges and metadata; no checker execution or dedicated mark editor. |
-| Text Services Framework tables (`Plcfuim`, `PlfguidUim`, `UIM`) | 🟡 | ✅ | 🟡 | `Document::text_services_tables()` exposes validated records/GUIDs. Public record/table encoders retain inert values; they do not attach an input service or provide an ordinary package transaction. |
-| Grammar checker cookies (`Plcfcookie` and legacy cookies) | 🟡 | ✅ | 🟡 | `Document::grammar_cookie_tables()` returns current/legacy cookie tables; checked record/table codecs serialize the values. No grammar checking or ordinary cookie-table package editor. |
-| Language auto-detection state (`Plcflad`, `LadSpls`) | 🟡 | ✅ | 🟡 | `Document::proofing_tables().language_detection()` exposes ranges/states through the fallible proofing accessor. `parts::proofing` supplies table encoding and in-memory set/remove; this does not detect languages. |
-| Table character cache (`PlcfTch`) | 🟡 | ✅ | 🟡 | `Document::table_character_cache()` exposes checked CP ranges and `TableCharInfo`; `TableCharacterCache::to_bytes` serializes a table. No cache regeneration or standalone package editor. |
-| E-mail revision threading (`RmdThreading`) | 🟡 | ✅ | ❌ | `Document::rmd_threading()` exposes messages, display metadata, author indices, and personal styles. No mail transport, threading engine, or semantic writer. |
-| Repair bookmarks (`SttbfBkmkBPRepairs` and companion PLCs) | 🟡 | ✅ | 🟡 | `Document::repair_bookmarks()` exposes retained repair ranges. `DocumentRepairBookmarks::to_bytes` encodes the three tables; it does not apply repairs or provide an ordinary repair-bookmark transaction. |
-| Annotation bookmarks (`SttbfAtnBkmk`) | ✅ | ✅ | ✅ | `parts::annotation_bookmarks` provides typed tags, source-checked transactions/inverse patches, and a package `Editor` that supports insert/replace/remove/clear. Annotation-tag edits are distinct from rewriting comment stories. |
-| Embedded font descriptions (`SttbTtmbd`) | 🟡 | ✅ | ❌ | `Document::embedded_fonts()` exposes font indices, source offsets, bold/italic flags, and subset order. This row covers descriptions only; no font-program interpretation or dedicated description authoring. |
-| VBA digital-signature storage (`DigitalSignature` PIDDSI and `StwUser` `Sign`/`SigAgile`/`SigV3`) | 🟡 | ✅ | 🟡 | `Package::vba_signature()` and the property-set snapshot/transaction facade expose bounded, inert `DigSigBlob` reads and source-preserving opaque signature/certificate-store edits. `Document::vba_signatures()` defers bounded `StwUser`/`WordSigBlob` reads and caches the first range or parse error. The PKCS#7 `SignedData`, `contentInfo` form (`SpcIndirectDataContent` versus `SpcIndirectDataContentV2`), certificate trust, project activation, and `StwUser` writing remain outside this owner. |
-| Saved selection (`Selsf`, `fcWss`) | 🟡 | ✅ | 🟡 | `Document::saved_selection()` defers a bounded typed read of the main-document selection flags, CP anchors, and validated `BlockSel`/`TableSel` geometry. `SavedSelection::edit()` produces source-checked reversible patches; `body_text::Snapshot`/`Edit` publish same-length patches through the DOC commit/reopen path without exposing FIB or mutable table streams. Main-story length changes remap absolute Selsf CPs at proven splice boundaries: a CP at the point of a pure insertion stays before the inserted text, except that a selected inline picture or shape moves after text inserted at its first CP; a CP strictly inside replaced or removed text, and text inserted at the first CP of a non-empty list-prefix selection, are refused. Replayed text patches apply the same remap. It never applies UI selection state. All 20 native DOC/DOT fixtures have `lcbWss=0`; this corpus does not qualify selection payloads or remapping. |
-| Paragraph-group properties (`PGPArray`, `PGPInfo`, `PGPOptions`) | 🟡 | ✅ | ❌ | `Document::paragraph_groups()` defers bounded typed PGP identifiers, table depth, presence bits, margins, HTML block type, raw `Brc` bytes, and future option bytes. No paragraph-layout application or PGP writer is provided. |
-| Print metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`) | 🟡 | ✅ | ❌ | `Document::print_environment()` defers bounded four-string driver metadata and exact ignored portrait/landscape printer blobs. No printer access, pagination, or print-settings writer is provided. All 20 native DOC/DOT fixtures have zero lengths for these records; section/page-layout evidence is recorded separately. |
-| Frame/list records (`RgDofr`, `Dofr`) | 🟡 | ✅ | 🟡 | `Document::dofr_records()` exposes bounded `Dofrh` boundaries, typed frame/list payloads, and retained unknown payload bytes. Same-length complete-record replacements produce source-checked reversible patches; `body_text::Snapshot`/`Edit` publish them through the DOC commit/reopen path without exposing FIB or mutable table streams. No frame renderer, external-file resolution, or list-style application is provided. |
-
-### Unmodeled FIB tables
-
-No `RgDofr`/`Dofr` subtable remains in this auxiliary gap list. The bounded
-reader intentionally stops at passive record semantics; renderer and list-style
-execution remain outside the DOC package API.
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| AutoText and attached glossary (`PlcfGlsy`, `SttbfGlsy`, `SttbGlsyStyle`, `LEGOXTR_V11`) | 🟡 | ✅ | 🟡 |
+| Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`) | 🟡 | ✅ | ❌ |
+| Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`) | 🟡 | ✅ | ❌ |
+| Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`) | 🟡 | ✅ | ❌ |
+| Text Services Framework tables (`Plcfuim`, `PlfguidUim`, `UIM`) | 🟡 | ✅ | 🟡 |
+| Grammar checker cookies (`Plcfcookie` and legacy cookies) | 🟡 | ✅ | 🟡 |
+| Language auto-detection state (`Plcflad`, `LadSpls`) | 🟡 | ✅ | 🟡 |
+| Table character cache (`PlcfTch`) | 🟡 | ✅ | 🟡 |
+| E-mail revision threading (`RmdThreading`) | 🟡 | ✅ | ❌ |
+| Repair bookmarks (`SttbfBkmkBPRepairs` and companion PLCs) | 🟡 | ✅ | 🟡 |
+| Annotation bookmarks (`SttbfAtnBkmk`) | ✅ | ✅ | ✅ |
+| Embedded font descriptions (`SttbTtmbd`) | 🟡 | ✅ | ❌ |
+| VBA digital-signature storage (`DigitalSignature` PIDDSI and `StwUser` `Sign`/`SigAgile`/`SigV3`) | 🟡 | ✅ | 🟡 |
+| Saved selection (`Selsf`, `fcWss`) | 🟡 | ✅ | 🟡 |
+| Paragraph-group properties (`PGPArray`, `PGPInfo`, `PGPOptions`) | 🟡 | ✅ | ❌ |
+| Print metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`) | 🟡 | ✅ | ❌ |
+| Frame/list records (`RgDofr`, `Dofr`) | 🟡 | ✅ | 🟡 |
 
 ## Core Word binary document model
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | ✅ | ✅ | ✅ | `parts::envelope` owns the `[MS-DOC]` `fcMsoEnvelope` FIB range and the documented `[MS-OSHARED]` Office 6/8 body, recipient property bags, and attachments. Unknown CLSIDs and supported-body tail bytes are preserved as bounded opaque data; `Package::edit_envelope()` stages a clone-first `parts::envelope::Edit` over package/FIB metadata and publishes source-checked reversible semantic/CFB patches. `Document::envelope()` remains inert: no mail transport, recipient resolution, attachment activation, or external behavior. |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | ✅ | ✅ | ✅ |
 
+## [MS-DOC] file structure and version
 
-## [MS-DOC] file structure and version audit
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| OLE2/CFB container and Word streams | ✅ | ✅ | ✅ |
+| Word 97+ FIB and versioned FibRgFcLcb tables | ✅ | ✅ | ✅ |
+| Versioned document properties (DopBase through Dop2013) | ✅ | ✅ | ✅ |
+| Word 6/95 and pre-Microsoft-Office binary profiles | ❌ | ❌ | ❌ |
+| WordDocument, table, Data, and story ranges | ✅ | ✅ | ✅ |
+| Custom XML data storage | ✅ | ✅ | ✅ |
+| Summary and document-summary property streams | ✅ | ✅ | ✅ |
+| Reserved user-defined hyperlink metadata | ✅ | ✅ | ✅ |
+| Encryption stream and password-to-open profiles | ✅ | ✅ | ✅ |
+| XML signatures storage and signatures stream | ✅ | ✅ | ✅ |
+| ObjectPool and embedded OLE/package objects | ✅ | ✅ | ✅ |
+| Macros storage and VBA project payload | ✅ | ✅ | ✅ |
+| Information Rights Management Data Space and protected content | 🟡 | ✅ | ❌ |
+| Unknown streams and storages | 🟡 | ✅ | 🟡 |
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| OLE2/CFB container and Word streams | ✅ | ✅ | ✅ | Package validates the WordDocument stream and the 0Table or 1Table stream, exposes bounded OLE editing, and writes new or transactionally edited packages |
-| Word 97+ FIB and versioned FibRgFcLcb tables | ✅ | ✅ | ✅ | FIB base/version fields, table-stream pointers, Word 97 through later extension ranges, fixed-layout older records, and declared pointer bounds are handled by the DOC reader/writer |
-| Versioned document properties (DopBase through Dop2013) | ✅ | ✅ | ✅ | `Document::document_properties()` exposes the deferred validated DOP record; `VersionedDocumentProperties` covers Word 95/97/2000/2002/2003/2007/2010/2013, including typed lossless `DopMth` equation defaults, image-save settings, paragraph-ID context, and chart tracking. Fixed/reserved fields and specification value domains are checked, undefined bytes/bits are preserved, and typed extension codecs write back without normalizing older generations |
-| Word 6/95 and pre-Microsoft-Office binary profiles | ❌ | ❌ | ❌ | The public reader intentionally rejects files predating the Word 97 binary profile rather than treating incompatible table layouts as DOC |
-| WordDocument, table, Data, and story ranges | ✅ | ✅ | ✅ | Piece-table text, formatting tables, auxiliary Data content, and story character counts are exposed through typed document and writer APIs |
-| Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless MsoDataStore item/property XML with typed GUIDs, schema references, IRM promotion markers, and inert schema URIs; shared `litchi_ole_common::custom_xml::{Snapshot, Edit, Commit, Patch}` supplies the layered source-checked owner |
-| Summary and document-summary property streams | ✅ | ✅ | ✅ | OLE property-set reading and editing with typed summary, document-summary, and user-defined property access |
-| Reserved user-defined hyperlink metadata | ✅ | ✅ | ✅ | `[MS-OSHARED]` §§2.3.3.1.18-21 and §2.4.2 define the typed `VtHyperlink`/vector/blob forms and hash used by `_PID_LINKBASE` and `_PID_HLINKS`. They are named values in the `UserDefinedProperties` section of `DocumentSummaryInformation`, never PIDDSI `0x15`. Shared `Properties` lazily decodes only the named value requested, while shared `Edit` applies caller-bounded typed writes for blob size, link count, and UTF-16 strings; these bounds apply to the typed overlay and secondary decoding after generic property-set parsing, not initial property-stream allocation. `Package::property_sets()?.user_defined_hyperlinks(fields, limits)` and `raw::Reader::user_defined_hyperlinks(limits)` expose possible `FieldCandidate` values rather than asserting an association: `dwApp` can be an `FcCompressed` or collide across the seven field stories. The caller must select an exact candidate with `resolve_field` before a changed write may canonically order entries per `[MS-DOC]` §2.4.7: Main, Footnote, Header, Comment, Endnote, Textbox, HeaderTextbox, then decreasing `aFld` index. An unresolved changed write refuses; an exact no-op remains preservable. OfficeArt, direct-picture, and ambiguous data remain inert and source-relative. This is an existing-artifact property-set transaction, not a claim that fresh-document generation automatically emits the properties. Targets and locations remain raw inert strings: Litchi never parses, normalizes, resolves, fetches, opens, or executes them. |
-| Encryption stream and password-to-open profiles | ✅ | ✅ | ✅ | The supported DOC encryption profiles cover the implemented XOR/RC4-compatible modes and typed password errors; unsupported profiles fail explicitly |
-| XML signatures storage and signatures stream | ✅ | ✅ | ✅ | Trust-neutral CFB signature verification and transactional signing/editing are exposed; certificate trust and revocation are not established |
-| ObjectPool and embedded OLE/package objects | ✅ | ✅ | ✅ | `embedded_object::Snapshot::storages()` exposes every discovered native ObjectPool storage for passive metadata/payload reads. The separate managed-field inventory and source-checked add/remove/reorder/replace operations use the editor-owned field convention; typed ODT/OLEDS metadata edits remain within that managed owner. Unknown streams and inert payloads are preserved and objects are never activated or opened. The ordinary `body_text` root exports and transfers the bounded standalone CFB plus exact preview block, regenerating field/CHPX/Data/CLX/PLCF receiver references under collision checks and blob-backed durable inversion. |
-| Macros storage and VBA project payload | ✅ | ✅ | ✅ | Bounded MS-OVBA compressed-container, dir, PROJECT, module, and cache-free source metadata are read and authored; code is never compiled or executed |
-| Information Rights Management Data Space and protected content | 🟡 | ✅ | ❌ | `raw::Reader::data_spaces` exposes the validated, inert `litchi_doc::spaces::Graph` from the shared MS-OFFCRYPTO owner, including legacy-binary IRM transform/license topology, labels, and integrity sidecars; rights evaluation, decryption, and protected-content access remain outside the API |
-| Unknown streams and storages | 🟡 | ✅ | 🟡 | Package-preserving editors can retain unrelated CFB topology where supported, but an arbitrary stream has no DOC semantic model or write guarantee |
+## [MS-DOC] PLC, property, and auxiliary-family
 
-## [MS-DOC] PLC, property, and auxiliary-family audit
-
-| Feature family | Status | Read | Write | Notes |
-|----------------|--------|------|-------|-------|
-| CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ | [MS-DOC] 2.2 defines character positions, piece and property storage, string tables, and single-property modifiers used by the typed model |
-| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ | Core text and formatting indices are decoded and generated with bounds checks and unknown property data retained where applicable. `body_text::{Snapshot, Edit, Commit, Patch}` adds bounded story/paragraph, simple table-cell and cached-field-result text, direct bold/italic/underline, safe revision-mark disposition, embedded-display metadata, managed embedded-resource add/remove/transfer, and canonical inline/floating native-picture transfer to one immutable root transaction. The picture slice validates the selected PICF/Data and, for floating pictures, the exact SPA, canonical top-level picture frame, `pib`, and native BStore bytes before re-homing one singleton graph. Unrelated bounded main/header-story shapes, groups, textboxes, reordered slots, and shared BStore resources may coexist; selected nested/group-owned shapes, noncanonical picture frames, transforms/extensions, delay-loaded BLIPs, selection outside the main story, and receiver graph collisions are typed refusals. Modeled CLX/CHPX/PLCF/FIB plus field/preview/Data/ObjectPool closure, full reopen validation, exact in-memory reversal, blob-backed durable replay/inversion, disjoint three-way planning, and bounded history are covered. |
-| Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
-| Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges. Native standard-bookmark CRUD preserves unrelated REF instructions and text; invalid names, name collisions and operation-limit failures leave a rename and earlier staged edits atomic. Renaming does not rewrite field instructions |
-| Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |
-| Field evaluation, document navigation, and generated results | 🟡 | 🟡 | 🟡 | The format owner stores inert instructions/results. `litchi-ops::File::refresh` computes bounded top-level main-story SEQ, property/statistics and explicit-clock fields through the native result editor. DOC REF, layout-dependent fields, external resolution, prompts and host identity remain outside that profile. |
-| Tables, nested tables, cell/row marks, merges, and TAP properties | ✅ | ✅ | ✅ | [MS-DOC] 2.4 table-depth and terminating-mark rules are represented by rows/cells and typed table/paragraph properties. Native tests cover outer row/cell extents, row headers, nested paragraph depth and vertical merges. `sprmTInsert`-defined rows start with zero columns; simple-cell catalogs exclude TTP marks and retain real empty cells. Native DOC/DOT nonempty cell replacement round-trips, while multiparagraph/nested cells remain outside that transaction profile. The fresh writer refuses, with a typed error, a row whose table properties cannot fit one PAPX FKP page (a plain row of 22 or more cells); it does not write `sprmPHugePapx` |
-| Character, paragraph, table, section, and picture SPRM families | ✅ | ✅ | ✅ | [MS-DOC] 2.6 property families map to typed formatting, page setup, borders, widths, shading, and picture options |
-| Stylesheet, list templates, list overrides, names, and numbering | ✅ | ✅ | ✅ | STSH/LSTF/LFO/LVLF and related style/list records have typed reading and writer generation. Native attached-glossary stylesheets use record-relative LPStd alignment; local misalignment remains rejected. |
-| Section layout, columns, borders, page/line numbering, and note placement | ✅ | ✅ | ✅ | Section properties are typed and serialized. Semantic section ranges stop at `ccpText`, even when the stored PlcfSed sentinel extends into secondary stories. Native portrait/landscape margin and column edits preserve that sentinel and unrelated properties; pagination and line-breaking calculations are not performed |
-| PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ | Bounded auxiliary tables and state are read and mutated with mandatory/optional emission rules where required |
-| Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ | `Dop97::auto_summary` and `Document::auto_summary()` expose typed state and checked `PlcfAsumy` ranges. Detached `DocumentAutoSummary` edits and `Dop97::write_into` provide bounded record authoring; there is no dedicated AutoSummary package editor. Native-parent tests use the public CFB owner to publish explicit derivatives. Word’s summary algorithm remains inert |
-| Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Edit, Commit, Patch}` and `captions::record::{Snapshot, Edit}` own bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic template package CRUD. The editor requires `fDot`; ordinary DOC edits refuse, and native DOT test derivatives do not establish the host-specific Normal-template role. Edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Automatic caption insertion, host activation and macro execution remain outside this metadata owner; bounded operations-layer SEQ refresh is separate |
-| Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | `parts::smart_tags::{Snapshot, Edit, Commit, Patch}` adds source-checked bookmark, property-bag, and recognizer-range edits while preserving opaque FIB/table bytes; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
-| Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 | `parts::subdocuments::{Snapshot, Transaction, TablePatch}` owns source-checked, failure-atomic semantic edits, exact table encoders, and package publication with checked FIB pointer relocation for `PlcfWKB`/`SttbFnm`; unrelated table bytes and undefined FNIF/WKB bits remain preserved. Referenced files remain inert and are never opened or followed |
-| Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior; `tracked_revision::{Snapshot, Transaction, Commit, Patch}` adds source-checked binary story edits with reversible snapshots. Native 0x80/0x81 revision toggles share the semantic reader’s flag resolution; valid toggles are not Bool8 repair cases. Native move pairs retain exact CP ranges, author, timestamp and RSID, and both accept/reject routes invert exactly. |
-| Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ | Stored settings and relationship-like metadata are available where exposed; templates and web targets are not loaded and web layout is not generated |
-| Mail-merge settings, sources, filters, and recipients (Pms, Pmfs, Rfs, ODSO) | 🟡 | ✅ | ✅ | Word 97 and Word 2002+ source descriptors, SQL/connection text, recipient filtering, sorting, inclusion, and field mappings are typed bounded metadata; data sources are never contacted and no merge is run |
-| Legacy form fields and FFData | ✅ | ✅ | ✅ | Text, checkbox, dropdown, defaults, selections, help/status text, and verbatim entry/exit macro names are typed; macros and host form behavior are inert |
-| ActiveX/OCX control semantics | 🟡 | ✅ | ✅ | `litchi_doc::ole_controls` exposes inert, typed [MS-DOC] OcxInfo/RgxOcxInfo, story-specific `ifld` validation, ObjectPool `ODT`/`ODTPersist1`/`ODTPersist2`, exact `ObjInfo`/`OCXDATA`/presentation-stream metadata, and snapshot editing; CFB payloads, lifecycle, properties, events, rendering, and activation remain intentionally absent |
-| Document protection settings and range-level protected bookmarks | 🟡 | ✅ | ✅ | Protection modes, hashes, SttbfBkmkProt ranges, editor assignments, and usernames are typed. Changed publication is refused under document or range protection unless the caller supplies the explicit `AllowProtected` capability; the classifier reads only the protection-bearing DOP fields (`DopBase` locks and `lKeyProtDoc`, `Dop2003` enforcement) and range tables, and a malformed or incomplete protection record is refused under every policy |
-| Document statistics and DOP version metadata | ✅ | ✅ | ✅ | Word/character/paragraph/line/page counts where stored, versioned DOP records, compatibility options, typography, macro-security metadata, and related state are exposed within bounded models. Native DOC/DOT tests distinguish saved Dop2013 counters from parsed paragraph counts, and base nFib compatibility from counted nFibNew metadata; they do not recalculate statistics |
+| Feature family | Status | Read | Write |
+| --- | --- | --- | --- |
+| CP, PLC, STTB, SPRM/PRL, and property storage primitives | ✅ | ✅ | ✅ |
+| Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable | ✅ | ✅ | ✅ |
+| Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ |
+| Bookmark PLCs and names | ✅ | ✅ | ✅ |
+| Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ |
+| Field evaluation, document navigation, and generated results | 🟡 | 🟡 | 🟡 |
+| Tables, nested tables, cell/row marks, merges, and TAP properties | ✅ | ✅ | ✅ |
+| Character, paragraph, table, section, and picture SPRM families | ✅ | ✅ | ✅ |
+| Stylesheet, list templates, list overrides, names, and numbering | ✅ | ✅ | ✅ |
+| Section layout, columns, borders, page/line numbering, and note placement | ✅ | ✅ | ✅ |
+| PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ |
+| Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ |
+| Captions and AutoCaption tables | ✅ | ✅ | ✅ |
+| Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ |
+| Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 |
+| Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ |
+| Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ |
+| Mail-merge settings, sources, filters, and recipients (Pms, Pmfs, Rfs, ODSO) | 🟡 | ✅ | ✅ |
+| Legacy form fields and FFData | ✅ | ✅ | ✅ |
+| ActiveX/OCX control semantics | 🟡 | ✅ | ✅ |
+| Document protection settings and range-level protected bookmarks | 🟡 | ✅ | ✅ |
+| Document statistics and DOP version metadata | ✅ | ✅ | ✅ |
 
 ## Drawings, equations, and payloads
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| OfficeArt/Escher drawing group and shape extraction | ✅ | ✅ | 🟡 | Data-stream OfficeArt, drawing-group anchors, shape properties, and text boxes are extracted; writer support covers main/header shapes and bounded shape kinds rather than every OfficeArt record |
-| Pictures and BLIP payloads | ✅ | ✅ | ✅ | EMF, WMF, PICT, JPEG, PNG, DIB/BMP, and TIFF families have stored BLIP views and authoring support. Inline PICFs resolve in Data; floating anchors resolve through their story's Spa, shape identity, pib and BStore. Metafile compression remains explicit in read views; authoring performs required metafile/BMP normalization. |
-| Floating shapes, textboxes, and header drawings | 🟡 | ✅ | 🟡 | Main/header anchors, text-box stories, pictures, positions, and selected presets are authored; full OfficeArt geometry, WordArt, rotation/z-order, and layout are not a complete model |
-| Embedded OLE and package payloads | ✅ | ✅ | ✅ | Payload bytes, storage topology, and bounded typed `ObjInfo`/`ODTPersist2` metadata round-trip through the source-checked embedded-object transactions without OLE activation or payload deserialization. Native storages without editor-managed field ownership remain available for passive reads and source preservation; storage-ID mutations return a typed `UnsupportedContent` refusal instead of reporting a corrupt document |
-| MathType/MTEF Equation.3 objects | ✅ | ✅ | ✅ | Native equation extraction/conversion and bounded MTEF/Equation.3 authoring include registration streams, ObjInfo, preserved CLSIDs, and real image previews; layout/evaluation remain external. The native math DOC retains EMF fallbacks with no Equation Native/ObjectPool storage, and the complete 20-file binary Word corpus lacks Equation.3/MTEF storage. These images do not qualify equation semantics. |
-| Embedded font programs | 🟡 | ✅ | 🟡 | Font-table records and embedded-font metadata are available; the writer does not claim a complete typed model for every embedded program and licensing behavior |
-| Generic rendering and pagination | ❌ | ❌ | ❌ | The library edits document data and drawing payloads; it does not lay out pages, calculate page fields, rasterize OfficeArt, or produce Word-compatible visual output |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| OfficeArt/Escher drawing group and shape extraction | ✅ | ✅ | 🟡 |
+| Pictures and BLIP payloads | ✅ | ✅ | ✅ |
+| Floating shapes, textboxes, and header drawings | 🟡 | ✅ | 🟡 |
+| Embedded OLE and package payloads | ✅ | ✅ | ✅ |
+| MathType/MTEF Equation.3 objects | ✅ | ✅ | ✅ |
+| Embedded font programs | 🟡 | ✅ | 🟡 |
+| Generic rendering and pagination | ❌ | ❌ | ❌ |
 
 ## Explicit unsupported or intentionally inert families
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Command bars, keymaps, menus, toolbars, and UI customizations | 🟡 | ✅ | ✅ | Bounded `CommandBars` metadata covers the FIB `Tcg` seam, inert `PlfMcd`/`PlfAcd`/`PlfKme` records, typed shared `TBCGeneralInfo`/`TBCExtraInfo`, and lossless CTBWRAPPER/TBC tails; shared `toolbar::{Snapshot, Transaction, Commit, Patch}` edits text, icons, and flags without executing macros/UI, while ambiguous variable boundaries and unknown Tcg records are refused |
-| Routing slips and route-slip protection | 🟡 | ✅ | ✅ | `litchi_doc::route_slip` owns typed, lossless `RouteSlip`/`RouteSlipInfo` metadata, exact narrow bytes, checked recipient selectors, immutable snapshots, and transactional package edits; `Document::route_slip()` exposes deferred optional metadata, while route protection rejects lifecycle edits unless the policy is `Off`; mail transport, authentication, and host routing remain inert |
-| Macro or control execution | ❌ | ❌ | ❌ | VBA source, macro names, form metadata, OLE objects, and control payloads are passive data only |
-| External document/database/include resolution | ❌ | ❌ | ❌ | RD, include/link/DDE, mail-merge paths, SQL, connection strings, and referenced subdocuments are never opened, contacted, imported, or refreshed |
-| Field calculation and generated tables/indexes | 🟡 | 🟡 | 🟡 | Bounded operations-layer refresh writes supported main-story results, including SEQ. It does not supply DOC TOC/TOA/INDEX generation, pagination or a complete Word field engine; nested fields and fields without results constrain native publication. |
-| IRM license evaluation and protected-content access | ❌ | ❌ | ❌ | IRM metadata and protected streams are not decrypted, authorized, or evaluated |
-| Complete later-version Word binary behavior | 🟡 | 🟡 | 🟡 | Versioned FIB/DOP structures are handled within the implemented profile, but unknown future records, application behavior, and undocumented compatibility quirks are not promised |
-
-## Implementation map
-
-- `src/package/{codec,model,property_set}.rs` owns DOC package opening, OLE access, package limits, encryption selection, properties, signatures, custom XML, and macro/storage access.
-- `src/document/{codec,mod}.rs`, `src/paragraph/`, `src/table.rs`, `src/section/`, `src/sprm.rs`, `src/sprm_operations/`, `src/parts/`, and `src/writer/` own CP/text, PLC, FKP, style/list, story, and formatting behavior.
-- The contextual metadata codecs live under `src/parts/`, with the corresponding facade modules in `src/lib.rs`; `src/route_slip.rs` layers route-slip codecs, validation, package editors, snapshot transactions, and its contextual facade. Envelope metadata is implemented by `src/parts/envelope/` over its FIB owner.
-- `src/shape/`, `src/image.rs`, `src/equation.rs`, `src/embedded_object/`, and `src/vba.rs` own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.
-
-## Native Microsoft Word regression scope
-
-`tests/microsoft_office_native.rs` opens 20 unmodified DOC/DOT/extensionless-child
-fixtures, checks exact all-story paragraph catalogs and top-level table counts,
-and preserves each CFB file byte for byte on no-op publication. Native body
-title edits across 13 packages preserve unrelated stream payloads and invert
-to the complete original file. A Unicode body also exercises paragraph
-creation, movement and removal.
-
-Targeted checks cover attached AutoText, move identities and accept/reject,
-comment reply metadata and timestamps, legacy FFData defaults versus undefined
-stored states, inert master/child paths, and encrypted DOC credentials and
-write-reservation metadata. Encrypted publication retains ciphertext; the
-ordinary edit API gives the typed Encrypted refusal. Main-body template text
-and deferred character-format edits retain the glossary’s text and selected
-formatting. Changed publication refuses broken pre-existing FIB coupling.
-The operations suite exercises native template queries and atomic body edits
-on both configured owner routes.
-
-`tools/native_office_tests.json` records the bounded assertion scopes. All-story
-paragraph counts include secondary stories and table marks; they are distinct
-from the ordinary body paragraph view. No-op preservation and macro-stream
-retention do not establish typed coverage of every embedded feature. These
-tests do not claim a fresh Word reopen, macro execution or external refresh.
-
-The native font specimen additionally checks six font-table names, two exact
-`SttbTtmbd` descriptions, the DOP embedding flag and the sizes/hashes of the
-Cambria Math and Aptos blocks at the recorded `WordDocument` offsets. A body
-edit retains both descriptions and block bytes through reopen and inverse.
-The legacy programs remain opaque; these assertions do not interpret them as
-OOXML sfnt resources, install fonts or qualify legacy font-program authoring.
-
-The native mail-merge test reads exact `Pms` flags, current record and data-file
-descriptor, resolves its `SttbFnm` entry as metadata, and checks four merge-field
-caches and two counters. The DOC retains a DOCX source path; it is neither
-followed nor silently relinked. The historical Word missing-source prompt's
-cause remains unresolved. No-op reopen preservation does not qualify source
-editing, recipient filtering, ODSO authoring or merge execution.
-
-`tests/microsoft_office_native_visuals.rs` checks the converted native OfficeArt
-group, all three child identities/kinds/anchors, fill colors, textbox text and
-retained container sizes. Native ObjectPool snapshots expose both Excel
-worksheet/chart storages with typed CompObj/ObjInfo metadata and distinct
-opaque workbook payloads. A body edit preserves that entire metadata/payload
-inventory through save/reopen and exact inverse. Native field-to-storage
-ownership is not inferred from the editor-managed field index; the new storage
-view is read-only. The facade explicitly opens the extracted worksheet as
-XLSX data without activating an OLE server or refreshing any cache.
-
-Native picture regressions distinguish the inline JPEG, floating PNG, compressed
-EMF worksheet preview and PNG chart preview. A floating marker never treats an
-inherited CPicLocation as its image address: the native rounded rectangle and
-converted vector group therefore cannot alias the first inline picture. Shape
-and CP indexes are cached per story, with deferred bounded OfficeArt parsing;
-unresolvable Spa-to-shape references and ambiguous CP mappings are errors.
-`Image::drawing_shape_id`
-identifies the floating route, and direct PICF-only `Image::data` gives a typed
-`DrawingStoreRequired` refusal for it.
-
-Tests check native PICF goals/scales, the floating frame/wrapping, stored hashes,
-compressed EMF metadata and its independently decoded file hash. The vector
-document's empty default PICF remains an explicit `NoPicture` case. Body edits
-preserve image identities and bytes through anchor relocation, save/reopen and
-inverse. Generated main/header and missing-Data cases qualify the store route;
-resource editing, page layout, rendering and unified `picture` nodes are not
-inferred from these owner reads.
-
-## Native property-set and table metadata qualification
-
-`tests/microsoft_office_native_metadata.rs` covers native DOC/DOT property
-reads and CRUD, including macro variants. It pins Mac code page 10000,
-producer-saved dates/counts/template names and review-document properties.
-Metadata changes preserve all non-property streams, including WordDocument,
-table/Data/ObjectPool/VBA content. Unicode custom values change only their
-user-defined section to UTF-16; reserved hyperlink blobs remain exact. Failed
-unsupported-field merges retain earlier staged work, and save/reopen, stale
-rejection and exact inverses are checked.
-
-Native text and math/navigation `_PID_HLINKS` payloads start with the vector
-count: the generic OLE BLOB layer already consumed `cbData`. The shared codec
-reads and writes exactly one outer length. Synthetic wire fixtures and native
-Word/Excel/PowerPoint regressions verify this boundary, while count, UTF-16,
-byte-budget, truncation and trailing-data checks remain enforced. Native field
-indices, CP ranges and instruction strings establish the Word candidates before
-explicit resolution. Changed unresolved writes refuse; resolved property edits
-leave field instructions and cached results untouched and inert.
-
-Native annotation tags and 16-byte `RgDofr` ListStyles records have exact table
-and semantic assertions. The latter exposes list index 0/style index 12 without
-claiming frame-set layout. Associated-string tables round-trip all 18 slots;
-their empty template-path slot stays distinct from the saved SummaryInformation
-template name. These are bounded STTB/list/property operations, not complete
-primitive, document-variable, web-export, UI selection, printer or layout support.
-No external target, macro, template, printer or native application is invoked.
-
-The generic later-version compatibility row is an explicit scope boundary in
-`tools/native_office_evidence_reviews.json`. The native structure regression
-pins four specimens' base `nFib=00C1`, 183 pointers, `cswNew=5`/`nFibNew=0112`,
-Dop2013 generation and exact saved counters. Native metadata CRUD on six
-DOC/DOT inputs preserves every non-property stream through file reopen and
-inverse. These tests qualify their concrete profiles; they do not establish
-arbitrary future Word behavior. The coverage report counts this boundary
-separately from missing native specimens and positive semantic assertions.
-
-The rendering boundary `doc-061`
-are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
-The operations test `microsoft_office_native_runtime_boundaries` checks all 139
-Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
-PDF requests return the advertised refusal through string, JSON and sink APIs,
-without writing to the sink. Locked files first require a password; supported
-unlocks still refuse visual output, and encrypted XLSB retains its separate
-unsupported-decryption boundary. Reads preserve publication bytes and all input
-files. Cited owner tests qualify saved data and bounded edits, not the excluded
-application rendering, layout or execution.
-Native math/layout/mail-merge inputs also refuse the worksheet evaluator;
-saved field results remain unchanged. RTF field results use separate story
-owners and are checked in the field inventory rather than paragraph text.
-
-`microsoft_office_native_version_boundary` qualifies profile admission using
-explicit header derivatives of native DOC/DOT inputs. Older nFib layouts are
-rejected with `UnsupportedVersion` before modern table pointers are consulted,
-even when a modern `1Table` remains and stylesheet tolerance is enabled. C0
-shell and C2 bidi compatibility headers retain text, table-pointer count,
-template identity and no-op bytes; the positional owner's rich-body edit
-refusal remains unchanged. Public operations preserve `UnsupportedFormat` and
-the nested version error on file/Auto and byte/Eager routes. This is not legacy
-Word interpretation or a claim of native-authored Word 6/95 fixtures.
-
-`microsoft_office_native_signature_boundary` authors disposable XML signatures
-over seven native Office parents. These are Litchi derivatives, not native
-Office signatures. Mathematical validity, resource coverage and signature
-presence remain distinct from `Trust::NotChecked`. Workbook cases also check
-outer/inner signed-handle edit refusals, explicit unsign, complete graph/data
-equivalence to an ordinary scalar edit, and invalid-payload detection. The
-shared verifier's older Microsoft-signed certificate fixtures explicitly retain
-unchecked trust too. These tests do not claim native application acceptance,
-legacy CryptoAPI signature authoring, trust-chain validation or revocation.
-Native signed-fixture handoffs remain open despite this bounded operation
-coverage; historical authoring statuses are unchanged.
-
-The worksheet evaluator's refusal on Word inputs does not imply absence of
-field refresh. `microsoft_office_native_refresh` qualifies the separate
-`File::refresh` operation: native DOC/DOT and DOCX/DOTX SEQ cache correction,
-DOCX TOC updates with bookmark/page-cache reuse, explicit missing-page refusal,
-file reopen and exact inverse. The earlier blanket field-execution exclusions
-are replaced by partial, scoped operation coverage; native mail merge still
-reports unsupported fields and remains inert.
-
-`doc-064` is reviewed in `tools/native_office_evidence_reviews.json`. Native tests
-cover bounded VBA source inspection, saved form defaults and inert payload
-retention. Compiling or executing VBA, instantiating controls and invoking host
-callbacks remain outside the supported API.
-
-Native IRM coverage now checks all twenty DOC/DOT inputs for the absence of a
-DataSpaces graph and tests explicitly added inert graph/license metadata on native
-document and macro parents. No-op publication, file reopen and source-conflict
-checks preserve all logical streams. These derivatives partially cover doc-031;
-doc-067 remains a reviewed rights-evaluation boundary without semantic credit.
-
-Native document and macro-template parents now qualify explicit MsoDataStore and
-opaque-storage derivatives through the shared Custom XML and CFB owners. The raw DOC
-reader exposes typed store metadata; ordinary paragraph edits preserve XML, macro
-streams, opaque binary payloads and empty-storage CLSIDs/state/timestamps. Store
-snapshots and CFB artifacts have separate patch scopes. Object target keys remain
-caller-supplied open policy and are reopened after topology-changing artifact
-replay. These tests partially cover doc-024/doc-032 without claiming native-authored
-Custom XML, schema evaluation, IRM behavior or fresh Word acceptance.
-
-Native-parent caption, envelope and AutoSummary regressions now qualify the
-bounded metadata surfaces. Caption changes preserve native SEQ fields, attached
-glossary and macro streams; invalid label references and UTF-16 limits preserve
-prior staging. Office 6 ANSI and Office 8 Unicode envelopes retain recipients,
-attachments, opaque tails and unknown CLSIDs, with stale/protected/invalid-message
-refusals. Native Asumyi state is inactive and PlcfAsumy absent; explicit priority
-additions use record codecs plus CFB publication. All stages preserve unowned
-stream bytes and directory metadata and pass file reopen/replay/exact inverse.
-Only the selected FIB pairs, appended table ranges and the declared Asumyi
-fields may change. No caption insertion, summarization, mail/attachment action or
-fresh Word validation is performed.
-
-The full 20-file native DOC/DOT audit finds PlcfTch caches and empty
-author-parallel RmdThreading slots in every file, plus language/recognizer state
-in nine files. These values now have direct typed/byte-level assertions. Native
-recognizer transactions accept absent bookmark tables and retain the producer's
-final terminator; noncontiguous range edits and sentinel retargeting refuse
-before changing staging, while duplicate-CP point ranges remain valid. Typed
-record edits published through the public CFB owner preserve all unowned stream
-bytes/directory metadata and exactly invert. No recognizer or language service
-runs, and empty review slots do not establish email-thread behavior.
-
-The same corpus has zero-length XML-schema, SDT, format-consistency, text-service,
-grammar-cookie, repair-bookmark and paragraph-group tables; public accessors
-confirm absence, including after opening the encrypted specimen. doc-002 through
-doc-006, doc-010 and doc-015 are recorded as native fixture gaps, without positive
-payload credit or an unsupported-library claim. Native specimens of those exact
-record families remain required. Historical authoring statuses are unchanged.
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| Command bars, keymaps, menus, toolbars, and UI customizations | 🟡 | ✅ | ✅ |
+| Routing slips and route-slip protection | 🟡 | ✅ | ✅ |
+| Macro or control execution | ❌ | ❌ | ❌ |
+| External document/database/include resolution | ❌ | ❌ | ❌ |
+| Field calculation and generated tables/indexes | 🟡 | 🟡 | 🟡 |
+| IRM license evaluation and protected-content access | ❌ | ❌ | ❌ |
+| Complete later-version Word binary behavior | 🟡 | 🟡 | 🟡 |

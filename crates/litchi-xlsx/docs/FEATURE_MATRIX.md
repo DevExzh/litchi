@@ -1,311 +1,104 @@
 # SpreadsheetML (.xlsx) Feature Matrix
 
-This document tracks the public feature families implemented by litchi-xlsx. It describes
-typed SpreadsheetML and OPC package support, not Excel rendering, recalculation, network
-access, macro execution, certificate trust, or complete support for every Microsoft
-extension schema.
-
-The audit uses the authoritative Microsoft [MS-XLSX] Front Matter and ToC, the part,
-extension, conceptual, and security material in [MS-XLSX] 2.1-2.7 and 4, and the slicer
-example in [MS-XLSX] 3.1. The conceptual review explicitly accounts for PivotTable
-what-if data, slicers, non-worksheet PivotTables, PivotValues, timelines, rich data,
-threaded comments, named sheet views, feature property bags, and Python in Excel.
-
-## Status model
-
-| Mark | Meaning |
-|------|---------|
-| ✅ | Supported for the scope described in the Notes cell |
-| 🟡 | Bounded, partial, metadata-only, pass-through, or inert support |
-| ❌ | No public typed support currently available |
-| N/A | The concept does not apply to this format or direction |
-
-Read and Write are independent. A typed package row does not imply that formula,
-query, macro, chart, pivot, or external content is executed.
+Feature checklist. ✅ Supported · 🟡 Partial · ❌ Unsupported · N/A Not applicable.
 
 ## OPC package and workbook
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| OPC package, parts, relationships, and content types | ✅ | ✅ | ✅ | The immutable `Package` owns SpreadsheetML parts, relationship graphs, content types, every state verb (open, `new`, `edit`, `apply`, saves) and commits carrying `package()`, `patch()` and content-free `diagnostics()`; `Package::workbook()` returns the read-only `Workbook` projection. Ordinary workbook commits expose bounded deterministic durable JSON, exact-source reversible application, commit-weighted bounded history, and non-applying bounded three-way plans. Those guarantees cover ordinary cell-region copy/move, selected picture/classic-chart graph transfer, direct cell/page-break edits, page setup, print options, and defined-name replacement. Strict and Transitional SpreadsheetML are handled where the feature codec supports both. |
-| Workbook and worksheet lifecycle | ✅ | ✅ | ✅ | Workbook creation/opening, sheet names/order, insert/remove/reorder operations, worksheet lookup, and chart-sheet removal are supported. |
-| Workbook properties and metadata | 🟡 | 🟡 | 🟡 | Custom document properties have typed package-facade read/write support, and workbook metadata/protection have bounded typed owners. Core and extended document properties remain below the ordinary facade and require the explicit raw `into_plain_opc()` boundary; they are not semantic facade CRUD. |
-| Data Model descriptor and payload | 🟡 | 🟡 | 🟡 | Source-bound snapshots share descriptor and inert payload storage; explicit owned conversion copies. Load-version edits preserve surrounding workbook XML, lexical opaque subtrees and inherited namespace/XML context. Whole-model creation/import validates outer storage and package ownership; source-bound structural edits are refused until inner table, relationship, column, and time-group identity closure can be proven. Changed signed packages and stale source closures are refused. Bounded removal checks recognized query, pivot and CUBE-formula consumers, retains ordinary connections, and removes eligible autoDelete connections while honoring usedByAddin. Removing the last eligible connection also removes its owner only when its content and inbound graph are fully owned. Source tokens preserve content types, relationships, processing instructions and empty members through save/reopen and exact inverse; inverse refuses reused part names or new inbound edges under OPC URI equivalence. The pinned native Tabular150 fixture covers descriptor edits/removal and exact restoration for owned and borrowed ingress. Full inner-model semantic decoding/authoring, dependent-feature conversion, broader dependency closure and native application edit evidence remain open. [MS-XLSX] §2.1.6; MS-XLDM §2.1.1.3. |
-| Custom Data and Custom Data Properties | 🟡 | 🟡 | 🟡 | Bounded catalog snapshots, transactions and reversible patches share inert payload storage. Caller-selected limits propagate through reads, edits and inverse replay, covering XML structure, namespace declarations, payloads, relationship metadata, temporary construction and logical OPC output bytes. UID rename updates recognized x14 connection `embeddedDataId` fields atomically; referenced removal requires explicit detach or retarget disposition. Connections admission validates the complete graph and schema, including case-equivalent owners and legal processing instructions. Checked attribute/extension edits retain surrounding source XML. Workbook, Properties and payload relationship tokens preserve comments, processing instructions and explicit empty `.rels` members through remove, save/reopen and inverse. Changed signed packages and stale source closures are refused. IDs use ST_Xstring escaping; an empty required ID is legal, while empty connection IDs mean no binding. Unmodeled MCE blocks identity changes. Native producer interoperability remains open. See [caller-limit validation](../../../docs/report/spec-gap-validation-evidence/xlsx-custom-data-completion/README.md). [MS-XLSX] §§2.1.2–2.1.3, §2.4.21, §2.6.34, §2.6.66. |
-| Cell values and cached results | ✅ | ✅ | ✅ | Numbers, dates, strings, inline/shared strings, booleans, errors, blanks, and cell references are typed and serialized. Ordinary workbook transactions also provide atomic, bounded rectangular cell copy/move with sparse missing-cell semantics and exact inverse/history/three-way participation. The guarded source-backed cell-value editor additionally exposes numeric-only `Insert` for a physically absent `<c>` owner, including absent-row creation and worksheet-dimension expansion; existing, explicit-empty, and style-only owners remain distinct and are refused. Insertion retains source, calculation-invalidation, exact inverse, and atomic-batch contracts. Targets inside array, data-table, or shared-formula owned ranges are refused; merge/table/MCE/opaque/relationship-bearing sources and signed or encrypted mutation remain outside the bounded closure. |
-| Shared strings and rich text runs | ✅ | ✅ | ✅ | Shared-string tables and supported rich text run properties are modeled. Cell-region transfer retains exact validated shared-string identity, including rich-text runs, instead of flattening display text. Modern rich-value objects are a separate bounded feature family below. |
-| Formula text and cached formula results | 🟡 | ✅ | 🟡 | Formula references, function text, shared/array formulas, table/pivot references, and bounded formula edits are supported. Cell-region transfer translates relative references in scalar formulas and strips stale caches; range-owned formulas are explicitly refused. No Excel-compatible evaluator, dependency graph, volatile refresh, or external-function execution is provided. |
-| Extension function names (`_xlfn`) | 🟡 | ✅ | 🟡 | Stored formula text retains extension-function names as inert syntax. This is not a complete typed function catalog, function-availability check, or execution implementation. Formula mutations retain the existing operation-specific grammar and dependency restrictions. [MS-XLSX] §2.2.3. |
-| Array and shared formulas | 🟡 | ✅ | 🟡 | Array/shared formula ownership and supported autofit/edit behavior are covered; the full dynamic-array spill engine is not. |
-| Calculation properties | ✅ | ✅ | ✅ | Bounded, inert typed reads and package transactions cover authored `calcPr` values and ordered, duplicate-preserving `calcFeatures`, including exact no-op/removal and source-checked reversible patches. Changed edits projected through MCE markup are refused. Formula edits only invalidate cached calculation state: Litchi does not recalculate formulas, infer calculation features, or implement complete calculation-engine semantics. Changed signed packages and mutation of encrypted-source facades are refused; encrypted input requires an explicit plaintext declassification/reopen workflow before editing. |
-| Calculation chain and volatile dependencies | 🟡 | ✅ | 🟡 | Cell edits remove an obsolete calculation chain using a source-bound content-type transition, preserving unrelated defaults/overrides and exact retained-owner inversion. Chain/volatile-dependency parts have bounded ownership and edit support; they are not recalculated and cannot establish Excel's full dependency semantics. |
-| Defined names | 🟡 | ✅ | 🟡 | Workbook/sheet-scoped records, built-in names, attributes, and formula text are exposed as inert catalog data. Structural sheet removal/reordering safely remaps or removes affected scopes and references, and ordinary workbook edits can atomically replace or clear the complete validated catalog. Fine-grained name formula construction/resolution is not claimed, and names never trigger external I/O. |
-| Styles and theme | ✅ | ✅ | ✅ | Fonts, fills, borders, alignment, number formats, cell formats, differential formats, themes, colors, and style inheritance are typed and writable. Cell-region transfer preserves exact validated local shared-style identity within the workbook lineage. |
-| Rows, columns, outlines, and dimensions | ✅ | ✅ | ✅ | Row/column height and width, hidden/collapsed state, outline levels, defaults, and dimension metadata are supported. |
-| Worksheet views, panes, selections, and named sheet views | ✅ | ✅ | ✅ | Sheet views, frozen panes, selections, tab/view settings, named sheet views, and supported reconciliation/filter metadata are available. The inert MS-XLSX `showDataTypeIcons` and `showDataTypeIconsCustomSheetView` values are typed on their exact `sheetView` and `namedSheetView` extension owners; source-bound transactions preserve unknown extension bytes, relationship closure, exact no-ops, and reversible edits. Changed values require an existing, unambiguous producer `ext` owner and a direct span-stable source owner; MCE-projected owners are refused atomically because their source branch cannot be mapped safely. No icons are rendered or refreshed. [MS-XLSX] §§2.4.108–2.4.109, 2.6.261–2.6.263. |
-| Merged cells | ✅ | ✅ | ✅ | Merge ranges have checked read and CRUD operations, including lookup by worksheet name. |
-| Scenarios and what-if data | ✅ | ✅ | ✅ | Scenario metadata and supported package relationships have typed CRUD; Excel's what-if calculation is not performed. |
-| Ignored errors and cell watches | 🟡 | ✅ | 🟡 | Ignored-error ranges and flags have a read-only model and eager worksheet getter. Cell watches have a standalone parser and detached Strict/Transitional fragment writer. Neither owner has a typed package editor or source-backed worksheet getter. Native A4:A5 evaluation-error exclusions and the A7 watch survive an unrelated source-backed cell edit; stored error caches remain unchanged. Watch-window monitoring and error diagnosis are not performed. |
-| Cell smart tags | 🟡 | ✅ | ✅ | The layered `smart_tags::{model,codec,package,validation,transaction}` owner provides inert typed annotations, checked cell references, strict Office type/property bounds, source-preserving worksheet edits, and semantic package selection. Action providers and smart-tag execution are intentionally unsupported. |
-| Phonetic properties | 🟡 | ✅ | ❌ | Worksheet phonetic properties and supported attributes have a read-only model, eager worksheet getter and standalone parser. There is no public typed constructor, fragment writer or package editor. Phonetic layout and language conversion are not performed. |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| OPC package, parts, relationships, and content types | ✅ | ✅ | ✅ |
+| Workbook and worksheet lifecycle | ✅ | ✅ | ✅ |
+| Workbook properties and metadata | 🟡 | 🟡 | 🟡 |
+| Data Model descriptor and payload | 🟡 | 🟡 | 🟡 |
+| Custom Data and Custom Data Properties | 🟡 | 🟡 | 🟡 |
+| Cell values and cached results | ✅ | ✅ | ✅ |
+| Shared strings and rich text runs | ✅ | ✅ | ✅ |
+| Formula text and cached formula results | 🟡 | ✅ | 🟡 |
+| Extension function names (`_xlfn`) | 🟡 | ✅ | 🟡 |
+| Array and shared formulas | 🟡 | ✅ | 🟡 |
+| Calculation properties | ✅ | ✅ | ✅ |
+| Calculation chain and volatile dependencies | 🟡 | ✅ | 🟡 |
+| Defined names | 🟡 | ✅ | 🟡 |
+| Styles and theme | ✅ | ✅ | ✅ |
+| Rows, columns, outlines, and dimensions | ✅ | ✅ | ✅ |
+| Worksheet views, panes, selections, and named sheet views | ✅ | ✅ | ✅ |
+| Merged cells | ✅ | ✅ | ✅ |
+| Scenarios and what-if data | ✅ | ✅ | ✅ |
+| Ignored errors and cell watches | 🟡 | ✅ | 🟡 |
+| Cell smart tags | 🟡 | ✅ | ✅ |
+| Phonetic properties | 🟡 | ✅ | ❌ |
 
 ## Worksheet interaction and presentation
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Hyperlinks | 🟡 | ✅ | 🟡 | Typed internal and external worksheet hyperlinks can be read and edited on existing worksheets through atomic workbook transactions with reversible, source-checked patches. A focused source-backed editor can add, replace, or remove internal links and update external-link metadata while retaining the exact inert target and private relationship identity; publication replaces only the selected worksheet payload and raw-preserves its relationship member and all unselected members. It refuses relationship creation/removal/retargeting, ambiguous or protected owners, stale/foreign closures, changed signed sources, encryption, and unsupported ZIP layouts. Native `xr:uid` revision identities are retained as validated GUIDs through reads and writes; namespace lookalikes, duplicate identity attributes and invalid GUIDs remain errors. New-sheet authoring remains unsupported. |
-| Legacy comments and VML note placeholders | 🟡 | ✅ | ✅ | The contextual `workbook::comments::{snapshot,transaction,patch}` owner provides checked cell/author CRUD for classic notes, exact semantic no-ops, relationship-safe source-checked patches, and inert VML shape-ID retention. VML layout and rendering remain outside the owner. |
-| Threaded comments, persons, and mentions | 🟡 | ✅ | 🟡 | Bounded typed models/codecs and eager/source worksheet/workbook readers retain people, roots/replies, mentions, timestamps and resolution metadata. No public package-level threaded-comment edit owner or automatic legacy-placeholder generator is exposed; callers managing parts use the OPC layer. Missing text cannot carry mentions. Classic notes remain a separate owner; no collaboration service is contacted. |
-| [MS-OREACTXML] `commentsExtensible` reactions | N/A | N/A | N/A | [MS-OREACTXML] §§1.3 and 1.5 explicitly bind these extensions to WordprocessingML. Its Word `commentsExtensible` part is not an XLSX part; this corrects the format assignment in the 2026-09-08 gap audit. It does not make a broader claim about Excel-service reaction features. |
-| Data validation | ✅ | ✅ | ✅ | Validation ranges, list/custom/date/time/whole/decimal/text-length rules, formulas, prompts, and error messages are typed and writable within supported schemas. |
-| Conditional formatting | 🟡 | ✅ | 🟡 | Bounded typed parsing covers rules, differential formats, ranges, formulas, color scales, data bars, icon sets, and supported extension forms. A guarded source-backed editor can add, replace, reorder, or clear the complete ordered direct core collection in one existing normal worksheet, with exact patch/inverse and raw-copy publication of unselected members. It refuses x14/MCE-selected or opaque owners, invalid DXF references, protected mutation, stale/foreign closures, changed signed sources, relationship/topology changes, and unsupported ZIP layouts. Conditions are not evaluated. |
-| AutoFilter and sort | ✅ | ✅ | ✅ | AutoFilter ranges, filters, sort states, custom/dynamic filters, and supported extension metadata are available. Direct table sort states retain their exact saved worksheet ranges, including stale extents beyond the current table. Authoring requires owner-bounded ranges and accepts full column keys extending beyond the selected sort-state rows. Reading this metadata does not execute sorting or filtering against cells. |
-| Structured tables | ✅ | ✅ | ✅ | Table identity, display names, ranges, columns, totals, styles, AutoFilter, calculated-column formulas, and package relationships are typed and writable. |
-| Surveys attached to tables | 🟡 | 🟡 | 🟡 | Bounded table-owned Survey snapshots and transactions expose semantic table/column selectors, typed question/property CRUD, and exact source-bound patches. Namespace-aware parsing validates schema order, attributes, IDs, ST_Xstring fields, and caller limits before retained-source/output allocation. Existing edits preserve comments, namespace bindings, lexical attributes, opaque extensions, and neighboring XML; question moves within their original parent retain source subtrees. Catalog snapshots share parsed Surveys and callbacks isolate the selected value. Changed publication enforces source identity and signature policy. Retained content-type and relationship tokens support exact remove/save/reopen/inverse restoration, including empty relationship parts. Cross-parent opaque transfers are refused. Arbitrary detached opaque context, broader dependency closure, and native producer edit evidence remain incomplete. Rendering and submission are inert. [MS-XLSX] §§2.6.142–2.6.145. |
-| Query tables and external-data table metadata | 🟡 | ✅ | 🟡 | The worksheet catalog follows direct and table-definition owners and exposes the owning part. Existing definitions support replacement; names alone splice the original source. Direct worksheet owners support CRUD/reorder. Relationship IDs must be unambiguous across owners; `replace_part` selects a full part name when IDs collide. Table-owned removal/reorder and field rebinding are refused because they also require updating table/column query bindings. No query is fetched or refreshed. |
-| Data consolidation | 🟡 | ✅ | 🟡 | The eager worksheet getter reads inert function, label/link flags and ordered source references. Detached Strict/Transitional fragment writing is available, but there is no package editor or source-backed worksheet getter. Native two-source Sum metadata and six linked formula/cache pairs are pinned; unrelated scalar publication preserves the consolidation worksheet exactly. Consolidation and formula recalculation are not executed. |
-| Page margins | ✅ | ✅ | ✅ | Validated inch/point/millimeter constructors and typed reads cover all six required values. Ordinary workbook put/remove/copy/move edits are byte-minimal, verified, reversible, join/conflict aware, and exact-source checked. |
-| Page setup and print options | ✅ | ✅ | ✅ | Typed reads and ordinary workbook put/remove/copy/move edits cover all relationship-free core `pageSetup` settings plus centering, headings, and gridline print flags. Writes are compact, verified, reversible, join/conflict aware, and preserve an attached Printer Settings relationship; removal is refused while that relationship is attached. Print options honor the schema default of true for omitted `gridLinesSet`; explicit false remains distinct. The source-backed print-option editor splices only the selected element, retaining producer whitespace and all unrelated XML. Native Excel for macOS zero DPI markers are retained as `Dpi::UNSPECIFIED`; `Dpi::new` continues to require a positive authored resolution. |
-| Row and column page breaks | ✅ | ✅ | ✅ | The `page_breaks` owner provides checked horizontal/vertical collections, Office count and grid bounds, Strict/Transitional reads, byte-minimal source-preserving rewrites, and exact-source-checked `Snapshot`/`Transaction`/`Commit`/`Patch` package CRUD. Ordinary workbook transactions can atomically copy or move owned page-break state between dependency-checked worksheets. It does not paginate or infer automatic breaks. |
-| Headers, footers, and printer settings | ✅ | ✅ | ✅ | Header/footer sections, odd/even/first-page settings, pictures/relationships, and supported printer-setting parts are typed; printing is not performed. |
-| Worksheet and workbook protection | ✅ | ✅ | ✅ | Sheet/workbook protection flags, legacy hashes, and supported modern hash/salt/spin metadata are validated and writable. Protection is not encryption or authorization. |
-| Revisions and collaboration metadata | 🟡 | ✅ | 🟡 | `revisions::{Snapshot, Edit, Commit, Patch}` provides source-checked package CRUD for revision users, headers, and inert logs with relationship/orphan validation and exact no-op preservation; live coauthoring, conflict resolution, locking, and recalculation are not implemented. |
-| Sparkline groups | 🟡 | ✅ | 🟡 | Supported sparkline group and worksheet relationships are bounded; native revision2 identities survive compatibility processing and fragment writing. The crate does not render sparklines or calculate their source values. |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| Hyperlinks | 🟡 | ✅ | 🟡 |
+| Legacy comments and VML note placeholders | 🟡 | ✅ | ✅ |
+| Threaded comments, persons, and mentions | 🟡 | ✅ | 🟡 |
+| [MS-OREACTXML] `commentsExtensible` reactions | N/A | N/A | N/A |
+| Data validation | ✅ | ✅ | ✅ |
+| Conditional formatting | 🟡 | ✅ | 🟡 |
+| AutoFilter and sort | ✅ | ✅ | ✅ |
+| Structured tables | ✅ | ✅ | ✅ |
+| Surveys attached to tables | 🟡 | 🟡 | 🟡 |
+| Query tables and external-data table metadata | 🟡 | ✅ | 🟡 |
+| Data consolidation | 🟡 | ✅ | 🟡 |
+| Page margins | ✅ | ✅ | ✅ |
+| Page setup and print options | ✅ | ✅ | ✅ |
+| Row and column page breaks | ✅ | ✅ | ✅ |
+| Headers, footers, and printer settings | ✅ | ✅ | ✅ |
+| Worksheet and workbook protection | ✅ | ✅ | ✅ |
+| Revisions and collaboration metadata | 🟡 | ✅ | 🟡 |
+| Sparkline groups | 🟡 | ✅ | 🟡 |
 
 ## Charts, drawings, pivots, and external references
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Charts and chart sheets | 🟡 | ✅ | 🟡 | Typed chart/chart-sheet resources, series, references, axes, labels, layouts, and supported relationships are available. Classic chart package CRUD inventories the exact relationship IDs referenced by chart XML and round-trips closed graphs containing user shapes, images, external hyperlinks/images, embedded workbook/package/OLE data, and relationship-free opaque `/xl/` leaves in both Strict and Transitional packages. Ordinary cell-region copy clones the same selected classic-chart closure under collision-free names. Stale or missing relationship metadata, ChartEx, nested user-shape dependencies, and other graph roles are refused atomically, and there is no renderer. |
-| Worksheet drawings and anchors | 🟡 | ✅ | 🟡 | Two-cell/one-cell/absolute anchors, groups, shapes, connections, text bodies, geometry, client data, images, and supported drawing relationships are typed. `drawing_anchor()` retains the complete numeric-EMU geometry for all three anchor forms; the legacy `anchor` field is a compatibility projection. Unit-bearing `ST_Coordinate` values remain unsupported; see the [anchor validation scope](../../../docs/report/spec-gap-validation-evidence/xlsx-drawing-anchors/README.md). Ordinary cross-sheet cell copy translates selected one-/two-cell anchors and clones their bounded closed image or supported classic-chart graphs into collision-free parts; existing target drawings, drawing-bearing moves, and unsupported dependency graphs are refused atomically. |
-| Images | ✅ | ✅ | ✅ | Supported image relationships and drawing image resources can be read and authored; image conversion and final layout/rendering are outside this crate. |
-| Existing worksheet SVG pictures | 🟡 | ✅ | 🟡 | `Worksheet::{drawing, picture, read_svg_image}` pairs direct source records with typed numeric two-cell/one-cell/absolute anchor geometry, selects through `drawing::PictureSelector`, and borrows SVG payload bytes. Ordinary `WorksheetEdit::{attach_svg, detach_svg}` stages borrowed `drawing::SvgInput` on existing direct pictures, preserves raster fallback/geometry and opaque siblings, and publishes drawing, relationship, media, and content-type changes atomically with source-checked in-memory inverse. Shared media cleanup respects remaining incoming references. Composed edits enforce final part, metadata, relationship, and graph limits. Strict and Transitional core namespaces are supported; ambiguous MCE owners, external or malformed media graphs, and unsupported extension owners are refused. New picture creation, rendering, and native application acceptance are not established by this owner. |
-| Core worksheet drawing content parts | 🟡 | ✅ | ❌ | `Worksheet::{content_part, content_parts}` and `WorksheetDrawing::{content_part, content_parts}` expose direct core `xdr:contentPart` owners through `drawing::ContentPartSelector`. Source ranges and complete two-cell/one-cell/absolute geometry are paired with the typed inventory. Matching Strict/Transitional `customXml` relationships resolve bounded XML targets; payload bytes and outbound relationship metadata remain borrowed. Malformed core attributes, dangling/external edges, and ambiguous MCE owners are refused. Nested `xdr14` owners remain opaque. Replacement/removal/creation, recursive graph ownership, typed Ink payloads, and native application compatibility remain open. |
-| OLE objects and embedded packages | 🟡 | ✅ | 🟡 | `ole_objects::{Snapshot, Transaction, Commit, Patch}` provides source-checked anchor/relationship metadata edits, MCE choice/fallback preservation, and bounded inert payload lifecycle support. Payloads are never activated, deserialized, or executed. |
-| Pivot caches | 🟡 | ✅ | 🟡 | Pivot cache definitions, fields, shared items, grouping, filters, styles, and supported extension data have typed bounded coverage. Cache refresh, cube access, and arbitrary unknown extensions are not implemented. |
-| PivotTable views | 🟡 | ✅ | 🟡 | Pivot view and field metadata are read and retained through the pivot package model; full report authoring, refresh, layout calculation, and all product-specific extensions are not claimed. |
-| PivotTable server formats (`pivotTableServerFormats`) | 🟡 | ✅ | 🟡 | `Workbook::pivot_table_server_formats` and `Package::edit_pivot_table` select by semantic name or position and exposes ordered `x15:serverFormat` values. Existing `culture` and `format` attributes support source-preserving keep/set/clear edits; ordered leaves support insert/push/remove/move/reorder with required `count` updates, known `pivotValueCellExtra@in` closure, and reversible source-checked patches. The admitted C510 owner validates the non-worksheet PivotTable/cache closure and supported source-connection route under caller limits. Unknown siblings, namespaces, and unchanged lexical source remain preserved. Container/Part lifecycle, other newer pivot extension families, and native producer compatibility remain open or unverified. Refresh and calculation are not performed. |
-| PivotValues (`pivotTableData`) | 🟡 | ✅ | 🟡 | `Workbook::pivot_table_data` and `Package::edit_pivot_table_data` select a non-worksheet PivotTable by semantic name or position. The C444 owner validates the PivotTable/cache closure and exposes authored rows/cells without allocating a dense matrix. Existing values and attributes on existing cell-extra children support source-preserving scalar edits, atomic commits, stale/signed-source refusal, and exact inverse patches. Caller-lowered limits separately bound logical dimensions, authored records, retained source/relationship metadata, and temporary replacement peaks. Matrix structural edits, container/Part lifecycle, native producer interoperability, refresh, calculation, and cube access remain unsupported or unverified. [Validation evidence](../../../docs/report/spec-gap-validation-evidence/xlsx-pivot-table-data/final-gate/README.md). |
-| Cached unique names (`cachedUniqueNames`) | 🟡 | 🟡 | 🟡 | `Workbook::pivot_cache(...).field(...).cached_unique_names()` reads model-associated cache-field diagnostics; `Package::edit_pivot_cache(...).field(...)` stages existing-name scalar changes and returns immutable commits with exact source-checked inverse patches. Cache IDs and field names/ordinals are semantic selectors. Required names may be empty `ST_Xstring` values; unique unsigned indices and decoded UTF-16 limits are checked. Recognized URI token padding is decoded for matching and retained lexically. MCE-selected owners remain read-only. The specification’s `CT_Items` index-bound anchor remains unresolved: diagnostics expose that status, and insertion, removal, and reindexing are refused. Native producer interoperability, cache refresh, and cube access are not claimed. |
-| Pivot charts and non-worksheet PivotTables | 🟡 | ✅ | 🟡 | Pivot-chart resources and non-worksheet chart relationships have bounded support; chart/pivot rendering and calculation are not implemented. |
-| Slicers and slicer caches | 🟡 | ✅ | ✅ | The layered `slicer::{model,codec,package,validation,transaction}` owner provides bounded typed cache/view graphs, extension retention, clone-staged CRUD, and explicit graph validation. Mixed-case integration GUIDs address the same owner during reads and rewrites. Native caches, view captions, selected-item XML and reversible cache reordering are tested. Slicer filtering, refresh, recalculation, and UI rendering remain inert. |
-| Timelines and timeline caches | 🟡 | ✅ | ✅ | The layered `timeline::{model,codec,package,validation,transaction}` owner provides bounded typed cache/view state, extension retention, clone-staged CRUD, and relationship/orphan validation. Both native 2011/lowercase and documented 2010/capitalized relationship/content types are accepted, with new authoring using the native spellings. Bounded MCE processing retains known revision IDs and opaque extension lists. Native selected-month state and reversible caption changes are tested. Timeline filtering, refresh, recalculation, and UI rendering remain explicitly unsupported. |
-| External workbook links | 🟡 | ✅ | 🟡 | `external_links::{Snapshot, Edit, Commit, Patch}` adds source-checked package CRUD and inert metadata/cache edits over external link parts, source relationships, defined names, and supported extension properties. The [MS-XLSX] §2.4.97 `alternateUrls` extension is typed with bounded `driveId`/`itemId`, one `absoluteUrl`, and one `relativeUrl`; each `r:id` is closed over an inert external-workbook relationship. Paths and targets are retained verbatim and never opened or refreshed. Source XML is bounded before retention, expanded element/relationship namespaces are matched exactly, and source edits refuse to delete opaque descendants. Explicit workbook externalReferences order defines catalog indexes; structural publication updates that list and binds the workbook XML into stale-source checks. Relationship-only legacy catalogs remain readable, but structural binding refuses existing unbound formula consumers. XML formula/VML references to affected indexes or DDE/OLE topic syntax refuse deletion/reindexing because formula remapping is not implemented. Structural changes also refuse ambiguous/non-direct or opaque reference owners. |
-| DDE/OLE links and external data | 🟡 | ✅ | 🟡 | Link targets, connection strings, commands, credentials, and DDE/OLE metadata are inert typed data. Native external-workbook/embedded payloads are retained during DDE/OLE derivative creation, cache/flag edits and removal. These derivatives do not establish native DDE/oleLink authoring or application interoperability. No conversation, COM activation, URL access, refresh, or execution occurs. |
-| External connections | ✅ | ✅ | ✅ | `connections::{Snapshot, Transaction, Commit, Patch}` provides source-checked create/update/remove edits for database, OLE DB/ODBC, OLAP, Web, text-import, parameters, credential, and query-table metadata while preserving opaque XML and graph topology. The connection is never contacted. |
-| XML maps and XML data bindings | ✅ | ✅ | ✅ | `xml_maps::{Snapshot, Transaction, Commit, Patch}` owns typed XML map schemas, data bindings, map IDs, XPath metadata, package relationships, and bounded mapped-data payloads with source-checked CRUD. XML is not fetched or transformed by a host service. |
-| Custom XML data stores | ✅ | ✅ | ✅ | Bounded custom XML payloads and package relationships are typed and editable through the shared `litchi_ooxml_common::custom_xml` owner; arbitrary application semantics are not inferred. |
-| Web extensions and Office add-ins | 🟡 | ✅ | 🟡 | Worksheet range bindings, task panes, web-extension relationships, IDs, app references, and supported binding-formula rewrites are handled with bounded validation. Add-in activation and provider-specific behavior remain unsupported. |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| Charts and chart sheets | 🟡 | ✅ | 🟡 |
+| Worksheet drawings and anchors | 🟡 | ✅ | 🟡 |
+| Images | ✅ | ✅ | ✅ |
+| Existing worksheet SVG pictures | 🟡 | ✅ | 🟡 |
+| Core worksheet drawing content parts | 🟡 | ✅ | ❌ |
+| OLE objects and embedded packages | 🟡 | ✅ | 🟡 |
+| Pivot caches | 🟡 | ✅ | 🟡 |
+| PivotTable views | 🟡 | ✅ | 🟡 |
+| PivotTable server formats (`pivotTableServerFormats`) | 🟡 | ✅ | 🟡 |
+| PivotValues (`pivotTableData`) | 🟡 | ✅ | 🟡 |
+| Cached unique names (`cachedUniqueNames`) | 🟡 | 🟡 | 🟡 |
+| Pivot charts and non-worksheet PivotTables | 🟡 | ✅ | 🟡 |
+| Slicers and slicer caches | 🟡 | ✅ | ✅ |
+| Timelines and timeline caches | 🟡 | ✅ | ✅ |
+| External workbook links | 🟡 | ✅ | 🟡 |
+| DDE/OLE links and external data | 🟡 | ✅ | 🟡 |
+| External connections | ✅ | ✅ | ✅ |
+| XML maps and XML data bindings | ✅ | ✅ | ✅ |
+| Custom XML data stores | ✅ | ✅ | ✅ |
+| Web extensions and Office add-ins | 🟡 | ✅ | 🟡 |
 
 ## Security, macros, and package extensions
 
-| Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Form-control properties (`x14:formControlPr`) | 🟡 | ✅ | 🟡 | The bounded worksheet owner selects existing controls by position/name and proves their properties, DrawingML and VML identity closure. Ordinary worksheet transactions and a source-backed editor compose paired scalar changes for one control per worksheet batch, with no-op preservation, inverse patches, source checks, limits, and structured join conflicts. Mirror support follows the documented field/default profile; creation/removal, list and graph-changing formula edits, and multi-control batches remain unsupported. Leaf scalar/item codecs also preserve unrelated lexical and opaque XML. Fixtures cover ten properties parts from seven native packages; edited-file native application acceptance is not claimed. See [scalar lifecycle evidence](../../../docs/report/spec-gap-validation-evidence/xlsx-form-control-scalar-final/contract.md). No control execution or rendering occurs. |
-| VBA projects in macro-enabled packages | 🟡 | 🟡 | 🟡 | Macro-enabled package relationships and bounded project/ActiveX payload metadata can be preserved or edited through package/ActiveX paths. VBA source is not a typed formula/runtime model, never executes, and is not trusted. |
-| ActiveX and form-control metadata | 🟡 | ✅ | 🟡 | ActiveX relationships, control metadata, and supported VBA-linked payload references are bounded and inert. Controls are not instantiated, rendered, or run. |
-| OOXML digital signatures | 🟡 | 🟡 | 🟡 | The shared OPC graph/signature adapter can inspect and edit supported XML signatures at package level; this crate's workbook model does not validate certificate trust, revocation, or every producer signature profile. |
-| OOXML package encryption | ✅ | ✅ | ✅ | With the optional `encryption` feature, `Package` supports the Standard AES-128/SHA-1, Agile AES-128/CBC/SHA-1 and native Agile AES-256/CBC/SHA-512 managed-package profiles through bounded password-aware ingress, retained-mode re-encryption, atomic encrypted saves, and explicit plaintext declassification. Other algorithm families are rejected. Crypto and inner OPC limits are independent; encrypted-source mutation and implicit plaintext output are refused. Encryption does not make formula or macro behavior safe. |
-| Persisted Office Add-in task panes and web-extension parts | ✅ | ✅ | ✅ | The layered `task_panes::{package,transaction}` owner exposes typed MS-OWEXML task-pane/add-in CRUD through clone-staged `Package::edit_task_panes`; existing relationship IDs, unrelated package graph entries, and supported opaque extension XML are retained. Add-in activation and provider behavior remain inert. |
-| Ribbon and custom UI XML | 🟡 | 🟡 | 🟡 | Ribbon/customUI parts and relationships remain bounded/pass-through where exposed; UI activation and arbitrary extension semantics are not implemented. |
-| Unknown package parts and extension XML | 🟡 | ✅ | 🟡 | OPC graph editing preserves supported opaque parts and validates relationship topology. Typed writers do not claim lossless preservation through every semantic mutation of unknown XML. |
-
-| Data Model time groupings (`modelTimeGroupings`) | 🟡 | ✅ | 🟡 | Typed reads cover the [MS-XLSX] 2014-11 namespace and `{9835A34E-60A6-4A7C-AAB8-D5F71C897F49}` owner, preserve unknown sibling extensions byte-for-byte, validate table references during package load, and retain forward content-type values as `Other`. Package authoring resolves each table, source column, and calculated column through the neutral XLDM 140 identity closure before staging the exact reversible descriptor edit; incomplete or opaque inner closures and standalone `Other` values remain read-only. No native Excel acceptance claim is made. [MS-XLSX] §§2.2.4.11, 2.4.71, 2.6.152–2.6.154. |
+| Feature | Status | Read | Write |
+| --- | --- | --- | --- |
+| Form-control properties (`x14:formControlPr`) | 🟡 | ✅ | 🟡 |
+| VBA projects in macro-enabled packages | 🟡 | 🟡 | 🟡 |
+| ActiveX and form-control metadata | 🟡 | ✅ | 🟡 |
+| OOXML digital signatures | 🟡 | 🟡 | 🟡 |
+| OOXML package encryption | ✅ | ✅ | ✅ |
+| Persisted Office Add-in task panes and web-extension parts | ✅ | ✅ | ✅ |
+| Ribbon and custom UI XML | 🟡 | 🟡 | 🟡 |
+| Unknown package parts and extension XML | 🟡 | ✅ | 🟡 |
 
 ## Explicit gaps
 
-| Feature family exposed by [MS-XLSX] | Status | Read | Write | Notes |
-|-------------------------------------|--------|------|-------|-------|
-| Rich values and modern rich-data objects | 🟡 | ✅ | ✅ | `rich_values` owns typed `rvData`, `rvStructures`, `arrayData`, and inert `refreshIntervals` metadata under each `rvTypesInfo` type's existing `extLst`; rich styles, supporting bags, other type metadata, and web-image payloads remain bounded opaque documents. Refresh metadata edits are source-bound to that part's relationship closure and never execute a service refresh. |
-| Feature property bags and checkbox/XF-control extensions | 🟡 | ✅ | ✅ | Typed `FeaturePropertyBags`, checkbox defaults, `XFControls`, `XFComplement`, `XFComplements`, and `DXFComplements` validation are inert; unknown XML and relationship IDs/topology are retained. |
-| Python in Excel and external code services | ❌ | ❌ | ❌ | Python environments, scripts, parameter encodings, external-code-service parts, and execution are not implemented. |
-| Complete PivotTable refresh/calculation | ❌ | ❌ | ❌ | Pivot metadata can be read or edited in bounded scope, but caches are not refreshed, cube connections are not queried, and report layouts are not calculated. |
-| Complete chart/drawing rendering and extension grammar | ❌ | ❌ | ❌ | Typed resources do not constitute an Excel renderer or unrestricted support for every chart, DrawingML, slicer, timeline, or producer extension schema. |
-| Complete Excel formula evaluation | ❌ | ❌ | ❌ | Formula text and cached values are supported, but there is no complete dependency graph, spill engine, volatile recalc, external function, Python, DDE, or query execution. |
-| External-link, connection, query, DDE, OLE, and add-in execution | ❌ | ❌ | ❌ | Targets and metadata are inert; no network, filesystem, COM, credential, or provider action is performed. |
-| Macro execution and trusted ActiveX behavior | ❌ | ❌ | ❌ | VBA and control payloads remain inert package data and are never loaded into a host runtime. |
-| Certificate trust and revocation | ❌ | ❌ | ❌ | Signature verification can establish cryptographic integrity/signature validity only, not trust-chain or revocation status. |
-
-## Native Microsoft Excel regression scope
-
-`tests/microsoft_office_native.rs` checks 18 unencrypted XLSX/XLSM/XLTX/XLTM
-packages, including Strict OOXML, chart sheets and a legacy macro sheet. Exact
-catalog names/kinds/flavors and complete no-op OPC member preservation are
-separate from feature semantics. Targeted tests cover 100 copied/shared formulas,
-CSE arrays, stored dynamic-array spills and `_xlfn` expressions, what-if formula
-owners, seven validations, notes, defined names, print settings, 1904 serials,
-hidden rows/columns, page breaks and inert hyperlink revision identities.
-
-Scalar create/update/remove edits cover 17 native variants. The protected
-interaction fixture gives the typed ProtectedSheet refusal. Calculation-chain
-removal and recalculation flags are deliberate related changes; every other
-part and all unrelated workbook XML/manifest fields are checked. Retained-owner
-inverses restore every original member byte; after save/reopen, workbook-relationship
-entry ordering can canonicalize, so its complete fields are compared while
-content types and all other payloads remain byte-exact.
-
-The native Agile AES-256/SHA-512 fixture tests wrong/empty/correct passwords,
-plain-publication refusal and rekeying with clear-member preservation. The
-operations test checks native formula queries and atomic edits on Auto/Eager
-routes. The assertion index is `tools/native_office_tests.json`; these tests
-do not establish complete feature coverage, fresh Excel validation, formula
-evaluation, external refresh, macro execution or rendering.
-
-The analytics regressions additionally check four native workbook variants
-for exact Table1 columns/sort bounds, eight decoded PivotCache records, pivot
-field roles, Sum aggregation metadata and filtered/unfiltered cached totals.
-They check both sparkline groups and all destinations/source formulas, flags,
-colors and native GUIDs through fragment writing. The conditional-format
-fixture checks all eight core rules, source priority order, DXF/formula
-bindings, threshold/color/icon payloads and the matching x14 data-bar rule.
-
-Slicer/timeline caption changes and slicer-cache order changes preserve every
-unrelated package member and invert after reopen. Filter application is tested
-as an explicit Unsupported result; no refresh or rendering occurs. Selection
-items in slicer cache data remain a retained XML scope, distinct from the
-typed cache/view identities and timeline state.
-
-The native form-controls fixture checks eleven typed controls across eager and
-source-backed readers: identities, stored/default properties, links, ranges,
-selections and spinner/scroll settings. Existing unproven mirror diagnostics
-remain visible. A checked-to-unchecked edit changes exactly the selected
-property attribute and VML mirror, preserving all other members and the
-unchanged linked-cell cache, with exact inverse publication. These assertions
-cover form controls; they do not qualify ActiveX, control execution, linked-cell
-synchronization or native Excel acceptance of the edit.
-
-Native image regressions now pair the direct picture and rounded rectangle in
-`excel-conditional-drawings.xlsx`, checking raster hash, alt text, full marker
-offsets, edit behavior and shape text. The source scanner recognizes shapes,
-connectors and graphic frames as anchor objects while keeping their descendants
-outside the direct-picture inventory; order and cardinality remain checked.
-`excel-chart-families.xlsx` qualifies an existing SVG/raster pair and a bounded
-SVG detach/attach replacement with unrelated chart parts preserved and exact
-inverse after save/reopen. It does not establish rendering or Office acceptance.
-
-`excel-links-objects.xlsx` qualifies the four rich-value parts, the `_localImage`
-structure, stored integer values, inert image relation and exact PNG payload.
-Content-type classification is ASCII case-insensitive and retains the producer's
-original spelling. The refresh view also recognizes the native types part and
-retains its root `mc:Ignorable` declaration after checking bound prefixes; foreign
-subtrees do not acquire typed refresh ownership. The fixture has no refresh
-intervals. Public relationship and style-complement writers now produce complete
-XML start tags; typed native data/structures/relationships pass codec round trips.
-This does not qualify rich-value cell binding, evaluation or service refresh.
-
-Native external-data tests qualify both query-table ownership routes in
-`excel-connections.xlsx`, including all three Power Query field bindings and
-the legacy import. Connections validation admits a table owner only through
-one worksheet relationship and rejects duplicate, external and orphan graphs.
-Native Text/OleDb metadata is read inertly; a description edit preserves
-imported data, query parts and DataMashup payloads.
-
-`excel-links-objects.xlsx` qualifies the declared-ignorable `alternateUrls`
-namespace, exact primary/alternate targets, source sheet names and stored
-49.75/14 caches. A drive-ID metadata edit preserves both targets and caches.
-Connection and external-link inverses replay captured part changes, including
-relationship and manifest images, while retaining their existing source guards.
-Native owner creation and last-connection removal also preserve unrelated
-parts and restore original relationship/manifest member bytes through inverse.
-Native save/reopen inverses restore exact package-member bytes; identical ZIP
-compression is outside the part-level patch contract. No external target,
-provider, macro, query or refresh was executed.
-
-
-## Native shared-workbook revision qualification
-
-`tests/microsoft_office_native_revisions.rs` pins the native three-header graph,
-six tracked cell/sheet changes, custom-view delete/add records, exact local
-header timestamps and an empty current-user list. Formula text is read from
-revision records without inventing absent historical caches; the current B3
-cache is independently read as 75 and remains unchanged during edits.
-
-User CRUD, header settings, matching header/log append/removal, complete owner
-removal/recreation, invalid-call atomicity, stale checks and file reopen/inverse
-publication are covered on the native input. Unrelated workbook payloads stay
-exact. Recreated owner XML is canonical, so semantic comparisons ignore only
-attribute order and retain every namespace/value/text and child/record order.
-The revisions are inert metadata; these tests do not execute collaboration,
-recalculation, native history UI or fresh Excel reopen.
-
-The complete-Excel-evaluation row is an explicit compatibility boundary, separate
-from the optional bounded `litchi-ops` evaluator. Its native calculation suite
-checks scalar arithmetic/aggregates, shared `ROW` formulas, cached error kinds,
-1904 dates, cache preference, file reopen and read-only byte preservation.
-Explicit evaluation refuses external references and syntax/context outside the
-profile; an unregistered table reference cannot silently aggregate to zero.
-Date functions use the workbook date system, including holiday/offset inputs.
-These checks do not establish a complete Excel dependency/spill engine, external
-refresh, cache publication or fresh Excel acceptance. See
-`tools/native_office_evidence_reviews.json` and
-`crates/litchi-ops/tests/microsoft_office_native_calc.rs`.
-
-The runtime boundaries `xlsx-269`
-are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
-The operations test `microsoft_office_native_runtime_boundaries` checks all 139
-Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
-PDF requests return the advertised refusal through string, JSON and sink APIs,
-without writing to the sink. Locked files first require a password; supported
-unlocks still refuse visual output, and encrypted XLSB retains its separate
-unsupported-decryption boundary. Reads preserve publication bytes and all input
-files. Cited owner tests qualify saved data and bounded edits, not the excluded
-application rendering, layout or execution.
-
-`microsoft_office_native_signature_boundary` authors disposable XML signatures
-over seven native Office parents. These are Litchi derivatives, not native
-Office signatures. Mathematical validity, resource coverage and signature
-presence remain distinct from `Trust::NotChecked`. Workbook cases also check
-outer/inner signed-handle edit refusals, explicit unsign, complete graph/data
-equivalence to an ordinary scalar edit, and invalid-payload detection. The
-shared verifier's older Microsoft-signed certificate fixtures explicitly retain
-unchecked trust too. These tests do not claim native application acceptance,
-legacy CryptoAPI signature authoring, trust-chain validation or revocation.
-Native signed-fixture handoffs remain open despite this bounded operation
-coverage; historical authoring statuses are unchanged.
-
-Native calculation and refresh tests retain physical tab positions across a
-leading chart tab, include the trailing worksheet, and verify cross-sheet
-results. `File::refresh` reports stale caches by default and writes only
-supported results when `write_cache(true)` is explicit. Workbook refresh keeps
-external dependencies unsupported and unchanged; it does not refresh data
-providers. XLS's inline FormulaValue 03 is a saved blank string, distinct from
-a missing following STRING record, and no longer triggers a spurious write.
-
-`xlsx-272` is reviewed in `tools/native_office_evidence_reviews.json`. Native tests
-cover explicit VBA package retention/removal and saved control-state edits while
-preserving linked cells and unrelated controls. Macro execution, ActiveX activation
-and trusted-host behavior remain outside the supported API.
-
-xlsx-267 is reviewed as an explicit Python/external-code-service boundary. Library-
-authored Python-part and PY-formula derivatives of native XLSX/XLSM parents retain
-opaque script/relationship bytes through ordinary edits. Auto/Eager uncached PY
-evaluation returns the exact unsupported calculation error. This does not qualify a
-native-authored Python specimen, typed Python model or execution.
-
-Native Transitional, Strict and macro-workbook parents now qualify shared Custom XML
-graph lifecycle operations and preservation. Rejected insertions retain both prior
-items and source preconditions; commit normalizes catalog order while staged
-ordinals remain usable. Properties removal now clears the stale part target as well
-as its relationship/value. Save/reopen, inverse, stale-source and exact payload-
-budget checks pass. Owned relationship/content-type XML may normalize, with complete
-effective-graph and all data-part/unowned-member preservation checked. Additions are
-library derivatives, and schemas are never fetched or executed.
-
-Native-parent threaded-comment regressions now qualify every model field and
-UTF-16 mention ranges through both readers, ordinary cell-edit preservation,
-protected-sheet refusal and external-target admission. A missing text element with
-mentions previously escaped validation in both the parser and model/writer path;
-both now return the same typed Invalid reason. Text remains optional for comments
-without mentions. The historical xlsx-220 authoring status stays unchanged, and
-these explicit derivatives do not claim native collaboration-service acceptance.
-The former blanket package CRUD/legacy-placeholder claim is corrected to match
-the public API; bounded codec authoring is not a package thread transaction.
-
-Native-parent task-pane tests qualify the public package owner on ordinary and
-macro-enabled sources: two-pane lifecycle, inert provider/binding/custom-function
-metadata, shared snapshot bytes, opaque extension retention, semantic no-op and
-stale/resource-collision refusals. File reopen/replay/inverse retains all data
-parts and complete effective graphs; owned root-relationship/content-type XML may
-normalize during generic replay. Additions are explicit library derivatives, with
-no add-in activation, worksheet binding resolution or fresh Office validation.
-The same lifecycle also runs on the native Strict workbook.
+| Feature family exposed by [MS-XLSX] | Status | Read | Write |
+| --- | --- | --- | --- |
+| Rich values and modern rich-data objects | 🟡 | ✅ | ✅ |
+| Feature property bags and checkbox/XF-control extensions | 🟡 | ✅ | ✅ |
+| Python in Excel and external code services | ❌ | ❌ | ❌ |
+| Complete PivotTable refresh/calculation | ❌ | ❌ | ❌ |
+| Complete chart/drawing rendering and extension grammar | ❌ | ❌ | ❌ |
+| Complete Excel formula evaluation | ❌ | ❌ | ❌ |
+| External-link, connection, query, DDE, OLE, and add-in execution | ❌ | ❌ | ❌ |
+| Macro execution and trusted ActiveX behavior | ❌ | ❌ | ❌ |
+| Certificate trust and revocation | ❌ | ❌ | ❌ |
