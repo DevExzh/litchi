@@ -182,6 +182,65 @@ fn numbering_snapshot_can_add_and_remove_a_prefixed_extension_without_reformatti
 }
 
 #[test]
+fn clearing_restart_attributes_removes_both_quotes_and_preserves_neighboring_xml() {
+    for quote in ['\'', '"'] {
+        for value in ["0", "true", "on"] {
+            for following in ["", " w:foo='keep'", "\n w:foo = \"keep\""] {
+                let attribute = format!("w12:restartNumberingAfterBreak = {quote}{value}{quote}");
+                let source_xml = numbering_xml(&format!(
+                    "<w:abstractNum w:abstractNumId='1' {attribute}{following}><x:future xmlns:x='urn:future'/></w:abstractNum>"
+                ));
+                let source = Snapshot::from_xml(source_xml.as_bytes().to_vec()).unwrap();
+                let mut edit = source.edit();
+                edit.clear_restart_numbering_after_break(1).unwrap();
+                let commit = edit.commit().unwrap();
+                assert_eq!(
+                    commit.snapshot().restart_numbering_after_break(1).unwrap(),
+                    None
+                );
+                assert_eq!(
+                    commit.snapshot().xml_bytes(),
+                    source_xml.replace(&attribute, "").as_bytes()
+                );
+                let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+                assert_eq!(restored.xml_bytes(), source.xml_bytes());
+            }
+        }
+    }
+}
+
+#[test]
+fn clearing_multiple_restart_attributes_uses_source_ranges_in_reverse_order() {
+    let source_xml = numbering_xml(
+        r#"<w:abstractNum w:abstractNumId="1" w12:restartNumberingAfterBreak="false"/><w:abstractNum w12:restartNumberingAfterBreak='true' w:abstractNumId="2"/>"#,
+    );
+    let source = Snapshot::from_xml(source_xml.as_bytes().to_vec()).unwrap();
+    let mut edit = source.edit();
+    edit.clear_restart_numbering_after_break(1).unwrap();
+    edit.clear_restart_numbering_after_break(2).unwrap();
+    let commit = edit.commit().unwrap();
+    for id in [1, 2] {
+        assert_eq!(
+            commit.snapshot().restart_numbering_after_break(id).unwrap(),
+            None
+        );
+    }
+    let expected = source_xml
+        .replace(r#"w12:restartNumberingAfterBreak="false""#, "")
+        .replace("w12:restartNumberingAfterBreak='true'", "");
+    assert_eq!(commit.snapshot().xml_bytes(), expected.as_bytes());
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .xml_bytes(),
+        source.xml_bytes()
+    );
+}
+
+#[test]
 fn numbering_snapshot_rejects_invalid_extension_scope_and_stale_edits_atomically() {
     let invalid_value = format!(
         r#"<w:numbering xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12"><w:abstractNum w:abstractNumId="1" w12:restartNumberingAfterBreak="sometimes"/></w:numbering>"#

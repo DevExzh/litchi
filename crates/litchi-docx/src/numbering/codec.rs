@@ -1207,7 +1207,9 @@ pub(crate) fn rewrite_restart_numbering_after_break(
             }),
             (Some(attribute), None) => edits.push(Edit {
                 start: attribute.name_start,
-                end: attribute.value_end,
+                // value_end points at the closing quote, which must leave
+                // with the attribute. Keep the surrounding source whitespace.
+                end: attribute.value_end + 1,
                 replacement: Vec::new(),
             }),
             (None, Some(value)) => {

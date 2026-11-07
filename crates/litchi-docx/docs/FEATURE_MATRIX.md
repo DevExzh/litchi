@@ -306,3 +306,32 @@ inventory retains paragraph boundaries, whitespace, tabs, breaks, references
 and CDATA while excluding nested drawing stories. Drawing scans reject
 truncated/deep children. This remains a flat inventory: it does not establish
 group-child hierarchy/editing, page-position resolution or rendering coverage.
+
+## Native numbering and data-store qualification
+
+`tests/microsoft_office_native_numbering_stores.rs` covers the native text
+structure DOCX and math/navigation DOCX/DOTX. Numbering assertions pin all nine
+saved decimal/bullet levels, their paragraph bindings and the explicit false
+Word 2012 restart policy. Policy updates, clearing to absence, recreation,
+failure atomicity, file reopen and inverse preserve all unrelated bytes.
+Clearing the attribute includes its closing quote; focused tests also cover
+both quote styles, neighboring attributes and multiple definition edits. Common
+formats here do not establish the full Microsoft extended-format enumeration or
+computed numbering behavior.
+
+The two math/navigation files contain empty APA bibliography stores with distinct
+item GUIDs, an inert selected-style path, Version 6 metadata and one bibliography
+schema reference. Native tests verify those stored values and graph identities;
+positive source-entry CRUD adds Litchi-authored book/person/report/corporate data.
+Duplicate tags preserve staged work, root metadata survives canonical XML output,
+and inverse patches restore original source payloads. Canonical output can omit
+redundant namespace declarations; this is not native citation authoring or field
+refresh evidence.
+
+Custom XML tests add/update/replace/remove a second unbound item and remove the
+native unbound store, checking orphan collection, case-insensitive identities,
+failed-call atomicity, file reopen and graph-aware inverses. Native bibliography,
+document, numbering and cached field data remain unchanged outside the intended
+owner. Relationship XML may be reserialized with equivalent attributes. These
+assertions do not claim native SDT bindings, schema/style execution, bibliography
+regeneration or fresh Word reopen.

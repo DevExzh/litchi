@@ -7285,6 +7285,106 @@
         "Verify native video shape ID 4 on slide 2, then add seven typed trigger/play/pause/seek/resume/stop/null records with exact IDs/times. Updates, empty-list refusal, removal, file reopen, stale rejection and inverses preserve an existing Litchi laser trace, native creation IDs, shape XML and all media/package payloads."
       ],
       "scope_limit": "Events are Litchi-authored native-source derivatives. Typed inert values and preservation are tested; native event recording, playback, event dispatch and temporal/media execution validation are not claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_numbering_stores",
+      "name": "native_numbering_definitions_resolve_exact_levels_paragraphs_and_restart_state",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-105",
+        "docx-110"
+      ],
+      "assertions": [
+        "Three native numbering parts expose one definition/instance, nine exact decimal or bullet levels, saved level text, start/suffix/restart values, and the correct paragraph-to-instance/level bindings. Word 2012 restartNumberingAfterBreak is explicitly false; setting the same value is an exact no-op."
+      ],
+      "scope_limit": "Only saved common decimal/bullet formats and restart metadata are evidenced. This does not establish the complete Microsoft extended-number-format enumeration, label generation, style resolution or section-restart execution."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_numbering_stores",
+      "name": "native_restart_attribute_crud_preserves_list_definitions_and_failed_edits",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-105"
+      ],
+      "assertions": [
+        "Set true, clear to absent, recreate false and reset on native sources. An invalid definition ID preserves the prior staged change. Native change output is exactly the original numbering XML with the intended scalar replacement; all other members, definition children and durable IDs remain exact. File reopen, forward replay, stale rejection and inverse pass."
+      ],
+      "scope_limit": "Inert restart-policy metadata CRUD; no numbering or pagination engine result and no fresh Word reopen is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_numbering_stores",
+      "name": "native_bibliography_stores_retain_exact_apa_metadata_and_distinct_item_ids",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-115",
+        "docx-119"
+      ],
+      "assertions": [
+        "Native DOCX/DOTX stores retain distinct saved item GUIDs, main-document/data/properties part identities, internal relationships, bibliography schema reference, APA selected-style path/name and Version 6 metadata. Native source lists are empty. Typed no-ops preserve the archive, including case-insensitive Custom XML item lookup."
+      ],
+      "scope_limit": "Positive native store metadata/topology, not native-authored bibliography source entries or evaluated citations. The style path and schema URI remain inert."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_numbering_stores",
+      "name": "native_bibliography_source_crud_preserves_style_owner_and_unrelated_parts",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-115"
+      ],
+      "assertions": [
+        "Add a typed book source with person, locale/year, publisher and escaped Unicode custom field to each native empty store; reject duplicate tags without losing staged work. Replace it, add a corporate-author report and remove both. File reopen, forward replay, stale rejection and inverse preserve root metadata, store identity and every unrelated payload."
+      ],
+      "scope_limit": "Source entries are Litchi-authored derivatives. Canonical bibliography XML may omit redundant namespace declarations; metadata and typed values are asserted and inverses restore exact payloads. No citation matching, XSLT/style loading or field refresh occurs."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_numbering_stores",
+      "name": "native_custom_xml_crud_keeps_the_bibliography_owner_and_staged_payloads",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-119"
+      ],
+      "assertions": [
+        "Add a second inert Custom XML item, reject duplicate identity atomically, update its payload, replace payload/schema metadata and remove its graph. File reopen, forward replay, stale refusal and inverse preserve the native bibliography owner and unrelated document parts. Relationship serialization differences are checked for complete graph equality."
+      ],
+      "scope_limit": "Generic unbound Custom XML item CRUD on native-source packages only; native SDT bindings, checksum semantics and schema execution are not established."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_numbering_stores",
+      "name": "native_bibliography_store_removal_collects_only_its_unbound_graph",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-119"
+      ],
+      "assertions": [
+        "Remove the native unbound bibliography item via case-insensitive identity. Only its data/properties parts and relationships/content-types change; all document, field, numbering and other payloads remain exact. Save/reopen and inverse restore the original payloads and graph."
+      ],
+      "scope_limit": "Unbound store removal only. No content-control dependency removal or citation regeneration is claimed."
     }
   ]
 }
