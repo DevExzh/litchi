@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "737510f36fe73662c0ae8aba2ea10e02c68b0432",
+  "base_commit": "dd1d898ee467806bb46963135ec6e2d7525f0a29",
+  "problem": "The native XLS custom validation rule retained its PtgRefN tokens but exposed no formula text because rendering lacked a target-cell origin. Native workbook structure protection also failed to prevent worksheet rename, although insertion/removal already enforced the same protection policy. Native defined-name, validation, protection and Mac property-set scopes needed semantic and preservation coverage.",
+  "changes": [
+    "Render DV formulas after validating their ranges, using the top-left of the first stored range as the documented inert preview origin. Give PtgRefN/PtgAreaN a separate origin so ordinary PtgRef/PtgArea coordinates stay literal. Preserve existing shared-formula behavior, rendering bounds, unresolved-name fallback and raw token bytes.",
+    "Reuse the existing protected/shared workbook tab check for changed worksheet renames. Keep exact same-name renames as no-ops; worksheet-content protection alone does not prevent a tab rename.",
+    "Add six native tests, two formula-preview unit regressions and one protection integration regression. Update the assertion index and affected feature-matrix notes."
+  ],
+  "verification_scope": {
+    "defined_names": "excel-interaction-print.xls retains exactly FixtureAmounts at workbook scope, Print_Area and Print_Titles at worksheet 0 scope. Record indices, built-in identity, ordinary-name flags, exact token bytes and rendered references are pinned. Print titles retain the BIFF8 whole-column/whole-row extents through row 65536 and column IV. These are reads and preservation checks, not new native name authoring.",
+    "validation_inventory": "The native Sheet1 DVAL declares seven rules: whole B2:B5 (1..10), explicit list C2:C5 (Open/Closed/Hold with embedded NUL token separators), date D2:D5 (46023..46387), decimal E2:E5 (0..100), time G2:G4 (0.375..0.75), text length H2:H4 (3..5), and custom I2:I4. All flags, source-order ranges, prompt/error metadata and formulas are asserted. The whole rule has Quantity input and Invalid quantity titles, no prompt body, and its exact saved error text.",
+    "relative_formula_fix": "The custom native formula now renders as =(MOD(I2,2)=0) with its original 15 token bytes untouched and stored values 2/4/6 unchanged. The first range is a library preview convention; formula execution would use the cell being validated. Unit regressions distinguish ordinary coordinate references from N-token offsets, preserve first-range order despite a later A1 range, cover mixed absolute/relative references and areas, verify BIFF wraparound to IV65536, and retain a valid unresolved PtgNameV when no workbook context exists.",
+    "protection": "The native workbook has passwordless structure protection, with window/revision/write protection off, zero workbook/revision verifiers and no file-sharing metadata. Its sheet/object/scenario flags are on, with no sheet password. Changed tab rename now returns the typed Protected refusal and leaves publication exact; exact same-name rename remains a no-op. A synthetic workbook verifies that sheet-only protection still allows rename and that the protected sheet and inverse remain intact.",
+    "mac_properties": "Three native XLS sources retain author/modifier Ryker Zhu, application Microsoft Macintosh Excel, their exact saved creation/modification timestamps, empty company, security 0 and codepage 10000. The interaction/print file retains a 140-byte reserved _PID_HLINKS blob containing the inert fixture URL. The metadata and macro fixtures have no custom-property section. No-op metadata transactions preserve exact source bytes.",
+    "metadata_crud": "Across interaction/print, metadata and recorded-macro workbooks, create a title and custom Boolean, update the Boolean, then remove the authored values. A mixed unsupported identifier update fails atomically after prior changes. Each commit saves/reopens, forward-replays exactly, rejects stale replay and inverts to the exact source CFB bytes. Workbook bytes, names, validation records, protection flags, VBA/other streams, root CLSID, standard document-summary values and existing custom values remain preserved.",
+    "unicode_custom_properties": "Adding the Chinese custom property 审核=完成 to the native MacExcel interaction file switches only the custom section to UTF-16. The complete SummaryInformation stream stays byte-identical; standard summary/document-summary snapshots, native reserved hyperlink bytes and other streams remain exact. File reopen and inverse pass.",
+    "specification_basis": "Read-only research used MS-XLS 2.4.95 Dv, 2.5.198.9 DVParsedFormula, 2.5.198.88 PtgRefN, 2.5.198.31 PtgAreaN, 2.5.198.109 RgceLoc, 2.5.198.111 RgceLocRel and 2.4.207 Protect. The reference structures distinguish literal coordinates from offsets relative to an evaluation cell; the implementation only renders a documented preview. No production/test code references the research checkout.",
+    "limits": "No validation rule is executed, no cell value is rejected by an Excel-compatible validator, and no formula is recalculated. Native name/validation CRUD is not claimed. Protection assertions qualify workbook tab rename; they do not claim a general worksheet authorization policy for all scalar edits. New title/custom-property values are Litchi-authored derivatives. No hyperlink navigation, macro execution, fresh Excel reopen or native UI validation occurred."
+  },
+  "results": {
+    "new_native_tests": 6,
+    "new_unit_regressions": 2,
+    "new_protection_integration_regressions": 1,
+    "xls_all_features_passed": 1952,
+    "ops_passed": 114,
+    "facade_passed": 21,
+    "rust_passed": 2087,
+    "rust_ignored": 1,
+    "python_passed": 75,
+    "ignored_reason": "The pre-existing write_every_feature diagnostic writes an evidence workbook and remains ignored.",
+    "count_note": "Totals sum full owner, operations and facade runs. Final 18 validation unit tests and 9 native/protection tests overlap the full owner suite and are excluded. Those final reruns cover the refined unresolved-name test and the added exact SummaryInformation-stream assertion; runtime production code was unchanged after the full suite.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 294,
+      "indexed_tests": 398,
+      "reviewed_native_fixture_gaps": 6,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 294,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 30,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 37,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_native_fixture_gap_requires_followup": 6,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-full.log",
+        "bytes": 174114,
+        "sha256": "e52a98765e8bf0321736b2ef88979c784aab9bbe9514ad58ce7f18718c45342d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-full.log 2>&1",
+      "suites": 95,
+      "passed": 1952,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-ops.log",
+        "bytes": 28157,
+        "sha256": "3986134222c2a96564288ebf79943f6d3ef17482fb9fa4ac4cecee51cd6b43c2"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-ops.log 2>&1",
+      "suites": 13,
+      "passed": 114,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-facade.log",
+        "bytes": 19587,
+        "sha256": "70667ac7d72ad7f9d4e62f9699fb640787786cc33513dbe972537c056f398c86"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --lib data_validation::tests --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-unit-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-unit-final.log",
+        "bytes": 1958,
+        "sha256": "9116572f1ffb28890e05b8c5081cb4c35fd6592c9389e3155d7c281756d9f004"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --lib data_validation::tests --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-unit-final.log 2>&1",
+      "suites": 1,
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "overlaps_full_suite": true
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --test microsoft_office_native_names_validation --test xls_protection --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-native-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-native-final.log",
+        "bytes": 1361,
+        "sha256": "743ab56aa02a805399c2f766cf00106f71e929857b9329f936aaeb887341495b"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls --all-features --test microsoft_office_native_names_validation --test xls_protection --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-native-final.log 2>&1",
+      "suites": 2,
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "overlaps_full_suite": true
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-clippy.log",
+        "bytes": 136,
+        "sha256": "3022d27c62f08a97013afaef2ce77d219746f8e7e66099ad1192b8d0da5fbf90"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-python.log",
+        "bytes": 667,
+        "sha256": "82cfb90c7658d30b2b57fc2ece5019354f3103920bf713aa7e97c64a084856bc"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-xls-rules-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-coverage.json",
+        "bytes": 971183,
+        "sha256": "35a6be2d2ded90ce3b3eb6543840e275a6a7041ed584cb5ae61e0fc46e020810"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-coverage.json 2>&1"
+    }
+  ],
+  "initial_reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-xls-rules-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-rules-reproduction.log",
+        "bytes": 13973,
+        "sha256": "8db1fc1306c540cb9c9e3f8be10dbb88c403eaa60d6addfcecaca7c60654546f"
+      },
+      "note": "Before the DV fix, the native custom-rule regression expected =(MOD(I2,2)=0) but received None. Raw native tokens, ranges and saved fields were captured without altering fixture bytes."
+    },
+    {
+      "artifact": {
+        "file_name": "native-xls-protection-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-xls-protection-reproduction.log",
+        "bytes": 1025,
+        "sha256": "90a944329f4ed9723837e6865a1ef71fc574718feb4d4d69d6cb8ba95a3cc03f"
+      },
+      "note": "Before the rename fix, native passwordless workbook structure protection still allowed staging a changed worksheet name. The permanent test expects the same typed Protected policy used by other tab-structure operations."
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 checks and git diff --check/staged checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit; the new test source has mode 100644 and no executable was staged.",
+    "All three pre-existing untracked hashes remain unchanged; the 75 Python checks include integrity of all 139 native fixtures and four import assets.",
+    "Clippy passed with -D warnings on the final source. Existing vendored warnings in cross-crate builds remain unchanged."
+  ],
+  "goal_status": "active; 294 of 494 feature rows have partial assertions, 398 tests are indexed and six reviewed fixture gaps remain explicit. Remaining operation/bounded/UI/external/unsupported and partial-scope reviews are still required."
+}
