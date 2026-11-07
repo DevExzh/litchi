@@ -10298,6 +10298,87 @@
         "Changing an explicit native-parent catalog from Transitional to Strict and back retains every typed value and the opaque children's original namespace context. File reopen, source-checked replay and inverse preserve the complete effective graph and every unowned part."
       ],
       "scope_limit": "Conformance changes apply to the XML-map owner and its relationship only; they do not convert the complete native workbook or establish native Excel acceptance."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_xlsx_custom_data_catalog_edits_keep_opaque_payloads_and_native_parts",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-201"
+      ],
+      "assertions": [
+        "Custom Data creation, exact opaque payload/extension readback, duplicate-ID atomicity, no-op, rename, replacement, stale-patch refusal and removal retain physical identities and native parts through save/reopen/replay/inverse."
+      ],
+      "scope_limit": "Library-authored inert storage on native parents; no native add-in producer payload or runtime execution is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_xlsx_custom_data_reference_rename_retarget_and_detach_preserve_connections",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-201"
+      ],
+      "assertions": [
+        "An explicit embeddedDataId on the native type-5 connection follows rename, referenced-removal refusal, retarget and detach, preserving all original connection XML outside that attribute and all unowned parts."
+      ],
+      "scope_limit": "Only the supported embedded-data reference owner is edited; native text/OLE DB connection settings and query caches remain inert. No retrieval or refresh."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_xlsx_cell_smart_tag_lifecycle_preserves_worksheet_and_inert_native_parts",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-216"
+      ],
+      "assertions": [
+        "Exact Unicode properties, type IDs and deleted/XML flags survive native-parent smart-tag create/read/no-op/update/remove, save/reopen, source-checked replay and inverse; removing the collection restores the native worksheet bytes."
+      ],
+      "scope_limit": "Library-authored cell annotations, not native recognizer output. No recognizer or smart-tag action is loaded or executed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_xlsx_phonetic_properties_read_defaults_and_survive_cell_publication",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-217"
+      ],
+      "assertions": [
+        "All four phonetic types and alignments, including defaults, read through the worksheet owner and survive Z121=72 cell publication; only the expected calculation-chain invalidation and recalculation flags accompany the edit, with complete graph/data preservation on inverse."
+      ],
+      "scope_limit": "Explicit worksheet-property derivatives exercise the read model and preservation. This is not native East Asian authoring, phonetic-run generation or a dedicated phonetic-properties editor."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_xlsx_malformed_phonetic_properties_return_specific_reader_errors",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-217"
+      ],
+      "assertions": [
+        "Missing fontId and unknown phonetic type/alignment return exact Invalid reader reasons instead of an absent/default fallback, preserving the original native source."
+      ],
+      "scope_limit": "Malformed native-parent derivatives test reader admission; no invalid bytes are attributed to Microsoft Office."
     }
   ]
 }
