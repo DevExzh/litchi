@@ -32,7 +32,7 @@ pub(crate) fn refresh(
     if !options.writes_cache() {
         return Ok((Vec::new(), workbook_summary(file, &report, false)?));
     }
-    let names = file.workbook()?.worksheet_names()?;
+    let names = crate::calc::sheet_names(file)?;
     handle.check_source()?;
     let result = (|| {
         handle.admit_edit_for_write()?;

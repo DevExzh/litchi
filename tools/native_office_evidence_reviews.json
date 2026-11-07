@@ -976,8 +976,8 @@
       ],
       "reason": "The owner matrix disclaims complete Excel evaluation. This does not mean that the optional litchi-ops/litchi-eval bounded evaluator is absent or that supported calculations may return incorrect values.",
       "required_evidence": "Native cache/computed comparisons, explicit typed refusals and unchanged-source assertions for the implemented evaluator, with complete Excel semantics kept outside the claim.",
-      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference.",
-      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context.",
+      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference. Native refresh tests now pin complete tab ordinals, cross-sheet references, exact cache-only publication, limits and inverse. Inline XLS blank strings are preserved as saved values.",
+      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context. File::refresh can explicitly write supported stale formula caches in one atomic unified result; non-worksheet tab positions stay intact.",
       "unsupported_scope": "Complete Excel recalculation/dependency graphs, spill publication, every formula dialect, external/provider/clock/random execution, and arbitrary cache synchronization or native-app equivalence are not promised. Structured references require an explicitly registered table; the operations grid does not infer that graph.",
       "checks": [
         {
@@ -1029,6 +1029,38 @@
           "target": "microsoft_office_native_calc",
           "name": "native_evaluation_limits_and_volatile_derivative_boundaries_are_explicit",
           "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_chart_tabs_keep_cross_sheet_calculation_and_refresh_positions",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_workbook_cache_refresh_writes_only_stale_results_including_after_chart_tabs",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
             "xls",
             "xlsx",
             "xlsb",
@@ -1055,8 +1087,8 @@
       ],
       "reason": "The owner matrix disclaims complete Excel evaluation. This does not mean that the optional litchi-ops/litchi-eval bounded evaluator is absent or that supported calculations may return incorrect values.",
       "required_evidence": "Native cache/computed comparisons, explicit typed refusals and unchanged-source assertions for the implemented evaluator, with complete Excel semantics kept outside the claim.",
-      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference.",
-      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context.",
+      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference. Native refresh tests now pin complete tab ordinals, cross-sheet references, exact cache-only publication, limits and inverse. Inline XLS blank strings are preserved as saved values.",
+      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context. File::refresh can explicitly write supported stale formula caches in one atomic unified result; non-worksheet tab positions stay intact.",
       "unsupported_scope": "Complete Excel recalculation/dependency graphs, spill publication, every formula dialect, external/provider/clock/random execution, and arbitrary cache synchronization or native-app equivalence are not promised. Structured references require an explicitly registered table; the operations grid does not infer that graph.",
       "checks": [
         {
@@ -1108,6 +1140,38 @@
           "target": "microsoft_office_native_calc",
           "name": "native_evaluation_limits_and_volatile_derivative_boundaries_are_explicit",
           "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_chart_tabs_keep_cross_sheet_calculation_and_refresh_positions",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_workbook_cache_refresh_writes_only_stale_results_including_after_chart_tabs",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
             "xls",
             "xlsx",
             "xlsb",
@@ -1134,8 +1198,8 @@
       ],
       "reason": "The owner matrix disclaims complete Excel evaluation. This does not mean that the optional litchi-ops/litchi-eval bounded evaluator is absent or that supported calculations may return incorrect values.",
       "required_evidence": "Native cache/computed comparisons, explicit typed refusals and unchanged-source assertions for the implemented evaluator, with complete Excel semantics kept outside the claim.",
-      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference.",
-      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context.",
+      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference. Native refresh tests now pin complete tab ordinals, cross-sheet references, exact cache-only publication, limits and inverse. Inline XLS blank strings are preserved as saved values.",
+      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context. File::refresh can explicitly write supported stale formula caches in one atomic unified result; non-worksheet tab positions stay intact.",
       "unsupported_scope": "Complete Excel recalculation/dependency graphs, spill publication, every formula dialect, external/provider/clock/random execution, and arbitrary cache synchronization or native-app equivalence are not promised. Structured references require an explicitly registered table; the operations grid does not infer that graph.",
       "checks": [
         {
@@ -1192,6 +1256,38 @@
             "xlsb",
             "eval"
           ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_chart_tabs_keep_cross_sheet_calculation_and_refresh_positions",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_workbook_cache_refresh_writes_only_stale_results_including_after_chart_tabs",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
         }
       ],
       "evidence_refs": [
@@ -1200,96 +1296,6 @@
         "crates/litchi-eval/src/lib.rs"
       ],
       "scope_limit": "An explicit limit on full Excel compatibility, not positive semantic coverage of this universal row. Concrete native assertions are indexed under the corresponding formula/cache/link rows. Historical authoring status and source fixtures remain unchanged."
-    },
-    {
-      "feature_row": "doc-038",
-      "classification": "explicit_scope_boundary",
-      "fixtures": [
-        "word/word-mailmerge-fields.doc",
-        "word/word-math-navigation.doc",
-        "word/word-layout-extensions.doc"
-      ],
-      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
-      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
-      "supported_scope": "Typed field instructions, switches, bookmark/source identities and producer-saved cached results.",
-      "unsupported_scope": "Resolving fields against bookmarks/pages/styles/documents/databases/prompts or host identity, refreshing fields and generating navigation results.",
-      "checks": [
-        {
-          "crate": "litchi-ops",
-          "target": "microsoft_office_native_runtime_boundaries",
-          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
-          "required_features": [
-            "doc",
-            "docx",
-            "rtf",
-            "ppt",
-            "pptx",
-            "xls",
-            "xlsx",
-            "xlsb",
-            "encryption",
-            "eval"
-          ]
-        },
-        {
-          "crate": "litchi-doc",
-          "target": "microsoft_office_native",
-          "name": "native_word_mail_merge_retains_original_source_path_and_cached_records"
-        }
-      ],
-      "evidence_refs": [
-        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
-        "crates/litchi-ops/src/capabilities.rs",
-        "crates/litchi-ops/src/read.rs",
-        "crates/litchi-ops/src/capabilities/m4.rs"
-      ],
-      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
-    },
-    {
-      "feature_row": "doc-066",
-      "classification": "explicit_scope_boundary",
-      "fixtures": [
-        "word/word-mailmerge-fields.doc",
-        "word/word-math-navigation.doc",
-        "word/word-layout-extensions.doc"
-      ],
-      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
-      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
-      "supported_scope": "Stored TOC/sequence/page and other field metadata and cached text are preserved as document data.",
-      "unsupported_scope": "Calculating fields or generating TOC/TOA/INDEX/statistics/page/sequence results.",
-      "checks": [
-        {
-          "crate": "litchi-ops",
-          "target": "microsoft_office_native_runtime_boundaries",
-          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
-          "required_features": [
-            "doc",
-            "docx",
-            "rtf",
-            "ppt",
-            "pptx",
-            "xls",
-            "xlsx",
-            "xlsb",
-            "encryption",
-            "eval"
-          ]
-        },
-        {
-          "crate": "litchi-doc",
-          "target": "microsoft_office_native",
-          "name": "native_word_mail_merge_retains_original_source_path_and_cached_records"
-        }
-      ],
-      "evidence_refs": [
-        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
-        "crates/litchi-ops/src/capabilities.rs",
-        "crates/litchi-ops/src/read.rs",
-        "crates/litchi-ops/src/capabilities/m4.rs"
-      ],
-      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
     },
     {
       "feature_row": "doc-061",
@@ -1385,8 +1391,8 @@
       ],
       "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
       "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
-      "supported_scope": "Source-preserving section/layout metadata and saved caption fields; ordinary text/outline/statistics projections.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior. Current refresh coverage is separate from worksheet evaluation: bounded DOC/DOCX field and TOC refresh exists, while native merge fields remain unsupported; RTF/PPT have no refresh adapter, and PPTX changed-field MCE limits are explicit.",
+      "supported_scope": "Source-preserving section/layout metadata and saved caption fields; ordinary text/outline/statistics projections. Bounded TOC refresh can reuse saved page numbers or refuse/mark missing ones; it cannot calculate pagination.",
       "unsupported_scope": "Word-compatible line breaking, pagination, page-field evaluation and visual rendering.",
       "checks": [
         {
@@ -1427,35 +1433,11 @@
           "crate": "litchi-docx",
           "target": "microsoft_office_native_layout",
           "name": "native_caption_fields_keep_sequence_identifiers_and_cached_results"
-        }
-      ],
-      "evidence_refs": [
-        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
-        "crates/litchi-ops/src/capabilities.rs",
-        "crates/litchi-ops/src/read.rs",
-        "crates/litchi-ops/src/capabilities/m4.rs"
-      ],
-      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
-    },
-    {
-      "feature_row": "docx-124",
-      "classification": "explicit_scope_boundary",
-      "fixtures": [
-        "word/word-mailmerge-fields.docx",
-        "word/word-math-navigation.docx",
-        "word/word-layout-extensions.docx",
-        "word/word-layout-extensions.dotx"
-      ],
-      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
-      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
-      "supported_scope": "Typed field delimiters/instructions/switches, saved SEQ caption results and mail-merge IF/merge/counter caches.",
-      "unsupported_scope": "Recalculating, resolving or refreshing Word fields and regenerated tables/indexes.",
-      "checks": [
+        },
         {
           "crate": "litchi-ops",
-          "target": "microsoft_office_native_runtime_boundaries",
-          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_toc_refresh_reuses_bookmarks_and_saved_pages_and_refuses_unknown_pages",
           "required_features": [
             "doc",
             "docx",
@@ -1465,19 +1447,8 @@
             "xls",
             "xlsx",
             "xlsb",
-            "encryption",
             "eval"
           ]
-        },
-        {
-          "crate": "litchi-docx",
-          "target": "microsoft_office_native_layout",
-          "name": "native_caption_fields_keep_sequence_identifiers_and_cached_results"
-        },
-        {
-          "crate": "litchi-docx",
-          "target": "microsoft_office_native_mail_merge",
-          "name": "native_mail_merge_settings_and_field_caches_are_inert"
         }
       ],
       "evidence_refs": [
@@ -1498,7 +1469,7 @@
       ],
       "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
       "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior. Current refresh coverage is separate from worksheet evaluation: bounded DOC/DOCX field and TOC refresh exists, while native merge fields remain unsupported; RTF/PPT have no refresh adapter, and PPTX changed-field MCE limits are explicit.",
       "supported_scope": "Bounded mail-merge settings/source metadata CRUD; native active-record updates preserve complete document XML and every unrelated package member.",
       "unsupported_scope": "Opening/contacting a data source, executing SQL/query/provider logic, consuming credentials and generating mail-merge output.",
       "checks": [
@@ -1528,6 +1499,22 @@
           "crate": "litchi-docx",
           "target": "microsoft_office_native_mail_merge",
           "name": "native_mail_merge_update_clear_and_replay_preserve_body_and_other_parts"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
         }
       ],
       "evidence_refs": [
@@ -1855,7 +1842,7 @@
       ],
       "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
       "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior. Current refresh coverage is separate from worksheet evaluation: bounded DOC/DOCX field and TOC refresh exists, while native merge fields remain unsupported; RTF/PPT have no refresh adapter, and PPTX changed-field MCE limits are explicit.",
       "supported_scope": "Native shape/presentation data, timing/transition metadata and bounded source-preserving duration/advance edits.",
       "unsupported_scope": "Computing effective layout, rendering slides/shapes, playing transitions or executing animation timelines.",
       "checks": [
@@ -1880,6 +1867,22 @@
           "crate": "litchi-ppt",
           "target": "microsoft_office_native_metadata",
           "name": "native_animation_duration_edit_preserves_targets_builds_and_other_slides"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
         }
       ],
       "evidence_refs": [
@@ -1911,8 +1914,8 @@
       ],
       "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
       "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
-      "supported_scope": "Supported package/shape/media/animation metadata with source-preserving edits and saved target/graph data.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior. Current refresh coverage is separate from worksheet evaluation: bounded DOC/DOCX field and TOC refresh exists, while native merge fields remain unsupported; RTF/PPT have no refresh adapter, and PPTX changed-field MCE limits are explicit.",
+      "supported_scope": "Supported package/shape/media/animation metadata with source-preserving edits and saved target/graph data. Bounded number/date field-cache refresh is supported within native text-owner limits, with an explicit clock for dates.",
       "unsupported_scope": "Slide rendering, effective layout, media/animation playback, link/action activation and macro/add-in execution.",
       "checks": [
         {
@@ -1941,6 +1944,22 @@
           "crate": "litchi-pptx",
           "target": "microsoft_office_native",
           "name": "native_powerpoint_video_uses_the_embedded_office_resource_and_reads_caption_cues"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_slide_number_and_date_derivatives_refresh_with_an_explicit_clock",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
         }
       ],
       "evidence_refs": [
@@ -1972,7 +1991,7 @@
       ],
       "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
       "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
-      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior. Current refresh coverage is separate from worksheet evaluation: bounded DOC/DOCX field and TOC refresh exists, while native merge fields remain unsupported; RTF/PPT have no refresh adapter, and PPTX changed-field MCE limits are explicit.",
       "supported_scope": "Modern layout/direction metadata, paragraph text and separately owned field instructions/results; saved header/footer PAGE and mail-merge IF caches remain data.",
       "unsupported_scope": "Word-compatible rendering, pagination, shaping and field/formula calculation. RTF paragraph text does not incorporate separately owned field result text.",
       "checks": [
@@ -2019,6 +2038,22 @@
           "crate": "litchi-rtf",
           "target": "microsoft_office_native",
           "name": "native_word_mail_merge_preserves_empty_file_table_and_inert_source"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
         }
       ],
       "evidence_refs": [
@@ -2298,6 +2333,154 @@
         "crates/litchi-sign/tests/real_package_signatures.rs"
       ],
       "scope_limit": "An explicit trust boundary, not positive semantic coverage of PKI or a new native signed specimen. Generated signatures use disposable local keys; native-authored signature handoffs remain distinct. No trust lookup, revocation request or fresh native application validation is performed."
+    },
+    {
+      "feature_row": "xls-195",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-links-objects.xls",
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "reason": "The bounded evaluator/cache refresh is not an external-data or macro host. VBA and provider descriptors remain data; calculation of supported local formulas does not authorize execution or refresh of these targets.",
+      "required_evidence": "Native external-link refresh must preserve unsupported dependencies and exact source bytes; separate native VBA/connection tests must preserve opaque program/provider data at supported metadata operations.",
+      "observed_evidence": "Actual File::refresh with write_cache enabled reports the two native external references and their dependent formula Unsupported, with an exact no-op. Existing native VBA and connection/cache tests qualify passive inspection and bounded data edits. No macro or provider execution surface is inferred from these stored descriptors. Native macro-tab workbooks also refresh as exact no-ops without treating the macro sheet as a worksheet; direct macro-cell evaluation refuses.",
+      "supported_scope": "Inert VBA/connection/external-link metadata, cached results and supported source-preserving edits; bounded local formula calculation/cache publication remains a separate explicit operation.",
+      "unsupported_scope": "Macro/control/DDE/RTD/database/add-in execution, credentials or host-provider use, external workbook/resource fetching and connection/query refresh. No host runtime is supplied by the metadata owner.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_vba",
+          "name": "native_excel_biff_cell_edit_preserves_and_reopens_the_vba_project"
+        },
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_external_workbook_cache_exposes_both_source_cells_without_accessing_target"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs",
+        "crates/litchi-ops/src/refresh.rs",
+        "crates/litchi-ops/src/calc.rs"
+      ],
+      "scope_limit": "An explicit runtime boundary, not positive execution coverage or a native provider handoff. Native fixtures and historical authoring statuses remain unchanged; limited local cache writes must not be confused with external refresh."
+    },
+    {
+      "feature_row": "xlsx-271",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-connections.xlsx"
+      ],
+      "reason": "The bounded evaluator/cache refresh is not an external-data or macro host. VBA and provider descriptors remain data; calculation of supported local formulas does not authorize execution or refresh of these targets.",
+      "required_evidence": "Native external-link refresh must preserve unsupported dependencies and exact source bytes; separate native VBA/connection tests must preserve opaque program/provider data at supported metadata operations.",
+      "observed_evidence": "Actual File::refresh with write_cache enabled reports the two native external references and their dependent formula Unsupported, with an exact no-op. Existing native VBA and connection/cache tests qualify passive inspection and bounded data edits. No macro or provider execution surface is inferred from these stored descriptors. Native macro-tab workbooks also refresh as exact no-ops without treating the macro sheet as a worksheet; direct macro-cell evaluation refuses.",
+      "supported_scope": "Inert VBA/connection/external-link metadata, cached results and supported source-preserving edits; bounded local formula calculation/cache publication remains a separate explicit operation.",
+      "unsupported_scope": "Macro/control/DDE/RTD/database/add-in execution, credentials or host-provider use, external workbook/resource fetching and connection/query refresh. No host runtime is supplied by the metadata owner.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_vba",
+          "name": "native_excel_ooxml_vba_noop_remove_and_inverse_preserve_template_and_parts"
+        },
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_external_data",
+          "name": "native_connection_description_edit_keeps_import_data_and_mashup_payloads"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs",
+        "crates/litchi-ops/src/refresh.rs",
+        "crates/litchi-ops/src/calc.rs"
+      ],
+      "scope_limit": "An explicit runtime boundary, not positive execution coverage or a native provider handoff. Native fixtures and historical authoring statuses remain unchanged; limited local cache writes must not be confused with external refresh."
+    },
+    {
+      "feature_row": "xlsb-338",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-connections.xlsb"
+      ],
+      "reason": "The bounded evaluator/cache refresh is not an external-data or macro host. VBA and provider descriptors remain data; calculation of supported local formulas does not authorize execution or refresh of these targets.",
+      "required_evidence": "Native external-link refresh must preserve unsupported dependencies and exact source bytes; separate native VBA/connection tests must preserve opaque program/provider data at supported metadata operations.",
+      "observed_evidence": "Actual File::refresh with write_cache enabled reports the two native external references and their dependent formula Unsupported, with an exact no-op. Existing native VBA and connection/cache tests qualify passive inspection and bounded data edits. No macro or provider execution surface is inferred from these stored descriptors. Native macro-tab workbooks also refresh as exact no-ops without treating the macro sheet as a worksheet; direct macro-cell evaluation refuses.",
+      "supported_scope": "Inert VBA/connection/external-link metadata, cached results and supported source-preserving edits; bounded local formula calculation/cache publication remains a separate explicit operation.",
+      "unsupported_scope": "Macro/control/DDE/RTD/database/add-in execution, credentials or host-provider use, external workbook/resource fetching and connection/query refresh. No host runtime is supplied by the metadata owner.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_vba",
+          "name": "native_excel_binary_vba_noop_remove_and_inverse_preserve_all_other_members"
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_external_data",
+          "name": "native_connection_description_edit_keeps_text_records_in_their_original_scope"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs",
+        "crates/litchi-ops/src/refresh.rs",
+        "crates/litchi-ops/src/calc.rs"
+      ],
+      "scope_limit": "An explicit runtime boundary, not positive execution coverage or a native provider handoff. Native fixtures and historical authoring statuses remain unchanged; limited local cache writes must not be confused with external refresh."
     }
   ]
 }

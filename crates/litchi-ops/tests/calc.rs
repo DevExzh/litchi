@@ -32,7 +32,7 @@ fn computes_uncached_formulas_and_reads_literals() {
             .expect("formula")
             .set("/sheet[1]/A3", props! { "formula" => "A2/0" })
             .expect("division");
-        // The XLSB writer stores an empty string cache with a new formula, so
+        // XLS and XLSB writers store a blank string cache with a new formula, so
         // ask for recalculation in every format.
         let recalculate = Options::new().recalculate(true);
         let evaluated = file

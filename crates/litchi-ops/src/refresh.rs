@@ -6,8 +6,9 @@
 //! PPTX and ODP, and formula results in XLSX, XLSB and XLS (records 0279
 //! and 0295). Every field the
 //! refresh meets is reported in the [`Summary`] with a [`Status`]; the
-//! changed results are written in **one** atomic native commit, and a
-//! document whose results are all current is an exact no-op.
+//! changed results are published in one atomic unified operation (XLS may
+//! use several native chunks). A document whose supported results are all
+//! current is an exact no-op. Unsupported fields retain their saved results.
 //!
 //! ```
 //! # #[cfg(feature = "docx")]
@@ -73,7 +74,10 @@
 //! | ODP | as ODT, and `text:page-number` (the slide position) and `text:page-count` (the number of slides) on every slide and notes page |
 //! | XLSB, XLS | formula results as XLSX, written back with [`Options::write_cache`] as the formula records' cached results |
 //!
-//! PPT and RTF have no refresh adapter yet.
+//! PPT and RTF have no refresh adapter yet. Changed PPTX fields inherit the
+//! native text editor's markup profile: fields on slides requiring unsupported
+//! markup-compatibility branch selection refuse atomically, while unchanged
+//! fields can still be reported without a write.
 //!
 //! # Limits
 //!
@@ -447,7 +451,7 @@ impl Options {
         self
     }
 
-    /// Whether an XLSX refresh writes recalculated formula results back as
+    /// Whether an XLS/XLSX/XLSB refresh writes recalculated formula results back as
     /// the cells' cached values (off by default: a workbook refresh then
     /// only reports).
     #[must_use]
@@ -950,7 +954,7 @@ pub(crate) fn workbook_summary(
     report: &crate::calc::Report,
     written: bool,
 ) -> Result<Summary> {
-    let names = file.workbook()?.worksheet_names()?;
+    let names = crate::calc::sheet_names(file)?;
     Ok(Summary {
         fields: report
             .formulas()

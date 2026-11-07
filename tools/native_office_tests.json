@@ -8724,6 +8724,252 @@
         "xlsb",
         "sign"
       ]
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_blank_string_formula_cache_is_present_and_does_not_trigger_refresh",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141",
+        "xlsx-202",
+        "xlsx-204",
+        "xlsb-280",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "B18 is a present cached empty string through Auto/file and Eager/byte ingress in all three formats. Explicit cache refresh is an exact no-op on the unmodified native workbook."
+      ],
+      "scope_limit": "Blank-string cache and current-workbook behavior only; unsupported formulas remain reported rather than computed."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_chart_tabs_keep_cross_sheet_calculation_and_refresh_positions",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xls-138",
+        "xls-141",
+        "xlsx-198",
+        "xlsx-204",
+        "xlsb-279",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "The leading chart retains physical tab position zero; all 16 worksheet formulas are visited, with 14 on tab one and two on tab two. Sheet2!B3 computes its Sheet1 reference correctly, summaries use the correct name, and chart-cell targets refuse explicitly. An invalid chart-reference derivative cannot produce a numeric zero."
+      ],
+      "scope_limit": "Only supported worksheet formulas are evaluated; charts/macros retain catalog positions without becoming cell grids. Complete Excel evaluation is not claimed."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_caption_caches_refresh_in_doc_docx_and_templates_without_layout",
+      "fixtures": [
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "doc-037",
+        "doc-038",
+        "doc-066",
+        "docx-113",
+        "docx-124"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Native SEQ caches are initially current. Explicit stale-cache derivatives refresh Figure/Table results through both ingress routes, with one native commit, exact unowned streams/members, file reopen, forward replay and byte-exact inverse. DOCX output document XML returns to the original native bytes."
+      ],
+      "scope_limit": "Only the tested top-level SEQ fields and supported main-story refresh profile; stale caches are library derivatives. No pagination, complete Word field engine or native-app execution."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_toc_refresh_reuses_bookmarks_and_saved_pages_and_refuses_unknown_pages",
+      "fixtures": [
+        "word/word-math-navigation.docx"
+      ],
+      "feature_rows": [
+        "docx-113",
+        "docx-124"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Changing a native heading rebuilds its TOC using existing bookmarks and cached pages, while standalone PAGEREF remains NeedsLayout. Every byte outside the TOC owner and every other package member remains exact. A newly added heading refuses under Require-page policy without mutation, or adds one bookmark and one missing-page/dirty marker under Keep. Reopen and inverse pass."
+      ],
+      "scope_limit": "Main-story TOC profile only; cached page numbers are reused, never calculated. New heading/bookmark output is library-authored and fresh Word acceptance is not claimed."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_workbook_cache_refresh_writes_only_stale_results_including_after_chart_tabs",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141",
+        "xlsx-202",
+        "xlsx-204",
+        "xlsb-280",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "After a native-source scalar edit, report-only refresh is a no-op with six XLS or five XLSX/XLSB stale results. Explicit write-back updates the exact named cache locations, including the last worksheet; all unrelated package members remain exact and XLS changes only the selected Formula cache bytes. Reopen retains Cached origins, subsequent refresh is a no-op, inverses restore complete input bytes, and a one-target quota fails atomically with exact ExpandedTargets counts."
+      ],
+      "scope_limit": "The native XLS table formula is converted to a supported range calculation; XLSX/XLSB structured-table formulas remain unsupported and retain their caches. This does not refresh providers, execute macros or supply a complete dependency/spill engine."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters",
+      "fixtures": [
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-fields.docx",
+        "excel/excel-links-objects.xls",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-links-objects.xlsb",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-layout-extensions.rtf",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "excel/excel-legacy-sheets.xls",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-legacy-sheets.xlsb"
+      ],
+      "feature_rows": [
+        "doc-037",
+        "docx-113",
+        "xls-186",
+        "xlsx-250",
+        "xlsb-319",
+        "xlsb-320",
+        "xls-153",
+        "xlsx-198",
+        "xlsb-279"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Actual refresh reports all seven native mail-merge fields and all three external-link/dependent formulas unsupported, publishing exact no-ops. RTF and binary PPT return the explicit no-refresh-adapter error without mutation, on both ingress routes.",
+        "Native macro tabs remain in the catalog but are excluded from worksheet refresh; sources remain exact and direct macro-cell evaluation retains the format-specific typed refusal."
+      ],
+      "scope_limit": "This tests refresh rather than inferring its absence from worksheet-evaluator refusals. It does not generate merge output, fetch external data or perform field execution in unsupported formats."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_refresh",
+      "name": "native_slide_number_and_date_derivatives_refresh_with_an_explicit_clock",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-409"
+      ],
+      "required_features": [
+        "doc",
+        "docx",
+        "rtf",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Reordering native non-MCE slides refreshes two number fields; a native-slide datetime1 derivative stays NeedsClock without an explicit clock and writes the exact date with one. Other members, file reopen and inverse remain exact. Changed fields on native MCE-bearing slides refuse UnsupportedContent atomically in both source and eager modes."
+      ],
+      "scope_limit": "Date-field authoring is explicitly a library derivative. Native text-owner MCE limits remain enforced; there is no ambient clock, slide layout or playback."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_blank_string_formula_value_is_a_saved_string_in_both_readers",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141"
+      ],
+      "assertions": [
+        "Native B18 pins inline FormulaValue 03/FFFF, no following String record, exact empty-string formula tokens and cached String(\"\") through eager and positional readers. The input file remains exact."
+      ],
+      "scope_limit": "Blank-string cache representation only; unresolved following-STRING metadata is a separate case and no formula calculation is implied."
     }
   ]
 }

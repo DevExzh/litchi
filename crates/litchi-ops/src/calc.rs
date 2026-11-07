@@ -4,7 +4,9 @@
 //! [`File::evaluate`] evaluates one cell and [`File::recalculate`] evaluates
 //! every formula of an XLSX, XLSB or XLS workbook. Both are reads: they never
 //! change the file, and the formula caches a workbook stores are left as they
-//! are. The cell node view keeps reporting `cachedValue` and `evaluated`
+//! are. XLS and XLSB may save a blank-string placeholder when authoring a
+//! formula; request recalculation to compute it instead of reading that cache.
+//! The cell node view keeps reporting `cachedValue` and `evaluated`
 //! (whether a cached value exists); the computed value is this module's.
 //!
 //! ```
@@ -333,7 +335,7 @@ pub struct Formula {
 }
 
 impl Formula {
-    /// The zero-based worksheet position.
+    /// The zero-based position in the complete tab catalog, including non-worksheet tabs.
     #[must_use]
     pub const fn sheet(&self) -> usize {
         self.sheet
@@ -619,6 +621,29 @@ impl File {
     }
 }
 
+fn sheet_catalog(file: &File) -> Result<Vec<(String, bool)>> {
+    match file {
+        #[cfg(feature = "xls")]
+        File::Xls(handle) => crate::format::xls::calc::catalog(handle),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => crate::format::xlsb::calc::catalog(handle),
+        #[cfg(feature = "xlsx")]
+        File::Xlsx(handle) => crate::format::xlsx::calc::catalog(handle),
+        File::Signed(signed) => sheet_catalog(signed.file()),
+        _ => Err(not_a_workbook(file)),
+    }
+}
+
+/// Physical tab names for reports and native cache writes. The public family
+/// worksheet view filters non-worksheets in XLS/XLSB and cannot index these
+/// operations' physical tab selectors.
+pub(crate) fn sheet_names(file: &File) -> Result<Vec<String>> {
+    Ok(sheet_catalog(file)?
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect())
+}
+
 fn is_depth(error: &crate::Error) -> bool {
     matches!(
         error.leaf(),
@@ -700,6 +725,7 @@ struct Sheet {
 struct Grid<'f> {
     file: &'f File,
     names: Vec<String>,
+    has_grid: Vec<bool>,
     sheets: Vec<OnceLock<Sheet>>,
     recalculate: bool,
     date1904: bool,
@@ -737,12 +763,13 @@ impl<'f> Grid<'f> {
             _ => return Err(not_a_workbook(file)),
         }
         let view = inner.workbook()?;
-        let names = view.worksheet_names()?;
+        let (names, has_grid): (Vec<_>, Vec<_>) = sheet_catalog(inner)?.into_iter().unzip();
         let date1904 = view.is_1904_date_system();
         let sheets = names.iter().map(|_| OnceLock::new()).collect();
         Ok(Self {
             file: inner,
             names,
+            has_grid,
             sheets,
             recalculate,
             date1904,
@@ -760,11 +787,17 @@ impl<'f> Grid<'f> {
 
     /// Load (once) and return a worksheet.
     fn sheet(&self, index: usize) -> Result<&Sheet> {
-        if let Some(sheet) = self.sheets[index].get() {
+        let slot = self.sheets.get(index).ok_or_else(|| {
+            crate::Error::new(
+                Code::OutOfRange,
+                "the calculation tab position is out of range",
+            )
+        })?;
+        if let Some(sheet) = slot.get() {
             return Ok(sheet);
         }
         let sheet = self.load(index)?;
-        Ok(self.sheets[index].get_or_init(|| sheet))
+        Ok(slot.get_or_init(|| sheet))
     }
 
     fn load(&self, index: usize) -> Result<Sheet> {
@@ -1074,6 +1107,9 @@ impl<'f> WorkbookTrait for Grid<'f> {
                 "worksheet_by_index",
                 "the worksheet position is out of range",
             ));
+        }
+        if !self.has_grid[index] {
+            return Err(MISSING_SHEET);
         }
         let sheet = self.sheet(index).map_err(|error| self.trip(error))?;
         Ok(SheetRef { grid: self, sheet })

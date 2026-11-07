@@ -358,7 +358,7 @@ impl CellError {
     }
 }
 
-/// An inert, non-string cached result stored in a `Formula` record.
+/// An inert cached result stored by a `Formula` record and optional string continuation.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum FormulaCache {
@@ -368,7 +368,8 @@ pub enum FormulaCache {
     Boolean(bool),
     /// Cached spreadsheet error.
     Error(CellError),
-    /// Empty cached result.
+    /// Cached blank string stored inline (FormulaValue byte1=03).
+    /// This is distinct from an absent cache and needs no following String record.
     Empty,
     /// Cached string result owned by the following `String`/`Continue` records.
     String(String),

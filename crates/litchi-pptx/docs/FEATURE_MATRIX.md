@@ -365,3 +365,10 @@ unchecked trust too. These tests do not claim native application acceptance,
 legacy CryptoAPI signature authoring, trust-chain validation or revocation.
 Native signed-fixture handoffs remain open despite this bounded operation
 coverage; historical authoring statuses are unchanged.
+
+The operations refresh adapter also updates supported slide-number and date
+field caches. Native reordered slides without MCE refresh through both ingress
+routes; library-authored date-field derivatives require an explicit clock.
+Changed fields on native MCE-bearing slides retain the text editor's precise
+`UnsupportedContent` refusal and leave the source unchanged. This is field-data
+publication, not slide layout or playback.

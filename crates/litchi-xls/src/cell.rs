@@ -174,7 +174,9 @@ impl Cell {
                     FormulaValue::String(s) => CellValue::String(s.clone()),
                     FormulaValue::Bool(b) => CellValue::Bool(*b),
                     FormulaValue::Error(e) => CellValue::Error(error_text(*e)),
-                    FormulaValue::Empty => CellValue::Empty,
+                    // MS-XLS FormulaValue byte1=03 is a cached blank string,
+                    // not a missing value or an unresolved following STRING.
+                    FormulaValue::Empty => CellValue::String(String::new()),
                 };
 
                 let formula_text = render_formula(formula, formula_context);
@@ -601,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_record_formula_empty() {
+    fn test_from_record_formula_blank_string() {
         let record = CellRecord::Formula {
             row: 0,
             col: 0,
@@ -611,10 +613,26 @@ mod tests {
             formula: vec![],
         };
         let cell = Cell::from_record(&record, None).unwrap();
-        assert!(matches!(cell.value(), CellValue::Empty));
+        assert_eq!(cell.value(), &CellValue::String(String::new()));
         assert!(cell.is_formula());
         assert_eq!(cell.formula(), None);
         assert_eq!(cell.formula_bytes(), Some([].as_slice()));
+    }
+
+    #[test]
+    fn pending_formula_string_does_not_invent_a_blank_string_cache() {
+        let record = CellRecord::Formula {
+            row: 0,
+            col: 0,
+            xf_index: 0,
+            value: FormulaValue::StringPending,
+            metadata: Metadata::default(),
+            formula: vec![],
+        };
+        assert_eq!(
+            Cell::from_record(&record, None).unwrap().value(),
+            &CellValue::Empty
+        );
     }
 
     #[test]

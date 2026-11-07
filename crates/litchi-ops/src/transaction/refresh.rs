@@ -11,8 +11,8 @@ use crate::{Code, File, Result};
 
 impl File {
     /// Recompute the derived results the document caches, in one atomic
-    /// commit: DOCX tables of contents and computable fields, PPTX slide
-    /// numbers and dates, XLSX formula results (with
+    /// publication: DOC/DOCX computable fields, DOCX tables of contents,
+    /// PPTX slide numbers and dates, and XLS/XLSX/XLSB formula results (with
     /// [`Options::write_cache`]). See [`crate::refresh`] for what each
     /// format computes, what it keeps, and how each field is reported.
     ///
@@ -26,8 +26,10 @@ impl File {
     /// are unknown under [`PageNumbers::Require`](crate::refresh::PageNumbers::Require),
     /// [`Code::LimitExceeded`] past the default [`EditOptions`],
     /// [`Code::DocumentProtected`] for a signed or locked file, and
-    /// [`Code::UnsupportedCapability`] for other formats (and for formula
-    /// cache write-back outside XLSX).
+    /// [`Code::UnsupportedCapability`] for formats without a refresh adapter
+    /// or a changed native text owner outside its edit profile (including
+    /// PPTX markup-compatibility branch selection). XLS cache writes may
+    /// use several native chunks inside this atomic unified operation.
     ///
     /// ```
     /// # #[cfg(all(feature = "xlsx", feature = "eval"))]

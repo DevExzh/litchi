@@ -163,18 +163,20 @@ class NativeOfficeCorpus(unittest.TestCase):
             "doc-059", "xls-173", "xls-178", "ppt-377", "ppt-383", "ppt-384",
             "pptx-432", "pptx-435", "pptx-449", "ppt-343", "ppt-364",
             "doc-068", "docx-133", "pptx-451", "xls-193", "xlsx-270", "xlsb-331",
-            "doc-038", "doc-066", "doc-061", "docx-123", "docx-124", "docx-125",
+            "doc-061", "docx-123", "docx-125",
             "docx-130", "xls-194", "xlsx-269", "xlsb-334", "ppt-375", "ppt-393",
             "pptx-452", "rtf-493",
             "doc-022", "xls-196", "xlsx-273", "xlsb-339", "docx-132",
+            "xls-195", "xlsx-271", "xlsb-338",
         })
         boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
         self.assertEqual({row["id"] for row in boundaries}, {
             "doc-068", "docx-133", "pptx-451", "xls-193", "xlsx-270", "xlsb-331",
-            "doc-038", "doc-066", "doc-061", "docx-123", "docx-124", "docx-125",
+            "doc-061", "docx-123", "docx-125",
             "docx-130", "xls-194", "xlsx-269", "xlsb-334", "ppt-375", "ppt-393",
             "pptx-452", "rtf-493",
             "doc-022", "xls-196", "xlsx-273", "xlsb-339", "docx-132",
+            "xls-195", "xlsx-271", "xlsb-338",
         })
         self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed) - len(boundaries))
         self.assertEqual(coverage["summary"]["reviewed_explicit_scope_boundaries"], len(boundaries))
@@ -185,6 +187,14 @@ class NativeOfficeCorpus(unittest.TestCase):
                 self.assertEqual(row["tests"], [])
                 self.assertEqual(row["native_fixture_status"], historical[row["id"]])
                 self.assertTrue(row["evidence_review"]["checks"])
+
+    def test_word_refresh_is_not_excluded_by_worksheet_evaluator_refusals(self) -> None:
+        rows = {row["id"]: row for row in report()["feature_rows"]}
+        for name in ("doc-038", "doc-066", "docx-124"):
+            with self.subTest(row=name):
+                self.assertNotIn("evidence_review", rows[name])
+                self.assertEqual(rows[name]["automated_coverage"], "partial")
+                self.assertTrue(any("native_caption_caches_refresh_in_doc_docx_and_templates_without_layout" in test for test in rows[name]["tests"]))
 
     def test_scope_boundary_requires_both_sides_of_the_contract(self) -> None:
         original = json.loads(EVIDENCE_REVIEWS.read_text())

@@ -1008,3 +1008,35 @@ fn native_external_workbook_cache_exposes_both_source_cells_without_accessing_ta
         assert_eq!(rows[0].values(), [CachedValue::Number(value)]);
     }
 }
+
+#[test]
+fn native_blank_string_formula_value_is_a_saved_string_in_both_readers() {
+    let bytes = native("excel-values-formulas-chart.xls");
+    let parts = streams(&bytes);
+    let frames = records(&parts[&vec!["Workbook".to_owned()]]);
+    let (at, (_, payload)) = frames
+        .iter()
+        .enumerate()
+        .find(|(_, (kind, p))| *kind == 6 && p[..4] == [17, 0, 1, 0])
+        .unwrap();
+    assert_eq!(&payload[6..14], &[3, 0, 0, 0, 0, 0, 0xff, 0xff]);
+    assert_ne!(
+        frames[at + 1].0,
+        0x0207,
+        "inline blank string has no following String record"
+    );
+    let reader = Reader::new(Cursor::new(&bytes)).unwrap();
+    let cell = reader.xls_worksheet(0).unwrap().get_cell(17, 1).unwrap();
+    assert!(cell.is_formula());
+    assert_eq!(cell.formula(), Some("=\"\""));
+    assert_eq!(cell.formula_bytes(), Some([0x17, 0, 0].as_slice()));
+    assert_eq!(cell.value(), &CellValue::String(String::new()));
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/excel/excel-values-formulas-chart.xls");
+    let source = litchi_xls::SourceBackedWorkbook::open(&path).unwrap();
+    let cell = source.cell_by_index(0, 17, 1).unwrap().unwrap();
+    assert!(cell.is_formula());
+    assert_eq!(cell.formula(), Some("=\"\""));
+    assert_eq!(cell.value(), &CellValue::String(String::new()));
+    assert!(std::fs::read(path).unwrap() == bytes);
+}

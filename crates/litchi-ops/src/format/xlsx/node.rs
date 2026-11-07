@@ -316,6 +316,13 @@ impl SheetHandle {
         })
     }
 
+    pub(super) fn name(&self) -> &str {
+        match self {
+            Self::Eager { sheet, .. } => sheet.name(),
+            Self::Source { sheet } => sheet.name(),
+        }
+    }
+
     pub(super) fn position(&self) -> usize {
         match self {
             Self::Eager { sheet, .. } => sheet.position(),

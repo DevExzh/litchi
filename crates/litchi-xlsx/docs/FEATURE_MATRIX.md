@@ -262,3 +262,11 @@ unchecked trust too. These tests do not claim native application acceptance,
 legacy CryptoAPI signature authoring, trust-chain validation or revocation.
 Native signed-fixture handoffs remain open despite this bounded operation
 coverage; historical authoring statuses are unchanged.
+
+Native calculation and refresh tests retain physical tab positions across a
+leading chart tab, include the trailing worksheet, and verify cross-sheet
+results. `File::refresh` reports stale caches by default and writes only
+supported results when `write_cache(true)` is explicit. Workbook refresh keeps
+external dependencies unsupported and unchanged; it does not refresh data
+providers. XLS's inline FormulaValue 03 is a saved blank string, distinct from
+a missing following STRING record, and no longer triggers a spurious write.

@@ -151,14 +151,14 @@ execution remain outside the DOC package API.
 | Main, footnote, endnote, header, comment, textbox, and header-textbox parts | ✅ | ✅ | ✅ | [MS-DOC] 2.3 story ranges and the corresponding PLCs are exposed through typed document, note, comment, header/footer, picture, shape, and textbox APIs |
 | Bookmark PLCs and names | ✅ | ✅ | ✅ | Range and point bookmarks are typed and editable, including repair/validation behavior for malformed ranges. Native standard-bookmark CRUD preserves unrelated REF instructions and text; invalid names, name collisions and operation-limit failures leave a rename and earlier staged edits atomic. Renaming does not rewrite field instructions |
 | Field PLCs and non-Plcfld text-only fields | ✅ | ✅ | ✅ | Native field delimiters, instruction/result text, marker positions, nesting, and the five text-only field families are reconstructed and authored with balanced graphs |
-| Field evaluation, document navigation, and generated results | ❌ | ❌ | ❌ | Cached results and inert typed instructions are available, but fields never resolve bookmarks, pages, styles, documents, databases, prompts, or host identity and are never refreshed |
+| Field evaluation, document navigation, and generated results | 🟡 | 🟡 | 🟡 | The format owner stores inert instructions/results. `litchi-ops::File::refresh` computes bounded top-level main-story SEQ, property/statistics and explicit-clock fields through the native result editor. DOC REF, layout-dependent fields, external resolution, prompts and host identity remain outside that profile. |
 | Tables, nested tables, cell/row marks, merges, and TAP properties | ✅ | ✅ | ✅ | [MS-DOC] 2.4 table-depth and terminating-mark rules are represented by rows/cells and typed table/paragraph properties. Native tests cover outer row/cell extents, row headers, nested paragraph depth and vertical merges. `sprmTInsert`-defined rows start with zero columns; simple-cell catalogs exclude TTP marks and retain real empty cells. Native DOC/DOT nonempty cell replacement round-trips, while multiparagraph/nested cells remain outside that transaction profile. The fresh writer refuses, with a typed error, a row whose table properties cannot fit one PAPX FKP page (a plain row of 22 or more cells); it does not write `sprmPHugePapx` |
 | Character, paragraph, table, section, and picture SPRM families | ✅ | ✅ | ✅ | [MS-DOC] 2.6 property families map to typed formatting, page setup, borders, widths, shading, and picture options |
 | Stylesheet, list templates, list overrides, names, and numbering | ✅ | ✅ | ✅ | STSH/LSTF/LFO/LVLF and related style/list records have typed reading and writer generation. Native attached-glossary stylesheets use record-relative LPStd alignment; local misalignment remains rejected. |
 | Section layout, columns, borders, page/line numbering, and note placement | ✅ | ✅ | ✅ | Section properties are typed and serialized. Semantic section ranges stop at `ccpText`, even when the stored PlcfSed sentinel extends into secondary stories. Native portrait/landscape margin and column edits preserve that sentinel and unrelated properties; pagination and line-breaking calculations are not performed |
 | PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ | Bounded auxiliary tables and state are read and mutated with mandatory/optional emission rules where required |
 | Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ | Typed summary state and checked `PlcfAsumy` ranges support bounded CRUD and exact PLC authoring; Word’s summary algorithm remains inert |
-| Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Editor, Snapshot, Transaction}` owns bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic package CRUD; edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Word caption insertion, field refresh, host activation, and macro execution remain inert |
+| Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Editor, Snapshot, Transaction}` owns bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic package CRUD; edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Automatic caption insertion, host activation and macro execution remain outside this metadata owner; bounded operations-layer SEQ refresh is separate |
 | Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | `parts::smart_tags::{Snapshot, Transaction, Commit, Patch}` adds source-checked bookmark, property-bag, and recognizer-range edits while preserving opaque FIB/table bytes; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
 | Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 | `parts::subdocuments::{Snapshot, Transaction, TablePatch}` owns source-checked, failure-atomic semantic edits, exact table encoders, and package publication with checked FIB pointer relocation for `PlcfWKB`/`SttbFnm`; unrelated table bytes and undefined FNIF/WKB bits remain preserved. Referenced files remain inert and are never opened or followed |
 | Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior; `tracked_revision::{Snapshot, Transaction, Commit, Patch}` adds source-checked binary story edits with reversible snapshots. Native 0x80/0x81 revision toggles share the semantic reader’s flag resolution; valid toggles are not Bool8 repair cases. Native move pairs retain exact CP ranges, author, timestamp and RSID, and both accept/reject routes invert exactly. |
@@ -189,7 +189,7 @@ execution remain outside the DOC package API.
 | Routing slips and route-slip protection | 🟡 | ✅ | ✅ | `litchi_doc::route_slip` owns typed, lossless `RouteSlip`/`RouteSlipInfo` metadata, exact narrow bytes, checked recipient selectors, immutable snapshots, and transactional package edits; `Document::route_slip()` exposes deferred optional metadata, while route protection rejects lifecycle edits unless the policy is `Off`; mail transport, authentication, and host routing remain inert |
 | Macro or control execution | ❌ | ❌ | ❌ | VBA source, macro names, form metadata, OLE objects, and control payloads are passive data only |
 | External document/database/include resolution | ❌ | ❌ | ❌ | RD, include/link/DDE, mail-merge paths, SQL, connection strings, and referenced subdocuments are never opened, contacted, imported, or refreshed |
-| Field calculation and generated tables/indexes | ❌ | ❌ | ❌ | TOC, TOA, INDEX, sequence, formula, style-reference, page, statistics, and navigation fields retain instructions/results but do not calculate or generate content |
+| Field calculation and generated tables/indexes | 🟡 | 🟡 | 🟡 | Bounded operations-layer refresh writes supported main-story results, including SEQ. It does not supply DOC TOC/TOA/INDEX generation, pagination or a complete Word field engine; nested fields and fields without results constrain native publication. |
 | IRM license evaluation and protected-content access | ❌ | ❌ | ❌ | IRM metadata and protected streams are not decrypted, authorized, or evaluated |
 | Complete later-version Word binary behavior | 🟡 | 🟡 | 🟡 | Versioned FIB/DOP structures are handled within the implemented profile, but unknown future records, application behavior, and undocumented compatibility quirks are not promised |
 
@@ -304,7 +304,7 @@ inverse. These tests qualify their concrete profiles; they do not establish
 arbitrary future Word behavior. The coverage report counts this boundary
 separately from missing native specimens and positive semantic assertions.
 
-The runtime boundaries `doc-038`, `doc-061`, `doc-066`
+The rendering boundary `doc-061`
 are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
 The operations test `microsoft_office_native_runtime_boundaries` checks all 139
 Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
@@ -339,3 +339,11 @@ unchecked trust too. These tests do not claim native application acceptance,
 legacy CryptoAPI signature authoring, trust-chain validation or revocation.
 Native signed-fixture handoffs remain open despite this bounded operation
 coverage; historical authoring statuses are unchanged.
+
+The worksheet evaluator's refusal on Word inputs does not imply absence of
+field refresh. `microsoft_office_native_refresh` qualifies the separate
+`File::refresh` operation: native DOC/DOT and DOCX/DOTX SEQ cache correction,
+DOCX TOC updates with bookmark/page-cache reuse, explicit missing-page refusal,
+file reopen and exact inverse. The earlier blanket field-execution exclusions
+are replaced by partial, scoped operation coverage; native mail merge still
+reports unsupported fields and remains inert.

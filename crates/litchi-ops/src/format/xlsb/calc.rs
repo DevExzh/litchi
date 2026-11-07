@@ -8,6 +8,18 @@ use super::node::Grid;
 use super::owner::SheetHandle;
 use crate::{Code, Error, Result};
 
+/// Names and grid availability in the complete physical tab catalog.
+pub(crate) fn catalog(file: &Xlsb) -> Result<Vec<(String, bool)>> {
+    let mut entries = Vec::new();
+    while let Some(sheet) = SheetHandle::at(file, entries.len())? {
+        entries
+            .try_reserve(1)
+            .map_err(|source| crate::transaction::Error::Allocation { source })?;
+        entries.push((sheet.name().to_owned(), sheet.is_grid()));
+    }
+    Ok(entries)
+}
+
 /// Visit every stored cell of the worksheet at `position` with zero-based
 /// coordinates; a formula cell is [`CellValue::Formula`] with its text and
 /// cached value. A missing position has no cells.

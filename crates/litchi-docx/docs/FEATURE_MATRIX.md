@@ -196,7 +196,7 @@ are not executed.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Pagination, line breaking, page fields, and rendering | ❌ | ❌ | ❌ | Section/page properties are data models only; there is no Word layout engine or renderer |
-| Field calculation and refresh | ❌ | ❌ | ❌ | Field delimiters, instructions, switches, and cached results are typed or preserved, but fields are never recalculated, refreshed, or resolved |
+| Field calculation and refresh | 🟡 | 🟡 | 🟡 | `litchi-ops::File::refresh` provides bounded main-story TOC/SEQ/REF, property/statistics and explicit-clock refresh over the native result editor. It preserves or refuses unknown TOC pages according to policy, retains layout-dependent caches, and skips locked, nested or unsupported fields. This is not a complete Word field engine or external-data runtime. |
 | Mail-merge execution | ❌ | ❌ | ❌ | Mail-merge settings, recipients, filters, and source targets are typed bounded metadata; no data source is opened or contacted and no merge output is generated |
 | AltChunk import and foreign-content conversion | ❌ | ❌ | ❌ | AltChunk anchors and payloads have bounded opaque CRUD; source-backed publication can replace one existing inert payload when its active relationship closure, direct `/word/` target, media type, and extension are exact, preserving every other ZIP member. HTML, XHTML, RTF, text, XML, and MIME payloads are never imported or rendered |
 | Macro, ActiveX, form-control, and add-in execution | ❌ | ❌ | ❌ | VBA projects, OLE payloads, legacy form state, web extensions, and control metadata are inert; code, callbacks, events, and host UI are never executed |
@@ -345,7 +345,7 @@ round-trip guarantee for every unmodeled namespace and mutation. Concrete
 extension profiles keep their own tests; this boundary receives no positive
 semantic credit and does not alter historical native-authoring status.
 
-The runtime boundaries `docx-123`, `docx-124`, `docx-125`, `docx-130`
+The runtime boundaries `docx-123`, `docx-125`, `docx-130`
 are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
 The operations test `microsoft_office_native_runtime_boundaries` checks all 139
 Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
@@ -370,3 +370,11 @@ unchecked trust too. These tests do not claim native application acceptance,
 legacy CryptoAPI signature authoring, trust-chain validation or revocation.
 Native signed-fixture handoffs remain open despite this bounded operation
 coverage; historical authoring statuses are unchanged.
+
+The worksheet evaluator's refusal on Word inputs does not imply absence of
+field refresh. `microsoft_office_native_refresh` qualifies the separate
+`File::refresh` operation: native DOC/DOT and DOCX/DOTX SEQ cache correction,
+DOCX TOC updates with bookmark/page-cache reuse, explicit missing-page refusal,
+file reopen and exact inverse. The earlier blanket field-execution exclusions
+are replaced by partial, scoped operation coverage; native mail merge still
+reports unsupported fields and remains inert.

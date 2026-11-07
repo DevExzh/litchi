@@ -2833,6 +2833,7 @@ pub enum FormulaValue {
     String(String),
     Bool(bool),
     Error(u8),
+    /// BIFF FormulaValue byte1=03: a saved blank string, not an absent cache.
     Empty,
 }
 
