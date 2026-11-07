@@ -10591,6 +10591,72 @@
         "Native slide-library metadata leaves facade document/slide text and operations text/JSON/slide views unchanged in file-backed Auto and Eager ingress; reads retain the exact derived artifact and original fixtures."
       ],
       "scope_limit": "Explicit metadata derivatives exercise text visibility, not server synchronization or native Office authoring."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_conflicts_ink",
+      "name": "native_docx_conflict_metadata_edits_and_annotation_removal_preserve_story_payloads",
+      "fixtures": [
+        "word/word-tables-layout.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-100"
+      ],
+      "assertions": [
+        "Main/header inventories retain exact insertion/deletion kinds, inline/property scopes, paired ranges, IDs and source text. Author/date edits, no-op, stale refusal and annotation removal save/reopen/replay/invert with exact story payload spans and unrelated members."
+      ],
+      "scope_limit": "Explicit W14 annotations on native parents. Removal preserves the inline/range payload and does not accept, reject, resolve or merge a Word conflict."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_conflicts_ink",
+      "name": "native_docx_conflict_invalid_metadata_is_atomic_and_unpaired_ranges_are_rejected",
+      "fixtures": [
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-100"
+      ],
+      "assertions": [
+        "Invalid date and XML-forbidden author text return exact errors without losing a valid staged author update; an orphaned range-start derivative is rejected precisely."
+      ],
+      "scope_limit": "Library-authored and malformed derivatives test metadata admission; no native collaboration conflict is attributed to Word."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_conflicts_ink",
+      "name": "native_office_ink_payload_shared_between_word_stories_is_read_cloned_and_collected",
+      "fixtures": [
+        "word/word-tables-layout.docx",
+        "powerpoint/powerpoint-ink-stroke.pptx"
+      ],
+      "feature_rows": [
+        "docx-128"
+      ],
+      "assertions": [
+        "The original 2424-byte Office InkML payload is shared across native main/header stories. Exact trace count and brush values read back; replacing one anchor clones the payload, retains the other native annotation, and removes each resource only after its last reference. Failed selection, no-op, stale refusal and replay/inverse are checked."
+      ],
+      "scope_limit": "PowerPoint-authored InkML is explicitly attached to a Word derivative; it is not a native Word ink specimen. Traces are inert, with no recognition, rendering or coordinate evaluation."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_conflicts_ink",
+      "name": "native_docx_ink_authoring_preserves_word_variants_and_exact_fallback_image",
+      "fixtures": [
+        "word/word-tables-layout.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-layout-extensions.dotx",
+        "powerpoint/powerpoint-ink-stroke.pptx"
+      ],
+      "feature_rows": [
+        "docx-128"
+      ],
+      "assertions": [
+        "Both base content-part profiles and a drawing host publish bounded two-trace annotations on native DOCX/DOCM/DOTX parents. The native PNG fallback and InkML donor are SHA-256 checked; source paragraph prefix/suffix, unrelated members, model counts and complete inverse graph/data remain exact."
+      ],
+      "scope_limit": "New strokes use the canonical library authoring profile. Native PowerPoint supplies only the inert fallback image; no Word rendering or fresh Office acceptance is claimed."
     }
   ]
 }
