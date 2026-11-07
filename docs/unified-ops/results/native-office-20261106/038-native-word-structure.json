@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "154d3b83ed94624182198563cd706ace4a9a707f",
+  "base_commit": "791219cbda5d04750fe761d82202626e1768a4f3",
+  "problem": "Real Microsoft Word DOC/DOT files exposed four supported-behavior defects: simple-cell catalogs counted top-level row-end marks as editable empty cells; modern insertion-defined TAPs started with a phantom column; failed bookmark renames could erase the original name; and the last section incorrectly included secondary-story CPs from the stored PlcfSed sentinel.",
+  "changes": [
+    "Cache direct sprmPFInTable and sprmPFTtp state in one byte per PAPX run, retaining strict last-operand semantics and allocation-free terminator queries. Refresh both flags whenever properties change. Exclude standalone TTP marks from the simple-cell catalog; retain genuine empty cells and the existing refusal for complex cell content.",
+    "Initialize rows lacking sprmTDefTable with zero columns, so modern sprmPTableProps/sprmTInsert sequences produce the correct number of cells and boundaries.",
+    "Perform bookmark remove/add rename operations on a candidate edit and publish the candidate only after both succeed. Invalid/duplicate names and a late operation-limit error preserve both the original bookmark and prior staged work.",
+    "Bound semantic section and section-revision ranges at ccpText while retaining the source PlcfSed sentinel. Reject a sentinel short of the main story or section starts outside its valid extent.",
+    "Add seven native DOC/DOT tests and four focused unit regressions; extend the native-test index and clarify affected feature-matrix scopes."
+  ],
+  "verification_scope": {
+    "fib_and_dop": "Four native documents distinguish base nFib 0x00c1, 183 counted FcLcb pointers, nFibNew 0x0112, table-stream selection and the DOC/DOT template flag. Dop2013 saved statistics are asserted in all ten main/subdocument counters. These saved counters are not recomputed or equated with parsed paragraph counts; empty commits preserve exact input bytes.",
+    "table_reads": "word-tables-layout.doc exposes one outer table spanning CP 85..233, five rows, exact header/data/Unicode text, and a final single physical merged-width cell. Cell CP ranges tile each row except its one-CP TTP. Seven nested paragraphs retain depth two; two nested row TAPs retain First/Merged vertical-merge state. The modern outer TAP has four columns and boundaries [0,2448,4788,7128,9468]; its last row has one column. Nested TAPs have two columns and boundaries [5,1170,2227].",
+    "modern_vs_compatibility_tables": "Initial read-only inspection of the compatibility sprmTDefTable showed different margin coordinates. Tracing sprmPTableProps confirmed that the semantic reader correctly selects the modern sprmTInsert sequence, but its initial one-column default was wrong. The regression pins the modern sequence, not compatibility coordinates. No source fixture was altered.",
+    "cell_edits": "word-layout-extensions.doc and .dot each expose exactly AUTO_TABLE_016, Amount, Native AutoCaption and 42. Replacing the fourth cell with 420 advances main/section end to 380; a fifth-cell edit refuses without losing the staged edit. File save/reopen, exact inverse, template flag, complete text except the replacement, stylesheet/fonts/DOP and all unrelated CFB streams pass.",
+    "bookmarks": "The native LITCHI_BOOKMARK_003 remains at 126..144. An unrelated bookmark is added at 0..6, renamed, saved/reopened and removed, preserving all text and field/annotation PLCs. Both commits invert exactly. Invalid names preserve the exact original artifact; case-insensitive collision and operation-budget failure on the second rename step preserve the existing entry, one prior addition and its exact publication bytes.",
+    "sections": "Semantic final ends are 434,257,379,379 across the four files, while stored sentinels remain 556,346,548,548. Every tested CP at or after the main-story end has no section. The two-section fixture retains portrait 12240x15840 and landscape 15840x12240 geometry, CP split 283 and RSID 15497745. Changing only the landscape left margin to 1600 and equal-width column count to 3 preserves all other section values, text, source tables and unrelated streams; save/reopen and exact inverse pass.",
+    "unit_regressions": "Cover zero-column initialization and invalid range operations on undefined cells; genuine empty-cell enumeration without a phantom TTP; last-wins row-end cache refresh and malformed-transform atomicity; and bounded section/revision CP ranges without wire mutation, with short-sentinel/out-of-range-start rejection.",
+    "specification_basis": "Read-only research used MS-DOC 2.4.3 table/cell/TTP rules and parallel compatibility/modern table definitions, MS-DOC 2.6.3 zero-column defaults, and MS-DOC 2.8.26 trailing PlcfSed sentinel semantics. Tests and production code depend only on tracked fixtures, not the research checkout.",
+    "limits": "Nested/multiparagraph cells remain outside the simple-cell editing profile; empty-cell insertion and structural table editing are not added. Standard bookmark rename does not rewrite REF instructions or execute fields. No pagination, layout rendering, statistic recalculation, fresh Word reopen or native UI behavior is claimed. Corrected simple-cell indices now exclude TTP marks; callers must use the resulting real-cell catalog."
+  },
+  "results": {
+    "new_native_tests": 7,
+    "new_unit_regressions": 4,
+    "doc_all_features_passed": 1531,
+    "ops_passed": 47,
+    "facade_passed": 21,
+    "rust_passed": 1599,
+    "rust_ignored": 3,
+    "python_passed": 75,
+    "ignored_reason": "Two pre-existing litchi-doc package tests require external DOC fixtures; the pre-existing litchi-ops libreoffice_probe_files diagnostic writes probe files to DOC_WRITE_DIR.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 287,
+      "indexed_tests": 387,
+      "reviewed_native_fixture_gaps": 4,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 287,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 35,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 41,
+        "unsupported_boundary_needs_review": 41,
+        "not_applicable": 1,
+        "reviewed_native_fixture_gap_requires_followup": 4
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-full.log",
+        "bytes": 155004,
+        "sha256": "cde287006bdd7a0bb20dcbd0b003efefd089af44f2871fbbd86240f0f05154f3"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-full.log 2>&1",
+      "suites": 56,
+      "passed": 1531,
+      "failed": 0,
+      "ignored": 2
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'doc_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-ops.log",
+        "bytes": 21685,
+        "sha256": "a1630672886077bf562da24e7374868c990c27191e37fc3bc5f08fa3c70d6be2"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'doc_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-ops.log 2>&1",
+      "suites": 5,
+      "passed": 47,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-facade.log",
+        "bytes": 19662,
+        "sha256": "1c43e0efc4cd19f1ca1e3cb84af1b71f7fda67569101a0b44a755d1bd665465e"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-clippy.log",
+        "bytes": 17369,
+        "sha256": "e37765628c1f5b614a94ab136d5abf6ba0b79fb84b8a5b24dfc73ee1acc3ad3e"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-python.log",
+        "bytes": 667,
+        "sha256": "56625d316ed386028229dfc0c62656f6cc4a6e9a40440651574ab510d3d6ef17"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-structure-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-coverage.json",
+        "bytes": 951333,
+        "sha256": "2fdcd7868cc0e3898ed7c2a5907858554483e76773446fcf22e6a35edd9aa936"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-coverage.json 2>&1"
+    }
+  ],
+  "initial_reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-doc-structure-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-structure-reproduction.log",
+        "bytes": 18570,
+        "sha256": "cb017f5faab10a733e3b20ea6b58dca5bba2eda6c0f368c57031480f387ded28"
+      },
+      "note": "Before the fixes, the native catalog returned six cells instead of four and a failed invalid-name rename removed the original bookmark."
+    },
+    {
+      "artifact": {
+        "file_name": "native-doc-section-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-section-reproduction.log",
+        "bytes": 17949,
+        "sha256": "fb75668b78cafe75db97a38f321850404a9828f0778448d182840ddddfdb3114"
+      },
+      "note": "Before the fix, the final semantic section ended at the stored secondary-story sentinel instead of ccpText."
+    },
+    {
+      "artifact": {
+        "file_name": "native-doc-tap-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-tap-reproduction.log",
+        "bytes": 32774,
+        "sha256": "91c9651c0acee07fe8b70b065bd02bdb6cf1d85c3ad85cc5b5e51138c738cd9a"
+      },
+      "note": "The native outer row reported five TAP columns for four physical cells. Subsequent tracing identified insertion into an incorrect one-column default."
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check, git diff --check and staged diff checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit; the only added file has mode 100644 and no executable was staged.",
+    "All three pre-existing untracked file hashes remain unchanged; the native-corpus integrity Python tests passed.",
+    "Clippy passed with -D warnings. Existing vendored zlib-rs warnings remain."
+  ],
+  "goal_status": "active; 287 of 494 feature rows have partial assertions, with 387 indexed tests. Remaining operation/bounded/UI/external/unsupported and partial-scope reviews are still required."
+}
