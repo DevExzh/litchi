@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "b6e0c26d4bfd2e974cee00eb824aefa773f63082",
+  "base_commit": "fa8eac6ddd8ae29ebac2c93551017e4fd8afa259",
+  "problem": "The remaining RTF rows were unverified despite real native latent-style catalogs. Legacy/modern protection passwords and SmartTag payloads were absent and needed explicit separation from neighboring protection flags, namespace tables and write-reservation metadata.",
+  "changes": [
+    "Add four indexed native semantic tests for complete latent-style catalogs, supported run/tail publication and detached typed model edits/clear. Add one independent full-corpus absence audit.",
+    "Record rtf-486, rtf-489 and rtf-491 as reviewed native fixture gaps without positive payload credit. Preserve the historical authoring inventory and native fixture bytes.",
+    "Update the RTF matrix and evidence-accounting guard. No runtime implementation or dependency changes were needed."
+  ],
+  "verification_scope": {
+    "catalogs": "All 15 manifest RTF files expose lsdstimax=376, explicit false lock/visibility/unhide/quick-format defaults and priority 99. Fourteen files have 376 exceptions; table-grid has 332. Full ordered names and every optional flag/priority are hashed using a documented tuple encoding and compared to an independent raw-control oracle. Normal, heading 1, Title, Strong, TOC Heading and the final five entries also have direct assertions.",
+    "independent_oracle": "The oracle separately parses the pinned ASCII native latent-style groups and emits [name, locked, semihidden, unhideused, qformat, priority] tuples using integer Boolean values and null for omitted controls. It does not invoke Litchi. The two full-catalog SHA-256 values are 451effee7ec167202747229c20ae4374c7b9bfc241a17a88b0a8649fa83d82a2 (376 entries) and a507c51621e96ac8799ab450c8777b163d7f2c284708ff1477d38be3942dc240 (332 entries).",
+    "publication": "Supported first-run edits on native minimal and bidirectional files preserve the exact complete latentstyles source group and typed restrictions. Layout/table-grid inputs use the supported tail-append owner, retaining the native header/catalog and adding one paragraph. File save/reopen, exact forward replay and inverse pass, with original snapshots/files unchanged. The run path also asserts stale-source refusal.",
+    "edit_boundary": "The layout fixture explicitly returns UnsupportedContent/edit with the dependent-body/review-content reason for a run edit. Tail append does not shift its existing anchors and remains supported. The test does not widen mixed/dependent run-edit or canonical table-writing scope.",
+    "model_edits": "Detached native Tree metadata changes the default priority to 42 and Title priority/quick-format values. Invalid priority 100, duplicate names and a forbidden semicolon return exact MalformedDocument reasons without losing valid state. Canonical writing/reopening retains the expected catalog; clearing removes the latentstyles destination. Body text, every visible character format, paragraph properties, font/color/style tables, information, protection, theme, data store and separate restriction metadata remain equal. Canonical syntax is not claimed byte-identical.",
+    "absence_audit": "All 15 files have no password/passwordhash or SmartTag marker controls and expose absent password fields/empty smart_tags. The independent lexical scan skips escaped symbols/hex bytes and binary payloads. Native Comments/Forms protection profiles are positively present in two files, and the distinct 120-byte writereservhash is positively present in the reservation fixture. None is counted as password or SmartTag payload evidence.",
+    "limits": "Saved/detached style metadata does not execute style enforcement or host style resolution. No password authentication, SmartTag provider/action, native before/after restriction change or fresh Word validation is performed. The three missing native payload families still require producer specimens; synthetic controls are not attributed to Word."
+  },
+  "specification_evidence": [
+    {
+      "reference": "RTF 1.9.1, Style Sheets / Style and Formatting Restrictions, pp. 28-29",
+      "source": "User-supplied local full specification",
+      "finding": "The latentstyles grammar separates defaults from semicolon-delimited per-style overrides. The numeric lsdstimax value and optional controls are retained as metadata, without inferring application enforcement."
+    },
+    {
+      "reference": "RTF 1.9.1, Document Properties, pp. 40-41; SmartTag Data, pp. 153-154",
+      "source": "User-supplied local full specification",
+      "finding": "The modern starred passwordhash destination is distinct from deprecated password and write-reservation metadata. SmartTags require their own xmlopen/xmlclose and factoid/attribute vocabulary; a namespace table alone is insufficient."
+    }
+  ],
+  "independent_measurement": {
+    "artifact": {
+      "file_name": "native-rtf-latent-oracle.json",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-latent-oracle.json",
+      "bytes": 5947,
+      "sha256": "ffd6fa2cd446516c9ac84f49c8621afd1c7b88832dfd24c417f98992dfbe802c"
+    },
+    "source_artifact": {
+      "file_name": "native-rtf-latent-oracle.py",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-latent-oracle.py",
+      "bytes": 1631,
+      "sha256": "838d91e8ee05b42ddf1c40a07f443c635b262f6927d6d1b6814fca3816179dad"
+    },
+    "command": "python3 /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-latent-oracle.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-latent-oracle.json",
+    "exit_code": 0,
+    "regenerate": "python3 - <<'PY' > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-latent-oracle.json\n\"\"\"Independent ASCII catalog oracle for the pinned native Word RTF files.\"\"\"\nimport hashlib\nimport json\nfrom pathlib import Path\nimport re\n\nroot = Path('test-data/microsoft-office')\nmanifest = json.loads((root / 'manifest.json').read_text())\noutput = []\nfields = ['lsdlocked', 'lsdsemihidden', 'lsdunhideused', 'lsdqformat', 'lsdpriority']\nfor item in manifest['files']:\n    if not item['path'].endswith('.rtf'):\n        continue\n    data = (root / item['path']).read_bytes()\n    start = data.index(b'\\\\latentstyles')\n    end = data.index(b'}}', start) + 2\n    group = data[start:end]\n    header, body = group.split(b'{\\\\lsdlockedexcept', 1)\n    defaults = dict((key.decode(), int(value)) for key, value in re.findall(rb'\\\\(lsd[a-z]+)([0-9]+)', header))\n    entries = []\n    for entry in body[:-2].split(b';'):\n        if not entry.strip():\n            continue\n        controls = dict((key.decode(), int(value)) for key, value in re.findall(rb'\\\\(lsdlocked|lsdsemihidden|lsdunhideused|lsdqformat|lsdpriority)([0-9]+)', entry))\n        name = re.sub(rb'\\\\[a-z]+[0-9]+ ?', b'', entry).strip()\n        assert b'\\\\' not in name and b'{' not in name and b'}' not in name\n        name = name.decode('ascii')\n        entries.append([name, *[controls.get(field) for field in fields]])\n    canonical = json.dumps(entries, ensure_ascii=False, separators=(',', ':')).encode()\n    output.append({'fixture': item['path'], 'defaults': defaults, 'exceptions': len(entries), 'ordered_values_sha256': hashlib.sha256(canonical).hexdigest()})\nassert len(output) == 15\nprint(json.dumps({'field_order': ['name', *fields], 'files': output}, indent=2))\nPY\n"
+  },
+  "coverage": {
+    "summary": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 384,
+      "indexed_tests": 581,
+      "reviewed_native_fixture_gaps": 34,
+      "reviewed_explicit_scope_boundaries": 41,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 384,
+        "reviewed_native_fixture_gap_requires_followup": 34,
+        "external_fixture_handoff_needs_review": 11,
+        "reviewed_explicit_scope_boundary": 41,
+        "native_ui_limitation_needs_review": 23,
+        "not_applicable": 1
+      }
+    },
+    "new_partial_rows": [
+      "rtf-469"
+    ],
+    "new_native_fixture_gap_reviews": [
+      "rtf-486",
+      "rtf-489",
+      "rtf-491"
+    ],
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false,
+    "accounting": "Four new indexed tests yield 581 indexed tests and 384 partial feature rows. Three evidence-only reviews increase reviewed native fixture gaps to 34 without positive payload credit. Historical authoring statuses are unchanged."
+  },
+  "validation": [
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-rtf --all-features --lib --test 'microsoft_office_native*' --test latent_styles --test document_style_restrictions --test document_protection --test smart_tags_move_bookmarks --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-owners.log",
+        "bytes": 43249,
+        "sha256": "e93e9fd8d1e037557add0ae57d6f155b9385b98fd8eff3405c100dac4d9df294"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-rtf --all-features --lib --test 'microsoft_office_native*' --test latent_styles --test document_style_restrictions --test document_protection --test smart_tags_move_bookmarks --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-owners.log 2>&1",
+      "results": {
+        "targets": 13,
+        "passed": 477,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-ops.log",
+        "bytes": 22490,
+        "sha256": "8f862fac001a837b70e41ddc93b05ee55d53dc848ffd6d455a6857405379ff06"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-ops.log 2>&1",
+      "results": {
+        "targets": 9,
+        "passed": 34,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,eval --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-facade.log",
+        "bytes": 19908,
+        "sha256": "236dcc543b52a6d8abd395c8d54600b900f66638e3c5c7124cf85fd1dcdc1ec4"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,eval --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-facade.log 2>&1",
+      "results": {
+        "targets": 4,
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-rtf --all-features --test microsoft_office_native_style_metadata --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-clippy.log",
+        "bytes": 265,
+        "sha256": "174492c9ac2749846495a67bb3dbf523bd73cae6702d195877919d712700a2c5"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-rtf --all-features --test microsoft_office_native_style_metadata --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-python.log",
+        "bytes": 670,
+        "sha256": "8662e9dbbd03f665610fecece577e7be168d31b3a4f8cb51e7839eee597b8785"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-coverage.json",
+        "bytes": 1450523,
+        "sha256": "1652d2b26c12a4f3d39a9bcfd6758078b008a3eaa66f04b99dbac5e61a0d28d1"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-coverage.json 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-gate.log 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check --config skip_children=true crates/litchi-rtf/tests/microsoft_office_native_style_metadata.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-rtf-styles-format.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --edition 2024 --check --config skip_children=true crates/litchi-rtf/tests/microsoft_office_native_style_metadata.rs > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-rtf-styles-format.log 2>&1"
+    }
+  ],
+  "validation_totals": {
+    "distinct_rust_tests_passed": 534,
+    "rust_tests_ignored": 0,
+    "python_tests_passed": 78,
+    "breakdown": "477 RTF library/native/related integration tests, 34 operations tests and 23 facade tests. Earlier focused runs are not counted twice.",
+    "clippy": "The new RTF integration target passed with -D warnings.",
+    "formatting": "Targeted rustfmt and git diff --check passed.",
+    "gate": "Non-iWork topology verification, all 139 native files/four import assets size/SHA-256 checks and coverage accounting passed.",
+    "staged_file_guards": "Both required size and binaries checks emitted nothing before each commit."
+  },
+  "environment": {
+    "scratch": "/home/zhuhe/.cache/litchi-native-office.V1L32Z",
+    "temporary_files": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp",
+    "unrelated_files": "The three original untracked files retain their original hashes. The separately appearing production-readiness assessment remains untouched and unstaged.",
+    "fixture_access": "Tests use tracked test-data only. The independent oracle is external evidence, not a runtime test dependency. No binary fixture or compiled harness was added."
+  },
+  "goal_status": "active; 23 native UI limitations, 11 external handoffs and 34 reviewed native fixture gaps remain, plus the final scope/completion audit"
+}
