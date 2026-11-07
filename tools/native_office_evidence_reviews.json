@@ -2028,6 +2028,276 @@
         "crates/litchi-ops/src/capabilities/m4.rs"
       ],
       "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "doc-022",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-layout-extensions.dot"
+      ],
+      "reason": "The canonical DOC reader implements the Word 97+ profile; a retained table stream cannot make an older nFib layout supported.",
+      "required_evidence": "Precise older-profile refusal before modern pointer interpretation, independent of table-stream presence and stylesheet leniency, while retaining the known Word 97 compatibility exceptions.",
+      "observed_evidence": "Five older nFib values on two native-source derivatives now return exact UnsupportedVersion values/names under both leniency modes, rather than a misleading CLX-corruption error. The positional edit owner returns UnsupportedSource. Word 6/95 derivatives propagate UnsupportedFormat through both public operations ingress routes. C0/C2 variants retain text, pointer count, template flag and no-op bytes.",
+      "supported_scope": "Word 97+ canonical reads and the existing C0 shell/C2 bidi compatibility admission within the implemented profile. Low-level FIB inspection remains separate from document admission.",
+      "unsupported_scope": "Reading Word 6/95 and earlier incompatible layouts as modern DOC, including attempts to use modern Table streams to bypass the profile boundary. No complete early Word implementation or legacy application compatibility is supplied.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_version_boundary",
+          "name": "native_doc_derivatives_reject_older_fib_profiles_even_with_modern_table_streams"
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_version_boundary",
+          "name": "native_word97_shell_and_bidi_derivatives_remain_in_the_modern_profile"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_legacy_profile",
+          "name": "native_doc_profile_derivatives_keep_public_unsupported_format_errors",
+          "required_features": [
+            "doc"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-doc/src/document/package.rs",
+        "crates/litchi-doc/src/source_backed/owner.rs",
+        "crates/litchi-ops/src/error.rs"
+      ],
+      "scope_limit": "Native-source incompatible-header derivatives and an explicit library profile limit, not native-authored legacy specimens or positive coverage of legacy reading. Historical status and original fixtures are unchanged."
+    },
+    {
+      "feature_row": "xls-196",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "reason": "Cryptographic signature validity, payload integrity, signature-presence/edit policy and PKI trust are distinct contracts. The shared verifier deliberately does not perform ambient certificate trust or revocation lookup.",
+      "required_evidence": "Explicit Trust::NotChecked alongside valid signature/integrity reports, invalid-payload separation, and evidence that a nonempty certificate list does not silently become trusted.",
+      "observed_evidence": "Caller-key signature derivatives over native Office parents verify supported-resource integrity and mathematical signatures while reporting Trust::NotChecked. Native workbook derivatives also verify explicit unsign policy and distinguish payload tampering from valid signature math. The pre-existing tracked Microsoft Office 2010 signed DOCX/XLSX/PPTX fixtures contain certificates and verify under their compatible SHA-1 policy, yet now explicitly assert Trust::NotChecked; these supplemental files are separate from the 139-file corpus.",
+      "supported_scope": "Bounded mathematical integrity/signature verification, explicit complete/partial coverage reports, certificate metadata, and supported signature presence/consumption policy. Native parent data remains inert and preserved.",
+      "unsupported_scope": "Certificate-chain trust, revocation, signer authority, organizational trust policy, ambient credential/provider lookup and native Office acceptance. A Signed wrapper detects presence rather than proving validity or trust.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_office_signature_derivatives_verify_integrity_without_claiming_trust",
+          "required_features": [
+            "doc",
+            "docx",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_signed_workbooks_require_explicit_unsign_on_outer_and_inner_handles",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_workbook_payload_tampering_separates_signature_math_from_integrity_and_trust",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-sign",
+          "target": "real_package_signatures",
+          "name": "real_microsoft_package_signatures_verify_through_public_xml_api"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-sign/src/lib.rs",
+        "crates/litchi-ops/src/signed.rs",
+        "crates/litchi-sign/tests/real_package_signatures.rs"
+      ],
+      "scope_limit": "An explicit trust boundary, not positive semantic coverage of PKI or a new native signed specimen. Generated signatures use disposable local keys; native-authored signature handoffs remain distinct. No trust lookup, revocation request or fresh native application validation is performed."
+    },
+    {
+      "feature_row": "xlsx-273",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "reason": "Cryptographic signature validity, payload integrity, signature-presence/edit policy and PKI trust are distinct contracts. The shared verifier deliberately does not perform ambient certificate trust or revocation lookup.",
+      "required_evidence": "Explicit Trust::NotChecked alongside valid signature/integrity reports, invalid-payload separation, and evidence that a nonempty certificate list does not silently become trusted.",
+      "observed_evidence": "Caller-key signature derivatives over native Office parents verify supported-resource integrity and mathematical signatures while reporting Trust::NotChecked. Native workbook derivatives also verify explicit unsign policy and distinguish payload tampering from valid signature math. The pre-existing tracked Microsoft Office 2010 signed DOCX/XLSX/PPTX fixtures contain certificates and verify under their compatible SHA-1 policy, yet now explicitly assert Trust::NotChecked; these supplemental files are separate from the 139-file corpus.",
+      "supported_scope": "Bounded mathematical integrity/signature verification, explicit complete/partial coverage reports, certificate metadata, and supported signature presence/consumption policy. Native parent data remains inert and preserved.",
+      "unsupported_scope": "Certificate-chain trust, revocation, signer authority, organizational trust policy, ambient credential/provider lookup and native Office acceptance. A Signed wrapper detects presence rather than proving validity or trust.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_office_signature_derivatives_verify_integrity_without_claiming_trust",
+          "required_features": [
+            "doc",
+            "docx",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_signed_workbooks_require_explicit_unsign_on_outer_and_inner_handles",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_workbook_payload_tampering_separates_signature_math_from_integrity_and_trust",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-sign",
+          "target": "real_package_signatures",
+          "name": "real_microsoft_package_signatures_verify_through_public_xml_api"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-sign/src/lib.rs",
+        "crates/litchi-ops/src/signed.rs",
+        "crates/litchi-sign/tests/real_package_signatures.rs"
+      ],
+      "scope_limit": "An explicit trust boundary, not positive semantic coverage of PKI or a new native signed specimen. Generated signatures use disposable local keys; native-authored signature handoffs remain distinct. No trust lookup, revocation request or fresh native application validation is performed."
+    },
+    {
+      "feature_row": "xlsb-339",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "reason": "Cryptographic signature validity, payload integrity, signature-presence/edit policy and PKI trust are distinct contracts. The shared verifier deliberately does not perform ambient certificate trust or revocation lookup.",
+      "required_evidence": "Explicit Trust::NotChecked alongside valid signature/integrity reports, invalid-payload separation, and evidence that a nonempty certificate list does not silently become trusted.",
+      "observed_evidence": "Caller-key signature derivatives over native Office parents verify supported-resource integrity and mathematical signatures while reporting Trust::NotChecked. Native workbook derivatives also verify explicit unsign policy and distinguish payload tampering from valid signature math. The pre-existing tracked Microsoft Office 2010 signed DOCX/XLSX/PPTX fixtures contain certificates and verify under their compatible SHA-1 policy, yet now explicitly assert Trust::NotChecked; these supplemental files are separate from the 139-file corpus.",
+      "supported_scope": "Bounded mathematical integrity/signature verification, explicit complete/partial coverage reports, certificate metadata, and supported signature presence/consumption policy. Native parent data remains inert and preserved.",
+      "unsupported_scope": "Certificate-chain trust, revocation, signer authority, organizational trust policy, ambient credential/provider lookup and native Office acceptance. A Signed wrapper detects presence rather than proving validity or trust.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_office_signature_derivatives_verify_integrity_without_claiming_trust",
+          "required_features": [
+            "doc",
+            "docx",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_signed_workbooks_require_explicit_unsign_on_outer_and_inner_handles",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_workbook_payload_tampering_separates_signature_math_from_integrity_and_trust",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-sign",
+          "target": "real_package_signatures",
+          "name": "real_microsoft_package_signatures_verify_through_public_xml_api"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-sign/src/lib.rs",
+        "crates/litchi-ops/src/signed.rs",
+        "crates/litchi-sign/tests/real_package_signatures.rs"
+      ],
+      "scope_limit": "An explicit trust boundary, not positive semantic coverage of PKI or a new native signed specimen. Generated signatures use disposable local keys; native-authored signature handoffs remain distinct. No trust lookup, revocation request or fresh native application validation is performed."
+    },
+    {
+      "feature_row": "docx-132",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "reason": "Cryptographic signature validity, payload integrity, signature-presence/edit policy and PKI trust are distinct contracts. The shared verifier deliberately does not perform ambient certificate trust or revocation lookup.",
+      "required_evidence": "Explicit Trust::NotChecked alongside valid signature/integrity reports, invalid-payload separation, and evidence that a nonempty certificate list does not silently become trusted.",
+      "observed_evidence": "Caller-key signature derivatives over native Office parents verify supported-resource integrity and mathematical signatures while reporting Trust::NotChecked. Native workbook derivatives also verify explicit unsign policy and distinguish payload tampering from valid signature math. The pre-existing tracked Microsoft Office 2010 signed DOCX/XLSX/PPTX fixtures contain certificates and verify under their compatible SHA-1 policy, yet now explicitly assert Trust::NotChecked; these supplemental files are separate from the 139-file corpus.",
+      "supported_scope": "Bounded mathematical integrity/signature verification, explicit complete/partial coverage reports, certificate metadata, and supported signature presence/consumption policy. Native parent data remains inert and preserved.",
+      "unsupported_scope": "Certificate-chain trust, revocation, signer authority, organizational trust policy, ambient credential/provider lookup and native Office acceptance. A Signed wrapper detects presence rather than proving validity or trust.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_signature_boundary",
+          "name": "native_office_signature_derivatives_verify_integrity_without_claiming_trust",
+          "required_features": [
+            "doc",
+            "docx",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "sign"
+          ]
+        },
+        {
+          "crate": "litchi-sign",
+          "target": "real_package_signatures",
+          "name": "real_microsoft_package_signatures_verify_through_public_xml_api"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-sign/src/lib.rs",
+        "crates/litchi-ops/src/signed.rs",
+        "crates/litchi-sign/tests/real_package_signatures.rs"
+      ],
+      "scope_limit": "An explicit trust boundary, not positive semantic coverage of PKI or a new native signed specimen. Generated signatures use disposable local keys; native-authored signature handoffs remain distinct. No trust lookup, revocation request or fresh native application validation is performed."
     }
   ]
 }

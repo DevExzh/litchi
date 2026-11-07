@@ -10,7 +10,7 @@
 )]
 
 use litchi_sign::xml::{self, Profile, Resolver, Transform};
-use litchi_sign::{Coverage, Error, Limits, Policy, Status};
+use litchi_sign::{Coverage, Error, Limits, Policy, Status, Trust};
 use quick_xml::{Reader, XmlVersion, events::Event};
 use soapberry_zip::office::ArchiveReader;
 use std::borrow::Cow;
@@ -242,6 +242,7 @@ fn real_microsoft_package_signatures_verify_through_public_xml_api() {
         assert_eq!(report.coverage(), Coverage::Partial);
         assert!(report.uses_sha1());
         assert!(!report.certificates().is_empty());
+        assert_eq!(report.trust(), Trust::NotChecked);
     }
 }
 

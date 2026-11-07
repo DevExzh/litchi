@@ -88,6 +88,17 @@ impl Document {
         // Parse the File Information Block (FIB) from the start of WordDocument
         let mut fib = FileInformationBlock::parse_shared(Arc::clone(&word_document), 0)?;
 
+        // Reject an older layout before consulting any modern table pointer.
+        // A stray/retained Table stream does not make a Word 6/95 FIB readable
+        // as Word 97. MS-DOC's Word 97 shell-template value 00C0 is the known
+        // exception, also admitted by the positional source owner.
+        if fib.version() < WORD_97_NFIB && fib.version() != 0x00c0 {
+            return Err(PackageError::UnsupportedVersion {
+                nfib: fib.version(),
+                name: fib.version_name(),
+            });
+        }
+
         // Determine which table stream to use (0Table or 1Table)
         let table_stream_name = if fib.which_table_stream() {
             "1Table"
@@ -95,27 +106,14 @@ impl Document {
             "0Table"
         };
 
-        // Resolve the table stream. MS-DOC 2.1 requires one of `0Table`/`1Table`
-        // to be present, so a file without it is either damaged or predates the
-        // format: Word 6.0 and Word 95 keep those structures inside
-        // `WordDocument`. Naming the version is far more actionable for the
-        // caller than reporting a missing stream.
+        // Every admitted modern layout requires the selected table stream.
         let _table_stream_size = locate_stream(
             ole,
             &[table_stream_name],
             source_limits.max_entry_bytes(),
             table_stream_name,
         )?
-        .ok_or_else(|| {
-            if fib.version() < WORD_97_NFIB {
-                PackageError::UnsupportedVersion {
-                    nfib: fib.version(),
-                    name: fib.version_name(),
-                }
-            } else {
-                PackageError::StreamNotFound(table_stream_name.to_string())
-            }
-        })?;
+        .ok_or_else(|| PackageError::StreamNotFound(table_stream_name.to_string()))?;
 
         let data_stream_present =
             locate_stream(ole, &["Data"], source_limits.max_entry_bytes(), "Data")?;

@@ -168,6 +168,9 @@ serde-saphyr        = { workspace = true, optional = true } # Markdown YAML fron
 sha2                = { workspace = true } # Streaming content proofs for process-local patch replay
 
 [dev-dependencies]
+# Native signature-policy tests author disposable signatures through OPC.
+litchi-opc = { workspace = true, features = ["sign"] }
+p256 = { workspace = true }
 proptest = "1.5" # PathArg display fixed point (record 0338 F2)
 tempfile = { workspace = true }
 zip      = { version = "8", default-features = false, features = ["deflate"] }

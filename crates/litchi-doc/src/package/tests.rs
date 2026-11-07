@@ -6,20 +6,22 @@ use std::io::Cursor;
 use std::path::Path;
 
 #[test]
-#[ignore = "requires an external DOC fixture"]
-fn test_open_package() {
-    let result = Reader::open("test.doc");
-    assert!(result.is_ok());
+fn opens_tracked_native_word_package() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word/word-text-structure.doc");
+    let mut reader = Reader::open(path).unwrap();
+    let document = reader.document().unwrap();
+    assert_eq!(document.fib().table_pointer_count(), Some(183));
+    assert_eq!(document.paragraph_count().unwrap(), 25);
+    assert!(document.text().unwrap().contains("WORD_NATIVE_END"));
 }
 
 #[test]
-#[ignore = "requires an external DOC fixture"]
-fn test_invalid_file() {
-    // Create a non-DOC file
-    std::fs::write("test_invalid.tmp", b"Not a DOC file").unwrap();
-    let result = Reader::open("test_invalid.tmp");
-    assert!(result.is_err());
-    std::fs::remove_file("test_invalid.tmp").ok();
+fn rejects_non_cfb_bytes_without_creating_files() {
+    assert!(matches!(
+        Reader::from_bytes(&[0; 512]),
+        Err(Error::Ole(litchi_cfb::OleError::NotOleFile))
+    ));
 }
 
 fn poi_fixture(name: &str) -> std::path::PathBuf {

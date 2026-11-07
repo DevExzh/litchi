@@ -358,3 +358,15 @@ application rendering, layout or execution.
 Native math/layout/mail-merge inputs also refuse the worksheet evaluator;
 saved field results remain unchanged. RTF field results use separate story
 owners and are checked in the field inventory rather than paragraph text.
+
+`microsoft_office_native_signature_boundary` authors disposable XML signatures
+over seven native Office parents. These are Litchi derivatives, not native
+Office signatures. Mathematical validity, resource coverage and signature
+presence remain distinct from `Trust::NotChecked`. Workbook cases also check
+outer/inner signed-handle edit refusals, explicit unsign, complete graph/data
+equivalence to an ordinary scalar edit, and invalid-payload detection. The
+shared verifier's older Microsoft-signed certificate fixtures explicitly retain
+unchecked trust too. These tests do not claim native application acceptance,
+legacy CryptoAPI signature authoring, trust-chain validation or revocation.
+Native signed-fixture handoffs remain open despite this bounded operation
+coverage; historical authoring statuses are unchanged.
