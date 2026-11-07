@@ -176,3 +176,19 @@ native-parent tests preserve eight unmodeled controls as exact opaque nodes, enf
 an opaque-node quota, and refuse lossy canonical header publication before output.
 The historical authoring inventory is unchanged; unsupported layout and unmodeled
 control semantics remain explicit.
+
+The complete 15-file native RTF corpus now has exact latent-style defaults,
+ordered exception values and full-catalog digest assertions, checked against an
+independent raw-control inventory. Fourteen catalogs contain 376 exceptions and
+the table-grid catalog 332; all retain lsdstimax=376. Separate style-restriction
+flags are absent. Supported run/tail edits preserve the exact header group, and
+detached model updates/clear pass canonical file readback with unchanged body
+formatting and unrelated modeled metadata. Invalid latent-style values leave
+prior valid model state intact. No style-enforcement or Word UI action occurs.
+
+All 15 native files lack legacy password, modern passwordhash and SmartTag
+marker payloads. Public model absence agrees with a lexical control inventory;
+the two native protection profiles and the distinct 120-byte write-reservation
+hash remain positively identified. rtf-486/489/491 are reviewed fixture gaps,
+without positive payload credit. Native specimens of those precise families
+and fresh Office validation remain open; historical authoring data is unchanged.

@@ -192,6 +192,7 @@ class NativeOfficeCorpus(unittest.TestCase):
             "ppt-369", "ppt-390",
             "doc-002", "doc-003", "doc-004", "doc-005", "doc-006", "doc-010", "doc-015",
             "pptx-438",
+            "rtf-486", "rtf-489", "rtf-491",
         })
         boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
         self.assertEqual({row["id"] for row in boundaries}, {

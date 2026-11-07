@@ -10139,6 +10139,85 @@
         "Slide-level Designer tags are stored on the native stable slide-ID owner. Unicode tags, present-empty and removed states retain the exact slide ID and relationship/part binding, while only presentation.xml changes. All slide bytes and other package members remain exact through reopen/replay/inverse."
       ],
       "scope_limit": "Stable slide-binding metadata is qualified without invoking Designer or asserting a fresh native-app change."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_style_metadata",
+      "name": "native_rtf_latent_catalogs_match_exact_defaults_order_and_values",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-math-navigation.rtf",
+        "word/word-rtf-minimal.rtf",
+        "word/word-rtf-table-grid.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-embedded-fonts.rtf",
+        "word/word-vector-diagram.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-layout-extensions.rtf",
+        "word/word-tracked-moves.rtf",
+        "word/word-write-reservation.rtf"
+      ],
+      "feature_rows": [
+        "rtf-469"
+      ],
+      "assertions": [
+        "All 15 native files expose max-style metadata 376, explicit false lock/visibility/unhide/quick-format defaults and priority 99. Fourteen have 376 ordered exceptions; table-grid has 332. A canonical digest of every name/optional flag/priority matches an independent raw-control oracle, with exact Normal/heading/Title/Strong/TOC and final-name checks.",
+        "Exactly one latentstyles destination is present. Separate stylelock/stylelockenforced/stylelockbackcomp/autofmtoverride controls are absent and the public restriction record is empty. Native source bytes and files remain unchanged."
+      ],
+      "scope_limit": "Saved style metadata only. The catalog does not execute style restrictions, resolve host styles or establish a native before/after restriction change."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_style_metadata",
+      "name": "native_rtf_run_edits_preserve_the_complete_latent_style_header",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-469"
+      ],
+      "assertions": [
+        "Supported native first-run text edits retain the exact complete latentstyles source group, every typed latent-style value and restriction record. Unicode replacement text survives file save/reopen, exact patch replay/inverse and stale-source refusal; originals remain unchanged."
+      ],
+      "scope_limit": "The ordinary run editor is qualified for these supported native inputs; no general mixed/dependent paragraph-edit capability is inferred."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_style_metadata",
+      "name": "native_rtf_latent_model_edits_are_atomic_and_preserve_canonical_body_semantics",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-469"
+      ],
+      "assertions": [
+        "Detached native Tree metadata changes the default priority and Title priority/quick-format flag. Invalid priorities, duplicate names and forbidden delimiters return their precise MalformedDocument reasons without losing the valid candidate. Canonical file output reopens with every expected latent value.",
+        "Clearing the latent group removes its control while retaining body text, every visible character format, paragraph properties, font/color/style tables, information, protection, theme, data store and separate restriction metadata. Source snapshots/files stay exact."
+      ],
+      "scope_limit": "Detached typed model editing and canonical writing, not a source-checked latent-style Package transaction. Canonical syntax may normalize; no Word UI or enforcement behavior is claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_style_metadata",
+      "name": "native_rtf_tail_append_keeps_latent_catalogs_for_dependent_and_table_owners",
+      "fixtures": [
+        "word/word-layout-extensions.rtf",
+        "word/word-rtf-table-grid.rtf"
+      ],
+      "feature_rows": [
+        "rtf-469"
+      ],
+      "assertions": [
+        "The layout fixture retains the exact UnsupportedContent refusal for run edits of dependent body content. The supported tail-append lane adds a Unicode paragraph on layout and table-grid parents while preserving the complete native latentstyles bytes, all typed catalog values and restrictions, and exact file/patch replay/inverse."
+      ],
+      "scope_limit": "The added paragraph uses the declared tail owner; this does not widen run-edit or canonical table-writing scope."
     }
   ]
 }

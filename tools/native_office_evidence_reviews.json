@@ -3368,6 +3368,114 @@
         "crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs"
       ],
       "scope_limit": "Evidence-only native fixture gap, not positive action-payload coverage or an unsupported-library claim. Historical authoring inventory stays unchanged. Fresh native InkAction editing/interoperability remains unqualified."
+    },
+    {
+      "feature_row": "rtf-486",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-math-navigation.rtf",
+        "word/word-rtf-minimal.rtf",
+        "word/word-rtf-table-grid.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-embedded-fonts.rtf",
+        "word/word-vector-diagram.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-layout-extensions.rtf",
+        "word/word-tracked-moves.rtf",
+        "word/word-write-reservation.rtf"
+      ],
+      "reason": "The current native RTF corpus lacks the distinct legacy protection password; related protection, reservation and namespace metadata cannot substitute for it.",
+      "required_evidence": "A native-authored RTF containing a nonempty starred password group inside info, with the eight-digit hex value, with producer provenance and expected passive values.",
+      "observed_evidence": "All 15 manifest RTF files were scanned with an independent control-word inventory that skips escaped characters and binary payloads, and opened through the public parser. Legacy password controls and the public protection.password_hash value are absent. Native comments/forms protection flags are positively present in two files; those flags are not password evidence.",
+      "checks": [
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native_style_metadata",
+          "name": "native_rtf_corpus_has_protection_and_reservation_but_no_password_or_smarttag_payloads"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/rtf-final-gap-review.json",
+        "crates/litchi-rtf/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Native files/historical authoring statuses are unchanged. No password authentication, provider activation or synthetic destination is attributed to Word."
+    },
+    {
+      "feature_row": "rtf-489",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-math-navigation.rtf",
+        "word/word-rtf-minimal.rtf",
+        "word/word-rtf-table-grid.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-embedded-fonts.rtf",
+        "word/word-vector-diagram.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-layout-extensions.rtf",
+        "word/word-tracked-moves.rtf",
+        "word/word-write-reservation.rtf"
+      ],
+      "reason": "The current native RTF corpus lacks the distinct SmartTag/factoid payload; related protection, reservation and namespace metadata cannot substitute for it.",
+      "required_evidence": "A native-authored RTF containing paired starred xmlopen/xmlclose groups with xmlns, factoidname and optional xmlattr/xmlattrns metadata over a known body range, with producer provenance and expected passive values.",
+      "observed_evidence": "All 15 manifest RTF files were scanned with an independent control-word inventory that skips escaped characters and binary payloads, and opened through the public parser. No xmlopen/xmlclose/xmlattr/xmlattrns/factoidname controls occur and smart_tags() is empty. Namespace-table declarations do not establish factoid records.",
+      "checks": [
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native_style_metadata",
+          "name": "native_rtf_corpus_has_protection_and_reservation_but_no_password_or_smarttag_payloads"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/rtf-final-gap-review.json",
+        "crates/litchi-rtf/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Native files/historical authoring statuses are unchanged. No password authentication, provider activation or synthetic destination is attributed to Word."
+    },
+    {
+      "feature_row": "rtf-491",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-math-navigation.rtf",
+        "word/word-rtf-minimal.rtf",
+        "word/word-rtf-table-grid.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-embedded-fonts.rtf",
+        "word/word-vector-diagram.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-layout-extensions.rtf",
+        "word/word-tracked-moves.rtf",
+        "word/word-write-reservation.rtf"
+      ],
+      "reason": "The current native RTF corpus lacks the distinct modern protection password hash; related protection, reservation and namespace metadata cannot substitute for it.",
+      "required_evidence": "A native-authored RTF containing a valid starred root-header passwordhash SDATA record with bounded header, salt/hash ranges and any retained unknown bytes, with producer provenance and expected passive values.",
+      "observed_evidence": "All 15 manifest RTF files were scanned with an independent control-word inventory that skips escaped characters and binary payloads, and opened through the public parser. No passwordhash control occurs and modern_password_hash() is None. The separate 120-byte writereservhash is positively present in the write-reservation fixture and is not a protection password hash.",
+      "checks": [
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native_style_metadata",
+          "name": "native_rtf_corpus_has_protection_and_reservation_but_no_password_or_smarttag_payloads"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/rtf-final-gap-review.json",
+        "crates/litchi-rtf/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Native files/historical authoring statuses are unchanged. No password authentication, provider activation or synthetic destination is attributed to Word."
     }
   ]
 }
