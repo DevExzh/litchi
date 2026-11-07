@@ -123,7 +123,7 @@ editor, playback, or native application behavior.
 |-----------------------------------------------|--------|------|-------|-------|
 | General title-, notes-, and handout-master authoring | 🟡 | ✅ | 🟡 | Contextual master inventory resolves main, title, notes, and handout records from the persist graph; master_layout Snapshot/Transaction provides bounded lossless record-tree edits, the metadata editor authors checked SlideNameAtom values, the nested master::metadata::template facade authors main-master TemplateNameAtom values, and notes_styles authors a bounded validated `txStyles` OPC package for notes masters with atomic validation and unknown-record preservation. Full append-only package rebuilding and semantic OfficeArt master synthesis remain outside this scope |
 | Complete native chart authoring | 🟡 | ✅ | 🟡 | The neutral chart inventory and source-bound Graph replacement remain available; the writer now creates a bounded standalone Graph profile (one primary Bar, Line, or no-axis Pie group) with matching `ObjectSubtype::Graph`, `MSGraph.Chart`, persist/storage, and OfficeArt frame closure. Excel-hosted charts, secondary axes, mixed groups, rendering, evaluation, and arbitrary semantic mutation remain outside this profile |
-| Native diagram or SmartArt authoring | ❌ | ❌ | ❌ | The read-only inventory is not a layout/rendering engine or full SmartArt authoring surface; MS-PPT diagram-build records remain animation metadata |
+| Native diagram or SmartArt authoring | ❌ | ❌ | ❌ | Bounded inventory and fixed-width build-metadata edits are not a layout/rendering engine or full SmartArt authoring surface; MS-PPT diagram-build records remain animation metadata |
 | Full OfficeArt record and vendor-extension semantics | 🟡 | 🟡 | 🟡 | The record graph handles the implemented record families and preserves bounded unknown data where possible; unsupported record semantics are not promoted to typed APIs |
 | External resource resolution and OLE/macro/media execution | ❌ | N/A | N/A | URLs, paths, links, OLE verbs, macro names, scripts, and media remain inert even when their containing records are supported |
 | Rendering and slide-show playback | ❌ | N/A | N/A | The crate serializes and exposes presentation data; it does not calculate layout, render shapes, play transitions, or run animation timelines |
@@ -226,3 +226,10 @@ cover stored VBA source, media/OLE frames and paths, plus metadata edits preserv
 presentation and program payloads. External-resource retrieval, OLE/media
 activation, action-link following and macro execution remain outside the supported
 API.
+
+Native-parent Comment 2000 derivatives now qualify classic comment
+create/update/remove, exact fields, catalog validation, drawing/stream preservation,
+file reopen and inverse patches for ppt-368. ppt-369 and ppt-390 remain reviewed
+modern-comment and full-SmartArt boundaries. Declared public gaps and the existing
+native picture/build-record audits provide explicit scope evidence; the comments are
+library-authored additions.

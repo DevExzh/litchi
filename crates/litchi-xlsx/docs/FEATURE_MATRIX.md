@@ -275,3 +275,9 @@ a missing following STRING record, and no longer triggers a spurious write.
 cover explicit VBA package retention/removal and saved control-state edits while
 preserving linked cells and unrelated controls. Macro execution, ActiveX activation
 and trusted-host behavior remain outside the supported API.
+
+xlsx-267 is reviewed as an explicit Python/external-code-service boundary. Library-
+authored Python-part and PY-formula derivatives of native XLSX/XLSM parents retain
+opaque script/relationship bytes through ordinary edits. Auto/Eager uncached PY
+evaluation returns the exact unsupported calculation error. This does not qualify a
+native-authored Python specimen, typed Python model or execution.

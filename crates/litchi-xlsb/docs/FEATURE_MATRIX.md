@@ -290,3 +290,10 @@ Native `get_cell`, cell constructors, concrete `Cell::row`/`column`, wire/editor
 coordinates and positional source reads retain their zero-based contracts.
 Callers that used zero-based arguments for shared-trait reads must add one or
 use the explicit native stored-cell API. Row iteration remains zero-based.
+
+xlsb-332 is reviewed as a typed rich-data boundary, not a fixture-absence claim. The
+native links/objects workbook contains a local-image rich-data closure and
+metadata.bin. A scalar insertion preserves those parts and all relationships/images,
+changes only the worksheet and its rebuilt binary index, and passes eager/indexed
+readback, reopen and exact inverse. No public typed XLSB rich-value model is
+inferred.

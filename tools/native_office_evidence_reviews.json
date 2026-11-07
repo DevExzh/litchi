@@ -2756,6 +2756,292 @@
         "crates/litchi-docx/src/source_backed/alt_chunk_payload.rs"
       ],
       "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "doc-067",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "All twenty native DOC/DOT inputs lack a DataSpaces graph. Explicit native-parent IRM derivatives expose the supported graph and licenses without granting rights; exact payload/identity refusals and stream preservation pass.",
+      "supported_scope": "Validated DataSpaces graph inspection, inert publishing/end-user license payloads and source-bound metadata publication.",
+      "unsupported_scope": "IRM license authorization/evaluation, rights-server access, protected-content decryption or activation.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_irm",
+          "name": "native_binary_word_corpus_has_no_irm_graph_or_license_evidence"
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_irm",
+          "name": "native_word_irm_metadata_derivatives_preserve_inert_payloads_and_refuse_reinterpretation"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-doc/src/package/codec.rs",
+        "crates/litchi-crypto/src/spaces.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "xls-189",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "Native B6 classic notes retain the recorded author/text and protected behavior. The public threadedComment vocabulary returns UnsupportedPath for XLS, with no corresponding capability element; the valid parent sheet remains readable.",
+      "supported_scope": "Native classic NOTE annotations, authors and saved text; exact no-op and protected-note edit refusal.",
+      "unsupported_scope": "A BIFF8 typed threaded-comment/person/mention/reply model or modern collaboration behavior.",
+      "checks": [
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_print_setup_notes_and_hyperlinks_retain_exact_metadata"
+        },
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_protected_notes_allow_exact_noop_and_refuse_changed_text_atomically"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_modern_boundaries",
+          "name": "native_legacy_readers_refuse_declared_modern_feature_paths",
+          "required_features": [
+            "xls",
+            "ppt"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/format/xls/spec.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "xls-190",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-interaction-print.xls",
+        "excel/excel-pivot-controls.xls",
+        "excel/excel-visual-analytics.xls"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "Native pivot reads and caption edits preserve cached data and streams. The public XLS slicer path returns its declared UnsupportedCapability gap. Timeline support is excluded by the owner contract; the slicer refusal does not independently test a timeline endpoint.",
+      "supported_scope": "Native BIFF pivot tables/caches, cached rows and inert pivot-caption edits.",
+      "unsupported_scope": "Typed BIFF8 slicer/timeline cache/view models, selection application or timeline filtering.",
+      "checks": [
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_pivot_cache_rows_axes_and_aggregations_retain_saved_totals"
+        },
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_pivot_caption_edit_preserves_cache_streams_items_and_inverse"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_modern_boundaries",
+          "name": "native_legacy_readers_refuse_declared_modern_feature_paths",
+          "required_features": [
+            "xls",
+            "ppt"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/format/workbook/spec.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "xls-191",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-formula-owners.xls",
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-links-objects.xls"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "Native converted array/spill cells retain exact ranges, tokens and caches even when formula text is unrenderable. Actual unsupported future-function and external-reference calculation returns typed Unsupported without changing saved values. This does not label all formula evaluation unsupported.",
+      "supported_scope": "Native array/shared formula records and saved scalar caches, including converted dynamic-array owners; bounded supported calculations remain separate.",
+      "unsupported_scope": "Modern rich-data types or complete dynamic-array spill/dependency propagation in the BIFF8 owner.",
+      "checks": [
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_formula_owners_keep_cse_shared_dynamic_and_data_table_storage"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_external_and_unregistered_table_formulas_refuse_instead_of_fabricating_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/calc.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "xlsx-267",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "Native-parent derivatives use the specified Python content type/relationship and a PY formula referencing script zero. Auto/Eager evaluators refuse the uncached function with Calc::Error::Unsupported, reports retain Unsupported status, and independent edits/reopen keep the script and workbook relationship bytes. No native-authored Python fixture or executed script is claimed.",
+      "supported_scope": "Opaque OPC preservation of explicitly added Python parts and ordinary cell edits; bounded formula inventory and typed evaluator refusals.",
+      "unsupported_scope": "Python environments/scripts/parameter semantics, typed external-code-service models or execution.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_python_boundary",
+          "name": "native_python_part_derivatives_are_preserved_while_uncached_py_evaluation_refuses",
+          "required_features": [
+            "xlsx",
+            "eval"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-eval/src/engine/dispatch.rs",
+        "crates/litchi-ops/src/calc.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "xlsb-332",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "The native file really contains a _localImage rich-data closure; this is not an absence claim. Scalar insertion preserves that closure byte-for-byte and rebuilds the selected worksheet index correctly. Native array/shared groups also retain their metadata and caches. Generic package preservation does not create a typed rich-value API.",
+      "supported_scope": "Saved scalar/formula values and opaque preservation of native rich-data XML, metadata.bin, image payloads and their OPC graph.",
+      "unsupported_scope": "A public XLSB typed rich-value/rich-data/modern-data-type model, rich-object evaluation or refresh.",
+      "checks": [
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_rich_data_boundary",
+          "name": "native_xlsb_rich_data_and_cell_metadata_remain_opaque_through_scalar_publication"
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_array_shared_and_dynamic_groups_keep_ranges_tokens_and_all_caches"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-xlsb/src/lib.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "ppt-369",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "Explicit classic-comment derivatives on native decks pass create/update/remove with exact field, preservation and inverse checks. The public modernComment path returns the declared UnsupportedCapability gap while ordinary slides remain readable.",
+      "supported_scope": "Binary Comment 2000 author/comment records and source-preserving classic-comment lifecycle edits.",
+      "unsupported_scope": "PresentationML modern-comment parts, replies, persons, presence, reactions or collaboration services in the binary PPT owner.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_legacy_comments",
+          "name": "native_ppt_classic_comment_lifecycle_retains_slide_drawings_and_other_streams"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_modern_boundaries",
+          "name": "native_legacy_readers_refuse_declared_modern_feature_paths",
+          "required_features": [
+            "xls",
+            "ppt"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ppt/src/comments/model.rs",
+        "crates/litchi-ops/src/format/ppt/spec.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
+    },
+    {
+      "feature_row": "ppt-390",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "reason": "The current owner supports the bounded operations listed here; nearby retained data does not establish the excluded semantic/runtime surface.",
+      "required_evidence": "Current documented owner scope, native or clearly labeled native-parent derivative checks, and precise typed refusals at existing public endpoints where available.",
+      "observed_evidence": "The native SmartArt slide stores an exact PNG fallback and no editable diagram builds. The all-deck audit independently scans raw slide envelopes and finds no diagram-build records; typed missing-owner refusals remain explicit. Public smartart navigation returns its declared UnsupportedCapability gap.",
+      "supported_scope": "Native picture/group fallbacks and bounded fixed-width diagram-build metadata inventory/edits where those owners exist.",
+      "unsupported_scope": "Full SmartArt diagram authoring, layout, rendering or conversion of picture fallbacks into editable diagram graphs.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_smartart_derivatives_have_a_picture_without_editable_diagram_builds"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_missing_owners",
+          "name": "native_binary_powerpoint_slides_have_no_diagram_build_records",
+          "required_features": [
+            "encryption"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_modern_boundaries",
+          "name": "native_legacy_readers_refuse_declared_modern_feature_paths",
+          "required_features": [
+            "xls",
+            "ppt"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/format/ppt/spec.rs"
+      ],
+      "scope_limit": "This review remains uncovered and earns no positive semantic coverage for the excluded feature. It does not turn derivative metadata into native-authored evidence, assert universal format absence or qualify fresh Microsoft Office behavior."
     }
   ]
 }

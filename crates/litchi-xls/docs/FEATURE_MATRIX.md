@@ -239,3 +239,9 @@ Native `get_cell`, cell constructors, concrete `Cell::row`/`column`, wire/editor
 coordinates and positional source reads retain their zero-based contracts.
 Callers that used zero-based arguments for shared-trait reads must add one or
 use the explicit native stored-cell API. Row iteration remains zero-based.
+
+The explicit scope reviews for xls-189, xls-190 and xls-191 distinguish native
+classic notes, pivot caches and converted array/formula storage from modern threads,
+slicer/timeline models and rich-value/spill engines. Public native XLS threaded-
+comment and slicer paths retain their precise declared errors; supported bounded
+calculation is not excluded by these reviews.

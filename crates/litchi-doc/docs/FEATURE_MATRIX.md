@@ -139,7 +139,7 @@ execution remain outside the DOC package API.
 | XML signatures storage and signatures stream | ✅ | ✅ | ✅ | Trust-neutral CFB signature verification and transactional signing/editing are exposed; certificate trust and revocation are not established |
 | ObjectPool and embedded OLE/package objects | ✅ | ✅ | ✅ | `embedded_object::Snapshot::storages()` exposes every discovered native ObjectPool storage for passive metadata/payload reads. The separate managed-field inventory and source-checked add/remove/reorder/replace operations use the editor-owned field convention; typed ODT/OLEDS metadata edits remain within that managed owner. Unknown streams and inert payloads are preserved and objects are never activated or opened. The ordinary `body_text` root exports and transfers the bounded standalone CFB plus exact preview block, regenerating field/CHPX/Data/CLX/PLCF receiver references under collision checks and blob-backed durable inversion. |
 | Macros storage and VBA project payload | ✅ | ✅ | ✅ | Bounded MS-OVBA compressed-container, dir, PROJECT, module, and cache-free source metadata are read and authored; code is never compiled or executed |
-| Information Rights Management Data Space and protected content | 🟡 | ✅ | ❌ | `Package::data_spaces` exposes the validated, inert `litchi_doc::spaces::Graph` from the shared MS-OFFCRYPTO owner, including legacy-binary IRM transform/license topology, labels, and integrity sidecars; rights evaluation, decryption, and protected-content access remain outside the API |
+| Information Rights Management Data Space and protected content | 🟡 | ✅ | ❌ | `raw::Reader::data_spaces` exposes the validated, inert `litchi_doc::spaces::Graph` from the shared MS-OFFCRYPTO owner, including legacy-binary IRM transform/license topology, labels, and integrity sidecars; rights evaluation, decryption, and protected-content access remain outside the API |
 | Unknown streams and storages | 🟡 | ✅ | 🟡 | Package-preserving editors can retain unrelated CFB topology where supported, but an arbitrary stream has no DOC semantic model or write guarantee |
 
 ## [MS-DOC] PLC, property, and auxiliary-family audit
@@ -352,3 +352,9 @@ reports unsupported fields and remains inert.
 cover bounded VBA source inspection, saved form defaults and inert payload
 retention. Compiling or executing VBA, instantiating controls and invoking host
 callbacks remain outside the supported API.
+
+Native IRM coverage now checks all twenty DOC/DOT inputs for the absence of a
+DataSpaces graph and tests explicitly added inert graph/license metadata on native
+document and macro parents. No-op publication, file reopen and source-conflict
+checks preserve all logical streams. These derivatives partially cover doc-031;
+doc-067 remains a reviewed rights-evaluation boundary without semantic credit.

@@ -6981,12 +6981,13 @@
       ],
       "feature_rows": [
         "rtf-464",
-        "rtf-485"
+        "rtf-485",
+        "rtf-492"
       ],
       "assertions": [
         "Arabic/Hebrew/Japanese/Chinese runs resolve exact native fonts, selected associated font IDs and language IDs. Canonical model writing preserves all visible characters with complete Formatting values, paragraph properties, opaque nodes, fonts, colors, styles, metadata, theme and datastore."
       ],
-      "scope_limit": "Explicit local LTR metadata is kept distinct from script/language data; no bidi layout or glyph-shaping result is claimed. Lexical Unicode escapes may split run segmentation."
+      "scope_limit": "Explicit local LTR metadata is kept distinct from script/language data; no bidi layout or glyph-shaping result is claimed. Lexical Unicode escapes may split run segmentation. RTF 1.9.1 identifies loch/hich/dbch as Word 6J-associated properties; the historical blanket exclusion is corrected to partial support, not full East Asian layout."
     },
     {
       "crate": "litchi-rtf",
@@ -9184,6 +9185,86 @@
         "On native Print_015, numeric (2,2), coordinate B2 and direct FormulaEvaluator reads all return the saved value 42 (Float in XLS, Int in XLSB). The shared cell reports (2,2) and source files remain exact."
       ],
       "scope_limit": "Closes the coordinate discrepancy recorded in receipt 060; does not execute formulas, providers or macros."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_irm",
+      "name": "native_word_irm_metadata_derivatives_preserve_inert_payloads_and_refuse_reinterpretation",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.doc"
+      ],
+      "feature_rows": [
+        "doc-031"
+      ],
+      "assertions": [
+        "Explicit IRM metadata derivatives preserve every native CFB stream and native visible text. The raw owner classifies the legacy-binary protected-stream reference and retains publishing-license XML and the end-user certificate chain verbatim.",
+        "Known transform identity/payload changes return exact Invalid errors without altering staging. No-op publication, file save/reopen and inverse preserve all logical stream contents; a different license rejects the stale patch."
+      ],
+      "scope_limit": "Library-authored structural metadata and inert sentinel payloads only. No native-authored IRM fixture, encrypted protected-content access, cryptographic license validity, authorization or rights-server interaction is claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_legacy_east_asia",
+      "name": "native_rtf_unmodeled_east_asian_controls_remain_opaque_through_body_writing",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-492"
+      ],
+      "assertions": [
+        "Eight explicitly injected unmodeled East Asian controls retain exact lexical bytes and the body anchor after the native marker. Native text, font data and all opaque nodes survive canonical model writing, while direct save is exact. A twelve-node source exceeds an eleven-node quota with exact typed counts."
+      ],
+      "scope_limit": "These controls are explicit native-parent derivatives and remain opaque; this does not implement their legacy layout or claim they were emitted by the recorded Office session."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_legacy_east_asia",
+      "name": "native_rtf_legacy_control_header_derivative_refuses_lossy_canonical_publication",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-492"
+      ],
+      "assertions": [
+        "The same eight library-added controls in a header keep exact source bytes and typed HeaderFooter structural anchors. Canonical rewriting returns the exact InvalidInput refusal before writing any output; source round trips and native body text remain unchanged."
+      ],
+      "scope_limit": "Opaque structural preservation/refusal only, not typed semantics for the controls or fresh Word layout."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_rich_data_boundary",
+      "name": "native_xlsb_rich_data_and_cell_metadata_remain_opaque_through_scalar_publication",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-280"
+      ],
+      "assertions": [
+        "Pin the native five-part rich-data closure, _localImage payload, image digest and metadata.bin digest. Inserting J50=42.5 changes exactly sheet1.bin and its rebuilt binary index; every rich-data part, relationship, image and other member remains exact.",
+        "Every original cell keeps its value, formula bytes and style. Eager and indexed source reads agree on J50; file reopen, forward replay and complete inverse preserve the expected package bytes."
+      ],
+      "scope_limit": "Generic scalar editing and opaque preservation only. The XLSB crate still exposes no typed rich-value model; xlsb-332 remains a reviewed uncovered boundary."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_legacy_comments",
+      "name": "native_ppt_classic_comment_lifecycle_retains_slide_drawings_and_other_streams",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-368"
+      ],
+      "assertions": [
+        "Native decks start without comments. Library-authored Comment 2000 additions retain exact author, initials, Unicode text, date, index and position. Update and removal preserve the comment identity and other fields as specified.",
+        "Each stage saves/reopens, validates the author/comment catalog, replays and exactly inverts. Every slide keeps its drawing payload and text, unselected slide envelopes remain exact, and all streams outside PowerPoint Document/Current User are preserved."
+      ],
+      "scope_limit": "Classic-comment derivatives only; no native-authored classic-comment fixture, modern replies/persons/presence/reactions or service interaction is claimed."
     }
   ]
 }
