@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "e0b82993b0cc7abb6d24b4be96ec4311aef99ff3",
+  "base_commit": "0a3b7c920f04579fac4f116e79987a2e34c0907f",
+  "problem": "The canonical DOC reader rejected older FIB versions only when the selected table stream was missing. A retained modern table stream caused older-profile headers to be misinterpreted as table pointers and reported as CLX corruption. Signature/trust rows also lacked native-parent operation coverage separating cryptographic validity, payload integrity, signature presence and PKI trust.",
+  "changes": [
+    "Reject older DOC layouts before consulting modern table pointers, independently of table presence and stylesheet leniency. Retain the known C0 Word 97 shell-template exception; C2 compatibility admission is unchanged. Missing table streams on admitted modern profiles remain StreamNotFound.",
+    "Add two owning-DOC and one public-operations native-source derivative regressions for exact older-version refusals, compatible-header admission and error propagation. Originals are immutable and the derivatives are not claimed to be native-authored older Word files.",
+    "Add three signature regressions: caller-key signature creation/verification over seven native Office parents; signed workbook outer/inner no-op and edit policy through explicit unsign; and payload-tamper separation of integrity, signature math and trust.",
+    "Strengthen the existing tracked Microsoft Office 2010 certificate-bearing signature tests to require Trust::NotChecked. Add test-only P-256 and optional OPC signature-authoring dependencies for fixture creation; no production operations signing-provider API is introduced.",
+    "Replace two ignored DOC placeholders with a tracked native file-opening check and an in-memory typed invalid-CFB check. The tests no longer require an untracked test.doc or write test_invalid.tmp into the working directory.",
+    "Index six concrete native-input tests and record five explicit boundaries: doc-022, xls-196, xlsx-273, xlsb-339 and docx-132. Keep native-authored signed-fixture handoffs open and all historical authoring statuses unchanged."
+  ],
+  "verification_scope": {
+    "legacy_admission": "On native word-text-structure.doc and word-layout-extensions.dot derivatives, nFib 0021/0045/0065/0067/0068 yields exact UnsupportedVersion values/names under Strict and TolerateStylesheetDefects. Each retains 1Table. The positional edit owner returns Refused(UnsupportedSource). CFB envelopes are reserialized; all stream payloads except the selected WordDocument nFib bytes remain exact.",
+    "compatible_headers": "C0 shell and C2 bidi derivatives retain complete projected text, 183 table pointers, template identity and byte-exact no-op publication. Their positional editing refusal matches the original rich-body restriction rather than becoming UnsupportedSource. This does not qualify all shell/bidi semantics or arbitrary FIB versions.",
+    "public_errors": "Word 6/95 header derivatives of both native DOC/DOT parents return Code::UnsupportedFormat with nested DOC UnsupportedVersion through Auto/file and Eager/byte ingress. Original and temporary input files remain unchanged. The prior invalid-table-pointer interpretation is not accepted as the intended boundary.",
+    "seven_signature_parents": "Native DOC/DOCX/PPT/PPTX text specimens and XLS/XLSX/XLSB metadata workbooks begin unsigned. Disposable deterministic caller-key XML signatures verify Valid integrity and signature math, Complete supported-resource reference coverage, non-SHA1 algorithms, exact claimed time, no certificate chain and Trust::NotChecked. Original CFB streams/data-part payloads remain exact; library reopen detects Signed, retains original text and publishes the signed archive exactly on no-op.",
+    "signed_edit_policy": "XLS/XLSX/XLSB signed derivatives exercise Auto/file and Eager/byte ingress. Outer and wrapped inner handles retain cache A7=30 and exact no-op bytes and reject Z100 edits with DocumentProtected. Explicit unsign permits the edit. The result has no signatures and matches an ordinary native-source scalar edit by every CFB stream byte or the complete OPC content-type/relationship graph and every data-part payload. Other signed clones remain unchanged.",
+    "tamper_and_presence": "Replacing only the signed Workbook or sheet1 payload with a valid scalar-edited payload makes integrity Invalid while signature math stays Valid and trust stays NotChecked. Opening still detects Signed because that wrapper is presence/edit-policy metadata, not automatic cryptographic verification. The original signed derivative continues to verify.",
+    "actual_microsoft_certificates": "The pre-existing tracked Microsoft Office 2010 signed DOCX/XLSX/PPTX fixtures under test-data/poi/test-data/xmldsign have nonempty certificates and valid mathematical verification under their explicitly compatible SHA-1 policy, with Partial reference coverage and Trust::NotChecked. They supplement, rather than change, the 139-file corpus; no new native signatures were authored.",
+    "reactivated_tests": "The raw DOC reader now opens the tracked native text fixture and asserts 183 pointers, 25 paragraphs and WORD_NATIVE_END. A zeroed 512-byte input asserts Error::Ole(NotOleFile) without filesystem side effects. Both former ignored placeholders now run.",
+    "limits": "No native Word 6/95 interpretation, full C0/C2 compatibility, native-authored signature generation, fresh Office reopen, legacy CryptoAPI _signatures authoring, authenticated signer identity, certificate-chain/revocation lookup, trusted timestamp, macro execution or external activation is claimed. A mathematically valid signature is not PKI trust."
+  },
+  "reproduction": {
+    "artifact": {
+      "file_name": "native-inert-version-reproduction.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-version-reproduction.log",
+      "bytes": 18655,
+      "sha256": "56ecc38628d9d0636173e091f8574193082c69a661361fae6b594a754f30c638"
+    },
+    "observed": "The older-profile derivative with nFib 0021 and retained native 1Table was reported as Corrupted(CLX offset 640614400 is beyond table stream length 11310). The same initial probe also assumed the positional owner admitted the rich-body compatibility derivative; the final test correctly preserves that owner's existing Field/Table-style edit refusal and does not treat it as a product defect.",
+    "regenerate": "In an isolated base_commit checkout, copy crates/litchi-doc/tests/microsoft_office_native_version_boundary.rs from source_commit and run TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --test microsoft_office_native_version_boundary native_doc_derivatives_reject_older_fib_profiles_even_with_modern_table_streams --locked --offline."
+  },
+  "results": {
+    "new_indexed_native_input_tests": 6,
+    "reactivated_ignored_tests": 2,
+    "strengthened_existing_certificate_test": 1,
+    "new_native_authored_signed_fixtures": 0,
+    "distinct_rust_tests_passed": 2550,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_tests_passed": 76,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 341,
+      "indexed_tests": 496,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 20,
+      "unsupported_boundary_needs_review": 24,
+      "external_fixture_handoff_needs_review": 27
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 348,
+      "indexed_tests": 502,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 25,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 348,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 19,
+        "reviewed_native_fixture_gap_requires_followup": 23,
+        "reviewed_explicit_scope_boundary": 25,
+        "unsupported_boundary_needs_review": 20,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-sign --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-owners-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-owners-final.log",
+        "bytes": 160584,
+        "sha256": "7c48de8e18b6de03aeff97264549128c3f61afe56eff3d9caa1935481ac4c296"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-sign --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-owners-final.log 2>&1"
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --lib --test 'doc_*' --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-ops.log",
+        "bytes": 95420,
+        "sha256": "e750c754f2e53f6c3e0db66d068bad5dd1801422272731d2daeb585c17d2c134"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --lib --test 'doc_*' --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-ops.log 2>&1"
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,xls,xlsx,xlsb,sign --test microsoft_office_native_signature_boundary --test microsoft_office_native_legacy_profile --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-focused.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-focused.log",
+        "bytes": 18010,
+        "sha256": "ac49fd110827a333a58538c05b2b24576ca234cd408cbb239e1065a4098712ad"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,xls,xlsx,xlsb,sign --test microsoft_office_native_signature_boundary --test microsoft_office_native_legacy_profile --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-focused.log 2>&1"
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-facade.log",
+        "bytes": 20436,
+        "sha256": "8894d240bebee16b329e51a7140e381d27d7b5802dd664149efbafc79946f357"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-facade.log 2>&1"
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc -p litchi-sign --all-features --lib --tests --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-owner-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-owner-clippy.log",
+        "bytes": 17717,
+        "sha256": "f965715aacb65d8f00ffa99e75b7751f80065accb9d37980353e3012fbb97193"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc -p litchi-sign --all-features --lib --tests --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-owner-clippy.log 2>&1"
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,xls,xlsx,xlsb,sign --lib --test microsoft_office_native_signature_boundary --test microsoft_office_native_legacy_profile --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-ops-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-ops-clippy.log",
+        "bytes": 18936,
+        "sha256": "80c8bcbc89935b54342e42a5e3c9bb31a06b6300db1f69bda88b9fae64f239fa"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,xls,xlsx,xlsb,sign --lib --test microsoft_office_native_signature_boundary --test microsoft_office_native_legacy_profile --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-ops-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-python.log",
+        "bytes": 668,
+        "sha256": "f96cb4341fb968731dfcfde80ac67fdec458f840f84272616cca5dddc4c5aa64"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-inert-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-coverage.json",
+        "bytes": 1249272,
+        "sha256": "322a48945acdcf0c51a67712ecb0eb44327a6cbca9d5121b1447a3f2421b562c"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-inert-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check on every changed Rust file; git diff --cached --check; both AGENTS.md staged evidence/binaries guards",
+      "result": "Passed with no output before source commit. No binaries or large evidence are committed."
+    }
+  ],
+  "validation_details": {
+    "owners": "1582 passed in 62 suites, zero ignored after replacing the two stale placeholders.",
+    "operations": "947 passed in ten suites; the one existing ignored libreoffice_probe_files test writes manual export probes to DOC_WRITE_DIR and is outside automated native validation.",
+    "facade": "21 passed in three native targets. The final focused four tests overlap the operations suite and are not counted twice.",
+    "review_liveness": "All seven distinct check identities referenced by the five new boundary reviews have explicit passing entries in the final owner/operations logs.",
+    "dependency_scope": "OPC signing and the public test P-256 key are fixture-construction dependencies of operations tests only; default production operations features are unchanged. No lockfile change was required.",
+    "warnings": "Existing vendor warnings remain unchanged.",
+    "scope_accounting": "The seven signature feature rows now have partial native-parent operation coverage only. Their native_pending_classification and scope limits continue to record native-authored signature handoffs. Neither these derivatives nor the five boundary reviews promote historical native-fixture status."
+  },
+  "remaining_work": "The goal remains active. There are 348 partial assertion scopes to review, 23 reviewed native-fixture gaps, 58 native-UI dispositions, 19 still-unreviewed external dispositions and 20 unsupported-boundary rows. Twenty-five explicit boundaries are reviewed. Native-authored signature handoffs also remain visible inside the newly partial rows; the reduced external-only count is not evidence that those producer fixtures now exist."
+}
