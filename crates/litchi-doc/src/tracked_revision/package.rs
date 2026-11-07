@@ -1985,9 +1985,13 @@ impl RevisionEditor {
             });
             cursor = end;
         }
-        candidate
-            .papx
-            .push(PapxRun::new(fc, cursor, copy.papx.clone(), false, copy.phe));
+        candidate.papx.push(PapxRun::new(
+            fc,
+            cursor,
+            copy.papx.clone(),
+            super::codec::papx_table_state(&copy.papx)?,
+            copy.phe,
+        ));
         candidate.shift_cp_tables(at, 0, added)?;
         candidate.main_ccp = candidate
             .main_ccp
@@ -2110,6 +2114,11 @@ impl RevisionEditor {
 
     /// Whether the paragraph ending at `cp` has the MS-DOC in-table flag.
     pub(crate) fn is_in_table_at_cp(&self, cp: u32) -> Result<bool> {
+        self.table_terminator_state_at_cp(cp).map(|state| state.0)
+    }
+
+    /// Direct in-table and top-level TTP flags at a paragraph terminator.
+    pub(crate) fn table_terminator_state_at_cp(&self, cp: u32) -> Result<(bool, bool)> {
         let piece = containing_piece(&self.pieces, cp)
             .ok_or_else(|| corrupted("paragraph terminator has no text piece"))?;
         let width = if piece.unicode { 2 } else { 1 };
@@ -2124,7 +2133,7 @@ impl RevisionEditor {
             .ok_or_else(|| corrupted("paragraph FC overflow"))?;
         let run = containing_papx(&self.papx, fc)
             .ok_or_else(|| corrupted("paragraph terminator has no PAPX run"))?;
-        Ok(run.in_table())
+        Ok((run.in_table(), run.row_end()))
     }
 
     /// Resolves the exact Data-stream offset carried by
@@ -3810,7 +3819,7 @@ mod containment_tests {
             start,
             end,
             vec![0; 2],
-            false,
+            crate::tracked_revision::model::PapxTableState::default(),
             crate::parts::fkp::ParagraphHeight {
                 info_field: 0,
                 reserved: 0,

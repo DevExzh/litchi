@@ -87,17 +87,30 @@ pub(super) struct FcRun {
     pub(super) grpprl: Vec<u8>,
 }
 
+/// Direct table-membership and top-level row-terminator flags cached from PAPX.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(transparent)]
+pub(super) struct PapxTableState(u8);
+impl PapxTableState {
+    pub(super) fn new(in_table: bool, row_end: bool) -> Self {
+        Self(u8::from(in_table) | (u8::from(row_end) << 1))
+    }
+    pub(super) const fn in_table(self) -> bool {
+        self.0 & 1 != 0
+    }
+    pub(super) const fn row_end(self) -> bool {
+        self.0 & 2 != 0
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct PapxRun {
     pub(super) start: u32,
     pub(super) end: u32,
     pub(super) grpprl: Vec<u8>,
-    /// Final `sprmPFInTable` state from the strictly parsed PAPX body.
-    ///
-    /// Keeping only this scalar avoids retaining a parsed SPRM vector while
-    /// making paragraph-terminator table checks allocation-free. It must be
-    /// refreshed whenever `grpprl` changes.
-    in_table: bool,
+    /// Final `sprmPFInTable` and `sprmPFTtp` states. The one-byte cache
+    /// keeps terminator queries allocation-free and is refreshed on edits.
+    table_state: PapxTableState,
     pub(super) phe: ParagraphHeight,
 }
 
@@ -106,14 +119,14 @@ impl PapxRun {
         start: u32,
         end: u32,
         grpprl: Vec<u8>,
-        in_table: bool,
+        table_state: PapxTableState,
         phe: ParagraphHeight,
     ) -> Self {
         Self {
             start,
             end,
             grpprl,
-            in_table,
+            table_state,
             phe,
         }
     }
@@ -121,12 +134,16 @@ impl PapxRun {
     #[inline]
     #[must_use]
     pub(super) const fn in_table(&self) -> bool {
-        self.in_table
+        self.table_state.in_table()
     }
 
-    pub(super) fn replace_grpprl(&mut self, grpprl: Vec<u8>, in_table: bool) {
+    pub(super) const fn row_end(&self) -> bool {
+        self.table_state.row_end()
+    }
+
+    pub(super) fn replace_grpprl(&mut self, grpprl: Vec<u8>, table_state: PapxTableState) {
         self.grpprl = grpprl;
-        self.in_table = in_table;
+        self.table_state = table_state;
     }
 }
 

@@ -1382,3 +1382,25 @@ fn parses_table_row_revision_state_strictly() {
     let invalid_dttm = [0x67, 0xD6, 7, 1, 0, 0, 0x3F, 0, 0, 0];
     assert!(parser.parse_tap(&invalid_dttm).is_err());
 }
+
+#[test]
+fn insertion_defined_rows_start_empty_and_keep_exact_column_count() {
+    let arena = Bump::new();
+    let parser = TapParser::new(&arena);
+    let empty = parser.parse_tap(&[]).unwrap();
+    assert_eq!(empty.cell_count, 0);
+    assert_eq!(empty.cell_boundaries, [0]);
+    assert!(empty.cell_properties.is_empty());
+    let mut sprms = Vec::new();
+    append_fixed_sprm(&mut sprms, 0x9601, &108i16.to_le_bytes());
+    append_fixed_sprm(&mut sprms, 0x7621, &[0, 4, 0x24, 0x09]);
+    append_fixed_sprm(&mut sprms, 0x9602, &108i16.to_le_bytes());
+    let row = parser.parse_tap(&sprms).unwrap();
+    assert_eq!(row.cell_count, 4);
+    assert_eq!(row.cell_properties.len(), 4);
+    assert_eq!(row.cell_boundaries, [0, 2448, 4788, 7128, 9468]);
+    // A missing definition may not manufacture a cell for range operations.
+    let mut invalid = Vec::new();
+    append_fixed_sprm(&mut invalid, 0x7623, &[0, 1, 100, 0]);
+    assert!(parser.parse_tap(&invalid).is_err());
+}

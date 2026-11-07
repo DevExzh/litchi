@@ -6562,6 +6562,121 @@
         "Only the two exact val attribute strings in slide4.xml change. Every other XML byte/member, including opaque a16 GUIDs and chart/style/color/embedded-workbook graph, remains exact. File save/reopen and reopened member inverse pass."
       ],
       "scope_limit": "Bounded existing-identifier update and duplicate-ID refusal only; no chart regeneration, collaboration history or fresh native-app reopen."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_fib_generation_template_and_saved_statistics_remain_distinct",
+      "fixtures": [
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-020",
+        "doc-021",
+        "doc-054"
+      ],
+      "assertions": [
+        "Exact base nFib 0x00c1, 183 counted pointers, nFibNew 0x0112, table-stream selector, main-story counts, DOC/DOT template distinction, Dop2013 generation and all ten saved statistics; empty commits retain original bytes."
+      ],
+      "scope_limit": "Four modern Word binary files; no old-generation writer coverage, live statistic calculation or other DOP extension behavior is inferred."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_tables_keep_row_headers_nested_depth_merges_and_cell_extents",
+      "fixtures": [
+        "word/word-tables-layout.doc"
+      ],
+      "feature_rows": [
+        "doc-039"
+      ],
+      "assertions": [
+        "Five outer rows retain exact text, header state, physical-cell CP tiling and modern TAP boundaries; insertion-defined TAPs have no phantom cell. Seven nested paragraphs retain depth and two vertical-merge row properties."
+      ],
+      "scope_limit": "Nested content is inspected in the paragraph stream, not a recursive editable table tree. Multiparagraph/nested tables remain outside the simple-cell transaction profile; no layout rendering is claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_doc_and_dot_cell_resize_excludes_row_marks_and_preserves_other_stories",
+      "fixtures": [
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-034",
+        "doc-039"
+      ],
+      "assertions": [
+        "Four real cells exclude both TTP marks; final cell grows from 42 to 420, index four refuses after the staged edit, and main/section CP ends advance by one. File reopen, exact inverse, template flag, all other text, stylesheet/fonts/DOP records and unrelated CFB streams are preserved."
+      ],
+      "scope_limit": "Single nonempty plain cell replacement on native DOC/DOT; no structural, nested or empty-cell insertion support is added."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_bookmark_crud_preserves_the_original_reference_and_text",
+      "fixtures": [
+        "word/word-review-controls.doc"
+      ],
+      "feature_rows": [
+        "doc-036"
+      ],
+      "assertions": [
+        "Original LITCHI_BOOKMARK_003 remains at 126..144 while a new unreferenced bookmark is added at 0..6, renamed, saved/reopened and removed. Text, field/annotation PLCs and unrelated streams stay exact; both retained patches invert exactly."
+      ],
+      "scope_limit": "Standard body bookmarks only; renaming does not automatically rewrite REF instructions, navigate or refresh fields."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_failed_bookmark_rename_is_atomic_after_invalid_duplicate_and_limit_errors",
+      "fixtures": [
+        "word/word-review-controls.doc"
+      ],
+      "feature_rows": [
+        "doc-036"
+      ],
+      "assertions": [
+        "Invalid name preserves exact original bytes; case-insensitive collision and second-step operation-limit failure preserve the original bookmark, one previously staged addition and its exact committed bytes."
+      ],
+      "scope_limit": "Native standard-bookmark rename failure atomicity; other bookmark families are not covered."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_sections_stop_at_main_story_while_retaining_the_wire_sentinel",
+      "fixtures": [
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-042"
+      ],
+      "assertions": [
+        "Semantic final section ends match main-story counts 434/257/379/379 while raw PlcfSed sentinels remain 556/346/548/548; secondary-story CPs return no section and source bytes stay exact."
+      ],
+      "scope_limit": "Read membership boundaries only; no pagination or native UI validation."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_structure",
+      "name": "native_section_edit_keeps_landscape_geometry_other_properties_and_stories",
+      "fixtures": [
+        "word/word-tables-layout.doc"
+      ],
+      "feature_rows": [
+        "doc-042"
+      ],
+      "assertions": [
+        "Two native sections retain exact portrait/landscape geometry and CP ranges; second-section margin/column edits change only requested semantic properties. Raw sentinel, body and secondary-story text, saved RSID, stylesheet/fonts/DOP and unrelated streams survive file reopen; inverse is exact."
+      ],
+      "scope_limit": "Left margin and equal-width column count only; no rendered columns, page-numbering edits, footnote-column extension or fresh Word reopen is claimed."
     }
   ]
 }

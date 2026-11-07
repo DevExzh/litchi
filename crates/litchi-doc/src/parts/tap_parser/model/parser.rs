@@ -70,8 +70,9 @@ impl TapParser<'_> {
             }
         }
 
-        // No table definition found - use default with 1 cell
-        Ok(TableProperties::with_cell_count(1))
+        // MS-DOC 2.6.3: rows start with zero columns. Modern Word may
+        // define them entirely with sprmTInsert in sprmPTableProps.
+        Ok(TableProperties::with_cell_count(0))
     }
 
     /// Check if a SPRM is a TAP (table) SPRM.

@@ -1,6 +1,8 @@
 //! MS-DOC codecs and bounded binary helpers for tracked revisions.
 
-use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
+use super::model::{
+    CpTable, FcRun, PapxRun, PapxTableState, RawPiece, Revision, RevisionKind, RevisionMetadata,
+};
 use crate::DateTime;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
@@ -409,21 +411,36 @@ mod revision_flag_tests {
     }
 }
 
-/// Parse one PAPX group and retain only the final table-membership state.
-///
-/// PAPX carries a two-byte style index before its SPRM body. The reverse
-/// lookup deliberately mirrors the legacy reader semantics: duplicate
-/// `sprmPFInTable` records are resolved by the last record, and only the
-/// literal byte value `1` means that the paragraph is in a table.
-pub(super) fn papx_in_table_state(grpprl: &[u8]) -> Result<bool> {
+/// Parse one PAPX once and retain its direct table/row-end flags. Duplicate
+/// SPRMs are last-wins, and only the literal byte 1 denotes true, matching
+/// the reader's table-membership semantics.
+pub(super) fn papx_table_state(grpprl: &[u8]) -> Result<PapxTableState> {
     let body = grpprl
         .get(2..)
         .ok_or_else(|| corrupted("PAPX has no style index"))?;
-    Ok(papx_sprms(body)?
-        .iter()
-        .rev()
-        .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
-        .is_some_and(|sprm| sprm.operand_byte() == Some(1)))
+    let sprms = papx_sprms(body)?;
+    let mut in_table = None;
+    let mut row_end = None;
+    for sprm in sprms.iter().rev() {
+        if sprm.opcode == SPRM_P_F_IN_TABLE && in_table.is_none() {
+            in_table = Some(sprm.operand_byte() == Some(1));
+        }
+        if sprm.opcode == crate::sprm_operations::SPRM_P_F_TTP && row_end.is_none() {
+            row_end = Some(sprm.operand_byte() == Some(1));
+        }
+        if in_table.is_some() && row_end.is_some() {
+            break;
+        }
+    }
+    Ok(PapxTableState::new(
+        in_table.unwrap_or(false),
+        row_end.unwrap_or(false),
+    ))
+}
+
+#[cfg(test)]
+fn papx_in_table_state(grpprl: &[u8]) -> Result<bool> {
+    papx_table_state(grpprl).map(PapxTableState::in_table)
 }
 
 /// The SPRMs of a PAPX body (after its style index). A PAPX in an FKP is
@@ -503,16 +520,16 @@ pub(super) fn split_transform_papx(
             .any(|(a, b)| *a < run.end && *b > run.start)
         {
             let grpprl = transform(&run.grpprl)?;
-            let in_table = papx_in_table_state(&grpprl)?;
-            replacements.push((index, grpprl, in_table));
+            let table_state = papx_table_state(&grpprl)?;
+            replacements.push((index, grpprl, table_state));
         }
     }
     if replacements.is_empty() {
         return Err(corrupted("tracked property range is outside PAPX coverage"));
     }
-    for (index, grpprl, in_table) in replacements {
+    for (index, grpprl, table_state) in replacements {
         let run = &mut runs[index];
-        run.replace_grpprl(grpprl, in_table);
+        run.replace_grpprl(grpprl, table_state);
     }
     Ok(())
 }
@@ -572,12 +589,12 @@ pub(super) fn parse_papx(word: &[u8], table: &[u8]) -> Result<Vec<PapxRun>> {
             if grpprl.len() < 2 {
                 return Err(corrupted("PAPX style index is missing"));
             }
-            let in_table = papx_in_table_state(&grpprl)?;
+            let table_state = papx_table_state(&grpprl)?;
             output.push(PapxRun::new(
                 entry.fc,
                 entry.end_fc,
                 grpprl,
-                in_table,
+                table_state,
                 entry
                     .paragraph_height
                     .ok_or_else(|| corrupted("PAPX PHE is missing"))?,
@@ -1248,7 +1265,7 @@ mod papx_cache_tests {
     }
 
     fn papx_run(start: u32, end: u32, grpprl: Vec<u8>) -> PapxRun {
-        let in_table = papx_in_table_state(&grpprl).expect("test PAPX should parse");
+        let in_table = papx_table_state(&grpprl).expect("test PAPX should parse");
         PapxRun::new(
             start,
             end,
@@ -1275,6 +1292,33 @@ mod papx_cache_tests {
             !papx_in_table_state(&papx_grpprl(&[table_sprm(1), table_sprm(0),].concat())).unwrap()
         );
         assert!(!papx_in_table_state(&papx_grpprl(&table_sprm(2))).unwrap());
+    }
+
+    #[test]
+    fn papx_row_end_cache_tracks_last_operand_and_atomic_transform() {
+        let mut row = crate::sprm_operations::SPRM_P_F_TTP.to_le_bytes().to_vec();
+        row.push(1);
+        let original = papx_grpprl(&[table_sprm(1).to_vec(), row.clone()].concat());
+        let mut runs = vec![papx_run(0, 10, original)];
+        assert!(runs[0].in_table() && runs[0].row_end());
+        for value in [0, 2, 1] {
+            row[2] = value;
+            split_transform_papx(&mut runs, &[(0, 10)], |grpprl| {
+                Ok([grpprl, row.as_slice()].concat())
+            })
+            .unwrap();
+            assert!(runs[0].in_table());
+            assert_eq!(runs[0].row_end(), value == 1);
+        }
+        let before = runs[0].clone();
+        assert!(
+            split_transform_papx(&mut runs, &[(0, 10)], |grpprl| {
+                Ok([grpprl, &row[..2]].concat())
+            })
+            .is_err()
+        );
+        assert_eq!(runs[0].grpprl, before.grpprl);
+        assert!(runs[0].in_table() && runs[0].row_end());
     }
 
     #[test]
@@ -1387,7 +1431,7 @@ mod papx_cache_tests {
             start,
             start + 10,
             vec![0x5A; len],
-            false,
+            PapxTableState::default(),
             ParagraphHeight {
                 info_field: 0,
                 reserved: 0,

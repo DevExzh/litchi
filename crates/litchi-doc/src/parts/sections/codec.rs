@@ -32,7 +32,13 @@ pub(super) fn parse(
     let data = table_stream.get(start..end).ok_or_else(|| {
         PackageError::Corrupted("PlcfSed extends beyond the table stream".to_string())
     })?;
-    parse_data(data, word_document, authors, tolerance)
+    parse_data(
+        data,
+        word_document,
+        authors,
+        tolerance,
+        Some(fib.get_main_doc_range().1),
+    )
 }
 
 impl SectionsTable {
@@ -73,6 +79,7 @@ impl SectionsTable {
             word_document,
             authors,
             &mut ToleranceReport::default(),
+            None,
         )
     }
 
@@ -83,7 +90,7 @@ impl SectionsTable {
         authors: &RevisionAuthorTable,
     ) -> Result<(Self, ToleranceReport)> {
         let mut tolerance = ToleranceReport::default();
-        let table = parse_data(data, word_document, authors, &mut tolerance)?;
+        let table = parse_data(data, word_document, authors, &mut tolerance, None)?;
         Ok((table, tolerance))
     }
 }
@@ -93,6 +100,7 @@ fn parse_data(
     word_document: &[u8],
     authors: &RevisionAuthorTable,
     tolerance: &mut ToleranceReport,
+    main_end: Option<u32>,
 ) -> Result<SectionsTable> {
     if data.len() < 20 || !(data.len() - 4).is_multiple_of(16) {
         return Err(PackageError::Corrupted(
@@ -108,6 +116,20 @@ fn parse_data(
         cps.push(read_u32(data, index * 4, "PlcfSed CP")?);
     }
     validation::character_positions(&cps)?;
+    if let Some(main_end) = main_end {
+        // MS-DOC 2.8.26 allows the stored sentinel to extend into later
+        // document parts. Those parts are not members of the last section.
+        if cps[section_count] < main_end
+            || cps[..section_count]
+                .iter()
+                .any(|&start| start > main_end || (start == main_end && main_end != 0))
+        {
+            return Err(PackageError::Corrupted(
+                "PlcfSed does not delimit sections of the main document".into(),
+            ));
+        }
+        cps[section_count] = main_end;
+    }
 
     let mut sections = Vec::with_capacity(section_count);
     let mut revisions = Vec::new();
@@ -177,4 +199,69 @@ fn parse_data(
         sections,
         revisions,
     })
+}
+
+#[cfg(test)]
+mod main_story_tests {
+    use super::*;
+
+    #[test]
+    fn section_and_revision_ranges_share_main_end_without_mutating_wire_data() {
+        // One section, a trailing sentinel in secondary text, and a revision.
+        let mut data = [0u32.to_le_bytes(), 30u32.to_le_bytes()].concat();
+        data.extend_from_slice(&[0, 0]);
+        data.extend_from_slice(&8i32.to_le_bytes());
+        data.extend_from_slice(&[0; 6]);
+        let mut word = vec![0; 8];
+        let sprms = [0x43, 0xd2, 7, 1, 0, 0, 0, 0, 0, 0];
+        word.extend_from_slice(&(sprms.len() as i16).to_le_bytes());
+        word.extend_from_slice(&sprms);
+        let authors = RevisionAuthorTable::from_authors(&["Editor"]);
+        let original = data.clone();
+        let parsed = parse_data(
+            &data,
+            &word,
+            &authors,
+            &mut ToleranceReport::default(),
+            Some(20),
+        )
+        .unwrap();
+        assert_eq!(
+            (parsed.sections()[0].start_cp, parsed.sections()[0].end_cp),
+            (0, 20)
+        );
+        assert_eq!(
+            (parsed.revisions()[0].start, parsed.revisions()[0].end),
+            (0, 20)
+        );
+        assert!(parsed.section_at_cp(20).is_none());
+        assert_eq!(data, original);
+        assert!(
+            parse_data(
+                &data,
+                &word,
+                &authors,
+                &mut ToleranceReport::default(),
+                Some(31)
+            )
+            .is_err()
+        );
+        // A nonfinal start at/past the main-story end cannot be clamped away.
+        let mut two = [0u32.to_le_bytes(), 20u32.to_le_bytes(), 30u32.to_le_bytes()].concat();
+        for _ in 0..2 {
+            two.extend_from_slice(&[0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0]);
+        }
+        for end in [19, 20] {
+            assert!(
+                parse_data(
+                    &two,
+                    &[],
+                    &authors,
+                    &mut ToleranceReport::default(),
+                    Some(end)
+                )
+                .is_err()
+            );
+        }
+    }
 }

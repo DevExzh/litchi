@@ -880,8 +880,14 @@ impl Edit {
             .find(|bookmark| bookmark.name == from)
             .map(|bookmark| (bookmark.start, bookmark.end))
             .ok_or(Error::Refused(Refusal::BookmarkNotFound))?;
-        self.remove_bookmark(from)?;
-        self.add_bookmark_range(to, range.0, range.1)
+        // Both semantic operations must succeed before replacing this edit.
+        // The addition can fail on the name, operation budget or publication
+        // closure after removal has already rewritten the bookmark tables.
+        let mut candidate = self.clone();
+        candidate.remove_bookmark(from)?;
+        candidate.add_bookmark_range(to, range.0, range.1)?;
+        *self = candidate;
+        Ok(())
     }
 
     /// Remove the standard bookmark named exactly `name`; the text it

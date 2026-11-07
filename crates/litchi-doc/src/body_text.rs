@@ -1962,6 +1962,7 @@ pub(crate) struct ValidatedPackage {
 }
 
 /// Clone-first staged text edit over one immutable source snapshot.
+#[derive(Clone)]
 pub(crate) struct Edit {
     source: Snapshot,
     editor: RevisionEditor,
@@ -5637,7 +5638,16 @@ fn simple_table_cell_spans(editor: &RevisionEditor) -> Result<Vec<SourceSpan>> {
             segment_cp = next_cp;
             segment_byte = byte + character.len_utf8();
         } else if character == '\u{7}' {
-            if editor.is_in_table_at_cp(cp).map_err(Error::Invalid)? {
+            let (in_table, row_end) = editor
+                .table_terminator_state_at_cp(cp)
+                .map_err(Error::Invalid)?;
+            if in_table && row_end {
+                // MS-DOC 2.4.3: the TTP follows the cells; it is not an
+                // extra empty cell that callers may insert text into.
+                if pending.is_some() || segment_cp != cp {
+                    return Err(Error::Refused(Refusal::ComplexTableCell));
+                }
+            } else if in_table {
                 let (start_cp, end_cp, start_byte, end_byte) = match pending.take() {
                     Some(span) if segment_cp == cp => span,
                     Some(_) => return Err(Error::Refused(Refusal::ComplexTableCell)),
@@ -7581,6 +7591,23 @@ mod tests {
             commit.package().table_cells().expect("changed table cells")[0].text(),
             ""
         );
+    }
+
+    #[test]
+    fn genuine_empty_table_cell_remains_in_catalog_but_row_mark_does_not() {
+        let source = Snapshot::parse(&empty_body_and_table_doc()).expect("empty cell source");
+        let cells = source.table_cells().expect("cell catalog");
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].text(), "");
+        let mut edit = source.edit().expect("edit");
+        edit.replace_text(TextTarget::TableCell(Position::new(0)), "")
+            .expect("empty no-op");
+        assert!(matches!(
+            edit.replace_text(TextTarget::TableCell(Position::new(1)), "row"),
+            Err(Error::Refused(Refusal::TargetNotFound))
+        ));
+        let commit = edit.commit().expect("commit");
+        assert_eq!(commit.package(), &source);
     }
 
     #[test]

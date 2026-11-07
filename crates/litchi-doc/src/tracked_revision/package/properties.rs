@@ -14,7 +14,7 @@ use super::{
 };
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::styles::StyleSheet;
-use crate::tracked_revision::codec::papx_in_table_state;
+use crate::tracked_revision::codec::papx_table_state;
 
 /// `FibRgFcLcb97` index of the standard bookmark names, `SttbfBkmk`.
 const STTBF_BKMK: usize = 21;
@@ -66,7 +66,7 @@ impl RevisionEditor {
         }
         let body = &grpprl[2..];
         let _ = papx_sprms(body)?;
-        let in_table = papx_in_table_state(&grpprl)?;
+        let table_state = papx_table_state(&grpprl)?;
         let mark_fc = self.fc_at_cp(mark)?;
         let width = containing_piece(&self.pieces, mark)
             .map_or(2, |piece| if piece.unicode { 2 } else { 1 });
@@ -96,7 +96,7 @@ impl RevisionEditor {
             .iter_mut()
             .find(|run| run.start <= mark_fc && mark_fc < run.end)
             .ok_or_else(|| corrupted("paragraph mark has no PAPX run"))?;
-        run.replace_grpprl(grpprl, in_table);
+        run.replace_grpprl(grpprl, table_state);
         candidate.rewrite_papx()?;
         candidate.commit()?;
         *self = candidate;
