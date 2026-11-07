@@ -98,10 +98,11 @@ impl Grid {
         SheetWorksheet::name(self.worksheet.as_ref())
     }
 
-    /// The worksheet dimensions, if it contains stored cells.
+    /// Inclusive zero-based worksheet dimensions, if it contains stored cells.
     #[must_use]
     pub fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
         SheetWorksheet::dimensions(self.worksheet.as_ref())
+            .map(|(a, b, c, d)| (a - 1, b - 1, c - 1, d - 1))
     }
 
     /// Number of logical rows represented by this worksheet.
@@ -535,6 +536,15 @@ impl Worksheet {
     }
 }
 
+fn trait_cell_position(row: u32, column: u32) -> Result<(u32, u32)> {
+    if !(1..=1_048_576).contains(&row) || !(1..=16_384).contains(&column) {
+        return Err(PackageError::InvalidCellReference(
+            "coordinates are outside the one-based XLSB grid",
+        ));
+    }
+    Ok((row - 1, column - 1))
+}
+
 impl SheetWorksheet for Worksheet {
     /// Stored cells are borrowed; an absent position reads as an owned
     /// empty cell.
@@ -559,11 +569,12 @@ impl SheetWorksheet for Worksheet {
         if self.cells.is_empty() {
             None
         } else {
-            Some((0, 0, self.max_row, self.max_col))
+            Some((1, 1, self.max_row + 1, self.max_col + 1))
         }
     }
 
     fn cell(&self, row: u32, column: u32) -> Result<Cow<'_, Cell>> {
+        let (row, column) = trait_cell_position(row, column)?;
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell)),
             // Return empty cell for missing positions
@@ -573,7 +584,12 @@ impl SheetWorksheet for Worksheet {
 
     fn cell_by_coordinate(&self, coordinate: &str) -> Result<Cow<'_, Cell>> {
         let (row, col) = crate::package::utils::parse_cell_reference(coordinate)?;
-        self.cell(row, col)
+        if row >= 1_048_576 || col >= 16_384 {
+            return Err(PackageError::InvalidCellReference(
+                "coordinates are outside the one-based XLSB grid",
+            ));
+        }
+        self.cell(row + 1, col + 1)
     }
 
     fn cells(&self) -> StoredCells<'_> {
@@ -604,6 +620,7 @@ impl SheetWorksheet for Worksheet {
     }
 
     fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+        let (row, column) = trait_cell_position(row, column)?;
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),
@@ -667,7 +684,7 @@ mod tests {
             values.push(cell.value().clone());
         }
 
-        assert_eq!(coordinates, [(0, 1), (0, 3), (2, 1)]);
+        assert_eq!(coordinates, [(1, 2), (1, 4), (3, 2)]);
         assert_eq!(
             values,
             [CellValue::Int(1), CellValue::Int(3), CellValue::Int(21)]

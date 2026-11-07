@@ -37,10 +37,12 @@ pub fn column_name_to_index(name: &str) -> Option<u32> {
         if !ch.is_ascii_uppercase() {
             return None;
         }
-        result = result * 26 + (ch as u32 - 'A' as u32) + 1;
+        result = result
+            .checked_mul(26)?
+            .checked_add(ch as u32 - 'A' as u32 + 1)?;
     }
 
-    Some(result - 1) // Make 0-based
+    result.checked_sub(1) // Make 0-based
 }
 
 /// Convert row and column to Excel cell reference (e.g., "A1", "B2")

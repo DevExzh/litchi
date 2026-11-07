@@ -8985,7 +8985,7 @@
         "Native five-sheet input starts without map owners. A library catalog/single-cell binding is created on the last worksheet, renamed/updated and removed with file reopen, forward replay and inverse. Print_015!B2 stays Int(42), every worksheet payload stays exact, and updates touch only the map XML and singleton binding part. Removing a catalog with live bindings returns the exact refusal while retaining valid staging.",
         "Inverses and logical removal preserve the complete effective relationship/content-type graph and all data payloads; only owned relationship/content-type XML serialization may normalize."
       ],
-      "scope_limit": "Native-authored XML maps are absent. These are inert library-authored bindings, not XML import/export, XPath/schema evaluation or a fresh Excel result. Numeric native/core coordinate conventions are a separately recorded open finding; the cell expectation uses coordinate lookup."
+      "scope_limit": "Native-authored XML maps are absent. These are inert library-authored bindings, not XML import/export, XPath/schema evaluation or a fresh Excel result. Numeric and coordinate lookup agreement is separately qualified by microsoft_office_native_coordinates after correcting the shared trait adapters."
     },
     {
       "crate": "litchi-xlsb",
@@ -9070,6 +9070,120 @@
         "An invalid anchor selector returns OutOfBounds without losing a prior staged import. Applying a source payload patch to a different committed payload returns the exact family PatchConflict; originals remain unchanged."
       ],
       "scope_limit": "Negative lifecycle and stale-source checks for inert library derivatives only."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_coordinates",
+      "name": "native_shared_sheet_traits_use_one_based_cells_and_keep_native_storage_zero_based",
+      "fixtures": [
+        "excel/excel-form-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-139"
+      ],
+      "assertions": [
+        "On the immutable native form-controls workbook, shared numeric B2 reads and zero-based row iteration return the stored Bool(true). Every stored cell agrees across iterator positions, numeric lookup and A1 lookup; dimensions are the exact inclusive one-based (1,1,12,4). An absent C8 retains its address and Empty value.",
+        "Explicit native get_cell(1,1) and concrete Cell row/column retain zero-based storage conventions, while the same cell read through the shared Cell trait reports (2,2)."
+      ],
+      "scope_limit": "Shared worksheet/cell addressing and format-grid boundaries only. Native wire/editor/source APIs retain their explicit zero-based contracts; no control activation or fresh Excel validation is implied."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_coordinates",
+      "name": "native_shared_sheet_traits_refuse_out_of_grid_coordinates",
+      "fixtures": [
+        "excel/excel-form-controls.xls"
+      ],
+      "feature_rows": [
+        "xls-139"
+      ],
+      "assertions": [
+        "Zero axes, coordinates beyond each format grid, u32::MAX and invalid or overflowing A1 labels return InvalidCellReference. The valid final grid coordinate returns a correctly addressed Empty cell without allocation proportional to its position. The native fixture remains exact."
+      ],
+      "scope_limit": "Shared worksheet/cell addressing and format-grid boundaries only. Native wire/editor/source APIs retain their explicit zero-based contracts; no control activation or fresh Excel validation is implied."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_coordinates",
+      "name": "native_shared_sheet_traits_use_one_based_cells_and_keep_native_storage_zero_based",
+      "fixtures": [
+        "excel/excel-form-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-280"
+      ],
+      "assertions": [
+        "On the immutable native form-controls workbook, shared numeric B2 reads and zero-based row iteration return the stored Bool(true). Every stored cell agrees across iterator positions, numeric lookup and A1 lookup; dimensions are the exact inclusive one-based (1,1,12,4). An absent C8 retains its address and Empty value.",
+        "Explicit native get_cell(1,1) and concrete Cell row/column retain zero-based storage conventions, while the same cell read through the shared Cell trait reports (2,2)."
+      ],
+      "scope_limit": "Shared worksheet/cell addressing and format-grid boundaries only. Native wire/editor/source APIs retain their explicit zero-based contracts; no control activation or fresh Excel validation is implied."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_coordinates",
+      "name": "native_shared_sheet_traits_refuse_out_of_grid_coordinates",
+      "fixtures": [
+        "excel/excel-form-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-280"
+      ],
+      "assertions": [
+        "Zero axes, coordinates beyond each format grid, u32::MAX and invalid or overflowing A1 labels return InvalidCellReference. The valid final grid coordinate returns a correctly addressed Empty cell without allocation proportional to its position. The native fixture remains exact."
+      ],
+      "scope_limit": "Shared worksheet/cell addressing and format-grid boundaries only. Native wire/editor/source APIs retain their explicit zero-based contracts; no control activation or fresh Excel validation is implied."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_coordinates",
+      "name": "native_direct_evaluator_and_facade_share_one_based_cell_and_sheet_reads",
+      "fixtures": [
+        "excel/excel-form-controls.xls",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-form-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141",
+        "xlsx-202",
+        "xlsb-280",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "The direct FormulaEvaluator on native XLS/XLSB owners reads B2 as Bool(true) and returns the exact 12x4 form-state grid, retaining the saved #N/A error. Public Auto/Eager facade evaluators agree within each format, including XLSX, and preserve original bytes."
+      ],
+      "scope_limit": "Stored native scalar/error reads and dense traversal through the evaluator are qualified, not complete Excel recalculation or control execution."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_coordinates",
+      "name": "native_metadata_numeric_b2_reads_match_coordinate_reads_in_direct_evaluators",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141",
+        "xlsb-280",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "On native Print_015, numeric (2,2), coordinate B2 and direct FormulaEvaluator reads all return the saved value 42 (Float in XLS, Int in XLSB). The shared cell reports (2,2) and source files remain exact."
+      ],
+      "scope_limit": "Closes the coordinate discrepancy recorded in receipt 060; does not execute formulas, providers or macros."
     }
   ]
 }

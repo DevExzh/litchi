@@ -36,6 +36,20 @@ pub struct Cell {
 }
 
 impl Cell {
+    /// Zero-based row in the native BIFF grid.
+    /// Generic [`litchi_core::sheet::Cell`] reads use one-based positions.
+    #[must_use]
+    pub fn row(&self) -> u32 {
+        self.row
+    }
+
+    /// Zero-based column in the native BIFF grid.
+    /// Generic [`litchi_core::sheet::Cell`] reads use one-based positions.
+    #[must_use]
+    pub fn column(&self) -> u32 {
+        self.col
+    }
+
     /// Create a new XLS cell
     #[must_use]
     pub fn new(row: u32, col: u32, value: CellValue) -> Self {
@@ -312,11 +326,11 @@ fn table_is_date_time(formatting: Option<&Formatting>, format_id: u16) -> bool {
 
 impl CellTrait for Cell {
     fn row(&self) -> u32 {
-        self.row
+        self.row + 1
     }
 
     fn column(&self) -> u32 {
-        self.col
+        self.col + 1
     }
 
     fn coordinate(&self) -> String {

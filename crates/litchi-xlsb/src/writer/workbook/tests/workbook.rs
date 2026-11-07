@@ -160,11 +160,11 @@ fn defined_name_survives_package_roundtrip() {
     assert_eq!(reader.defined_names(), &["SalesData"]);
     let summary = reader.worksheet_by_index(1).unwrap();
     assert!(matches!(
-        summary.cell_value(0, 0).unwrap().as_ref(),
+        summary.cell_value(1, 1).unwrap().as_ref(),
         CellValue::Formula { formula, .. } if formula == "SalesData"
     ));
     assert!(matches!(
-        summary.cell_value(0, 1).unwrap().as_ref(),
+        summary.cell_value(1, 2).unwrap().as_ref(),
         CellValue::Formula { formula, .. } if formula == "'Data Sheet'!$B$2"
     ));
 }

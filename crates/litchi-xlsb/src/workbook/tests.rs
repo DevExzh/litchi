@@ -1115,7 +1115,7 @@ fn reads_formula_records_from_real_workbook_fixture() {
         if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
             for row in min_row..=max_row {
                 for col in min_col..=max_col {
-                    let Some(cell) = worksheet.get_cell(row, col) else {
+                    let Some(cell) = worksheet.get_cell(row - 1, col - 1) else {
                         continue;
                     };
                     if cell.is_formula() {
@@ -1220,7 +1220,7 @@ fn reads_rich_and_phonetic_shared_strings_from_local_fixtures() {
         };
         for row in min_row..=max_row {
             for col in min_col..=max_col {
-                found_cell_text |= worksheet.get_cell(row, col).is_some_and(|cell| {
+                found_cell_text |= worksheet.get_cell(row - 1, col - 1).is_some_and(|cell| {
                         matches!(cell.value(), litchi_core::sheet::CellValue::String(value) if value == "hello, xssf")
                     });
             }
@@ -1339,7 +1339,7 @@ fn resolves_cell_style_references_from_real_fixtures() {
             if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
                 for row in min_row..=max_row {
                     for col in min_col..=max_col {
-                        let Some(cell) = worksheet.get_cell(row, col) else {
+                        let Some(cell) = worksheet.get_cell(row - 1, col - 1) else {
                             continue;
                         };
                         saw_nondefault_style |= cell.style_id() != 0;

@@ -68,6 +68,20 @@ pub struct Cell {
 }
 
 impl Cell {
+    /// Zero-based row in the native BIFF grid.
+    /// Generic [`litchi_core::sheet::Cell`] reads use one-based positions.
+    #[must_use]
+    pub fn row(&self) -> u32 {
+        self.row
+    }
+
+    /// Zero-based column in the native BIFF grid.
+    /// Generic [`litchi_core::sheet::Cell`] reads use one-based positions.
+    #[must_use]
+    pub fn column(&self) -> u32 {
+        self.col
+    }
+
     fn authored_formula_metadata(
         value: &CellValue,
     ) -> (Option<FormulaResolutionStatus>, Option<Box<CellValue>>) {
@@ -531,11 +545,11 @@ impl Cell {
 
 impl SheetCell for Cell {
     fn row(&self) -> u32 {
-        self.row
+        self.row + 1
     }
 
     fn column(&self) -> u32 {
-        self.col
+        self.col + 1
     }
 
     fn coordinate(&self) -> String {

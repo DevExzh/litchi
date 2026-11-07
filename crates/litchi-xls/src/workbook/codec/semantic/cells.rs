@@ -11,7 +11,6 @@
 use crate::cell::Cell;
 use crate::error::{Error, Result};
 use crate::worksheet::Worksheet;
-use litchi_core::sheet::Cell as _;
 use std::collections::HashMap;
 
 /// A cell record's `(row, column)` exactly as the record stores it.

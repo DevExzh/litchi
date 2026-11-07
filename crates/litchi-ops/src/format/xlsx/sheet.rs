@@ -249,7 +249,10 @@ impl CoreWorksheet for Sheet {
     }
 
     fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
-        self.dimensions_typed().ok().flatten()
+        self.dimensions_typed()
+            .ok()
+            .flatten()
+            .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1))
     }
 
     fn cell(&self, row: u32, column: u32) -> Result<XlsxCell> {

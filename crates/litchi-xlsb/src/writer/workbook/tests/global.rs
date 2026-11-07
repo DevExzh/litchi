@@ -368,11 +368,11 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     let tail = reader.worksheet_by_index(1).unwrap();
     assert_eq!(tail.name(), "Tail");
     assert!(matches!(
-        tail.cell_value(0, 0).unwrap().as_ref(),
+        tail.cell_value(1, 1).unwrap().as_ref(),
         CellValue::String(value) if value == "tail marker"
     ));
     assert!(matches!(
-        tail.cell_value(0, 1).unwrap().as_ref(),
+        tail.cell_value(1, 2).unwrap().as_ref(),
         CellValue::Formula { formula, .. } if formula == "Data!A1"
     ));
     assert!(reader.worksheet_by_name("Data").is_ok());

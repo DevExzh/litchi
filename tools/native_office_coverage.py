@@ -32,7 +32,11 @@ def test_identity(test: dict) -> str:
         if not re.fullmatch(r"[a-z][a-z0-9_-]*", component):
             raise ValueError(f"invalid Rust test identity: {identity}")
     source = ROOT / "crates" / test["crate"] / "tests" / f"{test['target']}.rs"
-    if not re.search(r"#\[test\]\s*fn\s+" + re.escape(test["name"]) + r"\s*\(", source.read_text()):
+    if not re.search(
+        r"(?:#\[test\]\s*fn|#\[tokio::test\]\s*async\s+fn)\s+"
+        + re.escape(test["name"]) + r"\s*\(",
+        source.read_text(),
+    ):
         raise ValueError(f"missing test: {identity} in {source}")
     return identity
 

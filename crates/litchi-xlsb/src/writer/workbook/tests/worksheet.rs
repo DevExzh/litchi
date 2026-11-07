@@ -595,7 +595,7 @@ fn sheet_range_formula_survives_package_roundtrip() {
     let summary = reader.worksheet_by_index(2).unwrap();
     for col in 0..2 {
         assert!(matches!(
-            summary.cell_value(0, col).unwrap().as_ref(),
+            summary.cell_value(1, col + 1).unwrap().as_ref(),
             CellValue::Formula { formula, .. }
                 if formula == "SUM('Data Sheet:Summary'!A1)"
         ));
@@ -636,7 +636,7 @@ fn contextual_grouped_formulas_survive_package_roundtrip() {
     let summary = reader.worksheet_by_index(2).unwrap();
     for col in 0..=1 {
         assert!(matches!(
-            summary.cell_value(0, col).unwrap().as_ref(),
+            summary.cell_value(1, col + 1).unwrap().as_ref(),
             CellValue::Formula {
                 formula,
                 is_array: true,
@@ -646,18 +646,18 @@ fn contextual_grouped_formulas_survive_package_roundtrip() {
         ));
     }
     assert!(matches!(
-        summary.cell_value(0, 2).unwrap().as_ref(),
+        summary.cell_value(1, 3).unwrap().as_ref(),
         CellValue::Formula { formula, is_array: false, .. }
             if formula == "(Data!A1+$A1)"
     ));
     assert!(matches!(
-        summary.cell_value(1, 2).unwrap().as_ref(),
+        summary.cell_value(2, 3).unwrap().as_ref(),
         CellValue::Formula { formula, is_array: false, .. }
             if formula == "(Data!A1+$A2)"
     ));
     for col in 3..=4 {
         assert!(matches!(
-            summary.cell_value(0, col).unwrap().as_ref(),
+            summary.cell_value(1, col + 1).unwrap().as_ref(),
             CellValue::Formula {
                 formula,
                 is_array: true,
@@ -699,7 +699,7 @@ fn contextual_group_setters_defer_until_workbook_context_and_roundtrip() {
     let worksheet = reader.worksheet_by_index(1).unwrap();
     for col in 0..=1 {
         assert!(matches!(
-            worksheet.cell_value(0, col).unwrap().as_ref(),
+            worksheet.cell_value(1, col + 1).unwrap().as_ref(),
             CellValue::Formula {
                 formula,
                 is_array: true,
@@ -709,7 +709,7 @@ fn contextual_group_setters_defer_until_workbook_context_and_roundtrip() {
         ));
     }
     assert!(matches!(
-        worksheet.cell_value(1, 0).unwrap().as_ref(),
+        worksheet.cell_value(2, 1).unwrap().as_ref(),
         CellValue::Formula {
             formula,
             is_array: false,
@@ -828,7 +828,7 @@ fn contextual_formula_dependency_can_be_added_after_failed_build() {
     workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
-    let array = worksheet.cell_value(0, 0).unwrap();
+    let array = worksheet.cell_value(1, 1).unwrap();
     let CellValue::Formula {
         formula,
         is_array,
@@ -842,7 +842,7 @@ fn contextual_formula_dependency_can_be_added_after_failed_build() {
     assert!(*is_array);
     assert_eq!(array_range.as_deref(), Some("A1:A1"));
 
-    let shared = worksheet.cell_value(1, 0).unwrap();
+    let shared = worksheet.cell_value(2, 1).unwrap();
     let CellValue::Formula {
         formula, is_array, ..
     } = shared.as_ref()
@@ -975,7 +975,7 @@ fn formula_survives_workbook_package_roundtrip() {
     workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
-    let value = worksheet.cell_value(0, 2).unwrap();
+    let value = worksheet.cell_value(1, 3).unwrap();
     assert!(matches!(
         value.as_ref(),
         CellValue::Formula {
@@ -985,28 +985,28 @@ fn formula_survives_workbook_package_roundtrip() {
         } if formula == "(A1+B1)" && matches!(cached.as_ref(), CellValue::Float(5.0))
     ));
     assert!(matches!(
-        worksheet.cell_value(1, 0).unwrap().as_ref(),
+        worksheet.cell_value(2, 1).unwrap().as_ref(),
         CellValue::Formula {
             cached_value: Some(cached),
             ..
         } if matches!(cached.as_ref(), CellValue::String(value) if value == "result")
     ));
     assert!(matches!(
-        worksheet.cell_value(1, 1).unwrap().as_ref(),
+        worksheet.cell_value(2, 2).unwrap().as_ref(),
         CellValue::Formula {
             cached_value: Some(cached),
             ..
         } if matches!(cached.as_ref(), CellValue::Bool(true))
     ));
     assert!(matches!(
-        worksheet.cell_value(1, 2).unwrap().as_ref(),
+        worksheet.cell_value(2, 3).unwrap().as_ref(),
         CellValue::Formula {
             cached_value: Some(cached),
             ..
         } if matches!(cached.as_ref(), CellValue::Error(error) if error == "#DIV/0!")
     ));
     assert!(matches!(
-        worksheet.cell_value(2, 0).unwrap().as_ref(),
+        worksheet.cell_value(3, 1).unwrap().as_ref(),
         CellValue::Formula {
             formula,
             cached_value: Some(cached),
@@ -1015,7 +1015,7 @@ fn formula_survives_workbook_package_roundtrip() {
             && matches!(cached.as_ref(), CellValue::Error(error) if error == "#REF!")
     ));
     assert!(matches!(
-        worksheet.cell_value(2, 1).unwrap().as_ref(),
+        worksheet.cell_value(3, 2).unwrap().as_ref(),
         CellValue::Formula {
             formula,
             cached_value: Some(cached),
@@ -1053,7 +1053,7 @@ fn array_and_shared_formulas_survive_package_roundtrip() {
     let worksheet = reader.worksheet_by_index(0).unwrap();
 
     assert!(matches!(
-        worksheet.cell_value(2, 2).unwrap().as_ref(),
+        worksheet.cell_value(3, 3).unwrap().as_ref(),
         CellValue::Formula {
             formula,
             cached_value: Some(cached),
@@ -1062,7 +1062,7 @@ fn array_and_shared_formulas_survive_package_roundtrip() {
         } if formula == "B3" && matches!(cached.as_ref(), CellValue::Float(10.0))
     ));
     assert!(matches!(
-        worksheet.cell_value(3, 2).unwrap().as_ref(),
+        worksheet.cell_value(4, 3).unwrap().as_ref(),
         CellValue::Formula {
             formula,
             cached_value: Some(cached),
@@ -1073,7 +1073,7 @@ fn array_and_shared_formulas_survive_package_roundtrip() {
     for row in 0..=1 {
         for col in 4..=5 {
             assert!(matches!(
-                worksheet.cell_value(row, col).unwrap().as_ref(),
+                worksheet.cell_value(row + 1, col + 1).unwrap().as_ref(),
                 CellValue::Formula {
                     formula,
                     is_array: true,
@@ -1085,7 +1085,7 @@ fn array_and_shared_formulas_survive_package_roundtrip() {
     }
     for col in 0..=1 {
         assert!(matches!(
-            worksheet.cell_value(5, col).unwrap().as_ref(),
+            worksheet.cell_value(6, col + 1).unwrap().as_ref(),
             CellValue::Formula {
                 formula,
                 is_array: true,
@@ -1117,7 +1117,7 @@ fn array_constant_survives_package_roundtrip() {
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
     assert!(matches!(
-        worksheet.cell_value(0, 0).unwrap().as_ref(),
+        worksheet.cell_value(1, 1).unwrap().as_ref(),
         CellValue::Formula {
             formula,
             cached_value: Some(cached),

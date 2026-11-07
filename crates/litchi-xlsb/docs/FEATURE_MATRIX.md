@@ -279,3 +279,14 @@ worksheet data remains unchanged; the native range table correctly refuses XML-t
 column bindings. XML instance import/export, XPath/schema evaluation, URI retrieval
 and control/OLE execution remain outside the supported API. These derivatives do not
 supply native-authored XML-map evidence.
+
+The native shared-trait regressions in `microsoft_office_native_coordinates.rs`
+qualify one-based `Worksheet::cell`, `cell_value`, inclusive dimensions and
+`Cell` trait positions, including absent cells and format-grid refusals.
+The leaf adapters now satisfy the same contract as the public facade; the
+facade no longer applies a second coordinate conversion. Direct generic
+formula-evaluator reads agree with native B2 values and Auto/Eager facade grids.
+Native `get_cell`, cell constructors, concrete `Cell::row`/`column`, wire/editor
+coordinates and positional source reads retain their zero-based contracts.
+Callers that used zero-based arguments for shared-trait reads must add one or
+use the explicit native stored-cell API. Row iteration remains zero-based.

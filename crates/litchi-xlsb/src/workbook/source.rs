@@ -2278,8 +2278,9 @@ fn map_text_output_error(error: TextOutputError<Error>, allocation: Option<Error
 }
 
 fn worksheet_dimensions(worksheet: &Worksheet) -> Result<(usize, usize)> {
-    let (min_row, min_column, max_row, max_column) =
-        SheetWorksheet::dimensions(worksheet).unwrap_or((0, 0, 0, 0));
+    let (min_row, min_column, max_row, max_column) = SheetWorksheet::dimensions(worksheet)
+        .map(|(a, b, c, d)| (a - 1, b - 1, c - 1, d - 1))
+        .unwrap_or((0, 0, 0, 0));
     if min_row > max_row || min_column > max_column {
         return Err(Error::InvalidFormat(
             "XLSB worksheet dimensions are reversed",

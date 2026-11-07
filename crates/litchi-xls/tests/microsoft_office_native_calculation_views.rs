@@ -213,10 +213,10 @@ fn native_cell_edit_preserves_calculation_view_records_and_other_cells() {
         assert_eq!(a.worksheet_views(), b.worksheet_views());
         for c in a.cells() {
             let c = c.unwrap();
-            if name == "Sheet1" && (c.row(), c.column()) == (1, 1) {
+            if name == "Sheet1" && (c.row(), c.column()) == (2, 2) {
                 continue;
             }
-            let other = b.get_cell(c.row(), c.column()).unwrap();
+            let other = b.get_cell(c.row() - 1, c.column() - 1).unwrap();
             assert_eq!(c.value(), other.value());
             assert_eq!(c.formula(), other.formula());
         }

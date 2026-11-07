@@ -97,7 +97,7 @@ pub trait Worksheet: Send + Sync {
     /// Get the number of columns in the worksheet.
     fn column_count(&self) -> usize;
 
-    /// Get the dimensions as (`min_row`, `min_col`, `max_row`, `max_col`).
+    /// Get inclusive one-based dimensions as (`min_row`, `min_col`, `max_row`, `max_col`).
     /// Returns None if the worksheet is empty.
     fn dimensions(&self) -> Option<(u32, u32, u32, u32)>;
 

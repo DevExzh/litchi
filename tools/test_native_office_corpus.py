@@ -26,6 +26,24 @@ def document(name: str) -> dict:
 
 
 class NativeOfficeCorpus(unittest.TestCase):
+    def test_index_accepts_registered_async_tests_but_rejects_plain_helpers(self) -> None:
+        import tempfile
+        from unittest.mock import patch
+        from tools.native_office_coverage import test_identity
+
+        check = {"crate": "litchi", "target": "coordinates", "name": "native_cells"}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/litchi/tests/coordinates.rs"
+            source.parent.mkdir(parents=True)
+            with patch("tools.native_office_coverage.ROOT", root):
+                source.write_text("#[tokio::test]\nasync fn native_cells() {}\n")
+                self.assertEqual(test_identity(check), "litchi::coordinates::native_cells")
+                for body in ("async fn native_cells() {}", "#[test]\nfn different_test() {}"):
+                    source.write_text(body)
+                    with self.assertRaisesRegex(ValueError, "missing test"):
+                        test_identity(check)
+
     def test_manifest_and_assets_match_saved_native_bytes(self) -> None:
         manifest = document("manifest.json")
         fixtures = manifest["files"]

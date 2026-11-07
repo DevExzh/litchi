@@ -16,10 +16,6 @@ use litchi_xlsb as xlsb;
 
 use crate::error::{Code, Error, Result};
 
-pub(super) fn internal(message: impl Into<Cow<'static, str>>) -> Error {
-    Error::new(Code::InternalError, message).with_format(FileFormat::Xlsb)
-}
-
 /// Deferred XLSB catalog plus the per-worksheet materialization cache.
 pub(super) struct SourceWorkbook {
     workbook: xlsb::SourceBackedWorkbook,
@@ -221,10 +217,6 @@ pub(crate) struct SourceSheet<'a> {
     name: String,
 }
 
-fn overflow(message: &'static str) -> Error {
-    internal(message)
-}
-
 const XLSB_ROWS: u32 = 1_048_576;
 const XLSB_COLUMNS: u32 = 16_384;
 
@@ -288,48 +280,24 @@ impl<'a> SourceSheet<'a> {
             .materialize(self, |worksheet| Ok(worksheet.row(row)?.into_owned()))
     }
 
-    fn copy_cell(cell: &impl CoreCell) -> Result<FacadeCell> {
-        let row = cell
-            .row()
-            .checked_add(1)
-            .ok_or_else(|| overflow("XLSB cell row overflow"))?;
-        let column = cell
-            .column()
-            .checked_add(1)
-            .ok_or_else(|| overflow("XLSB cell column overflow"))?;
-        Ok(FacadeCell {
-            row,
-            column,
+    fn copy_cell(cell: &impl CoreCell) -> FacadeCell {
+        FacadeCell {
+            row: cell.row(),
+            column: cell.column(),
             value: cell.value().clone(),
-        })
+        }
     }
 
     fn dimensions_inner(&self) -> Result<Option<(u32, u32, u32, u32)>> {
-        self.workbook.materialize(self, |worksheet| {
-            let Some((min_row, min_column, max_row, max_column)) = worksheet.dimensions() else {
-                return Ok(None);
-            };
-            let min_row = min_row
-                .checked_add(1)
-                .ok_or_else(|| overflow("XLSB worksheet minimum row overflow"))?;
-            let min_column = min_column
-                .checked_add(1)
-                .ok_or_else(|| overflow("XLSB worksheet minimum column overflow"))?;
-            let max_row = max_row
-                .checked_add(1)
-                .ok_or_else(|| overflow("XLSB worksheet maximum row overflow"))?;
-            let max_column = max_column
-                .checked_add(1)
-                .ok_or_else(|| overflow("XLSB worksheet maximum column overflow"))?;
-            Ok(Some((min_row, min_column, max_row, max_column)))
-        })
+        self.workbook
+            .materialize(self, |worksheet| Ok(worksheet.dimensions()))
     }
 
     fn stored_cells(&self) -> Result<Vec<FacadeCell>> {
         self.workbook.materialize(self, |worksheet| {
             let mut cells = Vec::new();
             for cell in worksheet.cells() {
-                cells.push(Self::copy_cell(&cell?)?);
+                cells.push(Self::copy_cell(&cell?));
             }
             Ok(cells)
         })
@@ -375,9 +343,13 @@ impl<'w> CoreWorksheet for SourceSheet<'w> {
         let (row, column) = zero_based_cell(row, column)?;
         self.workbook
             .materialize(self, |worksheet| match worksheet.get_cell(row, column) {
-                Some(cell) => Self::copy_cell(cell),
+                Some(cell) => Ok(Self::copy_cell(cell)),
                 // The leaf trait's empty cell for an absent position.
-                None => Self::copy_cell(&xlsb::Cell::new(row, column, CellValue::Empty)),
+                None => Ok(Self::copy_cell(&xlsb::Cell::new(
+                    row,
+                    column,
+                    CellValue::Empty,
+                ))),
             })
     }
 
@@ -389,8 +361,8 @@ impl<'w> CoreWorksheet for SourceSheet<'w> {
                     .caused_by_argument(Code::InvalidArgument)
             })?;
         self.workbook.materialize(self, |worksheet| {
-            let cell = worksheet.cell(at.row().get(), at.column().get())?;
-            Self::copy_cell(&cell)
+            let cell = worksheet.cell(at.row().get() + 1, at.column().get() + 1)?;
+            Ok(Self::copy_cell(&cell))
         })
     }
 

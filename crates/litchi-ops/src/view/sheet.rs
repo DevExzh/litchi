@@ -234,8 +234,8 @@ impl<'a, C: Blank> Stored<'a, C> {
             Cow::Owned(cell) => {
                 debug_assert!(cell.is_empty() && !cell.is_formula());
                 Self::Absent {
-                    row: cell.row(),
-                    column: cell.column(),
+                    row: cell.row() - 1,
+                    column: cell.column() - 1,
                 }
             },
         }
@@ -247,7 +247,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
     #[inline]
     fn column(&self) -> u32 {
         match self {
-            Self::Cell(cell) => cell.column() + 1,
+            Self::Cell(cell) => cell.column(),
             Self::Absent { column, .. } => *column + 1,
         }
     }
@@ -287,7 +287,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
     #[inline]
     fn row(&self) -> u32 {
         match self {
-            Self::Cell(cell) => cell.row() + 1,
+            Self::Cell(cell) => cell.row(),
             Self::Absent { row, .. } => *row + 1,
         }
     }
@@ -468,12 +468,12 @@ impl CoreWorksheet for Worksheet<'_> {
             SheetInner::XlsbSource(sheet) => sheet.cell_value(row, column),
             #[cfg(feature = "xlsb")]
             SheetInner::XlsbEager(sheet) => {
-                let (row, column) = biff_cell(row, column, litchi_core::FileFormat::Xlsb)?;
+                biff_cell(row, column, litchi_core::FileFormat::Xlsb)?;
                 sheet.cell_value(row, column).map_err(Into::into)
             },
             #[cfg(feature = "xls")]
             SheetInner::Xls(sheet) => {
-                let (row, column) = biff_cell(row, column, litchi_core::FileFormat::Xls)?;
+                biff_cell(row, column, litchi_core::FileFormat::Xls)?;
                 sheet.cell_value(row, column).map_err(Into::into)
             },
             SheetInner::Never(never, _) => match *never {},
@@ -501,19 +501,13 @@ impl CoreWorksheet for Worksheet<'_> {
     fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
         match &self.0 {
             #[cfg(feature = "xlsx")]
-            SheetInner::Xlsx(sheet) => sheet
-                .dimensions()
-                .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1)),
+            SheetInner::Xlsx(sheet) => sheet.dimensions(),
             #[cfg(feature = "xlsb")]
             SheetInner::XlsbSource(sheet) => sheet.dimensions(),
             #[cfg(feature = "xlsb")]
-            SheetInner::XlsbEager(sheet) => sheet
-                .dimensions()
-                .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1)),
+            SheetInner::XlsbEager(sheet) => sheet.dimensions(),
             #[cfg(feature = "xls")]
-            SheetInner::Xls(sheet) => sheet
-                .dimensions()
-                .map(|(a, b, c, d)| (a + 1, b + 1, c + 1, d + 1)),
+            SheetInner::Xls(sheet) => sheet.dimensions(),
             SheetInner::Never(never, _) => match *never {},
         }
     }

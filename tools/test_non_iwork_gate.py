@@ -2153,7 +2153,7 @@ class NonIworkGateTests(unittest.TestCase):
         self.assertIn("CARGO_PROFILE_DEV_DEBUG: 0", workflow)
         self.assertIn("CARGO_PROFILE_TEST_DEBUG: 0", workflow)
 
-    def test_facade_format_tests_select_all_office_leaves_and_encryption(self) -> None:
+    def test_facade_format_tests_select_office_leaves_encryption_and_eval(self) -> None:
         specs = gate.command_specs("cargo", self.plan, "facade-format-tests")
         self.assertEqual(specs, gate.command_specs("cargo", self.plan, "facade-format-tests"))
         self.assertEqual([spec.scope for spec in specs], ["facade-format-tests"])
@@ -2168,7 +2168,7 @@ class NonIworkGateTests(unittest.TestCase):
                 FIXTURE_FACADE_PACKAGE,
                 "--no-default-features",
                 "--features",
-                "doc,docx,encryption,ppt,pptx,rtf,xls,xlsb,xlsx",
+                "doc,docx,encryption,eval,ppt,pptx,rtf,xls,xlsb,xlsx",
                 "--lib",
                 "--tests",
                 "--no-fail-fast",
@@ -2176,11 +2176,11 @@ class NonIworkGateTests(unittest.TestCase):
                 "--test-threads=1",
             ),
         )
-        # The leaves and encryption must be declared by the facade, must
+        # The leaves, encryption and evaluator must be declared by the facade, must
         # be safe, and must stay sorted so the argument is deterministic.
         self.assertEqual(
             set(gate.FACADE_FORMAT_TEST_FEATURES),
-            {"doc", "docx", "encryption", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx"},
+            {"doc", "docx", "encryption", "eval", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx"},
         )
         self.assertEqual(
             list(gate.FACADE_FORMAT_TEST_FEATURES),

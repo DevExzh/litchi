@@ -325,7 +325,8 @@ MODES = (
 # password fixtures; the closure reaches no iWork package. Change 0629 found
 # a DOCX test hidden by the empty default features; native-fixture coverage
 # additionally requires DOC, RTF, XLSB and PPT to run in this gate.
-FACADE_FORMAT_TEST_FEATURES = ("doc", "docx", "encryption", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx")
+# Native worksheet trait tests also exercise the generic formula evaluator.
+FACADE_FORMAT_TEST_FEATURES = ("doc", "docx", "encryption", "eval", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx")
 
 # The facade's ODF/DOCX polyglot detector tests live behind a feature pair that
 # is intentionally separate from the eight-format Office closure above.  Keep

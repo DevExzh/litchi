@@ -291,10 +291,7 @@ impl SourceBackedWorksheet {
                     finished = true;
                     break;
                 };
-                let at = {
-                    use litchi_core::sheet::Cell as _;
-                    (cell.row(), cell.column())
-                };
+                let at = (cell.row(), cell.column());
                 if previous.is_some_and(|previous| at <= previous) {
                     return Ok(None);
                 }

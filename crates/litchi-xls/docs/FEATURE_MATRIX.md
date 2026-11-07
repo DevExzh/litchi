@@ -228,3 +228,14 @@ supported results when `write_cache(true)` is explicit. Workbook refresh keeps
 external dependencies unsupported and unchanged; it does not refresh data
 providers. XLS's inline FormulaValue 03 is a saved blank string, distinct from
 a missing following STRING record, and no longer triggers a spurious write.
+
+The native shared-trait regressions in `microsoft_office_native_coordinates.rs`
+qualify one-based `Worksheet::cell`, `cell_value`, inclusive dimensions and
+`Cell` trait positions, including absent cells and format-grid refusals.
+The leaf adapters now satisfy the same contract as the public facade; the
+facade no longer applies a second coordinate conversion. Direct generic
+formula-evaluator reads agree with native B2 values and Auto/Eager facade grids.
+Native `get_cell`, cell constructors, concrete `Cell::row`/`column`, wire/editor
+coordinates and positional source reads retain their zero-based contracts.
+Callers that used zero-based arguments for shared-trait reads must add one or
+use the explicit native stored-cell API. Row iteration remains zero-based.

@@ -2433,12 +2433,12 @@ fn source_external_link_catalog_is_payload_lazy_and_target_inert() {
     let mut formula_count = 0usize;
     for row in min_row..=max_row {
         for column in min_column..=max_column {
-            let Some(source_cell) = source_worksheet.get_cell(row, column) else {
+            let Some(source_cell) = source_worksheet.get_cell(row - 1, column - 1) else {
                 continue;
             };
             if source_cell.is_formula() {
                 formula_count += 1;
-                let eager_cell = eager_worksheet.get_cell(row, column).unwrap();
+                let eager_cell = eager_worksheet.get_cell(row - 1, column - 1).unwrap();
                 assert_eq!(source_cell.value(), eager_cell.value());
             }
         }

@@ -7,7 +7,6 @@ use super::spec::Kind;
 use crate::error::{Code, Error, Result};
 use crate::node::ViewOptions;
 use crate::path::navigate::KindSet;
-use litchi_core::sheet::Cell as _;
 
 /// Children are cursor-backed. The grid itself is shared by `Arc`; only the
 /// selected coordinate list is retained by a row/range cursor.

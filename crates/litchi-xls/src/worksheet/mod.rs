@@ -308,7 +308,8 @@ impl Worksheet {
         self.cells.keys().copied().collect()
     }
 
-    /// Get cell at position
+    /// Borrow a stored cell at zero-based native BIFF coordinates.
+    /// The shared [`WorksheetTrait::cell`] lookup instead uses one-based coordinates.
     #[must_use]
     #[inline]
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {
@@ -848,6 +849,15 @@ impl Worksheet {
     }
 }
 
+fn trait_cell_position(row: u32, column: u32) -> Result<(u32, u32)> {
+    if !(1..=65_536).contains(&row) || !(1..=256).contains(&column) {
+        return Err(Error::InvalidCellReference(format!(
+            "({row}, {column}) is outside the one-based XLS grid"
+        )));
+    }
+    Ok((row - 1, column - 1))
+}
+
 impl WorksheetTrait for Worksheet {
     /// Stored cells are borrowed; an absent position reads as an owned
     /// empty cell.
@@ -872,11 +882,12 @@ impl WorksheetTrait for Worksheet {
         if self.cells.is_empty() {
             None
         } else {
-            Some((0, 0, self.max_row, self.max_col))
+            Some((1, 1, self.max_row + 1, self.max_col + 1))
         }
     }
 
     fn cell(&self, row: u32, column: u32) -> Result<Cow<'_, Cell>> {
+        let (row, column) = trait_cell_position(row, column)?;
         match self.cells.get(&(row, column)) {
             // Return reference instead of clone - zero-copy!
             Some(cell) => Ok(Cow::Borrowed(cell)),
@@ -888,7 +899,10 @@ impl WorksheetTrait for Worksheet {
     fn cell_by_coordinate(&self, coordinate: &str) -> Result<Cow<'_, Cell>> {
         let (row, col) = crate::utils::parse_cell_reference(coordinate)
             .ok_or_else(|| Error::InvalidCellReference(coordinate.to_string()))?;
-        self.cell(row, col)
+        if row >= 65_536 || col >= 256 {
+            return Err(Error::InvalidCellReference(coordinate.to_owned()));
+        }
+        self.cell(row + 1, col + 1)
     }
 
     fn cells(&self) -> Cells<'_> {
@@ -920,6 +934,7 @@ impl WorksheetTrait for Worksheet {
     }
 
     fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+        let (row, column) = trait_cell_position(row, column)?;
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),

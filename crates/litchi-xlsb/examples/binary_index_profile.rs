@@ -419,9 +419,7 @@ impl Args {
             match argument.as_str() {
                 "--case" => case = Some(Case::parse(&next_arg(&mut arguments, "--case")?)?),
                 "--fixture" => fixture = PathBuf::from(next_arg(&mut arguments, "--fixture")?),
-                "--sheet" => {
-                    sheet = parse_positive(&next_arg(&mut arguments, "--sheet")?, "--sheet")?
-                },
+                "--sheet" => sheet = next_arg(&mut arguments, "--sheet")?.parse()?,
                 "--warmup" => {
                     warmup = parse_positive(&next_arg(&mut arguments, "--warmup")?, "--warmup")?
                 },
@@ -511,11 +509,17 @@ impl Corpus {
             .into());
         }
         let worksheet = workbook.worksheet(sheet_index)?;
-        let dimensions = worksheet.dimensions();
+        let dimensions = worksheet
+            .dimensions()
+            .map(|(a, b, c, d)| (a - 1, b - 1, c - 1, d - 1));
         let mut cells = Vec::new();
         for cell in WorksheetTrait::cells(&worksheet) {
             let cell = cell?;
-            cells.push((cell.row(), cell.column(), canonical_value(cell.value())));
+            cells.push((
+                cell.as_ref().row(),
+                cell.as_ref().column(),
+                canonical_value(cell.value()),
+            ));
         }
         cells.sort_by_key(|(row, column, _)| (*row, *column));
         let coordinates = cells
