@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "f6d88b5a223871af02d77f2c552669aaceef1b55",
+  "base_commit": "05207ac4fa606886909cc9c1d1d5cd6795c88c52",
+  "problem": "The public XLS BOF decoder interpreted rupBuild as a date-system flag although BOF carries substream type/history and Date1904 carries the date mode. XLSX external-link insertion on a native workbook also failed readback when rId12 sorted before rId2; the owner neither bound catalog indexes to workbook externalReferences order nor maintained that XML list during structural publication.",
+  "changes": [
+    "Replace BofRecord.is_1904_date_system with substream_type decoded from BOF.dt at offset 2. Remove the erroneous globals date reset, reuse the correct field in source-backed substream validation, and retain date mode solely from Date1904.",
+    "Read explicit externalReferences in XML order, register structural changes in that workbook list, retain existing reference bytes/root context, and include workbook XML in snapshot/stale-patch identity. Relationship-only legacy catalogs retain their prior read ordering until structural registration.",
+    "Validate namespace/owner/relationship closure with finite input, event, depth and reference limits. Refuse structural edits of opaque/non-direct reference owners, incomplete bindings, affected XML numeric-index consumers or DDE/OLE topic formulas; no formula rewriting is attempted. Existing unbound consumers prevent silent catalog binding. Output size is planned and bounded before publication, and variable replacement buffering is fallibly bounded.",
+    "Add nine native-input regressions across XLS/XLSX/XLSB, eight focused regressions and one evidence-only audit. Record two missing native owners, WebPub and XCB, separately from positive feature coverage."
+  ],
+  "api_migration": {
+    "bof": "BofRecord.is_1904_date_system was removed because no date-system value can be read from BOF. Callers inspecting BOF use substream_type; callers needing date mode use raw::Reader::date_system() or WorkbookTrait::is_1904_date_system(). This is an intentional public field correction.",
+    "external_links": "Entry.index and Snapshot::entries() follow explicit workbook externalReferences order rather than lexicographic relationship-ID order. Structural publication maintains the list. Legacy metadata-only sources without a list remain readable, but registration cannot silently assign existing formula consumers.",
+    "removal": "Commit may now return Refused(UnsupportedContent) when deletion/reindexing would require formula remapping or the reference owner is opaque/non-direct. Formula scanning is conservative, bounded and includes VML formula fields; it is not a complete formula/runtime dependency engine."
+  },
+  "verification_scope": {
+    "xls_framing": "Four native Workbook streams pin lengths/frame counts 195402/564, 18386/415, 24253/406 and 16193/334. Every borrowed/owned frame, header, payload and offset re-encodes exactly. Native metadata has an 8220-byte maximum payload and full Continue chunks of 8212 bytes, distinct from the BIFF format ceiling. One-under input/count/payload/output budgets and exact BOF truncation errors are checked.",
+    "xls_bof_and_dates": "Metadata/date1904 fixtures share BOF producer bytes 5A4FCD07, BIFF8 version, global dt=0005 and worksheet dt=0010. Their Date1904 payloads and reader date modes differ correctly. A focused test varies the producer build independently from the substream type and retains truncated-input guards.",
+    "xls_future_records": "Changing Print_015!B2 from 42 to 43 changes exactly one fixed-position numeric frame. More than 100 native future records, including BookExt/XFExt/StyleExt/Theme counts 1/62/47/1, and every unrelated CFB stream remain exact. Save/reopen and complete archive inverse pass.",
+    "xlsb_volatile_derivative": "The native five-sheet metadata workbook starts without a volatile owner. Library-authored RTD/cube groups exercise Unicode subtopics, numeric/Boolean/string/error caches, first/last sheet ordinals, lifecycle, no-op, failure atomicity, stale/forward replay and exact inverse. NaN, duplicate types, a one-type quota and sheet ordinal 5 fail at their appropriate staging/commit boundaries. Native Workbook/worksheet/media payloads remain exact. No provider or dependency/formula correspondence is established.",
+    "xlsx_dde_ole_derivatives": "The original native external workbook link and its caches remain unchanged while unused DDE/OLE metadata parts are appended, updated and removed. New workbook XML references retain the original first slot, with rId12/rId13 appended despite lexical sorting. Four cached scalar kinds, item flags, matrices and target relationship metadata round-trip through file reopen. Invalid matrices, empty program IDs and core OLE cache misuse retain prior staging.",
+    "xlsx_reference_closure": "Native formulas use the original first external workbook slot, so its removal is refused. A changed workbook XML source with unchanged relationship IDs invalidates an earlier patch. Focused tests cover Strict/Transitional aliases, BOM and exact retained reference bytes, opaque/unbound source refusals, entity-split numeric references, VML consumers, DDE topic syntax and exact output limits.",
+    "logical_removal_and_inverse": "Logical removal after creation may canonicalize only content-types and workbook-relationship XML. Tests compare every effective part content type and every relationship ID/type/target/mode, while all other member payloads remain exact. Inverse patches retain the stronger byte-exact member restoration requirement; graph canonicalization is not ignored or treated as a native application result.",
+    "fixture_gaps": "All 17 native XLS/XLT files, including the encrypted specimen opened with its recorded password, lack WebPub 0801 records and an XCB stream. Typed workbook publication catalogs are empty, body catalogs remain readable, and plaintext/ciphertext archives remain exact. These checks support separate fixture-gap reviews, not passing web/toolbar semantics.",
+    "limits": "No arbitrary-future-record preservation across every mutation, native-authored volatile/DDE/oleLink specimen, provider correspondence, full extension schema, live RTD/cube/DDE/COM behavior, web publishing, toolbar execution, formula recalculation or fresh Excel reopen is claimed. The new RTD/cube/DDE/OLE records are explicitly library-authored derivatives."
+  },
+  "specification_evidence": [
+    {
+      "reference": "[MS-XLS] 2.4.21 BOF and Date1904",
+      "source": "User-supplied local full specification",
+      "finding": "BOF.dt follows vers; rupBuild follows dt. The workbook date mode belongs to the separate Date1904 record. The native 1904 specimen demonstrates why the former BOF date flag was unsound."
+    },
+    {
+      "reference": "Office Open XML Part 3, 3.13.3.1-3.13.3.3",
+      "url": "https://download.microsoft.com/download/e/1/4/e14fb96f-83b8-4a2a-84db-7fa8acbe061a/Office%20Open%20XML%20Part%203%20-%20Primer.pdf",
+      "finding": "Bracketed external-workbook numbers are one-based positions in the workbook externalReferences collection; relationship-ID lexical order does not define that mapping. Publication must preserve existing bindings or prove removal/renumbering safe."
+    },
+    {
+      "reference": "[MS-XLS] 2.1.7.10 Office Toolbars Stream (XCB)",
+      "source": "User-supplied local full specification",
+      "finding": "The stream name is XCB and its payload is CTBWRAPPER. The native absence audit checks the real CFB stream catalog, rather than treating macros or controls as toolbar evidence."
+    }
+  ],
+  "reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-excel-bof-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-bof-reproduction.log",
+        "bytes": 2631,
+        "sha256": "42ab1d5d2e795b85dc6fbd4d7d38f3561109a62143ce7e2acd54b187219153e0"
+      },
+      "note": "The original BOF projection reports false on the native date1904 workbook while the actual reader reports true. BOF bytes are identical between 1900/1904 fixtures.",
+      "regenerate": "At base_commit, extract Workbook via litchi_cfb::OleFile, read its first litchi_biff::Records frame, and compare records::BofRecord::parse(payload).is_1904_date_system with raw::Reader::is_1904_date_system for excel-date1904-breaks.xls. The latter trait accessor requires litchi_core::sheet::WorkbookTrait. The final native_bof_substream_types_and_workbook_date_modes_are_independent test demonstrates the corrected model without the obsolete field."
+    },
+    {
+      "artifact": {
+        "file_name": "native-excel-external-link-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-external-link-reproduction.log",
+        "bytes": 21510,
+        "sha256": "9b70d81f659199ac41d3adea7a6305f9234c65a6c7824b7d98ada58ba338942d"
+      },
+      "note": "Appending a DDE catalog entry to the native external workbook failed with publication changed the staged graph. Diagnostic readback showed rId12/DDE reordered ahead of the existing rId2/workbook entry.",
+      "regenerate": "In an isolated base_commit checkout, copy microsoft_office_native_dde_ole.rs from source_commit and run CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx --all-features --test microsoft_office_native_dde_ole native_external_catalog_append_update_remove --locked --offline. The final test fails at the base commit before publication; temporary diagnostic prints used for the original artifact are not committed."
+    }
+  ],
+  "results": {
+    "new_native_input_tests": 9,
+    "new_focused_regressions": 8,
+    "new_evidence_audits": 1,
+    "distinct_rust_tests_passed": 6460,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 337,
+      "indexed_tests": 482,
+      "reviewed_native_fixture_gaps": 13
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 341,
+      "indexed_tests": 491,
+      "reviewed_native_fixture_gaps": 15,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 341,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 27,
+        "reviewed_native_fixture_gap_requires_followup": 15,
+        "unsupported_boundary_needs_review": 41,
+        "operation_needs_verification": 11,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-full.log",
+        "bytes": 591946,
+        "sha256": "c5fc2132860bb06221b7ca0eae103cc04c40750f5d4f3a867a12eb64b0222e49"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-full.log 2>&1",
+      "suites": 263,
+      "passed": 6027,
+      "failed": 0,
+      "ignored": 1,
+      "existing_ignored_tests": [
+        "write_every_feature: writes an evidence workbook"
+      ],
+      "note": "Full regression run before the final bounded-buffer preflight refinement and its additional output-limit test; the following final focused/native runs qualify that refinement."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx --all-features --lib external_links --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-external-link-focused.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-external-link-focused.log",
+        "bytes": 20148,
+        "sha256": "bc55c73f2a771915c44594ea6032c2619fc5d2f5b9924a5888d543a2f0ede25e"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx --all-features --lib external_links --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-external-link-focused.log 2>&1",
+      "suites": 1,
+      "passed": 28,
+      "failed": 0,
+      "ignored": 0,
+      "note": "Final complete external-link owner suite. Twenty-seven overlap the full run; workbook_output_limit_is_checked_before_atomic_publication adds one distinct passing case."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx --all-features --test microsoft_office_native_dde_ole --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-dde-ole-native.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-dde-ole-native.log",
+        "bytes": 17621,
+        "sha256": "9d08985d32e347e04b23fbb872083c9cb8bafdc010822d88ed2ff0be7e088365"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx --all-features --test microsoft_office_native_dde_ole --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-dde-ole-native.log 2>&1",
+      "suites": 1,
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "note": "Final native publication rerun after bounded-buffer changes; all three are included in the full-run count."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'xlsx_*' --test 'xlsb_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-ops.log",
+        "bytes": 55886,
+        "sha256": "f68928f74affe55e12055f58db667ad204a85b1c69c8cb1b6744664f5c16cd6a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'xlsx_*' --test 'xlsb_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-ops.log 2>&1",
+      "suites": 40,
+      "passed": 411,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-facade.log",
+        "bytes": 19664,
+        "sha256": "85914f07638765b94522e0f7e36309cb17a1ca1b6b02069bce7e62aa5fa7e9fe"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-clippy.log",
+        "bytes": 17224,
+        "sha256": "cdde3557c2a2f62638acdfe491370c881a610b374400b956744c8af82985471a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls -p litchi-xlsx -p litchi-xlsb --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-python.log",
+        "bytes": 667,
+        "sha256": "58e8976d93cf6579fbc94f3a94b4ff472216f61ca53584bb85148da856f0a261"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-python.log 2>&1",
+      "passed": 75
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-records-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-coverage.json",
+        "bytes": 1121763,
+        "sha256": "3736299e85d5167dc2ed39b6109bf5781547d9a6996b1d29bb056ca269aa9dd7"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-records-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check on the twelve changed Rust files and git diff --check/staged checks passed.",
+    "Both AGENTS.md evidence-size/binaries guards printed nothing before the source commit. New source/tests are mode 100644; no compiled executable or full log/report was staged.",
+    "All three pre-existing untracked SHA-256 values are unchanged. Corpus checks verify all 139 Office fixtures and four import assets.",
+    "Clippy passed with -D warnings for all three complete owner crates and their tests; existing zlib-rs dependency warnings remain unchanged.",
+    "The long-running XLSX corpus oracle was polled on its original live handle through completion. No test was restarted due to observation timeout.",
+    "All temporary diagnostic prints and outside-checkout extraction writes were removed from committed source/tests. The only WebPub/XCB audit remains outside the positive semantic-test index."
+  ],
+  "goal_status": "active; 341 of 494 feature rows have partial assertions and 491 tests are indexed. Fifteen reviewed native fixture gaps remain, with 11 operation, 58 UI, 27 external and 41 unsupported reviews plus partial-scope reviews still open. Historical fixture statuses remain unchanged."
+}
