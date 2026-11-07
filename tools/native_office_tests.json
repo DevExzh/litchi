@@ -7055,6 +7055,123 @@
         "Exact existing UnsupportedContent reasons distinguish paragraph-layout preflight refusal from run-format publication refusal on dependent field/table/review content. Refused operations preserve immutable native artifacts and an empty layout transaction retains exact source bytes."
       ],
       "scope_limit": "These are operation-specific supported-profile boundaries, not unsupported-format claims or substitutes for the separate positive native formatting/frame tests."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_theme_values_match_eager_and_source_views_with_one_payload_load",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-275"
+      ],
+      "assertions": [
+        "Exact native Office theme name, twelve colors, major/minor Aptos fonts, 47 supplemental scripts and theme-family GUIDs agree across eager and source-backed owners. The source-backed read loads only the 8721-byte theme once; repeated reads and no-op publication retain source bytes."
+      ],
+      "scope_limit": "Bounded theme metadata and payload loading; effects, font shaping, rendering and theme application to cells are not claimed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_theme_name_palette_and_family_edits_preserve_fonts_effects_and_binary_parts",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-275"
+      ],
+      "assertions": [
+        "Native-source theme name, Accent1 color and family-name edits survive file reopen, forward replay and exact inverse. Only the theme part changes; native font/effect/object-default/custom-scheme fragments remain exact. Invalid names preserve staged changes; changed font schemes with native panose attributes produce the precise unsupported-attribute refusal."
+      ],
+      "scope_limit": "Native panose font metadata is preserved, not silently dropped; arbitrary font-scheme replacement, effect editing and Excel acceptance remain outside this scope."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_theme_family_and_owner_removal_restore_the_original_graph",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-275"
+      ],
+      "assertions": [
+        "Remove native theme-family metadata independently; remove/recreate the theme owner and verify typed theme/family values and ownership after file reopen. Inverse patches restore payload bytes, relationships and effective content types."
+      ],
+      "scope_limit": "The recreated theme is Litchi-authored from a native typed model; it does not claim exact recreation of unmodeled native effect XML or native Excel authoring."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_properties_keep_saved_values_and_source_eager_noop_parity",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-294"
+      ],
+      "assertions": [
+        "Native core author, last modifier, exact timestamps, empty company and Macintosh Excel application/version/flags agree between eager and source-backed owners. Setting identical metadata/application properties produces equal patches and byte-exact no-op output."
+      ],
+      "scope_limit": "Saved package property metadata only; no document execution, clock update or native application validation."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_metadata_crud_has_source_eager_patch_parity_and_preserves_app_vectors",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-294"
+      ],
+      "assertions": [
+        "Title/company/custom-property changes produce equal eager/source-backed patches and identical property/binary payloads with equivalent OPC graphs. HeadingPairs and TitlesOfParts remain exact. File reopen, stale-patch refusal, application/custom-property removal and inverses preserve every unrelated member."
+      ],
+      "scope_limit": "Effective content types and relationship attributes are compared; graph XML whitespace and equivalent Default/Override choices may differ. Property edits are library-generated native-source derivatives, with macros inert."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_biff12_parts_reencode_exactly_and_bundle_records_match_the_package_graph",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-274",
+        "xlsb-276"
+      ],
+      "assertions": [
+        "Pin native package member counts and four BIFF12 part sizes, record counts and begin/end kinds. Raw decoding/re-encoding preserves every byte. BrtBundleSh physical order, tab IDs/names and relationship IDs match worksheet/chartsheet targets; a truncated last length header yields the exact Truncated/Length error and a fused iterator."
+      ],
+      "scope_limit": "Four selected streams per specimen and the saved package graph; physical chartsheet order is distinct from the worksheet axis. This is not exhaustive BIFF12 grammar coverage."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_package",
+      "name": "native_opc_sidecar_crud_and_failed_updates_preserve_the_workbook",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-274",
+        "xlsb-330"
+      ],
+      "assertions": [
+        "Create/update/delete an inert package sidecar and root relationship on the recorded-macro source, with file reopen and inverse graph/payload checks. A failed update rolls back only that call and retains earlier staged work. Publication refuses a derivative with a truncated workbook while the source and unrelated VBA/binary payloads remain exact."
+      ],
+      "scope_limit": "Generic graph CRUD and workbook validation only; the sidecar is Litchi-authored and macros are not executed. No native Excel reopen is claimed."
     }
   ]
 }

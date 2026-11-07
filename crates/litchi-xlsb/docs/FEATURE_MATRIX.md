@@ -53,7 +53,7 @@ The deferred cell-value selector API is `Result<Edit>`; callers use
 | Workbook and worksheet views | 🟡 | ✅ | 🟡 | Sheet views, panes, selections, zoom, tab/window metadata, and chart-sheet views have typed coverage; all producer-specific view extensions are not modeled. |
 | Merged cells | ✅ | ✅ | ✅ | Worksheet merge ranges have checked read and CRUD operations, including lookup by sheet name. |
 | Row and column layout | ✅ | ✅ | ✅ | Row/column dimensions, hidden and collapsed state, outline levels, widths, heights, and supported worksheet defaults are available. |
-| Core/package properties | 🟡 | 🟡 | 🟡 | Generic OPC package editing is public; there is no broad XLSB-specific typed property facade comparable to the binary package and workbook models. |
+| Core/package properties | 🟡 | 🟡 | 🟡 | `Package::{metadata, app_props, edit_metadata, apply_metadata}` and the corresponding source-backed owner APIs expose core, application and custom-property transactions through the shared OOXML property engine. Exact no-ops retain source bytes; changed fields preserve unrelated lexical XML, and source-checked reversible patches refuse stale, signed or unrepresentable edits. Source-backed publication replaces property parts without materializing worksheets. Unmodeled application vectors remain retained source XML; the typed property vocabulary is bounded. |
 
 ## Worksheet features
 
@@ -174,3 +174,31 @@ record kinds. The implementation refuses structural changes in scopes whose
 opaque context cannot be preserved, and refuses connection removal with query
 dependencies. The native tests do not establish Text15 semantics, complete
 connection ABNF, text-file import, refresh or Excel acceptance of edits.
+
+## Native package, theme and property qualification
+
+`tests/microsoft_office_native_package.rs` covers the tracked native values,
+metadata and recorded-macro XLSB specimens. It pins package member counts,
+physical `BrtBundleSh` order and relationship targets, and byte-exact raw record
+round trips for the workbook, styles, shared strings and first worksheet. The
+values specimen starts its physical catalog with a chartsheet; this order is
+separate from the worksheet axis. Truncated BIFF12 headers fail both raw reading
+and generic package publication.
+
+Native theme reads expose the Office palette, Aptos major/minor fonts and
+DrawingML theme-family GUIDs, with one source-backed theme-payload load. Name,
+color and family edits preserve font/effect/default XML and every binary part.
+Native font schemes carry `panose` attributes outside the writable `Face` model;
+replacing those schemes is an explicit unsupported-attribute refusal. Removing
+and recreating a theme verifies bounded typed values and graph ownership; the
+recreated theme is a Litchi derivative and does not recreate unmodeled effect XML.
+
+Metadata tests exercise eager/source-backed no-ops and equal property patches,
+title/company/custom-property changes, application/custom-part removal, stale
+patch refusal and inverses after file reopen. Native `HeadingPairs` and
+`TitlesOfParts` vectors stay exact. Generic OPC sidecar CRUD and failed-update
+rollback preserve the workbook and inert VBA payload. Every unchanged payload
+is checked byte-for-byte; graph comparisons check relationship attributes and
+effective content types because equivalent defaults/overrides and XML whitespace
+can differ between writers. These are library operations on immutable native
+inputs, without fresh Excel reopen, rendering, refresh or macro execution.
