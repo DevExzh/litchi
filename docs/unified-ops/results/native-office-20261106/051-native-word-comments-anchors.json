@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "3bb85666ca24f9ba163f92bae81735bc21f1e073",
+  "base_commit": "e0c8ee11a4ad16d0fad524804868aa31a8e2af59",
+  "problem": "The real Word visual-object fixture failed Paragraph::legacy_anchors because its w14 namespace was inherited from the document root and discarded by the fragment scanner. The remaining bounded Word rows also conflated reaction-capable metadata with actual reactions, page setup with printer records, and equation pictures with Equation.3/MTEF storage.",
+  "changes": [
+    "Pass the paragraph retained namespace bindings into the legacy-anchor scanner, using the existing bounded namespace acquisition path. Seed the resolver before parsing, retain local rebinding and range checks, and keep standalone test parsing available without invented bindings.",
+    "Add six native DOCX tests for eager/source anchor reads, fresh anchor authoring using a real embedded workbook/preview, unrelated text-edit preservation, native comment metadata graphs, detached reaction/OEXTXML derivatives and the create-only raw metadata-store boundary.",
+    "Add focused inherited-alias/sibling-scope and wrong-namespace/range regressions. Add two evidence-only audits over all 20 native DOC/DOT files and record three separate gaps for saved selection, printer metadata and Equation.3/MTEF storage.",
+    "Correct stale builder/SavedSelection API names and state the package-edit/native-qualification limits in both Word feature matrices. Historical corpus statuses and fixture bytes remain unchanged."
+  ],
+  "verification_scope": {
+    "native_anchor": "word-visual-objects.docx contains exactly one selected legacy anchor, on the OLE object in zero-based paragraph 6: 61C01E2C. Eager and source-backed views now agree. The Word vector fixture selected view has no legacy owner because its VML compatibility branch is inactive; absence is not counted as positive w:pict evidence.",
+    "namespace_fix": "Inherited Strict Word and aliased Word 2010 bindings are admitted. An unrelated sibling local binding does not leak, explicit foreign/unqualified anchorId attributes still fail, and zero/high-bit values remain invalid. Native input uses the document-root w14 binding rather than a synthesized local declaration.",
+    "fresh_anchor_derivative": "A fresh builder document reuses the exact native 18372-byte Excel.Sheet.12 payload and its real image preview. Present object/pict anchor IDs, clearing optional IDs and the legal maximum 7FFFFFFF survive save/reopen with payload/preview bytes exact. This does not edit the opened native object or prove native Word acceptance of the derivative.",
+    "unrelated_publication": "A first-run text transaction on the visual/review fixtures retains the anchor inventory and complete modern-comment metadata. The entire native w:object fragment and every package member other than document.xml remain exact. Inverse restores all member payloads.",
+    "native_comment_metadata": "Review, text-structure and document-protection files retain exact paragraph-to-durable-ID mappings, UTC dates, root/reply parent linkage, unresolved flags and the original person/presence values. All four metadata-part codecs round-trip those native models in Strict and Transitional output. Native reaction lists and intelligentPlaceholder attributes are absent.",
+    "reaction_derivatives": "Detached copies of the native durable-comment models add Like type 1 and unknown type 2 reactions with exact UTC fractions, user values and ordered OEXTXML entries on reaction/info/user owners. Both conformance codecs preserve complete typed values. Non-UTC dates, duplicate reaction types and multiple extension roots are refused. Clearing derivatives restores the original model. The raw OPC store intentionally refuses the existing graph without changing any part; it creates absent graphs rather than updating existing reactions.",
+    "saved_selection_gap": "All 20 native DOC/DOT files, including password-backed opening of the encrypted specimen, expose saved_selection()=None and zero length in FIB slot 30. These inputs cannot qualify Selsf flags, CP geometry, same-length selection edits or CP remapping.",
+    "printer_gap": "All 20 files expose print_environment()=None and zero lengths in FIB slots 27/28/29. Native page margins and section orientation are separate evidence and do not establish PrDrvr/PrEnvPort/PrEnvLand contents.",
+    "equation_gap": "All 20 files lack Equation Native, MSWordEquation and Equation.3 streams; inspected CompObj CLSIDs are not Equation.3. The math DOC has no ObjectPool. Its PICF locations 500/18383 share a 12398-byte EMF payload (SHA-256 470418143d90103432afb25d7384cbe51198149da0bda81523c4f1fb26a813e4), while location 36266 contains a 12470-byte EMF (cf898ccce10b71d9cd38e04ade7450c5801ecfe4ff944da3b409789f5299962b). The visual fixture ObjectPool contains Excel objects. These pictures do not qualify MTEF extraction/authoring.",
+    "limits": "No native-authored reactions, opened-object anchor CRUD, native w:pict anchor interoperability, saved selection, printer records, Equation.3 object semantics, rendering, embedded activation, collaboration service access or fresh Word reopen is claimed. Binary audits remain excluded from positive semantic coverage; encrypted input retains its original ciphertext."
+  },
+  "specification_evidence": [
+    {
+      "reference": "[MS-DOCX] 2.6.2.1 anchorId and integration at 2.2.6",
+      "source": "User-supplied local full specification",
+      "finding": "The attribute belongs to the Word 2010 wordml namespace and its numeric value is nonzero and below 80000000. Inherited namespace scope must be supplied to a paragraph fragment parser; local foreign binding remains invalid."
+    },
+    {
+      "reference": "[MS-OREACTXML] 3.2 and reaction structures",
+      "source": "User-supplied local full specification",
+      "finding": "The example distinguishes Like type 1 from valid unknown type 2. Detached derivatives retain the numeric type, user/time data and extension lists without interpreting reaction policy or requiring a live provider."
+    },
+    {
+      "reference": "[MS-OREACTXML] 3.3",
+      "source": "User-supplied local full specification",
+      "finding": "The user identifier identifies a reaction instance within its reaction context. This batch retains the current bounded duplicate-user/type guards and makes no claim to execute Office duplicate-reaction policy."
+    }
+  ],
+  "reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-word-anchor-namespace-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-anchor-namespace-reproduction.log",
+        "bytes": 19468,
+        "sha256": "c804a5ec204de0c3df08fa6fa81001c8191b188d04a053964dd36de0205b2fc0"
+      },
+      "note": "The unmodified native visual fixture failed legacy_anchors with InvalidFormat(\"legacy anchorId is not in the Word 2010 wordml namespace\") although the document root declares w14 correctly.",
+      "regenerate": "In an isolated base_commit checkout, copy microsoft_office_native_comment_anchors.rs from source_commit and run CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_comment_anchors native_ole_anchor_reads_document_root_namespace_in_eager_and_source_views --locked --offline"
+    }
+  ],
+  "results": {
+    "new_native_semantic_tests": 6,
+    "new_evidence_audits": 2,
+    "new_focused_regressions": 2,
+    "rust_passed": 4246,
+    "rust_failed": 0,
+    "rust_ignored": 3,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 332,
+      "indexed_tests": 468,
+      "reviewed_native_fixture_gaps": 10
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 334,
+      "indexed_tests": 474,
+      "reviewed_native_fixture_gaps": 13,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 334,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 27,
+        "reviewed_native_fixture_gap_requires_followup": 13,
+        "unsupported_boundary_needs_review": 41,
+        "operation_needs_verification": 20,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-full.log",
+        "bytes": 388484,
+        "sha256": "311db4162588e18b6e693ff882b8c09fb182fe2a1139d1b61d0b7b66d7bbd057"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-full.log 2>&1",
+      "suites": 148,
+      "passed": 3987,
+      "failed": 0,
+      "ignored": 2,
+      "existing_ignored_tests": [
+        "DOC package::tests::test_invalid_file: requires an external DOC fixture",
+        "DOC package::tests::test_open_package: requires an external DOC fixture"
+      ]
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'doc_*' --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-ops.log",
+        "bytes": 39541,
+        "sha256": "1b6ed00ab7982e21bb686f2f52b651279ed317cc395c5b1709e141004804c556"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'doc_*' --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-ops.log 2>&1",
+      "suites": 23,
+      "passed": 238,
+      "failed": 0,
+      "ignored": 1,
+      "existing_ignored_tests": [
+        "libreoffice_probe_files: writes external LibreOffice probe artifacts"
+      ]
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-facade.log",
+        "bytes": 19721,
+        "sha256": "def869cf9dd82f1d462bcf4233c268225a99ffd9c391c0085e75d10c9b258529"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-clippy.log",
+        "bytes": 18681,
+        "sha256": "5d12c39ebd856b63844599d66dffe524a5686d449c5bbdc6b5da23f51cc33163"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-python.log",
+        "bytes": 667,
+        "sha256": "35187211ac66fcce480fd3b5f6472aeaf3c8b1068460a9ee0f0f022ee145d292"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-python.log 2>&1",
+      "passed": 75
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-word-comments-anchors-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-coverage.json",
+        "bytes": 1093754,
+        "sha256": "1aaa93daf4162a56b8b71759d4c24ab1b8817493856af6142c222e1703a3cd20"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-word-comments-anchors-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check on six changed Rust files and git diff --check/staged checks passed.",
+    "Both AGENTS.md evidence-size/binaries guards printed nothing before the source commit. New tests are mode 100644; no harness binary or full log/report was staged.",
+    "All three pre-existing untracked files retain their original SHA-256 values. The Python corpus checks verify all 139 Office fixtures and four import assets.",
+    "Clippy passed with -D warnings for both complete owner crates and their tests. Existing zlib-rs/allsorts warnings remain unchanged.",
+    "Long-running owner/operations/facade handles were polled through completion. The three existing ignored tests remain ignored; no fresh native application run is inferred from library round trips.",
+    "DOC encryption support is unconditional, so the evidence audit checks the encrypted fixture without an optional encryption feature gate. The ciphertext archive remains byte-identical."
+  ],
+  "goal_status": "active; 334 of 494 feature rows have partial assertions and 474 tests are indexed. Thirteen reviewed native fixture gaps remain, with 20 operation, 58 UI, 27 external and 41 unsupported reviews plus partial-scope reviews still open. No bounded-native row remains without either partial tests or an explicit fixture-gap review; that does not establish complete feature semantics."
+}
