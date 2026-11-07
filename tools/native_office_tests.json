@@ -10472,6 +10472,125 @@
         "Wrong relationship-family/root-version combinations and a DTD return exact typed errors without losing valid staging; the remaining edit saves, reopens, replays and inverts with the native macro payload unchanged."
       ],
       "scope_limit": "Bounded XML admission and transaction atomicity; no recognizer, callback, macro or external provider is invoked. XLSB publication uses its package Ribbon transaction."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_ppt_slide_library_metadata_lifecycle_preserves_round_trip_records_and_streams",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-381"
+      ],
+      "assertions": [
+        "Synchronization creation, exact Unicode ID/URL/timestamp readback, no-op, update, stale refusal and removal save/reopen/replay/invert while preserving native slide text, fast text, round-trip metadata, persisted owners, other streams and CFB directory metadata."
+      ],
+      "scope_limit": "Library-authored synchronization metadata on native parents; the HTTP library URL remains inert and no server synchronization or new Office validation is claimed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_ppt_slide_sync_invalid_values_and_missing_slide_keep_source_unchanged",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-381"
+      ],
+      "assertions": [
+        "Non-HTTP URLs, control-bearing IDs, invalid Gregorian dates and a missing slide return precise typed errors while the native package and file remain unchanged."
+      ],
+      "scope_limit": "Metadata admission only; the HTTP restriction follows the MS-PPT wire contract and does not contact a URL."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_ppt_photo_album_settings_read_all_layouts_and_frames_without_changing_pictures",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-340"
+      ],
+      "assertions": [
+        "Explicit PhotoAlbumInfo10Atom derivatives cover every layout/frame enum, flags and the retained undefined byte through live-document reads and file reopen, preserving native pictures and all other persisted objects."
+      ],
+      "scope_limit": "The public raw record/CFB route seeds metadata for the bounded reader; this is not native Photo Album authoring, a semantic album writer or picture relayout."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_ppt_invalid_photo_album_enums_report_exact_reader_errors",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-340"
+      ],
+      "assertions": [
+        "Out-of-range layout and frame values return exact Corrupted reader reasons without mutating the native source."
+      ],
+      "scope_limit": "Explicit malformed derivatives test reader admission; invalid records are not attributed to PowerPoint."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_ppt_privacy_web_routing_and_envelope_settings_stay_inert_through_metadata_edits",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-382"
+      ],
+      "assertions": [
+        "Exact privacy, HTML-document/publication, routing-slip and Office8 mail-envelope fields survive live-document reads and summary-title edits. Undefined routing bytes, Unicode MAPI values and inert attachments remain exact; privacy-on-save does not silently strip metadata."
+      ],
+      "scope_limit": "Raw record/CFB publication seeds read-model derivatives. No browser export, mail delivery, provider activation or metadata-removal workflow is performed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_auxiliary_metadata",
+      "name": "native_ppt_broadcast_metadata_edits_preserve_opaque_records_and_native_content",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-382"
+      ],
+      "assertions": [
+        "A complete inert broadcast derivative supports typed read/no-op/title update, exact invalid-dependency errors, failure atomicity, stale refusal and save/reopen/replay/inverse, retaining interleaved unknown records and native content."
+      ],
+      "scope_limit": "The dedicated editor updates an existing broadcast container; initial seeding uses public raw record/CFB APIs. Network, camera, email, chat and file paths are stored only."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_ppt_metadata_text",
+      "name": "native_ppt_sync_metadata_is_invisible_in_operations_and_facade_text_views",
+      "required_features": [
+        "ppt"
+      ],
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-381"
+      ],
+      "assertions": [
+        "Native slide-library metadata leaves facade document/slide text and operations text/JSON/slide views unchanged in file-backed Auto and Eager ingress; reads retain the exact derived artifact and original fixtures."
+      ],
+      "scope_limit": "Explicit metadata derivatives exercise text visibility, not server synchronization or native Office authoring."
     }
   ]
 }

@@ -260,6 +260,7 @@ serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 clap = { version = "4", features = ["derive"] }
 litchi-ops = { workspace = true, features = ["test-support"] }
 proptest = "1.5"
+serde_json = { workspace = true }
 tempfile = "3"
 tokio = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }

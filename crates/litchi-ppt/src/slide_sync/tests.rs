@@ -103,6 +103,39 @@ fn parses_and_round_trips_slide_sync_without_editing_unknown_records() {
 }
 
 #[test]
+fn synchronization_strings_do_not_enter_visible_slide_text() {
+    let utf16 = |text: &str| {
+        text.encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>()
+    };
+    let original = Snapshot::from_record(
+        root(vec![
+            atom(RecordType::TextCharsAtom, 0, 0, &utf16("Visible body")),
+            atom(RecordType::CString, 0, 0, &utf16("Visible CString")),
+        ]),
+        &Limits::default(),
+    )
+    .unwrap();
+    let mut edit = original.edit();
+    edit.set(synchronization()).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit.snapshot().record().extract_text().unwrap(),
+        "Visible body\nVisible CString"
+    );
+    assert_eq!(
+        commit.snapshot().synchronization().unwrap(),
+        Some(synchronization())
+    );
+    let reopened = Snapshot::parse(commit.snapshot().bytes(), &Limits::default()).unwrap();
+    assert_eq!(
+        reopened.record().extract_text().unwrap(),
+        original.record().extract_text().unwrap()
+    );
+}
+
+#[test]
 fn set_and_clear_are_atomic_and_reversible() {
     let original = source();
     let original_bytes = original.bytes().to_vec();

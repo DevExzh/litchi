@@ -721,6 +721,7 @@ impl Record {
                 | RecordType::ProgStringTag
                 | RecordType::ProgBinaryTag
                 | RecordType::Comment2000
+                | RecordType::RoundTripSlideSyncInfo12
         ) {
             return Ok(String::new());
         }
