@@ -152,13 +152,14 @@ class NativeOfficeCorpus(unittest.TestCase):
     def test_evidence_reviews_never_count_absence_as_semantic_coverage(self) -> None:
         coverage = report()
         reviewed = [row for row in coverage["feature_rows"] if "evidence_review" in row]
-        self.assertEqual({row["id"] for row in reviewed}, {"xlsx-240", "xlsx-245", "xlsx-266", "ppt-363"})
+        self.assertEqual({row["id"] for row in reviewed}, {"xlsx-240", "xlsx-245", "xlsx-266", "ppt-363", "docx-093", "docx-097"})
         self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed))
+        historical = {row["id"]: row["fixture_status"] for row in document("coverage.json")["feature_inventory"]}
         for row in reviewed:
             with self.subTest(row=row["id"]):
                 self.assertEqual(row["automated_coverage"], "uncovered")
                 self.assertEqual(row["tests"], [])
-                self.assertEqual(row["native_fixture_status"], "verified_native_fixture")
+                self.assertEqual(row["native_fixture_status"], historical[row["id"]])
                 self.assertTrue(row["evidence_review"]["checks"])
 
     def test_evidence_review_validation_rejects_unknown_or_unsubstantiated_claims(self) -> None:

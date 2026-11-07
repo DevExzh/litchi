@@ -280,11 +280,12 @@ impl Extensions {
     /// Panics if an internal writer invariant is violated.
     pub fn to_xml(&self, word_prefix: &str) -> String {
         let mut output = String::new();
-        let mut wrote_word_2010_namespace = false;
-        let mut wrote_word_2012_namespace = false;
-        let mut wrote_word_namespace = false;
-
         for extension in &self.values {
+            // These are sibling elements, not descendants of the first
+            // extension. Each must declare the namespaces it uses locally.
+            let mut wrote_word_2010_namespace = false;
+            let mut wrote_word_2012_namespace = false;
+            let mut wrote_word_namespace = false;
             match extension {
                 Extension::ChartTrackingRefBased(value) => write_on_off(
                     &mut output,

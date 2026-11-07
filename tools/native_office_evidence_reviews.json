@@ -156,6 +156,104 @@
         "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "This proves the saved picture representation and absence of the supported build owner; it does not claim every possible opaque SmartArt compatibility record is absent, or that a picture/empty inventory qualifies diagram semantics. A native build-bearing legacy specimen remains needed."
+    },
+    {
+      "feature_row": "docx-093",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-visual-objects.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-glossary.dotx",
+        "word/word-glossary.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-master-document.docx",
+        "word/word-tracked-moves.docx",
+        "word/word-encrypted.docx"
+      ],
+      "reason": "Namespace declarations, OpenType ligatures and DrawingML shape graphics do not evidence the seven Word 2010 run-effect elements.",
+      "required_evidence": "A native Word run/rPr or style carrying w14 glow, shadow, reflection, textOutline, textFill, scene3d or props3d, with its actual parameter values.",
+      "observed_evidence": "All 24 manifest Word OOXML files, including the explicitly decrypted encrypted document, lack the seven w14 run-effect elements and the reviewed SDT/dataBinding elements across XML parts. Neighboring native evidence is positively checked: nine explicit ligature records in the macro document (five runs and four paragraph-mark properties), three legacy ffData fields, and three WordprocessingShape graphics in the vector specimen.",
+      "checks": [
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_word_corpus_has_no_run_effects_or_extension_content_controls",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/residual-coverage-audit.json",
+        "test-data/microsoft-office/word/layout-extensions-inspection.json",
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Corpus evidence correction only. This does not count as semantic coverage or make an unsupported-library claim. Historical pending authoring status is unchanged; direct native evidence remains required."
+    },
+    {
+      "feature_row": "docx-097",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-visual-objects.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-glossary.dotx",
+        "word/word-glossary.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-master-document.docx",
+        "word/word-tracked-moves.docx",
+        "word/word-encrypted.docx"
+      ],
+      "reason": "The native legacy form fields and ordinary document metadata do not evidence SDT extension controls or content-control data bindings.",
+      "required_evidence": "A native structured-document tag with the specific w14 checkbox/entityPicker or w15 repeatingSection/repeatingSectionItem/appearance/color/dataBinding payload, or core dataBinding and its store closure.",
+      "observed_evidence": "All 24 manifest Word OOXML files, including the explicitly decrypted encrypted document, lack the seven w14 run-effect elements and the reviewed SDT/dataBinding elements across XML parts. Neighboring native evidence is positively checked: nine explicit ligature records in the macro document (five runs and four paragraph-mark properties), three legacy ffData fields, and three WordprocessingShape graphics in the vector specimen.",
+      "checks": [
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_word_corpus_has_no_run_effects_or_extension_content_controls",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/residual-coverage-audit.json",
+        "test-data/microsoft-office/word/layout-extensions-inspection.json",
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Corpus evidence correction only. This does not count as semantic coverage or make an unsupported-library claim. Historical pending authoring status is unchanged; direct native evidence remains required."
     }
   ]
 }

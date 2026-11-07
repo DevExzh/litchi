@@ -6677,6 +6677,93 @@
         "Two native sections retain exact portrait/landscape geometry and CP ranges; second-section margin/column edits change only requested semantic properties. Raw sentinel, body and secondary-story text, saved RSID, stylesheet/fonts/DOP and unrelated streams survive file reopen; inverse is exact."
       ],
       "scope_limit": "Left margin and equal-width column count only; no rendered columns, page-numbering edits, footnote-column extension or fresh Word reopen is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_extensions",
+      "name": "native_settings_ids_authored_defaults_and_compatibility_triples_are_distinct",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-095",
+        "docx-096"
+      ],
+      "assertions": [
+        "Exact paragraph-context IDs, document-vs-template source GUID presence, authored-default chart-tracking state, six ordered compatibility name/URI/value triples and no-op original bytes; native mathPr is retained as opaque metadata."
+      ],
+      "scope_limit": "Four native Word variants; compatibility intent is metadata, not layout behavior or chart refresh."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_extensions",
+      "name": "native_settings_extension_updates_preserve_compatibility_math_and_macro_members",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-095"
+      ],
+      "assertions": [
+        "Native ID and chart-tracking updates plus source GUID/conflict/image metadata authoring retain every byte outside the owned extension children. Invalid IDs preserve earlier staged values. File reopen, complete other-member preservation including macros, and exact member inverse pass."
+      ],
+      "scope_limit": "Added settings are Litchi-authored derivatives of immutable native sources; no Word reopen, macro execution, image processing or chart behavior is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_extensions",
+      "name": "native_settings_extension_removal_and_reset_preserve_unowned_records",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-095"
+      ],
+      "assertions": [
+        "Removing all three native typed extension families leaves exact other settings XML and package members; save/reopen and inverse pass. Reset discards staged DPI authoring with exact source bytes."
+      ],
+      "scope_limit": "Only modeled settings extensions are removed; no document behavior is evaluated."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_extensions",
+      "name": "native_compatibility_values_round_trip_through_the_typed_settings_codec",
+      "fixtures": [
+        "word/word-math-navigation.docx"
+      ],
+      "feature_rows": [
+        "docx-096",
+        "docx-095"
+      ],
+      "assertions": [
+        "Native six-triple compatibility metadata supports detached mode replacement, named-record deletion and escaped arbitrary-record addition. Reparse retains all typed extensions including the Word 2012 source GUID; extension siblings bind their own namespaces."
+      ],
+      "scope_limit": "Detached Settings codec result, not a source-package rewrite or Word-layout parity claim."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_extensions",
+      "name": "native_macro_runs_preserve_explicit_no_ligatures_and_detached_opentype_edits",
+      "fixtures": [
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-094"
+      ],
+      "assertions": [
+        "Each of five native macro-document/template runs retains explicit ligatures=none, distinct from other absent OpenType properties. A detached native bold target run accepts five-family OpenType edits and restoration while every unowned XML byte remains exact."
+      ],
+      "scope_limit": "Run/snapshot reads and detached fragment rewrites; no source-package OpenType edit transaction, font shaping, rendering or macro activation is claimed."
     }
   ]
 }

@@ -23,3 +23,51 @@ fn package_processing_understands_ignorable_word_settings_extensions() {
     assert!(processed.contains("conflictMode"));
     assert!(processed.contains("chartTrackingRefBased"));
 }
+
+#[test]
+fn serialized_extension_siblings_each_bind_their_own_namespaces() {
+    use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
+    let mut values = Extensions::new();
+    values
+        .set_chart_tracking_ref_based(Some(OnOff::off()))
+        .unwrap()
+        .set_source_document_id(Some(Guid::from_bytes([0xab; 16])))
+        .unwrap()
+        .set_document_id(Some(1))
+        .unwrap()
+        .set_conflict_mode(Some(OnOff::default_on()))
+        .unwrap()
+        .set_discard_image_editing_data(Some(OnOff::on()))
+        .unwrap()
+        .set_default_image_dpi(Some(144))
+        .unwrap();
+    for prefix in ["w", "word", ""] {
+        let fragment = values.to_xml(prefix);
+        // No enclosing namespace bindings can mask a missing declaration.
+        let mut reader = NsReader::from_str(&fragment);
+        let mut count = 0;
+        loop {
+            let (namespace, event) = reader.read_resolved_event().unwrap();
+            match event {
+                Event::Empty(element) => {
+                    assert!(matches!(namespace, ResolveResult::Bound(_)));
+                    for attr in element.attributes() {
+                        let attr = attr.unwrap();
+                        if !attr.key.as_ref().starts_with(b"xmlns:") {
+                            assert!(matches!(
+                                reader.resolver().resolve_attribute(attr.key).0,
+                                ResolveResult::Bound(_)
+                            ));
+                        }
+                    }
+                    count += 1;
+                },
+                Event::Eof => break,
+                _ => panic!("expected a self-contained extension child"),
+            }
+        }
+        assert_eq!(count, 6);
+        let xml = format!(r#"<w:settings xmlns:w="{W}">{fragment}</w:settings>"#);
+        assert_eq!(Extensions::parse(xml.as_bytes()).unwrap(), values);
+    }
+}
