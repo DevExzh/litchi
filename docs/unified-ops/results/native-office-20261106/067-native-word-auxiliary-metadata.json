@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "b91add3b8901e923f84959dac938bcb89d956688",
+  "base_commit": "bdce82696198aa6b4a47dd1a7bef9d8eb59922dc",
+  "problem": "Native Word caption, envelope and AutoSummary rows had no scoped automated evidence. The matrix used stale caption/envelope API names and did not distinguish detached AutoSummary record editing from a package editor.",
+  "changes": [
+    "Add seven native-parent regressions for caption template ownership/lifecycle/atomicity, Office 6/8 and opaque envelope lifecycle/protection, actual inactive native AutoSummary state and explicit priority-table derivatives.",
+    "Add a small tracked helper that compares CFB directory path/type/CLSID/state-bit/creation-time/modification-time metadata independently of sector allocation.",
+    "Correct feature-matrix API names and scope, and correct the PlcfAsumy specification reference from 2.8.4 to 2.8.9 in its source/test documentation. Runtime implementation and native fixture bytes are unchanged."
+  ],
+  "verification_scope": {
+    "captions": "Native layout, glossary and recorded-macro DOT parents begin without caption tables. Explicit typed labels, chapter numbering/separators, location/omit-label/format options and ProgID references survive create/update/clear. The 40-UTF-16-unit boundary succeeds; 42 units refuse. Clearing referenced labels returns the exact InvalidFormat transaction reason and leaves valid staging intact. Reopen, exact no-op, stale typed patch conflict, forward replay and whole-artifact inverse pass.",
+    "caption_owner_boundary": "Ordinary native layout and macro DOC files have fDot=false and zero caption table lengths. The public editor refuses with its precise Normal-template-only Corrupted reason without changing the source. The specification requires zero caption lengths for fDot=0 and defines the records for the Normal template. Successful metadata publication on a native DOT derivative does not establish that host-specific role or native caption insertion.",
+    "envelopes": "Native text DOC and macro DOT parents receive explicit Office 8 Unicode messages with recipient property bags, binary attachments, security intent flags and opaque tail bytes. Subject updates retain every other field. Invalid Office 8 contact-link removal refuses with the exact transaction error and preserves prior staging. Office 6 replacement retains uninterpreted ANSI bytes, including 0x80, and the required absent Unicode-only collections. An unknown CLSID stores exact opaque data and rejects message-only updates as an exact no-op; removal clears its FIB pair.",
+    "protection": "The protected native DOC cannot acquire an envelope under default policy: Package(ProtectionDenied(Document)) is asserted, and committing after refusal is an exact no-op. No protection bypass is used.",
+    "autosummary_native": "Three native DOC/DOT parents expose inactive Asumyi metadata: valid/view-active/update flags false, Highlight view and zero desired/highest/current levels. PlcfAsumy is absent with a zero length. An unchanged Dop97 parse/write retains the complete native DOP bytes.",
+    "autosummary_derivatives": "Detached DocumentAutoSummary codecs create 0..8 level 1 and 8..16 level 3 ranges. Public CFB stream publication attaches these explicit derivatives, and Document::auto_summary reads exact values. A level replacement, invalid noncontiguous append with retained state, range removal and full clearing pass. State edits are confined to the 12-byte Asumyi span at DOP offset 414; only the priority pointer pair and appended table data may change. There is no dedicated AutoSummary package edit API.",
+    "preservation": "Caption/envelope edits change only their FIB pairs and append selected-table ranges; original table prefixes remain exact. AutoSummary derivatives additionally own only the Asumyi span. Native document text, SEQ/glossary content, VBA and all unrelated stream bytes are retained; exact stream keys and directory metadata are checked. Every changed stage saves/reopens, replays and exactly inverts at its declared public package/CFB layer. Original package bytes and files stay unchanged.",
+    "limits": "All caption/envelope/priority additions are library-authored derivatives. No caption insertion, field refresh, summarization, mail transport, recipient resolution, attachment activation, macro execution, native Normal-template identity, UI state application or fresh Word validation is inferred. Envelope signed/encrypted flags are metadata intent, not cryptographic proof."
+  },
+  "specification_evidence": [
+    {
+      "reference": "[MS-DOC] 2.5.6, 2.9.24, 2.9.278 and 2.9.285",
+      "source": "User-supplied local full specification",
+      "finding": "The caption FIB pairs, CAPI, AutoCaption ProgID references and caption STTB constraints define the tested metadata. Caption lengths must be zero when fDot is zero; the Normal-template role remains a separate host condition."
+    },
+    {
+      "reference": "[MS-DOC] 2.5.7; [MS-OSHARED] 2.3.8",
+      "source": "Local full specification and the tracked envelope codec/model contracts",
+      "finding": "The selected FIB range contains a CLSID-selected envelope with Office 6/8 versioned strings, recipient properties and attachment data. Tests keep it inert and preserve unknown CLSID/tail payloads."
+    },
+    {
+      "reference": "[MS-DOC] 2.7.4, 2.7.14, 2.8.9 and 2.9.3",
+      "source": "User-supplied local full specification",
+      "finding": "Dop97 contains the Asumyi state record; PlcfAsumy contains four-byte ASUMY priorities. The source/test citation incorrectly pointed to 2.8.4 (Plcbkld) and now points to 2.8.9."
+    }
+  ],
+  "coverage": {
+    "summary": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 376,
+      "indexed_tests": 565,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 41,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 376,
+        "native_ui_limitation_needs_review": 38,
+        "external_fixture_handoff_needs_review": 15,
+        "reviewed_native_fixture_gap_requires_followup": 23,
+        "reviewed_explicit_scope_boundary": 41,
+        "not_applicable": 1
+      }
+    },
+    "new_partial_rows": [
+      "doc-018",
+      "doc-044",
+      "doc-045"
+    ],
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false,
+    "accounting": "Seven new indexed tests yield 565 indexed tests and 376 partial feature rows. Three UI-limited rows gain bounded native-state/derivative operation evidence without promoting historical authoring status."
+  },
+  "validation": [
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --lib --test microsoft_office_native_caption_envelope --test microsoft_office_native_auto_summary --test doc_captions --test doc_auto_summary --test microsoft_office_native_metadata --test microsoft_office_native_protection --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-owners.log",
+        "bytes": 126417,
+        "sha256": "bcff22320e3a5f97eb2ace5bb4fbda43e131308af1e82cdb106f97e1a2d29a6a"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --lib --test microsoft_office_native_caption_envelope --test microsoft_office_native_auto_summary --test doc_captions --test doc_auto_summary --test microsoft_office_native_metadata --test microsoft_office_native_protection --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-owners.log 2>&1",
+      "results": {
+        "targets": 7,
+        "passed": 1291,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --test microsoft_office_native_caption_envelope --test microsoft_office_native_auto_summary --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-final.log",
+        "bytes": 18217,
+        "sha256": "b24e5912e7f021dc8bde2ec39cffe720cd8dc504861e5dd894122f3e2b4bffc6"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc --all-features --test microsoft_office_native_caption_envelope --test microsoft_office_native_auto_summary --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-final.log 2>&1",
+      "results": {
+        "targets": 2,
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0
+      },
+      "note": "Final rerun after strengthening the immediate-source envelope preservation comparison and removing an unnecessary test clone; the seven tests are already in the owner total."
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-ops.log",
+        "bytes": 22641,
+        "sha256": "3d6e3fd7b2f30fdb1e883863e04c361ed875216721c1299eb03e54e167b3801d"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-ops.log 2>&1",
+      "results": {
+        "targets": 9,
+        "passed": 34,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,eval --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-facade.log",
+        "bytes": 20230,
+        "sha256": "6f2728f7f5f1400e8939d6d554a5a5ee1c73248f950da23c4425cf4473348e48"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,eval --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-facade.log 2>&1",
+      "results": {
+        "targets": 4,
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc --all-features --lib --test microsoft_office_native_caption_envelope --test microsoft_office_native_auto_summary --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-clippy.log",
+        "bytes": 17080,
+        "sha256": "02fcd16312462e46ef0a82618cb11ffcc8a82e979738d61f691f93dd82db4301"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc --all-features --lib --test microsoft_office_native_caption_envelope --test microsoft_office_native_auto_summary --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-python.log",
+        "bytes": 670,
+        "sha256": "72b979b11b699effe9f0d5dc6438335a573748fd5cd52304c9fcf3b4f96d9b55"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-coverage.json",
+        "bytes": 1390663,
+        "sha256": "2a4d5a13dae75380d3be500ca402170620e27e9bff50ce1b01592bffed637e54"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-coverage.json 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-gate.log 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check --config skip_children=true tools/test_support/cfb_directory_metadata.rs crates/litchi-doc/tests/microsoft_office_native_caption_envelope.rs crates/litchi-doc/tests/microsoft_office_native_auto_summary.rs crates/litchi-doc/src/parts/auto_summary.rs crates/litchi-doc/tests/doc_auto_summary.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-doc-aux-format.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --edition 2024 --check --config skip_children=true tools/test_support/cfb_directory_metadata.rs crates/litchi-doc/tests/microsoft_office_native_caption_envelope.rs crates/litchi-doc/tests/microsoft_office_native_auto_summary.rs crates/litchi-doc/src/parts/auto_summary.rs crates/litchi-doc/tests/doc_auto_summary.rs > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-doc-aux-format.log 2>&1"
+    }
+  ],
+  "validation_totals": {
+    "distinct_rust_tests_passed": 1348,
+    "rust_tests_ignored": 0,
+    "python_tests_passed": 78,
+    "breakdown": "1291 DOC library/owning-format tests, 34 operations tests and 23 facade tests. The final seven-test rerun and earlier focused runs are not counted twice.",
+    "clippy": "The DOC library and both new integration targets, including the shared directory helper, passed with -D warnings. Existing vendored warnings are unchanged.",
+    "formatting": "Targeted rustfmt and git diff --check passed.",
+    "gate": "Non-iWork topology verification, all 139 native files/four import assets size/SHA-256 checks and coverage accounting passed.",
+    "staged_file_guards": "Both required size and binaries checks emitted nothing before each commit."
+  },
+  "environment": {
+    "scratch": "/home/zhuhe/.cache/litchi-native-office.V1L32Z",
+    "temporary_files": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp",
+    "unrelated_files": "The three original untracked files retain their original hashes. The separately appearing production-readiness assessment remains untouched and unstaged.",
+    "fixture_access": "Tests use tracked test-data paths; no new binary fixture, dependency or upstream-checkout runtime reference was introduced."
+  },
+  "goal_status": "active; 38 native UI limitations, 15 external handoffs and 23 reviewed native fixture gaps remain, plus the final scope/completion audit"
+}
