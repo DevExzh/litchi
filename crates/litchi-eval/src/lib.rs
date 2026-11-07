@@ -65,6 +65,13 @@ const MISSING_COLUMN: SheetError = SheetError::refused(
     "the table has no column of that name",
 );
 
+/// Explicit table syntax requires a table definition from the caller.
+const MISSING_TABLE: SheetError = SheetError::refused(
+    RefusalKind::UnsupportedContent,
+    "evaluate",
+    "a structured reference requires a registered table",
+);
+
 struct Visit<'a> {
     session: &'a Mutex<HashSet<CellRef>>,
     key: CellRef,
@@ -526,6 +533,13 @@ where
 
         let table = match self.tables.get(&table_name.to_uppercase()) {
             Some(t) => t,
+            // Returning None here turns the structured reference into an
+            // unresolved scalar name. Aggregates can then discard that error
+            // as nonnumeric input and manufacture a result such as SUM=0.
+            // Bare identifiers must still fall through to defined-name lookup.
+            None if name.contains('[') => {
+                return Err(MISSING_TABLE);
+            },
             None => return Ok(None),
         };
 
@@ -888,6 +902,53 @@ mod transport_tests {
             cached_value: None,
             is_array: false,
             array_range: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_table_references_refuse_without_breaking_registered_tables_or_names() {
+        for reference in ["Inventory[Quantity]", "Inventory[#All]", "Inventory[]"] {
+            let book = Book {
+                names: vec!["Sheet1".into()],
+                cells: HashMap::from([((1, 3), formula(&format!("SUM({reference})")))]),
+            };
+            assert_eq!(
+                FormulaEvaluator::new(&book)
+                    .evaluate_cell("Sheet1", 1, 3)
+                    .await,
+                Err(MISSING_TABLE)
+            );
+        }
+        let book = Book {
+            names: vec!["Sheet1".into()],
+            cells: HashMap::from([
+                ((1, 3), formula("SUM(Inventory[Quantity])")),
+                ((2, 3), formula("SUM(Total)")),
+                ((2, 1), CellValue::String("Quantity".into())),
+                ((3, 1), CellValue::Int(5)),
+                ((4, 1), CellValue::Int(7)),
+            ]),
+        };
+        let mut evaluator = FormulaEvaluator::new(&book);
+        assert_eq!(
+            evaluator.evaluate_cell("Sheet1", 1, 3).await,
+            Err(MISSING_TABLE)
+        );
+        evaluator.define_table(TableConfig {
+            name: "Inventory",
+            sheet_name: "Sheet1",
+            start_row: 2,
+            start_col: 1,
+            end_row: 4,
+            end_col: 1,
+            headers: &["Quantity".into()],
+        });
+        evaluator.define_name("Total", "Sheet1!A3:A4");
+        for row in [1, 2] {
+            assert_eq!(
+                evaluator.evaluate_cell("Sheet1", row, 3).await.unwrap(),
+                CellValue::Float(12.0)
+            );
         }
     }
 

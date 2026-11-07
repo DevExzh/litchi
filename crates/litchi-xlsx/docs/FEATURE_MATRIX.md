@@ -227,3 +227,15 @@ exact. Recreated owner XML is canonical, so semantic comparisons ignore only
 attribute order and retain every namespace/value/text and child/record order.
 The revisions are inert metadata; these tests do not execute collaboration,
 recalculation, native history UI or fresh Excel reopen.
+
+The complete-Excel-evaluation row is an explicit compatibility boundary, separate
+from the optional bounded `litchi-ops` evaluator. Its native calculation suite
+checks scalar arithmetic/aggregates, shared `ROW` formulas, cached error kinds,
+1904 dates, cache preference, file reopen and read-only byte preservation.
+Explicit evaluation refuses external references and syntax/context outside the
+profile; an unregistered table reference cannot silently aggregate to zero.
+Date functions use the workbook date system, including holiday/offset inputs.
+These checks do not establish a complete Excel dependency/spill engine, external
+refresh, cache publication or fresh Excel acceptance. See
+`tools/native_office_evidence_reviews.json` and
+`crates/litchi-ops/tests/microsoft_office_native_calc.rs`.

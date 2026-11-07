@@ -5,7 +5,7 @@ use litchi_core::sheet::{CellValue, Result};
 use chrono::Datelike;
 
 use super::helpers::{
-    SECONDS_PER_DAY, coerce_date_value, coerce_time_fraction, serial_to_excel_date_1900,
+    SECONDS_PER_DAY, coerce_date_value, coerce_time_fraction, serial_to_excel_date,
 };
 
 pub(crate) fn eval_year(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
@@ -13,7 +13,7 @@ pub(crate) fn eval_year(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) ->
         return Ok(CellValue::Error("YEAR expects 1 argument".to_string()));
     }
     let value = evaluate_expression(ctx, current_sheet, &args[0])?;
-    match coerce_date_value(&value) {
+    match coerce_date_value(&value, ctx.is_1904_date_system()) {
         Some(date) => Ok(CellValue::Int(date.year() as i64)),
         None => Ok(CellValue::Error(
             "YEAR expects a valid date serial or text".to_string(),
@@ -30,7 +30,7 @@ pub(crate) fn eval_month(
         return Ok(CellValue::Error("MONTH expects 1 argument".to_string()));
     }
     let value = evaluate_expression(ctx, current_sheet, &args[0])?;
-    match coerce_date_value(&value) {
+    match coerce_date_value(&value, ctx.is_1904_date_system()) {
         Some(date) => Ok(CellValue::Int(date.month() as i64)),
         None => Ok(CellValue::Error(
             "MONTH expects a valid date serial or text".to_string(),
@@ -43,7 +43,7 @@ pub(crate) fn eval_day(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> 
         return Ok(CellValue::Error("DAY expects 1 argument".to_string()));
     }
     let value = evaluate_expression(ctx, current_sheet, &args[0])?;
-    match coerce_date_value(&value) {
+    match coerce_date_value(&value, ctx.is_1904_date_system()) {
         Some(date) => Ok(CellValue::Int(date.day() as i64)),
         None => Ok(CellValue::Error(
             "DAY expects a valid date serial or text".to_string(),
@@ -53,7 +53,7 @@ pub(crate) fn eval_day(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> 
 
 /// DATESTRING(serial_number) — East Asian date string in the form
 /// `YYYY年MM月DD日` (ECMA-376 §18.17.7.62). Only a numeric date serial in the
-/// 1900 date system is accepted, matching the other component functions.
+/// workbook date system is used, matching the other component functions.
 pub(crate) fn eval_datestring(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
@@ -69,7 +69,7 @@ pub(crate) fn eval_datestring(
         Some(n) => n,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    match serial_to_excel_date_1900(serial) {
+    match serial_to_excel_date(serial, ctx.is_1904_date_system()) {
         Some(date) => Ok(CellValue::String(format!(
             "{:04}年{:02}月{:02}日",
             date.year(),

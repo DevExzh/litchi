@@ -18,3 +18,6 @@ pub(crate) use week::{eval_isoweeknum, eval_weekday, eval_weeknum};
 pub(crate) use workdays::{
     eval_networkdays, eval_networkdays_intl, eval_workday, eval_workday_intl,
 };
+
+#[cfg(test)]
+mod date_system_tests;

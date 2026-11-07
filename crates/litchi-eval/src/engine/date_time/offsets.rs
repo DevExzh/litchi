@@ -3,7 +3,7 @@ use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 
 use super::helpers::{
-    add_months, date_to_excel_serial_1900, last_day_of_month, number_arg, serial_to_excel_date_1900,
+    add_months, date_to_excel_serial, last_day_of_month, number_arg, serial_to_excel_date,
 };
 
 pub(crate) fn eval_edate(
@@ -32,7 +32,7 @@ pub(crate) fn eval_edate(
         },
     };
 
-    let date = match serial_to_excel_date_1900(start) {
+    let date = match serial_to_excel_date(start, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -48,7 +48,7 @@ pub(crate) fn eval_edate(
         },
     };
 
-    let serial = date_to_excel_serial_1900(shifted);
+    let serial = date_to_excel_serial(shifted, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 
@@ -80,7 +80,7 @@ pub(crate) fn eval_eomonth(
         },
     };
 
-    let date = match serial_to_excel_date_1900(start) {
+    let date = match serial_to_excel_date(start, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -107,7 +107,7 @@ pub(crate) fn eval_eomonth(
         },
     };
 
-    let serial = date_to_excel_serial_1900(last_day);
+    let serial = date_to_excel_serial(last_day, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 

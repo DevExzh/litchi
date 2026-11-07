@@ -41,7 +41,10 @@
 //!
 //! The `_xlfn.` and `_xlws.` prefixes of newer functions are removed before
 //! evaluation. A formula whose result is a blank reference evaluates to 0,
-//! as in Excel.
+//! as in Excel. Date functions use the workbook's date-system flag; evaluating
+//! a 1904 workbook does not substitute 1900-based serials. Explicit structured
+//! references without a registered table are unsupported, including when nested
+//! inside aggregates; a missing table never supplies an empty range.
 //!
 //! # Volatile functions
 //!

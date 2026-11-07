@@ -15,25 +15,33 @@ pub(super) fn number_arg(
     Ok(to_number(&v))
 }
 
-pub(super) fn date_to_excel_serial_1900(date: NaiveDate) -> f64 {
-    let base = NaiveDate::from_ymd_opt(1899, 12, 30).expect("Invalid Excel 1900 base date");
+fn date_epoch(date1904: bool) -> NaiveDate {
+    if date1904 {
+        NaiveDate::from_ymd_opt(1904, 1, 1).expect("valid 1904 epoch")
+    } else {
+        NaiveDate::from_ymd_opt(1899, 12, 30).expect("valid 1900 compatibility epoch")
+    }
+}
+
+pub(super) fn date_to_excel_serial(date: NaiveDate, date1904: bool) -> f64 {
+    let base = date_epoch(date1904);
     let days = (date - base).num_days();
     days as f64
 }
 
-pub(super) fn datetime_to_excel_serial_1900(dt: NaiveDateTime) -> f64 {
-    let date_serial = date_to_excel_serial_1900(dt.date());
+pub(super) fn datetime_to_excel_serial(dt: NaiveDateTime, date1904: bool) -> f64 {
+    let date_serial = date_to_excel_serial(dt.date(), date1904);
     let seconds = dt.time().num_seconds_from_midnight() as f64;
     date_serial + seconds / SECONDS_PER_DAY
 }
 
-pub(super) fn serial_to_excel_date_1900(serial: f64) -> Option<NaiveDate> {
-    let base = NaiveDate::from_ymd_opt(1899, 12, 30)?;
+pub(super) fn serial_to_excel_date(serial: f64, date1904: bool) -> Option<NaiveDate> {
+    let base = date_epoch(date1904);
     let days = serial.floor() as i64;
     base.checked_add_signed(Duration::days(days))
 }
 
-pub(super) fn make_date_serial_1900(year: f64, month: f64, day: f64) -> Option<f64> {
+pub(super) fn make_date_serial(year: f64, month: f64, day: f64, date1904: bool) -> Option<f64> {
     let y = year.trunc() as i32;
     let m = month.trunc() as i32;
     let d = day.trunc() as i64;
@@ -47,7 +55,7 @@ pub(super) fn make_date_serial_1900(year: f64, month: f64, day: f64) -> Option<f
 
     let first_of_month = NaiveDate::from_ymd_opt(norm_year, norm_month, 1)?;
     let target = first_of_month.checked_add_signed(Duration::days(d - 1))?;
-    Some(date_to_excel_serial_1900(target))
+    Some(date_to_excel_serial(target, date1904))
 }
 
 pub(super) fn parse_date_string(s: &str) -> Option<NaiveDate> {
@@ -85,9 +93,9 @@ pub(super) fn parse_datetime_string(s: &str) -> Option<NaiveDateTime> {
     None
 }
 
-pub(super) fn coerce_date_value(value: &CellValue) -> Option<NaiveDate> {
+pub(super) fn coerce_date_value(value: &CellValue, date1904: bool) -> Option<NaiveDate> {
     if let Some(n) = to_number(value)
-        && let Some(date) = serial_to_excel_date_1900(n)
+        && let Some(date) = serial_to_excel_date(n, date1904)
     {
         return Some(date);
     }
@@ -183,7 +191,7 @@ pub(super) fn collect_holiday_dates(
     let mut out = Vec::new();
     for v in &range.values {
         if let Some(n) = to_number(v)
-            && let Some(d) = serial_to_excel_date_1900(n)
+            && let Some(d) = serial_to_excel_date(n, ctx.is_1904_date_system())
         {
             out.push(d);
         }

@@ -65,7 +65,8 @@ fn computes_uncached_formulas_and_reads_literals() {
 
 #[test]
 fn recalculation_matches_cached_results_in_each_format() {
-    // The XLS workbook stores no cached value for five string results.
+    // The XLS workbook stores seven STRING records beside its formula caches;
+    // all twelve results are now exposed by the native reader.
     for (relative, formulas, uncached) in [
         ("ooxml/xlsx/shared_formulas.xlsx", 40, 0),
         (
@@ -73,7 +74,7 @@ fn recalculation_matches_cached_results_in_each_format() {
             30,
             0,
         ),
-        ("ole/xls/ComplexFunctionTestCaseData.xls", 12, 5),
+        ("ole/xls/ComplexFunctionTestCaseData.xls", 12, 0),
     ] {
         let file = corpus(relative);
         let before = file.to_bytes().expect("publish");
@@ -90,6 +91,23 @@ fn recalculation_matches_cached_results_in_each_format() {
             if formula.status() == Status::Match {
                 assert_eq!(formula.cached(), formula.computed());
             }
+        }
+        if relative == "ole/xls/ComplexFunctionTestCaseData.xls" {
+            let strings = report
+                .formulas()
+                .iter()
+                .filter_map(|formula| {
+                    if let Some(Value::Text(text)) = formula.cached() {
+                        Some(text.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                strings,
+                ["3+4i", "3+4j", "i", "1", "2+3i", "-2-3i", "-0.5-3.2i"]
+            );
         }
         // Evaluation is a read.
         assert_eq!(file.to_bytes().expect("publish"), before);

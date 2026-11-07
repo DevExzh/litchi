@@ -185,3 +185,15 @@ as `0600`. Strict errors and byte-exact preservation are asserted; body values
 B2=25 and cached B3=75 still read and save unchanged. The User Names row remains
 a reviewed fixture gap, not positive user-log coverage. No bytes are corrected
 to manufacture a passing artifact, and no history is replayed or merged.
+
+The complete-Excel-evaluation row is an explicit compatibility boundary, separate
+from the optional bounded `litchi-ops` evaluator. Its native calculation suite
+checks scalar arithmetic/aggregates, shared `ROW` formulas, cached error kinds,
+1904 dates, cache preference, file reopen and read-only byte preservation.
+Explicit evaluation refuses external references and syntax/context outside the
+profile; an unregistered table reference cannot silently aggregate to zero.
+Date functions use the workbook date system, including holiday/offset inputs.
+These checks do not establish a complete Excel dependency/spill engine, external
+refresh, cache publication or fresh Excel acceptance. See
+`tools/native_office_evidence_reviews.json` and
+`crates/litchi-ops/tests/microsoft_office_native_calc.rs`.

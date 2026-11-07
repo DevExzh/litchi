@@ -17,7 +17,7 @@ pub(crate) fn eval_weekday(
         ));
     }
     let value = evaluate_expression(ctx, current_sheet, &args[0])?;
-    let date = match coerce_date_value(&value) {
+    let date = match coerce_date_value(&value, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -60,7 +60,7 @@ pub(crate) fn eval_weeknum(
         ));
     }
     let value = evaluate_expression(ctx, current_sheet, &args[0])?;
-    let date = match coerce_date_value(&value) {
+    let date = match coerce_date_value(&value, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -100,7 +100,7 @@ pub(crate) fn eval_isoweeknum(
         ));
     }
     let value = evaluate_expression(ctx, current_sheet, &args[0])?;
-    let date = match coerce_date_value(&value) {
+    let date = match coerce_date_value(&value, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(

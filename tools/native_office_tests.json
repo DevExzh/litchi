@@ -8445,6 +8445,147 @@
         "A source workbook XML change with unchanged relationship IDs invalidates an earlier external-link patch, proving the complete workbook owner is bound."
       ],
       "scope_limit": "Conservative XML formula/VML consumer checks refuse affected numeric indexes and DDE/OLE topic syntax. This owner does not rewrite formulas or prove arbitrary opaque/runtime consumers."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_calc",
+      "name": "native_1904_date_formulas_compute_in_the_workbook_date_system",
+      "fixtures": [
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-date1904-breaks.xlsb"
+      ],
+      "feature_rows": [
+        "xls-141",
+        "xlsx-204",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Both Auto/file-backed and Eager ingress preserve cached-vs-computed origins for B5 DATE, B6 DATE+TIME and B8 TIME. Exact native 1904 serials match within 1e-9; all three report formulas match their caches, and evaluation leaves archive bytes unchanged."
+      ],
+      "scope_limit": "Only the three saved 1904 formulas and bounded calculation profile; no complete Excel recalc, early-1900 compatibility, cache rewrite or native application recalculation claim."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_calc",
+      "name": "native_scalar_edits_leave_caches_distinct_from_computed_values",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xls-139",
+        "xls-141",
+        "xlsx-202",
+        "xlsx-204",
+        "xlsb-280",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Native product, SUM and AVERAGE caches match computed scalar results in both ingress modes. A library scalar edit keeps D2 cache 3.75 while explicit computation returns 5 and D6 returns 51; file reopen preserves that distinction and every evaluation leaves output bytes unchanged."
+      ],
+      "scope_limit": "The scalar edit is a Litchi derivative; read-only calculation does not write caches or establish dependency-graph completeness or native Excel acceptance."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_calc",
+      "name": "native_shared_formulas_and_error_caches_keep_exact_result_kinds",
+      "fixtures": [
+        "excel/excel-formula-owners.xls",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-metadata.xls",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xls-142",
+        "xlsx-206",
+        "xlsb-283",
+        "xls-141",
+        "xlsx-204",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Shared ROW()*2 at D4/D53/D103 computes 8/106/206 with correct Cached/Computed origins through Auto and Eager routes. Native metadata #VALUE!, #DIV/0! and SUM=30 keep exact result kinds; all nine metadata formulas agree with caches and source archives remain exact."
+      ],
+      "scope_limit": "Only the selected shared-scalar and error formulas. Dynamic spills, array publication, complete formula-token dialects and full Excel evaluation remain outside these assertions."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_calc",
+      "name": "native_external_and_unregistered_table_formulas_refuse_instead_of_fabricating_values",
+      "fixtures": [
+        "excel/excel-links-objects.xls",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xls-186",
+        "xlsx-250",
+        "xlsb-319",
+        "xlsb-320",
+        "xls-141",
+        "xlsx-204",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "Native external references and their dependent B4 retain 49.75/14/63.75 caches but explicit evaluation returns Calc(Unsupported); the report has three Unsupported entries with no computed result. Native concatenation is refused; XLSX SUM(Table1[Quantity]) retains cache 14 and refuses instead of returning zero when the operations grid has no registered table. All archive bytes remain unchanged."
+      ],
+      "scope_limit": "External targets stay inert. These are precise unsupported grammar/context boundaries, not external refresh, table registration, concatenation support or arbitrary formula completeness."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native_calc",
+      "name": "native_evaluation_limits_and_volatile_derivative_boundaries_are_explicit",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xls-141",
+        "xlsx-204",
+        "xlsb-282"
+      ],
+      "required_features": [
+        "xls",
+        "xlsx",
+        "xlsb",
+        "eval"
+      ],
+      "assertions": [
+        "A one-cell quota fails with Calc(Limit Cells observed=2 maximum=1) without changing source or subsequent valid evaluation. Explicit NOW derivatives use an uncached XLSX formula with Calc(Volatile) and an existing cached XLSB formula that returns cache 30 even when recalculation is requested; each reports one volatile formula and preserves bytes. XLS cell authoring refuses NOW outside its 14-function tokenizer with exact InvalidValue/property/message."
+      ],
+      "scope_limit": "NOW records are explicitly library-authored derivatives, not native volatile specimens. XLSB retains the existing formula owner to respect its native calculation-chain boundary. No clock/random source is consulted by the operations evaluator; no new XLS volatile authoring is claimed."
     }
   ]
 }

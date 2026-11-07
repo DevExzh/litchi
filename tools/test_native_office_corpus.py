@@ -162,10 +162,10 @@ class NativeOfficeCorpus(unittest.TestCase):
             "ppt-341", "ppt-379", "xls-176", "ppt-355", "doc-014", "doc-016",
             "doc-059", "xls-173", "xls-178", "ppt-377", "ppt-383", "ppt-384",
             "pptx-432", "pptx-435", "pptx-449", "ppt-343", "ppt-364",
-            "doc-068", "docx-133", "pptx-451",
+            "doc-068", "docx-133", "pptx-451", "xls-193", "xlsx-270", "xlsb-331",
         })
         boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
-        self.assertEqual({row["id"] for row in boundaries}, {"doc-068", "docx-133", "pptx-451"})
+        self.assertEqual({row["id"] for row in boundaries}, {"doc-068", "docx-133", "pptx-451", "xls-193", "xlsx-270", "xlsb-331"})
         self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed) - len(boundaries))
         self.assertEqual(coverage["summary"]["reviewed_explicit_scope_boundaries"], len(boundaries))
         historical = {row["id"]: row["fixture_status"] for row in document("coverage.json")["feature_inventory"]}

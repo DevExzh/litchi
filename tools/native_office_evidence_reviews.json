@@ -963,6 +963,243 @@
         "crates/litchi-pptx/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "This review documents an explicit library scope boundary, not a missing finite feature specimen, positive semantic coverage, whole-feature completion or a fresh native application result. Historical authoring status remains pending; concrete owner coverage stays indexed separately."
+    },
+    {
+      "feature_row": "xls-193",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-formula-owners.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-links-objects.xls"
+      ],
+      "reason": "The owner matrix disclaims complete Excel evaluation. This does not mean that the optional litchi-ops/litchi-eval bounded evaluator is absent or that supported calculations may return incorrect values.",
+      "required_evidence": "Native cache/computed comparisons, explicit typed refusals and unchanged-source assertions for the implemented evaluator, with complete Excel semantics kept outside the claim.",
+      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference.",
+      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context.",
+      "unsupported_scope": "Complete Excel recalculation/dependency graphs, spill publication, every formula dialect, external/provider/clock/random execution, and arbitrary cache synchronization or native-app equivalence are not promised. Structured references require an explicitly registered table; the operations grid does not infer that graph.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_1904_date_formulas_compute_in_the_workbook_date_system",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_scalar_edits_leave_caches_distinct_from_computed_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_shared_formulas_and_error_caches_keep_exact_result_kinds",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_external_and_unregistered_table_formulas_refuse_instead_of_fabricating_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_evaluation_limits_and_volatile_derivative_boundaries_are_explicit",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/calc.rs",
+        "crates/litchi-eval/src/lib.rs"
+      ],
+      "scope_limit": "An explicit limit on full Excel compatibility, not positive semantic coverage of this universal row. Concrete native assertions are indexed under the corresponding formula/cache/link rows. Historical authoring status and source fixtures remain unchanged."
+    },
+    {
+      "feature_row": "xlsx-270",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-links-objects.xlsx"
+      ],
+      "reason": "The owner matrix disclaims complete Excel evaluation. This does not mean that the optional litchi-ops/litchi-eval bounded evaluator is absent or that supported calculations may return incorrect values.",
+      "required_evidence": "Native cache/computed comparisons, explicit typed refusals and unchanged-source assertions for the implemented evaluator, with complete Excel semantics kept outside the claim.",
+      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference.",
+      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context.",
+      "unsupported_scope": "Complete Excel recalculation/dependency graphs, spill publication, every formula dialect, external/provider/clock/random execution, and arbitrary cache synchronization or native-app equivalence are not promised. Structured references require an explicitly registered table; the operations grid does not infer that graph.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_1904_date_formulas_compute_in_the_workbook_date_system",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_scalar_edits_leave_caches_distinct_from_computed_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_shared_formulas_and_error_caches_keep_exact_result_kinds",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_external_and_unregistered_table_formulas_refuse_instead_of_fabricating_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_evaluation_limits_and_volatile_derivative_boundaries_are_explicit",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/calc.rs",
+        "crates/litchi-eval/src/lib.rs"
+      ],
+      "scope_limit": "An explicit limit on full Excel compatibility, not positive semantic coverage of this universal row. Concrete native assertions are indexed under the corresponding formula/cache/link rows. Historical authoring status and source fixtures remain unchanged."
+    },
+    {
+      "feature_row": "xlsb-331",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-date1904-breaks.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-links-objects.xlsb"
+      ],
+      "reason": "The owner matrix disclaims complete Excel evaluation. This does not mean that the optional litchi-ops/litchi-eval bounded evaluator is absent or that supported calculations may return incorrect values.",
+      "required_evidence": "Native cache/computed comparisons, explicit typed refusals and unchanged-source assertions for the implemented evaluator, with complete Excel semantics kept outside the claim.",
+      "observed_evidence": "Native scalar arithmetic, aggregates, shared ROW formulas, 1904 DATE/TIME values and cached error kinds are covered through Auto and Eager ingress. External links, concatenation and unregistered table references have explicit unsupported results. The regression exposed and fixed ignored 1904 epochs and the erroneous zero from aggregating an unregistered table reference.",
+      "supported_scope": "The optional operations evaluator performs bounded read-only calculations of the supported grammar and registered functions. Native caches remain separate, volatile caches are retained, and 1904 date conversion follows workbook context.",
+      "unsupported_scope": "Complete Excel recalculation/dependency graphs, spill publication, every formula dialect, external/provider/clock/random execution, and arbitrary cache synchronization or native-app equivalence are not promised. Structured references require an explicitly registered table; the operations grid does not infer that graph.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_1904_date_formulas_compute_in_the_workbook_date_system",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_scalar_edits_leave_caches_distinct_from_computed_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_shared_formulas_and_error_caches_keep_exact_result_kinds",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_external_and_unregistered_table_formulas_refuse_instead_of_fabricating_values",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_calc",
+          "name": "native_evaluation_limits_and_volatile_derivative_boundaries_are_explicit",
+          "required_features": [
+            "xls",
+            "xlsx",
+            "xlsb",
+            "eval"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/calc.rs",
+        "crates/litchi-eval/src/lib.rs"
+      ],
+      "scope_limit": "An explicit limit on full Excel compatibility, not positive semantic coverage of this universal row. Concrete native assertions are indexed under the corresponding formula/cache/link rows. Historical authoring status and source fixtures remain unchanged."
     }
   ]
 }

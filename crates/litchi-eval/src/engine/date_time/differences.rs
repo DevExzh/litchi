@@ -16,7 +16,7 @@ pub(crate) fn eval_days(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) ->
     let end_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let start_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
-    let end_date = match coerce_date_value(&end_val) {
+    let end_date = match coerce_date_value(&end_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -24,7 +24,7 @@ pub(crate) fn eval_days(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) ->
             ));
         },
     };
-    let start_date = match coerce_date_value(&start_val) {
+    let start_date = match coerce_date_value(&start_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -51,7 +51,7 @@ pub(crate) fn eval_days360(
     let start_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let end_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
-    let start_date = match coerce_date_value(&start_val) {
+    let start_date = match coerce_date_value(&start_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -59,7 +59,7 @@ pub(crate) fn eval_days360(
             ));
         },
     };
-    let end_date = match coerce_date_value(&end_val) {
+    let end_date = match coerce_date_value(&end_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -109,7 +109,7 @@ pub(crate) fn eval_datedif(
     let end_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let unit_val = evaluate_expression(ctx, current_sheet, &args[2])?;
 
-    let mut start_date = match coerce_date_value(&start_val) {
+    let mut start_date = match coerce_date_value(&start_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -117,7 +117,7 @@ pub(crate) fn eval_datedif(
             ));
         },
     };
-    let mut end_date = match coerce_date_value(&end_val) {
+    let mut end_date = match coerce_date_value(&end_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -354,7 +354,7 @@ pub(crate) fn eval_yearfrac(
     let start_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let end_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
-    let start_date = match coerce_date_value(&start_val) {
+    let start_date = match coerce_date_value(&start_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -362,7 +362,7 @@ pub(crate) fn eval_yearfrac(
             ));
         },
     };
-    let end_date = match coerce_date_value(&end_val) {
+    let end_date = match coerce_date_value(&end_val, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(

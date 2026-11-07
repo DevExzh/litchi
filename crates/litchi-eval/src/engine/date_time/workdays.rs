@@ -3,8 +3,8 @@ use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 
 use super::helpers::{
-    WeekendConfig, collect_holiday_dates, date_to_excel_serial_1900, networkdays_core, number_arg,
-    serial_to_excel_date_1900, workday_core,
+    WeekendConfig, collect_holiday_dates, date_to_excel_serial, networkdays_core, number_arg,
+    serial_to_excel_date, workday_core,
 };
 
 pub(crate) fn eval_workday(
@@ -33,7 +33,7 @@ pub(crate) fn eval_workday(
         },
     };
 
-    let start_date = match serial_to_excel_date_1900(start) {
+    let start_date = match serial_to_excel_date(start, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -58,7 +58,7 @@ pub(crate) fn eval_workday(
         },
     };
 
-    let serial = date_to_excel_serial_1900(result);
+    let serial = date_to_excel_serial(result, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 
@@ -104,7 +104,7 @@ pub(crate) fn eval_workday_intl(
         WeekendConfig::default()
     };
 
-    let start_date = match serial_to_excel_date_1900(start) {
+    let start_date = match serial_to_excel_date(start, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -128,7 +128,7 @@ pub(crate) fn eval_workday_intl(
         },
     };
 
-    let serial = date_to_excel_serial_1900(result);
+    let serial = date_to_excel_serial(result, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 
@@ -160,7 +160,7 @@ pub(crate) fn eval_networkdays(
         },
     };
 
-    let start_date = match serial_to_excel_date_1900(start) {
+    let start_date = match serial_to_excel_date(start, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -168,7 +168,7 @@ pub(crate) fn eval_networkdays(
             ));
         },
     };
-    let end_date = match serial_to_excel_date_1900(end) {
+    let end_date = match serial_to_excel_date(end, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -230,7 +230,7 @@ pub(crate) fn eval_networkdays_intl(
         WeekendConfig::default()
     };
 
-    let start_date = match serial_to_excel_date_1900(start) {
+    let start_date = match serial_to_excel_date(start, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(
@@ -238,7 +238,7 @@ pub(crate) fn eval_networkdays_intl(
             ));
         },
     };
-    let end_date = match serial_to_excel_date_1900(end) {
+    let end_date = match serial_to_excel_date(end, ctx.is_1904_date_system()) {
         Some(d) => d,
         None => {
             return Ok(CellValue::Error(

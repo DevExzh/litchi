@@ -60,6 +60,7 @@ pub(crate) mod test_helpers {
         cells: Arc<RwLock<TestCellMap>>,
         current_pos: Arc<RwLock<Option<(String, u32, u32)>>>,
         sheet_count: usize,
+        date1904: bool,
         #[cfg(feature = "web_functions")]
         fetch: Option<Arc<dyn Fetch>>,
     }
@@ -70,9 +71,15 @@ pub(crate) mod test_helpers {
                 cells: Arc::new(RwLock::new(HashMap::new())),
                 current_pos: Arc::new(RwLock::new(None)),
                 sheet_count: 1,
+                date1904: false,
                 #[cfg(feature = "web_functions")]
                 fetch: None,
             }
+        }
+
+        pub(crate) fn with_date_system(mut self, date1904: bool) -> Self {
+            self.date1904 = date1904;
+            self
         }
 
         #[cfg(feature = "web_functions")]
@@ -144,7 +151,7 @@ pub(crate) mod test_helpers {
         }
 
         fn is_1904_date_system(&self) -> bool {
-            false
+            self.date1904
         }
 
         /// The test transports complete at once: poll the response here.

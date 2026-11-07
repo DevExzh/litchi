@@ -5,8 +5,8 @@ use litchi_core::sheet::{CellValue, Result};
 use chrono::Timelike;
 
 use super::helpers::{
-    SECONDS_PER_DAY, date_to_excel_serial_1900, make_date_serial_1900, number_arg,
-    parse_date_string, parse_time_string,
+    SECONDS_PER_DAY, date_to_excel_serial, make_date_serial, number_arg, parse_date_string,
+    parse_time_string,
 };
 
 pub(crate) fn eval_date(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
@@ -35,7 +35,7 @@ pub(crate) fn eval_date(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) ->
         },
     };
 
-    let serial = match make_date_serial_1900(y, m, d) {
+    let serial = match make_date_serial(y, m, d, ctx.is_1904_date_system()) {
         Some(s) => s,
         None => {
             return Ok(CellValue::Error("DATE arguments out of range".to_string()));
@@ -115,7 +115,7 @@ pub(crate) fn eval_datevalue(
             ));
         },
     };
-    let serial = date_to_excel_serial_1900(date);
+    let serial = date_to_excel_serial(date, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 

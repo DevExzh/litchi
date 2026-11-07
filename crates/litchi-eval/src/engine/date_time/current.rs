@@ -4,10 +4,10 @@ use litchi_core::sheet::{CellValue, Result};
 
 use chrono::Utc;
 
-use super::helpers::{date_to_excel_serial_1900, datetime_to_excel_serial_1900};
+use super::helpers::{date_to_excel_serial, datetime_to_excel_serial};
 
 pub(crate) fn eval_today(
-    _ctx: EvalCtx<'_>,
+    ctx: EvalCtx<'_>,
     _current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
@@ -16,21 +16,17 @@ pub(crate) fn eval_today(
     }
 
     let now = Utc::now().date_naive();
-    let serial = date_to_excel_serial_1900(now);
+    let serial = date_to_excel_serial(now, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 
-pub(crate) fn eval_now(
-    _ctx: EvalCtx<'_>,
-    _current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_now(ctx: EvalCtx<'_>, _current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if !args.is_empty() {
         return Ok(CellValue::Error("NOW expects 0 arguments".to_string()));
     }
 
     let now = Utc::now().naive_utc();
-    let serial = datetime_to_excel_serial_1900(now);
+    let serial = datetime_to_excel_serial(now, ctx.is_1904_date_system());
     Ok(CellValue::DateTime(serial))
 }
 
