@@ -254,6 +254,78 @@
         "crates/litchi-docx/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Corpus evidence correction only. This does not count as semantic coverage or make an unsupported-library claim. Historical pending authoring status is unchanged; direct native evidence remains required."
+    },
+    {
+      "feature_row": "ppt-341",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "Native PP9 programmable tags with navigation links do not establish Presentation Advisor warning preferences.",
+      "required_evidence": "A native PP9 document extension carrying PresAdvisorFlags9Atom (0x177A), with known warning-rule bits.",
+      "observed_evidence": "All 11 native binary PowerPoint manifest files, including the decrypted encrypted PPT, have nonempty strictly parsed document-extension inventories but no advisor atom or smart-tag store. Both typed accessors return None, and raw known-version tag records contain neither target type. The navigation fixture positively retains eight PP9 ExternalHyperlink9 records.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_powerpoint_corpus_lacks_advisor_flags_and_smart_tag_stores",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "test-data/microsoft-office/powerpoint/fonts-math-handout-inspection.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Corpus evidence correction only, not positive semantic coverage or a library-unsupported claim. Historical authoring status is unchanged; direct native specimens of these features remain required."
+    },
+    {
+      "feature_row": "ppt-379",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "Ordinary programmable tags and presentation text do not establish a PP11 smart-tag property-bag store.",
+      "required_evidence": "A native PP11 document extension carrying SmartTagStore11Container (0x36B3), its type/string/property-bag tables and corresponding shape/text mappings.",
+      "observed_evidence": "All 11 native binary PowerPoint manifest files, including the decrypted encrypted PPT, have nonempty strictly parsed document-extension inventories but no advisor atom or smart-tag store. Both typed accessors return None, and raw known-version tag records contain neither target type. The navigation fixture positively retains eight PP9 ExternalHyperlink9 records.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_powerpoint_corpus_lacks_advisor_flags_and_smart_tag_stores",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "test-data/microsoft-office/powerpoint/fonts-math-handout-inspection.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Corpus evidence correction only, not positive semantic coverage or a library-unsupported claim. Historical authoring status is unchanged; direct native specimens of these features remain required."
     }
   ]
 }

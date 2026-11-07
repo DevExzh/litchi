@@ -57,3 +57,86 @@ fn native_smartart_derivatives_have_a_picture_without_editable_diagram_builds() 
         assert!(p.to_bytes().unwrap() == bytes);
     }
 }
+
+#[cfg(feature = "encryption")]
+#[test]
+fn native_binary_powerpoint_corpus_lacks_advisor_flags_and_smart_tag_stores() {
+    use litchi_ppt::{OpenOptions, ProgBinaryTagVersion, ProgTag};
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/microsoft-office");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("manifest.json")).unwrap()).unwrap();
+    let mut files = 0;
+    let mut encrypted = 0;
+    let mut navigation = false;
+    for item in manifest["files"].as_array().unwrap() {
+        let name = item["path"].as_str().unwrap();
+        if !name.starts_with("powerpoint/")
+            || !matches!(
+                std::path::Path::new(name)
+                    .extension()
+                    .and_then(|v| v.to_str()),
+                Some("ppt" | "pps" | "pot")
+            )
+        {
+            continue;
+        }
+        let bytes = std::fs::read(root.join(name)).unwrap();
+        let p = if name == "powerpoint/powerpoint-encrypted.ppt" {
+            encrypted += 1;
+            Package::from_bytes_with_options(
+                &bytes,
+                OpenOptions::new().password("OfficeFixture42!"),
+            )
+            .unwrap()
+        } else {
+            Package::from_bytes(&bytes).unwrap()
+        };
+        let d = p.presentation().unwrap();
+        assert!(d.slide_count() > 0);
+        assert!(
+            d.presentation_advisor_settings().unwrap().is_none(),
+            "{name}: new advisor evidence; update the review"
+        );
+        assert!(
+            d.smart_tags().unwrap().is_none(),
+            "{name}: new smart-tag evidence; update the review"
+        );
+        let tags = d.programmable_tags().unwrap().unwrap();
+        let mut count = 0;
+        for tag in &tags.tags {
+            if let ProgTag::Binary(tag) = tag {
+                assert_ne!(
+                    tag.version,
+                    ProgBinaryTagVersion::Unknown,
+                    "{name}: inspect unknown binary payload before revising this audit"
+                );
+                for record in tag.records().unwrap() {
+                    assert!(
+                        !matches!(record.record_type_raw, 0x177a | 0x36b3),
+                        "{name}: new target record"
+                    );
+                    count += 1;
+                }
+            }
+        }
+        assert!(
+            count >= 2,
+            "{name}: meaningful document extension inventory required"
+        );
+        if name == "powerpoint/powerpoint-navigation-review.ppt" {
+            let pp9 = tags.binary_tag(ProgBinaryTagVersion::PowerPoint9).unwrap();
+            assert_eq!(
+                pp9.records()
+                    .unwrap()
+                    .iter()
+                    .map(|r| r.record_type)
+                    .collect::<Vec<_>>(),
+                [RecordType::ExternalHyperlink9; 8]
+            );
+            navigation = true;
+        }
+        files += 1;
+    }
+    assert_eq!((files, encrypted, navigation), (11, 1, true));
+}

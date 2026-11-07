@@ -467,7 +467,7 @@ impl SlideViewInformation {
         self.notes.as_ref()
     }
 
-    pub(crate) fn parse_records(records: &[&Record]) -> Result<Self> {
+    pub(crate) fn parse_records(records: &[Record]) -> Result<Self> {
         let mut information = Self::default();
         for record in records {
             if record.record_type != RecordType::SlideViewInfo {

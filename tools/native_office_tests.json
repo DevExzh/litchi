@@ -6859,6 +6859,103 @@
         "Adding a Chinese custom-property name/value upgrades only the user-defined section to UTF-16. Native standard summary/document-summary snapshots, reserved hyperlink bytes, Workbook stream and all other streams remain exact; file reopen and inverse pass."
       ],
       "scope_limit": "New Unicode custom property is Litchi-authored on a native MacExcel source, not a native-authoring fixture claim."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_slide_notes_and_opaque_pane_preferences_keep_variant_differences",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-352"
+      ],
+      "assertions": [
+        "Exact slide/notes zoom ratios and origins, snap flags, notes-text scaling and native template omissions. Non-layout NormalViewSet payloads remain exact opaque bytes; normal/slide view encodings reproduce the source records."
+      ],
+      "scope_limit": "No nonempty guide lists or print-option atoms are evidenced by these fixtures; opaque pane bytes do not qualify interpreted splitter geometry, layout or native UI behavior."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_views_and_tags_survive_incremental_reorder_save_reopen_and_inverse",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-352",
+        "ppt-380"
+      ],
+      "assertions": [
+        "Move the first native slide to the end, save/reopen, and read only live-document preferences without duplicate-history errors. View values and programmable tags remain exact, source stream prefix and unrelated streams remain unchanged, order changes as requested and inverse restores exact original bytes."
+      ],
+      "scope_limit": "Native-source incremental history and preservation; no view-property mutation or rendering is claimed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_programmable_tag_order_and_payloads_round_trip_without_interpretation",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-380",
+        "ppt-352"
+      ],
+      "assertions": [
+        "Native document tag order PP12/PP10 plus PP9 on navigation, exact grid/flag/font-flag payloads and eight PP9 hyperlink records. Container and typed extension codecs reproduce source bytes; duplicate version and undersized payload limits refuse."
+      ],
+      "scope_limit": "Document-level tags and selected PP9/10/12 payloads; no tag execution, broader slide/shape-tag family or new native tag authoring is claimed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_powerpoint_mac_summary_dates_and_saved_counts_keep_variant_precision",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-351"
+      ],
+      "assertions": [
+        "Exact Mac codepage10000, author/application, empty title/company, revision, saved word counts, subsecond timestamps, last-printed metadata and template absent-versus-empty distinctions; metadata no-ops retain exact source bytes."
+      ],
+      "scope_limit": "Saved property values only; word counts are not recalculated and a last-printed timestamp does not establish print-option semantics."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_summary_property_crud_preserves_presentation_views_tags_and_macro_payloads",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-351"
+      ],
+      "assertions": [
+        "Native-source title/custom Boolean CRUD and atomic unsupported-field failure; file reopen, forward replay, stale rejection and exact inverse pass. All non-property streams, including PowerPoint Document, Pictures, embedded/macro payloads and Current User, remain exact."
+      ],
+      "scope_limit": "Property transactions on immutable native sources; no PowerPoint reopen, macro execution, visual rendering or print behavior is claimed."
     }
   ]
 }

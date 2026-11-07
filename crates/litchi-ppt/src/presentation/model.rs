@@ -509,35 +509,28 @@ impl Presentation {
     }
 
     /// The normal three-pane view's splitter state (`NormalViewSetInfo9`,
-    /// MS-PPT 2.4.21.2), when the document declares one. Files with multiple
-    /// top-level Document containers yield the first occurrence.
+    /// MS-PPT 2.4.21.2), when the live document declares one. Superseded
+    /// document records in an incremental save are not part of this view.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn normal_view_set_info(&self) -> Result<Option<crate::view_set_info::NormalViewSet>> {
-        for record in self.inner.parser.find_records_ref() {
-            if record.record_type == RecordType::NormalViewSetInfo9 {
-                return crate::view_set_info::NormalViewSet::parse_record(record).map(Some);
-            }
-        }
-        Ok(None)
+        self.document_view_record(RecordType::NormalViewSetInfo9)?
+            .map(crate::view_set_info::NormalViewSet::parse_record)
+            .transpose()
     }
 
     /// The notes-text view's scaling state (`NotesTextViewInfo9`, MS-PPT
-    /// 2.4.21.4), when the document declares one. Files with multiple
-    /// top-level Document containers yield the first occurrence.
+    /// 2.4.21.4), when the live document declares one.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn notes_text_view_info(&self) -> Result<Option<crate::view_set_info::NotesTextViewInfo>> {
-        for record in self.inner.parser.find_records_ref() {
-            if record.record_type == RecordType::NotesTextViewInfo9 {
-                return crate::view_set_info::NotesTextViewInfo::parse_record(record).map(Some);
-            }
-        }
-        Ok(None)
+        self.document_view_record(RecordType::NotesTextViewInfo9)?
+            .map(crate::view_set_info::NotesTextViewInfo::parse_record)
+            .transpose()
     }
 
     /// The default language and spelling settings for document text
@@ -1577,14 +1570,55 @@ impl Presentation {
         self.inner.pictures_data.is_some() || self.inner.pictures_source.is_some()
     }
 
+    /// MS-PPT 2.4.4: display records belong to the live document's direct
+    /// DocInfoList, not to a superseded document or an unrelated container.
+    fn document_view_records(&self) -> Result<&[Record]> {
+        let document = self.live_document_ref()?;
+        let mut owners = document
+            .children
+            .iter()
+            .filter(|record| record.record_type == RecordType::DocInfoList);
+        let Some(owner) = owners.next() else {
+            return Ok(&[]);
+        };
+        if owners.next().is_some() {
+            return Err(Error::Corrupted(
+                "live document contains multiple DocInfoList owners".into(),
+            ));
+        }
+        if owner.version != 0xf
+            || owner.instance != 0
+            || owner.record_type_raw != RecordType::DocInfoList.as_u16()
+            || usize::try_from(owner.data_length).ok() != Some(owner.data.len())
+        {
+            return Err(Error::Corrupted(
+                "DocInfoList has an invalid owner header".into(),
+            ));
+        }
+        Ok(&owner.children)
+    }
+
+    fn document_view_record(&self, kind: RecordType) -> Result<Option<&Record>> {
+        let mut records = self
+            .document_view_records()?
+            .iter()
+            .filter(|record| record.record_type == kind);
+        let record = records.next();
+        if records.next().is_some() {
+            return Err(Error::Corrupted(
+                "live DocInfoList contains duplicate view records".into(),
+            ));
+        }
+        Ok(record)
+    }
+
     /// Strictly parse slide and notes editing-view information.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn slide_view_information(&self) -> Result<SlideViewInformation> {
-        let records = self.inner.parser.find_records_ref();
-        SlideViewInformation::parse_records(&records)
+        SlideViewInformation::parse_records(self.document_view_records()?)
     }
 
     /// Strictly parse outline and slide-sorter editing-view information.
@@ -1593,8 +1627,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn outline_sorter_view_information(&self) -> Result<OutlineSorterViewInformation> {
-        let records = self.inner.parser.find_records_ref();
-        OutlineSorterViewInformation::parse_records(&records)
+        OutlineSorterViewInformation::parse_records(self.document_view_records()?)
     }
 
     /// Parse all slide comments in the presentation.

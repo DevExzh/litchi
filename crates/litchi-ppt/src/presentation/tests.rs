@@ -99,6 +99,20 @@ fn lazy_live_document_reuses_presentation_source_limits() {
             ..
         })
     ));
+    for result in [
+        presentation.normal_view_set_info().map(|_| ()),
+        presentation.notes_text_view_info().map(|_| ()),
+        presentation.slide_view_information().map(|_| ()),
+        presentation.outline_sorter_view_information().map(|_| ()),
+    ] {
+        assert!(matches!(
+            result,
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                ..
+            })
+        ));
+    }
 }
 
 #[test]
@@ -490,5 +504,187 @@ fn slide_handles_share_the_memoized_shape_array() {
             texts(memoized.shapes().unwrap()),
             texts(independent.shapes().unwrap())
         );
+    }
+}
+
+fn preference_children(marker: i32) -> Vec<Vec<u8>> {
+    use crate::{
+        NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, Ratio, SlideViewInfo,
+        SlideViewPreferences, ViewKind, ViewOrigin, ZoomViewInfo,
+    };
+    let mut pane = Vec::new();
+    for value in [marker, 10, 7, 10] {
+        pane.extend_from_slice(&value.to_le_bytes());
+    }
+    pane.extend_from_slice(&[1, 1, 0, 0]);
+    let normal_atom = record_bytes(0, 0, RecordType::NormalViewSetInfo9Atom, &pane);
+    let normal = record_bytes(0xf, 1, RecordType::NormalViewSetInfo9, &normal_atom);
+    let scale = Ratio::new(marker, 2).unwrap();
+    let nozoom = NoZoomViewInfo::new(
+        scale,
+        scale,
+        [0; 24],
+        ViewOrigin::new(marker, 0),
+        0,
+        false,
+        [0; 2],
+    )
+    .unwrap();
+    let outline = OutlineSorterViewInfo::new(NonZoomViewKind::Outline, Some(nozoom.clone()))
+        .to_bytes()
+        .unwrap();
+    let sorter = OutlineSorterViewInfo::new(NonZoomViewKind::Sorter, Some(nozoom))
+        .to_bytes()
+        .unwrap();
+    let notes = record_bytes(0xf, 1, RecordType::NotesTextViewInfo9, &outline[8..]);
+    let slide = SlideViewInfo::new(
+        ViewKind::Slide,
+        SlideViewPreferences::new(false, false),
+        Some(ZoomViewInfo::new(scale, scale, ViewOrigin::new(marker, 0), true, false).unwrap()),
+        Vec::new(),
+    )
+    .unwrap()
+    .to_bytes()
+    .unwrap();
+    vec![normal, notes, slide, outline, sorter]
+}
+
+fn presentation_with_view_history(live_children: Vec<Vec<u8>>) -> Presentation {
+    let old_info = record_bytes(
+        0xf,
+        0,
+        RecordType::DocInfoList,
+        &preference_children(1).concat(),
+    );
+    let mut bytes = record_bytes(0xf, 0, RecordType::Document, &old_info);
+    let offset = bytes.len();
+    bytes.extend_from_slice(&record_bytes(
+        0xf,
+        0,
+        RecordType::Document,
+        &live_children.concat(),
+    ));
+    let mut parser = RecordParser::new();
+    parser
+        .parse_document(&bytes, &crate::SourceLimits::default())
+        .unwrap();
+    let mut persist_mapping = PersistMapping::new();
+    persist_mapping.add_mapping(1, offset as u32);
+    Presentation::from_data(PresentationData {
+        powerpoint_document: std::sync::Arc::new(bytes),
+        parser,
+        persist_mapping,
+        slide_directory: SlideDirectory::new_for_test(offset),
+        pictures_data: None,
+        pictures_source: None,
+        source_limits: crate::SourceLimits::default(),
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
+        tolerance: crate::leniency::ToleranceReport::default(),
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption: None,
+        shape_memo: crate::slide::ShapeMemo::default(),
+    })
+}
+
+#[test]
+fn display_preferences_resolve_only_the_live_document_info_owner() {
+    let info = record_bytes(
+        0xf,
+        0,
+        RecordType::DocInfoList,
+        &preference_children(2).concat(),
+    );
+    let p = presentation_with_view_history(vec![info]);
+    assert_eq!(
+        p.normal_view_set_info()
+            .unwrap()
+            .unwrap()
+            .layout()
+            .unwrap()
+            .left_portion()
+            .numerator(),
+        2
+    );
+    assert_eq!(
+        p.notes_text_view_info()
+            .unwrap()
+            .unwrap()
+            .view_info()
+            .origin()
+            .x(),
+        2
+    );
+    assert_eq!(
+        p.slide_view_information()
+            .unwrap()
+            .slide()
+            .unwrap()
+            .zoom()
+            .unwrap()
+            .origin()
+            .x(),
+        2
+    );
+    let other = p.outline_sorter_view_information().unwrap();
+    assert_eq!(
+        other.outline().unwrap().view_info().unwrap().origin().x(),
+        2
+    );
+    assert_eq!(other.sorter().unwrap().view_info().unwrap().origin().x(), 2);
+}
+
+#[test]
+fn missing_live_view_owner_does_not_fall_back_to_history_or_wrong_scope() {
+    // Direct Document children are not the required DocInfoList owner.
+    let p = presentation_with_view_history(preference_children(2));
+    assert!(p.normal_view_set_info().unwrap().is_none());
+    assert!(p.notes_text_view_info().unwrap().is_none());
+    let slide = p.slide_view_information().unwrap();
+    assert!(slide.slide().is_none() && slide.notes().is_none());
+    let other = p.outline_sorter_view_information().unwrap();
+    assert!(other.outline().is_none() && other.sorter().is_none());
+}
+
+#[test]
+fn duplicate_live_view_records_still_refuse_after_history_is_excluded() {
+    for (index, child) in preference_children(2).into_iter().enumerate() {
+        let info = record_bytes(
+            0xf,
+            0,
+            RecordType::DocInfoList,
+            &[child.clone(), child].concat(),
+        );
+        let p = presentation_with_view_history(vec![info]);
+        let result = match index {
+            0 => p.normal_view_set_info().map(|_| ()),
+            1 => p.notes_text_view_info().map(|_| ()),
+            2 => p.slide_view_information().map(|_| ()),
+            _ => p.outline_sorter_view_information().map(|_| ()),
+        };
+        assert!(matches!(result, Err(Error::Corrupted(_))));
+    }
+}
+
+#[test]
+fn duplicate_or_invalid_live_doc_info_owner_is_rejected() {
+    let children = preference_children(2).concat();
+    let info = record_bytes(0xf, 0, RecordType::DocInfoList, &children);
+    for owners in [
+        vec![info.clone(), info],
+        vec![record_bytes(0xf, 1, RecordType::DocInfoList, &children)],
+    ] {
+        let p = presentation_with_view_history(owners);
+        assert!(matches!(p.normal_view_set_info(), Err(Error::Corrupted(_))));
+        assert!(matches!(p.notes_text_view_info(), Err(Error::Corrupted(_))));
+        assert!(matches!(
+            p.slide_view_information(),
+            Err(Error::Corrupted(_))
+        ));
+        assert!(matches!(
+            p.outline_sorter_view_information(),
+            Err(Error::Corrupted(_))
+        ));
     }
 }

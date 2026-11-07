@@ -328,7 +328,7 @@ impl OutlineSorterViewInformation {
         clippy::wildcard_enum_match_arm,
         reason = "only the outline and sorter view containers are collected; every other record type is skipped"
     )]
-    pub(crate) fn parse_records(records: &[&Record]) -> Result<Self> {
+    pub(crate) fn parse_records(records: &[Record]) -> Result<Self> {
         let mut information = Self::default();
         for record in records {
             let slot = match record.record_type {
