@@ -335,3 +335,12 @@ document, numbering and cached field data remain unchanged outside the intended
 owner. Relationship XML may be reserialized with equivalent attributes. These
 assertions do not claim native SDT bindings, schema/style execution, bibliography
 regeneration or fresh Word reopen.
+
+The generic unsupported-extension namespace row is recorded as an explicit
+scope boundary in `tools/native_office_evidence_reviews.json`. The settings
+extension tests retain compatibility/math XML and every unrelated member in
+four native DOCX/DOTX/DOCM/DOTM inputs through bounded metadata edits, file reopen
+and inverse. Retention at those owners does not establish semantics or a
+round-trip guarantee for every unmodeled namespace and mutation. Concrete
+extension profiles keep their own tests; this boundary receives no positive
+semantic credit and does not alter historical native-authoring status.

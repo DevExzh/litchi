@@ -186,3 +186,14 @@ toolbar state, or a modify-password atom. It decodes the live document's
 unencrypted files. Open encryption is distinct from a modify password. These
 are fixture gaps in `tools/native_office_evidence_reviews.json`; they do not
 count as passing custom-XML, comparison or modify-password semantics.
+
+The same audit target checks all 49 native slides for `RecolorInfoAtom`,
+`DiagramBuild` and `DiagramBuildAtom`, entering both OfficeArt client-data
+records and PP10 binary-tag payloads with exact record framing. The full ten
+unencrypted document streams add historical/master/notes coverage. The encrypted
+specimen contributes its decrypted slide and image inventory, not a claim about
+every encrypted persisted record. Across all eleven files there are 26 PNG,
+four JPEG and two EMF images, with no WMF. One paragraph build remains distinct
+from diagram builds; six unencrypted slide catalogs contain no diagram builds,
+and 42 slides refuse the absent build-list target. Recolor and diagram owners
+still need native specimens; these two reviews do not qualify their semantics.

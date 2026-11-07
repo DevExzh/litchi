@@ -294,3 +294,12 @@ their empty template-path slot stays distinct from the saved SummaryInformation
 template name. These are bounded STTB/list/property operations, not complete
 primitive, document-variable, web-export, UI selection, printer or layout support.
 No external target, macro, template, printer or native application is invoked.
+
+The generic later-version compatibility row is an explicit scope boundary in
+`tools/native_office_evidence_reviews.json`. The native structure regression
+pins four specimens' base `nFib=00C1`, 183 pointers, `cswNew=5`/`nFibNew=0112`,
+Dop2013 generation and exact saved counters. Native metadata CRUD on six
+DOC/DOT inputs preserves every non-property stream through file reopen and
+inverse. These tests qualify their concrete profiles; they do not establish
+arbitrary future Word behavior. The coverage report counts this boundary
+separately from missing native specimens and positive semantic assertions.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Current evidence corrections are separate from historical authoring status and positive semantic test coverage. These fixture gaps remain unresolved follow-up work.",
+  "scope": "Current evidence corrections are separate from historical authoring status and positive semantic test coverage. Fixture gaps remain follow-up work; explicit scope boundaries document implemented profiles and excluded universal claims, without declaring whole-feature completion.",
   "reviews": [
     {
       "feature_row": "xlsx-240",
@@ -809,6 +809,160 @@
         "crates/litchi-pptx/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Evidence-only fixture gap, not passing semantic feature coverage or an unsupported-library claim. Source files and historical authoring statuses remain unchanged. No PowerPoint execution, comparison generation, protection enforcement, control activation or fresh native reopen is claimed."
+    },
+    {
+      "feature_row": "ppt-343",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "Native vector/image objects do not establish WMF recoloring metadata.",
+      "required_evidence": "A native WMF and shape-owned RecolorInfoAtom with known color/brush mappings for the bounded codec; selected-shape recolor authoring and rasterization are separate unsupported operations.",
+      "observed_evidence": "All 11 binary files have a combined image inventory of 26 PNG, 4 JPEG and 2 EMF payloads, with no WMF. Exact record framing scans find no RecolorInfoAtom across all 49 slide drawings, including the decrypted encrypted slide. Ten complete unencrypted PowerPoint Document streams additionally cover historical, master and notes records; encrypted non-slide stream bytes are not claimed to be scanned.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_missing_owners",
+          "name": "native_binary_powerpoint_images_and_slide_records_do_not_evidence_wmf_recoloring",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap. Absence, PNG/EMF fallbacks and paragraph builds do not qualify recolor or diagram semantics. No source modification, WMF rasterization, SmartArt authoring, animation playback or fresh native PowerPoint validation."
+    },
+    {
+      "feature_row": "ppt-364",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "A flattened SmartArt picture and paragraph animation do not establish a DiagramBuildContainer.",
+      "required_evidence": "A native slide PP10 BuildList containing DiagramBuild/DiagramBuildAtom records and associated drawing-shape closure.",
+      "observed_evidence": "All 49 slides across the 11 binary files lack DiagramBuild and DiagramBuildAtom in both the decoded PP10 records and an independent exact framing walk, including the decrypted encrypted slide. One ParaBuild is present. Among 48 unencrypted slides, six typed catalogs are empty and 42 refuse UnsupportedTarget because they lack a supported build-list owner.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_missing_owners",
+          "name": "native_binary_powerpoint_slides_have_no_diagram_build_records",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only native fixture gap. Absence, PNG/EMF fallbacks and paragraph builds do not qualify recolor or diagram semantics. No source modification, WMF rasterization, SmartArt authoring, animation playback or fresh native PowerPoint validation."
+    },
+    {
+      "feature_row": "doc-068",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "reason": "The authoritative feature matrix explicitly limits this broad compatibility row. A finite native corpus and successful preservation operation cannot establish its universal claim.",
+      "required_evidence": "Concrete owner-specific native semantic and preservation regressions plus an explicit supported/unsupported contract; do not convert a broad compatibility disclaimer into a completed feature claim.",
+      "observed_evidence": "Four native DOC/DOT specimens have 183 FIB pointers, explicit extension bytes 05 00 12 01 and a typed Dop2013 projection with exact saved counters. Six native documents/templates additionally preserve every non-property CFB stream byte through metadata CRUD, file reopen and inverse. These establish the named profiles, not an arbitrary future Word implementation.",
+      "supported_scope": "Known Word 97+ FIB pointer arrays, native base nFib C1 versus cswNew 5/nFibNew 0112, size-defined Dop2013 metadata and source-preserving property-set publication.",
+      "unsupported_scope": "Complete later-version Word behavior, arbitrary future records, undocumented producer quirks, native application compatibility and rendering are not promised.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_structure",
+          "name": "native_fib_generation_template_and_saved_statistics_remain_distinct"
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_metadata_crud_preserves_reserved_hyperlinks_macros_and_staged_changes"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "This review documents an explicit library scope boundary, not a missing finite feature specimen, positive semantic coverage, whole-feature completion or a fresh native application result. Historical authoring status remains pending; concrete owner coverage stays indexed separately."
+    },
+    {
+      "feature_row": "docx-133",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "reason": "The authoritative feature matrix explicitly limits this broad compatibility row. A finite native corpus and successful preservation operation cannot establish its universal claim.",
+      "required_evidence": "Concrete owner-specific native semantic and preservation regressions plus an explicit supported/unsupported contract; do not convert a broad compatibility disclaimer into a completed feature claim.",
+      "observed_evidence": "Four native DOCX/DOTX/DOCM/DOTM inputs preserve compatibility/math XML and all unrelated package members during settings metadata edits, save/reopen and inverse. The test does not supply native arbitrary-namespace authoring or infer semantics from retained bytes.",
+      "supported_scope": "Bounded source-preserving updates at supported settings owners, retaining XML outside the selected extension children and all other package members.",
+      "unsupported_scope": "Semantic interpretation or guaranteed round trips for every unmodeled Word extension namespace and every mutation are not promised; each concrete extension owner requires its own profile.",
+      "checks": [
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_extensions",
+          "name": "native_settings_extension_updates_preserve_compatibility_math_and_macro_members"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "This review documents an explicit library scope boundary, not a missing finite feature specimen, positive semantic coverage, whole-feature completion or a fresh native application result. Historical authoring status remains pending; concrete owner coverage stays indexed separately."
+    },
+    {
+      "feature_row": "pptx-451",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "reason": "The authoritative feature matrix explicitly limits this broad compatibility row. A finite native corpus and successful preservation operation cannot establish its universal claim.",
+      "required_evidence": "Concrete owner-specific native semantic and preservation regressions plus an explicit supported/unsupported contract; do not convert a broad compatibility disclaimer into a completed feature claim.",
+      "observed_evidence": "Changing the two existing p14 identifier fields in the native chart slide preserves every other XML byte, including opaque a16 creation GUIDs, and the complete chart/style/color/workbook graph. File reopen and inverse verify that concrete preservation profile only.",
+      "supported_scope": "Bounded source-checked edits of supported owner fields with byte-preserving retention of unowned extension XML and related package payloads.",
+      "unsupported_scope": "Universal MS-PPTX/MS-ODRAWXML extension-schema conformance and semantics for every versioned extension family are not promised; native application validation is separate.",
+      "checks": [
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native_copy",
+          "name": "native_identifier_edits_preserve_the_chart_graph_and_unknown_creation_guids"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-pptx/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "This review documents an explicit library scope boundary, not a missing finite feature specimen, positive semantic coverage, whole-feature completion or a fresh native application result. Historical authoring status remains pending; concrete owner coverage stays indexed separately."
     }
   ]
 }

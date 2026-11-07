@@ -6,7 +6,8 @@ listed assertions exist, not that an entire feature row is complete or that a
 test passed in this checkout. Run the referenced Cargo targets to establish that.
 Unmapped fixtures and rows remain visible in every generated report.
 Evidence-only checks live in a separate review index. They can correct a
-historical fixture claim, but never count as semantic feature coverage.
+historical fixture claim or document an explicit scope boundary, but never
+count as semantic feature coverage.
 """
 
 from __future__ import annotations
@@ -46,10 +47,14 @@ def evidence_reviews(document: dict, rows: dict, fixtures: dict) -> dict:
         if row not in rows or row in reviewed:
             raise ValueError(f"unknown or duplicate evidence review row: {row}")
         if review["classification"] not in {
-            "fixture_feature_mismatch", "native_derivative_outside_semantic_profile"
+            "fixture_feature_mismatch", "native_derivative_outside_semantic_profile",
+            "explicit_scope_boundary"
         }:
             raise ValueError(f"unknown evidence review classification: {row}")
-        for field in ("reason", "required_evidence", "observed_evidence", "scope_limit"):
+        fields = ["reason", "required_evidence", "observed_evidence", "scope_limit"]
+        if review["classification"] == "explicit_scope_boundary":
+            fields.extend(("supported_scope", "unsupported_scope"))
+        for field in fields:
             if not isinstance(review.get(field), str) or not review[field].strip():
                 raise ValueError(f"missing evidence review {field}: {row}")
         if not review["fixtures"] or not review["checks"] or not review["evidence_refs"]:
@@ -71,6 +76,8 @@ def verification_gap(item: dict, tests: list[str], disposition: dict | None, evi
     if tests:
         return "partial_assertions_require_scope_review"
     if evidence is not None:
+        if evidence["classification"] == "explicit_scope_boundary":
+            return "reviewed_explicit_scope_boundary"
         return "reviewed_native_fixture_gap_requires_followup"
     status = item["fixture_status"]
     if status == "verified_native_fixture":
@@ -121,7 +128,7 @@ def report() -> dict:
     for item in inventory["feature_inventory"]:
         evidence = reviewed.get(item["id"])
         if evidence is not None and rows[item["id"]]:
-            raise ValueError(f"fixture-gap review conflicts with semantic assertions: {item['id']}; reconcile the review first")
+            raise ValueError(f"evidence review conflicts with semantic assertions: {item['id']}; reconcile the review first")
         row = {
             "id": item["id"],
             "format": item["format"],
@@ -143,14 +150,15 @@ def report() -> dict:
         feature_rows.append(row)
     return {
         "schema_version": 1,
-        "scope": "Semantic assertions and reviewed fixture gaps are separate from historical authoring evidence; neither implies whole-feature completion or a test execution receipt.",
+        "scope": "Semantic assertions, reviewed fixture gaps and explicit scope boundaries are separate from historical authoring evidence; none implies whole-feature completion or a test execution receipt.",
         "summary": {
             "fixtures": len(fixtures),
             "fixtures_with_tests": sum(bool(tests) for tests in fixtures.values()),
             "feature_rows": len(rows),
             "feature_rows_with_partial_tests": sum(bool(tests) for tests in rows.values()),
             "indexed_tests": len(test_ids),
-            "reviewed_native_fixture_gaps": len(reviewed),
+            "reviewed_native_fixture_gaps": sum(review["classification"] != "explicit_scope_boundary" for review in reviewed.values()),
+            "reviewed_explicit_scope_boundaries": sum(review["classification"] == "explicit_scope_boundary" for review in reviewed.values()),
             "native_fixture_statuses": dict(Counter(item["fixture_status"] for item in inventory["feature_inventory"])),
             "verification_gaps": dict(Counter(row["verification_gap"] for row in feature_rows)),
         },

@@ -332,3 +332,13 @@ The only two `contentPart` anchors belong to the Ink fixtures and target their
 anchors. Non-Ink content parts still need a native specimen. These three gaps
 are recorded separately from positive semantic coverage, without changing the
 historical native-authoring inventory or claiming fresh PowerPoint validation.
+
+Full extension-schema conformance is an explicit scope boundary in
+`tools/native_office_evidence_reviews.json`. The native chart-slide identifier
+regression changes only two existing `p14` values while retaining opaque `a16`
+creation GUIDs, every other XML byte and the full chart/style/color/workbook
+graph through file reopen and inverse. That concrete preservation profile does
+not establish universal MS-PPTX/MS-ODRAWXML grammar or application semantics.
+The report counts the boundary separately from missing native specimens and
+positive semantic assertions; concrete extension owners remain independently
+qualified by their tests.

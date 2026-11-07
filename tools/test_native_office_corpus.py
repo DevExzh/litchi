@@ -142,7 +142,12 @@ class NativeOfficeCorpus(unittest.TestCase):
                 if row["tests"]:
                     self.assertEqual(row["verification_gap"], "partial_assertions_require_scope_review")
                 elif "evidence_review" in row:
-                    self.assertEqual(row["verification_gap"], "reviewed_native_fixture_gap_requires_followup")
+                    expected = (
+                        "reviewed_explicit_scope_boundary"
+                        if row["evidence_review"]["classification"] == "explicit_scope_boundary"
+                        else "reviewed_native_fixture_gap_requires_followup"
+                    )
+                    self.assertEqual(row["verification_gap"], expected)
                 elif row["native_fixture_status"] == "verified_native_fixture":
                     self.assertEqual(row["verification_gap"], "native_evidence_needs_semantic_tests")
                 elif row["native_fixture_status"] == "pending":
@@ -152,8 +157,17 @@ class NativeOfficeCorpus(unittest.TestCase):
     def test_evidence_reviews_never_count_absence_as_semantic_coverage(self) -> None:
         coverage = report()
         reviewed = [row for row in coverage["feature_rows"] if "evidence_review" in row]
-        self.assertEqual({row["id"] for row in reviewed}, {"xlsx-240", "xlsx-245", "xlsx-266", "ppt-363", "docx-093", "docx-097", "ppt-341", "ppt-379", "xls-176", "ppt-355", "doc-014", "doc-016", "doc-059", "xls-173", "xls-178", "ppt-377", "ppt-383", "ppt-384", "pptx-432", "pptx-435", "pptx-449"})
-        self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed))
+        self.assertEqual({row["id"] for row in reviewed}, {
+            "xlsx-240", "xlsx-245", "xlsx-266", "ppt-363", "docx-093", "docx-097",
+            "ppt-341", "ppt-379", "xls-176", "ppt-355", "doc-014", "doc-016",
+            "doc-059", "xls-173", "xls-178", "ppt-377", "ppt-383", "ppt-384",
+            "pptx-432", "pptx-435", "pptx-449", "ppt-343", "ppt-364",
+            "doc-068", "docx-133", "pptx-451",
+        })
+        boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
+        self.assertEqual({row["id"] for row in boundaries}, {"doc-068", "docx-133", "pptx-451"})
+        self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed) - len(boundaries))
+        self.assertEqual(coverage["summary"]["reviewed_explicit_scope_boundaries"], len(boundaries))
         historical = {row["id"]: row["fixture_status"] for row in document("coverage.json")["feature_inventory"]}
         for row in reviewed:
             with self.subTest(row=row["id"]):
@@ -161,6 +175,22 @@ class NativeOfficeCorpus(unittest.TestCase):
                 self.assertEqual(row["tests"], [])
                 self.assertEqual(row["native_fixture_status"], historical[row["id"]])
                 self.assertTrue(row["evidence_review"]["checks"])
+
+    def test_scope_boundary_requires_both_sides_of_the_contract(self) -> None:
+        original = json.loads(EVIDENCE_REVIEWS.read_text())
+        rows = {item["id"]: [] for item in document("coverage.json")["feature_inventory"]}
+        fixtures = {item["path"]: [] for item in document("manifest.json")["files"]}
+        for field in ("supported_scope", "unsupported_scope"):
+            for value in (None, "", " "):
+                with self.subTest(field=field, value=value):
+                    candidate = copy.deepcopy(original)
+                    boundary = next(review for review in candidate["reviews"] if review["classification"] == "explicit_scope_boundary")
+                    if value is None:
+                        del boundary[field]
+                    else:
+                        boundary[field] = value
+                    with self.assertRaisesRegex(ValueError, field):
+                        evidence_reviews(candidate, rows, fixtures)
 
     def test_evidence_review_validation_rejects_unknown_or_unsubstantiated_claims(self) -> None:
         original = json.loads(EVIDENCE_REVIEWS.read_text())
@@ -187,19 +217,21 @@ class NativeOfficeCorpus(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     evidence_reviews(candidate, rows, fixtures)
 
-    def test_fixture_gap_cannot_gain_semantic_credit_without_reconciliation(self) -> None:
+    def test_evidence_review_cannot_gain_semantic_credit_without_reconciliation(self) -> None:
         import tempfile
         from unittest.mock import patch
         from tools.native_office_coverage import INDEX
 
-        index = json.loads(INDEX.read_text())
-        index["tests"][0]["feature_rows"].append("xlsx-240")
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "index.json"
-            path.write_text(json.dumps(index))
-            with patch("tools.native_office_coverage.INDEX", path):
-                with self.assertRaisesRegex(ValueError, "fixture-gap review conflicts"):
-                    report()
+        for row in ("xlsx-240", "doc-068"):
+            with self.subTest(row=row):
+                index = json.loads(INDEX.read_text())
+                index["tests"][0]["feature_rows"].append(row)
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "index.json"
+                    path.write_text(json.dumps(index))
+                    with patch("tools.native_office_coverage.INDEX", path):
+                        with self.assertRaisesRegex(ValueError, "evidence review conflicts"):
+                            report()
 
 
 if __name__ == "__main__":
