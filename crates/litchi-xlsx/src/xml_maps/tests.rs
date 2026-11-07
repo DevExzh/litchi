@@ -521,3 +521,39 @@ fn transaction_noop_inverse_and_stale_patch_are_atomic() {
     assert!(patch.apply(&mut stale).is_err());
     assert_eq!(PackageWriter::to_bytes(&stale).unwrap(), stale_bytes);
 }
+
+#[test]
+fn publication_only_accepts_namespace_additions_to_opaque_roots() {
+    let before = br#"<n:item xmlns:n="urn:payload" value="A &amp; B"><n:child/></n:item>"#;
+    let completed = br#"<n:item xmlns:n="urn:payload" value="A &amp; B" xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><n:child/></n:item>"#;
+    let mut value = fixture_info();
+    value.schemas[0].payload_xml = Some(before.to_vec());
+    let mut actual = value.clone();
+    actual.schemas[0].payload_xml = Some(completed.to_vec());
+    let original = value.clone();
+    assert!(matches!(
+        codec::complete_payload_namespaces(&mut value, &actual, Some(&original)),
+        Err(Error::Invalid(_))
+    ));
+    codec::complete_payload_namespaces(&mut value, &actual, None).unwrap();
+    assert_eq!(value, actual);
+    for invalid in [
+        br#"<n:item xmlns:n="urn:changed" value="A &amp; B"><n:child/></n:item>"#.as_slice(),
+        br#"<n:item xmlns:n="urn:payload" value="different" xmlns="urn:parent"><n:child/></n:item>"#,
+        br#"<n:item xmlns:n="urn:payload" value="A &amp; B" extra="lost"><n:child/></n:item>"#,
+        br#"<n:item xmlns:n="urn:payload" value="A &amp; B" xmlns="urn:parent"><n:other/></n:item>"#,
+        br#"<n:item xmlns:n="urn:payload" value="A &amp; B" xmlns:n="urn:duplicate"><n:child/></n:item>"#,
+    ] {
+        let mut expected = fixture_info();
+        expected.schemas[0].payload_xml = Some(before.to_vec());
+        let mut actual = expected.clone();
+        actual.schemas[0].payload_xml = Some(invalid.to_vec());
+        let error = codec::complete_payload_namespaces(&mut expected, &actual, None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Invalid(message)
+                if message == "custom XML maps publication changed an opaque payload"
+        ));
+    }
+}

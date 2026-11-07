@@ -357,8 +357,12 @@ impl Edit {
         }
 
         let snapshot = Snapshot::load(&candidate)?;
-        if snapshot.info() != draft.as_ref()
-            || (draft.is_some() && snapshot.conformance() != conformance)
+        let mut expected = draft;
+        if let (Some(expected), Some(actual)) = (expected.as_mut(), snapshot.info()) {
+            codec::complete_payload_namespaces(expected, actual, before.info())?;
+        }
+        if snapshot.info() != expected.as_ref()
+            || (expected.is_some() && snapshot.conformance() != conformance)
         {
             return Err(invalid(
                 "custom XML maps publication changed the staged model",

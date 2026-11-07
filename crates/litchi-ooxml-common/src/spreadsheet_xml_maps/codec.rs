@@ -977,7 +977,21 @@ fn patch_xml_map_info_source_impl(
 
     let schema_nodes = tree.direct_children(root, "Schema");
     let map_nodes = tree.direct_children(root, "Map");
-    if schema_nodes.len() != before.schemas.len() || map_nodes.len() != before.maps.len() {
+    if schema_nodes.len() != before.schemas.len()
+        || map_nodes.len() != before.maps.len()
+        || before
+            .schemas
+            .iter()
+            .map(|schema| schema.id)
+            .ne(after.schemas.iter().map(|schema| schema.id))
+        || before
+            .maps
+            .iter()
+            .map(|map| map.id)
+            .ne(after.maps.iter().map(|map| map.id))
+    {
+        // The span patcher updates existing entries only. Growth, removal and
+        // reordering need a complete catalog replacement to retain every item.
         return serialize_xml_map_info_ref(after, conformance(after_strict), limits);
     }
     for (node, schema) in schema_nodes.iter().zip(&before.schemas) {
@@ -1078,6 +1092,7 @@ fn patch_xml_map_info_source_impl(
             *node,
             before_schema.payload_xml,
             after_schema.payload_xml,
+            before_strict != after_strict,
             &mut edits,
         )?;
     }
@@ -1216,6 +1231,7 @@ fn patch_xml_map_info_source_impl(
                     binding_node,
                     before_binding.payload_xml,
                     after_binding.payload_xml,
+                    before_strict != after_strict,
                     &mut edits,
                 )?;
             },
@@ -1243,9 +1259,13 @@ fn patch_payload(
     parent: usize,
     before: Option<&[u8]>,
     after: Option<&[u8]>,
+    parent_namespace_changed: bool,
     edits: &mut Vec<SourceEdit>,
 ) -> Result<()> {
-    if before == after {
+    // Parsed payloads carry their inherited namespace declarations. When the
+    // MapInfo dialect changes, write those declarations back even if the
+    // payload value is unchanged, keeping its original namespace context.
+    if before == after && !parent_namespace_changed {
         return Ok(());
     }
     let existing = tree.element_children(parent).first().copied();

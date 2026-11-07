@@ -3476,6 +3476,180 @@
         "crates/litchi-rtf/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Native files/historical authoring statuses are unchanged. No password authentication, provider activation or synthetic destination is attributed to Word."
+    },
+    {
+      "feature_row": "xlsx-200",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-encrypted.xlsx"
+      ],
+      "reason": "Native ordinary connections, worksheet PivotTables and cell metadata do not establish Data Model descriptor/payload.",
+      "required_evidence": "A native workbook with a matching dataModel descriptor and /xl/model/item.data payload, plus native modelTimeGroupings when qualifying time-group identities.",
+      "observed_evidence": "All 19 manifest XLSX-family inputs have absent typed Data Model snapshots, no model+data content type/fixed model part, and no model/time-group extension elements or URIs in any XML part. The encrypted XLSX is inspected through the supported password-aware owner.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_data_model_inventory",
+          "name": "native_xlsx_corpus_has_connections_and_pivots_without_data_model_owners",
+          "required_features": [
+            "xlsx",
+            "xlsb",
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+        "test-data/microsoft-office/excel/encryption-inspection.json"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not positive Data Model payload coverage or an unsupported-library claim. Native files and historical authoring statuses are unchanged. No refresh, DAX/MDX evaluation or external retrieval is performed."
+    },
+    {
+      "feature_row": "xlsx-264",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-encrypted.xlsx"
+      ],
+      "reason": "Native ordinary connections, worksheet PivotTables and cell metadata do not establish Data Model time groupings.",
+      "required_evidence": "A native workbook with a matching dataModel descriptor and /xl/model/item.data payload, plus native modelTimeGroupings when qualifying time-group identities.",
+      "observed_evidence": "All 19 manifest XLSX-family inputs have absent typed Data Model snapshots, no model+data content type/fixed model part, and no model/time-group extension elements or URIs in any XML part. The encrypted XLSX is inspected through the supported password-aware owner.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_data_model_inventory",
+          "name": "native_xlsx_corpus_has_connections_and_pivots_without_data_model_owners",
+          "required_features": [
+            "xlsx",
+            "xlsb",
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+        "test-data/microsoft-office/excel/encryption-inspection.json"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not positive Data Model payload coverage or an unsupported-library claim. Native files and historical authoring statuses are unchanged. No refresh, DAX/MDX evaluation or external retrieval is performed."
+    },
+    {
+      "feature_row": "xlsb-286",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-visual-analytics.xlsb",
+        "excel/excel-conditional-drawings.xlsb",
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-form-controls.xlsb",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-connections.xlsb",
+        "excel/excel-date1904-breaks.xlsb",
+        "excel/excel-chart-families.xlsb",
+        "excel/excel-revisions.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-legacy-sheets.xlsb",
+        "excel/excel-encrypted.xlsb"
+      ],
+      "reason": "Native ordinary connections, worksheet PivotTables and cell metadata do not establish Data Model workbook records/payload.",
+      "required_evidence": "A native XLSB with BrtBeginDataModel/table/relationship/time-group records and matching /xl/model/item.data, including a complete XLDM 140 identity closure when qualifying identity edits.",
+      "observed_evidence": "All 16 manifest XLSB-family inputs have absent typed Data Model snapshots, no model+data content type/fixed model part, and no model/time-group extension elements or URIs in any XML part. The complete workbook BIFF12 scan also has no known model-family records. The encrypted XLSB is inspected only after explicit authenticated shared-crypto decryption in memory; its public XLSB ingress still returns the exact unsupported-container error.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_data_model_inventory",
+          "name": "native_xlsb_corpus_including_explicitly_decrypted_fixture_has_no_model_records",
+          "required_features": [
+            "xlsx",
+            "xlsb",
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/src/data_model/codec.rs",
+        "test-data/microsoft-office/excel/encryption-inspection.json"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not positive Data Model payload coverage or an unsupported-library claim. Native files and historical authoring statuses are unchanged. No refresh, DAX/MDX evaluation or external retrieval is performed."
+    },
+    {
+      "feature_row": "xlsb-287",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-visual-analytics.xlsb",
+        "excel/excel-conditional-drawings.xlsb",
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-form-controls.xlsb",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-connections.xlsb",
+        "excel/excel-date1904-breaks.xlsb",
+        "excel/excel-chart-families.xlsb",
+        "excel/excel-revisions.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-legacy-sheets.xlsb",
+        "excel/excel-encrypted.xlsb"
+      ],
+      "reason": "Native ordinary connections, worksheet PivotTables and cell metadata do not establish XLDM 140 identities/time groupings.",
+      "required_evidence": "A native XLSB with BrtBeginDataModel/table/relationship/time-group records and matching /xl/model/item.data, including a complete XLDM 140 identity closure when qualifying identity edits.",
+      "observed_evidence": "All 16 manifest XLSB-family inputs have absent typed Data Model snapshots, no model+data content type/fixed model part, and no model/time-group extension elements or URIs in any XML part. The complete workbook BIFF12 scan also has no known model-family records. The encrypted XLSB is inspected only after explicit authenticated shared-crypto decryption in memory; its public XLSB ingress still returns the exact unsupported-container error.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_data_model_inventory",
+          "name": "native_xlsb_corpus_including_explicitly_decrypted_fixture_has_no_model_records",
+          "required_features": [
+            "xlsx",
+            "xlsb",
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/src/data_model/codec.rs",
+        "test-data/microsoft-office/excel/encryption-inspection.json"
+      ],
+      "scope_limit": "Evidence-only fixture gap, not positive Data Model payload coverage or an unsupported-library claim. Native files and historical authoring statuses are unchanged. No refresh, DAX/MDX evaluation or external retrieval is performed."
     }
   ]
 }

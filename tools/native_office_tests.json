@@ -10218,6 +10218,86 @@
         "The layout fixture retains the exact UnsupportedContent refusal for run edits of dependent body content. The supported tail-append lane adds a Unicode paragraph on layout and table-grid parents while preserving the complete native latentstyles bytes, all typed catalog values and restrictions, and exact file/patch replay/inverse."
       ],
       "scope_limit": "The added paragraph uses the declared tail owner; this does not widen run-edit or canonical table-writing scope."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_xlsx_xml_map_catalog_lifecycle_keeps_cells_parts_and_opaque_payloads",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-253"
+      ],
+      "assertions": [
+        "Explicit MapInfo catalogs retain complete schema/map/binding values on native Transitional, Strict and macro parents. Namespace-complete opaque readback is checked exactly, while the original authored child bytes remain in the serialized part. Source-loaded and original-model no-ops, scalar updates, insertion/reordering/removal of a second schema/map, stale-source refusal and owner removal are covered.",
+        "Every stage saves/reopens/replays/inverts. Existing part/relationship identities, all native data-part payloads and the complete effective unowned graph remain exact. Only owned content-type/workbook-relationship XML may normalize during inverse."
+      ],
+      "scope_limit": "Library-authored XML-map metadata derivatives. No native mapped-cell specimen, dedicated worksheet binding editor, XML import/export, XPath/schema evaluation, connection refresh or fresh Excel validation is inferred."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_xlsx_xml_map_rejected_schema_removal_and_duplicate_id_keep_valid_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-253"
+      ],
+      "assertions": [
+        "Removing the sole schema, inserting a duplicate Map ID and selecting FileBinding=true without ConnectionID return their exact shared SpreadsheetXmlMaps errors. Earlier valid staging remains unchanged and still publishes/reopens/replays/inverts."
+      ],
+      "scope_limit": "Catalog admission and failure atomicity only; no external schema or binding target is opened."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_xls_xml_map_codec_and_stream_lifecycle_preserve_cells_macros_and_directory",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-192"
+      ],
+      "assertions": [
+        "Explicit legacy XML-stream catalogs expose exact MapInfo/schema/map/data-binding values through the public raw reader escape. Catalog creation, Unicode name/load-mode update and removal use the public codec and CFB owner, preserving native Workbook bytes, all other streams and directory metadata with exact artifact replay/inverse.",
+        "An ordinary native cell insertion to Z121=71 saves/reopens with the XML catalog and every unowned stream retained, then exactly inverts. Original source snapshots/files remain unchanged."
+      ],
+      "scope_limit": "The legacy package exposes XML-map reads through reader_ref; publication here uses the public CFB owner, not a dedicated opened-workbook XML-map transaction. XML instances are not imported/exported or evaluated; schemas and file-binding URIs remain inert."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_xls_malformed_map_reference_is_reported_by_codec_and_package_reader",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-192"
+      ],
+      "assertions": [
+        "A native-parent derivative with a Map SchemaID referencing a missing schema returns the exact InvalidData reason from the codec and Reader-wrapped package error. Invalid metadata is not silently omitted, and the native file remains unchanged."
+      ],
+      "scope_limit": "Explicit malformed derivative used for the supported reader error contract; no claim of native producer output for the invalid XML."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_xlsx_xml_map_conformance_change_preserves_opaque_namespace_context",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-253"
+      ],
+      "assertions": [
+        "Changing an explicit native-parent catalog from Transitional to Strict and back retains every typed value and the opaque children's original namespace context. File reopen, source-checked replay and inverse preserve the complete effective graph and every unowned part."
+      ],
+      "scope_limit": "Conformance changes apply to the XML-map owner and its relationship only; they do not convert the complete native workbook or establish native Excel acceptance."
     }
   ]
 }

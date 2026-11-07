@@ -2,6 +2,7 @@
 
 use crate::error::Result;
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -284,4 +285,129 @@ pub(super) fn patch_source(
             &litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits::DEFAULT,
         )?,
     )
+}
+
+/// Account for the reader making opaque children namespace-complete. Every
+/// original root attribute and every byte outside added namespace declarations
+/// must survive; the caller still compares the complete typed catalog.
+pub(super) fn complete_payload_namespaces(
+    expected: &mut XmlMapInfo,
+    actual: &XmlMapInfo,
+    source: Option<&XmlMapInfo>,
+) -> Result<()> {
+    let schemas: std::collections::HashMap<_, _> = source
+        .into_iter()
+        .flat_map(|info| &info.schemas)
+        .map(|schema| (schema.id.as_str(), schema.payload_xml.as_deref()))
+        .collect();
+    let maps: std::collections::HashMap<_, _> = source
+        .into_iter()
+        .flat_map(|info| &info.maps)
+        .map(|map| {
+            (
+                map.id,
+                map.data_binding
+                    .as_ref()
+                    .and_then(|binding| binding.payload_xml.as_deref()),
+            )
+        })
+        .collect();
+    for (schema, found) in expected.schemas.iter_mut().zip(&actual.schemas) {
+        if schema.id == found.id {
+            complete_payload(
+                &mut schema.payload_xml,
+                found.payload_xml.as_deref(),
+                schemas.get(schema.id.as_str()).copied().flatten(),
+            )?;
+        }
+    }
+    for (map, found) in expected.maps.iter_mut().zip(&actual.maps) {
+        if map.id == found.id
+            && let (Some(binding), Some(found)) =
+                (map.data_binding.as_mut(), found.data_binding.as_ref())
+        {
+            complete_payload(
+                &mut binding.payload_xml,
+                found.payload_xml.as_deref(),
+                maps.get(&map.id).copied().flatten(),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn complete_payload(
+    expected: &mut Option<Vec<u8>>,
+    actual: Option<&[u8]>,
+    source: Option<&[u8]>,
+) -> Result<()> {
+    if expected.as_deref() == actual {
+        return Ok(());
+    }
+    let (Some(before), Some(after)) = (expected.as_deref(), actual) else {
+        return Err(super::invalid(
+            "custom XML maps publication changed an opaque payload",
+        ));
+    };
+    // A source-loaded fragment already carries its namespace context. A new
+    // declaration on an unchanged fragment could retarget unqualified names.
+    if source == Some(before) || !namespace_completion_only(before, after) {
+        return Err(super::invalid(
+            "custom XML maps publication changed an opaque payload",
+        ));
+    }
+    *expected = Some(after.to_vec());
+    Ok(())
+}
+
+fn namespace_completion_only(before: &[u8], after: &[u8]) -> bool {
+    use quick_xml::Reader;
+    // Captured payloads are single elements. Do not excuse lost prolog, outside
+    // whitespace or trailing content as namespace completion.
+    if !before.starts_with(b"<") || !after.starts_with(b"<") {
+        return false;
+    }
+    let mut before_reader = Reader::from_reader(before);
+    let mut after_reader = Reader::from_reader(after);
+    let (a, b) = match (before_reader.read_event(), after_reader.read_event()) {
+        (Ok(Event::Start(a)), Ok(Event::Start(b))) | (Ok(Event::Empty(a)), Ok(Event::Empty(b))) => {
+            (a, b)
+        },
+        _ => return false,
+    };
+    if a.name() != b.name() || !b.as_ref().starts_with(a.as_ref()) {
+        return false;
+    }
+    let Ok(original) = a
+        .unchecked_attributes()
+        .collect::<std::result::Result<Vec<_>, _>>()
+    else {
+        return false;
+    };
+    let Ok(projected) = b
+        .unchecked_attributes()
+        .collect::<std::result::Result<Vec<_>, _>>()
+    else {
+        return false;
+    };
+    if projected.len() <= original.len() {
+        return false;
+    }
+    let mut keys = original
+        .iter()
+        .map(|a| a.key.as_ref())
+        .collect::<std::collections::HashSet<_>>();
+    for attribute in &projected[original.len()..] {
+        let key = attribute.key.as_ref();
+        if !(key == b"xmlns" || key.starts_with(b"xmlns:")) || !keys.insert(key) {
+            return false;
+        }
+    }
+    let (Ok(a_end), Ok(b_end)) = (
+        usize::try_from(before_reader.buffer_position()),
+        usize::try_from(after_reader.buffer_position()),
+    ) else {
+        return false;
+    };
+    before.get(a_end..) == after.get(b_end..)
 }

@@ -482,3 +482,78 @@ fn opaque_payload_roots_of_many_repeated_names_keep_their_bytes() {
         format!(r#"<x:schema xmlns:x="urn:test"{attributes} xmlns="{NS_TEXT}"/>"#)
     );
 }
+
+#[test]
+fn source_patch_retains_added_and_reordered_catalog_entries() {
+    for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
+        let before = fixture();
+        let source = serialize_xml_map_info(&before, conformance, &XmlMapLimits::DEFAULT).unwrap();
+        let mut expanded = before.clone();
+        let mut schema = expanded.schemas[0].clone();
+        schema.id = "schema-2".into();
+        expanded.schemas.push(schema);
+        let mut map = expanded.maps[0].clone();
+        map.id = 2;
+        map.name = "second".into();
+        map.schema_id = "schema-2".into();
+        expanded.maps.push(map);
+        let output = patch_xml_map_info_source(
+            &source,
+            &before,
+            &expanded,
+            conformance,
+            conformance,
+            &XmlMapLimits::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_xml_map_info(&output, &XmlMapLimits::DEFAULT).unwrap(),
+            expanded
+        );
+        let mut reordered = expanded.clone();
+        reordered.schemas.reverse();
+        reordered.maps.reverse();
+        let output = patch_xml_map_info_source(
+            &output,
+            &expanded,
+            &reordered,
+            conformance,
+            conformance,
+            &XmlMapLimits::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_xml_map_info(&output, &XmlMapLimits::DEFAULT).unwrap(),
+            reordered
+        );
+    }
+}
+
+#[test]
+fn source_conformance_changes_preserve_opaque_default_namespace() {
+    let value = fixture();
+    let xml = serialize_xml_map_info(
+        &value,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let xml = String::from_utf8(xml).unwrap().replace(
+        &format!(r#"<x:schema xmlns:x="urn:test" xmlns="{NS_TEXT}"/>"#),
+        r#"<x:schema xmlns:x="urn:test"/>"#,
+    );
+    let before = parse_xml_map_info(xml.as_bytes(), &XmlMapLimits::DEFAULT).unwrap();
+    assert_eq!(before, value);
+    let strict = patch_xml_map_info_source(
+        xml.as_bytes(),
+        &before,
+        &before,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Strict,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let parsed = parse_xml_map_info_with_conformance(&strict, &XmlMapLimits::DEFAULT).unwrap();
+    assert_eq!(parsed.conformance, XmlMapConformance::Strict);
+    assert_eq!(parsed.info, before);
+}
