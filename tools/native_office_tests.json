@@ -7385,6 +7385,135 @@
         "Remove the native unbound bibliography item via case-insensitive identity. Only its data/properties parts and relationships/content-types change; all document, field, numbering and other payloads remain exact. Save/reopen and inverse restore the original payloads and graph."
       ],
       "scope_limit": "Unbound store removal only. No content-control dependency removal or citation regeneration is claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_reserved_hyperlinks_decode_the_single_ole_blob_envelope",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc"
+      ],
+      "feature_rows": [
+        "doc-026"
+      ],
+      "assertions": [
+        "Read native 128/164-byte reserved hyperlink vectors with exact count, stored hash, app/OfficeArt/info values, targets and locations. Main-story field candidates retain exact marker indices and CPs and match stored instruction text. Shared re-encoding preserves each native payload and an unresolved exact no-op preserves the archive."
+      ],
+      "scope_limit": "Reserved property metadata and candidate evidence only; associations require explicit caller proof. No target is opened or field refreshed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_hyperlink_property_edits_require_resolved_fields_and_preserve_body_streams",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc"
+      ],
+      "feature_rows": [
+        "doc-026"
+      ],
+      "assertions": [
+        "A changed unresolved metadata write gives the exact UnresolvedFieldCandidates refusal while preserving a staged title edit. Explicit resolution permits source-checked target changes and canonical field ordering; removal, save/reopen, forward replay, stale rejection and exact inverse preserve every non-property stream."
+      ],
+      "scope_limit": "Edits affect reserved hyperlink property records, not the field instruction/result text or external resources. Fresh Word validation and automatic field association are not claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_summary_properties_keep_mac_codepage_dates_templates_and_saved_counts",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-025"
+      ],
+      "assertions": [
+        "Pin native Word application/author/modifier, Mac code page 10000, exact saved timestamps, template names, revision 2 and producer word/character/page counts across six DOC/DOT variants. Review-document title/keywords/company and exact same-title no-op publication are checked."
+      ],
+      "scope_limit": "Producer-saved property values only; counters are not recalculated and template paths are not loaded."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_metadata_crud_preserves_reserved_hyperlinks_macros_and_staged_changes",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-025"
+      ],
+      "assertions": [
+        "Title/company and Boolean/Unicode custom-property edits preserve unsupported-field failure atomicity, source Mac encoding, reserved hyperlink BLOBs and every non-property stream, including inert macros. Only the custom section changes to UTF-16. Removal, file reopen, forward replay, stale refusal and exact inverses pass."
+      ],
+      "scope_limit": "Existing-artifact property-set CRUD; no associated-string synchronization, document text mutation, macro execution or native application reopen is claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_annotation_tags_and_list_style_records_keep_exact_table_bytes",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc",
+        "word/word-review-controls.doc"
+      ],
+      "feature_rows": [
+        "doc-011",
+        "doc-017",
+        "doc-033"
+      ],
+      "assertions": [
+        "Pin native annotation tag IDs and exact STTBF encoding, plus each 16-byte RgDofr ListStyles record with list index 0, style index 12 and unset custom/unused bits. An independent metadata edit preserves all binary body/table streams and reopens the same records."
+      ],
+      "scope_limit": "Opaque annotation identities and native list-style records; no arbitrary ranged-comment rebinding, frame-set layout or exhaustive binary-primitive coverage."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_metadata",
+      "name": "native_associated_string_tables_round_trip_without_conflating_summary_templates",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-math-navigation.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-049",
+        "doc-033"
+      ],
+      "assertions": [
+        "Native associated author/modifier/title/subject/keyword values occupy the expected 18 slots and re-encode byte-exactly. Empty associated template paths stay distinct from nonempty SummaryInformation template names. Detached title mutation round-trips without changing the native package."
+      ],
+      "scope_limit": "Associated-string STTB semantics and detached encoding only; document variables, web-export execution and package-level associated-string mutation are not claimed."
+    },
+    {
+      "crate": "litchi-ole-common",
+      "target": "microsoft_office_native_hyperlinks",
+      "name": "native_excel_and_powerpoint_hyperlinks_use_one_blob_length_and_keep_producer_values",
+      "fixtures": [
+        "excel/excel-interaction-print.xls",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "xls-146",
+        "ppt-351"
+      ],
+      "assertions": [
+        "Native Excel and PowerPoint reserved lists retain all target/location strings, raw producer hashes/flags and duplicate order. Byte-exact vector re-encoding, a single outer VT_BLOB length, generic property-stream reopen and distinct blob/link-count limits are asserted."
+      ],
+      "scope_limit": "Shared property-set wire semantics only. Excel/PPT application fields remain uninterpreted; URLs, mail targets and slide references are never executed."
     }
   ]
 }

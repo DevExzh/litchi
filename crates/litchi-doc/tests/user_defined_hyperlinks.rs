@@ -446,8 +446,9 @@ fn stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it() {
                     panic!("fixture must contain the typed hyperlink property");
                 };
                 let mut value = value.clone();
-                // `cbData` + `cElements` + VT_I4 tag/padding precede dwHash.
-                value[12] = value[12].wrapping_add(1);
+                // Value::Blob starts at cElements; the first VT_I4 tag and
+                // padding precede dwHash. The outer codec owns cbData.
+                value[8] = value[8].wrapping_add(1);
                 section.update(identifier, Value::Blob(value))?;
                 Ok(())
             })

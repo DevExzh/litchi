@@ -266,3 +266,31 @@ preserve image identities and bytes through anchor relocation, save/reopen and
 inverse. Generated main/header and missing-Data cases qualify the store route;
 resource editing, page layout, rendering and unified `picture` nodes are not
 inferred from these owner reads.
+
+## Native property-set and table metadata qualification
+
+`tests/microsoft_office_native_metadata.rs` covers native DOC/DOT property
+reads and CRUD, including macro variants. It pins Mac code page 10000,
+producer-saved dates/counts/template names and review-document properties.
+Metadata changes preserve all non-property streams, including WordDocument,
+table/Data/ObjectPool/VBA content. Unicode custom values change only their
+user-defined section to UTF-16; reserved hyperlink blobs remain exact. Failed
+unsupported-field merges retain earlier staged work, and save/reopen, stale
+rejection and exact inverses are checked.
+
+Native text and math/navigation `_PID_HLINKS` payloads start with the vector
+count: the generic OLE BLOB layer already consumed `cbData`. The shared codec
+reads and writes exactly one outer length. Synthetic wire fixtures and native
+Word/Excel/PowerPoint regressions verify this boundary, while count, UTF-16,
+byte-budget, truncation and trailing-data checks remain enforced. Native field
+indices, CP ranges and instruction strings establish the Word candidates before
+explicit resolution. Changed unresolved writes refuse; resolved property edits
+leave field instructions and cached results untouched and inert.
+
+Native annotation tags and 16-byte `RgDofr` ListStyles records have exact table
+and semantic assertions. The latter exposes list index 0/style index 12 without
+claiming frame-set layout. Associated-string tables round-trip all 18 slots;
+their empty template-path slot stays distinct from the saved SummaryInformation
+template name. These are bounded STTB/list/property operations, not complete
+primitive, document-variable, web-export, UI selection, printer or layout support.
+No external target, macro, template, printer or native application is invoked.

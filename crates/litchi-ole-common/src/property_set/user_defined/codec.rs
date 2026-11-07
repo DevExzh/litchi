@@ -160,15 +160,9 @@ pub(super) fn encode_link_base(value: &LinkBase, limits: Limits) -> Result<Vec<u
 
 pub(super) fn decode_hyperlinks(data: &[u8], limits: Limits) -> Result<Hyperlinks, Error> {
     check_blob(data, limits, "_PID_HLINKS")?;
+    // MS-OSHARED 2.3.3.1.20's cbData is the VT_BLOB size already consumed
+    // by the generic property reader. Value::Blob starts at VecVtHyperlink.
     let mut reader = Reader::new(data);
-    let declared_bytes_raw = reader.u32("_PID_HLINKS cbData")?;
-    let declared_bytes = usize::try_from(declared_bytes_raw)
-        .map_err(|_conversion_error| invalid("_PID_HLINKS cbData is too large"))?;
-    if declared_bytes != reader.remaining() {
-        return Err(invalid(
-            "_PID_HLINKS cbData does not exactly bound VecVtHyperlink",
-        ));
-    }
     let elements = usize::try_from(reader.u32("_PID_HLINKS cElements")?)
         .map_err(|_conversion_error| invalid("_PID_HLINKS cElements is too large"))?;
     if elements % 6 != 0 {
@@ -221,7 +215,7 @@ pub(super) fn encode_hyperlinks(value: &Hyperlinks, limits: Limits) -> Result<Ve
     output
         .try_reserve_exact(planned)
         .map_err(|source| allocation("user-defined hyperlinks", source))?;
-    output.extend_from_slice(&0u32.to_le_bytes());
+    // The generic Value::Blob writer emits cbData around this vector.
     output.extend_from_slice(&element_count.to_le_bytes());
     let mut units = 0;
     for link in value.links() {
@@ -247,18 +241,11 @@ pub(super) fn encode_hyperlinks(value: &Hyperlinks, limits: Limits) -> Result<Ve
             "hyperlink location",
         )?;
     }
-    let payload_size = output
-        .len()
-        .checked_sub(4)
-        .ok_or_else(|| invalid("_PID_HLINKS payload underflow"))?;
-    let data_size = u32::try_from(payload_size)
-        .map_err(|_conversion_error| invalid("_PID_HLINKS cbData exceeds u32"))?;
     if output.len() != planned {
         return Err(invalid(
             "_PID_HLINKS encoded size does not match its checked plan",
         ));
     }
-    output[..4].copy_from_slice(&data_size.to_le_bytes());
     check_blob(&output, limits, "_PID_HLINKS")?;
     Ok(output)
 }
@@ -279,7 +266,7 @@ fn check_blob_len(length: usize, limits: Limits, _field: &str) -> Result<(), Err
 }
 
 fn encoded_hyperlinks_size(value: &Hyperlinks, limits: Limits) -> Result<usize, Error> {
-    let mut total = 8usize;
+    let mut total = 4usize;
     let mut units = 0usize;
     for link in value.links() {
         total = total
@@ -304,6 +291,7 @@ fn encoded_hyperlinks_size(value: &Hyperlinks, limits: Limits) -> Result<usize, 
         check_blob_len(total, limits, "_PID_HLINKS")?;
     }
     check_blob_len(total, limits, "_PID_HLINKS")?;
+    u32::try_from(total).map_err(|_conversion_error| invalid("_PID_HLINKS cbData exceeds u32"))?;
     Ok(total)
 }
 

@@ -3,8 +3,8 @@ use crate::property_set::{CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section,
 use crate::{Error, LimitKind};
 
 const LINK_BASE_FIXTURE: [u8; 4] = [0x62, 0x00, 0x00, 0x00];
-const HYPERLINKS_FIXTURE: [u8; 64] = [
-    0x3c, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, // cbData, cElements
+const HYPERLINKS_FIXTURE: [u8; 60] = [
+    0x06, 0x00, 0x00, 0x00, // cElements; VT_BLOB owns cbData outside Value::Blob
     0x03, 0x00, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00, // hash: "A" ^ ""
     0x03, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, // app
     0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // OfficeArt
@@ -85,8 +85,8 @@ fn independent_compact_fixtures_have_exact_tags_hash_and_alignment() {
     );
 
     let mut padded = HYPERLINKS_FIXTURE;
-    padded[42] = 0x34;
-    padded[43] = 0x12;
+    padded[38] = 0x34;
+    padded[39] = 0x12;
     let mut padded_source = section();
     padded_source
         .add_named(2, HYPERLINKS.into(), Value::Blob(padded.to_vec()))
@@ -120,7 +120,7 @@ fn property_stream_outer_hyperlink_padding_is_ignored_before_typed_overlay() {
         .unwrap();
     let mut bytes = crate::property_set::Stream::new(source).to_bytes().unwrap();
     let marker = [
-        0x41, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x00,
+        0x41, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
     ];
     let offset = bytes
         .windows(marker.len())
@@ -139,6 +139,89 @@ fn property_stream_outer_hyperlink_padding_is_ignored_before_typed_overlay() {
         .unwrap();
     assert_eq!(links.links()[0].target(), "A");
     assert_eq!(links.links()[0].stored_hash(), 0x61);
+}
+
+#[test]
+fn hyperlink_blob_has_one_length_and_rejects_invalid_vectors() {
+    let mut section = section();
+    section
+        .add_named(
+            2,
+            HYPERLINKS.into(),
+            Value::Blob(HYPERLINKS_FIXTURE.to_vec()),
+        )
+        .unwrap();
+    let wire = crate::property_set::Stream::new(section.clone())
+        .to_bytes()
+        .unwrap();
+    let marker = [0x41, 0, 0, 0, 60, 0, 0, 0, 6, 0, 0, 0];
+    let at = wire
+        .windows(marker.len())
+        .position(|w| w == marker)
+        .unwrap();
+    assert_eq!(&wire[at + 8..at + 68], &HYPERLINKS_FIXTURE);
+    // The generic parser reports and drops malformed properties under its
+    // documented repair policy; it must not expose this as a valid BLOB.
+    let mut oversized = wire.clone();
+    oversized[at + 4..at + 8].copy_from_slice(&u32::MAX.to_le_bytes());
+    let repaired = crate::property_set::Stream::parse(&oversized).unwrap();
+    assert!(
+        repaired
+            .tolerance_report()
+            .contains(crate::leniency::PropertyDefect::MalformedValue)
+    );
+    assert!(
+        repaired
+            .section(crate::property_set::USER_DEFINED_PROPERTIES_FMTID)
+            .unwrap()
+            .find_named(HYPERLINKS)
+            .is_none()
+    );
+    let mut extra = HYPERLINKS_FIXTURE.to_vec();
+    extra.extend_from_slice(&[0, 0, 0, 0]);
+    let mut nested = 60u32.to_le_bytes().to_vec();
+    nested.extend_from_slice(&HYPERLINKS_FIXTURE);
+    for payload in [HYPERLINKS_FIXTURE[..59].to_vec(), extra, nested] {
+        section.update(2, Value::Blob(payload)).unwrap();
+        assert!(
+            Properties::new(&section, Limits::default())
+                .unwrap()
+                .hyperlinks()
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn empty_hyperlink_vector_has_only_its_count_with_exact_blob_bounds() {
+    let mut source = section();
+    let values = Hyperlinks::new(vec![]);
+    let limits = Limits::builder().max_blob_bytes(4).build().unwrap();
+    Edit::new(&mut source, limits)
+        .unwrap()
+        .set_hyperlinks(values.clone())
+        .unwrap();
+    assert_eq!(
+        source.find_named(HYPERLINKS).unwrap().1,
+        &Value::Blob(vec![0; 4])
+    );
+    assert!(
+        Properties::new(&source, limits)
+            .unwrap()
+            .hyperlinks()
+            .unwrap()
+            .unwrap()
+            .is_empty()
+    );
+    let before = source.clone();
+    let limit = Limits::builder().max_blob_bytes(3).build().unwrap();
+    assert!(
+        Edit::new(&mut source, limit)
+            .unwrap()
+            .set_hyperlinks(values)
+            .is_err()
+    );
+    assert_eq!(source, before);
 }
 
 #[test]
@@ -194,7 +277,7 @@ fn malformed_values_are_lazy_and_bounded() {
 #[test]
 fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
     let mut source = section();
-    let mut malformed = vec![4, 0, 0, 0, 1, 0, 0, 0];
+    let mut malformed = vec![1, 0, 0, 0];
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(malformed.clone()))
         .unwrap();
@@ -205,7 +288,7 @@ fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
             .is_err()
     );
 
-    malformed[4] = 6;
+    malformed[0] = 6;
     let mut source = section();
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(malformed))
@@ -225,7 +308,7 @@ fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
         unreachable!()
     };
     let mut raw = raw.clone();
-    raw[10] = 1;
+    raw[6] = 1;
     source.update(2, Value::Blob(raw)).unwrap();
     let links = Properties::new(&source, Limits::default())
         .unwrap()
@@ -238,7 +321,7 @@ fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
         unreachable!()
     };
     let mut raw = raw.clone();
-    raw[42] = 0x7f;
+    raw[38] = 0x7f;
     source.update(2, Value::Blob(raw)).unwrap();
     let links = Properties::new(&source, Limits::default())
         .unwrap()
@@ -312,7 +395,7 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         .is_err()
     );
 
-    for (offset, value) in [(0, 0x3b), (4, 5), (40, 0x1e), (48, 0)] {
+    for (offset, value) in [(0, 5), (4, 4), (36, 0x1e), (44, 0)] {
         let mut malformed = HYPERLINKS_FIXTURE;
         malformed[offset] = value;
         let mut source = section();
@@ -327,8 +410,8 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         );
     }
     let mut malformed = HYPERLINKS_FIXTURE;
-    malformed[48] = 0;
-    malformed[49] = 0xd8;
+    malformed[44] = 0;
+    malformed[45] = 0xd8;
     let mut source = section();
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(malformed.to_vec()))
