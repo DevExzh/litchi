@@ -30,6 +30,7 @@ use std::sync::{Arc, OnceLock};
 
 mod composition;
 mod destination_splice;
+mod layout_source;
 mod marks;
 mod picture_payload;
 mod producer_paragraphs;
@@ -5886,8 +5887,11 @@ impl Edit {
                 .plain_body_text_editability()
                 .map_err(Error::unsupported_source)?;
         }
-        let span = if layout_operation {
-            retained_or_located_layout_body_source_span(&self.source, source_bytes)?
+        let layout_source = layout_operation
+            .then(|| layout_source::plan(&self.source, source_bytes))
+            .transpose()?;
+        let span = if let Some(plan) = &layout_source {
+            plan.span.clone()
         } else {
             retained_or_located_body_source_span(&self.source, source_bytes)?
         };
@@ -5918,6 +5922,10 @@ impl Edit {
                 &paragraph_properties,
                 self.source.limits(),
                 &span,
+                &layout_source
+                    .as_ref()
+                    .ok_or(Error::Internal("layout source plan is missing"))?
+                    .event_offsets,
             )?
         } else if property_operation {
             encoded_body_with_properties(
@@ -6017,6 +6025,11 @@ impl Edit {
             }
         }
         if layout_operation {
+            if !same_layout_resources(&snapshot, &self.source) {
+                return Err(Error::unsupported_source(
+                    "paragraph-layout publication changed document resources",
+                ));
+            }
             if !same_source_runs(&snapshot, &self.source) {
                 return Err(Error::unsupported_source(
                     "candidate character runs did not survive paragraph-layout publication",
@@ -9619,13 +9632,64 @@ fn source_paragraph_properties(source: &Package) -> Result<Vec<crate::types::Par
     Ok(properties)
 }
 
+fn same_layout_resources(left: &Package, right: &Package) -> bool {
+    let left = left.raw();
+    let right = right.raw();
+    left.font_table().fonts() == right.font_table().fonts()
+        && left.color_table().colors() == right.color_table().colors()
+        && (0..left.color_table().colors().len()).all(|index| {
+            left.color_table().is_automatic_at(index) == right.color_table().is_automatic_at(index)
+        })
+        && left.stylesheet() == right.stylesheet()
+        && left.info() == right.info()
+        && left.theme() == right.theme()
+        && left.data_store() == right.data_store()
+}
+
+// Canonical Unicode escapes can split one source run into several parsed
+// runs. Compare exact text and every formatting field over their shared
+// byte ranges without allocating a per-character projection.
 fn same_source_runs(left: &Package, right: &Package) -> bool {
-    let mut left = left.body().runs();
-    let mut right = right.body().runs();
+    let mut left_runs = left.body().runs();
+    let mut right_runs = right.body().runs();
+    let mut left_run = left_runs.next();
+    let mut right_run = right_runs.next();
+    let mut left_offset = 0;
+    let mut right_offset = 0;
     loop {
-        match (left.next(), right.next()) {
-            (Some(left), Some(right))
-                if left.text() == right.text() && left.format().raw() == right.format().raw() => {},
+        match (left_run, right_run) {
+            (Some(left), Some(right)) => {
+                if left.format().raw() != right.format().raw() {
+                    return false;
+                }
+                let (Some(left_bytes), Some(right_bytes)) = (
+                    left.text().as_bytes().get(left_offset..),
+                    right.text().as_bytes().get(right_offset..),
+                ) else {
+                    return false;
+                };
+                if left_bytes.is_empty() != right_bytes.is_empty() {
+                    return false;
+                }
+                let length = left_bytes.len().min(right_bytes.len());
+                if left_bytes
+                    .get(..length)
+                    .zip(right_bytes.get(..length))
+                    .is_none_or(|(left, right)| left != right)
+                {
+                    return false;
+                }
+                left_offset += length;
+                right_offset += length;
+                if left_offset == left.text().len() {
+                    left_run = left_runs.next();
+                    left_offset = 0;
+                }
+                if right_offset == right.text().len() {
+                    right_run = right_runs.next();
+                    right_offset = 0;
+                }
+            },
             (None, None) => return true,
             _ => return false,
         }
@@ -12125,27 +12189,7 @@ fn retained_or_located_body_source_span(
         {
             Ok(span)
         },
-        Some(_) | None => {
-            ordinary_body_source_span(source_bytes, source.text(), source.options(), false)
-        },
-    }
-}
-
-fn retained_or_located_layout_body_source_span(
-    source: &Package,
-    source_bytes: &[u8],
-) -> Result<Range<usize>, Error> {
-    match source.model().ordinary_body_source_span() {
-        Some(span)
-            if source_bytes.is_ascii()
-                && span.start <= span.end
-                && span.end <= source_bytes.len() =>
-        {
-            Ok(span)
-        },
-        Some(_) | None => {
-            ordinary_body_source_span(source_bytes, source.text(), source.options(), true)
-        },
+        Some(_) | None => ordinary_body_source_span(source_bytes, source.text(), source.options()),
     }
 }
 
@@ -12153,7 +12197,6 @@ fn ordinary_body_source_span(
     source: &[u8],
     semantic_text: &str,
     options: crate::OpenOptions,
-    allow_nested_root_groups: bool,
 ) -> Result<Range<usize>, Error> {
     let lexical = if source.is_ascii() {
         std::str::from_utf8(source)
@@ -12173,7 +12216,7 @@ fn ordinary_body_source_span(
     for (token, span) in tokens.iter().zip(&spans) {
         match token {
             crate::lexer::Token::OpenBrace => {
-                if depth == 1 && start.is_some() && !allow_nested_root_groups {
+                if depth == 1 && start.is_some() {
                     return Err(Error::unsupported_source(
                         "the body source is not one contiguous root-level span",
                     ));
@@ -12191,7 +12234,11 @@ fn ordinary_body_source_span(
                     "RTF group nesting underflowed while locating the body",
                 ))?;
             },
-            crate::lexer::Token::Text(_) if depth == 1 && start.is_none() => {
+            crate::lexer::Token::Text(text)
+                if depth == 1
+                    && start.is_none()
+                    && text.bytes().any(|b| !matches!(b, b'\r' | b'\n')) =>
+            {
                 start = Some(span.start);
             },
             crate::lexer::Token::Binary(_) if start.is_some() => {
@@ -12777,11 +12824,12 @@ fn encoded_body_with_paragraph_properties(
     properties: &[crate::types::Paragraph],
     limits: crate::SourceLimits,
     source_span: &Range<usize>,
+    event_source_offsets: &[usize],
 ) -> Result<Vec<u8>, Error> {
     let mut output = BoundedVec::new(limits.max_input_bytes());
     let opaque_nodes = body_opaque_nodes(source, source_span)?;
     let mut opaque_index = 0usize;
-    let layout_events = body_layout_events(source)?;
+    let layout_events = body_layout_events(source, source_span, event_source_offsets)?;
     let mut layout_event_index = 0usize;
     let mut body_position = 0usize;
     let mut paragraph_count = 0usize;
@@ -12959,6 +13007,9 @@ fn body_opaque_nodes<'a>(
             }
             continue;
         }
+        if node_start >= source_span.end {
+            continue;
+        }
         if node_end > source_span.end {
             return Err(Error::unsupported_source(
                 "body-anchored opaque syntax exceeds the source span",
@@ -12985,7 +13036,11 @@ struct BodyLayoutEvent {
     kind: BodyLayoutEventKind,
 }
 
-fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
+fn body_layout_events(
+    source: &Package,
+    source_span: &Range<usize>,
+    event_source_offsets: &[usize],
+) -> Result<Vec<BodyLayoutEvent>, Error> {
     let bookmarks = source.model().bookmarks().bookmarks();
     let mut events = Vec::new();
     events
@@ -13027,12 +13082,12 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
                 ));
             },
         };
-        // The retained ordinary-body source span begins at the first literal
-        // body token.  A zero-width event at body offset zero is therefore
-        // serialized in the preserved prefix (its destination group precedes
-        // that literal token); emitting it again in the replacement body
-        // duplicates the marker.  Later events lie inside the retained span.
-        if position == 0 {
+        // Events in the retained prefix or trailer are already preserved.
+        // A leading event inside a replaced formatting group must be emitted.
+        let source_offset = *event_source_offsets
+            .get(source_order)
+            .ok_or(Error::Internal("layout event source offset is missing"))?;
+        if !source_span.contains(&source_offset) {
             continue;
         }
         if source.text().get(position..position).is_none() {
@@ -13150,6 +13205,11 @@ fn write_text_with_body_opaque(
                 "body opaque node index became inconsistent",
             ))?;
             write_bounded(output, node.source())?;
+            if node.needs_control_separator() {
+                // A space would become part of the retained control's source.
+                // An ignored line break terminates it without adding a scope.
+                write_bounded(output, b"\n")?;
+            }
             cursor = offset;
             *node_index = node_index.saturating_add(1);
         } else {
@@ -16820,5 +16880,58 @@ mod payload_admission_tests {
         let pointer = input.as_ptr();
         let admitted = source.edit().admit_text(input, 0).expect("admitted");
         assert_eq!(admitted.as_ptr(), pointer);
+    }
+}
+
+#[cfg(test)]
+mod layout_character_coverage_tests {
+    use super::{Package, same_source_runs};
+
+    #[test]
+    fn equivalent_fragmentation_keeps_all_text_and_formatting_constraints() {
+        let plain = Package::parse(r"{\rtf1\ansi AB}").unwrap();
+        let split = Package::parse(r"{\rtf1\ansi A\b0 B}").unwrap();
+        assert_ne!(plain.body().runs().count(), split.body().runs().count());
+        assert!(same_source_runs(&plain, &split));
+        assert!(same_source_runs(&split, &plain));
+        for altered in [
+            r"{\rtf1\ansi AC}",
+            r"{\rtf1\ansi ABC}",
+            r"{\rtf1\ansi A{\b B}}",
+            r"{\rtf1\ansi A{\lang1031 B}}",
+            r"{\rtf1\ansi A{\insrsid1 B}}",
+            r"{\rtf1\ansi A{\fcs1 B}}",
+        ] {
+            let changed = Package::parse(altered).unwrap();
+            assert!(!same_source_runs(&plain, &changed));
+            assert!(!same_source_runs(&changed, &plain));
+        }
+    }
+}
+
+#[cfg(test)]
+mod layout_resource_guard_tests {
+    use super::{Package, same_layout_resources, same_source_runs};
+
+    #[test]
+    fn identical_run_references_do_not_mask_changed_palette_or_metadata() {
+        let automatic = Package::parse(r"{\rtf1\ansi{\colortbl;}AB}").unwrap();
+        let explicit = Package::parse(r"{\rtf1\ansi{\colortbl\red0\green0\blue0;}AB}").unwrap();
+        assert_eq!(
+            automatic.raw().color_table().colors(),
+            explicit.raw().color_table().colors()
+        );
+        assert!(same_source_runs(&automatic, &explicit));
+        assert!(!same_layout_resources(&automatic, &explicit));
+        for header in [
+            r"{\fonttbl{\f0\fnil Changed;}}",
+            r"{\info{\title Changed}}",
+            r"{\colortbl;\red12\green34\blue56;}",
+        ] {
+            let changed = Package::parse(&format!("{{\\rtf1\\ansi{header}AB}}")).unwrap();
+            assert!(same_source_runs(&automatic, &changed));
+            assert!(!same_layout_resources(&automatic, &changed));
+        }
+        assert!(same_layout_resources(&automatic, &automatic));
     }
 }

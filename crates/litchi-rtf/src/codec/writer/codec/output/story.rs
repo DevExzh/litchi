@@ -1428,7 +1428,13 @@ impl<W: Write> Writer<W> {
                 }
                 Ok(())
             },
-            BodyEventKind::Opaque(node) => self.writer.write_all(node.source()),
+            BodyEventKind::Opaque(node) => {
+                self.writer.write_all(node.source())?;
+                if node.needs_control_separator() {
+                    self.writer.write_all(b"\n")?;
+                }
+                Ok(())
+            },
         }
     }
 

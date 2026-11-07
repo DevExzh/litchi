@@ -319,3 +319,30 @@ fn style_and_list_extensions_are_preserved_or_refused_atomically() {
         assert!(!probe.touched);
     }
 }
+
+#[test]
+fn canonical_opaque_controls_keep_text_boundaries_and_stabilize() {
+    for text in [
+        r"{\rtf1\ansi\vendor\ql Alpha}",
+        r"{\rtf1\ansi One\vendor12\ql 34}",
+        r"{\rtf1\ansi One\vendor\ql -3}",
+        r"{\rtf1\ansi\vendor\other\ql Alpha}",
+        r"{\rtf1\ansi\vendor  Alpha}",
+        r"{\rtf1\ansi\| Alpha}",
+        r"{\rtf1\ansi{\*\vendor payload}Alpha}",
+    ] {
+        let source = Package::parse(text).unwrap();
+        let mut bytes = Vec::new();
+        Writer::new(&mut bytes)
+            .write_document(source.raw())
+            .unwrap();
+        let written = Package::from_bytes(&bytes).unwrap();
+        assert_eq!(written.text(), source.text());
+        assert_eq!(written.opaque(), source.opaque());
+        let mut second = Vec::new();
+        Writer::new(&mut second)
+            .write_document(written.raw())
+            .unwrap();
+        assert_eq!(second, bytes);
+    }
+}

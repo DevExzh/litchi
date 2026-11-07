@@ -469,7 +469,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Text(text) if !text.is_empty() => {
-                    if contexts.len() == 1 {
+                    if contexts.len() == 1 && text.bytes().any(|b| !matches!(b, b'\r' | b'\n')) {
                         potential_root_body_blocks += 1;
                         if ordinary_body_start.is_none() {
                             ordinary_body_start = self

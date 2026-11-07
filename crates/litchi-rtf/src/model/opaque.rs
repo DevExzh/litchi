@@ -78,6 +78,13 @@ impl Node {
         self.anchor
     }
 
+    /// An unterminated word or numeric parameter needs a lexical boundary
+    /// before reconstructed text. Symbols and already space-delimited words
+    /// are complete. An ignored line break preserves these exact retained bytes.
+    pub(crate) fn needs_control_separator(&self) -> bool {
+        self.kind == Kind::ControlWord && self.source.last().is_some_and(u8::is_ascii_alphanumeric)
+    }
+
     /// Borrow the exact uncompressed RTF transport bytes.
     #[must_use]
     pub fn source(&self) -> &[u8] {

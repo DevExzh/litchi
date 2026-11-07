@@ -885,3 +885,14 @@ fn decodes_declared_codepage_in_semantic_destinations() {
     assert_eq!(doc.notes()[0].content, "Привет\u{00A0}X");
     assert_eq!(doc.revisions()[0].author, "Привет");
 }
+
+#[test]
+fn ordinary_body_cache_skips_transport_newlines_between_header_destinations() {
+    let input = b"{\\rtf1\\ansi\r\n{\\fonttbl{\\f0\\fnil Native;}}\r\n{\\colortbl;\\red12\\green34\\blue56;}\r\n\\f0 Body\\par}";
+    let doc = Tree::parse_bytes(input, OpenOptions::default()).unwrap();
+    assert_eq!(
+        &input[doc.ordinary_body_source_span().unwrap()],
+        br"Body\par"
+    );
+    assert_eq!(doc.text(), "Body\n");
+}

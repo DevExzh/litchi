@@ -892,3 +892,181 @@ fn layout_refuses_each_exclusive_lifecycle_without_poisoning_it() {
         assert_eq!(actual, expected);
     }
 }
+
+#[test]
+fn layout_keeps_opaque_control_words_separate_from_reconstructed_text() {
+    for source in [
+        r"{\rtf1\ansi{\vendor\ql Alpha}}",
+        r"{\rtf1\ansi{\vendor12\ql 34}}",
+        r"{\rtf1\ansi{\vendor\ql -3}}",
+        r"{\rtf1\ansi\vendor\ql Alpha}",
+        r"{\rtf1\ansi\vendor12\ql 34}",
+        r"{\rtf1\ansi\vendor\ql -3}",
+        r"{\rtf1\ansi One\vendor\ql Two}",
+        r"{\rtf1\ansi\vendor\other\ql Alpha}",
+        r"{\rtf1\ansi\vendor  Alpha}",
+        r"{\rtf1\ansi\|\ql Alpha}",
+        r"{\rtf1\ansi{\*\vendor payload}Alpha}",
+    ] {
+        let source = Package::parse(source).unwrap();
+        let mut edit = source.edit();
+        edit.patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+        )
+        .unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.package().text(), source.text());
+        assert_eq!(commit.package().opaque(), source.opaque());
+        assert_eq!(
+            commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .package()
+                .to_bytes()
+                .unwrap(),
+            source.to_bytes().unwrap()
+        );
+    }
+}
+
+#[test]
+fn layout_preserves_character_coverage_when_unicode_encoding_splits_runs() {
+    let source = Package::parse(r"{\rtf1\ansi\ansicpg1252 \'e9\'e9{\b \'e0\'e0}}").unwrap();
+    let coverage = |p: &Package| {
+        p.raw()
+            .blocks()
+            .iter()
+            .flat_map(|b| {
+                b.text
+                    .chars()
+                    .filter(|c| *c != '\n')
+                    .map(move |c| (c, b.formatting))
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().text(), source.text());
+    assert_eq!(coverage(commit.package()), coverage(&source));
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        source.to_bytes().unwrap()
+    );
+}
+
+#[test]
+fn layout_preserves_header_newlines_resources_and_trailer_destinations() {
+    let input = concat!(
+        "{\\rtf1\\ansi\r\n{\\fonttbl{\\f0\\fnil Native Font;}}\r\n",
+        "{\\colortbl;\\red12\\green34\\blue56;}\r\n{\\info{\\title Keep title}}\r\n",
+        "\\pard\\f0\\cf1{\\b One\\par}\r\n\\pard{\\i Two\\par}\r\n",
+        "{\\*\\datastore}{\\*\\futuretail retained}}"
+    );
+    let source = Package::parse(input).unwrap();
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let output = commit.package().to_bytes().unwrap();
+    let first = input.find(r"{\b One\par}").unwrap();
+    let trailer = input.find(r"{\*\datastore}").unwrap();
+    assert!(output.starts_with(&input.as_bytes()[..first]));
+    assert!(output.ends_with(&input.as_bytes()[trailer..]));
+    assert_eq!(commit.package().text(), source.text());
+    assert_eq!(
+        commit.package().raw().font_table().fonts(),
+        source.raw().font_table().fonts()
+    );
+    assert_eq!(
+        commit.package().raw().color_table().colors(),
+        source.raw().color_table().colors()
+    );
+    assert_eq!(commit.package().raw().info(), source.raw().info());
+    assert_eq!(
+        commit.package().raw().data_store(),
+        source.raw().data_store()
+    );
+    assert_eq!(commit.package().opaque(), source.opaque());
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        input.as_bytes()
+    );
+}
+
+#[test]
+fn layout_reemits_only_bookmark_events_inside_the_replaced_source_extent() {
+    for text in [
+        r"{\rtf1\ansi{\b {\*\bkmkstart bm}One{\*\bkmkend bm}\par}}",
+        r"{\rtf1\ansi{\*\bkmkstart bm}{\b One}{\*\bkmkend bm}}",
+        r"{\rtf1\ansi{\b {\*\bkmkstart bm}One}{\*\bkmkend bm}}",
+        r"{\rtf1\ansi{\page\b One\softpage}}",
+    ] {
+        let source = Package::parse(text).unwrap();
+        let mut edit = source.edit();
+        edit.patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+        )
+        .unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.package().text(), source.text());
+        assert_eq!(
+            commit.package().raw().body_story_events(),
+            source.raw().body_story_events()
+        );
+        if let Some(bookmark) = commit.package().raw().bookmarks().bookmarks().first() {
+            assert_eq!((bookmark.position, bookmark.content.as_ref()), (0, "One"));
+            let output = String::from_utf8(commit.package().to_bytes().unwrap()).unwrap();
+            assert_eq!(output.matches(r"\bkmkstart").count(), 1);
+            assert_eq!(output.matches(r"\bkmkend").count(), 1);
+        }
+        assert_eq!(
+            commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .package()
+                .to_bytes()
+                .unwrap(),
+            text.as_bytes()
+        );
+    }
+}
+
+#[test]
+fn interleaved_nonbody_metadata_is_refused_without_dropping_it() {
+    let source = Package::parse(r"{\rtf1\ansi One{\colortbl;\red12\green34\blue56;}Two}").unwrap();
+    let original = source.to_bytes().unwrap();
+    let mut edit = source.edit();
+    edit.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
+    )
+    .unwrap();
+    assert!(
+        matches!(edit.commit(),Err(Error::Refused(r)) if r.reason()=="paragraph-layout source contains interleaved non-body destinations")
+    );
+    assert_eq!(source.to_bytes().unwrap(), original);
+}

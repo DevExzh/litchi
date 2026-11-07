@@ -6956,6 +6956,105 @@
         "Native-source title/custom Boolean CRUD and atomic unsupported-field failure; file reopen, forward replay, stale rejection and exact inverse pass. All non-property streams, including PowerPoint Document, Pictures, embedded/macro payloads and Current User, remain exact."
       ],
       "scope_limit": "Property transactions on immutable native sources; no PowerPoint reopen, macro execution, visual rendering or print behavior is claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_headings_expose_exact_fonts_colors_spacing_and_numbered_indents",
+      "fixtures": [
+        "word/word-math-navigation.rtf"
+      ],
+      "feature_rows": [
+        "rtf-464"
+      ],
+      "assertions": [
+        "Exact native title/TOC/H1/H2 text, Aptos Display sizes/bold/color, paragraph spacing and keep flags, and numbered-item physical/hanging indents; no-op output retains original bytes."
+      ],
+      "scope_limit": "Typed local formatting only; no font shaping, TOC refresh, numbering generation or pagination."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_script_fonts_and_associated_languages_survive_model_writing",
+      "fixtures": [
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-464",
+        "rtf-485"
+      ],
+      "assertions": [
+        "Arabic/Hebrew/Japanese/Chinese runs resolve exact native fonts, selected associated font IDs and language IDs. Canonical model writing preserves all visible characters with complete Formatting values, paragraph properties, opaque nodes, fonts, colors, styles, metadata, theme and datastore."
+      ],
+      "scope_limit": "Explicit local LTR metadata is kept distinct from script/language data; no bidi layout or glyph-shaping result is claimed. Lexical Unicode escapes may split run segmentation."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_run_format_batches_preserve_other_facets_and_prior_staged_changes",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-457",
+        "rtf-464"
+      ],
+      "assertions": [
+        "Bold/italic/double-underline/size batches on native title and Arabic runs preserve every unselected Formatting field, all other characters, paragraph metadata and resources. Invalid batch selectors stage nothing; later invalid calls preserve staged edits. File reopen, forward replay, stale rejection and exact inverse pass."
+      ],
+      "scope_limit": "Selected ordinary run facets on dependency-free native inputs; no associated-format mutation, dependent-story edit or native application reopen is claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_frame_crud_preserves_opaque_tokens_and_unicode_character_coverage",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf",
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-457",
+        "rtf-488"
+      ],
+      "assertions": [
+        "Create/update/remove positioned body-frame geometry and wrapping on immutable native sources. Invalid width preserves staged work. Text, complete per-character formatting, all other paragraph properties, opaque bytes/anchors, font/color/style/info/theme/datastore metadata survive save/reopen and exact inverse."
+      ],
+      "scope_limit": "Body frames are Litchi-authored native-source derivatives. Metadata destinations interleaved inside the required body extent remain a precise unsupported-content boundary; no layout engine or Word reopen is claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_footer_frames_and_page_fields_survive_an_independent_header_edit",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-472",
+        "rtf-488"
+      ],
+      "assertions": [
+        "Both native footer PAGE paragraphs carry exact margin/right/paragraph-anchor/zero-offset/overlay frame state. An independent header-text edit changes only the intended literal bytes; a dependent-footer edit refuses without losing the staged header change. Frames, fields, body text and source bytes remain preserved; reopen/inverse pass."
+      ],
+      "scope_limit": "Native footer frame metadata and preservation only; footer frame/property mutation and field refresh are not claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_formatting",
+      "name": "native_dependent_formatting_boundaries_keep_original_artifacts",
+      "fixtures": [
+        "word/word-math-navigation.rtf",
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-457",
+        "rtf-464",
+        "rtf-488"
+      ],
+      "assertions": [
+        "Exact existing UnsupportedContent reasons distinguish paragraph-layout preflight refusal from run-format publication refusal on dependent field/table/review content. Refused operations preserve immutable native artifacts and an empty layout transaction retains exact source bytes."
+      ],
+      "scope_limit": "These are operation-specific supported-profile boundaries, not unsupported-format claims or substitutes for the separate positive native formatting/frame tests."
     }
   ]
 }
