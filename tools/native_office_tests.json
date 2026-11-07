@@ -10379,6 +10379,99 @@
         "Missing fontId and unknown phonetic type/alignment return exact Invalid reader reasons instead of an absent/default fallback, preserving the original native source."
       ],
       "scope_limit": "Malformed native-parent derivatives test reader admission; no invalid bytes are attributed to Microsoft Office."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_ribbon",
+      "name": "native_xlsx_ribbon_families_round_trip_with_callbacks_and_native_parts_inert",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-262"
+      ],
+      "assertions": [
+        "Legacy/modern Ribbon slots preserve exact callback XML and Unicode labels through creation, no-op, modern vocabulary replacement, stale refusal, removal, file reopen, replay and inverse, retaining native data parts and the complete effective graph."
+      ],
+      "scope_limit": "Explicit library-authored metadata on native parents; no native add-in authoring, UI rendering or callback execution is claimed. XLSX publication uses the public shared OPC Ribbon owner."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_ribbon",
+      "name": "native_xlsx_ribbon_image_collection_and_shared_owner_fork_preserve_native_assets",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-262"
+      ],
+      "assertions": [
+        "Removal collects a private image while preserving a referenced native image. Updating a shared UI forks its part and keeps identity and image targets; in-memory and reopened inverse restore the complete source, and removal preserves opaque inbound owners."
+      ],
+      "scope_limit": "Only Ribbon graph storage is tested; images remain exact inert bytes and are not decoded or rendered. XLSX publication uses the public shared OPC Ribbon owner."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_ribbon",
+      "name": "native_xlsx_ribbon_invalid_xml_and_version_mismatch_preserve_valid_staging",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsm"
+      ],
+      "feature_rows": [
+        "xlsx-262"
+      ],
+      "assertions": [
+        "Wrong relationship-family/root-version combinations and a DTD return exact typed errors without losing valid staging; the remaining edit saves, reopens, replays and inverts with the native macro payload unchanged."
+      ],
+      "scope_limit": "Bounded XML admission and transaction atomicity; no recognizer, callback, macro or external provider is invoked. XLSX publication uses the public shared OPC Ribbon owner."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_ribbon",
+      "name": "native_xlsb_ribbon_families_round_trip_with_callbacks_and_native_parts_inert",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-325"
+      ],
+      "assertions": [
+        "Legacy/modern Ribbon slots preserve exact callback XML and Unicode labels through creation, no-op, modern vocabulary replacement, stale refusal, removal, file reopen, replay and inverse, retaining native data parts and the complete effective graph."
+      ],
+      "scope_limit": "Explicit library-authored metadata on native parents; no native add-in authoring, UI rendering or callback execution is claimed. XLSB publication uses its package Ribbon transaction."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_ribbon",
+      "name": "native_xlsb_ribbon_image_collection_and_shared_owner_fork_preserve_native_assets",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-325"
+      ],
+      "assertions": [
+        "Removal collects a private image while preserving a referenced native image. Updating a shared UI forks its part and keeps identity and image targets; in-memory and reopened inverse restore the complete source, and removal preserves opaque inbound owners."
+      ],
+      "scope_limit": "Only Ribbon graph storage is tested; images remain exact inert bytes and are not decoded or rendered. XLSB publication uses its package Ribbon transaction."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_ribbon",
+      "name": "native_xlsb_ribbon_invalid_xml_and_version_mismatch_preserve_valid_staging",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-325"
+      ],
+      "assertions": [
+        "Wrong relationship-family/root-version combinations and a DTD return exact typed errors without losing valid staging; the remaining edit saves, reopens, replays and inverts with the native macro payload unchanged."
+      ],
+      "scope_limit": "Bounded XML admission and transaction atomicity; no recognizer, callback, macro or external provider is invoked. XLSB publication uses its package Ribbon transaction."
     }
   ]
 }

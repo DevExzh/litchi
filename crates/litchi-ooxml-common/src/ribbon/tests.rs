@@ -149,6 +149,94 @@ fn shared_ribbon_is_forked_before_update() {
 }
 
 #[test]
+fn forked_image_relationships_support_inverse_without_relaxing_source_checks() {
+    use litchi_opc::PackageWriter;
+    let mut package = package_with_legacy();
+    let original = legacy_part(&package);
+    let image = add_image(&mut package, "/customUI/image.png", "image/png");
+    package
+        .get_part_mut(&original)
+        .unwrap()
+        .relate_to("image.png", rt::IMAGE);
+    let source = add_source(&mut package, "/word/document.xml");
+    package
+        .get_part_mut(&source)
+        .unwrap()
+        .relate_to("../customUI/customUI.xml", "urn:shared-ribbon");
+    let package = OpcPackage::from_bytes(
+        &PackageWriter::to_bytes(&package).unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    let mut edit = Edit::new(&package).unwrap();
+    edit.put(Version::V2007, br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#.to_vec()).unwrap();
+    let commit = edit.commit().unwrap();
+    let fork = legacy_part(commit.package());
+    assert_ne!(fork, original);
+    let inverse = commit.patch().inverse();
+    let reopened = OpcPackage::from_bytes(
+        &PackageWriter::to_bytes(commit.package()).unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    for published in [commit.package(), &reopened] {
+        let restored = inverse.apply(published).unwrap().into_package();
+        assert_eq!(legacy_part(&restored), original);
+        assert_eq!(restored.part_count(), package.part_count());
+        let limits = restored.read_limits();
+        assert_eq!(
+            restored.source_content_types(limits).unwrap(),
+            package.source_content_types(limits).unwrap()
+        );
+        let root = PackURI::new("/").unwrap();
+        assert_eq!(
+            restored.source_relationships(&root, limits).unwrap(),
+            package.source_relationships(&root, limits).unwrap()
+        );
+        for part in package.iter_parts() {
+            let name = part.partname();
+            let actual = restored.get_part(name).unwrap();
+            assert_eq!(actual.content_type(), part.content_type());
+            assert_eq!(actual.blob(), package.get_part(name).unwrap().blob());
+            assert_eq!(
+                restored.source_relationships(name, limits).unwrap(),
+                package.source_relationships(name, limits).unwrap()
+            );
+        }
+    }
+
+    // Source equality still includes payload bytes, lexical relationship XML
+    // and the difference between an absent and an explicit empty member.
+    for change in 0..3 {
+        let mut stale = reopened.clone();
+        let limits = stale.read_limits();
+        match change {
+            0 => stale.get_part_mut(&image).unwrap().set_blob(vec![9, 8, 7]),
+            1 => {
+                let root = PackURI::new("/").unwrap();
+                let before = stale.source_relationships(&root, limits).unwrap();
+                let mut bytes = before.bytes().to_vec();
+                bytes.extend_from_slice(b"<!-- changed source -->");
+                stale
+                    .try_replace_relationships_bytes(&before, Arc::new(bytes), true, limits)
+                    .unwrap();
+            },
+            2 => {
+                let before = stale.source_relationships(&image, limits).unwrap();
+                assert!(!before.member_present());
+                stale
+                    .try_replace_relationships_bytes(&before, before.bytes_arc(), true, limits)
+                    .unwrap();
+            },
+            _ => unreachable!(),
+        }
+        let bytes = PackageWriter::to_bytes(&stale).unwrap();
+        assert!(matches!(inverse.apply(&stale), Err(Error::PatchConflict)));
+        assert_eq!(PackageWriter::to_bytes(&stale).unwrap(), bytes);
+    }
+}
+
+#[test]
 fn identical_put_is_a_signature_and_allocation_preserving_noop() {
     let mut package = OpcPackage::new();
     put(

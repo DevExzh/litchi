@@ -348,7 +348,10 @@ impl Patch {
     pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
         let hints = part_names(&self.before);
         let current = capture_state(package, &self.limits, &hints)?;
-        if current != self.before {
+        // Publication and reopen can give canonical relationship bytes retained
+        // source provenance. Match their exact bytes and member presence using
+        // the same rules as destination validation, including inverse patches.
+        if !matches_graph_state(&current, &self.before) {
             return Err(Error::PatchConflict);
         }
         if self.is_noop() {
@@ -362,7 +365,7 @@ impl Patch {
         let mut candidate = package.clone();
         apply_graph_state(&mut candidate, &self.before, &self.after)?;
         let resulting = capture_state(&candidate, &self.limits, &part_names(&self.after))?;
-        if !destination_matches(&resulting, &self.after) {
+        if !matches_graph_state(&resulting, &self.after) {
             return Err(Error::Internal(
                 "Ribbon patch publication changed the selected graph",
             ));
@@ -593,7 +596,7 @@ fn retained_content_types_destination_matches(
     }
 }
 
-fn destination_matches(actual: &GraphState, expected: &GraphState) -> bool {
+fn matches_graph_state(actual: &GraphState, expected: &GraphState) -> bool {
     if actual.families != expected.families
         || actual.root != expected.root
         || actual.content_types != expected.content_types
