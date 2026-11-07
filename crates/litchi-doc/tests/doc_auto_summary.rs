@@ -32,7 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-//! Tests for the `PlcfAsumy` AutoSummary priority table (MS-DOC 2.8.4).
+//! Tests for the `PlcfAsumy` AutoSummary priority table (MS-DOC 2.8.9).
 
 use litchi_cfb::OleFile;
 use litchi_doc::parts::fib::FileInformationBlock;

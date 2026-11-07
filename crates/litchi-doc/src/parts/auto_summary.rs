@@ -1,4 +1,4 @@
-//! Word `AutoSummary` priority ranges (`PlcfAsumy`, MS-DOC 2.8.4).
+//! Word `AutoSummary` priority ranges (`PlcfAsumy`, MS-DOC 2.8.9).
 //!
 //! The PLCF assigns document-text ranges a priority for automatic
 //! summarization. It is parsed as inert metadata: no summary is generated.
@@ -84,7 +84,7 @@ impl AutoSummaryRange {
     }
 }
 
-/// A document's `AutoSummary` priority ranges (MS-DOC 2.8.4).
+/// A document's `AutoSummary` priority ranges (MS-DOC 2.8.9).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DocumentAutoSummary {
     ranges: Vec<AutoSummaryRange>,

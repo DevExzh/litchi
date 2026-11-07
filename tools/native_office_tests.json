@@ -9773,6 +9773,122 @@
         "A two-item budget accepts the complete two-pane graph and refuses a third pane with the exact typed Web(TaskPaneItems) limit, maximum 2 and observed 3. The previous graph remains commit-ready and reopens with exactly two panes; every unowned member including the VBA project remains exact."
       ],
       "scope_limit": "Resource admission and valid-staging preservation only; the generated metadata remains inert and has no native-app acceptance claim."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_caption_envelope",
+      "name": "native_dot_caption_lifecycle_preserves_fields_glossary_and_macro_streams",
+      "fixtures": [
+        "word/word-layout-extensions.dot",
+        "word/word-glossary.dot",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-045"
+      ],
+      "assertions": [
+        "Native DOT parents begin without caption/AutoCaption tables. Typed labels, chapter separators, location/omit-label/number-format options and ProgID-to-label references survive create/update/clear, file reopen, exact forward replay and inverse. A 40-UTF-16-unit label roundtrips.",
+        "Same-value writes are no-ops and stale patches refuse. Only FIB pairs 52/53 and appended selected-table bytes change; original WordDocument bytes, table prefixes, every other CFB stream and directory metadata are retained, including native SEQ fields, attached glossary and VBA."
+      ],
+      "scope_limit": "The template-only owner admits fDot metadata. These library-authored DOT derivatives do not prove the host-specific Normal-template role, automatic caption insertion or fresh Word acceptance."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_caption_envelope",
+      "name": "native_dot_caption_invalid_reference_and_label_limit_leave_staging_intact",
+      "fixtures": [
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-045"
+      ],
+      "assertions": [
+        "Clearing labels while AutoCaption references them returns the exact InvalidFormat transaction reason. A 42-UTF-16-unit label returns the exact Corrupted length reason. Prior valid staging commits/reopens/replays/inverts without changing native unowned bytes."
+      ],
+      "scope_limit": "Caller-model validation and failure atomicity only; no automatic captions or macros run."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_caption_envelope",
+      "name": "native_doc_caption_edit_refuses_the_non_template_owner",
+      "fixtures": [
+        "word/word-layout-extensions.doc",
+        "word/word-recorded-macro.doc"
+      ],
+      "feature_rows": [
+        "doc-045"
+      ],
+      "assertions": [
+        "Native ordinary DOC files have fDot=false and zero caption table lengths. The public editor returns its precise Corrupted Normal-template-only reason and preserves original bytes."
+      ],
+      "scope_limit": "[MS-DOC] 2.5.6 requires zero caption lengths when fDot=0 and defines these records for the Normal template. The test preserves the documented package-owner boundary rather than manufacturing a DOC caption write."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_caption_envelope",
+      "name": "native_doc_and_macro_dot_envelope_lifecycle_retains_typed_and_opaque_payloads",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-018"
+      ],
+      "assertions": [
+        "Explicit Office 8 Unicode and Office 6 ANSI envelope metadata preserves typed recipients, raw ANSI bytes, attachments, security intent flags, opaque tails and all other fields. A subject update retains the rest of the message. An invalid Office 8 collection removal leaves prior staging unchanged.",
+        "Unknown CLSIDs retain exact opaque bytes and refuse message-only updates unchanged. No-op/stale handling and removal pass file reopen, forward replay and whole-package inverse. Only FIB pair 97 and appended table data change; all native text, streams, original table bytes and directory metadata remain exact."
+      ],
+      "scope_limit": "Library-authored inert envelope additions. Signed/encrypted intent flags do not establish cryptographic protection; no mail transport, recipient resolution, attachment activation or fresh Word validation occurs."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_caption_envelope",
+      "name": "native_doc_envelope_protection_refusal_preserves_exact_noop",
+      "fixtures": [
+        "word/word-document-protection.doc"
+      ],
+      "feature_rows": [
+        "doc-018"
+      ],
+      "assertions": [
+        "The protected native source has no envelope; adding one returns Package(ProtectionDenied(Document)). The failed edit commits an exact no-op and preserves the original protected source."
+      ],
+      "scope_limit": "The default protection policy is qualified without bypassing or reinterpreting the native document restriction."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auto_summary",
+      "name": "native_doc_autosummary_state_is_inert_and_has_no_priority_table",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-044"
+      ],
+      "assertions": [
+        "Native Asumyi state is explicitly inactive: valid/view/update flags false, Highlight view, and desired/highest/current levels zero. PlcfAsumy is absent and its FIB length is zero. Unchanged Dop97 codec publication retains every native DOP byte and the native package remains exact."
+      ],
+      "scope_limit": "This is saved inactive metadata, not an observed Word summary or generated priority table."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_auto_summary",
+      "name": "native_doc_autosummary_record_edits_preserve_the_native_dop_and_other_streams",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-layout-extensions.dot"
+      ],
+      "feature_rows": [
+        "doc-044"
+      ],
+      "assertions": [
+        "Explicit contiguous priority ranges 0..8 level 1 and 8..16 level 3 are encoded, attached through the public CFB owner and read through Document::auto_summary. Priority replacement, invalid noncontiguous append with state retained, range removal and full clearing reopen correctly.",
+        "Asumyi changes are confined to its 12-byte DOP span, the PlcfAsumy pointer pair and appended selected-table bytes. Every other stream and CFB directory metadata remains exact. File reopen, public CFB patch replay and exact artifact inverse pass at every stage."
+      ],
+      "scope_limit": "The additions use detached typed record codecs and public CFB publication; there is no dedicated AutoSummary package editor and no summarization, native UI state application or fresh Word validation is inferred."
     }
   ]
 }

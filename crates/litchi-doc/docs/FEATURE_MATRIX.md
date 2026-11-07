@@ -120,7 +120,7 @@ execution remain outside the DOC package API.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | ✅ | ✅ | ✅ | `parts::envelope` owns the `[MS-DOC]` `fcMsoEnvelope` FIB range and the documented `[MS-OSHARED]` Office 6/8 body, recipient property bags, and attachments. Unknown CLSIDs and supported-body tail bytes are preserved as bounded opaque data; `Editor` stages clone-first package/FIB edits and publishes source-checked reversible semantic/CFB patches. `Document::envelope()` remains inert: no mail transport, recipient resolution, attachment activation, or external behavior. |
+| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | ✅ | ✅ | ✅ | `parts::envelope` owns the `[MS-DOC]` `fcMsoEnvelope` FIB range and the documented `[MS-OSHARED]` Office 6/8 body, recipient property bags, and attachments. Unknown CLSIDs and supported-body tail bytes are preserved as bounded opaque data; `Package::edit_envelope()` stages a clone-first `parts::envelope::Edit` over package/FIB metadata and publishes source-checked reversible semantic/CFB patches. `Document::envelope()` remains inert: no mail transport, recipient resolution, attachment activation, or external behavior. |
 
 
 ## [MS-DOC] file structure and version audit
@@ -157,8 +157,8 @@ execution remain outside the DOC package API.
 | Stylesheet, list templates, list overrides, names, and numbering | ✅ | ✅ | ✅ | STSH/LSTF/LFO/LVLF and related style/list records have typed reading and writer generation. Native attached-glossary stylesheets use record-relative LPStd alignment; local misalignment remains rejected. |
 | Section layout, columns, borders, page/line numbering, and note placement | ✅ | ✅ | ✅ | Section properties are typed and serialized. Semantic section ranges stop at `ccpText`, even when the stored PlcfSed sentinel extends into secondary stories. Native portrait/landscape margin and column edits preserve that sentinel and unrelated properties; pagination and line-breaking calculations are not performed |
 | PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ | Bounded auxiliary tables and state are read and mutated with mandatory/optional emission rules where required |
-| Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ | Typed summary state and checked `PlcfAsumy` ranges support bounded CRUD and exact PLC authoring; Word’s summary algorithm remains inert |
-| Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Editor, Snapshot, Transaction}` owns bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic package CRUD; edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Automatic caption insertion, host activation and macro execution remain outside this metadata owner; bounded operations-layer SEQ refresh is separate |
+| Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ | `Dop97::auto_summary` and `Document::auto_summary()` expose typed state and checked `PlcfAsumy` ranges. Detached `DocumentAutoSummary` edits and `Dop97::write_into` provide bounded record authoring; there is no dedicated AutoSummary package editor. Native-parent tests use the public CFB owner to publish explicit derivatives. Word’s summary algorithm remains inert |
+| Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Edit, Commit, Patch}` and `captions::record::{Snapshot, Edit}` own bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic template package CRUD. The editor requires `fDot`; ordinary DOC edits refuse, and native DOT test derivatives do not establish the host-specific Normal-template role. Edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Automatic caption insertion, host activation and macro execution remain outside this metadata owner; bounded operations-layer SEQ refresh is separate |
 | Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | `parts::smart_tags::{Snapshot, Transaction, Commit, Patch}` adds source-checked bookmark, property-bag, and recognizer-range edits while preserving opaque FIB/table bytes; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
 | Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 | `parts::subdocuments::{Snapshot, Transaction, TablePatch}` owns source-checked, failure-atomic semantic edits, exact table encoders, and package publication with checked FIB pointer relocation for `PlcfWKB`/`SttbFnm`; unrelated table bytes and undefined FNIF/WKB bits remain preserved. Referenced files remain inert and are never opened or followed |
 | Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior; `tracked_revision::{Snapshot, Transaction, Commit, Patch}` adds source-checked binary story edits with reversible snapshots. Native 0x80/0x81 revision toggles share the semantic reader’s flag resolution; valid toggles are not Bool8 repair cases. Native move pairs retain exact CP ranges, author, timestamp and RSID, and both accept/reject routes invert exactly. |
@@ -367,3 +367,15 @@ snapshots and CFB artifacts have separate patch scopes. Object target keys remai
 caller-supplied open policy and are reopened after topology-changing artifact
 replay. These tests partially cover doc-024/doc-032 without claiming native-authored
 Custom XML, schema evaluation, IRM behavior or fresh Word acceptance.
+
+Native-parent caption, envelope and AutoSummary regressions now qualify the
+bounded metadata surfaces. Caption changes preserve native SEQ fields, attached
+glossary and macro streams; invalid label references and UTF-16 limits preserve
+prior staging. Office 6 ANSI and Office 8 Unicode envelopes retain recipients,
+attachments, opaque tails and unknown CLSIDs, with stale/protected/invalid-message
+refusals. Native Asumyi state is inactive and PlcfAsumy absent; explicit priority
+additions use record codecs plus CFB publication. All stages preserve unowned
+stream bytes and directory metadata and pass file reopen/replay/exact inverse.
+Only the selected FIB pairs, appended table ranges and the declared Asumyi
+fields may change. No caption insertion, summarization, mail/attachment action or
+fresh Word validation is performed.
