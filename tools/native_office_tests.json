@@ -9525,6 +9525,101 @@
         "Under a limit admitting every original native part, an exactly bounded XML payload stages successfully. One byte more returns the exact CustomXml PayloadBytes limit with actual/maximum counts without losing the prior payload. The retained change commits/reopens and the native source stays exact."
       ],
       "scope_limit": "Payload admission/atomicity only; output is a library derivative and no application XML semantics are executed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_threaded_comments",
+      "name": "native_xlsb_thread_lifecycle_preserves_cells_legacy_notes_and_chart_tab_order",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-298"
+      ],
+      "assertions": [
+        "Library-authored people/root/reply/mention metadata is added to native worksheet owners, including Sheet2 after a leading chart. Exact Unicode text, timestamps, optional done states, person identities and UTF-16 mention ranges survive publication.",
+        "Reply updates, resolution metadata and person renaming retain part/relationship identities. Removing a referenced person refuses; thread removal, worksheet-part removal and people cleanup preserve native cells, classic notes, drawings, all unowned data and effective graph edges. Each stage saves/reopens, replays and exactly inverts."
+      ],
+      "scope_limit": "These are explicitly library-authored threaded-comment derivatives, not native-authored collaboration specimens. The owner does not contact providers, execute collaboration behavior or generate legacy placeholders."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_threaded_comments",
+      "name": "native_xlsb_invalid_thread_references_preserve_valid_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-298"
+      ],
+      "assertions": [
+        "An exact UTF-16 end boundary is accepted and one unit beyond refuses without losing the valid staged range. Missing text, out-of-range mentions, missing parents/persons and a reply carrying a cell reference return the exact InvalidValue refusal; referenced-people removal also refuses. Prior valid staging remains commit-ready and originals stay exact."
+      ],
+      "scope_limit": "Bounded metadata graph validation only; mention offsets are retained data, not UI notification or identity resolution."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_threaded_comments",
+      "name": "native_xlsb_chart_tab_cannot_own_a_threaded_comment_part",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-298"
+      ],
+      "assertions": [
+        "A native chartsheet part cannot be used as a worksheet threaded-comments owner: commit returns the exact Unrecognized package-graph reason. Reset produces an exact no-op and leaves the source immutable."
+      ],
+      "scope_limit": "This qualifies the actual absolute-part owner boundary rather than confusing worksheet order with physical tab order."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_threaded_comments",
+      "name": "native_xlsx_thread_models_read_on_both_owners_and_survive_ordinary_cell_edits",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-interaction-print.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-220"
+      ],
+      "assertions": [
+        "Explicit people/threaded-comment parts are installed through the public OPC layer on native workbook parents. Eager and source-backed reads retain every model field, reply identity, timestamp, absent/false resolution states and the UTF-16 mention substring Bob after an emoji.",
+        "File reopen preserves parts. Ordinary unprotected cell edits retain comment/person and macro/legacy-note payloads and invert; the protected native worksheet returns EditBlocked(ProtectedSheet) unchanged. All original parts outside the declared graph additions remain exact."
+      ],
+      "scope_limit": "XLSX exposes typed models/codecs and package readers, but no public package-level threaded-comment editor. Raw OPC setup is test construction, not a claimed source-checked thread CRUD API or legacy-placeholder generator. No collaboration service or fresh Excel validation is performed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_threaded_comments",
+      "name": "native_xlsx_mentions_without_text_are_refused_by_model_and_package_readers",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-220"
+      ],
+      "assertions": [
+        "A malformed native-parent comment part with mentions but no text is rejected by eager and source-backed worksheet reads. The model validator and writer return the exact Invalid reason too. An absent text with no mentions remains valid and distinct; originals and malformed source bytes remain unchanged."
+      ],
+      "scope_limit": "The invalid part is an explicit derivative. This fixes a real parser/validator inconsistency without requiring text on every valid comment."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_threaded_comments",
+      "name": "native_xlsx_external_thread_relationships_refuse_without_fetching_targets",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-220"
+      ],
+      "assertions": [
+        "Explicit external persons and threaded-comments relationship derivatives return their precise Invalid errors in both readers before target access. Source artifacts remain unchanged."
+      ],
+      "scope_limit": "Relationship admission only, not provider activation or a general network sandbox guarantee."
     }
   ]
 }

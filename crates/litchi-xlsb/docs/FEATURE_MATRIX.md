@@ -297,3 +297,12 @@ metadata.bin. A scalar insertion preserves those parts and all relationships/ima
 changes only the worksheet and its rebuilt binary index, and passes eager/indexed
 readback, reopen and exact inverse. No public typed XLSB rich-value model is
 inferred.
+
+Native-parent threaded-comment tests now qualify people, root/reply/mention
+lifecycle edits, optional resolution state, part/relationship identity retention,
+UTF-16 ranges, stale/invalid graph refusals and cleanup. Existing classic-note,
+worksheet and drawing payloads remain exact; file reopen/replay/inverse and the
+native chartsheet-owner refusal are checked. xlsb-298 gains partial operation
+coverage from explicitly library-authored additions; there is no identity-provider
+lookup, collaboration execution, automatic legacy-placeholder generation or fresh
+Excel validation.

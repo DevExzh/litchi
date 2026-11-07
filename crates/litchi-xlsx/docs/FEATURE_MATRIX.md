@@ -55,7 +55,7 @@ query, macro, chart, pivot, or external content is executed.
 |---------|--------|------|-------|-------|
 | Hyperlinks | 🟡 | ✅ | 🟡 | Typed internal and external worksheet hyperlinks can be read and edited on existing worksheets through atomic workbook transactions with reversible, source-checked patches. A focused source-backed editor can add, replace, or remove internal links and update external-link metadata while retaining the exact inert target and private relationship identity; publication replaces only the selected worksheet payload and raw-preserves its relationship member and all unselected members. It refuses relationship creation/removal/retargeting, ambiguous or protected owners, stale/foreign closures, changed signed sources, encryption, and unsupported ZIP layouts. Native `xr:uid` revision identities are retained as validated GUIDs through reads and writes; namespace lookalikes, duplicate identity attributes and invalid GUIDs remain errors. New-sheet authoring remains unsupported. |
 | Legacy comments and VML note placeholders | 🟡 | ✅ | ✅ | The contextual `workbook::comments::{snapshot,transaction,patch}` owner provides checked cell/author CRUD for classic notes, exact semantic no-ops, relationship-safe source-checked patches, and inert VML shape-ID retention. VML layout and rendering remain outside the owner. |
-| Threaded comments, persons, and mentions | ✅ | ✅ | ✅ | Threaded comment threads, persons, mentions, replies, legacy placeholders, relationship IDs, and CRUD are supported as metadata; no collaboration service is contacted. |
+| Threaded comments, persons, and mentions | 🟡 | ✅ | 🟡 | Bounded typed models/codecs and eager/source worksheet/workbook readers retain people, roots/replies, mentions, timestamps and resolution metadata. No public package-level threaded-comment edit owner or automatic legacy-placeholder generator is exposed; callers managing parts use the OPC layer. Missing text cannot carry mentions. Classic notes remain a separate owner; no collaboration service is contacted. |
 | [MS-OREACTXML] `commentsExtensible` reactions | N/A | N/A | N/A | [MS-OREACTXML] §§1.3 and 1.5 explicitly bind these extensions to WordprocessingML. Its Word `commentsExtensible` part is not an XLSX part; this corrects the format assignment in the 2026-09-08 gap audit. It does not make a broader claim about Excel-service reaction features. |
 | Data validation | ✅ | ✅ | ✅ | Validation ranges, list/custom/date/time/whole/decimal/text-length rules, formulas, prompts, and error messages are typed and writable within supported schemas. |
 | Conditional formatting | 🟡 | ✅ | 🟡 | Bounded typed parsing covers rules, differential formats, ranges, formulas, color scales, data bars, icon sets, and supported extension forms. A guarded source-backed editor can add, replace, reorder, or clear the complete ordered direct core collection in one existing normal worksheet, with exact patch/inverse and raw-copy publication of unselected members. It refuses x14/MCE-selected or opaque owners, invalid DXF references, protected mutation, stale/foreign closures, changed signed sources, relationship/topology changes, and unsupported ZIP layouts. Conditions are not evaluated. |
@@ -290,3 +290,13 @@ as its relationship/value. Save/reopen, inverse, stale-source and exact payload-
 budget checks pass. Owned relationship/content-type XML may normalize, with complete
 effective-graph and all data-part/unowned-member preservation checked. Additions are
 library derivatives, and schemas are never fetched or executed.
+
+Native-parent threaded-comment regressions now qualify every model field and
+UTF-16 mention ranges through both readers, ordinary cell-edit preservation,
+protected-sheet refusal and external-target admission. A missing text element with
+mentions previously escaped validation in both the parser and model/writer path;
+both now return the same typed Invalid reason. Text remains optional for comments
+without mentions. The historical xlsx-220 authoring status stays unchanged, and
+these explicit derivatives do not claim native collaboration-service acceptance.
+The former blanket package CRUD/legacy-placeholder claim is corrected to match
+the public API; bounded codec authoring is not a package thread transaction.

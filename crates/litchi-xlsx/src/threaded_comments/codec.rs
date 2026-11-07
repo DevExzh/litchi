@@ -474,6 +474,7 @@ fn finish_comment_element(
     let pending = pending
         .take()
         .ok_or_else(|| invalid("missing pending threaded comment"))?;
+    validate_mention_text_presence(&pending.comment)?;
     if let Some(text) = pending.comment.text.as_deref() {
         let text_len = u32::try_from(text.encode_utf16().count())
             .map_err(|_source| invalid("threaded-comment text is too long"))?;
@@ -491,6 +492,13 @@ fn finish_comment_element(
         }
     }
     comments.push(pending.comment);
+    Ok(())
+}
+
+fn validate_mention_text_presence(comment: &Comment) -> SheetResult<()> {
+    if comment.text.is_none() && !comment.mentions.is_empty() {
+        return Err(invalid("threaded-comment has mentions but no text"));
+    }
     Ok(())
 }
 
@@ -822,6 +830,7 @@ pub fn validate_comments(comments: &Comments) -> SheetResult<()> {
             )));
         }
 
+        validate_mention_text_presence(comment)?;
         let text_len = comment
             .text
             .as_deref()
