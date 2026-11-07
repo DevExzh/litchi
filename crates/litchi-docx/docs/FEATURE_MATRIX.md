@@ -410,3 +410,12 @@ required `mc:Ignorable` declaration previously caused supported symbols to be
 removed from semantic projections. Native-parent regressions retain these symbols
 while foreign-namespace lookalikes remain unmodeled. Detached `Run` setters leave
 the containing package unchanged.
+
+Native-parent task-pane tests qualify the public package owner on ordinary and
+macro-enabled sources: two-pane lifecycle, inert provider/binding/custom-function
+metadata, shared snapshot bytes, opaque extension retention, semantic no-op and
+stale/resource-collision refusals. File reopen/replay/inverse retains all data
+parts and complete effective graphs; owned root-relationship/content-type XML may
+normalize during generic replay. Additions are explicit library derivatives, with
+no add-in activation, worksheet binding resolution or fresh Office validation.
+A two-pane budget also proves that a rejected third pane leaves valid staging intact.

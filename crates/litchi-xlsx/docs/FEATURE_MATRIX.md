@@ -300,3 +300,12 @@ without mentions. The historical xlsx-220 authoring status stays unchanged, and
 these explicit derivatives do not claim native collaboration-service acceptance.
 The former blanket package CRUD/legacy-placeholder claim is corrected to match
 the public API; bounded codec authoring is not a package thread transaction.
+
+Native-parent task-pane tests qualify the public package owner on ordinary and
+macro-enabled sources: two-pane lifecycle, inert provider/binding/custom-function
+metadata, shared snapshot bytes, opaque extension retention, semantic no-op and
+stale/resource-collision refusals. File reopen/replay/inverse retains all data
+parts and complete effective graphs; owned root-relationship/content-type XML may
+normalize during generic replay. Additions are explicit library derivatives, with
+no add-in activation, worksheet binding resolution or fresh Office validation.
+The same lifecycle also runs on the native Strict workbook.

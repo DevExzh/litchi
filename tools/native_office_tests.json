@@ -9620,6 +9620,159 @@
         "Explicit external persons and threaded-comments relationship derivatives return their precise Invalid errors in both readers before target access. Source artifacts remain unchanged."
       ],
       "scope_limit": "Relationship admission only, not provider activation or a general network sandbox guarantee."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_docx_task_pane_lifecycle_preserves_native_parts_and_shared_snapshots",
+      "fixtures": [
+        "word/word-visual-objects.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-088",
+        "docx-129"
+      ],
+      "assertions": [
+        "Native parents begin without task panes. Explicit typed additions retain catalog/fallback references, bindings, Unicode properties, pane position/width/visibility/locking, frozen state, inert external snapshot links and custom-function/background-runtime metadata. Omitted containsCustomFunctions val has schema-effective false.",
+        "Where the parent contains a PNG, its bytes are copied into a new image part shared by both added panes. Removing one pane retains that shared payload; final cleanup removes it and restores the original member catalog. Native body/worksheet/slide, macro, media and other data parts remain exact throughout, and their effective relationship/content-type graphs are preserved.",
+        "File save/reopen, semantic no-op, stale patch refusal, forward replay and inverse pass at each lifecycle stage. Scalar updates retain part/relationship identities and opaque extension bytes. All data-part bytes and member keys are checked on replay/inverse; only the owned root relationship and content-type XML may normalize, with complete effective graph equality required."
+      ],
+      "scope_limit": "Library-authored derivatives of immutable native parents, not native-authored add-in specimens or fresh Office validation. Task panes, references, custom-function IDs and runtime metadata remain inert. No host UI, provider access, worksheet range-binding behavior, custom-function evaluation or add-in activation is inferred."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_docx_task_pane_resource_collision_preserves_valid_staging",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-088",
+        "docx-129"
+      ],
+      "assertions": [
+        "After valid task panes are staged, an attempt to take ownership of an existing native PNG part returns the precise shared Invalid reason even when its payload matches. Earlier valid staging still commits/reopens/replays/inverts, every native data part/effective graph is retained, and source files remain unchanged."
+      ],
+      "scope_limit": "This qualifies the public task-pane package owner resource boundary; it does not grant ownership of arbitrary native image parts."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_pptx_task_pane_lifecycle_preserves_native_parts_and_shared_snapshots",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm"
+      ],
+      "feature_rows": [
+        "pptx-436"
+      ],
+      "assertions": [
+        "Native parents begin without task panes. Explicit typed additions retain catalog/fallback references, bindings, Unicode properties, pane position/width/visibility/locking, frozen state, inert external snapshot links and custom-function/background-runtime metadata. Omitted containsCustomFunctions val has schema-effective false.",
+        "Where the parent contains a PNG, its bytes are copied into a new image part shared by both added panes. Removing one pane retains that shared payload; final cleanup removes it and restores the original member catalog. Native body/worksheet/slide, macro, media and other data parts remain exact throughout, and their effective relationship/content-type graphs are preserved.",
+        "File save/reopen, semantic no-op, stale patch refusal, forward replay and inverse pass at each lifecycle stage. Scalar updates retain part/relationship identities and opaque extension bytes. All data-part bytes and member keys are checked on replay/inverse; only the owned root relationship and content-type XML may normalize, with complete effective graph equality required."
+      ],
+      "scope_limit": "Library-authored derivatives of immutable native parents, not native-authored add-in specimens or fresh Office validation. Task panes, references, custom-function IDs and runtime metadata remain inert. No host UI, provider access, worksheet range-binding behavior, custom-function evaluation or add-in activation is inferred."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_pptx_task_pane_resource_collision_preserves_valid_staging",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-436"
+      ],
+      "assertions": [
+        "After valid task panes are staged, an attempt to take ownership of an existing native PNG part returns the precise shared Invalid reason even when its payload matches. Earlier valid staging still commits/reopens/replays/inverts, every native data part/effective graph is retained, and source files remain unchanged."
+      ],
+      "scope_limit": "This qualifies the public task-pane package owner resource boundary; it does not grant ownership of arbitrary native image parts."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_xlsx_task_pane_lifecycle_preserves_native_parts_and_shared_snapshots",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-255",
+        "xlsx-261"
+      ],
+      "assertions": [
+        "Native parents begin without task panes. Explicit typed additions retain catalog/fallback references, bindings, Unicode properties, pane position/width/visibility/locking, frozen state, inert external snapshot links and custom-function/background-runtime metadata. Omitted containsCustomFunctions val has schema-effective false.",
+        "Where the parent contains a PNG, its bytes are copied into a new image part shared by both added panes. Removing one pane retains that shared payload; final cleanup removes it and restores the original member catalog. Native body/worksheet/slide, macro, media and other data parts remain exact throughout, and their effective relationship/content-type graphs are preserved.",
+        "File save/reopen, semantic no-op, stale patch refusal, forward replay and inverse pass at each lifecycle stage. Scalar updates retain part/relationship identities and opaque extension bytes. All data-part bytes and member keys are checked on replay/inverse; only the owned root relationship and content-type XML may normalize, with complete effective graph equality required."
+      ],
+      "scope_limit": "Library-authored derivatives of immutable native parents, not native-authored add-in specimens or fresh Office validation. Task panes, references, custom-function IDs and runtime metadata remain inert. No host UI, provider access, worksheet range-binding behavior, custom-function evaluation or add-in activation is inferred."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_xlsx_task_pane_resource_collision_preserves_valid_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-255",
+        "xlsx-261"
+      ],
+      "assertions": [
+        "After valid task panes are staged, an attempt to take ownership of an existing native PNG part returns the precise shared Invalid reason even when its payload matches. Earlier valid staging still commits/reopens/replays/inverts, every native data part/effective graph is retained, and source files remain unchanged."
+      ],
+      "scope_limit": "This qualifies the public task-pane package owner resource boundary; it does not grant ownership of arbitrary native image parts."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_xlsb_task_pane_lifecycle_preserves_native_parts_and_shared_snapshots",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-326"
+      ],
+      "assertions": [
+        "Native parents begin without task panes. Explicit typed additions retain catalog/fallback references, bindings, Unicode properties, pane position/width/visibility/locking, frozen state, inert external snapshot links and custom-function/background-runtime metadata. Omitted containsCustomFunctions val has schema-effective false.",
+        "Where the parent contains a PNG, its bytes are copied into a new image part shared by both added panes. Removing one pane retains that shared payload; final cleanup removes it and restores the original member catalog. Native body/worksheet/slide, macro, media and other data parts remain exact throughout, and their effective relationship/content-type graphs are preserved.",
+        "File save/reopen, semantic no-op, stale patch refusal, forward replay and inverse pass at each lifecycle stage. Scalar updates retain part/relationship identities and opaque extension bytes. All data-part bytes and member keys are checked on replay/inverse; only the owned root relationship and content-type XML may normalize, with complete effective graph equality required."
+      ],
+      "scope_limit": "Library-authored derivatives of immutable native parents, not native-authored add-in specimens or fresh Office validation. Task panes, references, custom-function IDs and runtime metadata remain inert. No host UI, provider access, worksheet range-binding behavior, custom-function evaluation or add-in activation is inferred."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_xlsb_task_pane_resource_collision_preserves_valid_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-326"
+      ],
+      "assertions": [
+        "After valid task panes are staged, an attempt to take ownership of an existing native PNG part returns the precise shared Invalid reason even when its payload matches. Earlier valid staging still commits/reopens/replays/inverts, every native data part/effective graph is retained, and source files remain unchanged."
+      ],
+      "scope_limit": "This qualifies the public task-pane package owner resource boundary; it does not grant ownership of arbitrary native image parts."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_task_panes",
+      "name": "native_docx_task_pane_limit_refusal_keeps_prior_valid_staging",
+      "fixtures": [
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-088",
+        "docx-129"
+      ],
+      "assertions": [
+        "A two-item budget accepts the complete two-pane graph and refuses a third pane with the exact typed Web(TaskPaneItems) limit, maximum 2 and observed 3. The previous graph remains commit-ready and reopens with exactly two panes; every unowned member including the VBA project remains exact."
+      ],
+      "scope_limit": "Resource admission and valid-staging preservation only; the generated metadata remains inert and has no native-app acceptance claim."
     }
   ]
 }

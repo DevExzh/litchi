@@ -306,3 +306,11 @@ native chartsheet-owner refusal are checked. xlsb-298 gains partial operation
 coverage from explicitly library-authored additions; there is no identity-provider
 lookup, collaboration execution, automatic legacy-placeholder generation or fresh
 Excel validation.
+
+Native-parent task-pane tests qualify the public package owner on ordinary and
+macro-enabled sources: two-pane lifecycle, inert provider/binding/custom-function
+metadata, shared snapshot bytes, opaque extension retention, semantic no-op and
+stale/resource-collision refusals. File reopen/replay/inverse retains all data
+parts and complete effective graphs; owned root-relationship/content-type XML may
+normalize during generic replay. Additions are explicit library derivatives, with
+no add-in activation, worksheet binding resolution or fresh Office validation.
