@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "953e19055e64b86cd9e6fe53f46066215e833b5e",
+  "base_commit": "9c51600a67513596a8b9da02c368e18c8f040271",
+  "problem": "A native Word settings typed-codec round trip lost the Word 2012 source-document ID: Extensions::to_xml declared a namespace on the first child and incorrectly reused that declaration for later siblings. The later w15:docId had an unbound prefix and reparsed as opaque unknown XML. Native settings/compatibility/OpenType scopes and two purported bounded extension-evidence rows also lacked current tests.",
+  "changes": [
+    "Reset namespace emission state for every serialized settings-extension child. Each sibling now binds the namespaces used by its element and attributes without relying on another sibling.",
+    "Add five positive native tests across DOCX/DOTX/DOCM/DOTM settings and macro-run OpenType metadata, plus one independent sibling-namespace unit regression.",
+    "Audit every XML part in all 24 Word OOXML manifest files, explicitly decrypting the encrypted native document. Record separate fixture gaps for docx-093 run effects and docx-097 SDT extension controls/data bindings. The audit never counts absence as semantic feature coverage.",
+    "Update the coverage index and feature matrix, including correction of stale OpenType Transaction/Commit/Patch documentation: the current API has immutable snapshots and detached Run::set_open_type, while managed runs reject detached mutation. Document settings uses the actual Edit API.",
+    "Generalize the evidence-review accounting assertion to require the unchanged historical status of each reviewed row, so both previously verified and pending authoring rows can receive evidence corrections without being promoted."
+  ],
+  "verification_scope": {
+    "native_settings_reads": "word-math-navigation.docx/.dotx retain paragraph context ID 0x338555C9; word-recorded-macro.docm/.dotm retain 0x1EB37E66. The document variants have source GUIDs {AA7E02D1-2356-234F-B79F-09B57E04FCB0} and {AE65EE72-34DD-E848-9C96-D70156049F27}; their template variants lack the source-ID element. Chart tracking is present with omitted val (default on), distinct from absent conflict/image metadata. Native mathPr remains an opaque settings child and unchanged commits retain original ZIP bytes.",
+    "compatibility": "All four variants expose the same six ordered name/URI/value triples under http://schemas.microsoft.com/office/word, including compatibilityMode=15, enableOpenTypeFeatures=1 and useWord2013TrackBottomHyphenation=0. Wrong-URI lookup does not alias the known name. A detached Settings codec derivative changes the mode to 14, removes enableOpenTypeFeatures and adds an escaped arbitrary triple while retaining all typed extensions and the native source GUID.",
+    "settings_crud": "Update context ID, source GUID and chart tracking; add conflict mode, image-editing discard metadata and DPI 144. Invalid IDs 0, 0x80000000 and u32::MAX return the precise typed Invalid error and retain earlier staged values. Removal of native ID/chart families and reset are tested independently. These new values are Litchi-authored derivatives of native inputs.",
+    "source_preservation_and_replay": "Only word/settings.xml changes. Removing the owned extension ranges from source/output leaves exactly equal XML bytes, including the root declarations, MCE directives, compatibility records and math properties. All other package members, including macros, relationships, templates and content types, remain exact. File save/reopen, retained forward replay, stale forward-patch rejection and complete member inverse pass across four variants.",
+    "opentype": "Every one of five body runs in each native DOCM/DOTM explicitly declares ligatures=none, while number form/spacing, contextual alternatives and stylistic sets are absent. A detached copy of the bold MACRO_FORMAT_TARGET run accepts ligature, number form, number spacing, stylistic-set and contextual-alternate edits, then restoration. Text, bold, fonts and every XML byte outside the owned OpenType children remain exact. Original snapshots and packages remain unchanged; no package-level OpenType publication is claimed.",
+    "namespace_regression": "All six typed extension siblings are independently namespace-resolved with no enclosing bindings to mask missing declarations. Element and non-xmlns attribute prefixes must resolve. Complete typed reparse matches under word prefixes w, word and the default empty-prefix argument.",
+    "evidence_review": "All 24 native Word OOXML files, including one Agile-encrypted DOCX opened with its recorded fixture password, lack the seven w14 run-effect elements and the reviewed w14 checkbox/entityPicker, w15 repeatingSection/repeatingSectionItem/appearance/color/dataBinding and core dataBinding elements. Positive neighboring checks find nine macro-document ligature records (five runs and four paragraph-mark records), three legacy ffData controls and three WordprocessingShape graphics. These are distinct features and do not qualify either missing row.",
+    "specification_basis": "Read-only research used MS-DOCX 2.2.1-2.2.3, compatibility-setting definitions in 2.3, and the Word 2010/2012 schemas in 5.1/5.2. It confirmed the effect/control families, including the Word 2010 entityPicker namespace. No code or test references the research checkout.",
+    "limits": "Native runs evidence explicit no-ligature metadata, not rendered OpenType behavior or every authored feature. Compatibility metadata does not implement Word layout. No chart refresh, image processing, macro execution, SDT activation, fresh Word reopen or native UI validation was performed. Direct native run-effect and SDT-extension specimens remain required; their historical pending status is unchanged."
+  },
+  "results": {
+    "new_native_semantic_tests": 5,
+    "new_native_evidence_audits": 1,
+    "new_unit_regressions": 1,
+    "docx_all_features_passed": 2432,
+    "ops_passed": 205,
+    "facade_passed": 21,
+    "rust_passed": 2658,
+    "rust_ignored": 0,
+    "python_passed": 75,
+    "count_note": "Totals sum owner, operations and facade suites. The six-test final native run overlaps the owner suite and is excluded from the total. The final native rerun and Clippy also cover the audit's Word 2010 entityPicker namespace correction. Runtime production code was unchanged after the full suite.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 290,
+      "indexed_tests": 392,
+      "reviewed_native_fixture_gaps": 6,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 290,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 30,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 41,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_native_fixture_gap_requires_followup": 6,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-full.log",
+        "bytes": 246707,
+        "sha256": "6623ea6de03ccb732e4f4c47434a7e86549c147cd104ac210256e91db5a9fc67"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-full.log 2>&1",
+      "suites": 88,
+      "passed": 2432,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-ops.log",
+        "bytes": 36662,
+        "sha256": "55981928e72f62b1bb220655ac8ff5b3f80d07de170a641f398639be743d4693"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-ops.log 2>&1",
+      "suites": 20,
+      "passed": 205,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-facade.log",
+        "bytes": 19664,
+        "sha256": "f0cd92b6b7b31cfb16c4334db27df4dd12763fddd0b0bd7f6a6d6925d60916ee"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-clippy.log",
+        "bytes": 18177,
+        "sha256": "ea8746cab6f3eca76974b2cb5f3c20967b81995805aad0bcef010aaaadb21481"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-clippy.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_extensions --test microsoft_office_native_evidence_review --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-final.log",
+        "bytes": 19245,
+        "sha256": "13e77ea7608eae810ea7354eefb4d11efc0c9c288239d18bd6085d0739f6aefd"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_extensions --test microsoft_office_native_evidence_review --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-final.log 2>&1",
+      "suites": 2,
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "overlaps_full_suite": true
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-python.log",
+        "bytes": 667,
+        "sha256": "9e3cc53a0c787555e4678d85033c178df9d74d2fbe2e95a5b306472747798cda"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-extensions-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-coverage.json",
+        "bytes": 964089,
+        "sha256": "ef5d01ae5e2e6421a3eed715863e35da0e5e376c8fcb7d61f69720b1251adf0e"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-coverage.json 2>&1"
+    }
+  ],
+  "initial_reproduction": {
+    "artifact": {
+      "file_name": "native-docx-extensions-reproduction.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-extensions-reproduction.log",
+      "bytes": 33834,
+      "sha256": "16727c6bbaabb97b49615f6c6c5ef0a523b387146e3b49e57d8e7b207996e1e5"
+    },
+    "note": "Before the fix, the native compatibility typed-codec round trip retained w15:docId only as Unknown instead of DocumentId::Source because its namespace declaration was scoped to a preceding sibling. The permanent test keeps the full typed-extension equality assertion."
+  },
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check and git diff --check/staged checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit; both added source files have mode 100644 and no executable was staged.",
+    "The three pre-existing untracked hashes remain unchanged. All 139 corpus fixtures and four import assets pass the corpus integrity checks.",
+    "Clippy passed with -D warnings. Existing vendor warnings remain: zlib-rs 77 and allsorts 3."
+  ],
+  "goal_status": "active; 290 of 494 feature rows have partial semantic assertions, 392 tests are indexed and six reviewed fixture gaps remain explicit. Remaining operation/bounded/UI/external/unsupported and partial-scope reviews still require work."
+}
