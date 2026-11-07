@@ -472,7 +472,14 @@ impl RecordCommit {
 }
 
 fn validate_candidate(candidate: &ClientData, limits: ClientDataLimits) -> Result<()> {
-    candidate.validate_with_limits(limits)
+    // The source snapshot has already passed wire validation. A candidate
+    // grammar failure describes the requested edit, not corrupt input bytes.
+    candidate
+        .validate_with_limits(limits)
+        .map_err(|error| match error {
+            Error::Corrupted(message) => Error::InvalidFormat(message),
+            error => error,
+        })
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

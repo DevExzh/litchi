@@ -348,6 +348,42 @@
         "crates/litchi-xls/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Fixture-profile evidence only, never positive semantic coverage or a claim that User Names is generally unsupported. Native bytes and historical authoring classifications remain unchanged; a conforming native user-log specimen remains required."
+    },
+    {
+      "feature_row": "ppt-355",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "Ordinary pictures and native text bullets do not establish a BlipCollection9 picture-bullet owner. The current package editor requires an existing collection.",
+      "required_evidence": "A native PPT with a BlipCollection9/BlipEntity9 collection and text-style picture-bullet references, including an unreferenced entry or a supported reference-removal scenario for CRUD.",
+      "observed_evidence": "All 11 binary PowerPoint manifest fixtures, including explicit read-only decryption of the encrypted PPT, have no live picture-bullet collection. Document binary tags contain neither collection nor entry records. The ten unencrypted packages refuse removal from the absent owner and retain exact bytes on no-op publication.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_powerpoint_corpus_has_no_picture_bullet_collections",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/residual-coverage-audit.json",
+        "crates/litchi-ppt/src/picture_bullets/edit.rs",
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Evidence-only corpus gap: absence/refusal does not qualify native picture-bullet semantics or declare the implemented codecs unsupported. Native collection and dependency fixtures remain needed; no source files or historical status are changed."
     }
   ]
 }

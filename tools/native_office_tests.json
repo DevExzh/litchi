@@ -7946,6 +7946,110 @@
         "Existing relationship IDs and part names are refused atomically; native media still has exactly its original single descriptor, and inverse restores every original member."
       ],
       "scope_limit": "Related caption-part creation is distinct from attaching a descriptor or replacing an existing track. Added caption is an inert Litchi derivative; no player selection or native validation."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_record_metadata",
+      "name": "native_custom_table_style_records_distinguish_populated_and_empty_packages",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-344"
+      ],
+      "assertions": [
+        "Live custom-table-style atoms occur before EndDocument, with version 0 and exact native OPC payloads. Text/table has a 2393-byte package containing Medium Style 2 - Accent 1; the other three have 1986-byte empty lists with the same default style GUID.",
+        "Typed package validation exposes one tableStyles.xml part; physical member names, style ID/name, exact payload and no-op replacement are pinned."
+      ],
+      "scope_limit": "Record placement and embedded package/read evidence only; empty style-list presence is distinct from populated styles. No effective table-style resolution or rendering."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_record_metadata",
+      "name": "native_table_style_atom_move_remove_insert_keeps_live_catalog_and_every_other_owner",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.ppt"
+      ],
+      "feature_rows": [
+        "ppt-344"
+      ],
+      "assertions": [
+        "Move the native atom after EndDocument, remove it and reinsert it before EndDocument through save/reopen; typed live-document discovery follows every change.",
+        "Duplicate insertion and repeated removal have exact typed refusals. Existing stream prefixes, unrelated CFB streams, every other Document child and all slide records remain exact; no-op, forward/stale replay and inverse are checked."
+      ],
+      "scope_limit": "Bounded record-envelope lifecycle; the publisher does not validate effective custom-style dependencies or render styles. All outputs are library derivatives."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_record_metadata",
+      "name": "native_table_style_payload_replacement_uses_a_valid_native_donor_and_rejects_bad_envelopes",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-text-table.ppt"
+      ],
+      "feature_rows": [
+        "ppt-344"
+      ],
+      "assertions": [
+        "Replace the modern-media empty-list atom with the complete native text/table style package; typed readback and payload digest match the donor exactly.",
+        "A malformed atom header fails with InvalidValue without losing the staged donor. Save/reopen preserves all other live Document children, slide records and unrelated streams, and inverse restores original bytes."
+      ],
+      "scope_limit": "Passive valid-native payload replacement only; no style application, full dependency resolution or fresh PowerPoint acceptance."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_record_metadata",
+      "name": "native_text_language_and_spelling_defaults_round_trip_without_claiming_outline_bodies",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-354"
+      ],
+      "assertions": [
+        "Native default text special information is exactly language 0x0409, alternate language 0 and both spelling flags false; its ten-byte payload and full record serialization match the source.",
+        "All four fixtures have nonempty slide text but no outline references or slide-list outline bodies; source archives remain exact."
+      ],
+      "scope_limit": "Native language/spelling default read and detached serialization only. Outline-body binding, language mutation, spell checking and the other text-extension subfamilies remain unqualified by this test."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_record_metadata",
+      "name": "native_client_data_reads_exact_placeholder_roundtrip_and_external_object_children",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-357"
+      ],
+      "assertions": [
+        "Native title client data has exact Placeholder/ProgrammableTags/RoundTripShapeId12 order, placeholder bytes, 58-byte tags and original shape ID 2, with exact snapshot codec parity.",
+        "Audio/OLE shapes retain external IDs 4/5 and round-trip shape ID 3; navigation header/footer placeholders retain IDs 7/9/8. No-op publication is exact."
+      ],
+      "scope_limit": "Selected top-level native shape metadata only; external payloads stay inert, and cross-format reconstruction, activation and rendering are not claimed."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_record_metadata",
+      "name": "native_client_data_opaque_child_crud_is_atomic_and_preserves_every_other_record",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.ppt"
+      ],
+      "feature_rows": [
+        "ppt-357"
+      ],
+      "assertions": [
+        "A Litchi-authored opaque child is appended, replaced and removed on the native title shape; file reopen and exact native child order/payloads are verified.",
+        "Duplicate known-child insertion is an InvalidValue refusal and invalid removal is NotFound, both retaining prior staged work. Every other drawing leaf, slide record, Document record and unrelated CFB stream remains exact; stale replay, forward/inverse and no-op are checked."
+      ],
+      "scope_limit": "Inert ordered client-data editing; the new opaque payload is a library derivative. Known metadata interpretation is covered separately, and no opaque semantics, execution or native application validation is inferred."
     }
   ]
 }

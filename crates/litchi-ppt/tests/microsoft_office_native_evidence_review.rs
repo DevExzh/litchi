@@ -140,3 +140,77 @@ fn native_binary_powerpoint_corpus_lacks_advisor_flags_and_smart_tag_stores() {
     }
     assert_eq!((files, encrypted, navigation), (11, 1, true));
 }
+
+#[cfg(feature = "encryption")]
+#[test]
+fn native_binary_powerpoint_corpus_has_no_picture_bullet_collections() {
+    use litchi_ppt::{OpenOptions, ProgTag};
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/microsoft-office");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("manifest.json")).unwrap()).unwrap();
+    let mut files = 0;
+    let mut encrypted = 0;
+    let mut editable = 0;
+    for item in manifest["files"].as_array().unwrap() {
+        let name = item["path"].as_str().unwrap();
+        if !name.starts_with("powerpoint/")
+            || !matches!(
+                std::path::Path::new(name)
+                    .extension()
+                    .and_then(|v| v.to_str()),
+                Some("ppt" | "pps" | "pot")
+            )
+        {
+            continue;
+        }
+        let bytes = std::fs::read(root.join(name)).unwrap();
+        let protected = name == "powerpoint/powerpoint-encrypted.ppt";
+        let p = if protected {
+            encrypted += 1;
+            Package::from_bytes_with_options(
+                &bytes,
+                OpenOptions::new().password("OfficeFixture42!"),
+            )
+            .unwrap()
+        } else {
+            Package::from_bytes(&bytes).unwrap()
+        };
+        let view = p.presentation().unwrap();
+        assert!(view.slide_count() > 0);
+        assert!(
+            view.picture_bullets().unwrap().is_none(),
+            "{name}: new native picture-bullet evidence; revise this audit"
+        );
+        let tags = view.programmable_tags().unwrap().unwrap();
+        for tag in &tags.tags {
+            if let ProgTag::Binary(tag) = tag {
+                let records = tag.records().unwrap();
+                for record in &records {
+                    assert_ne!(record.record_type, RecordType::BlipCollection9, "{name}");
+                    assert_ne!(record.record_type, RecordType::BlipEntity9Atom, "{name}");
+                }
+            }
+        }
+        if !protected {
+            let mut edit = p.edit_picture_bullets().unwrap();
+            assert!(edit.picture_bullets().unwrap().is_none());
+            assert!(
+                matches!(edit.remove_picture_bullet(0),Err(litchi_ppt::picture_bullets::Error::Refused(ref r)) if r.kind()==RefusalKind::UnsupportedTarget)
+            );
+            edit.reorder_picture_bullets(&[]).unwrap();
+            assert!(edit.changes().unwrap().is_empty());
+            assert!(edit.commit().unwrap().package().to_bytes().unwrap() == bytes);
+            assert!(p.to_bytes().unwrap() == bytes);
+            editable += 1;
+        } else {
+            assert!(matches!(
+                p.to_bytes(),
+                Err(litchi_ppt::package::Error::EncryptionPolicy)
+            ));
+        }
+        assert!(std::fs::read(root.join(name)).unwrap() == bytes);
+        files += 1;
+    }
+    assert_eq!((files, encrypted, editable), (11, 1, 10));
+}

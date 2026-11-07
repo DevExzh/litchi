@@ -583,3 +583,37 @@ fn package_client_data_edits_admit_a_signed_package_and_refuse_a_changed_commit(
     assert!(matches!(edit.commit(), Err(super::Error::Signed)));
     assert_eq!(signed.to_bytes().unwrap(), bytes);
 }
+
+#[test]
+fn duplicate_candidate_is_an_invalid_value_but_duplicate_source_remains_corrupt() {
+    use crate::text_edit::Target;
+    use litchi_core::{Position, edit::RefusalKind};
+
+    let wire = child(0, 0, ClientDataChildKind::ShapeFlags10, &[4]);
+    let mut duplicate = wire.clone();
+    duplicate.extend_from_slice(&wire);
+    assert!(matches!(
+        super::Snapshot::parse(container(&duplicate), &ClientDataLimits::default()),
+        Err(crate::package::Error::Corrupted(_))
+    ));
+
+    let (source, bytes) = package_with_client_data();
+    let mut edit = source
+        .edit_client_data(Target::new(Position::new(0), Position::new(0)))
+        .unwrap();
+    let original = edit.children().unwrap()[0].clone();
+    edit.insert(
+        0,
+        ClientDataChild::new(ClientDataChildKind::ShapeFlags, vec![1]).unwrap(),
+    )
+    .unwrap();
+    let staged = edit.children().unwrap().to_vec();
+    let Err(super::Error::Refused(refusal)) = edit.append(original) else {
+        panic!("invalid candidate must be a typed refusal");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::InvalidValue);
+    assert_eq!(edit.children().unwrap(), staged);
+    assert_eq!(edit.changes().unwrap().len(), 1);
+    assert!(edit.commit().unwrap().diagnostics().changed());
+    assert_eq!(source.to_bytes().unwrap(), bytes);
+}
