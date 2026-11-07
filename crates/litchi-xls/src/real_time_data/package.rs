@@ -4,8 +4,8 @@ use super::codec::{
     CONTINUE_FRT_RECORD_TYPE, FRT_HEADER_LEN, MAX_LOGICAL_PAYLOAD_BYTES, MAX_STRING_CHARACTERS,
     MAX_TOPIC_SEGMENTS, MIN_PREFIXED_TOPIC_SEGMENTS, MIN_TOPIC_SEGMENTS, Payload,
     REAL_TIME_DATA_RECORD_TYPE, RTD_E_ITEM_LEN, RTD_OPER_BOOLEAN, RTD_OPER_ERROR, RTD_OPER_INTEGER,
-    RTD_OPER_LONG_TEXT, RTD_OPER_NUMBER, RTD_OPER_SHORT_TEXT, biff_char_count, invalid,
-    join_segments, parse_rtd_oper, parse_segmented_topic, read_u16, read_u32, write_chars,
+    RTD_OPER_LONG_TEXT, RTD_OPER_NUMBER, RTD_OPER_SHORT_TEXT, biff_char_count, continuation_data,
+    invalid, join_segments, parse_rtd_oper, parse_segmented_topic, read_u16, read_u32, write_chars,
     write_segmented_topic,
 };
 use super::model::{Cell, Record, UnknownRecord, Value};
@@ -68,14 +68,12 @@ impl Package {
                 if continuation.record_type != CONTINUE_FRT_RECORD_TYPE {
                     break;
                 }
-                let continuation_len = continuation
-                    .payload_end
-                    .checked_sub(continuation.payload_start)
-                    .ok_or_else(|| invalid("ContinueFrt payload span is inverted"))?;
+                let continued = continuation_data(continuation.payload(bytes))?;
+                let continuation_len = continued.len();
                 logical_payload
                     .try_reserve(continuation_len)
                     .map_err(|_error| Error::Allocation("assembling RealTimeData continuations"))?;
-                logical_payload.extend_from_slice(continuation.payload(bytes));
+                logical_payload.extend_from_slice(continued);
                 end_record = end_record
                     .checked_add(1)
                     .ok_or_else(|| invalid("RealTimeData continuation span overflows"))?;
@@ -184,7 +182,7 @@ impl Package {
 
 impl Record {
     /// Parse one logical `RealTimeData` payload: the record body with any
-    /// `ContinueFrt` bodies already appended.
+    /// `ContinueFrt` data already appended, excluding each `FrtHeaderOld`.
     ///
     /// `previous_topic` is the reconstructed [`Record::topic`] of
     /// the preceding `RealTimeData` record in the globals substream, needed
@@ -263,19 +261,33 @@ impl Record {
                 .ok_or_else(|| invalid("first RealTimeData record declares a shared prefix"))?;
             let prefix_len = usize::try_from(common_prefix_len)
                 .map_err(|_error| invalid("RealTimeData ichSamePrefix overflows"))?;
-            if prefix_len > previous.chars().count() {
+            let mut units = 0;
+            let mut prefix_end = 0;
+            for character in previous.chars() {
+                if units == prefix_len {
+                    break;
+                }
+                units += character.len_utf16();
+                if units > prefix_len {
+                    return Err(invalid(
+                        "RealTimeData ichSamePrefix splits a UTF-16 surrogate pair",
+                    ));
+                }
+                prefix_end += character.len_utf8();
+            }
+            if units != prefix_len {
                 return Err(invalid(
                     "RealTimeData ichSamePrefix exceeds the previous topic",
                 ));
             }
-            let capacity = prefix_len
+            let capacity = prefix_end
                 .checked_add(stored.len())
                 .ok_or_else(|| invalid("reconstructed RealTimeData topic length overflows"))?;
             let mut topic = String::new();
             topic
                 .try_reserve(capacity)
                 .map_err(|_error| Error::Allocation("reconstructing RealTimeData topic"))?;
-            topic.extend(previous.chars().take(prefix_len));
+            topic.push_str(&previous[..prefix_end]);
             topic.push_str(&stored);
             topic
         };

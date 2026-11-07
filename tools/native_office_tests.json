@@ -10894,6 +10894,85 @@
         "Explicit StwUser derivatives recognize Sign/SigAgile/SigV3, retain WordSigBlob signature/certificate bytes and padding, and ignore an unrelated variable. Duplicate names produce the exact deferred error while body text remains readable; FIB/table and CFB inverse are exact."
       ],
       "scope_limit": "Raw public CFB publication seeds storage-reader derivatives. This is not a dedicated StwUser signature editor or a cryptographic signing operation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_rtd_phonetic",
+      "name": "native_xls_rtd_continuation_headers_and_cached_values_read_without_refresh",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-174"
+      ],
+      "assertions": [
+        "Independent ContinueFrt frames with unused header flags reconstruct exact Unicode topics, long cached text and subscriber coordinates. Identical edits preserve bytes; value replacement, failed staging and removal replay/invert while preserving unrelated records, streams, directory metadata and native cells."
+      ],
+      "scope_limit": "Explicit inert RTD derivatives on native parents; detached record edits require caller-managed Workbook offset relocation and public CFB publication. No package RTD editing or provider refresh is inferred."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_rtd_phonetic",
+      "name": "native_xls_rtd_shared_prefix_uses_utf16_units_and_rejects_half_surrogates",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-174"
+      ],
+      "assertions": [
+        "Shared topic prefixes count UTF-16 units, reconstruct exact non-BMP topic text and cached Boolean/number values, and reject a prefix that splits a surrogate pair with the exact typed error."
+      ],
+      "scope_limit": "Independent library-authored RTD records on a native parent; no RTD server invocation or producer-authored RTD evidence."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_rtd_phonetic",
+      "name": "native_xls_rtd_authoring_emits_real_continuefrt_headers",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-174"
+      ],
+      "assertions": [
+        "Detached RTD authoring and the fresh workbook builder emit the mandatory four-byte FrtHeaderOld in continuation frames. Long cached text survives native-parent publication, save/reopen, exact patch replay/inverse and unrelated stream preservation."
+      ],
+      "scope_limit": "Library-authored inert metadata; detached RTD edits use explicit CFB publication with caller-managed offset repair. No dedicated package RTD editor or external provider refresh."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_rtd_phonetic",
+      "name": "native_xls_rtd_malformed_continuation_headers_are_not_interpreted_as_topic_bytes",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-174"
+      ],
+      "assertions": [
+        "Wrong continuation record echoes and forbidden reference flags produce exact InvalidRecord errors; the source native workbook remains byte-identical."
+      ],
+      "scope_limit": "Malformed derivatives test bounded continuation parsing, not native producer behavior or RTD execution."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_rtd_phonetic",
+      "name": "native_xls_phonetic_info_continuations_survive_ordinary_cell_publication",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-171"
+      ],
+      "assertions": [
+        "Builder-authored Hiragana/center metadata with 4000 ranges and unused format bits survives native-parent attachment, typed reads and an ordinary cell insertion with exact continued phonetic frames, unrelated streams and patch inverse."
+      ],
+      "scope_limit": "Explicit library-authored phonetic derivatives use public CFB setup. No native phonetic specimen, opened-workbook phonetic setter or phonetic rendering is claimed."
     }
   ]
 }

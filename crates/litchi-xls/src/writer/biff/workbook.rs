@@ -327,20 +327,23 @@ pub(super) fn write_real_time_data<W: Write>(
     value: &crate::real_time_data::Record,
 ) -> Result<()> {
     let payload = value.to_payload()?;
-    let mut chunks = payload.chunks(MAX_RECORD_DATA);
-    let first = chunks.next().expect("RTD payload is never empty");
+    let first_len = payload.len().min(MAX_RECORD_DATA);
+    let first = &payload[..first_len];
     write_record_header(
         writer,
         crate::real_time_data::REAL_TIME_DATA_RECORD_TYPE,
         crate::utils::truncate_usize_to_u16(first.len()),
     )?;
     writer.write_all(first)?;
-    for chunk in chunks {
+    let header_len = crate::real_time_data::CONTINUE_FRT_HEADER_LEN;
+    for chunk in payload[first_len..].chunks(MAX_RECORD_DATA - header_len) {
         write_record_header(
             writer,
             crate::real_time_data::CONTINUE_FRT_RECORD_TYPE,
-            crate::utils::truncate_usize_to_u16(chunk.len()),
+            crate::utils::truncate_usize_to_u16(chunk.len() + header_len),
         )?;
+        writer.write_all(&crate::real_time_data::CONTINUE_FRT_RECORD_TYPE.to_le_bytes())?;
+        writer.write_all(&0u16.to_le_bytes())?;
         writer.write_all(chunk)?;
     }
     Ok(())

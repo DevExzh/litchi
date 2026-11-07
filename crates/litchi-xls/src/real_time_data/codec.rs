@@ -8,6 +8,27 @@ pub(crate) const REAL_TIME_DATA_RECORD_TYPE: u16 = 0x0813;
 /// Record type of the `ContinueFrt` record (MS-XLS 2.4.60) that continues a
 /// `RealTimeData` payload.
 pub(crate) const CONTINUE_FRT_RECORD_TYPE: u16 = 0x0812;
+pub(crate) const CONTINUE_FRT_HEADER_LEN: usize = 4;
+
+/// Strip the per-record FrtHeaderOld before reassembling RTD data.
+pub(crate) fn continuation_data(data: &[u8]) -> Result<&[u8]> {
+    let invalid = |message: &str| Error::InvalidRecord {
+        record_type: CONTINUE_FRT_RECORD_TYPE,
+        message: message.into(),
+    };
+    if data.len() < CONTINUE_FRT_HEADER_LEN {
+        return Err(invalid("ContinueFrt header is truncated"));
+    }
+    if u16::from_le_bytes([data[0], data[1]]) != CONTINUE_FRT_RECORD_TYPE {
+        return Err(invalid("ContinueFrt header has the wrong record type"));
+    }
+    if u16::from_le_bytes([data[2], data[3]]) & 3 != 0 {
+        return Err(invalid(
+            "ContinueFrt reference and alert flags must be zero",
+        ));
+    }
+    Ok(&data[CONTINUE_FRT_HEADER_LEN..])
+}
 
 /// Size in bytes of an `FrtHeader` (MS-XLS 2.5.135).
 pub(super) const FRT_HEADER_LEN: usize = 12;

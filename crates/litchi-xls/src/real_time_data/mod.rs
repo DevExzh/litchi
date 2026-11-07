@@ -3,7 +3,8 @@
 //!
 //! There is one `RealTimeData` record per RTD topic; the `RTD` production
 //! (MS-XLS 2.1) is `RealTimeData *ContinueFrt`, so the logical payload is the
-//! record body followed by any `ContinueFrt` bodies concatenated. Each record
+//! record body followed by `ContinueFrt` data with each four-byte
+//! `FrtHeaderOld` removed. Each record
 //! carries the topic as an `XLUnicodeStringSegmentedRTD` (MS-XLS 2.5.298)
 //! whose first sub-string is the RTD server ProgID and whose second is the
 //! server name, the last value returned by the server as an `RTDOper`
@@ -35,7 +36,10 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use codec::{CONTINUE_FRT_RECORD_TYPE, REAL_TIME_DATA_RECORD_TYPE};
+pub(crate) use codec::{
+    CONTINUE_FRT_HEADER_LEN, CONTINUE_FRT_RECORD_TYPE, REAL_TIME_DATA_RECORD_TYPE,
+    continuation_data,
+};
 
 #[allow(
     unused_imports,

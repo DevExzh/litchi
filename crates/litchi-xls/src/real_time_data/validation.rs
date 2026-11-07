@@ -148,35 +148,42 @@ pub(super) fn frame_logical_payload(
         ));
     }
 
-    let record_count = payload.len().div_ceil(MAX_RECORD_PAYLOAD);
+    let first_len = payload.len().min(MAX_RECORD_PAYLOAD);
+    let continuation_header_len = super::codec::CONTINUE_FRT_HEADER_LEN;
+    let continuation_count =
+        (payload.len() - first_len).div_ceil(MAX_RECORD_PAYLOAD - continuation_header_len);
     let framed_len = payload
         .len()
-        .checked_add(
-            record_count
-                .checked_mul(RECORD_HEADER_LEN)
-                .ok_or(Error::Allocation("sizing RealTimeData record framing"))?,
-        )
+        .checked_add(RECORD_HEADER_LEN)
+        .and_then(|length| {
+            continuation_count
+                .checked_mul(RECORD_HEADER_LEN + continuation_header_len)
+                .and_then(|headers| length.checked_add(headers))
+        })
         .ok_or(Error::Allocation("sizing RealTimeData record framing"))?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(framed_len)
         .map_err(|_error| Error::Allocation("allocating RealTimeData record framing"))?;
 
-    for (index, chunk) in payload.chunks(MAX_RECORD_PAYLOAD).enumerate() {
-        let record_type = if index == 0 {
-            real_time_data_record_type
-        } else {
-            continue_frt_record_type
-        };
-        let payload_len = u16::try_from(chunk.len()).map_err(|_error| {
+    let encoded_length = |length| {
+        u16::try_from(length).map_err(|_error| {
             Error::refused(
                 RefusalKind::InvalidValue,
                 "edit real-time data",
                 "RealTimeData record payload length exceeds u16",
             )
-        })?;
-        output.extend_from_slice(&record_type.to_le_bytes());
+        })
+    };
+    output.extend_from_slice(&real_time_data_record_type.to_le_bytes());
+    output.extend_from_slice(&encoded_length(first_len)?.to_le_bytes());
+    output.extend_from_slice(&payload[..first_len]);
+    for chunk in payload[first_len..].chunks(MAX_RECORD_PAYLOAD - continuation_header_len) {
+        let payload_len = encoded_length(chunk.len() + continuation_header_len)?;
+        output.extend_from_slice(&continue_frt_record_type.to_le_bytes());
         output.extend_from_slice(&payload_len.to_le_bytes());
+        output.extend_from_slice(&continue_frt_record_type.to_le_bytes());
+        output.extend_from_slice(&0u16.to_le_bytes());
         output.extend_from_slice(chunk);
     }
     Ok(output)

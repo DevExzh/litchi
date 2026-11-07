@@ -56,9 +56,89 @@ fn framed_rtd(value: &Record, chunk_size: usize) -> Vec<u8> {
         } else {
             CONTINUE_FRT_RECORD_TYPE
         };
-        stream.extend_from_slice(&biff_record(record_type, chunk));
+        if index == 0 {
+            stream.extend_from_slice(&biff_record(record_type, chunk));
+        } else {
+            let mut continued = CONTINUE_FRT_RECORD_TYPE.to_le_bytes().to_vec();
+            continued.extend_from_slice(&0u16.to_le_bytes());
+            continued.extend_from_slice(chunk);
+            stream.extend_from_slice(&biff_record(record_type, &continued));
+        }
     }
     stream
+}
+
+#[test]
+fn continuation_headers_are_checked_and_not_part_of_logical_rtd_data() {
+    use super::codec::continuation_data;
+    assert_eq!(
+        continuation_data(&[0x12, 0x08, 0, 0x80, 0xaa, 0xbb]).unwrap(),
+        &[0xaa, 0xbb]
+    );
+    for (bytes, message) in [
+        (vec![0x12, 0x08, 0], "ContinueFrt header is truncated"),
+        (
+            vec![0x13, 0x08, 0, 0],
+            "ContinueFrt header has the wrong record type",
+        ),
+        (
+            vec![0x12, 0x08, 1, 0],
+            "ContinueFrt reference and alert flags must be zero",
+        ),
+        (
+            vec![0x12, 0x08, 2, 0],
+            "ContinueFrt reference and alert flags must be zero",
+        ),
+    ] {
+        assert!(
+            matches!(continuation_data(&bytes), Err(crate::Error::InvalidRecord {record_type:0x0812,message:m}) if m == message)
+        );
+    }
+}
+
+#[test]
+fn continuation_framing_accounts_for_the_four_byte_header_at_payload_boundaries() {
+    for (length, count) in [(8224, 1), (8225, 2), (16444, 2), (16445, 3)] {
+        let payload = vec![0x76; length];
+        let framed = super::validation::frame_logical_payload(
+            &payload,
+            REAL_TIME_DATA_RECORD_TYPE,
+            CONTINUE_FRT_RECORD_TYPE,
+        )
+        .unwrap();
+        let records = litchi_biff::Records::new(&framed, litchi_biff::Limits::default())
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(records.len(), count);
+        let mut decoded = records[0].payload().to_vec();
+        assert_eq!(records[0].kind().get(), REAL_TIME_DATA_RECORD_TYPE);
+        for record in &records[1..] {
+            assert_eq!(record.kind().get(), CONTINUE_FRT_RECORD_TYPE);
+            assert_eq!(&record.payload()[..4], &[0x12, 0x08, 0, 0]);
+            assert!(record.payload().len() <= 8224);
+            decoded.extend_from_slice(&record.payload()[4..]);
+        }
+        assert_eq!(decoded, payload);
+        assert_eq!(framed.len(), length + 4 + (count - 1) * 8);
+    }
+}
+
+#[test]
+fn shared_topic_prefix_counts_utf16_units_without_splitting_a_surrogate_pair() {
+    let mut value = Record {
+        common_prefix_len: 3,
+        topic_segments: vec![String::new(), String::new(), "C".into()],
+        topic: "A🍎C".into(),
+        value: Value::Integer(1),
+        cells: Vec::new(),
+    };
+    let parsed = Record::parse(&value.to_payload().unwrap(), Some("A🍎B")).unwrap();
+    assert_eq!(parsed, value);
+    value.common_prefix_len = 2;
+    assert!(
+        matches!(Record::parse(&value.to_payload().unwrap(),Some("A🍎B")),Err(crate::Error::InvalidRecord {record_type:0x0813,message}) if message=="RealTimeData ichSamePrefix splits a UTF-16 surrogate pair")
+    );
 }
 
 fn source_stream() -> Vec<u8> {

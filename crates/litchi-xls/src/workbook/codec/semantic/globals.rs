@@ -131,15 +131,15 @@ impl<R: Read + Seek> Reader<R> {
                 },
                 crate::real_time_data::REAL_TIME_DATA_RECORD_TYPE => {
                     // RTD = RealTimeData *ContinueFrt (MS-XLS 2.1): the
-                    // logical payload is the record body plus any trailing
-                    // ContinueFrt bodies.
+                    // Strip each ContinueFrt's FrtHeaderOld before assembling
+                    // the logical RealTimeData payload.
                     let mut payload = record.payload().to_vec();
                     while records.get(i + 1).is_some_and(|next| {
                         next.kind().get()
                             == crate::real_time_data::CONTINUE_FRT_RECORD_TYPE
                     }) {
                         i += 1;
-                        payload.extend_from_slice(records[i].payload());
+                        payload.extend_from_slice(crate::real_time_data::continuation_data(records[i].payload())?);
                     }
                     let previous_topic =
                         self.real_time_data.last().map(|topic| topic.topic.as_str());

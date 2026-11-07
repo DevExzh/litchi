@@ -53,7 +53,8 @@ impl Cell {
 /// Typed `RealTimeData` record content (MS-XLS 2.4.214).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
-    /// Number of leading characters this topic shares with the previous
+    /// Number of leading BIFF character units (UTF-16 code units for wide text)
+    /// this topic shares with the previous
     /// record's topic (`ichSamePrefix`); always zero for the first record.
     pub common_prefix_len: u32,
     /// The topic sub-strings as stored (without the shared prefix). The
