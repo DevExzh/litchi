@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "02a4b0c87277568e724e388a4157eb22a48d69b0",
+  "base_commit": "cabd715ea8d5f862631a240a0b154759e1e33b6c",
+  "problem": "Document statistics counted words after concatenating paragraph text, merging adjacent paragraph and table-cell words. The native vector/diagram document also received a false incompatible-content-type error because the validator image allowlist omitted image/svg+xml. Streaming authoring and cross-story hyperlink batch contracts had no native-input qualification.",
+  "changes": [
+    "Count whitespace words per projected paragraph with checked accumulation, retaining the existing character projection and approximate line/page counters. A focused regression keeps adjacent runs in one word but separates paragraphs and table cells.",
+    "Admit the exact SVG image/svg+xml content type for image relationships. Retain strict rejection of non-image application/xml targets even when their names end in .svg.",
+    "Add five native statistics/validation/streaming tests and three hyperlink-batch tests, plus the two focused regressions. Native content and explicitly labeled library derivatives remain distinct.",
+    "Correct the story-family public API name and document its staged commit/patch lifecycle. Qualify statistics, validation and streaming scope in the matrix and index three more operation rows."
+  ],
+  "verification_scope": {
+    "statistics": "Native text-structure/table-layout/BiDi word counts change from 40/26/18 to 51/57/24 because paragraph boundaries now separate words. Independent native XML paragraph counts substantiate those values. Unicode character counts remain 334/390/239, nonspace counts 295/365/222 and paragraph counts 12/36/7. The visual fixture retains image=2 and drawing=4; those inventories overlap and exclude claims about rendered physical object totals.",
+    "validation": "Ten native DOCX/DOTX/DOCM/DOTM files complete applicable bounded checks without errors, including the original SVG graph. Tests pin direct supported-block counts and inert external/macro/embedded observations. Five macro observations count storage/relationship/type markers, not five executable procedures. The math template still reports one unsupported direct-body child warning under the bounded semantic checker; complete scanning is not complete schema certification. Reports omit native authored text, author names and target URL content.",
+    "validation_limits": "The vector/diagram source completes at its exact main-document byte limit. One byte less yields Blocked markup compatibility and StoppedBy semantic validation, with the source unchanged. This does not imply exhaustive limit coverage or validate SVG payload rendering.",
+    "streaming": "The native text and BiDi paragraph projections, including Arabic, Hebrew, CJK, accents and emoji, are streamed one Unicode scalar at a time through a sink that accepts at most three bytes per write and offers no Seek. Exact input/paragraph/run caps, three-member output, file save/reopen, paragraph/statistics parity, validation completion and memory release pass. These are fresh plaintext packages, not format-preserving conversions of native documents.",
+    "stream_failure": "A real native Arabic paragraph exceeds a one-under UTF-8 input cap before any text is accepted, preserving the reported output prefix and poisoning further publication. Cancellation after accepting that paragraph preserves progress and also prevents successful completion. Both paths release managed memory.",
+    "native_hyperlink": "The actual Reference link in text-structure paragraph 10 changes through edit_stories; only its escaped text slot differs. Relationship bytes, story topology, no-op, save/reopen, forward/stale patch application and exact member inverse are checked.",
+    "cross_story_derivative": "The native link fragment and its inert example.com target are copied into the native table-layout main/header/footer paragraphs through an explicit raw OPC preparation helper. The original header/footer roots, attributes, native PAGE field/control and unselected content are retained. The subsequent supported batch changes exactly three text slots and preserves every other package member and relationship. Header/footer hyperlinks are Litchi-authored derivatives because the native corpus contains none.",
+    "batch_atomicity": "After an earlier successful staged main edit, a late missing-header selector rolls back the entire later batch and retains the earlier change. Empty, duplicate, reversed and unreachable selectors likewise preserve prior staging. Committing publishes only that earlier edit.",
+    "limits": "Word counts use whitespace within projected paragraphs, not Word UI linguistic segmentation. Lines/pages remain rough estimates and image/drawing inventories overlap. Validation covers package/main-document/MCE/security presence only, not full schema, cryptographic trust or rendering. Streaming does not transfer source formatting, links, comments, stories or package resources. No external target, macro, embedded payload, layout engine or fresh Word application is executed."
+  },
+  "evidence_basis": [
+    {
+      "reference": "Native word-text-structure.docx, word-tables-layout.docx and word-bidi-eastasia.docx paragraph XML",
+      "finding": "Independent w:p/w:t enumeration yields 51, 57 and 24 whitespace-delimited words; the prior flattened projection merged neighboring paragraph tokens. The focused table/run test separately verifies that run boundaries do not create words."
+    },
+    {
+      "reference": "[MS-ODRAWXML] 1.3 SVG overview and 2.26.1.1 svgBlip",
+      "source": "User-supplied local full specification",
+      "finding": "Embedded SVG data is carried in an image part with a PNG compatibility image. The native vector fixture uses an ordinary image relationship to word/media/image2.svg with image/svg+xml, which must not be rejected as an incompatible image type."
+    },
+    {
+      "reference": "Public StreamingDocumentWriter and package::story::Edit contracts",
+      "finding": "The streaming owner creates only fresh plain paragraphs/runs. The story editor requires ordered exact main/header/footer selectors and atomically stages every selected story before publication. The tests preserve these stated boundaries rather than claiming source-format conversion or native multi-story authoring."
+    }
+  ],
+  "reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-docx-operation-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operation-reproduction.log",
+        "bytes": 29876,
+        "sha256": "f1145eb0a952af4ead6be34253375d65e54210b9f4782e133c057b763c6c73a5"
+      },
+      "note": "The initial native probe records undercounted 40/26/18 statistics and a content-type-mismatch issue on the valid native SVG graph. The latter is an error finding even though the validation check itself ran to completion.",
+      "regenerate": "In an isolated base_commit checkout, copy microsoft_office_native_operations.rs from source_commit and run CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_operations native_statistics --locked --offline, then repeat with native_validation_reports as the filter. Both regressions fail at the base."
+    }
+  ],
+  "results": {
+    "new_native_input_tests": 8,
+    "new_focused_regressions": 2,
+    "rust_passed": 2684,
+    "rust_failed": 0,
+    "rust_ignored": 0,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 334,
+      "indexed_tests": 474,
+      "reviewed_native_fixture_gaps": 13
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 337,
+      "indexed_tests": 482,
+      "reviewed_native_fixture_gaps": 13,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 337,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 27,
+        "reviewed_native_fixture_gap_requires_followup": 13,
+        "unsupported_boundary_needs_review": 41,
+        "operation_needs_verification": 17,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-full.log",
+        "bytes": 250222,
+        "sha256": "ac794f0f6c7919b52a89a532e5a1ecd8bbf53641c1ebf490e0fafbfe1205738c"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-full.log 2>&1",
+      "suites": 92,
+      "passed": 2458,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-ops.log",
+        "bytes": 36719,
+        "sha256": "b193eb87c1abfd88999957e5fc3812718982cbb63549b5b37b077b34fc28c1d0"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-ops.log 2>&1",
+      "suites": 20,
+      "passed": 205,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-facade.log",
+        "bytes": 19664,
+        "sha256": "f24900ae4d42fca24daca74201a8302aa6bb04469ee791383aa2974633edd476"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-clippy.log",
+        "bytes": 18527,
+        "sha256": "32db667c7b332327fdd2c39260d6702875f5136b48f12c65273e4db421118b35"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-python.log",
+        "bytes": 667,
+        "sha256": "200c6b33fa764591da9ebd63f163ac6f40f6d61f73cd58c83cd9eb8b88150ce6"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-python.log 2>&1",
+      "passed": 75
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-operations-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-coverage.json",
+        "bytes": 1106079,
+        "sha256": "6a24f22369b252ce55e707fa84e9cf37749e8acaee0a6d60bbda94d2e99db447"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-operations-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check on seven changed Rust files and git diff --check/staged checks passed.",
+    "Both AGENTS.md evidence-size/binaries guards printed nothing before the source commit. The two new test files are mode 100644, and logs/reports remain outside the checkout.",
+    "All three pre-existing untracked SHA-256 values remain unchanged. The 75 Python checks verify all 139 Office fixtures and four import assets.",
+    "Clippy passed with -D warnings on the complete DOCX owner and test targets; existing zlib-rs/allsorts dependency warnings are unchanged.",
+    "The full owner, affected operations and facade handles were polled through completion; no running process was restarted due to an observation timeout."
+  ],
+  "goal_status": "active; 337 of 494 feature rows have partial assertions and 482 tests are indexed. Thirteen reviewed native fixture gaps remain, with 17 operation, 58 UI, 27 external and 41 unsupported reviews plus partial-scope reviews still open. Historical 252 pending fixture statuses remain unchanged."
+}
