@@ -197,7 +197,6 @@ impl<R: Read + Seek> Reader<R> {
                     // BOF
                     let bof = BofRecord::parse(record.payload())?;
                     self.biff_version = bof.version;
-                    self.is_1904_date_system = bof.is_1904_date_system;
                 },
                 0x0042
                     // CodePage

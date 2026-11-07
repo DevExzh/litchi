@@ -2834,7 +2834,7 @@ fn parse_globals(
             found: first.payload().len(),
         }));
     }
-    let substream_type = u16::from_le_bytes([first.payload()[2], first.payload()[3]]);
+    let substream_type = bof.substream_type;
     if substream_type != WORKBOOK_BOF_TYPE {
         return Err(SourceBackedError::InvalidData(
             "Workbook globals BOF has an invalid substream type".into(),
@@ -3801,7 +3801,7 @@ fn validate_worksheet_bof(payload: &[u8]) -> Result<()> {
             found: payload.len(),
         }));
     }
-    let substream_type = u16::from_le_bytes([payload[2], payload[3]]);
+    let substream_type = bof.substream_type;
     if substream_type != WORKSHEET_BOF_TYPE {
         return Err(SourceBackedError::InvalidData(
             "BoundSheet8 position does not point to a worksheet BOF".into(),

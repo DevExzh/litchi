@@ -48,7 +48,10 @@ impl BiffVersion {
 #[derive(Debug, Clone)]
 pub struct BofRecord {
     pub version: BiffVersion,
-    pub is_1904_date_system: bool,
+    /// Raw `dt` substream type: for example 0x0005 for workbook globals or
+    /// 0x0010 for a worksheet/dialog sheet. Date mode belongs to Date1904,
+    /// not BOF; the following two bytes are the producer build identifier.
+    pub substream_type: u16,
 }
 
 impl BofRecord {
@@ -64,20 +67,14 @@ impl BofRecord {
         }
 
         let biff_version = binary::read_u16_le_at(data, 0)?;
-        let dt = if data.len() >= 6 {
-            binary::read_u16_le_at(data, 4)?
-        } else {
-            0
-        };
+        let substream_type = binary::read_u16_le_at(data, 2)?;
 
         let version = BiffVersion::from_bof_version(biff_version)
             .ok_or(Error::UnsupportedBiffVersion(biff_version))?;
 
-        let is_1904_date_system = dt == 1;
-
         Ok(BofRecord {
             version,
-            is_1904_date_system,
+            substream_type,
         })
     }
 }
@@ -3733,5 +3730,31 @@ mod cell_measure_tests {
     fn an_unknown_kind_is_refused_identically() {
         agree(0x00BD, &[0; 32], "MulRk is not a single-cell kind");
         agree(0x0000, &[0; 32], "kind zero");
+    }
+}
+
+#[cfg(test)]
+mod bof_metadata_tests {
+    use super::{BiffVersion, BofRecord};
+    #[test]
+    fn substream_type_is_independent_of_producer_build_and_date_mode() {
+        for build in [0u16, 1, 0x4f5a, u16::MAX] {
+            for kind in [0x0005u16, 0x0010, 0x0020, 0x0040] {
+                let mut bytes = vec![0, 6];
+                bytes.extend_from_slice(&kind.to_le_bytes());
+                bytes.extend_from_slice(&build.to_le_bytes());
+                let bof = BofRecord::parse(&bytes).unwrap();
+                assert_eq!(bof.version, BiffVersion::Biff8);
+                assert_eq!(bof.substream_type, kind);
+            }
+        }
+        assert_eq!(BofRecord::parse(&[0, 6, 5, 0]).unwrap().substream_type, 5);
+        assert!(matches!(
+            BofRecord::parse(&[0, 6, 5]),
+            Err(crate::Error::InvalidLength {
+                expected: 4,
+                found: 3
+            })
+        ));
     }
 }

@@ -8295,6 +8295,156 @@
         "Empty, duplicate, reversed and unreachable selections preserve the prior staged package; committing retains only the earlier valid edit and the source stays unchanged."
       ],
       "scope_limit": "Failure atomicity for main/header/footer direct-link selectors only; notes, comments, glossary, nested controls and link-target changes are not claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_records",
+      "name": "native_biff_frames_preserve_all_offsets_headers_payloads_and_continuations",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-conditional-drawings.xls",
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-136"
+      ],
+      "assertions": [
+        "Four native Workbook streams retain exact lengths/frame counts (195402/564,18386/415,24253/406,16193/334), BOF/EOF boundaries and every header/payload offset.",
+        "Borrowed-to-owned frame conversion and re-encoding reproduce the entire stream, including real Continue records and future record families; no-op packages retain exact bytes."
+      ],
+      "scope_limit": "Physical BIFF framing and selected native inventories only; no semantic implementation of every record kind or fresh writer interoperability is implied."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_records",
+      "name": "native_bof_substream_types_and_workbook_date_modes_are_independent",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-136"
+      ],
+      "assertions": [
+        "Native BOF payloads have BIFF8 version, workbook-global dt=5 and worksheet dt=10 hex, with producer build/year bytes 5A4FCD07.",
+        "The two workbooks have distinct Date1904 records and correct workbook date-mode projections even though their BOF producer metadata is identical."
+      ],
+      "scope_limit": "BOF exposes substream type, not a date-system flag. Date mode is asserted from its own record and reader projection; older BIFF producer layouts remain outside these specimens."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_records",
+      "name": "native_biff_limits_and_truncation_fail_at_exact_record_boundaries",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-136"
+      ],
+      "assertions": [
+        "One-under input, record-count, native maximum-payload and output budgets return precise framing errors while retaining complete emitted prefixes and fused iteration.",
+        "A truncated native BOF payload/header reports exact 16/15 and three-byte boundaries; the original fixture is unchanged."
+      ],
+      "scope_limit": "Framing and allocation limits only; native maximum payload is 8220 bytes and its full Continue chunks are 8212, distinct from the format ceiling."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_records",
+      "name": "native_scalar_edit_keeps_every_future_frame_and_all_unowned_streams_exact",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-137"
+      ],
+      "assertions": [
+        "Changing Print_015!B2 from 42 to 43 alters exactly one fixed-position numeric frame; every other frame and CFB stream remains exact.",
+        "More than 100 native future records remain exact, including pinned BookExt/XFExt/StyleExt/Theme counts 1/62/47/1; file reopen and full archive inverse pass."
+      ],
+      "scope_limit": "Selected native future-record preservation during one scalar edit. Arbitrary unknown records, structural edits and fresh authoring are not generally qualified."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_volatile",
+      "name": "native_workbook_volatile_owner_lifecycle_preserves_all_native_parts_and_inverses",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-289"
+      ],
+      "assertions": [
+        "The native five-sheet workbook starts without a volatile owner. An inert RTD/cube derivative with Unicode subtopics, numeric/Boolean/string/error caches and first/last sheet ordinals survives create/update/remove and save/reopen.",
+        "All native payloads remain exact; no-op/stale/forward/inverse checks pass. Logical removal canonicalizes content-type/relationship XML with exact effective graph equality; inverse patches restore every original member."
+      ],
+      "scope_limit": "Library-authored dependency metadata on a native workbook, not native-authored RTD/cube evidence. Formula/dependency correlation, providers, recalculation and native application acceptance remain unqualified."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_volatile",
+      "name": "native_volatile_dependency_sheet_bounds_and_bad_drafts_leave_source_and_prior_staging_intact",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-289"
+      ],
+      "assertions": [
+        "NaN values and duplicate type collections fail while retaining a valid staged hierarchy; a reference to sheet ordinal 5 is refused at commit against the native five-sheet catalog.",
+        "A one-type quota rejects the two-type hierarchy without staging it. The valid draft still publishes and every original source byte stays unchanged."
+      ],
+      "scope_limit": "Typed model/quota and workbook-ordinal closure only; no assurance that authored dependency cells contain corresponding live RTD/cube formulas."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_external_catalog_append_update_remove_preserves_original_link_and_all_payloads",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-250",
+        "xlsx-251"
+      ],
+      "assertions": [
+        "Append and update DDE/OLE metadata/cache derivatives while retaining the original native external workbook entry and all unrelated worksheet, drawing and embedded payloads.",
+        "Workbook externalReferences order matches catalog indexes even when rId12 sorts before rId2. Four cached scalar kinds, item flags, relationship closure, no-op/stale checks, file reopen and exact inverse are checked. Logical removal preserves the complete effective graph despite canonical graph XML."
+      ],
+      "scope_limit": "Inert library-authored DDE/OLE derivatives; native source contains an external workbook link and embedded OLE, not a DDE conversation or native external oleLink. Full extension-schema/native application compatibility and execution are not claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_external_catalog_invalid_dde_matrix_and_ole_metadata_leave_prior_staging_intact",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-251"
+      ],
+      "assertions": [
+        "Invalid DDE matrix dimensions, empty OLE program ID and cached values on a core OLE item are rejected without losing an earlier valid staged DDE entry.",
+        "The valid entry survives file reopen, and only the intended owner/graph members change; the native source remains exact."
+      ],
+      "scope_limit": "Bounded link model validation and failure atomicity; no provider lookup, conversation, COM activation or refresh."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_referenced_link_removal_and_stale_workbook_source_are_refused",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-250",
+        "xlsx-251"
+      ],
+      "assertions": [
+        "Removing the original external workbook link is refused because native formulas use its indexed binding; source package bytes remain exact.",
+        "A source workbook XML change with unchanged relationship IDs invalidates an earlier external-link patch, proving the complete workbook owner is bound."
+      ],
+      "scope_limit": "Conservative XML formula/VML consumer checks refuse affected numeric indexes and DDE/OLE topic syntax. This owner does not rewrite formulas or prove arbitrary opaque/runtime consumers."
     }
   ]
 }

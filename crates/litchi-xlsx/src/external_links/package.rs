@@ -23,6 +23,8 @@ use super::{invalid, validation};
 /// models remain usable without a package or relationship catalog.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// Zero-based workbook externalReferences slot. Legacy catalogs without
+    /// that element use relationship-ID order until structural publication.
     pub index: u32,
     pub relationship_id: String,
     pub part_uri: PackURI,
@@ -324,15 +326,13 @@ pub fn load_external_links(package: &OpcPackage, limits: &SourceLimits) -> Resul
     let workbook = package.main_document_part()?;
     require_workbook(workbook.content_type())?;
 
-    let mut relationships = workbook
-        .rels()
-        .iter()
-        .filter(|relationship| is_owner_relationship(relationship.reltype()))
-        .collect::<Vec<_>>();
-    relationships.sort_by(|left, right| left.r_id().cmp(right.r_id()));
-
-    let mut entries = Vec::with_capacity(relationships.len());
-    for (index, relationship) in relationships.into_iter().enumerate() {
+    let ids = super::workbook::ordered_ids(workbook, limits)?;
+    let mut entries = Vec::with_capacity(ids.len());
+    for (index, id) in ids.iter().enumerate() {
+        let relationship = workbook
+            .rels()
+            .get(id)
+            .ok_or_else(|| invalid("externalReference has no relationship"))?;
         if relationship.is_external() {
             return Err(invalid(
                 "workbook external-link relationship must target an internal part",
@@ -529,6 +529,8 @@ fn apply_entries_in_place(
         .map(|entry| (entry.relationship_id.clone(), entry.part_uri.clone()))
         .collect::<HashSet<_>>();
 
+    super::workbook::update(package, before, after)?;
+
     // Remove deleted owners first. Their parts are removed only when no
     // package relationship still references them.
     for entry in before {
@@ -590,7 +592,9 @@ fn apply_entries_in_place(
             );
     }
 
-    validate_graph(package, &limits)
+    validate_graph(package, &limits)?;
+    super::workbook::ordered_ids(package.main_document_part()?, &limits)?;
+    Ok(())
 }
 
 fn replace_existing_part(
@@ -791,6 +795,6 @@ fn require_workbook(content_type: &str) -> Result<()> {
     }
 }
 
-fn is_owner_relationship(value: &str) -> bool {
+pub(super) fn is_owner_relationship(value: &str) -> bool {
     matches!(value, rt::EXTERNAL_LINK | rt::STRICT_EXTERNAL_LINK)
 }

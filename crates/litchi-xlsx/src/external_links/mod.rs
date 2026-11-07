@@ -18,6 +18,7 @@ mod snapshot;
 #[cfg(test)]
 mod tests;
 pub mod validation;
+mod workbook;
 
 pub use codec::parse_external_link;
 pub use edit::Edit;

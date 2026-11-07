@@ -509,6 +509,84 @@
         "crates/litchi-doc/src/equation.rs"
       ],
       "scope_limit": "Evidence-only correction, not positive semantic coverage or an unsupported-library claim. Source fixtures and historical authoring statuses remain unchanged; a native specimen of this specific owner is still needed."
+    },
+    {
+      "feature_row": "xls-173",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-interaction-print.xls",
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-conditional-drawings.xls",
+        "excel/excel-links-objects.xls",
+        "excel/excel-pivot-controls.xls",
+        "excel/excel-form-controls.xls",
+        "excel/excel-formula-owners.xls",
+        "excel/excel-connections.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-chart-families.xls",
+        "excel/excel-revisions.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-legacy-sheets.xls",
+        "excel/excel-encrypted.xls"
+      ],
+      "reason": "Ordinary workbook URLs and external-data connections do not establish WebPub publication descriptors.",
+      "required_evidence": "Native WebPub records for workbook/sheet publication destinations, ranges, titles and flags; metadata tests must remain separate from actual publishing.",
+      "observed_evidence": "All 17 XLS/XLT manifest files, including the encrypted workbook, have no 0801 WebPub record in their complete physical Workbook stream and an empty typed workbook publication catalog.",
+      "checks": [
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_xls_corpus_has_no_webpub_records_or_office_toolbar_streams"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/excel/binary-residual-coverage-audit.json",
+        "test-data/microsoft-office/excel/final-gap-review.json",
+        "crates/litchi-xls/src/web_pub/mod.rs"
+      ],
+      "scope_limit": "Evidence-only gap; absence does not qualify WebPub/toolbar semantics or mark the implemented metadata codecs unsupported. No publishing, toolbar execution or source/historical-status modification occurs."
+    },
+    {
+      "feature_row": "xls-178",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-interaction-print.xls",
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-conditional-drawings.xls",
+        "excel/excel-links-objects.xls",
+        "excel/excel-pivot-controls.xls",
+        "excel/excel-form-controls.xls",
+        "excel/excel-formula-owners.xls",
+        "excel/excel-connections.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-chart-families.xls",
+        "excel/excel-revisions.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-legacy-sheets.xls",
+        "excel/excel-encrypted.xls"
+      ],
+      "reason": "Macro projects, form controls and ordinary workbook UI metadata do not establish an Office Toolbars XCB stream.",
+      "required_evidence": "A native XCB stream with CTBWRAPPER/CTBS/CTB and known toolbar/control metadata suitable for inert decode/encode assertions.",
+      "observed_evidence": "All 17 XLS/XLT files lack an XCB stream, including the password-backed encrypted fixture; original ciphertext/plaintext archives remain exact.",
+      "checks": [
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_xls_corpus_has_no_webpub_records_or_office_toolbar_streams"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/excel/binary-residual-coverage-audit.json",
+        "test-data/microsoft-office/excel/final-gap-review.json",
+        "crates/litchi-xls/src/toolbar/mod.rs"
+      ],
+      "scope_limit": "Evidence-only gap; absence does not qualify WebPub/toolbar semantics or mark the implemented metadata codecs unsupported. No publishing, toolbar execution or source/historical-status modification occurs."
     }
   ]
 }

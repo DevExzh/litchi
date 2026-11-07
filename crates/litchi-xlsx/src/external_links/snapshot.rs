@@ -42,8 +42,8 @@ impl Snapshot {
         })
     }
 
-    /// Borrow the workbook's external-link entries in stable relationship-ID
-    /// order.
+    /// Borrow entries in workbook externalReferences order. Relationship-only
+    /// legacy metadata sources retain relationship-ID order until structural publication.
     #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
@@ -89,6 +89,7 @@ impl Snapshot {
 pub(crate) struct SourceState {
     pub(crate) workbook_part_name: String,
     pub(crate) workbook_content_type: String,
+    pub(crate) workbook_xml: Arc<Vec<u8>>,
     pub(crate) workbook_relationships: Vec<SourceRelationship>,
     pub(crate) parts: Vec<SourcePart>,
     pub(crate) conformance: Conformance,
@@ -117,6 +118,7 @@ impl SourceState {
         Ok(Self {
             workbook_part_name: workbook.partname().to_string(),
             workbook_content_type: workbook.content_type().to_owned(),
+            workbook_xml: workbook.blob_arc(),
             workbook_relationships,
             parts,
             conformance,

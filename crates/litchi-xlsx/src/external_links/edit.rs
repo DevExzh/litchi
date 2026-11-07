@@ -129,7 +129,8 @@ impl Edit {
         })
     }
 
-    /// Insert a new link with an allocated workbook relationship and part URI.
+    /// Append a new link with an allocated workbook relationship and part URI.
+    /// Commit registers its ordered workbook externalReference as well.
     pub fn insert(&mut self, link: Link) -> Result<usize> {
         self.ensure_loaded()?;
         let limits = self.target.read_limits();
@@ -165,7 +166,9 @@ impl Edit {
         Ok(index)
     }
 
-    /// Remove one link from the staged catalog.
+    /// Remove one link from the staged catalog. Commit refuses removal or
+    /// renumbering when XML formula consumers may depend on an affected slot;
+    /// this owner does not rewrite formula references.
     pub fn remove(&mut self, index: usize) -> Result<Option<super::package::Entry>> {
         self.ensure_loaded()?;
         let mut draft = self
