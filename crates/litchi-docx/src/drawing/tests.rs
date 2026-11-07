@@ -328,3 +328,47 @@ fn repeated_inventory_attributes_keep_their_first_value() {
     assert_eq!((hostile.width_emu(), hostile.height_emu()), (1000, 2000));
     assert_eq!((hostile.name(), hostile.description()), ("first", "kept"));
 }
+
+fn inherited_anchor_paragraph(xml: &str) -> crate::Paragraph {
+    let namespaces = std::sync::Arc::from([
+        (
+            Some(b"d".to_vec()),
+            b"http://purl.oclc.org/ooxml/wordprocessingml/main".to_vec(),
+        ),
+        (
+            Some(b"aid".to_vec()),
+            b"http://schemas.microsoft.com/office/word/2010/wordml".to_vec(),
+        ),
+    ]);
+    crate::Paragraph::from_arc_range_with_context(
+        std::sync::Arc::new(xml.as_bytes().to_vec()),
+        0,
+        u32::try_from(xml.len()).unwrap(),
+        namespaces,
+    )
+}
+
+#[test]
+fn legacy_anchors_use_inherited_aliases_without_leaking_sibling_bindings() {
+    let p = inherited_anchor_paragraph(
+        r#"<d:p><d:r><d:pict xmlns:aid="urn:foreign"/><d:object aid:anchorId="0000002a"/></d:r></d:p>"#,
+    );
+    let anchors = p.legacy_anchors().unwrap();
+    assert_eq!(anchors.len(), 2);
+    assert_eq!(anchors[0].kind(), LegacyAnchorKind::Picture);
+    assert_eq!(anchors[0].anchor_id(), None);
+    assert_eq!(anchors[1].kind(), LegacyAnchorKind::Object);
+    assert_eq!(anchors[1].anchor_id(), AnchorId::new(42));
+}
+
+#[test]
+fn inherited_legacy_anchors_still_reject_wrong_namespaces_and_invalid_ranges() {
+    for xml in [
+        r#"<d:p><d:object xmlns:aid="urn:foreign" aid:anchorId="0000002a"/></d:p>"#,
+        r#"<d:p><d:object anchorId="0000002a"/></d:p>"#,
+        r#"<d:p><d:object aid:anchorId="80000000"/></d:p>"#,
+        r#"<d:p><d:object aid:anchorId="00000000"/></d:p>"#,
+    ] {
+        assert!(inherited_anchor_paragraph(xml).legacy_anchors().is_err());
+    }
+}

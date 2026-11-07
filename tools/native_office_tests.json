@@ -8050,6 +8050,108 @@
         "Duplicate known-child insertion is an InvalidValue refusal and invalid removal is NotFound, both retaining prior staged work. Every other drawing leaf, slide record, Document record and unrelated CFB stream remains exact; stale replay, forward/inverse and no-op are checked."
       ],
       "scope_limit": "Inert ordered client-data editing; the new opaque payload is a library derivative. Known metadata interpretation is covered separately, and no opaque semantics, execution or native application validation is inferred."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_comment_anchors",
+      "name": "native_ole_anchor_reads_document_root_namespace_in_eager_and_source_views",
+      "fixtures": [
+        "word/word-visual-objects.docx",
+        "word/word-vector-diagram.docx"
+      ],
+      "feature_rows": [
+        "docx-101"
+      ],
+      "assertions": [
+        "The native OLE object in paragraph 6 has exactly anchorId 61C01E2C; eager and source-backed paragraph views resolve the Word 2010 binding inherited from the document root.",
+        "Save/reopen and no-op publication retain all package members. The selected vector-diagram view has no legacy owner because its VML compatibility branch is inactive."
+      ],
+      "scope_limit": "Native w:object anchor read only; inactive VML fallback absence is not positive w:pict coverage. OLE/media stay inert; no layout or anchor relocation."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_comment_anchors",
+      "name": "native_embedded_workbook_and_preview_survive_fresh_legacy_anchor_authoring",
+      "fixtures": [
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-101"
+      ],
+      "assertions": [
+        "A fresh builder derivative reuses the exact native 18372-byte Excel.Sheet.12 payload and its real preview, authors checked object/pict anchors and saves/reopens them.",
+        "Present IDs 61C01E2C and 7FFFFFFF, cleared IDs, lower/upper range refusals and exact payload/preview preservation are checked; the source package remains unchanged."
+      ],
+      "scope_limit": "Fresh authoring using a native inert payload; not existing-object anchor CRUD, a native-authored w:pict fixture or fresh Word application validation."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_comment_anchors",
+      "name": "native_anchor_and_comment_metadata_survive_unrelated_text_publication",
+      "fixtures": [
+        "word/word-visual-objects.docx",
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-101",
+        "docx-092"
+      ],
+      "assertions": [
+        "An unrelated first-run replacement survives save/reopen with identical anchor inventory and modern-comment metadata; the complete native w:object fragment remains byte-exact.",
+        "Every package member except document.xml stays exact, including comments, relationships, previews and embedded workbooks. Inverse restores all original members."
+      ],
+      "scope_limit": "Metadata preservation during a supported text transaction; does not edit anchor IDs, author reactions or execute embedded content."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_comment_anchors",
+      "name": "native_comment_extension_graphs_keep_exact_durable_ids_times_and_parent_links",
+      "fixtures": [
+        "word/word-review-controls.docx",
+        "word/word-text-structure.docx",
+        "word/word-document-protection.docx"
+      ],
+      "feature_rows": [
+        "docx-091",
+        "docx-092"
+      ],
+      "assertions": [
+        "Three native graphs retain exact paragraph/durable-ID mappings, UTC timestamps, root/reply linkage, unresolved state and the Ryker Zhu person/presence values.",
+        "All four metadata-part codecs round-trip native models in Strict and Transitional output. Reaction lists and intelligent-placeholder attributes are absent; source members remain exact."
+      ],
+      "scope_limit": "Native metadata graph reads and detached codecs. Empty reaction lists are not evidence of native reaction behavior or collaboration-service integration."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_comment_anchors",
+      "name": "native_comment_models_round_trip_inert_reaction_and_ordered_extension_derivatives",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-092"
+      ],
+      "assertions": [
+        "Native durable comment models gain library-authored Like type 1 and unknown type 2 reactions with exact UTC fractions/users and ordered OEXTXML lists on reaction, info and user owners; both conformance codecs preserve complete typed values.",
+        "Non-UTC timestamps, duplicate reaction types and multiple extension child roots are refused. Extension removal/order and clearing reactions retain the original native model and package."
+      ],
+      "scope_limit": "Detached reaction/extension derivatives only; native corpus has no reaction payload, and this does not establish existing-package reaction transactions, policy, synchronization or fresh Word acceptance."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_comment_anchors",
+      "name": "native_existing_modern_comment_graph_refuses_create_only_store_atomically",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-092"
+      ],
+      "assertions": [
+        "The raw OPC metadata store refuses the already-present native graph with its explicit existing-part/relationship diagnostic.",
+        "All original package members and the complete metadata model remain exact after the rejected call."
+      ],
+      "scope_limit": "Intentional create-only API boundary, not a passing reaction update/removal operation. Existing graph mutation requires a separate supported owner."
     }
   ]
 }

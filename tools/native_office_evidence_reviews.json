@@ -384,6 +384,131 @@
         "crates/litchi-ppt/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Evidence-only corpus gap: absence/refusal does not qualify native picture-bullet semantics or declare the implemented codecs unsupported. Native collection and dependency fixtures remain needed; no source files or historical status are changed."
+    },
+    {
+      "feature_row": "doc-014",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The native documents do not persist Selsf selection records; an opened document and visible cursor are not saved-selection evidence.",
+      "required_evidence": "A native DOC with nonzero fcWss/lcbWss containing Selsf flags, main-story CP anchors and selection geometry suitable for read/edit/remap assertions.",
+      "observed_evidence": "All 20 DOC/DOT manifest files, including the encrypted specimen after password-backed opening, have lcbWss=0 and saved_selection()=None.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_has_no_saved_selection_or_printer_metadata_records"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/residual-coverage-audit.json",
+        "crates/litchi-doc/src/parts/saved_selection.rs"
+      ],
+      "scope_limit": "Evidence-only correction, not positive semantic coverage or an unsupported-library claim. Source fixtures and historical authoring statuses remain unchanged; a native specimen of this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-016",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "Section page setup and margins do not evidence the separate PrDrvr/PrEnvPort/PrEnvLand records.",
+      "required_evidence": "A native DOC with printer-driver names and/or nonempty portrait/landscape environment records, retained as inert bytes.",
+      "observed_evidence": "All 20 DOC/DOT files have zero lengths in FIB slots 27, 28 and 29 and print_environment()=None; their unrelated body content remains readable.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_corpus_has_no_saved_selection_or_printer_metadata_records"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/residual-coverage-audit.json",
+        "test-data/microsoft-office/word/tables-layout-inspection.json",
+        "crates/litchi-doc/src/parts/print_environment.rs"
+      ],
+      "scope_limit": "Evidence-only correction, not positive semantic coverage or an unsupported-library claim. Source fixtures and historical authoring statuses remain unchanged; a native specimen of this specific owner is still needed."
+    },
+    {
+      "feature_row": "doc-059",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The native math DOC contains EMF fallbacks and has no Equation.3/MTEF ObjectPool; picture representations are not equation semantics.",
+      "required_evidence": "A native Equation.3 or MathType-compatible OLE object with Equation Native/MTEF payload, registration/CLSID streams, field/preview closure and a known formula.",
+      "observed_evidence": "No Equation Native, MSWordEquation or Equation.3 streams occur in any of the 20 DOC/DOT files, and no inspected CompObj has the Equation.3 CLSID. The math DOC has no ObjectPool and exposes three PICF locations containing two distinct pinned EMF payloads (12398 and 12470 bytes). The only ObjectPool CompObj streams belong to the visual fixture Excel objects.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_binary_word_math_has_emf_fallbacks_without_equation_native_storage"
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/word/residual-coverage-audit.json",
+        "test-data/microsoft-office/word/math-navigation-inspection.json",
+        "crates/litchi-doc/src/equation.rs"
+      ],
+      "scope_limit": "Evidence-only correction, not positive semantic coverage or an unsupported-library claim. Source fixtures and historical authoring statuses remain unchanged; a native specimen of this specific owner is still needed."
     }
   ]
 }

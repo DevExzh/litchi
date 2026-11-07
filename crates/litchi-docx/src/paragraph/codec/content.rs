@@ -4,7 +4,7 @@
 )]
 //! Paragraph content adapters for drawings, revisions, and Office Math.
 
-use crate::drawing::{LegacyAnchor, Object, parse, parse_legacy};
+use crate::drawing::{LegacyAnchor, Object, parse, parse_legacy_with_context};
 use crate::error::{Error, Result};
 use crate::image::{InlineImage, parse_inline_images};
 use crate::math::OfficeMath;
@@ -142,7 +142,8 @@ impl Paragraph {
     /// Returns an error if the operation cannot be completed.
     pub fn legacy_anchors(&self) -> Result<SmallVec<[LegacyAnchor; 4]>> {
         let _parser_admission = self.parser_admission()?;
-        parse_legacy(self.xml_bytes())
+        let namespaces = self.xml_data.inherited_namespaces()?;
+        parse_legacy_with_context(self.xml_bytes(), &namespaces)
     }
 
     /// Extract all tracked changes (revisions) from this paragraph.

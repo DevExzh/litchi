@@ -30,7 +30,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 
@@ -303,8 +303,25 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
 /// Parse legacy Word `w:object` and `w:pict` anchors from a paragraph XML
 /// slice. Only the checked `anchorId` metadata is projected; child VML, OLE,
 /// and image content remains inert.
+#[cfg(test)]
 pub(crate) fn parse_legacy(xml_bytes: &[u8]) -> Result<SmallVec<[LegacyAnchor; 4]>> {
+    parse_legacy_with_context(xml_bytes, &std::sync::Arc::from([]))
+}
+
+pub(crate) fn parse_legacy_with_context(
+    xml_bytes: &[u8],
+    namespaces: &crate::namespace::NamespaceBindings,
+) -> Result<SmallVec<[LegacyAnchor; 4]>> {
     let mut reader = NsReader::from_reader(xml_bytes);
+    for (prefix, namespace) in namespaces.iter() {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_| Error::Xml("invalid inherited legacy-anchor namespace".into()))?;
+    }
     let mut fragment_prefix = None;
     let mut depth = 0usize;
     let mut nodes = 0usize;

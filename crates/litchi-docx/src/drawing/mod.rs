@@ -22,7 +22,9 @@ pub use source::{
     RelationshipDialect, RelationshipReference, ScanLimits, SourceDrawing, SvgOwner, SvgOwnerState,
 };
 
-pub(crate) use codec::{parse, parse_legacy};
+#[cfg(test)]
+pub(crate) use codec::parse_legacy;
+pub(crate) use codec::{parse, parse_legacy_with_context};
 
 /// Collect the drawing objects of `paragraphs` in document order, recording a
 /// [`crate::leniency::DrawingDefect`] (context: paragraph index) for each
