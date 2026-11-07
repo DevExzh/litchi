@@ -2481,6 +2481,281 @@
         "crates/litchi-ops/src/calc.rs"
       ],
       "scope_limit": "An explicit runtime boundary, not positive execution coverage or a native provider handoff. Native fixtures and historical authoring statuses remain unchanged; limited local cache writes must not be confused with external refresh."
+    },
+    {
+      "feature_row": "doc-064",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-legacy-form.doc"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Native DOC VBA storage and decoded module source remain inert. Native form defaults and stored undefined states are exposed as data; the shared VBA reader explicitly excludes compilation, interpretation and execution.",
+      "supported_scope": "Bounded VBA source/metadata inspection, saved form defaults and opaque OLE/control payload retention.",
+      "unsupported_scope": "Compiling/interpreting VBA, control instantiation, callbacks, events or host UI activation.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_vba",
+          "name": "native_word_vba_storage_and_decoded_modules_are_bounded_and_inert"
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native",
+          "name": "native_word_binary_form_data_retains_defaults_and_undefined_stored_states"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "docx-127",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-legacy-form.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-text-structure.docx"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Native DOCM/DOTM project graphs and source and native legacy form caches are inspected as data. AltChunk lifecycle derivatives on the native DOCM parent preserve every unrelated member, including the macro payload; no control or macro runtime is invoked.",
+      "supported_scope": "Native macro graph/source and legacy form-state reads, and package edits preserving inert macro parts and foreign payloads.",
+      "unsupported_scope": "VBA, ActiveX/form controls, add-in code/callbacks/events or host UI execution. Ordinary form-state evidence is not ActiveX execution evidence.",
+      "checks": [
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native",
+          "name": "native_word_macro_variants_expose_inert_project_graph_and_source",
+          "required_features": [
+            "vba-inspection"
+          ]
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_mail_merge",
+          "name": "native_legacy_form_instructions_caches_and_bookmarks_are_not_evaluated"
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_alt_chunks",
+          "name": "native_document_and_macro_alt_chunk_lifecycle_keeps_foreign_content_opaque"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "xlsx-272",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-form-controls.xlsx"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Native macro workbook/template removal and inverse tests preserve package data. Native checkbox edits preserve linked cells and unrelated control states. The shared VBA reader explicitly excludes execution.",
+      "supported_scope": "VBA package retention/removal under the explicit API and stored form-control state edits that preserve linked cells and unrelated controls.",
+      "unsupported_scope": "Macro execution, ActiveX activation or trusted-host behavior. Saved checkbox state does not execute a control or establish its trust.",
+      "checks": [
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_vba",
+          "name": "native_excel_ooxml_vba_noop_remove_and_inverse_preserve_template_and_parts"
+        },
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_controls",
+          "name": "native_checkbox_scalar_edit_preserves_cells_and_unrelated_controls"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "xlsb-337",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-form-controls.xlsb",
+        "excel/excel-links-objects.xlsb",
+        "word/word-legacy-form-unprotected.docx"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Native control drawing mirrors survive inert cell edits; eager and source readers agree on the native embedded Word catalog. These checks inspect stored controls/objects without activating a host.",
+      "supported_scope": "Drawing/control metadata mirrors and inert embedded-object payload discovery while native cell/package data remains intact.",
+      "unsupported_scope": "Instantiating, activating or running ActiveX/form controls or embedded OLE hosts. Drawing mirrors and embedded Word bytes do not qualify those runtimes.",
+      "checks": [
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_form_control_drawing_mirrors_survive_inert_cell_edits"
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_embedded",
+          "name": "native_embedded_word_catalog_agrees_across_eager_and_source_readers"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "ppt-392",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-fonts-math-handout.ppt"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Native macro source remains inert; native media/OLE placeholders expose typed frames. Summary-property CRUD preserves presentation views, tags and macro payloads without resolving links or activating programs.",
+      "supported_scope": "Inert VBA, external-media/OLE frames and path values, with metadata edits preserving the presentation and program payloads.",
+      "unsupported_scope": "Resolving external resources, activating OLE/media, following action links or executing macros/scripts.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native",
+          "name": "native_powerpoint_passive_macro_retains_module_source_without_execution",
+          "required_features": [
+            "vba-inspection"
+          ]
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native",
+          "name": "native_powerpoint_media_and_ole_placeholders_keep_typed_frames"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_preferences",
+          "name": "native_summary_property_crud_preserves_presentation_views_tags_and_macro_payloads"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-vba/src/lib.rs"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "rtf-494",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-visual-objects.rtf",
+        "word/word-rtf-minimal.rtf"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Native OLE payloads and preview wrappers survive model writing and supported object transfer. The API handles the stored bytes and does not activate the object or refresh external providers.",
+      "supported_scope": "Opaque object data, preview wrappers and linked-field metadata are parsed/retained or transferred within their declared profiles.",
+      "unsupported_scope": "Macro/control/object activation, external fetching or provider refresh. Transferring bytes is not execution or a general sandbox guarantee.",
+      "checks": [
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native_visuals",
+          "name": "native_rtf_ole_headers_payloads_and_previews_survive_model_writing"
+        },
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native_visuals",
+          "name": "native_rtf_object_transfer_preserves_payload_and_preview_wrappers"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-rtf/docs/FEATURE_MATRIX.md"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "xlsb-336",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Explicit library-authored XML MapInfo and single-cell binding derivatives preserve every native worksheet payload and saved B2 value. The native ordinary range table refuses LTXML column bindings. Quota, invalid staging and stale-patch refusals are checked; schema URIs and XPath remain data.",
+      "supported_scope": "Bounded XML MapInfo catalogs, lexically validated XPath and BIFF12 binding metadata, including native-parent single-cell lifecycle and explicit LTXML table restrictions.",
+      "unsupported_scope": "XML instance import/export, XPath or schema evaluation, schema URI fetching, cell synchronization or application-level custom XML processing.",
+      "checks": [
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_xml_maps",
+          "name": "native_metadata_xml_map_lifecycle_keeps_every_worksheet_payload_inert"
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_xml_maps",
+          "name": "native_range_table_refusal_and_single_bindings_keep_worksheet_order_after_a_chart"
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_xml_maps",
+          "name": "native_xml_map_invalid_staging_and_stale_patches_do_not_change_the_source"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-xlsb/src/xml_maps/mod.rs"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
+    },
+    {
+      "feature_row": "docx-126",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "reason": "The implemented interface is a bounded data owner, not an application runtime. Readable or editable payloads do not imply execution, import or host activation.",
+      "required_evidence": "Native or explicitly native-parent derivative data reads, preservation and declared failure boundaries, plus the current owner contract. Do not invent an execution endpoint or infer runtime support from metadata presence.",
+      "observed_evidence": "Explicit library-authored HTML, text, RTF and external-link AltChunk derivatives preserve native body text and unrelated members, including macros. Source-bound HTML replacement changes only its target payload; incompatible MIME families and stale patches refuse. No foreign payload becomes a Word paragraph.",
+      "supported_scope": "Opaque AltChunk anchor/relationship/payload lifecycle and source-bound payload replacement with preserved native body/macro data.",
+      "unsupported_scope": "Foreign HTML/XHTML/RTF/text/XML/MIME conversion, import into Word paragraphs, rendering, external-target retrieval or execution.",
+      "checks": [
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_alt_chunks",
+          "name": "native_document_and_macro_alt_chunk_lifecycle_keeps_foreign_content_opaque"
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_alt_chunks",
+          "name": "native_alt_chunk_payload_source_overlay_changes_only_the_inert_target"
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_alt_chunks",
+          "name": "native_alt_chunk_bad_selectors_preserve_staging_and_stale_payloads_refuse"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-docx/src/alt/package.rs",
+        "crates/litchi-docx/src/source_backed/alt_chunk_payload.rs"
+      ],
+      "scope_limit": "Explicit execution/import boundary, not positive runtime coverage, a new native-authored feature specimen or a general sandbox guarantee. Original fixtures and historical authoring status remain unchanged. Imported/host behavior would require a separate implementation and validation contract."
     }
   ]
 }

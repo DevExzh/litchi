@@ -270,3 +270,8 @@ supported results when `write_cache(true)` is explicit. Workbook refresh keeps
 external dependencies unsupported and unchanged; it does not refresh data
 providers. XLS's inline FormulaValue 03 is a saved blank string, distinct from
 a missing following STRING record, and no longer triggers a spurious write.
+
+`xlsx-272` is reviewed in `tools/native_office_evidence_reviews.json`. Native tests
+cover explicit VBA package retention/removal and saved control-state edits while
+preserving linked cells and unrelated controls. Macro execution, ActiveX activation
+and trusted-host behavior remain outside the supported API.

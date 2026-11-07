@@ -8970,6 +8970,106 @@
         "Native B18 pins inline FormulaValue 03/FFFF, no following String record, exact empty-string formula tokens and cached String(\"\") through eager and positional readers. The input file remains exact."
       ],
       "scope_limit": "Blank-string cache representation only; unresolved following-STRING metadata is a separate case and no formula calculation is implied."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_metadata_xml_map_lifecycle_keeps_every_worksheet_payload_inert",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-324"
+      ],
+      "assertions": [
+        "Native five-sheet input starts without map owners. A library catalog/single-cell binding is created on the last worksheet, renamed/updated and removed with file reopen, forward replay and inverse. Print_015!B2 stays Int(42), every worksheet payload stays exact, and updates touch only the map XML and singleton binding part. Removing a catalog with live bindings returns the exact refusal while retaining valid staging.",
+        "Inverses and logical removal preserve the complete effective relationship/content-type graph and all data payloads; only owned relationship/content-type XML serialization may normalize."
+      ],
+      "scope_limit": "Native-authored XML maps are absent. These are inert library-authored bindings, not XML import/export, XPath/schema evaluation or a fresh Excel result. Numeric native/core coordinate conventions are a separately recorded open finding; the cell expectation uses coordinate lookup."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_range_table_refusal_and_single_bindings_keep_worksheet_order_after_a_chart",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-324"
+      ],
+      "assertions": [
+        "The native table is ID 1/LTRANGE, so the LTXML-only table-column operation returns its exact refusal and preserves staging. A single-cell binding on worksheet ordinal 1 lands on sheet2.bin despite the leading chart tab; the ordinary table and every unowned native payload remain exact through creation/removal and inverse."
+      ],
+      "scope_limit": "No positive XML-mapped-table column qualification: the native ordinary table is not LTXML. Single-cell indices use the documented worksheet order, not complete tab order."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_xml_maps",
+      "name": "native_xml_map_invalid_staging_and_stale_patches_do_not_change_the_source",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-324"
+      ],
+      "assertions": [
+        "Duplicate map IDs, absent map IDs, an out-of-range worksheet and a one-binding quota fail without discarding prior valid staging. A changed map-name base rejects a stale patch; successful retained staging commits and reopens while the native source remains unchanged."
+      ],
+      "scope_limit": "Bounded metadata/graph validation only; schema references and XPath values are never resolved or executed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_alt_chunks",
+      "name": "native_document_and_macro_alt_chunk_lifecycle_keeps_foreign_content_opaque",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-069",
+        "docx-073",
+        "docx-087",
+        "docx-090"
+      ],
+      "assertions": [
+        "Add ordered HTML, text and inert external-link anchors to native document/macro parents; move, replace and remove them. Replacements return the removed anchor, collect its unreachable payload and expose the new target at the committed position. Body XML outside altChunk anchors, paragraph text and all original unrelated parts, including macros, remain exact.",
+        "File reopen/replay/inverse preserve the full effective graph and payloads; only owned relationship/content-type XML may normalize on graph lifecycle operations."
+      ],
+      "scope_limit": "Foreign payloads are library-authored additions, not native-authored AltChunk specimens. No HTML/RTF/text import, rendering, macro execution or external fetch occurs."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_alt_chunks",
+      "name": "native_alt_chunk_payload_source_overlay_changes_only_the_inert_target",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-069",
+        "docx-073",
+        "docx-087"
+      ],
+      "assertions": [
+        "The source-backed payload editor changes exactly the selected HTML member, leaving the anchor and all other members untouched. Reopen and inverse restore all member bytes; mismatched replacement MIME family returns Refused(InvalidValue) and leaves the source exact."
+      ],
+      "scope_limit": "Only payload replacement within the supported direct owner closure; it does not import or interpret the foreign format, and compressed ZIP byte identity is not claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_alt_chunks",
+      "name": "native_alt_chunk_bad_selectors_preserve_staging_and_stale_payloads_refuse",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-069",
+        "docx-073"
+      ],
+      "assertions": [
+        "An invalid anchor selector returns OutOfBounds without losing a prior staged import. Applying a source payload patch to a different committed payload returns the exact family PatchConflict; originals remain unchanged."
+      ],
+      "scope_limit": "Negative lifecycle and stale-source checks for inert library derivatives only."
     }
   ]
 }

@@ -268,3 +268,14 @@ supported results when `write_cache(true)` is explicit. Workbook refresh keeps
 external dependencies unsupported and unchanged; it does not refresh data
 providers. XLS's inline FormulaValue 03 is a saved blank string, distinct from
 a missing following STRING record, and no longer triggers a spurious write.
+
+`xlsb-337` and `xlsb-336` are reviewed in
+`tools/native_office_evidence_reviews.json`. Native tests cover stored
+control/drawing metadata and inert embedded payload discovery.
+`microsoft_office_native_xml_maps.rs` adds library-authored XML-map catalogs and
+single-cell bindings to native XLSB parents, checking lifecycle edits, worksheet
+order after a chart, save/reopen, inverse patches, stale patches and quotas. Native
+worksheet data remains unchanged; the native range table correctly refuses XML-table
+column bindings. XML instance import/export, XPath/schema evaluation, URI retrieval
+and control/OLE execution remain outside the supported API. These derivatives do not
+supply native-authored XML-map evidence.

@@ -163,3 +163,9 @@ application rendering, layout or execution.
 Native math/layout/mail-merge inputs also refuse the worksheet evaluator;
 saved field results remain unchanged. RTF field results use separate story
 owners and are checked in the field inventory rather than paragraph text.
+
+`rtf-494` is reviewed in `tools/native_office_evidence_reviews.json`. Native tests
+cover opaque object payloads and preview wrappers through model writing and
+transfer. Object/control activation, external fetching and provider refresh remain
+outside the supported API. Payload preservation does not qualify execution or
+provide a general sandbox guarantee.

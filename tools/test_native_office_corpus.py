@@ -168,6 +168,8 @@ class NativeOfficeCorpus(unittest.TestCase):
             "pptx-452", "rtf-493",
             "doc-022", "xls-196", "xlsx-273", "xlsb-339", "docx-132",
             "xls-195", "xlsx-271", "xlsb-338",
+            "doc-064", "docx-127", "xlsx-272", "xlsb-337", "ppt-392", "rtf-494",
+            "xlsb-336", "docx-126",
         })
         boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
         self.assertEqual({row["id"] for row in boundaries}, {
@@ -177,6 +179,8 @@ class NativeOfficeCorpus(unittest.TestCase):
             "pptx-452", "rtf-493",
             "doc-022", "xls-196", "xlsx-273", "xlsb-339", "docx-132",
             "xls-195", "xlsx-271", "xlsb-338",
+            "doc-064", "docx-127", "xlsx-272", "xlsb-337", "ppt-392", "rtf-494",
+            "xlsb-336", "docx-126",
         })
         self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed) - len(boundaries))
         self.assertEqual(coverage["summary"]["reviewed_explicit_scope_boundaries"], len(boundaries))

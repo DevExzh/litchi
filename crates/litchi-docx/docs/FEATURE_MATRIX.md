@@ -378,3 +378,12 @@ DOCX TOC updates with bookmark/page-cache reuse, explicit missing-page refusal,
 file reopen and exact inverse. The earlier blanket field-execution exclusions
 are replaced by partial, scoped operation coverage; native mail merge still
 reports unsupported fields and remains inert.
+
+`docx-127` and `docx-126` are reviewed in
+`tools/native_office_evidence_reviews.json`. Native tests cover macro graph/source
+reads and saved legacy form state. `microsoft_office_native_alt_chunks.rs` adds
+library-authored AltChunk payloads to native DOCX/DOCM parents and checks lifecycle
+edits, source-bound replacement, save/reopen and inverse patches while preserving
+native body and macro data. Foreign-content conversion, external-target retrieval,
+rendering and macro/control execution remain outside the supported API. These
+derivatives do not supply native-authored AltChunk evidence.

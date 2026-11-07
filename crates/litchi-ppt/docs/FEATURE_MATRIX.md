@@ -220,3 +220,9 @@ unchecked trust too. These tests do not claim native application acceptance,
 legacy CryptoAPI signature authoring, trust-chain validation or revocation.
 Native signed-fixture handoffs remain open despite this bounded operation
 coverage; historical authoring statuses are unchanged.
+
+`ppt-392` is reviewed in `tools/native_office_evidence_reviews.json`. Native tests
+cover stored VBA source, media/OLE frames and paths, plus metadata edits preserving
+presentation and program payloads. External-resource retrieval, OLE/media
+activation, action-link following and macro execution remain outside the supported
+API.

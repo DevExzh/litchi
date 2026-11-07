@@ -347,3 +347,8 @@ DOCX TOC updates with bookmark/page-cache reuse, explicit missing-page refusal,
 file reopen and exact inverse. The earlier blanket field-execution exclusions
 are replaced by partial, scoped operation coverage; native mail merge still
 reports unsupported fields and remains inert.
+
+`doc-064` is reviewed in `tools/native_office_evidence_reviews.json`. Native tests
+cover bounded VBA source inspection, saved form defaults and inert payload
+retention. Compiling or executing VBA, instantiating controls and invoking host
+callbacks remain outside the supported API.
