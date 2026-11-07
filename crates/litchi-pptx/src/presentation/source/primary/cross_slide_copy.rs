@@ -16,10 +16,11 @@
 //! Reading or editing the committed package materializes the published
 //! artifact once.
 //!
-//! The copy is one-way: a [`Patch`] replays onto a package over the same
-//! retained destination source, and its inverse applied to the commit's own
-//! package restores the package the commit was made on; it is not a durable
-//! removal of the copied slide (stage [`super::Edit::remove_slide`] for that).
+//! A [`Patch`] retains its process-local before/after packages. Replay and
+//! inverse accept the retained owner or an independently opened byte-equal
+//! artifact, restoring the exact recorded state under the recipient's policy.
+//! This is not a durable removal wire format for the copied slide (stage
+//! [`super::Edit::remove_slide`] for that).
 //!
 //! ```no_run
 //! use litchi_pptx::SourceBackedPresentation;
@@ -139,8 +140,8 @@ impl Patch {
         self.steps.is_empty()
     }
 
-    /// The patch that restores the before state: it applies to the commit's
-    /// own package only.
+    /// Restore the retained before state from the commit's package or an
+    /// independently opened byte-equal artifact. This patch is process-local.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {

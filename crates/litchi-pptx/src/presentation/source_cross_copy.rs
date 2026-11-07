@@ -6,6 +6,8 @@
 //! destination layout only after its registered layout/master/theme boundary
 //! has been proven equivalent.
 
+mod passive_metadata;
+
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::io::{self, Write};
@@ -5140,8 +5142,16 @@ fn validate_xml_with_policy(
     let mut xml_version = XmlVersion::Implicit1_0;
     let mut transitional = false;
     let mut strict = false;
+    let mut passive_metadata =
+        passive_metadata::Proof::new(reject_dependency_surfaces, execution_context);
+    let prove_passive_metadata = !allow_unknown_namespaces
+        && !matches!(
+            validation_policy,
+            XmlValidationPolicy::ExistingDestinationAnchor
+        );
     loop {
         check_execution(execution_context)?;
+        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -5197,6 +5207,15 @@ fn validate_xml_with_policy(
                 let chart_is_strict = value == STRICT_CHART_NAMESPACE;
                 let creation_id =
                     value == P14_NAMESPACE && element.local_name().as_ref() == b"creationId";
+                let passive = prove_passive_metadata
+                    && passive_metadata.start(
+                        value,
+                        &element,
+                        depth,
+                        !is_start,
+                        decoder,
+                        xml_version,
+                    )?;
                 if (!pml || !allow_pml)
                     && (!dml || !allow_dml)
                     && (!chart
@@ -5205,6 +5224,7 @@ fn validate_xml_with_policy(
                             XmlValidationPolicy::SourceSlideCharts | XmlValidationPolicy::ChartPart
                         ))
                     && !creation_id
+                    && !passive
                     && !allow_unknown_namespaces
                     && !matches!(
                         validation_policy,
@@ -5241,7 +5261,7 @@ fn validate_xml_with_policy(
                         strict = true;
                     }
                 }
-                if creation_id {
+                if creation_id && !passive {
                     if is_start {
                         return refusal(
                             SlideCopyRefusal::UnknownSemanticSurface,
@@ -5293,6 +5313,7 @@ fn validate_xml_with_policy(
                         root_closed = true;
                     }
                 } else if reject_dependency_surfaces
+                    && !passive
                     && unsupported_surface(element.local_name().as_ref())
                     && !(matches!(validation_policy, XmlValidationPolicy::SourceSlideCharts)
                         && element.local_name().as_ref() == b"graphicFrame")
@@ -5414,6 +5435,9 @@ fn validate_xml_with_policy(
                 }
             },
             Event::End(_) => {
+                if prove_passive_metadata {
+                    passive_metadata.end(depth)?;
+                }
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("XML depth underflow"))?;
@@ -5463,6 +5487,13 @@ fn validate_xml_with_policy(
                 return Err(Error::Xml(format!(
                     "{context} contains an invalid XML character reference"
                 )));
+            },
+            Event::Text(text) if prove_passive_metadata => passive_metadata.text(text.as_ref())?,
+            Event::CData(text) if prove_passive_metadata => passive_metadata.text(text.as_ref())?,
+            Event::GeneralRef(_) if prove_passive_metadata && passive_metadata.active() => {
+                return Err(Error::slide_copy_refused(
+                    SlideCopyRefusal::UnknownSemanticSurface,
+                ));
             },
             Event::Eof => break,
             _ => {},

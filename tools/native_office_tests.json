@@ -6491,6 +6491,77 @@
         "After a valid internal-link addition, external add/set operations with 257 UTF-16 tooltip units under a 256-unit ceiling raise typed StringLimit and preserve all earlier staged bytes. Missing-index removal is also atomic; no ghost relationships survive."
       ],
       "scope_limit": "Failure atomicity for range, string encoding and missing-index cases on the native owner; other limits/signature cases retain separate synthetic coverage."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_copy",
+      "name": "native_picture_slides_copy_with_metadata_media_and_exact_member_preservation",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-visual-objects.potx"
+      ],
+      "feature_rows": [
+        "pptx-398"
+      ],
+      "assertions": [
+        "For PPTX, PPSX and POTX separately, an independent source instance copies native JPEG slide 2 into an equal native destination at position 0. The catalog grows from five to six slides; title, creation ID 2058337588 and the complete slide XML remain exact.",
+        "The 83204-byte JPEG has pinned SHA-256 b6f8d168d41e0fc296eb1e0e3855d9669584b7528c2ef4966817443d9bc9b929. Exactly one media part and one slide/relationship pair are added. Original members and manifest entries are preserved, deterministic file publication/replay pass, and reopened inverse with the retained process-local patch restores exact original bytes."
+      ],
+      "scope_limit": "Independent instances of the same native variant satisfy exact layout/master/theme equivalence. Cross-variant graph equivalence, dependent charts, SVG extension bindings, rendering and durable wire inverse are not inferred."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_copy",
+      "name": "native_copy_rejects_dependent_graphs_without_discarding_a_prior_copy",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-398"
+      ],
+      "assertions": [
+        "After staging a valid native JPEG copy, the native chart with outbound resources returns the exact unsupported-relationship refusal and leaves the prior copy intact.",
+        "Native SVG relationship extensions, unequal PPTX-to-PPSX dependency graphs and an MCE-bearing destination master retain exact typed semantic/shared-owner/MCE refusals. No-op publication and both source states stay unchanged."
+      ],
+      "scope_limit": "These are documented copy-profile boundaries on valid native inputs, not evidence of native chart/workbook, SVG alternate-binding, MCE or layout-retarget support."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_copy",
+      "name": "native_creation_and_modification_ids_retain_their_distinct_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-visual-objects.potx"
+      ],
+      "feature_rows": [
+        "pptx-442"
+      ],
+      "assertions": [
+        "All five slide creation IDs are asserted across PPTX/PPSX/POTX. SmartArt and chart shapes retain p14 modification IDs 1341187905 and 4245603230, while absent IDs remain absent; each slide retains its Title 1 shape.",
+        "The typed p14 owner distinguishes these unsigned identifiers from opaque DrawingML creation GUIDs. Empty edit commits preserve exact native bytes."
+      ],
+      "scope_limit": "Only native p14 creation/modification identifier metadata is qualified; no change-history reconstruction, random-number quality, collaboration or every 2010/2012 extension is claimed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_copy",
+      "name": "native_identifier_edits_preserve_the_chart_graph_and_unknown_creation_guids",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx"
+      ],
+      "feature_rows": [
+        "pptx-442"
+      ],
+      "assertions": [
+        "Update the native chart slide creation ID and chart-shape modification ID; a duplicate Title 1 modification ID is refused without discarding prior changes.",
+        "Only the two exact val attribute strings in slide4.xml change. Every other XML byte/member, including opaque a16 GUIDs and chart/style/color/embedded-workbook graph, remains exact. File save/reopen and reopened member inverse pass."
+      ],
+      "scope_limit": "Bounded existing-identifier update and duplicate-ID refusal only; no chart regeneration, collaboration history or fresh native-app reopen."
     }
   ]
 }
