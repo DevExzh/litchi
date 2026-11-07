@@ -7811,6 +7811,141 @@
         "Repeated assignment/removal is a no-op; native A7 watch, saved formula caches, text/style records and all unowned package data remain exact."
       ],
       "scope_limit": "Litchi-authored derivative on a native workbook; no native-authored phonetic fixture, rendered pronunciation, language conversion or fresh Excel validation."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_comment_tasks",
+      "name": "native_text_anchored_threads_match_eager_and_source_semantics",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-430"
+      ],
+      "assertions": [
+        "Exact author/comment/reply GUIDs, timestamps, text-range owner (slide 259, shape 3, cp 0, len 52), position, reply text and omitted task/status/progress fields are pinned in both native decks.",
+        "Eager and source-backed views agree on complete comment/author data and exact text; no-op publication retains original archive bytes."
+      ],
+      "scope_limit": "Native plain modern threads only; task/reaction extensions and V2 commands are absent. No collaboration execution or text-anchor relocation."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_comment_tasks",
+      "name": "native_thread_task_fields_preserve_anchor_reply_and_failed_staging",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx"
+      ],
+      "feature_rows": [
+        "pptx-430",
+        "pptx-448"
+      ],
+      "assertions": [
+        "A native thread gains title, 25-percent progress, an existing-author assignment and dates through package update/save/reopen; exact anchor, root/reply text and every other package member survive.",
+        "Unresolved assignment and stable-ID mutation fail without losing staged work; source/eager reads, no-op update, forward/stale replay and exact member inverse are checked."
+      ],
+      "scope_limit": "Library-authored task fields on a real comment; no native task authoring, task execution or fresh PowerPoint validation. Saved inverse restores payloads, not producer ZIP compression."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_comment_tasks",
+      "name": "native_source_task_history_and_reaction_derivatives_add_update_clear_and_invert",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx"
+      ],
+      "feature_rows": [
+        "pptx-430",
+        "pptx-448"
+      ],
+      "assertions": [
+        "Task-history event identity/time, native author and comment anchors, assignment/progress actions, and root/reply reaction type/author/time survive add/update/clear and file reopen.",
+        "Invalid task author GUID preserves staged work. Exact native anchor/body/reply content and all other members survive; every inverse restores its prior member contents."
+      ],
+      "scope_limit": "Task/reaction extensions are Litchi-authored derivatives using caller-selected extension URIs. Native files contain neither; Office recognition, collaboration and V2 command behavior remain unqualified."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_comment_tasks",
+      "name": "native_thread_reply_crud_and_author_reference_guards_preserve_other_parts",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx"
+      ],
+      "feature_rows": [
+        "pptx-430"
+      ],
+      "assertions": [
+        "Add, resolve and remove a reply on the native thread; saved reply ordering, stable GUIDs and complete original thread model are checked.",
+        "Referenced author removal fails while retaining the staged reply; only the comment part changes and inverse restores all prior payloads."
+      ],
+      "scope_limit": "Modern reply metadata CRUD only; no author authentication, synchronization, command execution or fresh native reopen."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_tracks",
+      "name": "native_tracks_keep_exact_caption_identity_cues_and_absent_narration",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-422",
+        "pptx-450"
+      ],
+      "assertions": [
+        "Native video shape 4 on slide 2 selects rId2 media and rId4 WebVTT; exact caption GUID, English label, en-us language, media display location and absent narration are pinned.",
+        "Two exact 0-1000/1000-2000 ms cue texts with absent identifiers/settings round-trip through the WebVTT codec; no-op archive is exact."
+      ],
+      "scope_limit": "Saved caption descriptor/cue metadata only; no media playback, rendering, full TracksInfo schema or narration-owner authoring."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_tracks",
+      "name": "native_caption_metadata_update_preserves_trim_fade_cues_and_every_other_member",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-422",
+        "pptx-450"
+      ],
+      "assertions": [
+        "Update caption GUID, XML-sensitive label, language and display location; native slide bytes change at only those attribute values, preserving trim/fade, WebVTT and all other members.",
+        "Invalid GUID/index and absent narration-owner creation preserve staged metadata; save/reopen, exact no-op, forward replay, stale refusal and member inverse are checked."
+      ],
+      "scope_limit": "Existing native metadata edits; no playback/event handling or new TracksInfo/narration owner. ZIP compression may differ after inverse of a saved package, while every member payload is exact."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_tracks",
+      "name": "native_caption_language_remove_and_restore_keep_a_valid_owner_and_exact_inverse",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-422",
+        "pptx-450"
+      ],
+      "assertions": [
+        "Remove optional en-us language, save/reopen, repeat as exact no-op and reinsert; typed metadata returns to native values and cue payloads remain unchanged.",
+        "Only the slide owner changes; attribute-removal whitespace is retained, and source-checked inverse restores exact original package members."
+      ],
+      "scope_limit": "Optional language attribute lifecycle only; no language conversion, captions rendering, media evaluation or native application acceptance."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_tracks",
+      "name": "native_source_can_add_an_inert_webvtt_part_without_replacing_the_native_track",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-422",
+        "pptx-450"
+      ],
+      "assertions": [
+        "Create a related WebVTT derivative with one changed cue; both original and new tracks read exactly, and only the new part and source relationships change; the existing WebVTT content-type default stays exact.",
+        "Existing relationship IDs and part names are refused atomically; native media still has exactly its original single descriptor, and inverse restores every original member."
+      ],
+      "scope_limit": "Related caption-part creation is distinct from attaching a descriptor or replacing an existing track. Added caption is an inert Litchi derivative; no player selection or native validation."
     }
   ]
 }

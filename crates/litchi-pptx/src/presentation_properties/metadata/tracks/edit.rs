@@ -160,7 +160,9 @@ impl Edit<'_> {
         load(self.staged.opc(), self.limits)
     }
 
-    /// Create or replace one caption track.
+    /// Create one caption-track relationship and, for an internal target, a new
+    /// WebVTT part. Existing relationship IDs and internal part names are refused.
+    /// This does not add a caption descriptor to a media shape.
     ///
     /// # Errors
     ///
