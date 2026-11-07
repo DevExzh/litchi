@@ -15,6 +15,7 @@ use super::model::{
 use super::xml::{
     escape_attribute, is_whitespace, normalize_encoding, reject_other_attributes,
     required_attribute, resolved_element, restore_encoding, validate_characters, validate_payload,
+    validate_reference,
 };
 use super::{
     CUSTOM_XML_NAMESPACE, ITEM_STREAM, MODIFIED_PROMOTION_STORAGE, PROPERTIES_STREAM,
@@ -1036,10 +1037,19 @@ pub(crate) fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Resul
             Event::CData(text) if state.opaque_depth == 0 && !is_whitespace(text.as_ref()) => {
                 return Err(invalid("Properties XML contains CDATA content"));
             },
-            Event::DocType(_) | Event::GeneralRef(_) => {
+            Event::DocType(_) => {
                 return Err(invalid(
                     "DTD and general entity references are forbidden in Properties XML",
                 ));
+            },
+            Event::GeneralRef(reference) => {
+                if state.depth == 0 {
+                    return Err(invalid("Properties XML has a reference outside its root"));
+                }
+                let whitespace = validate_reference(&reference)?;
+                if state.opaque_depth == 0 && !whitespace {
+                    return Err(invalid("Properties XML contains text content"));
+                }
             },
             Event::Eof => break,
             Event::Text(_)

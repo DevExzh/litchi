@@ -281,3 +281,12 @@ authored Python-part and PY-formula derivatives of native XLSX/XLSM parents reta
 opaque script/relationship bytes through ordinary edits. Auto/Eager uncached PY
 evaluation returns the exact unsupported calculation error. This does not qualify a
 native-authored Python specimen, typed Python model or execution.
+
+Native Transitional, Strict and macro-workbook parents now qualify shared Custom XML
+graph lifecycle operations and preservation. Rejected insertions retain both prior
+items and source preconditions; commit normalizes catalog order while staged
+ordinals remain usable. Properties removal now clears the stale part target as well
+as its relationship/value. Save/reopen, inverse, stale-source and exact payload-
+budget checks pass. Owned relationship/content-type XML may normalize, with complete
+effective-graph and all data-part/unowned-member preservation checked. Additions are
+library derivatives, and schemas are never fetched or executed.

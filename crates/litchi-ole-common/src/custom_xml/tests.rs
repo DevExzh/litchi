@@ -682,3 +682,85 @@ fn public_codecs_honor_property_depth_and_aggregate_limits() {
         Err(Error::ResourceLimit(_))
     ));
 }
+
+#[test]
+fn predefined_and_numeric_item_references_are_retained_without_entity_resolution() {
+    let source = "<r>&amp;&lt;&gt;&quot;&apos;&#65;&#x1F642;</r>";
+    for bytes in [
+        source.as_bytes().to_vec(),
+        [
+            vec![0xff, 0xfe],
+            source.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+        ]
+        .concat(),
+        [
+            vec![0xfe, 0xff],
+            source.encode_utf16().flat_map(u16::to_be_bytes).collect(),
+        ]
+        .concat(),
+    ] {
+        let item = Item::new("references", bytes.clone(), properties()).unwrap();
+        assert_eq!(item.root_name().local_name, "r");
+        assert_eq!(item.xml(), bytes);
+        let store = Store::new(Promotion::Unspecified, vec![item]).unwrap();
+        let mut writer = OleWriter::new();
+        write(&mut writer, &store, &Limits::default()).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(output.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            inspect(&mut ole, Limits::default()).unwrap().unwrap(),
+            store
+        );
+    }
+    for source in [
+        "<r>&undefined;</r>",
+        "<r>&#0;</r>",
+        "<r>&#xD800;</r>",
+        "<r>&#x110000;</r>",
+        "&#32;<r/>",
+        "<r/>&amp;",
+        "<!DOCTYPE r [<!ENTITY external SYSTEM 'https://example.invalid/never-read'>]><r>&external;</r>",
+    ] {
+        assert!(
+            Item::new("invalid", source.as_bytes().to_vec(), properties()).is_err(),
+            "accepted {source}"
+        );
+    }
+}
+
+#[test]
+fn properties_references_preserve_opaque_text_and_reject_nonwhitespace_core_text() {
+    let source = format!(
+        r#"<d:datastoreItem xmlns:d="{CUSTOM_XML_NAMESPACE}" xmlns:x="urn:opaque" d:itemID="{ITEM_ID}">&#32;<x:payload>A &amp; B &#x1F642;</x:payload></d:datastoreItem>"#
+    );
+    let parsed = parse_properties(source.as_bytes(), &Limits::default()).unwrap();
+    assert_eq!(parsed.item_id.to_string(), ITEM_ID);
+    assert!(parsed.schema_references.is_empty());
+    let base = snapshot_store();
+    let mut edit = base.edit();
+    edit.set_properties_xml(0, source.as_bytes().to_vec())
+        .unwrap();
+    let first = edit.commit().unwrap();
+    let mut edit = first.package().edit();
+    edit.set_schema_references(0, ["https://example.invalid/schema"])
+        .unwrap();
+    let changed = edit.commit().unwrap();
+    assert!(
+        std::str::from_utf8(changed.package().item(0).unwrap().properties_xml())
+            .unwrap()
+            .contains("A &amp; B &#x1F642;")
+    );
+    for xml in [
+        source.replace("&#32;", "&amp;"),
+        source.replace("&amp; B", "&undefined; B"),
+        source.replace("&#x1F642;", "&#0;"),
+        format!("&#32;{source}"),
+    ] {
+        assert!(parse_properties(xml.as_bytes(), &Limits::default()).is_err());
+    }
+}

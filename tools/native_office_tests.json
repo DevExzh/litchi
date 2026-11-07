@@ -9427,6 +9427,104 @@
         "Library-added symEx runs survive the header, footnote, endnote, comment and glossary semantic MCE projections. Source-backed note/comment reads agree, unselected parts remain byte-exact, and file reopen retains the selected source payload."
       ],
       "scope_limit": "These are explicit native-parent extension derivatives. Namespace visibility is qualified across story readers, not symbol rendering or general foreign-extension semantics."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_custom_xml",
+      "name": "native_doc_custom_xml_lifecycle_and_text_edits_preserve_opaque_storage_metadata",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-024",
+        "doc-032"
+      ],
+      "assertions": [
+        "Native document/macro-template parents begin without MsoDataStore. Explicit store and opaque-storage derivatives use the public shared store and CFB owners for add/update/remove, exact no-op, stale rejection, limits, file reopen, artifact replay and byte-exact inverse.",
+        "Typed IDs, expanded root names, schemas and exact UTF-8 XML/Properties bytes survive publication. Ordinary DOC paragraph edits preserve every stream outside WordDocument/0Table/1Table, including macro data, the new store, opaque binary payload and empty-storage CLSIDs/state bits/timestamps; native text/template state is retained before the deliberate title change."
+      ],
+      "scope_limit": "Custom XML and opaque storage are library-authored additions to immutable native parents. Store patches own the typed store; CFB publication uses the public object owner. Object target keys are host open policy, so artifact replay uses an unselected view and target catalogs are reopened. No schema resolution, XML mapping, IRM promotion, macro execution or native-app acceptance is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_custom_xml",
+      "name": "native_xls_custom_xml_lifecycle_and_cell_edits_preserve_opaque_storage_metadata",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-152"
+      ],
+      "assertions": [
+        "Native workbook/macro-template parents receive explicit MsoDataStore and opaque-storage derivatives through the shared store/CFB owners. Typed XML CRUD, duplicate/malformed rejection, exact item quota, source conflict, save/reopen, replay and complete artifact inverse preserve native streams and directory metadata.",
+        "A normal Sheet1 Z121=42.5 insertion changes only the Workbook stream; every other stream, the custom store and empty opaque storage metadata remain exact. File reopen retains the value and the native inverse restores the complete input derivative."
+      ],
+      "scope_limit": "Payload-oriented shared CFB ownership only, not a new workbook XML-mapping engine or native-authored Custom XML specimen. Artifact patch targets are caller policy and are reopened after topology changes; no provider or macro execution occurs."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_custom_xml",
+      "name": "native_custom_xml_rejected_duplicate_id_preserves_prior_valid_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-254"
+      ],
+      "assertions": [
+        "After a valid new item is staged, a duplicate GUID targeting another native owner returns the exact Invalid error. The rejected item is absent, the source-precondition snapshot is unchanged, and prior valid staging still commits. Native source member bytes stay unchanged."
+      ],
+      "scope_limit": "Library-authored Custom XML graph derivatives; this tests transaction atomicity, not native producer XML mappings."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_custom_xml",
+      "name": "native_custom_xml_catalog_order_is_independent_of_staging_order",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsm"
+      ],
+      "feature_rows": [
+        "xlsx-254"
+      ],
+      "assertions": [
+        "Stage B then A and update staged ordinal zero. Publication succeeds in deterministic source/relationship catalog order A,B while retaining the update on B. Full graph/data preservation and inverse are checked; original macro-workbook bytes remain unchanged."
+      ],
+      "scope_limit": "Staged ordinals are kept until commit; published snapshots use catalog order. Owned manifest/relationship XML may normalize, so inverse checks compare the complete effective graph, all data parts, exact member keys and every unowned member byte."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_custom_xml",
+      "name": "native_transitional_strict_and_macro_custom_xml_lifecycle_preserves_all_native_parts",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-254"
+      ],
+      "assertions": [
+        "Explicit custom data/properties parts use each native parent’s Transitional or Strict relationships/namespaces. Create, payload/schema update with retained opaque properties markup, equal no-op, stale replay, properties-only removal and final item removal all save/reopen and invert.",
+        "Every native part payload, content type and unrelated relationship stays intact, including macros. The payload/schema update changes exactly the two intended custom members. Properties removal clears its staged target, typed data and XML, then collects only the unreferenced properties part."
+      ],
+      "scope_limit": "These are library-authored metadata additions. Unknown XML and schemas stay inert; there is no schema validation, mapped-cell synchronization, external retrieval or fresh Excel validation. Graph serialization normalization is scoped explicitly."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_custom_xml",
+      "name": "native_custom_xml_payload_budget_preserves_an_exact_limit_staged_value",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-254"
+      ],
+      "assertions": [
+        "Under a limit admitting every original native part, an exactly bounded XML payload stages successfully. One byte more returns the exact CustomXml PayloadBytes limit with actual/maximum counts without losing the prior payload. The retained change commits/reopens and the native source stays exact."
+      ],
+      "scope_limit": "Payload admission/atomicity only; output is a library derivative and no application XML semantics are executed."
     }
   ]
 }

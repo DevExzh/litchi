@@ -245,3 +245,10 @@ classic notes, pivot caches and converted array/formula storage from modern thre
 slicer/timeline models and rich-value/spill engines. Public native XLS threaded-
 comment and slicer paths retain their precise declared errors; supported bounded
 calculation is not excluded by these reviews.
+
+Native workbook and macro-template parents now qualify shared Custom XML store CRUD
+and public CFB publication, followed by ordinary native cell edits. XML/Properties
+streams, schema URI strings and opaque storage metadata remain inert and preserved;
+complete CFB inverse replay restores input bytes. xls-152 gains bounded payload-
+operation coverage, not a workbook XML-mapping model or a native-authored store
+specimen.

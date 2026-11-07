@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use quick_xml::XmlVersion;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
@@ -67,10 +67,16 @@ pub(crate) fn validate_payload(xml: &[u8], limits: &Limits) -> Result<RootName> 
             Event::CData(text) if depth == 0 && !is_whitespace(text.as_ref()) => {
                 return Err(invalid("Item XML has CDATA outside its root"));
             },
-            Event::DocType(_) | Event::GeneralRef(_) => {
+            Event::DocType(_) => {
                 return Err(invalid(
                     "DTD and general entity references are forbidden in Item XML",
                 ));
+            },
+            Event::GeneralRef(reference) => {
+                if depth == 0 {
+                    return Err(invalid("Item XML has a reference outside its root"));
+                }
+                validate_reference(&reference)?;
             },
             Event::Eof => break,
             Event::Text(_)
@@ -84,6 +90,30 @@ pub(crate) fn validate_payload(xml: &[u8], limits: &Limits) -> Result<RootName> 
         return Err(invalid("Item XML must have exactly one complete root"));
     }
     root_name.ok_or_else(|| invalid("Item XML has no root"))
+}
+
+/// Validate a numeric or predefined reference without resolving application
+/// entities or changing the retained lexical bytes. Return whether it is XML
+/// whitespace, for callers whose known grammar permits no other text.
+pub(crate) fn validate_reference(reference: &BytesRef<'_>) -> Result<bool> {
+    if let Some(character) = reference
+        .resolve_char_ref()
+        .map_err(|error| xml_error(error.to_string()))?
+    {
+        let mut encoded = [0; 4];
+        let value = character.encode_utf8(&mut encoded);
+        validate_characters(value)?;
+        return Ok(is_whitespace(value.as_bytes()));
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| xml_error(error.to_string()))?;
+    if quick_xml::escape::resolve_predefined_entity(&name).is_none() {
+        return Err(invalid(
+            "general entity references are forbidden in Custom XML",
+        ));
+    }
+    Ok(false)
 }
 
 fn expanded_root(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<RootName> {

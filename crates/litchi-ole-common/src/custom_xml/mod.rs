@@ -3,6 +3,8 @@
 //! The item payload is structurally validated and retained verbatim. Schema
 //! references are metadata only: this module never resolves a URI, loads a
 //! schema, expands an external entity, or executes application-specific XML.
+//! Numeric and predefined XML references are validated without changing their
+//! lexical bytes; DTDs, undeclared references and invalid characters are refused.
 
 mod codec;
 mod model;

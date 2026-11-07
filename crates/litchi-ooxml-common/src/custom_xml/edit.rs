@@ -64,7 +64,8 @@ impl Edit {
         &self.before
     }
 
-    /// Borrow the currently staged items.
+    /// Borrow the currently staged items. Insertions append here; publication
+    /// uses the snapshot's source-part and relationship-ID catalog order.
     #[must_use]
     pub fn items(&self) -> &[Item] {
         &self.draft
@@ -261,7 +262,7 @@ impl Edit {
                 "the Custom XML data target is already occupied",
             ));
         }
-        if !self
+        let before = if !self
             .before
             .scope_names()
             .iter()
@@ -269,11 +270,20 @@ impl Edit {
         {
             let mut hints = self.before.scope_names();
             push_name(&mut hints, item.source());
-            self.before = Snapshot::load_scoped(&self.source, &hints)?;
-        }
+            Some(Snapshot::load_scoped(&self.source, &hints)?)
+        } else {
+            None
+        };
         self.draft.push(item);
         let source_limits = self.source.read_limits();
-        validation::items(&self.draft, &source_limits)?;
+        if let Err(error) = validation::items(&self.draft, &source_limits) {
+            let _ = self.draft.pop();
+            return Err(error);
+        }
+        // A rejected item must not widen the patch's source precondition.
+        if let Some(before) = before {
+            self.before = before;
+        }
         Ok(self.draft.len() - 1)
     }
 
@@ -305,7 +315,15 @@ impl Edit {
     /// Returns [`Error::Signed`] for a change to a signed package, and an
     /// error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        // Keep staged ordinals usable until commit, then match discovery's
+        // deterministic catalog order before checking the published values.
+        self.draft.sort_unstable_by(|left, right| {
+            left.source()
+                .as_str()
+                .cmp(right.source().as_str())
+                .then_with(|| left.rel_id().cmp(right.rel_id()))
+        });
         if !self.is_staged() {
             let patch = Patch::new(self.before.clone(), self.before);
             return Ok(Commit::new(self.source, patch, Diagnostics::UNCHANGED));
@@ -406,6 +424,10 @@ fn clone_item(
     props_xml: Option<Vec<u8>>,
     relationships: Vec<Relationship>,
 ) -> Item {
+    let props_part = current
+        .props_part()
+        .filter(|_| props_xml.is_some())
+        .cloned();
     Item::new(
         current.source().clone(),
         current.rel_id().into(),
@@ -414,7 +436,7 @@ fn clone_item(
         content_type,
         root,
         Arc::new(xml),
-        current.props_part().cloned(),
+        props_part,
         props,
         props_xml.map(Arc::new),
         relationships.into(),
