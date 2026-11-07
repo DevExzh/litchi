@@ -69,7 +69,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Text boxes, paragraphs, runs, and bullets | ✅ | ✅ | ✅ | Bounded DrawingML text extraction and formatted text-box authoring, including text defaults and paragraph/run content |
-| Text styles and Kinsoku settings | ✅ | ✅ | ✅ | Presentation default text-style inventory and Kinsoku line-breaking settings are exposed as typed metadata |
+| Text styles and Kinsoku settings | 🟡 | 🟡 | 🟡 | Presentation `defaultTextStyle` and `kinsoku` are retained as source XML by package operations; the current presentation owner has no dedicated typed accessor or semantic transaction for these children. The Kinsoku asset test inspects raw XML and does not establish a typed facade. Native tests pin saved default-style values and exact preservation during an independent property edit, without style resolution or line breaking. |
 | Basic shapes, groups, transforms, and geometry | ✅ | ✅ | ✅ | Rectangles, ellipses, lines, text boxes, nested groups, formatting, non-visual IDs, deterministic depth-first shape inventory, and semantic shape selection |
 | Placeholders and master/layout inheritance | ✅ | ✅ | ✅ | Placeholder metadata and add/replace operations are validated against master/layout relationships; title-family types and subtitle indices bind to native layout slots, and bound shapes inherit geometry through an empty `spPr`. Effective rendering is not performed |
 | Images and picture backgrounds | ✅ | ✅ | ✅ | Embedded and linked picture resources, photo-album defaults, solid/gradient/pattern/picture backgrounds, inheritance, and relationship-resolved resources. `SourceBackedPresentation` additionally exposes a metadata-only scene-order inventory and exact zero-based reads for validated direct `p:pic` images under `/ppt/media/`; the `[MS-ODRAWXML]` 2.26 `asvg:svgBlip` extension is typed as an optional SVG descriptor with deferred embedded payload reads. Native vector-only pictures without a raster reference use the SVG as their primary image; linked SVG targets remain inert. External targets remain inert and backgrounds, inherited owners, notes, charts, OLE previews, and ambiguous/MCE picture branches are refused |
@@ -91,7 +91,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed effect/option combinations, direction/axis/corner/origin/shape/ripple/spoke variants, inherited slide/layout/master transitions, duration, speed, click, and timed advance |
 | PowerPoint 2010 transition extensions | ✅ | ✅ | ✅ | Compatibility-choice ripple plus the 18 remaining normative p14 effects (`conveyor`, `doors`, `ferris`, `flash`, `flip`, `flythrough`, `gallery`, `glitter`, `honeycomb`, `pan`, `prism`, `reveal`, `shred`, `switch`, `vortex`, `warp`, `wheelReverse`, and `window`), typed direction/options, exact bounded `h`, `min`, `s`, `ms`, `µs`, `ns`, and unitless decimal durations, deterministic fade fallback, bounded unknown-child retention, and safe prefix handling |
 | Morph and preset transitions | ✅ | ✅ | ✅ | Typed `p159:morph` (`byObject`, `byWord`, and `byChar`) and `p15:prstTrans` (`prst`, `invX`, and `invY`) values, MCE choices with deterministic fade fallbacks, bounded preset names, source-backed direct-transition editing, and exact source XML preservation for semantic no-op writes |
-| Slide-show laser traces | ✅ | ✅ | ✅ | Typed inert p14:laserTraceLst coordinates and time offsets with validated extension storage; traces are never replayed or rendered |
+| Slide-show laser traces | ✅ | ✅ | ✅ | Typed inert p14:laserTraceLst coordinates and time offsets with validated initial extension storage and reversible patches. Replacing an existing trace through `edit_laser_traces().set` is explicitly refused; traces are never replayed or rendered |
 | Slide-show event records | ✅ | ✅ | ✅ | `presentation_properties::metadata::events::{Snapshot, Edit, Commit, Patch}` provides bounded source-checked trigger/media event CRUD with opaque extension preservation; events are never replayed or executed |
 
 ## Comments, embedded content, and extensibility
@@ -294,3 +294,30 @@ with embedded-workbook/style/color relationships, the SVG extension binding and
 an MCE-bearing master. Native p14 creation/modification identifier reads and
 updates have separate exact-byte preservation assertions; DrawingML creation
 GUIDs remain unchanged and no collaboration history is inferred.
+
+## Native presentation preference qualification
+
+`tests/microsoft_office_native_preferences.rs` exercises the visual-object and
+passive-macro presentation, slideshow and template variants. These native files
+have no read-only recommendation or programmable-tag owners. The tests create
+Litchi derivatives, read and update their typed values, remove their owners, and
+verify file reopen, source-checked replay/inverses and unchanged payloads. An
+inert read-only recommendation still permits edits. Slide tags stay distinct
+from title-shape tags, and failed selectors retain prior staged work. All macro,
+chart, image and other unrelated resources remain exact.
+
+The native default style has nine levels, 457200-EMU indentation steps,
+914400-EMU default tabs and 1800/1200 size/kerning values. These are explicit raw
+source assertions and preservation checks, not a typed Kinsoku/default-style
+API or layout calculation. Borrowed-buffer ingress preserves member payloads
+while it may re-encode the ZIP; reader ingress also retains exact no-op archive
+bytes. Graph-changing inverses compare relationships and effective content
+types, with byte-exact comparison of all other members.
+
+Laser-trace creation is a Litchi-authored addition to native visual, macro and
+motion slides. Show-event CRUD targets the existing video shape (ID 4 on slide
+2) in both native media presentations, after adding a laser trace to that slide.
+Tests preserve existing creation IDs, shape content and media, retain a prior laser extension during event edits, and
+check exact replacement/empty-event refusals without losing staged work. The
+corpus specimens do not supply native-authored laser/event data for these tests.
+No fresh PowerPoint reopen, playback, rendering or macro execution is claimed.

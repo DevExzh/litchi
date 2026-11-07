@@ -7172,6 +7172,119 @@
         "Create/update/delete an inert package sidecar and root relationship on the recorded-macro source, with file reopen and inverse graph/payload checks. A failed update rolls back only that call and retains earlier staged work. Publication refuses a derivative with a truncated workbook while the source and unrelated VBA/binary payloads remain exact."
       ],
       "scope_limit": "Generic graph CRUD and workbook validation only; the sidecar is Litchi-authored and macros are not executed. No native Excel reopen is claimed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_default_text_style_bytes_survive_independent_property_edits",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-passive-macro.potm"
+      ],
+      "feature_rows": [
+        "pptx-410"
+      ],
+      "assertions": [
+        "Pin raw native default text-style values across nine levels: indentation, tab size, alignment, script line-breaking flags, size/kerning and theme font. An independent read-only property edit retains the full presentation member and existing image-DPI/discard/chart-tracking extensions exactly; reader no-ops retain the archive and borrowed-buffer ingress retains all member payloads."
+      ],
+      "scope_limit": "Raw positive source assertions and preservation only. The current presentation owner has no dedicated typed Kinsoku/default-style accessor or semantic transaction. These fixtures do not contain native Kinsoku settings; no layout or line-breaking result is claimed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_readonly_recommendation_crud_is_inert_reversible_and_source_checked",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-passive-macro.potm"
+      ],
+      "feature_rows": [
+        "pptx-407"
+      ],
+      "assertions": [
+        "Create true, update false, distinguish absent from false, and remove the recommendation on six native variants. File reopen, exact no-op, forward replay, stale rejection and inverse pass; the properties owner and unrelated payloads survive. A true hint still permits tag edits."
+      ],
+      "scope_limit": "The native inputs lack readonlyRecommended; this tests Litchi-authored derivatives and inert metadata behavior, not native recommendation authoring or host UI enforcement."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_slide_tag_crud_preserves_shapes_resources_and_prior_staged_changes",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-passive-macro.potm"
+      ],
+      "feature_rows": [
+        "pptx-434"
+      ],
+      "assertions": [
+        "Create/update/remove direct slide tags with case-insensitive lookup and literal escaped Unicode values. Invalid slide selection retains earlier staged tags. File reopen, forward replay, stale refusal, orphan-part cleanup and inverse preserve native shape trees, creation IDs and all unrelated package members."
+      ],
+      "scope_limit": "Tags are Litchi-authored additions to immutable native inputs. This does not establish native-authored tag/customer-data semantics, execution, or arbitrary customer-data/schema editing."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_shape_tags_keep_direct_and_sibling_owners_distinct",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-passive-macro.potm"
+      ],
+      "feature_rows": [
+        "pptx-434"
+      ],
+      "assertions": [
+        "Title-shape tag CRUD coexists with a distinct direct slide-tag list; subtitle tags remain absent. Invalid shape selection retains staged work. File reopen, inverse, selected title text/creation-ID preservation, separate part allocation and orphan cleanup leave direct tags and unrelated payloads exact."
+      ],
+      "scope_limit": "Shape/direct tag ownership on native variants with Litchi-created tag lists; generic shared-anchor graphs and native customer-data schemas remain outside this test."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_laser_creation_preserves_slide_content_and_refuses_replacement_atomically",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-427"
+      ],
+      "assertions": [
+        "Create a trace with exact time offsets and EMU coordinates on native slides. Initial creation survives a later precise unsupported replacement refusal, file reopen, forward replay and inverse. Existing shape content/creation IDs and every other member remain exact; stale patches fail."
+      ],
+      "scope_limit": "Litchi-authored trace additions, not native-authored trace fixtures. Only initial storage is supported by this API; no replacement, playback or rendering is claimed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_preferences",
+      "name": "native_event_crud_preserves_existing_laser_creation_ids_and_media_payloads",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-428"
+      ],
+      "assertions": [
+        "Verify native video shape ID 4 on slide 2, then add seven typed trigger/play/pause/seek/resume/stop/null records with exact IDs/times. Updates, empty-list refusal, removal, file reopen, stale rejection and inverses preserve an existing Litchi laser trace, native creation IDs, shape XML and all media/package payloads."
+      ],
+      "scope_limit": "Events are Litchi-authored native-source derivatives. Typed inert values and preservation are tested; native event recording, playback, event dispatch and temporal/media execution validation are not claimed."
     }
   ]
 }

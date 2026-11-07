@@ -11,10 +11,10 @@ const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/kinsoku/presentation.xml");
 
 #[test]
-fn presentation_kinsoku_settings_are_exposed_by_the_part_owner() {
-    // Kinsoku remains an intentionally narrow PresentationML part projection;
-    // keep its language and character-set regression here until a dedicated
-    // standalone metadata owner is published.
+fn tracked_kinsoku_fixture_contains_the_expected_raw_metadata() {
+    // This checks a tracked XML asset, not a public typed Kinsoku projection.
+    // The current presentation owner retains this vocabulary as source XML;
+    // it does not expose a dedicated semantic accessor or transaction.
     let settings = parse_kinsoku(PRESENTATION_XML);
 
     assert_eq!(settings.language.as_deref(), Some("ja-jp"));
