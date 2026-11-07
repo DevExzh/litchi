@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "d786e9614674a1e92b21c207d2a73c20db117148",
+  "base_commit": "86bac3b1088ad11cb055cc40fda5e6db025f80cd",
+  "problem": "Native-parent XML-map metadata and opaque AltChunk edits lacked focused operation coverage. Eight execution/import boundary rows still needed explicit evidence reviews distinguishing supported stored-data operations from application runtimes.",
+  "changes": [
+    "Add three XLSB native-parent XML-map tests for catalog/single-cell lifecycle, worksheet ordering after a chart, LTXML-only table restrictions, invalid staging, dependency guards, quotas and stale patches.",
+    "Add three DOCX/DOCM native-parent AltChunk tests for ordered lifecycle edits, source-bound opaque payload replacement, invalid selectors, MIME-family refusal and stale-source guards.",
+    "Bind all six tests to scoped partial feature coverage. Review doc-064, docx-127, xlsx-272, xlsb-337, ppt-392, rtf-494, xlsb-336 and docx-126 as explicit execution/import boundaries; keep them uncovered rather than crediting execution.",
+    "Update six owning matrices and coverage validation expectations. No production implementation or native fixture bytes changed."
+  ],
+  "verification_scope": {
+    "xlsb": "The native metadata workbook starts without XML maps. A library catalog and singleton binding on its last worksheet can be created, renamed, updated and removed. Print_015!B2 stays Int(42); every worksheet payload remains exact. Updates change only xl/xmlMaps.xml and the singleton binding part. A second native workbook has a leading chart and an ordinary range table: worksheet ordinal 1 correctly selects sheet2.bin, while table-column binding returns the exact LTXML refusal. No mapped-table success is claimed.",
+    "docx": "Native DOCX and macro-enabled DOCM parents receive explicit library-authored HTML, text, RTF and inert external-link derivatives. Add/move/replace/remove, file reopen, replay and inverse preserve body XML outside AltChunk spans, paragraph text and all unrelated members including macros. Replacement collects the old unreferenced target and resolves the new committed anchor.",
+    "payload_overlay": "Source-bound HTML replacement changes exactly one member and leaves anchor/relationship data untouched. Reopen and inverse restore all member payloads. A different MIME family refuses InvalidValue; applying a patch to a different committed source refuses the exact family PatchConflict.",
+    "preservation_contract": "Graph lifecycle inverses compare all effective content types and relationships plus every data-part payload and the exact member-key set. Only explicitly owned relationship/content-type XML serialization may normalize; all other member bytes remain exact. Compressed ZIP identity is not inferred from payload comparisons.",
+    "guards": "Duplicate/absent map IDs, out-of-range worksheets, catalog removal with live bindings, one-binding quota, stale map patches and invalid AltChunk selectors retain valid staging and leave original sources unchanged.",
+    "execution_reviews": "Existing native VBA, forms, media/OLE and RTF object tests are rerun to qualify stored data and supported preservation operations. The review records unsupported application runtime scope; it does not manufacture an execution endpoint or claim a general sandbox guarantee.",
+    "limitations": "XML maps and AltChunks are library-authored derivatives of native parents, not native-authored specimens. No XML instance import/export, XPath/schema evaluation, URI retrieval, foreign-format conversion, macro/control execution or fresh Microsoft Office reopen was performed."
+  },
+  "open_findings": [
+    {
+      "id": "native-shared-worksheet-coordinate-contract",
+      "status": "unresolved-supported-behavior-investigation",
+      "observed": "On native excel/excel-metadata.xlsb, Print_015.cell_value(2,2) returns Empty, while cell_by_coordinate(\"B2\").value() returns Int(42). The shared Worksheet trait documents numeric cell/cell_value arguments as one-based, but the eager XLSB implementation accesses zero-based storage directly. XLS uses the same pattern. Both Cell trait implementations also return raw zero-based positions despite shared one-based documentation.",
+      "source_refs": [
+        "crates/litchi-core/src/sheet/traits.rs",
+        "crates/litchi-xlsb/src/sheet.rs",
+        "crates/litchi-xlsb/src/host/cell.rs",
+        "crates/litchi-xls/src/worksheet/mod.rs",
+        "crates/litchi-xls/src/cell.rs"
+      ],
+      "diagnostic_artifact": {
+        "file_name": "native-maps-coordinate-observation.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-coordinate-observation.log",
+        "bytes": 18203,
+        "sha256": "6972983a99b0c698b719f99ad85e5eeeed57dad23f283c6c7e62f67dc7624353"
+      },
+      "diagnostic_limit": "The early failing probe expected Float(42.0); the coordinate-based reader subsequently established Int(42). The unresolved discrepancy is numeric (2,2) yielding Empty versus B2 yielding 42, not integer versus float representation. This early probe is retained only as diagnostic evidence, not as a passing test.",
+      "reproduce": "Open Package::from_bytes for test-data/microsoft-office/excel/excel-metadata.xlsb, obtain workbook().worksheet_by_name(\"Print_015\"), import litchi_core::sheet::{WorkbookTrait, Worksheet, Cell}, and compare worksheet.cell_value(2, 2) with worksheet.cell_by_coordinate(\"B2\").value(). Inspect the shared trait contract alongside each native implementation.",
+      "required_followup": "Audit direct native APIs, shared trait adapters, cell iterators and FormulaEvaluator consumers across XLS/XLSB/XLSX. Reconcile supported public coordinate semantics with narrow compatibility-aware changes and permanent native fixture regressions. Do not classify the discrepancy as an intentional unsupported boundary.",
+      "current_test_scope": "The XML-map preservation test uses coordinate lookup to test its metadata contract. The numeric discrepancy remains an explicit open goal item."
+    }
+  ],
+  "coverage": {
+    "summary": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 352,
+      "indexed_tests": 516,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 33,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 352,
+        "native_ui_limitation_needs_review": 57,
+        "external_fixture_handoff_needs_review": 19,
+        "reviewed_native_fixture_gap_requires_followup": 23,
+        "reviewed_explicit_scope_boundary": 33,
+        "unsupported_boundary_needs_review": 9,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsb -p litchi-docx --all-features --test microsoft_office_native_xml_maps --test microsoft_office_native_alt_chunks --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-focused.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-focused.log",
+        "bytes": 19234,
+        "sha256": "a13b2b42b7a5a0e8cccdbbd74c5645b5abbefe8e3fe7be92a374e2a7f6cf53b9"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsb -p litchi-docx --all-features --test microsoft_office_native_xml_maps --test microsoft_office_native_alt_chunks --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-focused.log 2>&1",
+      "results": {
+        "targets": 2,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-rtf -p litchi-xlsx -p litchi-xlsb --all-features --test microsoft_office_native --test microsoft_office_native_vba --test microsoft_office_native_mail_merge --test microsoft_office_native_controls --test microsoft_office_native_metadata --test microsoft_office_native_embedded --test microsoft_office_native_preferences --test microsoft_office_native_visuals --test alt_chunk_authoring --test xml_maps_public --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-owners.log",
+        "bytes": 41684,
+        "sha256": "59bc15a10f51b3684951b0b7b1db6cf87f30de38b19c17e2c89d84f39f19b9c6"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-rtf -p litchi-xlsx -p litchi-xlsb --all-features --test microsoft_office_native --test microsoft_office_native_vba --test microsoft_office_native_mail_merge --test microsoft_office_native_controls --test microsoft_office_native_metadata --test microsoft_office_native_embedded --test microsoft_office_native_preferences --test microsoft_office_native_visuals --test alt_chunk_authoring --test xml_maps_public --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-owners.log 2>&1",
+      "results": {
+        "targets": 24,
+        "passed": 204,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test source_backed alt_chunk --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-source.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-source.log",
+        "bytes": 18721,
+        "sha256": "dde32f259238308aa7fd6a322000c7bf4bdb23eec8a58a0b9fe358cae4c49f8b"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test source_backed alt_chunk --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-source.log 2>&1",
+      "results": {
+        "targets": 1,
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx -p litchi-xlsb --all-features --test microsoft_office_native_alt_chunks --test microsoft_office_native_xml_maps --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-clippy.log",
+        "bytes": 18166,
+        "sha256": "6ab3def0ddc225e6cb00d8fbf6840af58e1076a01ddab393edacdce8a3786f43"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx -p litchi-xlsb --all-features --test microsoft_office_native_alt_chunks --test microsoft_office_native_xml_maps --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-python.log",
+        "bytes": 669,
+        "sha256": "b61691dd3f72dc0b4885a31a2122f87289d53d5b1a10d5d7e6d58900aa300c66"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-gate.log 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-xlsb/tests/microsoft_office_native_xml_maps.rs crates/litchi-docx/tests/microsoft_office_native_alt_chunks.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-format.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --edition 2024 --check crates/litchi-xlsb/tests/microsoft_office_native_xml_maps.rs crates/litchi-docx/tests/microsoft_office_native_alt_chunks.rs > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-format.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-maps-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-coverage.json",
+        "bytes": 1302610,
+        "sha256": "f4f511ecc2870208eae6c63210707fe16a077d483c81ba26b784c1e2799f3242"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-maps-coverage.json 2>&1"
+    }
+  ],
+  "validation_totals": {
+    "distinct_rust_tests_passed": 215,
+    "rust_tests_ignored": 0,
+    "python_tests_passed": 77,
+    "clippy": "passed; existing dependency warnings in vendored zlib-rs and allsorts remain unchanged",
+    "formatting": "passed for both new integration targets",
+    "gate": "non-iWork topology verification passed; corpus manifest/hash and coverage checks passed",
+    "staged_file_guards": "Both required size/binaries guards emitted nothing before the source commit; repeated before this receipt commit."
+  },
+  "environment": {
+    "logs_and_build_outputs": "/home/zhuhe/.cache/litchi-native-office.V1L32Z",
+    "temporary_files": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp",
+    "sparse_checkout": "Existing tracked fixtures are materialized from HEAD as needed; tests use only tracked test-data paths.",
+    "unrelated_untracked_files": "Original bench_word_parse.rs, ADR 0033 and perf.data remain unchanged, verified by SHA-256."
+  },
+  "goal_status": "active; the coordinate finding and remaining feature/scope reviews are not complete"
+}
