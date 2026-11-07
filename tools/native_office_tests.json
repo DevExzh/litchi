@@ -11159,6 +11159,102 @@
         "Malformed derivatives with truncated, zero/negative, duplicate, reversed or orphaned metadata prefixes return exact InvalidFormat errors at cell publication and leave the source package and native fixture unchanged."
       ],
       "scope_limit": "Structural publication validates prefix framing and association; cross-part metadata-index semantics remain opaque and are not claimed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xlsb_dde_ole_derivatives_read_exact_caches_and_preserve_noops",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-321"
+      ],
+      "assertions": [
+        "Independent DDE/OLE record streams expose exact 2x3 row-major caches containing empty, numeric, Boolean, error and Unicode string values. Eager/source-backed reads agree; no-op bytes, unused flag bits, opaque records, original link ordinals and native cells are preserved through OPC publication and inverse."
+      ],
+      "scope_limit": "Explicit library-authored derivatives on native parents; the corpus does not provide native DDE/OLE producer records. Targets remain inert and no data exchange, OLE activation or refresh is performed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xlsb_dde_item_cache_lifecycle_keeps_opaque_records_and_failed_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-321"
+      ],
+      "assertions": [
+        "DDE server/topic, flags and long Unicode cache updates preserve unused bits and opaque records. Case-insensitive item add/remove, cache clearing, empty collections and recreation save/reopen exactly; wrong-kind staging and stale patches return precise errors."
+      ],
+      "scope_limit": "Detached stream edits are published through the public OPC owner with explicit host setup; this does not establish a dedicated package DDE editor or server behavior."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xlsb_ole_item_cache_lifecycle_keeps_external_relationships_inert",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-321"
+      ],
+      "assertions": [
+        "OLE ProgID, flags and mixed cache updates retain the selected external relationship and opaque records. Item/cache clearing and recreation preserve exact bytes, other package members, native macros/cells and patch inverse."
+      ],
+      "scope_limit": "Stored OLE metadata and caches only; no object activation, remote access or native application reopen."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xlsb_dde_ole_host_relationship_errors_refuse_publication_atomically",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-321"
+      ],
+      "assertions": [
+        "DDE-owned relationships and OLE missing/internal/wrong-type relationships fail full package publication with exact errors. A detached relationship-ID edit also requires its matching host edge; rejected commits leave the source exact."
+      ],
+      "scope_limit": "Relationship-closure validation of explicit derivatives, not external-resource availability or trust validation."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xlsb_dde_ole_cached_matrix_count_errors_refuse_host_publication",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-321"
+      ],
+      "assertions": [
+        "Declared cache dimensions that exceed the stored value count are rejected identically by the detached parser and package publication; source payloads and relationships remain unchanged."
+      ],
+      "scope_limit": "Malformed inert derivatives test bounded cache framing only."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xlsb_dde_ole_fresh_writer_streams_reopen_on_macro_parent",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-321"
+      ],
+      "assertions": [
+        "The fresh workbook builder emits DDE/OLE streams that match standalone canonical output and expose exact cached models. Reusing those streams on the native macro parent preserves the complete graph and all unrelated payloads through save/reopen/replay/inverse."
+      ],
+      "scope_limit": "Fresh library writing and native-parent publication only; no native DDE/OLE specimen, runtime exchange or Office validation is claimed."
     }
   ]
 }
