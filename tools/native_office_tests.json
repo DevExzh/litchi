@@ -7664,6 +7664,153 @@
         "Remove/recreate the complete revision package, check all owned parts are collected/recreated, compare full typed state with XML attribute order normalized, and preserve all unowned workbook payloads and the saved formula cache. Inverse patches restore exact prior payloads and graph."
       ],
       "scope_limit": "New owner XML is canonical: attribute order may differ while child/record order, namespaces, values and text remain exact. No fresh native-app acceptance is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_cell_watch_and_error_check_records_round_trip_with_saved_errors",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-170"
+      ],
+      "assertions": [
+        "Native CellWatch flags and exact A7 bounds; one calculation-error feature over A4:A5; exact #VALUE!, #DIV/0! and 30 formula caches and formula text.",
+        "Native record payloads round-trip exactly; detached error-check flags round-trip without changing the source package."
+      ],
+      "scope_limit": "Detached BIFF codecs and worksheet read only; no package watch/error CRUD, watch-window monitoring, diagnosis or recalculation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_background_and_header_footer_images_keep_continuations_and_opaque_payloads",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-169"
+      ],
+      "assertions": [
+        "Native BkHim joins 21 Continue records into a 172812-byte bitmap with a 320x180 24-bit core header and exact payload round-trip.",
+        "Two HFPicture records retain drawing-group/drawing flags and complete 1905/290-byte payloads; embedded PNG signature and ending are pinned."
+      ],
+      "scope_limit": "Opaque image payload codecs only; no typed placement, image edits, drawing reconstruction or rendering."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_consolidation_metadata_and_binary_pictures_survive_property_publication",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-169",
+        "xls-170",
+        "xls-172"
+      ],
+      "assertions": [
+        "Native Sum consolidation stores left-label=false, top-label=true and links=true, two exact A1:B3 source ranges, and six caches 10/5/15/20/7/27.",
+        "Changing the document title survives save/reopen while every other CFB stream, including all Workbook metadata and image bytes, is exact; inverse restores the original archive."
+      ],
+      "scope_limit": "Property publication preserves worksheet metadata; no consolidation/watch/image editor or recalculation. XLS fLeftCat=0 is asserted from saved bytes despite the historical audit claiming left labels."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_ignored_errors_and_a7_watch_keep_error_kinds_and_saved_cache_values",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-215"
+      ],
+      "assertions": [
+        "Native ignored-error model has exactly A4:A5 with only EvaluationError enabled; standalone watch reader returns A7 and stored formulas retain #VALUE!, #DIV/0! and 30.",
+        "Detached native watch collection round-trips in Strict and Transitional XML; a derivative A4/A7 collection round-trips and a range reference is refused. Source package members remain exact."
+      ],
+      "scope_limit": "Ignored errors are read-only; watches have detached fragment writing, not a package transaction. No source-backed getter, live monitoring or diagnostic execution."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_consolidation_sources_and_detached_writing_preserve_saved_formula_results",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-228"
+      ],
+      "assertions": [
+        "Native Sum metadata has left/top labels and links, two ordered local A1:B3 sources, and six exact linked formula/cache pairs.",
+        "Detached native consolidation round-trips in Strict and Transitional XML; an Average derivative retains its selected flags and sources without changing the package."
+      ],
+      "scope_limit": "Read and detached fragment writing only; no package consolidation editor, dependency rewrite, recalculation or native application acceptance of the derivative."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_scalar_publication_preserves_watches_ignored_errors_consolidation_and_pictures",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-215",
+        "xlsx-228"
+      ],
+      "assertions": [
+        "Source-backed numeric edit changes Print_015!B2 from 42 to 43 and saves/reopens; unrelated worksheet, watch, ignored-error, consolidation, media and VML members remain byte-exact.",
+        "Only the selected worksheet and calculation ownership may change; header/footer XML stays exact, native formula caches stay unchanged, and inverse restores all package members."
+      ],
+      "scope_limit": "Unrelated scalar publication preserves metadata; it does not author watched/error/consolidation owners or evaluate formulas."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_watch_reads_exact_a7_and_keeps_worksheet_error_caches",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-307"
+      ],
+      "assertions": [
+        "Native typed worksheet collection contains exactly A7 with no opaque records; all four other sheets have no watches and all five sheets have no phonetic defaults.",
+        "Stored #VALUE!, #DIV/0! and 30 formula caches survive the exact no-op archive publication."
+      ],
+      "scope_limit": "Native watch read only; absence of phonetic defaults does not establish native phonetic semantics. No live monitoring or recalculation."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_watch_crud_preserves_every_unowned_record_and_failed_staging",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-307"
+      ],
+      "assertions": [
+        "Native-source watch add, reorder, remove and clear survive file save/reopen with exact references, all unowned BIFF records and every other package member unchanged.",
+        "Duplicate and invalid-sheet staging retain earlier work; forward replay, stale-patch rejection, no-op removal and exact inverse preserve source state and cached errors/results."
+      ],
+      "scope_limit": "Inert watch metadata transactions on the native A7 collection; no Excel watch-window or fresh native application validation."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_worksheet_metadata",
+      "name": "native_source_phonetic_default_crud_preserves_watches_text_and_saved_values",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-307"
+      ],
+      "assertions": [
+        "Starting from absent native phonetic defaults, a Litchi-authored Hiragana/Center value is added, updated to AsEntered/Distribute, cleared and inverse-restored through file save/reopen.",
+        "Repeated assignment/removal is a no-op; native A7 watch, saved formula caches, text/style records and all unowned package data remain exact."
+      ],
+      "scope_limit": "Litchi-authored derivative on a native workbook; no native-authored phonetic fixture, rendered pronunciation, language conversion or fresh Excel validation."
     }
   ]
 }
