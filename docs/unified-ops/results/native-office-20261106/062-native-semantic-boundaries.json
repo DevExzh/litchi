@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "95c5c32187994eefb6adb6f3d1ab8a8d066ac8a4",
+  "base_commit": "10aaee80ed2ece09e604674a6830d4c4ec442049",
+  "problem": "Nine historical library-boundary rows still required current-scope review. The RTF Word 6J blanket exclusion was overbroad, while native XLSB rich-data parts needed preservation evidence and DOC IRM/PPT classic comments lacked native-parent operation qualification.",
+  "changes": [
+    "Add eight regressions: a complete twenty-file DOC/DOT DataSpaces absence scan; native-parent IRM metadata/payload refusal and preservation; two RTF opaque-control body/header derivatives; native XLSB rich-data preservation during scalar insertion; native-parent binary PPT classic-comment lifecycle; public declared modern-feature path refusals; and opaque Python-part/PY-formula derivatives with typed evaluator refusal.",
+    "Review doc-067, xls-189, xls-190, xls-191, xlsx-267, xlsb-332, ppt-369 and ppt-390 as explicit supported/unsupported scope boundaries. These rows remain uncovered and receive no positive credit for excluded semantics.",
+    "Correct rtf-492 to current partial coverage, supported by the local RTF specification and existing native associated-script/font assertions. Add partial native-parent operation bindings for doc-031 and ppt-368, and generic scalar/preservation coverage for the rich-data XLSB parent.",
+    "Correct the DOC matrix to name raw::Reader::data_spaces and the PPT matrix to acknowledge bounded diagram-build metadata edits. Update six owning matrices, the assertion index and evidence-review validation sets. No production Rust implementation or fixture bytes changed."
+  ],
+  "review_correction": {
+    "row": "rtf-492",
+    "finding": "RTF 1.9.1 lists loch/hich/dbch among Word 6J-associated properties; existing native Arabic/Hebrew/Japanese/Chinese font/script tests exercise supported behavior. The old row also mixed Word 6J, Word 97 and Word 2000 control families. A blanket unsupported label therefore understated the implemented scope.",
+    "current_scope": "Partial associated-script/font behavior plus opaque preservation of selected unmodeled controls. The eight added control words have no new typed semantics, and no legacy layout/shaping is calculated.",
+    "historical_inventory": "The immutable native authoring inventory still records its original library_boundary status. Only current matrix and operation coverage are corrected."
+  },
+  "verification_scope": {
+    "irm": "All twenty native DOC/DOT files lack a DataSpaces graph, including the encrypted native DOC. Library-authored legacy-binary IRM metadata on native document/macro parents retains publishing-license and certificate XML plus a clearly non-encrypted sentinel payload. Exact identity/payload reinterpretation refusals keep staging unchanged; no-op publication, file reopen, logical-stream preservation, inverse and stale-license patch rejection pass. Public native text remains unchanged; no protected data is decrypted or authorized.",
+    "rtf": "Eight explicitly injected controls (jsksu, jsku, horzvert, gcw, twoinone, nosectexpand, sectexpand, jclisttab) retain exact bytes and their body anchor after RTF_MINIMAL_006. Four pre-existing native opaque controls remain. Canonical body writing preserves text/fonts/opaque nodes, exact save preserves source bytes, and an eleven-node quota rejects twelve nodes with exact counts. A header derivative retains HeaderFooter anchors and refuses canonical output before any bytes are written.",
+    "xlsb": "The native links/objects package really contains five rich-data parts, metadata.bin and a local-image payload. Digests pin metadata and the image. Inserting J50=42.5 changes exactly sheet1.bin and binaryIndex1.bin; every rich-data/relationship/image/other member stays exact. All original cells retain value, formula bytes and style; eager/indexed reads agree, and file reopen/replay/inverse pass. This does not expose a typed rich-value model.",
+    "ppt": "Two native decks start without comments. Explicit Comment 2000 additions preserve exact author/initials/Unicode text/date/index/coordinates through update/removal. Catalog validation, file save/reopen, replay and exact inverse pass at each stage. All slide drawing payloads, unselected slide envelopes, main/notes/handout masters and non-presentation streams remain unchanged.",
+    "python": "Native XLSX/XLSM parents receive a specified Python part/relationship and an uncached PY(0,0) formula derivative. Auto/Eager evaluation returns Calc::Error::Unsupported through Code::UnsupportedCapability, reports remain Unsupported, and ordinary scalar edits/reopen retain script/relationship bytes and the macro payload. The code strings are inert; there is no native-authored Python specimen or executed script.",
+    "declared_paths": "On native XLS/PPT parents, the existing public vocabulary produces precise declared errors: XLS threadedComment is UnsupportedPath without a format element, XLS slicer is UnsupportedCapability, and PPT modernComment/smartart are UnsupportedCapability matching their capability gaps. Unknown or invented person/richValue/timeline paths are not used as evidence for runtime support boundaries.",
+    "other_reviews": "Existing native classic notes, pivot caches/caption edits, array/shared/dynamic storage, future-function/external calculation refusals, SmartArt PNG fallback and all-deck diagram-build absence checks were rerun. Their supported scope remains distinct from modern threads, slicer/timeline execution, rich-value/spill engines or full diagram authoring.",
+    "limits": "No native-app reopen/rendering, IRM rights evaluation, protected-content access, Python/control/macro execution, external retrieval or provider refresh was performed. Library-authored derivatives are labeled explicitly, and excluded semantics never gain positive coverage."
+  },
+  "specification_evidence": [
+    {
+      "reference": "RTF Specification 1.9.1, printed pp. 204-209 (Word 6J/Word 97/Word 2000 East Asian control families)",
+      "source": "User-supplied local full specification",
+      "finding": "The Word 6J-associated property list includes loch/hich/dbch; later tables include gcw/nosectexpand/sectexpand and the Word 2000 jsksu/horzvert/twoinone additions. This supports the scope correction, not new layout semantics.",
+      "extraction": {
+        "file_name": "rtf-specification.txt",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/rtf-specification.txt",
+        "bytes": 1028536,
+        "sha256": "b7cf6a860bfda62a8883a6c60dbbb94592b92f007fcc552f11573f55956bbffa"
+      },
+      "regenerate": "pdftotext -layout 3rdparty/specs/rtf-specs-1.9.1.pdf /home/zhuhe/.cache/litchi-native-office.V1L32Z/rtf-specification.txt"
+    },
+    {
+      "reference": "[MS-XLSX] 2.1.23, 2.3.10 and 2.6.249-253",
+      "source": "User-supplied local full specification",
+      "finding": "The Python part content type/relationship, python/environmentDefinition/pythonScripts shape and zero-based script index are used to construct an explicitly library-authored inert derivative."
+    },
+    {
+      "reference": "[MS-XLSB] 2.2.4 metadata overview",
+      "source": "User-supplied local full specification",
+      "finding": "Cell/value metadata and rich-data package payload preservation are separate from a typed semantic model; native metadata.bin remains exact."
+    }
+  ],
+  "coverage": {
+    "summary": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 355,
+      "indexed_tests": 527,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 41,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 355,
+        "native_ui_limitation_needs_review": 55,
+        "external_fixture_handoff_needs_review": 19,
+        "reviewed_native_fixture_gap_requires_followup": 23,
+        "reviewed_explicit_scope_boundary": 41,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false,
+    "accounting": "Five new positive index entries plus one expanded existing RTF binding produce 527 indexed tests and 355 partial rows. Three new absence/refusal-only tests appear as evidence-review checks without positive row credit. Eight scope reviews produce 41 reviewed boundaries; unsupported_boundary_needs_review is now zero, not semantically implemented."
+  },
+  "validation": [
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-ppt -p litchi-rtf -p litchi-xls -p litchi-xlsb --all-features --test microsoft_office_native_irm --test microsoft_office_native_legacy_comments --test microsoft_office_native_legacy_east_asia --test microsoft_office_native_rich_data_boundary --test microsoft_office_native_metadata --test microsoft_office_native_formatting --test microsoft_office_native_evidence_review --test microsoft_office_native_missing_owners --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-owners.log",
+        "bytes": 28647,
+        "sha256": "a815aacc4d00b002a1d6a97f7085411cd35ed998fc378d45559c8369fc92205f"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-doc -p litchi-ppt -p litchi-rtf -p litchi-xls -p litchi-xlsb --all-features --test microsoft_office_native_irm --test microsoft_office_native_legacy_comments --test microsoft_office_native_legacy_east_asia --test microsoft_office_native_rich_data_boundary --test microsoft_office_native_metadata --test microsoft_office_native_formatting --test microsoft_office_native_evidence_review --test microsoft_office_native_missing_owners --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-owners.log 2>&1",
+      "results": {
+        "targets": 15,
+        "passed": 71,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-crypto --all-features --lib spaces:: --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-spaces.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-spaces.log",
+        "bytes": 19470,
+        "sha256": "4be4cce3232656d9bc1785701f1ad1c3c681a8c69460a98a8cda637d2459a9a6"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-crypto --all-features --lib spaces:: --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-spaces.log 2>&1",
+      "results": {
+        "targets": 1,
+        "passed": 21,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt --all-features --test microsoft_office_native_legacy_comments --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-ppt-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-ppt-final.log",
+        "bytes": 18529,
+        "sha256": "0050d523ebe8606642f33767055119d586ae8ffb342a4128115b1cc2d5a8cdd0"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt --all-features --test microsoft_office_native_legacy_comments --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-ppt-final.log 2>&1",
+      "results": {
+        "targets": 1,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test microsoft_office_native_modern_boundaries --test microsoft_office_native_python_boundary --test microsoft_office_native_calc --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-ops.log",
+        "bytes": 18506,
+        "sha256": "72dc6c8aff4bfe02d7b6e89ce396e5e22d1168969bdee533698bc1245c9f803c"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test microsoft_office_native_modern_boundaries --test microsoft_office_native_python_boundary --test microsoft_office_native_calc --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-ops.log 2>&1",
+      "results": {
+        "targets": 3,
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc -p litchi-ppt -p litchi-rtf -p litchi-xlsb --all-features --test microsoft_office_native_irm --test microsoft_office_native_legacy_comments --test microsoft_office_native_legacy_east_asia --test microsoft_office_native_rich_data_boundary --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-clippy-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-clippy-owners.log",
+        "bytes": 18164,
+        "sha256": "9bb050e032c7a24f2bc95ad0622073c18bc9a6f1f7b7ad8a124fc9bbbc434a58"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-doc -p litchi-ppt -p litchi-rtf -p litchi-xlsb --all-features --test microsoft_office_native_irm --test microsoft_office_native_legacy_comments --test microsoft_office_native_legacy_east_asia --test microsoft_office_native_rich_data_boundary --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-clippy-owners.log 2>&1"
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test microsoft_office_native_modern_boundaries --test microsoft_office_native_python_boundary --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-clippy-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-clippy-ops.log",
+        "bytes": 17080,
+        "sha256": "3238c6d68349765f678136ca726a7cd744fdc024bbde5479ab8acc8db00d2cd5"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test microsoft_office_native_modern_boundaries --test microsoft_office_native_python_boundary --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-clippy-ops.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-python.log",
+        "bytes": 670,
+        "sha256": "8662e9dbbd03f665610fecece577e7be168d31b3a4f8cb51e7839eee597b8785"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-coverage.json",
+        "bytes": 1336075,
+        "sha256": "98301b75e7a16edb8cc6db1fadce1cee5a42ab9ffa8a79665f8e36539231bd67"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check --config skip_children=true crates/litchi-doc/tests/microsoft_office_native_irm.rs crates/litchi-rtf/tests/microsoft_office_native_legacy_east_asia.rs crates/litchi-xlsb/tests/microsoft_office_native_rich_data_boundary.rs crates/litchi-ppt/tests/microsoft_office_native_legacy_comments.rs crates/litchi-ops/tests/microsoft_office_native_python_boundary.rs crates/litchi-ops/tests/microsoft_office_native_modern_boundaries.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-boundaries-format.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --edition 2024 --check --config skip_children=true crates/litchi-doc/tests/microsoft_office_native_irm.rs crates/litchi-rtf/tests/microsoft_office_native_legacy_east_asia.rs crates/litchi-xlsb/tests/microsoft_office_native_rich_data_boundary.rs crates/litchi-ppt/tests/microsoft_office_native_legacy_comments.rs crates/litchi-ops/tests/microsoft_office_native_python_boundary.rs crates/litchi-ops/tests/microsoft_office_native_modern_boundaries.rs > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-boundaries-format.log 2>&1"
+    }
+  ],
+  "validation_totals": {
+    "distinct_rust_tests_passed": 99,
+    "rust_tests_ignored": 0,
+    "python_tests_passed": 78,
+    "repeat_note": "The final PPT rerun includes the additional master-preservation assertions and is already included in the 71 owner tests; it is not counted twice. The 21 shared DataSpaces tests and seven operations tests are distinct.",
+    "clippy": "Both affected owner and operations selections passed; pre-existing vendored dependency warnings are unchanged.",
+    "formatting": "All six new integration targets passed targeted rustfmt; git diff --check passed.",
+    "gate": "non-iWork topology verification, native corpus SHA-256/size checks and coverage accounting passed. No gate selection changed in this test/documentation batch.",
+    "staged_file_guards": "Both required size and binaries checks emitted nothing before each commit."
+  },
+  "environment": {
+    "scratch": "/home/zhuhe/.cache/litchi-native-office.V1L32Z",
+    "temporary_files": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp",
+    "unrelated_files": "The three original untracked files retain their original SHA-256 values; the separately appearing production-readiness assessment also remains untouched and unstaged.",
+    "fixture_access": "Tests refer only to tracked test-data paths. Specifications were read locally for review; no test or runtime script depends on those upstream directories."
+  },
+  "goal_status": "active; 55 native UI limitations, 19 external handoffs and 23 reviewed native fixture gaps still require follow-up, along with the final scope/completion audit"
+}
