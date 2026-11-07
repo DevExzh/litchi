@@ -125,6 +125,8 @@ pub(crate) fn semantic_xml(xml: &Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
     // acquire a Word-specific extension profile.
     let mut capabilities = Capabilities::default();
     capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+    // Retained run views understand symEx even when producers mark it ignorable.
+    capabilities.understand_namespace(crate::run_symbols::NAMESPACE);
     let processed =
         process_markup_compatibility(xml.as_slice(), &capabilities, &Limits::default())?;
     let output = match processed.xml {

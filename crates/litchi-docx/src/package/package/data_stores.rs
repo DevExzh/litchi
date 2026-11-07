@@ -752,7 +752,7 @@ fn visit_bindings(
     mut visit: impl FnMut(
         &PackURI,
         usize,
-        Option<u32>,
+        Option<i32>,
         &crate::content_control::DataBinding,
     ) -> Result<()>,
 ) -> Result<()> {

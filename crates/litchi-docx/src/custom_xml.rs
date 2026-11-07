@@ -28,8 +28,8 @@ pub struct Binding {
     pub source: PackURI,
     /// Stable source-order occurrence within `source`.
     pub occurrence: usize,
-    /// Optional producer ID. Absence and repeated IDs retain distinct occurrences.
-    pub control_id: Option<u32>,
+    /// Optional signed Word Int32 producer ID. Absence and repeated IDs retain distinct occurrences.
+    pub control_id: Option<i32>,
     /// Exact core or Word 2012 binding vocabulary.
     pub flavor: BindingFlavor,
     pub xpath: String,

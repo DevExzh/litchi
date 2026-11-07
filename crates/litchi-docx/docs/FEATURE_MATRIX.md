@@ -162,7 +162,7 @@ family has no typed model even if an untouched part can remain in a package-pres
 | sectPr footnoteColumns | ✅ | ✅ | ✅ | `[MS-DOCX]` Word 2012 `w12:footnoteColumns` is exposed through `section::footnote_columns::{Layout, Snapshot, Transaction}` and `Section` read/edit helpers; absence and explicit zero remain distinct, inherited package namespaces and `mc:Ignorable` are retained out-of-band, value edits preserve authored attributes/lexical source, and patches are source-checked and atomic; layout/pagination are not implemented |
 | pPr collapsed | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.5.1.3 `w12:collapsed` is exposed as the typed `Collapsed` value with paragraph read/replace, authoring helpers, and atomic body-paragraph edits; explicit true/false remains distinct from absence, unknown `pPr` content is preserved, and display/layout behavior is not implemented |
 | Numbering restartNumberingAfterBreak | ✅ | ✅ | ✅ | `[MS-DOCX]` Word 2012 `w12:restartNumberingAfterBreak` is exposed on contextual numbering definitions with namespace-aware parsing, absent-versus-explicit state, bounded source-preserving transactions, and package publication; numbering behavior itself remains inert |
-| Run symEx symbol extension | ✅ | ✅ | ✅ | [MS-DOCX] 2.2.11 and 2.7 expose ordered `run_symbols::{Symbol, Symbols}` values, optional `font`/Unicode-scalar `char` state, bounded validation, source-preserving snapshots/transactions/patches, raw `Run` edit helpers, and ergonomic mutable-run authoring; unknown run content remains inert and byte-preserved |
+| Run symEx symbol extension | ✅ | ✅ | ✅ | [MS-DOCX] 2.2.11 and 2.7 expose ordered `run_symbols::{Symbol, Symbols}` values, optional `font`/Unicode-scalar `char` state, bounded validation, immutable run snapshots, detached raw `Run` edit helpers, and ergonomic mutable-run authoring; no package-level symEx transaction is exposed. Main and secondary story MCE profiles retain this supported namespace when it is declared ignorable; unknown run content remains inert and byte-preserved |
 | Data-binding storeItemChecksum | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.11 normatively defines the checksum attribute on core `w:dataBinding`, strict Base64 storage, `MsoCrc32Compute`, and exact uncompressed, unencrypted Custom XML part input. Litchi documents zero seeding and little-endian DWORD-to-Base64 as the observed Word interoperability convention, not as seed or byte-order requirements stated by that section; observed Word `w15:dataBinding` checksum use is accepted as compatibility behavior rather than claimed as the normative owner. Typed reports distinguish absent, malformed, missing store, match, and mismatch states; duplicate store ownership is refused before reporting or mutation. Source-bound reversible transactions and managed Custom XML updates refresh every already-declared active checksum across reachable stories, preserve absence, reject stale or duplicate-owner edits atomically, preserve signed exact no-ops, and refuse changed signed publication without altering the logical OPC graph. Callers must explicitly invoke `Package::unsign` before a real mutation. CRC equality is advisory corruption detection, never authentication or trust |
 | Word 2024 formattingAllowed | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.13 is modeled as absent versus explicit `ST_OnOff` state on `contentLocked` or `sdtContentLocked`; all six lexical forms are accepted, invalid lock combinations are rejected, fresh authoring maintains namespace and `mc:Ignorable` declarations, and source-bound transactions preserve unrelated bytes |
 | Word 2023 dateUtc | 🟡 | ✅ | ✅ | `[MS-DOCX]` 2.12 `w16du:dateUtc` is namespace-bound and validated as a bounded UTC `xsd:dateTime`, retaining its lexical value on recognized tracked revision metadata. Authoring emits a local `mc:Ignorable` declaration; DOCX main-document and header/footer/note/comment/glossary MCE profiles retain the supported namespace. Header/footer and main-document save/reopen paths have package evidence. Inline, paragraph-mark/numbering, row/cell, and modeled property-history metadata are projected contextually. Complete revision-owner authoring and resolution remain partial. Modern comment and reaction timestamps retain their separate owners. |
@@ -387,3 +387,26 @@ edits, source-bound replacement, save/reopen and inverse patches while preservin
 native body and macro data. Foreign-content conversion, external-target retrieval,
 rendering and macro/control execution remain outside the supported API. These
 derivatives do not supply native-authored AltChunk evidence.
+
+Native-parent extension regressions now cover optional main/glossary
+`stylesWithEffects` resource lifecycle, cross-story Custom XML checksum refresh,
+Word 2024 formatting flags, inert web-link/calendar metadata and ordered `symEx`
+symbols. The parents are native DOCX/DOCM/DOTX files; the extension additions are
+explicit library derivatives and do not replace missing native-authored evidence.
+Unselected bytes/graphs, macro payloads, save/reopen, inverses and applicable
+resource/stale-source guards are checked. No calendar conversion, XPath, add-in,
+formatting enforcement or visual rendering is performed.
+
+Word's SDT identifiers are signed Int32 values. The native tables/layout footer
+contains `-1419789921`; treating it as malformed previously blocked unrelated
+Custom XML edits. Content-control models, authoring constructors, snapshots and
+binding/checksum reports now use `i32`, matching the existing block-identity API.
+Callers holding unsigned IDs must use a checked conversion when passing them to
+these constructors. Signed boundaries and out-of-range wire values are covered.
+
+The `symEx` namespace is now understood by the Word-owned MCE profiles for the
+main document, headers/footers, notes, comments, glossary and validation. Its
+required `mc:Ignorable` declaration previously caused supported symbols to be
+removed from semantic projections. Native-parent regressions retain these symbols
+while foreign-namespace lookalikes remain unmodeled. Detached `Run` setters leave
+the containing package unchanged.

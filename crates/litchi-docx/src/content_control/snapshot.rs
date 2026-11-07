@@ -168,7 +168,7 @@ impl LockSpan {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceOccurrence {
     ordinal: usize,
-    id: Option<u32>,
+    id: Option<i32>,
     id_count: usize,
     properties: Span,
     start_tag: Span,
@@ -185,7 +185,7 @@ impl SourceOccurrence {
 
     /// Optional semantic `w:id`.
     #[must_use]
-    pub const fn id(&self) -> Option<u32> {
+    pub const fn id(&self) -> Option<i32> {
         self.id
     }
 

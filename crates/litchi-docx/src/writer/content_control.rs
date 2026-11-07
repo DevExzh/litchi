@@ -14,8 +14,8 @@ pub use crate::content_control::{Checksum, DataBinding, FormattingAllowed};
 /// data binding, and user interface enhancements.
 #[derive(Debug, Clone)]
 pub struct ContentControl {
-    /// Control ID (unique within document)
-    id: u32,
+    /// Signed Word Int32 control ID (unique within document)
+    id: i32,
     /// Control tag (for programmatic identification)
     tag: Option<String>,
     /// Control title (displayed to user)
@@ -76,7 +76,7 @@ impl ContentControl {
     /// let control = ContentControl::rich_text(1, Some("CustomerName"));
     /// ```
     #[must_use]
-    pub fn rich_text(id: u32, tag: Option<&str>) -> Self {
+    pub fn rich_text(id: i32, tag: Option<&str>) -> Self {
         Self {
             id,
             tag: tag.map(ToString::to_string),
@@ -99,7 +99,7 @@ impl ContentControl {
     /// * `id` - Unique control ID
     /// * `tag` - Optional tag for programmatic identification
     #[must_use]
-    pub fn plain_text(id: u32, tag: Option<&str>) -> Self {
+    pub fn plain_text(id: i32, tag: Option<&str>) -> Self {
         Self {
             id,
             tag: tag.map(ToString::to_string),
@@ -134,7 +134,7 @@ impl ContentControl {
     /// let control = ContentControl::dropdown(1, Some("Color"), items);
     /// ```
     #[must_use]
-    pub fn dropdown(id: u32, tag: Option<&str>, items: Vec<(String, String)>) -> Self {
+    pub fn dropdown(id: i32, tag: Option<&str>, items: Vec<(String, String)>) -> Self {
         Self {
             id,
             tag: tag.map(ToString::to_string),
@@ -157,7 +157,7 @@ impl ContentControl {
     /// * `id` - Unique control ID
     /// * `tag` - Optional tag for programmatic identification
     /// * `format` - Date format string (e.g., "MM/dd/yyyy")
-    pub fn date_picker(id: u32, tag: Option<&str>, format: impl Into<String>) -> Self {
+    pub fn date_picker(id: i32, tag: Option<&str>, format: impl Into<String>) -> Self {
         Self {
             id,
             tag: tag.map(ToString::to_string),
@@ -183,7 +183,7 @@ impl ContentControl {
     /// * `tag` - Optional tag for programmatic identification
     /// * `checked` - Initial checked state
     #[must_use]
-    pub fn checkbox(id: u32, tag: Option<&str>, checked: bool) -> Self {
+    pub fn checkbox(id: i32, tag: Option<&str>, checked: bool) -> Self {
         Self {
             id,
             tag: tag.map(ToString::to_string),
@@ -202,7 +202,7 @@ impl ContentControl {
     /// Get the control ID.
     #[inline]
     #[must_use]
-    pub fn id(&self) -> u32 {
+    pub fn id(&self) -> i32 {
         self.id
     }
 

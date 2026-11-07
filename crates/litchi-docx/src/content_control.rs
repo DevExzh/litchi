@@ -87,7 +87,6 @@ const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/20
 const WORD_2010_NAMESPACE_TEXT: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE_TEXT: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const MAX_SDT_ID: u32 = i32::MAX as u32;
 
 /// Semantic kind of a Word content control.
 ///
@@ -391,7 +390,7 @@ impl std::error::Error for ParseKindError {}
 #[derive(Debug, Clone)]
 pub struct ContentControl {
     /// Control ID
-    id: Option<u32>,
+    id: Option<i32>,
     /// Control tag (optional identifier)
     tag: Option<String>,
     /// Control title
@@ -440,7 +439,7 @@ impl ContentControl {
     /// Create a new `ContentControl`.
     #[must_use]
     pub fn new(
-        id: u32,
+        id: i32,
         tag: Option<String>,
         title: Option<String>,
         kind: Option<Kind>,
@@ -473,17 +472,17 @@ impl ContentControl {
         }
     }
 
-    /// Get the control ID.
+    /// Get the signed Word Int32 control ID, or zero when it is absent.
     #[inline]
     #[must_use]
-    pub fn id(&self) -> u32 {
+    pub fn id(&self) -> i32 {
         self.id.unwrap_or_default()
     }
 
     /// Get the optional source ID without conflating a missing ID with zero.
     #[inline]
     #[must_use]
-    pub const fn id_opt(&self) -> Option<u32> {
+    pub const fn id_opt(&self) -> Option<i32> {
         self.id
     }
 
@@ -1191,7 +1190,7 @@ enum PropertyContext {
 
 struct PendingContentControl {
     depth: usize,
-    id: Option<u32>,
+    id: Option<i32>,
     tag: Option<String>,
     title: Option<String>,
     kind: Option<Kind>,
@@ -1325,12 +1324,18 @@ fn parse_direct_property(
     if is_wordprocessing_namespace(namespace) {
         match name.as_ref() {
             b"id" => {
-                let id = required_u32(element, b"val", decoder, resolver, "content-control ID")?;
-                if id > MAX_SDT_ID {
-                    return Err(Error::InvalidFormat(
-                        "content-control ID exceeds the Int32Value maximum".to_string(),
-                    ));
-                }
+                // Word's ST_DecimalNumber is an XML Schema int, including
+                // negative IDs emitted by native footer/building-block controls.
+                let value = required_word_attribute(
+                    element,
+                    b"val",
+                    decoder,
+                    resolver,
+                    "content-control ID",
+                )?;
+                let id = value.parse::<i32>().map_err(|_| {
+                    Error::InvalidFormat(format!("invalid content-control Int32 ID '{value}'"))
+                })?;
                 set_once(&mut control.id, id, "content-control ID")?;
             },
             b"tag" => {

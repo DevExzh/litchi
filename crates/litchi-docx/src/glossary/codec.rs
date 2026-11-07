@@ -66,6 +66,8 @@ pub(in crate::glossary) fn read_admitted_with_limits(
     // during the semantic projection.
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
     capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+    // Retained run views understand symEx even when producers mark it ignorable.
+    capabilities.understand_namespace(crate::run_symbols::NAMESPACE);
     let xml =
         litchi_ooxml_common::mce::process_markup_compatibility(xml, &capabilities, &mce_limits)?
             .xml;

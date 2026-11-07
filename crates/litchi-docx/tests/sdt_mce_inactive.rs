@@ -64,7 +64,7 @@ fn process_content_wrapped_properties_keep_their_exact_active_source_span() {
 
     let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
     assert_eq!(inventory.occurrences().len(), 1);
-    assert_eq!(inventory.occurrences()[0].id(), Some(i32::MAX as u32));
+    assert_eq!(inventory.occurrences()[0].id(), Some(i32::MAX));
 
     let snapshot = Snapshot::from_xml(xml.into_bytes(), Default::default()).unwrap();
     assert_eq!(snapshot.occurrences().len(), 1);
@@ -76,15 +76,17 @@ fn process_content_wrapped_properties_keep_their_exact_active_source_span() {
 }
 
 #[test]
-fn parsed_content_control_ids_reject_values_above_int32() {
-    let xml = format!(
-        r#"<w:document xmlns:w="{W}"><w:body><w:sdtPr><w:id w:val="2147483648"/></w:sdtPr></w:body></w:document>"#
-    );
+fn parsed_content_control_ids_reject_values_outside_int32() {
+    for value in ["2147483648", "-2147483649"] {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}"><w:body><w:sdtPr><w:id w:val="{value}"/></w:sdtPr></w:body></w:document>"#
+        );
 
-    // The read-only inventory drops the out-of-range ID and records it
-    // (leniency F2.8); the editable snapshot keeps refusing it.
-    let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
-    assert_eq!(inventory.occurrences()[0].id(), None);
-    assert_eq!(inventory.tolerance_report().total(), 1);
-    assert!(Snapshot::from_xml(xml.into_bytes(), Default::default()).is_err());
+        // The read-only inventory drops the out-of-range ID and records it
+        // (leniency F2.8); the editable snapshot keeps refusing it.
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
+        assert_eq!(inventory.occurrences()[0].id(), None);
+        assert_eq!(inventory.tolerance_report().total(), 1);
+        assert!(Snapshot::from_xml(xml.into_bytes(), Default::default()).is_err());
+    }
 }

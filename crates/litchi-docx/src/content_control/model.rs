@@ -526,9 +526,9 @@ impl Occurrence {
         self.ordinal
     }
 
-    /// Optional source ID. Missing and duplicate IDs remain distinct occurrences.
+    /// Optional signed Word Int32 source ID. Missing and duplicate IDs remain distinct occurrences.
     #[must_use]
-    pub const fn id(&self) -> Option<u32> {
+    pub const fn id(&self) -> Option<i32> {
         self.control.id_opt()
     }
 

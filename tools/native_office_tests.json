@@ -9265,6 +9265,168 @@
         "Each stage saves/reopens, validates the author/comment catalog, replays and exactly inverts. Every slide keeps its drawing payload and text, unselected slide envelopes remain exact, and all streams outside PowerPoint Document/Current User are preserved."
       ],
       "scope_limit": "Classic-comment derivatives only; no native-authored classic-comment fixture, modern replies/persons/presence/reactions or service interaction is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_effects_resources",
+      "name": "native_document_and_macro_effects_resources_create_replace_remove_and_invert",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-078"
+      ],
+      "assertions": [
+        "Explicit stylesWithEffects resources copied from native styles expose 43/34 style definitions and the exact Normal style name. Create, whole-resource replace, equal no-op, stale refusal and removal preserve ordinary native styles, document text, macro parts and every unrelated payload.",
+        "File reopen, forward replay and inverse restore every member payload. Complete original relationship/content-type graphs remain unchanged apart from the owned effects relationship; logical removal retains the original member-key set."
+      ],
+      "scope_limit": "These are library-created optional resources, not native-authored stylesWithEffects specimens. Only the resource lifecycle and read projection are qualified, not effect rendering or cascade evaluation."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_effects_resources",
+      "name": "native_glossary_effects_remain_independent_of_main_and_ordinary_styles",
+      "fixtures": [
+        "word/word-glossary.dotx"
+      ],
+      "feature_rows": [
+        "docx-078"
+      ],
+      "assertions": [
+        "Add independent main and glossary effects resources to the native template, retaining distinct names and native styles/body/glossary data. Removing glossary effects leaves main effects unchanged; package reopen, replay and complete inverse pass."
+      ],
+      "scope_limit": "Native glossary ownership is real; the added effects resources are explicit library derivatives and do not create a new glossary owner."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_effects_resources",
+      "name": "native_effects_missing_glossary_and_exact_xml_budget_are_explicit",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-078"
+      ],
+      "assertions": [
+        "The native document without a glossary returns the exact PartNotFound refusal when glossary effects are requested. The exact resource-byte budget succeeds and one byte less returns StylesWithEffectsLimit(XmlBytes) with exact actual/maximum values; source bytes remain unchanged."
+      ],
+      "scope_limit": "Resource ownership and admission bounds only, not full visual-effects schema support."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_sdt_extensions",
+      "name": "native_checksum_derivatives_refresh_declared_bindings_across_body_and_header",
+      "fixtures": [
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-107"
+      ],
+      "assertions": [
+        "Native-parent controls bind an added Custom XML item in the main story and an existing header. Changing exact bytes from <r/> to <r /> updates the two already-declared checksums from AsOd4Q== to hS38mw== and preserves a third checksum absence.",
+        "Only the selected Custom XML part and the two declared story owners change. All native text/XML outside added SDTs and every other package member remain exact; file reopen and the managed Custom XML inverse restore member bytes."
+      ],
+      "scope_limit": "Checksums are advisory CRC values over exact payload bytes, not authentication. Controls/stores are library-authored derivatives; no XPath, data-binding synchronization, external lookup or Word validation is performed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_sdt_extensions",
+      "name": "native_formatting_allowed_lifecycle_preserves_prior_staging_and_exact_output_limits",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-108"
+      ],
+      "assertions": [
+        "Explicit native-parent locks preserve absent/Allowed/Disallowed formatting states through create/update/remove. A disallowed lock combination returns its exact Invalid error without losing an earlier staged edit.",
+        "Only the selected main-story SDT changes; native text/macros/unowned members, file reopen, replay/inverse and typed stale-patch refusal pass. An exact aggregate output limit succeeds; one byte less returns ContentControlLimit(Output) with exact counts."
+      ],
+      "scope_limit": "Library-authored Word 2024 metadata only; this does not enforce Word UI formatting behavior or supply a native-authored formattingAllowed specimen."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_sdt_extensions",
+      "name": "native_checksum_reports_keep_absence_malformed_missing_and_mismatch_distinct",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-107"
+      ],
+      "assertions": [
+        "Checksums on explicit native-parent controls distinguish Absent, Malformed, MissingStore and Mismatch with exact values. Refresh repairs malformed/mismatched checksums while preserving absence; a missing store returns PartNotFound without publication. Reopen/inverse and all unrelated member bytes are checked."
+      ],
+      "scope_limit": "Bounded metadata reporting and checksum refresh only. Missing stores are not fabricated and CRC equality does not establish trust."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_sdt_extensions",
+      "name": "native_calendar_and_web_link_derivatives_keep_mce_choices_and_inert_boolean_precedence",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-098",
+        "docx-102"
+      ],
+      "assertions": [
+        "Explicit native-parent SDTs select Umalqura in a recognized Word 2010 MCE choice and Hijri in the fallback for an unrecognized choice. Linked=true and Created=false remain distinct, with Created(false) taking precedence. Exact save/reopen retains both branches and the original XML outside the additions."
+      ],
+      "scope_limit": "Readable library-authored calendar/boolean metadata, not date conversion or add-in behavior. No source-bound web-extension-link mutator is inferred."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_sdt_extensions",
+      "name": "native_negative_footer_control_id_is_conformant_and_does_not_block_unrelated_store_edits",
+      "fixtures": [
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-072",
+        "docx-107"
+      ],
+      "assertions": [
+        "The actual native footer2 SDT ID -1419789921 is retained as a signed value with no repair diagnostic. Package-bound control capture and an unrelated Custom XML addition succeed, preserving every native Word XML member and the original source."
+      ],
+      "scope_limit": "Native signed-ID regression and shared-store precondition only; the native footer does not contain the new checksum or formatting extensions."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_symbols",
+      "name": "native_symex_derivatives_keep_symbol_order_optional_values_and_detached_edits_inert",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm"
+      ],
+      "feature_rows": [
+        "docx-106"
+      ],
+      "assertions": [
+        "Eager and source-backed readers retain ordered ignorable Word 2015 symbols, distinguishing explicit empty attributes from absent ones and rejecting foreign-namespace lookalikes. Detached raw-run replace/clear preserve explicit zero and empty-font values without changing the package.",
+        "Invalid Unicode scalar values return typed Invalid; save/reopen and every original unrelated member, including macro payloads, remain exact."
+      ],
+      "scope_limit": "Symbols are library-authored derivatives. Raw Run mutation is detached; there is no claim of a package-level symEx transaction, glyph shaping or rendering."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_symbols",
+      "name": "native_ignorable_symbols_survive_header_note_comment_and_glossary_projection",
+      "fixtures": [
+        "word/word-tables-layout.docx",
+        "word/word-text-structure.docx",
+        "word/word-review-controls.docx",
+        "word/word-glossary.dotx"
+      ],
+      "feature_rows": [
+        "docx-106"
+      ],
+      "assertions": [
+        "Library-added symEx runs survive the header, footnote, endnote, comment and glossary semantic MCE projections. Source-backed note/comment reads agree, unselected parts remain byte-exact, and file reopen retains the selected source payload."
+      ],
+      "scope_limit": "These are explicit native-parent extension derivatives. Namespace visibility is qualified across story readers, not symbol rendering or general foreign-extension semantics."
     }
   ]
 }

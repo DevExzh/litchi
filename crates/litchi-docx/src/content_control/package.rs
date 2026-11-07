@@ -310,7 +310,7 @@ pub struct ChecksumEntry {
     occurrence: usize,
     binding: usize,
     flavor: BindingFlavor,
-    control_id: Option<u32>,
+    control_id: Option<i32>,
     store_item_id: String,
     store_part: Option<PackURI>,
     status: PackageChecksumStatus,
@@ -341,9 +341,9 @@ impl ChecksumEntry {
         self.flavor
     }
 
-    /// Optional producer ID, which is not used as transaction identity.
+    /// Optional signed Word Int32 producer ID, not used as transaction identity.
     #[must_use]
-    pub const fn control_id(&self) -> Option<u32> {
+    pub const fn control_id(&self) -> Option<i32> {
         self.control_id
     }
 

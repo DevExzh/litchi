@@ -19,12 +19,11 @@ use std::fmt::Write as _;
 const MC_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const WORD_2010_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
-const MAX_SDT_ID: u32 = i32::MAX as u32;
 
 /// Borrowed semantic properties used to author one w:sdtPr.
 #[derive(Debug, Clone, Copy)]
 pub struct AuthoringView<'a> {
-    id: u32,
+    id: i32,
     kind: Kind,
     lock: Lock,
     tag: Option<&'a str>,
@@ -50,7 +49,7 @@ pub struct AuthoringView<'a> {
 impl<'a> AuthoringView<'a> {
     /// Start a canonical property view with no optional properties.
     #[must_use]
-    pub const fn new(id: u32, kind: Kind, lock: Lock) -> Self {
+    pub const fn new(id: i32, kind: Kind, lock: Lock) -> Self {
         Self {
             id,
             kind,
@@ -257,11 +256,6 @@ impl AuthoredProperties {
 /// Returns an error if the operation cannot be completed.
 pub fn write_sdt_pr(view: &AuthoringView<'_>, limits: &Limits) -> Result<AuthoredProperties> {
     limits.validate()?;
-    if view.id > MAX_SDT_ID {
-        return Err(Error::Invalid(
-            "content control id exceeds the Int32Value maximum".into(),
-        ));
-    }
     validate_view(view, limits)?;
     let requirements = requirements(view);
     let metadata_bytes = metadata_bytes(view)?;
@@ -356,7 +350,7 @@ mod id_range_tests {
 
     #[test]
     fn writes_the_maximum_int32_content_control_id() {
-        let view = AuthoringView::new(i32::MAX as u32, Kind::RichText, Lock::Unlocked);
+        let view = AuthoringView::new(i32::MAX, Kind::RichText, Lock::Unlocked);
 
         let authored = write_sdt_pr(&view, &Limits::default()).unwrap();
 
@@ -364,12 +358,18 @@ mod id_range_tests {
     }
 
     #[test]
-    fn rejects_content_control_id_above_the_int32_range() {
-        let view = AuthoringView::new(i32::MAX as u32 + 1, Kind::RichText, Lock::Unlocked);
-
-        let error = write_sdt_pr(&view, &Limits::default()).unwrap_err();
-
-        assert!(matches!(error, Error::Invalid(message) if message.contains("Int32Value")));
+    fn writes_and_reads_the_minimum_int32_content_control_id() {
+        let view = AuthoringView::new(i32::MIN, Kind::RichText, Lock::Unlocked);
+        let authored = write_sdt_pr(&view, &Limits::default()).unwrap();
+        assert!(authored.xml().contains(r#"<w:id w:val="-2147483648"/>"#));
+        let xml = format!(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{}</w:document>"#,
+            authored.xml()
+        );
+        let inventory =
+            crate::content_control::Inventory::parse(xml.as_bytes(), &Limits::default()).unwrap();
+        assert!(inventory.tolerance_report().is_clean());
+        assert_eq!(inventory.occurrences()[0].id(), Some(i32::MIN));
     }
 }
 
