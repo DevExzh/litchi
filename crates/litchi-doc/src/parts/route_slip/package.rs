@@ -341,6 +341,11 @@ impl Editor {
             });
         }
 
+        if let Some(metadata) = self.route_slip.metadata() {
+            validation::editable(metadata)
+                .map_err(TransactionError::Protected)
+                .map_err(transaction_error)?;
+        }
         self.protection_policy.authorize(self.protection)?;
 
         let mut candidate = self.clone();

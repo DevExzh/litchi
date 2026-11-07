@@ -10797,6 +10797,103 @@
         "All 24 native Word packages expose the exact DOCX/DOCM/DOTX/DOTM main content types and Transitional root relationship/story namespaces, including 15 secondary owners and the encrypted specimen through explicit in-memory plaintext publication."
       ],
       "scope_limit": "Positive Transitional package-form evidence only. The corpus has no native Strict Word specimen; root namespace inspection does not establish general Strict editing or fresh Office acceptance."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_ui_metadata",
+      "name": "native_doc_macro_command_tables_have_exact_names_descriptors_and_wire_bytes",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-text-structure.doc"
+      ],
+      "feature_rows": [
+        "doc-062"
+      ],
+      "assertions": [
+        "The native 203-byte Tcg catalog has one exact macro descriptor, command string/reference count and uppercase macro name. Codec and package reads agree byte-for-byte, identical replacement is a no-op, and the ordinary native empty catalog is exactly FF40."
+      ],
+      "scope_limit": "Stored command metadata only; no macro dispatch, keyboard handling or UI rendering."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_ui_metadata",
+      "name": "native_doc_command_keymap_toolbar_lifecycle_preserves_vba_and_other_tables",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-062"
+      ],
+      "assertions": [
+        "Adding a typed keymap and toolbar/control, changing a reference count, refusing a missing macro-name dependency, clearing and recreating the catalog save/reopen/replay/invert with only the Cmds FIB pair and appended table range changed. Native VBA, other streams and directory metadata remain exact."
+      ],
+      "scope_limit": "The native macro table is real producer data; added UI metadata is explicitly library-authored and remains inert."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_ui_metadata",
+      "name": "native_doc_routing_lifecycle_preserves_narrow_bytes_and_unowned_document_state",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-063"
+      ],
+      "assertions": [
+        "Explicit routing metadata retains exact ANSI bytes and recipient IDs through creation, no-op, stage advance, final-stage refusal, recipient insertion/removal and completion. The route FIB pair is the only WordDocument change; other table bytes, streams, text and patch inverse remain exact."
+      ],
+      "scope_limit": "Library-authored route metadata on native parents; no mail delivery, account authentication or native Word routing workflow."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_ui_metadata",
+      "name": "native_doc_route_protection_applies_to_replacement_and_recipient_edits",
+      "fixtures": [
+        "word/word-text-structure.doc"
+      ],
+      "feature_rows": [
+        "doc-063"
+      ],
+      "assertions": [
+        "RevisionMark/Annotation/Form route policies have exact edit-kind projections and refuse changed whole-record replacement, stage changes and clearing without changing staging. Identical protected metadata remains a true no-op; underlying native document protection bytes are retained."
+      ],
+      "scope_limit": "Local route-metadata policy, separate from caller authentication and Dop/range protection enforcement."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_ui_metadata",
+      "name": "native_doc_vba_signature_property_storage_crud_keeps_opaque_bytes_and_macro_streams",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-013"
+      ],
+      "assertions": [
+        "PIDDSI DigitalSignature storage supports exact DigSigBlob creation/read/no-op, opaque signature replacement, callback failure atomicity, stale refusal and removal. Certificate bytes, undefined gaps, other property values, streams and CFB directory metadata survive save/reopen and exact inverse."
+      ],
+      "scope_limit": "Deliberately non-signing sentinel payloads exercise the documented opaque storage contract; no PKCS#7 validity, certificate trust or native signing evidence is claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native_ui_metadata",
+      "name": "native_doc_stw_user_signature_names_keep_padding_and_defer_invalid_metadata",
+      "fixtures": [
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot"
+      ],
+      "feature_rows": [
+        "doc-013"
+      ],
+      "assertions": [
+        "Explicit StwUser derivatives recognize Sign/SigAgile/SigV3, retain WordSigBlob signature/certificate bytes and padding, and ignore an unrelated variable. Duplicate names produce the exact deferred error while body text remains readable; FIB/table and CFB inverse are exact."
+      ],
+      "scope_limit": "Raw public CFB publication seeds storage-reader derivatives. This is not a dedicated StwUser signature editor or a cryptographic signing operation."
     }
   ]
 }

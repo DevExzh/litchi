@@ -3699,6 +3699,47 @@
         "test-data/microsoft-office/word/encryption-inspection.json"
       ],
       "scope_limit": "Evidence-only native fixture gap, not positive IRM payload coverage or an unsupported-library claim. No rights acquisition, license activation, service contact or fresh native Word validation is performed; plaintext inspection stays in memory."
+    },
+    {
+      "feature_row": "doc-052",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The corpus has ordinary Excel OLE stores and legacy Word form fields, not a native ActiveX/OCX control specimen.",
+      "required_evidence": "A native DOC with known ActiveX control CLSID, ObjInfo control flags, persistence streams and an explicit inert-control semantic expectation.",
+      "observed_evidence": "All 20 binary Word inputs are inspected. The 19 unencrypted documents have exactly two ObjectPool objects, both in the visual fixture, with the expected Excel CLSIDs and valid ObjInfo records whose ActiveX/stream-control flags are false. The encrypted native document has no ObjectPool directory.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_ui_metadata",
+          "name": "native_binary_word_corpus_has_excel_ole_objects_but_no_activex_control_specimen"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/src/embedded_object/model/metadata.rs",
+        "test-data/microsoft-office/word/visual-objects-inspection.json"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive ActiveX coverage or an unsupported-library claim. OLE objects are not relabeled as controls; no control is instantiated or executed and all source bytes remain unchanged."
     }
   ]
 }

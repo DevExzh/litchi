@@ -195,6 +195,7 @@ class NativeOfficeCorpus(unittest.TestCase):
             "rtf-486", "rtf-489", "rtf-491",
             "xlsx-200", "xlsx-264", "xlsb-286", "xlsb-287",
             "docx-086",
+            "doc-052",
         })
         boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
         self.assertEqual({row["id"] for row in boundaries}, {

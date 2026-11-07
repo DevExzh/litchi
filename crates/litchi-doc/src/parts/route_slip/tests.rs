@@ -236,6 +236,32 @@ fn protected_route_metadata_rejects_semantic_edits() {
 }
 
 #[test]
+fn protected_route_metadata_rejects_package_replacement_but_keeps_noops() {
+    let original = write_base_doc(b"retained table");
+    let mut editor = Editor::open(original).unwrap();
+    let value = sample();
+    let bytes = editor
+        .set(value.clone())
+        .unwrap()
+        .snapshot()
+        .finish()
+        .unwrap();
+    let mut editor = Editor::open(bytes.clone()).unwrap();
+    editor.set(value.clone()).unwrap();
+    editor.replace(value.clone()).unwrap();
+    assert!(!editor.is_changed());
+    let mut changed = value.clone();
+    changed.protection = Protection::Off;
+    for result in [editor.set(changed.clone()), editor.replace(changed)] {
+        assert!(
+            matches!(result, Err(crate::Error::InvalidFormat(message)) if message == "route-slip transaction failed: route-slip metadata is protected by Annotation")
+        );
+    }
+    assert_eq!(editor.metadata(), Some(&value));
+    assert_eq!(editor.finish().unwrap(), bytes);
+}
+
+#[test]
 fn package_lifecycle_appends_route_data_and_clears_only_fib_pointer() {
     let original_table = b"unrelated table bytes";
     let original = write_base_doc(original_table);
