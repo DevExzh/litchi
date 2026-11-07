@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "ec2cc6939c2e78348c1d30f78754152b3dd0ea93",
+  "base_commit": "dd9f3dcaec11dd5bd2119e3362e43288399f3105",
+  "problem": "Clearing the native Word 2012 restartNumberingAfterBreak attribute removed its name and value but left the closing quote in numbering.xml. Publication then failed with a malformed-attribute XML error. Existing removal coverage used an inverse patch, which restored captured bytes without exercising the clear operation. Native numbering, bibliography and Custom XML owner operations also lacked indexed tests.",
+  "changes": [
+    "Include the closing quote in the restart-attribute removal span, preserving surrounding source whitespace and all neighboring bytes.",
+    "Add two focused regressions covering both quote styles, false/true/on values, neighboring attributes with varied whitespace, nonempty/empty definition forms, multiple definition changes and exact inverses.",
+    "Add six native integration tests over word-text-structure.docx and word-math-navigation.docx/.dotx for numbering values/restart CRUD, native empty bibliography-store identity/style, bibliography entry CRUD and generic unbound Custom XML lifecycle operations.",
+    "Index bounded assertions for docx-105, docx-110, docx-115 and docx-119, and document the distinction between native saved metadata, Litchi-authored source entries and unsupported evaluation/native-UI scope."
+  ],
+  "verification_scope": {
+    "numbering_reads": "Each native numbering part has one abstract definition (0), one instance (1), and nine exact common decimal or bullet levels. The text specimen uses hybridMultilevel and repeating Symbol/Courier/Wingdings bullet characters; math/navigation uses multilevel and %1. through %1.%2....%9. level text. Typed start/suffix/restart values and the three body paragraph bindings are pinned. All three native restart attributes are explicitly false.",
+    "restart_crud": "Set true, clear to absent, recreate false, reset and exact same-value no-op pass. A nonexistent definition ID reports the precise error without losing a prior staged change. Initial changed output is exactly the original numbering XML with only the Boolean scalar replaced; all other members remain exact. File reopen, forward replay, stale conflict and inverse pass.",
+    "native_bibliography_metadata": "The math/navigation DOCX/DOTX stores are empty but retain distinct native item IDs {8F890C7E-E3B9-FA4F-9FD3-B127A8AD5D7E} and {72EE7E13-CEB2-0148-AD62-BE2A8CF06DAC}, main-document/data/properties part identities, internal relationships, a bibliography schema URI, /APASixthEditionOfficeOnline.xsl, APA and Version 6. No-op bibliography/custom-XML publication retains original archives.",
+    "bibliography_entries": "Litchi-authored book entries preserve exact person/year/locale/title/publisher and escaped Unicode custom-field values. Duplicate tags fail without discarding the staged source. Replacement, corporate-author report addition, removal, file reopen, forward replay, stale rejection and inverse are exercised. Initial creation changes only item1.xml, and root metadata survives canonical rewriting. Removing the final source retains the store.",
+    "custom_xml": "Add a second unbound store, reject duplicate item identity atomically, set its payload, replace payload/schema metadata, remove the orphan graph and invert after reopen. The original bibliography owner stays exact. A separate test removes the native unbound store via case-insensitive ID and restores its data/properties payloads and relationship graph.",
+    "serialization_contract": "Bibliography output is canonical XML and may omit a redundant default namespace declaration while retaining its namespace-bound source values and all stored root metadata. Custom XML graph operations may reserialize an existing properties relationship stream; complete relationship attributes and effective content types are checked, with exact payload comparison for every other member. Inverse patches restore exact source payloads.",
+    "limits": "Native formats here are common decimal/bullet values, not the full Microsoft extended-format enumeration. Bibliography source entries and the second Custom XML item are Litchi-authored derivatives. No number generation, style resolution, citation matching, field refresh, schema/XSLT execution, SDT binding/checksum semantics or fresh Word reopen is claimed."
+  },
+  "initial_reproductions": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_numbering_stores native_restart_attribute_crud_preserves_list_definitions_and_failed_edits --locked --offline",
+      "exit_code": 101,
+      "artifact": {
+        "file_name": "native-docx-numbering-clear-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-clear-reproduction.log",
+        "bytes": 19141,
+        "sha256": "326c229c010faf8e07b9cbb725d7999ec8d75284e0285bd2a94176f47c2447f5"
+      },
+      "result": "One native restart CRUD test failed at clear commit with Xml(\"syntax error: attribute value not closed: quote not found before end of input\"). The native input was unchanged.",
+      "regenerate": "In an isolated checkout of base_commit, copy crates/litchi-docx/tests/microsoft_office_native_numbering_stores.rs from source_commit and run the command above. The production removal span in base_commit still excludes the closing quote."
+    }
+  ],
+  "results": {
+    "rust_passed_excluding_focused_repeat": 2666,
+    "rust_failed": 0,
+    "rust_ignored": 0,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 309,
+      "indexed_tests": 422
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 313,
+      "indexed_tests": 428,
+      "reviewed_native_fixture_gaps": 8,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 313,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 22,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 24,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_native_fixture_gap_requires_followup": 8,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-full.log",
+        "bytes": 247731,
+        "sha256": "1f7512efacd1201af9f440d14837f495445627ae14327d24700ee6c6ee8da7a0"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-full.log 2>&1",
+      "suites": 89,
+      "passed": 2440,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_numbering_stores --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-native.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-native.log",
+        "bytes": 18957,
+        "sha256": "58c6b527b0acdb400b407f9f602f67f287c19fff6587c2a7d763757469388361"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-docx --all-features --test microsoft_office_native_numbering_stores --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-native.log 2>&1",
+      "suites": 1,
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "note": "Focused six-test run, included again in the full owner suite and excluded from the combined total."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-ops.log",
+        "bytes": 36662,
+        "sha256": "976e392d4d766e20fca37cfe776e674b2bf3a5376f78ba6d790502e9b834a777"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'docx_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-ops.log 2>&1",
+      "suites": 20,
+      "passed": 205,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-facade.log",
+        "bytes": 19664,
+        "sha256": "44d6506dd3e850de817579d3f67ed8d9af6d94427465965b8605cc909dfe5bdb"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-clippy.log",
+        "bytes": 18177,
+        "sha256": "f4a8267e287e4177662ff307fbed9a20fa1b1f0964a8de019c1014fb877e8316"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-docx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-python.log",
+        "bytes": 667,
+        "sha256": "eb211bade22f26bc37a5dff7384bfb7ff3c2a35e1d3144f5f765cbed841c2913"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-docx-numbering-stores-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-coverage.json",
+        "bytes": 1022519,
+        "sha256": "7af84a37859e416268b01372f193eac55ba30d267ac8cbd94fb64860d1007440"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-docx-numbering-stores-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check and git diff --check/staged checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit. The new Rust test file has mode 100644; no executable or large evidence was staged.",
+    "All three pre-existing untracked file SHA-256 values remain unchanged. The 75 Python checks include integrity of all 139 Office fixtures and four import assets.",
+    "Clippy passed with -D warnings on the owner library and all tests; existing zlib-rs and allsorts vendor warnings remain unchanged."
+  ],
+  "goal_status": "active; 313 of 494 feature rows have partial assertions and 428 tests are indexed. Eight reviewed native fixture gaps remain, with 24 operation, 22 bounded, 58 UI, 27 external and 41 unsupported reviews plus partial-scope reviews still open."
+}
