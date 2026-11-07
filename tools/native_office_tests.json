@@ -10657,6 +10657,146 @@
         "Both base content-part profiles and a drawing host publish bounded two-trace annotations on native DOCX/DOCM/DOTX parents. The native PNG fallback and InkML donor are SHA-256 checked; source paragraph prefix/suffix, unrelated members, model counts and complete inverse graph/data remain exact."
       ],
       "scope_limit": "New strokes use the canonical library authoring profile. Native PowerPoint supplies only the inert fallback image; no Word rendering or fresh Office acceptance is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_smart_tags",
+      "name": "native_docx_builder_smart_tags_and_settings_read_exactly_without_resolving_urls",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-116"
+      ],
+      "assertions": [
+        "Builder-authored nested and empty smart tags retain exact Unicode text, URI and property values on native parents; smartTagType and doNotEmbedSmartTags settings survive save/reopen while every unowned member stays exact."
+      ],
+      "scope_limit": "Explicit library-authored metadata derivatives; no native smart-tag recognizer output, vocabulary download or recognizer activation is claimed."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_smart_tags",
+      "name": "native_docx_smart_tag_namespace_declarations_and_aliases_do_not_change_metadata",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-116"
+      ],
+      "assertions": [
+        "Namespace declarations named element/uri/name/val remain namespace bindings. Local and document-inherited Word aliases expose the same exact tags, properties and text without changing unrelated native parts."
+      ],
+      "scope_limit": "Namespace-context regressions on native-parent derivatives; the original XML fragment bytes are retained."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_smart_tags",
+      "name": "native_docx_smart_tag_foreign_attributes_do_not_satisfy_required_word_metadata",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-116"
+      ],
+      "assertions": [
+        "Foreign element and val attributes cannot supply required Word smart-tag fields; the reader returns the exact missing-field errors and preserves the native source."
+      ],
+      "scope_limit": "Malformed derivatives qualify reader admission, not native producer output."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_smart_tags",
+      "name": "native_docx_story_text_edits_preserve_smart_tag_properties_and_nesting",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-116"
+      ],
+      "assertions": [
+        "Whole-paragraph replacement returns the precise ComplexContent refusal for a smart-tag paragraph without discarding an earlier valid native-title edit. Tags retain their raw XML and semantic metadata; source publication and inverse preserve all other members."
+      ],
+      "scope_limit": "The bounded source text editor does not flatten or directly replace smart-tag paragraphs; fresh smart-tag authoring is covered separately."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_smart_tags",
+      "name": "native_template_footnote_and_macro_variant_stories_support_source_text_edits",
+      "fixtures": [
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.dotx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "feature_rows": [
+        "docx-070"
+      ],
+      "assertions": [
+        "Source-backed main stories in DOCM/DOTM/DOTX and a native template footnote accept ordinary text edits with exact part identity/content-type preservation and complete inverse restoration."
+      ],
+      "scope_limit": "Native Transitional variants only; this does not qualify a native Strict Word specimen."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_smart_tags",
+      "name": "native_header_story_remains_editable_in_an_explicit_macro_template_variant",
+      "fixtures": [
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-070"
+      ],
+      "assertions": [
+        "An explicitly retyped macro-template derivative retains its native header and supports a header text edit; only that header changes, and inverse restores the exact derived members."
+      ],
+      "scope_limit": "The content-type derivative is library-authored and does not add VBA or claim native DOTM authoring or Strict support."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_container_profiles",
+      "name": "native_word_package_variants_have_transitional_main_and_story_dialects",
+      "required_features": [
+        "encryption"
+      ],
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-visual-objects.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-glossary.dotx",
+        "word/word-glossary.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-master-document.docx",
+        "word/word-tracked-moves.docx",
+        "word/word-encrypted.docx"
+      ],
+      "feature_rows": [
+        "docx-070"
+      ],
+      "assertions": [
+        "All 24 native Word packages expose the exact DOCX/DOCM/DOTX/DOTM main content types and Transitional root relationship/story namespaces, including 15 secondary owners and the encrypted specimen through explicit in-memory plaintext publication."
+      ],
+      "scope_limit": "Positive Transitional package-form evidence only. The corpus has no native Strict Word specimen; root namespace inspection does not establish general Strict editing or fresh Office acceptance."
     }
   ]
 }

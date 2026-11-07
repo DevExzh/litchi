@@ -14,7 +14,8 @@ mod xml;
 
 pub(crate) use paragraph_properties::DirectNumbering;
 pub(crate) use text::{
-    extract_word_paragraph_text, extract_word_text, for_each_word_text_chunk,
-    semantic_text_raw_xml_limit, write_text_to, write_text_to_with_operation_check,
+    extract_word_paragraph_text, extract_word_text, extract_word_text_with_bindings,
+    for_each_word_text_chunk, semantic_text_raw_xml_limit, write_text_to,
+    write_text_to_with_operation_check,
 };
 pub(crate) use xml::is_fragment_word_name;

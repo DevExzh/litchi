@@ -163,6 +163,39 @@ fn smart_tags_require_schema_mandated_attributes() {
 }
 
 #[test]
+fn smart_tags_resolve_inherited_aliases_and_ignore_foreign_metadata() {
+    for ns in [
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    ] {
+        let xml = format!(
+            r#"<w:p xmlns:w="{ns}" xmlns:q="{ns}" xmlns:f="urn:foreign"><w:smartTag xmlns:element="urn:namespace" w:element="person" f:element="ignored"><f:smartTagPr><f:attr f:name="wrong" f:val="wrong"/></f:smartTagPr><w:smartTagPr><f:attr w:name="also-wrong" w:val="wrong"/><q:attr xmlns:val="urn:namespace" f:name="ignored" w:name="kind" q:val="correct"/></w:smartTagPr><q:r><q:t>Visible &amp; </q:t></q:r><f:r><f:t>not Word text</f:t></f:r><q:smartTag q:element="nested"><w:r><w:t>nested</w:t></w:r></q:smartTag></w:smartTag></w:p>"#
+        );
+        let paragraph = Paragraph::new(xml.into_bytes());
+        let tags = paragraph.smart_tags().unwrap();
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags[0].element, "person");
+        assert_eq!(tags[0].attributes.len(), 1);
+        assert_eq!(tags[0].attributes[0].name, "kind");
+        assert_eq!(tags[0].attributes[0].value, "correct");
+        assert_eq!(tags[0].text().unwrap(), "Visible & nested");
+        assert_eq!(tags[1].element, "nested");
+        assert_eq!(tags[1].text().unwrap(), "nested");
+    }
+}
+
+#[test]
+fn smart_tag_namespace_capture_does_not_leak_empty_sibling_rebindings() {
+    let p = Paragraph::new(br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:smartTag xmlns:q="urn:foreign" w:element="empty"/><q:smartTag q:element="real"><w:r><w:t>kept</w:t></w:r></q:smartTag></w:p>"#.to_vec());
+    let tags = p.smart_tags().unwrap();
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].element, "empty");
+    assert_eq!(tags[0].text().unwrap(), "");
+    assert_eq!(tags[1].element, "real");
+    assert_eq!(tags[1].text().unwrap(), "kept");
+}
+
+#[test]
 fn runs_reject_unterminated_run_xml() {
     let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r><w:t>truncated</w:t>"#;
     let paragraph = Paragraph::new(xml.to_vec());

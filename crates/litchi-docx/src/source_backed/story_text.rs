@@ -1655,12 +1655,8 @@ fn resolve_part<'package>(
     match selector {
         Selector::Main => {
             let main = package.main_document_part()?;
-            if main.content_type() != ct::WML_DOCUMENT_MAIN {
-                return Err(Error::Document(crate::Error::InvalidContentType {
-                    expected: ct::WML_DOCUMENT_MAIN.to_owned(),
-                    got: main.content_type().to_owned(),
-                }));
-            }
+            crate::package::validate_document_main_content_type(main.content_type())
+                .map_err(Error::Document)?;
             Ok((
                 main.partname().clone(),
                 main,
@@ -1730,12 +1726,8 @@ fn resolve_secondary_part<'package>(
     }
     let execution = package.execution_context();
     let main = package.main_document_part()?;
-    if main.content_type() != ct::WML_DOCUMENT_MAIN {
-        return Err(Error::Document(crate::Error::InvalidContentType {
-            expected: ct::WML_DOCUMENT_MAIN.to_owned(),
-            got: main.content_type().to_owned(),
-        }));
-    }
+    crate::package::validate_document_main_content_type(main.content_type())
+        .map_err(Error::Document)?;
     let (transitional, strict) = profile.relationship_types();
     let mut selected: Option<(PackURI, &'static [u8])> = None;
     for relationship in main.rels().iter() {
@@ -1800,24 +1792,8 @@ fn resolve_glossary_part<'package>(
 ) -> Result<(PackURI, PartView<'package>, Option<&'static [u8]>)> {
     let execution = package.execution_context();
     let main = package.main_document_part()?;
-    if !matches!(
-        main.content_type(),
-        ct::WML_DOCUMENT_MAIN
-            | ct::WML_TEMPLATE_MAIN
-            | ct::WML_DOCUMENT_MACRO_MAIN
-            | ct::WML_TEMPLATE_MACRO_MAIN
-    ) {
-        return Err(Error::Document(crate::Error::InvalidContentType {
-            expected: format!(
-                "{}, {}, {}, or {}",
-                ct::WML_DOCUMENT_MAIN,
-                ct::WML_TEMPLATE_MAIN,
-                ct::WML_DOCUMENT_MACRO_MAIN,
-                ct::WML_TEMPLATE_MACRO_MAIN,
-            ),
-            got: main.content_type().to_owned(),
-        }));
-    }
+    crate::package::validate_document_main_content_type(main.content_type())
+        .map_err(Error::Document)?;
     if package.rels().iter().any(|relationship| {
         matches!(
             relationship.reltype(),
@@ -2143,12 +2119,8 @@ fn resolve_header_footer<'package>(
 ) -> Result<(PackURI, PartView<'package>, &'static [u8])> {
     let execution = package.execution_context();
     let main = package.main_document_part()?;
-    if main.content_type() != ct::WML_DOCUMENT_MAIN {
-        return Err(Error::Document(crate::Error::InvalidContentType {
-            expected: ct::WML_DOCUMENT_MAIN.to_owned(),
-            got: main.content_type().to_owned(),
-        }));
-    }
+    crate::package::validate_document_main_content_type(main.content_type())
+        .map_err(Error::Document)?;
     let relationship_types = if header {
         [rt::HEADER, STRICT_HEADER]
     } else {

@@ -47,7 +47,7 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
 // Retained semantic owners know their root namespace. Only an unresolved
 // root enables fragment fallback; an unqualified descendant cannot opt in.
 // Raw fragment helpers retain their historical fallback policy.
-pub(super) fn extract_word_text_with_bindings(
+pub(crate) fn extract_word_text_with_bindings(
     xml_bytes: &[u8],
     bindings: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> Result<String> {

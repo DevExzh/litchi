@@ -192,6 +192,17 @@ impl Paragraph {
         let source_arc = source_slice.arc();
         let base_offset = source_slice.start();
         let mut reader = NsReader::from_reader(xml_bytes);
+        for (prefix, namespace) in self.xml_data.inherited_namespaces()?.iter() {
+            let prefix = prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            );
+            reader
+                .resolver_mut()
+                .add(prefix, quick_xml::name::Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited smart-tag namespace".into()))?;
+        }
+        let mut namespaces = crate::namespace::NamespaceCapture::default();
         let origin = ReaderOrigin::of(xml_bytes);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut depth = 0usize;
@@ -259,15 +270,23 @@ impl Paragraph {
                         Error::InvalidFormat("Word XML nesting is too deep".into())
                     })?;
                     if is_smart_tag {
-                        open_tags.push((event_start, depth));
+                        open_tags.push((
+                            event_start,
+                            depth,
+                            namespaces.capture(reader.resolver())?,
+                        ));
                     }
                 },
                 SmartTagEvent::Empty(true) => {
-                    ranges.push((event_start, event_end));
+                    ranges.push((
+                        event_start,
+                        event_end,
+                        namespaces.capture(reader.resolver())?,
+                    ));
                 },
                 SmartTagEvent::End(is_smart_tag) => {
                     if is_smart_tag {
-                        let Some((start, tag_depth)) = open_tags.pop() else {
+                        let Some((start, tag_depth, bindings)) = open_tags.pop() else {
                             return Err(Error::InvalidFormat(
                                 "Word smart tag has no opening element".into(),
                             ));
@@ -277,7 +296,7 @@ impl Paragraph {
                                 "invalid nested Word smart tag".into(),
                             ));
                         }
-                        ranges.push((start, event_end));
+                        ranges.push((start, event_end, bindings));
                     }
                     depth = depth
                         .checked_sub(1)
@@ -293,10 +312,10 @@ impl Paragraph {
             }
         }
 
-        ranges.sort_unstable_by_key(|&(start, _)| start);
+        ranges.sort_unstable_by_key(|(start, _, _)| *start);
         ranges
             .into_iter()
-            .map(|(start, end)| {
+            .map(|(start, end, bindings)| {
                 let start = u32::try_from(start).map_err(|_source_error| {
                     Error::InvalidFormat("Word smart-tag offset exceeds u32".into())
                 })?;
@@ -309,11 +328,10 @@ impl Paragraph {
                 let absolute_start = base_offset.checked_add(start).ok_or_else(|| {
                     Error::InvalidFormat("Word smart-tag absolute offset exceeds u32".into())
                 })?;
-                SmartTag::parse(XmlSlice::new(
-                    Arc::clone(&source_arc),
-                    absolute_start,
-                    length,
-                ))
+                SmartTag::parse(
+                    XmlSlice::new(Arc::clone(&source_arc), absolute_start, length),
+                    bindings,
+                )
             })
             .collect()
     }

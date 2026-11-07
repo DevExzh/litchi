@@ -3650,6 +3650,55 @@
         "test-data/microsoft-office/excel/encryption-inspection.json"
       ],
       "scope_limit": "Evidence-only fixture gap, not positive Data Model payload coverage or an unsupported-library claim. Native files and historical authoring statuses are unchanged. No refresh, DAX/MDX evaluation or external retrieval is performed."
+    },
+    {
+      "feature_row": "docx-086",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-visual-objects.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-glossary.dotx",
+        "word/word-glossary.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-master-document.docx",
+        "word/word-tracked-moves.docx",
+        "word/word-encrypted.docx"
+      ],
+      "reason": "Password encryption and Word editing restrictions do not establish an IRM-protected OOXML document.",
+      "required_evidence": "A native Word IRM container with DRMEncryptedDataSpace, DRMEncryptedTransform, publishing/end-user licenses and a known protected-content profile.",
+      "observed_evidence": "The 24 inputs consist of 23 ordinary ZIP packages and one six-stream CFB password container. The latter has the exact StrongEncryptionDataSpace/StrongEncryptionTransform mapping and an authenticated Agile AES-256/SHA-512 profile, with no DRM transform or license streams. The document-protection fixture positively retains its separate Word editing restriction.",
+      "checks": [
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_container_profiles",
+          "name": "native_word_password_and_edit_protection_do_not_supply_irm_fixture_evidence",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-crypto/src/ooxml/container.rs",
+        "crates/litchi-crypto/src/spaces.rs",
+        "test-data/microsoft-office/word/encryption-inspection.json"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive IRM payload coverage or an unsupported-library claim. No rights acquisition, license activation, service contact or fresh native Word validation is performed; plaintext inspection stays in memory."
     }
   ]
 }

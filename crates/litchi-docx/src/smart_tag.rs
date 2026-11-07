@@ -9,12 +9,14 @@
 //! `WordprocessingML` smart-tag metadata.
 
 use crate::error::{Error, Result};
-use crate::paragraph::extract_word_text;
+use crate::namespace::{NamespaceBindings, is_wordprocessing_namespace};
+use crate::paragraph::{extract_word_text_with_bindings, is_fragment_word_name};
 use litchi_core::XmlSlice;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::reader::Reader;
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
+use quick_xml::reader::NsReader;
 
 /// One custom attribute attached to a smart tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,11 +39,22 @@ pub struct SmartTag {
     /// Custom attributes from the optional `smartTagPr` container.
     pub attributes: Vec<SmartTagAttribute>,
     xml: XmlSlice,
+    namespaces: NamespaceBindings,
 }
 
 impl SmartTag {
-    pub(crate) fn parse(xml: XmlSlice) -> Result<Self> {
-        let mut reader = Reader::from_reader(xml.as_bytes());
+    pub(crate) fn parse(xml: XmlSlice, namespaces: NamespaceBindings) -> Result<Self> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        for (prefix, namespace) in namespaces.iter() {
+            let prefix = prefix
+                .as_deref()
+                .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+            reader
+                .resolver_mut()
+                .add(prefix, Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited smart-tag namespace".into()))?;
+        }
+        let mut fragment_prefix = None;
         let mut uri = None;
         let mut element = None;
         let mut attributes = Vec::new();
@@ -51,41 +64,87 @@ impl SmartTag {
 
         loop {
             let decoder = reader.decoder();
-            match reader
+            let event = reader
                 .read_event()
-                .map_err(|error| Error::Xml(error.to_string()))?
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let resolver = reader.resolver();
+            let (namespace, event) = resolver.resolve_event(event);
+            if !saw_root
+                && depth == 0
+                && let Event::Start(start) | Event::Empty(start) = &event
+                && !matches!(namespace, ResolveResult::Bound(_))
             {
+                fragment_prefix = Some(start.name().prefix().map(|p| p.into_inner().to_vec()));
+            }
+            let is_word = |start: &BytesStart<'_>, name: &[u8]| {
+                is_fragment_word_name(&namespace, start.name(), name, &fragment_prefix)
+            };
+            match event {
                 Event::Start(start) => {
                     depth = depth.checked_add(1).ok_or_else(|| {
                         Error::InvalidFormat("smart-tag XML nesting is too deep".into())
                     })?;
                     match start.local_name().as_ref() {
-                        b"smartTag" if depth == 1 && !saw_root => {
+                        b"smartTag" if depth == 1 && !saw_root && is_word(&start, b"smartTag") => {
                             saw_root = true;
-                            uri = optional_attribute(&start, b"uri", decoder)?;
-                            element = optional_attribute(&start, b"element", decoder)?;
+                            uri = optional_attribute(
+                                &start,
+                                b"uri",
+                                decoder,
+                                resolver,
+                                &fragment_prefix,
+                            )?;
+                            element = optional_attribute(
+                                &start,
+                                b"element",
+                                decoder,
+                                resolver,
+                                &fragment_prefix,
+                            )?;
                         },
-                        b"smartTagPr" if depth == 2 && saw_root && properties_depth.is_none() => {
+                        b"smartTagPr"
+                            if depth == 2
+                                && saw_root
+                                && properties_depth.is_none()
+                                && is_word(&start, b"smartTagPr") =>
+                        {
                             properties_depth = Some(depth);
                         },
-                        b"attr" if properties_depth.is_some_and(|value| depth == value + 1) => {
-                            attributes.push(parse_attribute(&start, decoder)?);
+                        b"attr"
+                            if properties_depth.is_some_and(|value| depth == value + 1)
+                                && is_word(&start, b"attr") =>
+                        {
+                            attributes.push(parse_attribute(
+                                &start,
+                                decoder,
+                                resolver,
+                                &fragment_prefix,
+                            )?);
                         },
                         _ => {},
                     }
                 },
                 Event::Empty(start)
-                    if start.local_name().as_ref() == b"attr"
+                    if is_word(&start, b"attr")
                         && properties_depth.is_some_and(|value| depth == value) =>
                 {
-                    attributes.push(parse_attribute(&start, decoder)?);
+                    attributes.push(parse_attribute(
+                        &start,
+                        decoder,
+                        resolver,
+                        &fragment_prefix,
+                    )?);
                 },
-                Event::Empty(start)
-                    if depth == 0 && start.local_name().as_ref() == b"smartTag" && !saw_root =>
-                {
+                Event::Empty(start) if depth == 0 && is_word(&start, b"smartTag") && !saw_root => {
                     saw_root = true;
-                    uri = optional_attribute(&start, b"uri", decoder)?;
-                    element = optional_attribute(&start, b"element", decoder)?;
+                    uri = optional_attribute(&start, b"uri", decoder, resolver, &fragment_prefix)?;
+                    element = optional_attribute(
+                        &start,
+                        b"element",
+                        decoder,
+                        resolver,
+                        &fragment_prefix,
+                    )?;
                 },
                 Event::End(end) => {
                     if properties_depth == Some(depth) && end.local_name().as_ref() == b"smartTagPr"
@@ -123,6 +182,7 @@ impl SmartTag {
             })?,
             attributes,
             xml,
+            namespaces,
         })
     }
 
@@ -132,7 +192,7 @@ impl SmartTag {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
-        extract_word_text(self.xml.as_bytes())
+        extract_word_text_with_bindings(self.xml.as_bytes(), &self.namespaces)
     }
 
     /// Return the original smart-tag XML fragment.
@@ -157,15 +217,17 @@ impl Eq for SmartTag {}
 fn parse_attribute(
     start: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> Result<SmartTagAttribute> {
     Ok(SmartTagAttribute {
-        uri: optional_attribute(start, b"uri", decoder)?,
-        name: optional_attribute(start, b"name", decoder)?.ok_or_else(|| {
-            Error::InvalidFormat("Word smart-tag property is missing its name".into())
-        })?,
-        value: optional_attribute(start, b"val", decoder)?.ok_or_else(|| {
-            Error::InvalidFormat("Word smart-tag property is missing its value".into())
-        })?,
+        uri: optional_attribute(start, b"uri", decoder, resolver, fragment_prefix)?,
+        name: optional_attribute(start, b"name", decoder, resolver, fragment_prefix)?.ok_or_else(
+            || Error::InvalidFormat("Word smart-tag property is missing its name".into()),
+        )?,
+        value: optional_attribute(start, b"val", decoder, resolver, fragment_prefix)?.ok_or_else(
+            || Error::InvalidFormat("Word smart-tag property is missing its value".into()),
+        )?,
     })
 }
 
@@ -173,11 +235,25 @@ fn optional_attribute(
     start: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> Result<Option<String>> {
     let mut value = None;
     for attribute in start.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         if attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        // Keep the existing unqualified-attribute compatibility of Word
+        // fragments, while explicit foreign bindings never become metadata.
+        if !is_wordprocessing_namespace(&namespace)
+            && !matches!(namespace, ResolveResult::Unbound)
+            && !is_fragment_word_name(&namespace, attribute.key, name, fragment_prefix)
+        {
             continue;
         }
         if value.is_some() {
