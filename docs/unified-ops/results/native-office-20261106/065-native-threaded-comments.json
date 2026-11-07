@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "a61063e4855db230694fc97e031470b50fa142e2",
+  "base_commit": "368707ee59f43aaec286184c993c5d15c02c7afc",
+  "problem": "Native-parent threaded-comment regressions exposed XLSX acceptance of mentions without comment text, and a feature-matrix claim of package-level thread CRUD that the public XLSX API does not expose.",
+  "changes": [
+    "Apply one shared missing-text invariant during XLSX comment parsing and model validation, which also guards the writer. Comments without mentions retain optional text.",
+    "Add six native-parent integration tests for XLSX eager/source readers, ordinary cell-edit preservation, external relationship refusal, and XLSB metadata edit lifecycle/atomicity/owner admission.",
+    "Correct the XLSX feature matrix to distinguish bounded model/codec authoring and package reads from a source-checked package-level threaded-comment editor. Raw public OPC construction in tests does not establish such an API.",
+    "Bind only xlsx-220 and xlsb-298 to the new partial evidence; preserve the historical authoring inventory, native fixture bytes and existing reviewed scope boundaries."
+  ],
+  "verification_scope": {
+    "xlsx_readers": "Explicit people/threaded-comment parts are added through public OPC to immutable native XLSX, XLSM and protected XLSX parents. Exact field assertions cover root/reply IDs, cell anchors, person IDs/display names/user/provider IDs, Unicode text, timestamps, absent/false resolution states and mention IDs/offsets. Both eager and source-backed readers agree; the mention substring Bob follows a surrogate-pair emoji.",
+    "xlsx_preservation": "Setup checks all original data/member payloads outside the three declared graph files, every original content type/relationship, root relationships and the exact part catalog plus two additions. File save/reopen retains all members. Ordinary Z100=65 publication is read back and preserves thread/person, VBA and legacy-note/VML payloads; retained-owner inverse restores every member. The protected native worksheet refuses with EditBlocked(ProtectedSheet) and remains unchanged.",
+    "xlsx_invalid_input": "A malformed native-parent thread part with mentions but no text now refuses through eager and source readers; direct model validation and writing return Invalid with the shared missing-text reason. A no-text comment without mentions remains valid. External persons and threaded-comment relationship derivatives return their precise Invalid reasons before target access.",
+    "xlsb_lifecycle": "Native classic-note and leading-chart workbook parents receive explicit typed people, root/reply/mention and opaque-extension metadata. Create, reply update, resolution, person rename, thread/worksheet-owner/people removal retain expected semantics and part/relationship identities. Every committed stage saves/reopens, replays and exactly inverts. Only the selected person/thread XML changes on update; original cells, notes, drawings and all unowned members/effective graph edges remain exact.",
+    "xlsb_refusals": "An exact UTF-16 range ending at the text boundary stages; one unit beyond refuses without losing valid staging. Missing text, invalid range, missing parent/person and a reply with a cell anchor return the exact InvalidValue graph refusal. Referenced-person removal and stale patch replay refuse. A native chartsheet cannot own a worksheet thread part: commit returns the exact Unrecognized reason, and reset commits an exact no-op.",
+    "limits": "All threaded-comment additions and malformed/external variants are explicitly library-authored derivatives. No native-authored threaded-comment corpus specimen, package-level XLSX thread editor, automatic legacy placeholder generation, provider lookup, collaboration behavior, external retrieval, macro execution or fresh Excel reopen/UI validation is inferred."
+  },
+  "specification_evidence": [
+    {
+      "reference": "[MS-XLSX] 2.6.202, 2.6.203, 2.6.205 and 2.6.206",
+      "source": "User-supplied local full specification",
+      "finding": "Mentions identify people and index comment text; persons and root/reply attributes carry the metadata tested here. Comment text is optional. The missing-text check enforces the existing bounded model invariant for nonempty mention lists; UTF-16 offsets are qualified as the library contract, not a new claim about native-app UI behavior."
+    },
+    {
+      "reference": "Public XLSX threaded_comments and XLSB comments::threaded package/edit contracts",
+      "source": "crates/litchi-xlsx/src/threaded_comments/ and crates/litchi-xlsb/src/comments/threaded/",
+      "finding": "XLSX exposes typed codecs plus eager/source reads, while XLSB exposes source-checked package editing. Tests and feature documentation preserve this distinction."
+    }
+  ],
+  "reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-threads-xlsx-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-xlsx-reproduction.log",
+        "bytes": 18761,
+        "sha256": "e0fd86f0c93458a10c70a6d9b4512f3da3272518a1d20d34bda94426082257ca"
+      },
+      "observed": "Before the fix, the native-parent eager worksheet reader returned Ok(Some(Comments)) with root text=None and a nonempty mention at UTF-16 start 3, length 3. The independent model/writer path skipped the same presence invariant.",
+      "regenerate": "In an isolated base_commit checkout, copy crates/litchi-xlsx/tests/microsoft_office_native_threaded_comments.rs from source_commit, then run TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx --all-features --test microsoft_office_native_threaded_comments native_xlsx_mentions_without_text_are_refused_by_model_and_package_readers --locked --offline --no-fail-fast"
+    }
+  ],
+  "coverage": {
+    "summary": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 367,
+      "indexed_tests": 549,
+      "reviewed_native_fixture_gaps": 23,
+      "reviewed_explicit_scope_boundaries": 41,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 367,
+        "native_ui_limitation_needs_review": 43,
+        "external_fixture_handoff_needs_review": 19,
+        "reviewed_native_fixture_gap_requires_followup": 23,
+        "reviewed_explicit_scope_boundary": 41,
+        "not_applicable": 1
+      }
+    },
+    "new_partial_rows": [
+      "xlsx-220",
+      "xlsb-298"
+    ],
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false,
+    "accounting": "Six new indexed native-parent tests yield 549 indexed tests and 367 partial feature rows. Two UI-limited rows gain bounded operation evidence; absence of native-authored collaboration specimens remains explicit."
+  },
+  "validation": [
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx -p litchi-xlsb --all-features --lib --test microsoft_office_native_threaded_comments --test xlsx_threaded_comment_crud --test signature_policy --test microsoft_office_native_metadata --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-owners.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-owners.log",
+        "bytes": 275611,
+        "sha256": "f31a34032fee9eec6c48c41487f4adbe08b31c692aa3ace3bf49fbfc36c503ff"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx -p litchi-xlsb --all-features --lib --test microsoft_office_native_threaded_comments --test xlsx_threaded_comment_crud --test signature_policy --test microsoft_office_native_metadata --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-owners.log 2>&1",
+      "results": {
+        "targets": 7,
+        "passed": 2740,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx -p litchi-xlsb --all-features --test microsoft_office_native_threaded_comments --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-final.log",
+        "bytes": 18217,
+        "sha256": "36ebf5256bea0e7dc588522ce628cbbb91c566adbabf634cc65e4cf9fa5e9dc6"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xlsx -p litchi-xlsb --all-features --test microsoft_office_native_threaded_comments --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-final.log 2>&1",
+      "results": {
+        "targets": 2,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0
+      },
+      "note": "Final integration rerun after strengthening original OPC graph and edited-cell assertions; these six tests are already included in the owner total."
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-ops.log",
+        "bytes": 22799,
+        "sha256": "457d613f2d60e6bcb8a9aa2658f817c5635fa7a4a9056d38ad5f5e7c0b620bf8"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption,eval,sign --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-ops.log 2>&1",
+      "results": {
+        "targets": 9,
+        "passed": 34,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,eval --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-facade.log",
+        "bytes": 20128,
+        "sha256": "521eca6f20f28591b9ece20e9b490aef60372230afc3c62fd333bee88684979e"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx,eval --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-facade.log 2>&1",
+      "results": {
+        "targets": 4,
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xlsx -p litchi-xlsb --all-features --lib --test microsoft_office_native_threaded_comments --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-clippy.log",
+        "bytes": 17137,
+        "sha256": "81787ab15ffb0fd9d2f37b76a620246c89183dae079abd7ed2608cb44cd609bb"
+      },
+      "regenerate": "TMPDIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xlsx -p litchi-xlsb --all-features --lib --test microsoft_office_native_threaded_comments --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-python.log",
+        "bytes": 670,
+        "sha256": "c1ccb3ff4caf7d37ccac96b6d265ee5d9ee2439a86240c9d38f0140cf079705a"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-coverage.json",
+        "bytes": 1365753,
+        "sha256": "2e24e5e182a3b7f286839b75d1910f0740ce5b8830cea09162f2085cc137221a"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check --config skip_children=true crates/litchi-xlsx/src/threaded_comments/codec.rs crates/litchi-xlsx/tests/microsoft_office_native_threaded_comments.rs crates/litchi-xlsb/tests/microsoft_office_native_threaded_comments.rs",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-threads-format.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-format.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "regenerate": "rustfmt --edition 2024 --check --config skip_children=true crates/litchi-xlsx/src/threaded_comments/codec.rs crates/litchi-xlsx/tests/microsoft_office_native_threaded_comments.rs crates/litchi-xlsb/tests/microsoft_office_native_threaded_comments.rs > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-threads-format.log 2>&1"
+    }
+  ],
+  "validation_totals": {
+    "distinct_rust_tests_passed": 2797,
+    "rust_tests_ignored": 0,
+    "python_tests_passed": 78,
+    "breakdown": "2740 owner, 34 operations and 23 facade tests. The final six-test integration rerun and earlier focused/reproduction runs are not counted twice.",
+    "clippy": "Affected XLSX/XLSB libraries and new integration targets passed with -D warnings. Existing vendored zlib-rs/allsorts warnings are unchanged.",
+    "formatting": "Targeted rustfmt and git diff --check passed.",
+    "gate": "Non-iWork topology verification, native corpus size/SHA-256 checks and coverage accounting passed.",
+    "staged_file_guards": "Both required size and binaries checks emitted nothing before each commit."
+  },
+  "environment": {
+    "scratch": "/home/zhuhe/.cache/litchi-native-office.V1L32Z",
+    "temporary_files": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/tmp",
+    "unrelated_files": "The three original untracked files retain their original hashes. The separately appearing production-readiness assessment remains untouched and unstaged.",
+    "fixture_access": "All test input paths use tracked test-data. Local specifications are read-only research inputs, never runtime test dependencies."
+  },
+  "goal_status": "active; 43 native UI limitations, 19 external handoffs and 23 reviewed native fixture gaps remain, plus the final scope/completion audit"
+}
