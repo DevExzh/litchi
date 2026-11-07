@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "e688334e829b68da72a9d8741b24e97be8bf3387",
+  "base_commit": "8f1a3ad6951e38955dc813a8a0d2aedf311198cd",
+  "problem": "The native revision fixtures reached previously untested binary metadata paths. XLS read RRDInfo history fields two bytes early and compared historical sheet maps with the current catalog. Its cell-change reader also treated variable-value size descriptors as physical tail lengths. XLSB expected the wrong user-record order, appended typed records after an existing EOF, used specification subsection numbers as wire IDs for RRd projection, and could not append/remove the latest header while maintaining GUID closure.",
+  "changes": [
+    "Read XLS RRDInfo history flags/interval at offsets 46/48 after the complete four-byte version. Correct synthetic payload builders and test version/history independence.",
+    "Validate current BoundSheet8 cardinality against the latest XLS map while retaining historical map framing/uniqueness checks and the authoritative large-workbook omission boundary. Add differing-history and >4112-sheet regressions.",
+    "Retain fixed-type old-value wire-size checks and the formula minimum. Treat variable string/formula cbOldVal as its stored size descriptor, not an offset into the compressed/continued tail; add focused compressed-string, short-formula and truncated-fixed-value checks.",
+    "Admit native XLSB CUsr-before-BeginUsers order, keep typed user/header additions before explicit EOF, and emit EOF for newly authored typed owners. Preserve the existing bounded unterminated and opaque-trailing-record profiles; refuse typed owners after an explicit end marker.",
+    "Use the twelve actual BIFF12 RRd record IDs (405,407,409,412-419,421), leaving subsection numbers and unrelated records opaque. Maintain current/saved header GUID pointers during append/removal while retaining user-reference and final-header deletion refusals.",
+    "Add eleven native tests across XLS/XLSX/XLSB plus nine focused regressions. Ten native tests enter the semantic/operation index; the noncanonical XLS User Names check is evidence-only. Correct stale Transaction API names in feature matrices."
+  ],
+  "specification_evidence": [
+    {
+      "reference": "[MS-XLS] 2.4.227 RRDInfo",
+      "finding": "The 50-byte layout places version at 42..46, history flags at 46..48 and interval at 48..50. Native fields are revision 6, version 2 and 30-day history."
+    },
+    {
+      "reference": "[MS-XLS] 2.2.11.2 and 2.4.241",
+      "url": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/2cbd26e8-6f7e-4195-ada4-14c8b7e595b8",
+      "finding": "Each saved revision set has its own header and tab map, and the native history has varying map sizes. Implementation inference from that per-set scope: enforce current-catalog cardinality on the latest map. Framing and duplicate-identifier checks still apply to every historical map."
+    },
+    {
+      "reference": "[MS-XLS] 2.4.223 and 2.5.198.3",
+      "finding": "Variable old-value descriptors have type-specific size rules, including double-byte string sizing and a formula minimum; they are not physical offsets into a compressed/continued record tail. Fixed-size value rules remain enforced."
+    },
+    {
+      "reference": "[MS-XLS] 2.4.338 UsrChk",
+      "finding": "Allowed stored versions are 0200/0300/0400/0500/0600. The native legacy export stores 0006; that fixture-profile rejection is retained and separately reviewed."
+    },
+    {
+      "reference": "[MS-XLSB] 2.3; 2.4.296, 2.4.347, 2.4.661",
+      "url": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/d0b57914-519a-4455-a035-cf61b72f4286",
+      "finding": "BrtEOF ends the shared-workbook collection. Native user bytes contain CUsr, BeginUsers, EOF; new typed entries must remain before the existing end marker. Record IDs differ from the numbered 2.4 subsections."
+    },
+    {
+      "reference": "[MS-XLSB] 2.1.7.55 User Names",
+      "url": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/ef236b20-c733-4b46-82be-a2f1da764384",
+      "finding": "Both the supplied conversion and current public page expose a build-path placeholder for the ABNF. This work combines explicit record definitions and native wire evidence; it does not claim complete ABNF validation."
+    }
+  ],
+  "verification_scope": {
+    "xlsx": "Native three-header/three-log graph exposes six changes plus two custom-view actions, exact GUIDs/local times/sheet IDs, numeric and string old/new values, formula text and inserted-sheet attributes. The current-user list is empty. User/header edits, matching header/log append/removal, complete-owner removal/recreation, failure atomicity, file reopen, stale rejection and inverses preserve workbook bytes and the stored B3 cache of 75.",
+    "xlsb": "Native BrtInfo version 1/revision 6/30-day retention, three GUID-bound headers, source part bytes, empty user framing and log sizes 1/20/3 are pinned. Correct wire IDs expose six reviewable envelopes and two custom-view envelopes. User CRUD, header settings, append/removal, current/saved GUID repair and full-owner lifecycle pass after save/reopen; body values/cache stay unchanged.",
+    "xls": "The 1922-byte Revision Log contains 24 records. Valid component reads pin RRDInfo, five headers and six cell/sheet changes, including exact number/string tails and the 30-byte stored old-string descriptor over a 29-byte combined encoded tail. Current B2=25 and cached B3=75 remain readable. Full history/user-package admission still correctly refuses the two duplicate-zero RRTabId arrays; no native bytes are repaired.",
+    "xls_user_gap": "The 536-byte User Names stream has four framing records and no users, but UsrChk is 0006. Its inactive first CbUsr size is 41. The precise InvalidRecord 0198 diagnostic is evidence-only under xls-176, not a passing user-log projection. A conforming native user-log/dependency specimen remains needed.",
+    "preservation": "All unrelated workbook payloads remain exact. XLSB source relationship XML may be reserialized, with complete attribute equality checked. Newly recreated XLSX owner XML may reorder attributes; comparison preserves namespaces/values/text and record/child order. Source-checked inverses restore prior payloads and graph.",
+    "limits": "No live users, collaboration, locking, revision application, conflict resolution, formula recalculation or fresh Excel reopen is claimed. Added users/headers are Litchi-authored derivatives. XLS variable bodies remain opaque, and the malformed legacy revision/user profile remains unresolved."
+  },
+  "reproductions": [
+    {
+      "artifact": {
+        "file_name": "native-excel-revisions-probe.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-probe.log",
+        "bytes": 26081,
+        "sha256": "a8265e8879607362a410522d11b9362d33c6399a6d647f3e794050d11c00ab47"
+      },
+      "note": "Initial native reads: XLS rejected RRDInfo as zero-interval history; XLSB rejected the valid native user ordering; XLSX projected the saved revision graph.",
+      "regenerate": "In an isolated base_commit checkout, copy the three native revision test files from source_commit and run the owner Cargo test command above with --test microsoft_office_native_revisions instead of --lib --tests."
+    },
+    {
+      "artifact": {
+        "file_name": "native-excel-revisions-append-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-append-reproduction.log",
+        "bytes": 17996,
+        "sha256": "68f95b886b03ba5bc6b9ae905516f2b57b74f732bd57ef8bef48ecdba2ea7935"
+      },
+      "note": "After codec admission was corrected, appending a valid fourth native-source header/log failed because the transaction left BrtInfo.guid on the previous latest header.",
+      "regenerate": "In an isolated source_commit checkout, restore the prior push_revision GUID behavior and run cargo test -p litchi-xlsb --all-features --test microsoft_office_native_revisions native_header_append_keeps_a_valid_latest_header_identity --locked --offline with the recorded Cargo environment."
+    },
+    {
+      "artifact": {
+        "file_name": "native-excel-revisions-string-reproduction.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-string-reproduction.log",
+        "bytes": 1200,
+        "sha256": "ac9c3a8e8063b6abf9d7c3d0977bc9270f0fcefbc8dad442dd927859c9dd85fb"
+      },
+      "note": "Direct native RRDChgCell parsing rejected the compressed string revision because cbOldVal=30 exceeded the 29-byte encoded tail.",
+      "regenerate": "In an isolated source_commit checkout, restore only the unconditional old-value tail checks and run the native XLS revision-record test with the recorded Cargo environment."
+    }
+  ],
+  "native_wire_artifacts": [
+    {
+      "artifact": {
+        "file_name": "native-excel-revision-log.bin",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revision-log.bin",
+        "bytes": 1922,
+        "sha256": "9c125c5042a4c15727e70e99af4a4e94c8fee72c877a987221acb1be9a413b5c"
+      },
+      "source_fixture": "test-data/microsoft-office/excel/excel-revisions.xls",
+      "regenerate": "Extract the root Revision Log CFB stream with litchi_cfb::OleFile::open_stream; streams() in the native XLS test shows the exact extraction."
+    },
+    {
+      "artifact": {
+        "file_name": "native-excel-user-names.bin",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-user-names.bin",
+        "bytes": 536,
+        "sha256": "e6c25514eab29a9319bf9c7eda300095728987bada6d1dbefafb78b548d9c9bc"
+      },
+      "source_fixture": "test-data/microsoft-office/excel/excel-revisions.xls",
+      "regenerate": "Extract the root User Names CFB stream with litchi_cfb::OleFile::open_stream; streams() in the native XLS test shows the exact extraction."
+    }
+  ],
+  "results": {
+    "rust_passed": 6433,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 319,
+      "indexed_tests": 435,
+      "reviewed_native_fixture_gaps": 8
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 322,
+      "indexed_tests": 445,
+      "reviewed_native_fixture_gaps": 9,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 322,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 24,
+        "bounded_native_evidence_needs_verification": 12,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_native_fixture_gap_requires_followup": 9,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls -p litchi-xlsb -p litchi-xlsx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-full.log",
+        "bytes": 587405,
+        "sha256": "f2acd8df6357b125ecb6adb0c4f9870a315a9de595e51ef2aeaf77c06fbbaaf5"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-xls -p litchi-xlsb -p litchi-xlsx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-full.log 2>&1",
+      "suites": 256,
+      "passed": 6001,
+      "failed": 0,
+      "ignored": 1,
+      "existing_ignored_tests": [
+        "test write_every_feature ... ignored, writes an evidence workbook"
+      ]
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'xlsx_*' --test 'xlsb_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-ops.log",
+        "bytes": 55829,
+        "sha256": "84883c2f6970ff5235911ae31c221693bfc78d44dc8df4b38af861922456ba32"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'xls_*' --test 'xlsx_*' --test 'xlsb_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-ops.log 2>&1",
+      "suites": 40,
+      "passed": 411,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-facade.log",
+        "bytes": 19664,
+        "sha256": "c01b358e45826abb0f7a0e4b8c278b271c887307ccf2093c56f950ae090295b4"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls -p litchi-xlsb -p litchi-xlsx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-clippy.log",
+        "bytes": 17401,
+        "sha256": "6ca0c8d9ae07a2b31d8f0c9ba36437d36c1cc7ba9407b30127bbe306e676aa6d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-xls -p litchi-xlsb -p litchi-xlsx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-python.log",
+        "bytes": 667,
+        "sha256": "6e9386da5aaf3e9fbab8d53bb377a7906b24d33735640e45e4d6a200dfac5fbe"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-excel-revisions-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-coverage.json",
+        "bytes": 1046551,
+        "sha256": "1025241b2bcbb7a4b226c17b7fc84be9fc7d99f35f3daaf1c8dfa555f3f79346"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-excel-revisions-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check and git diff --check/staged checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit. Three new Rust tests have mode 100644; no executable or large evidence was staged.",
+    "All three pre-existing untracked file SHA-256 values remain unchanged. The 75 Python checks include integrity of all 139 Office fixtures and four import assets.",
+    "Clippy passed with -D warnings for all three owner crates and tests; the only final lint adjustment replaced an unnecessary clone in an equality assertion. Existing vendor warnings remain unchanged.",
+    "All diagnostic prints and outside-checkout extraction writes were removed from committed test code. The native User Names review does not enter the semantic assertion index."
+  ],
+  "goal_status": "active; 322 of 494 feature rows have partial assertions and 445 tests are indexed. Nine reviewed native fixture gaps remain, with 24 operation, 12 bounded, 58 UI, 27 external and 41 unsupported reviews plus partial-scope reviews still open."
+}
