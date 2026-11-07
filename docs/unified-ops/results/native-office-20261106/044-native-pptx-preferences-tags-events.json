@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "4b39d545ce5e26ada706d80cadbb22e163c6c004",
+  "base_commit": "eca3152999bc38998fb6a5b369e3884d365ddf92",
+  "problem": "Five PresentationML rows lacked indexed native-source operation assertions. The feature matrix also claimed dedicated typed default-style/Kinsoku access, but the current owner exposes no such accessor or semantic transaction; its Kinsoku asset test used a test-local XML parser.",
+  "changes": [
+    "Add six native integration tests for presentation recommendation CRUD, direct/shape tag CRUD, raw default-style preservation, initial laser-trace storage and show-event CRUD.",
+    "Correct the Text styles and Kinsoku settings matrix row to partial retained-XML support and rename the raw Kinsoku fixture check so it does not imply a public typed API. State the existing laser replacement refusal explicitly.",
+    "Index PresentationML scopes pptx-407, pptx-410, pptx-427, pptx-428 and pptx-434, keeping native authored input distinct from Litchi-authored derivative metadata. No production library code or fixture bytes changed."
+  ],
+  "verification_scope": {
+    "variants": "Read-only and tag operations cover powerpoint-visual-objects.pptx/.ppsx/.potx and powerpoint-passive-macro.pptm/.ppsm/.potm. These immutable native inputs do not contain the tested recommendation or tag owners; positive CRUD assertions apply to Litchi-authored derivatives.",
+    "raw_default_style": "Pin all nine level indentation values (457200-EMU steps), 914400-EMU tab defaults, alignment and script line-breaking flags, nine 1800/1200 size/kerning values and +mn-lt theme fonts. An independent recommendation edit retains the entire presentation member and native discardImageEditData/defaultImageDpi/chartTrackingRefBased fragments. These are raw source/preservation checks, not typed Kinsoku/style semantics.",
+    "readonly": "Absent, true and false are distinct. Create/update/remove, exact no-op, file reopen, forward replay, stale rejection and inverse retain all unrelated members. Recommendation removal retains the properties owner. A true recommendation permits a subsequent tag edit and does not become library access control.",
+    "tags": "Direct slide and title-shape lists remain distinct and subtitle tags stay absent. Escaped Unicode literals and case-insensitive keys survive. Failed slide/shape selectors retain earlier staged work. Updates change only the respective tag part; removal collects the orphan part and preserves the other owner. Native shape content, title text and creation IDs are checked alongside exact unrelated payloads and graph-aware inverse checks.",
+    "laser": "On native visual, macro and master-motion slide 1, store one three-point trace with 0/250/500-ms offsets and exact signed EMU coordinates. Replacement is the documented precise Invalid boundary; a refused second set preserves the first staged creation. File reopen, forward replay, stale rejection and inverse pass while native shape content/creation IDs and all other members remain exact.",
+    "events": "The media and modern-media specimens both expose native video shape ID 4 on slide 2. Add seven typed trigger/play/pause/seek/resume/stop/null events targeting that object, with exact IDs/times/seek position, after adding a laser trace. Update to a null event at 800 ms, reject an empty event collection without losing staged work, and remove/invert after file reopen. The pre-existing laser and native creation IDs/common slide data/media payloads survive.",
+    "specification_check": "Read-only research of the user-supplied [MS-PPTX] sections 2.3.3.16 (CT_MediaPlaybackEventRecord) and 2.3.3.17 (CT_MediaSeekEventRecord) confirms objId names a media object. Positive event tests therefore use the actual native video owner rather than a title-shape identifier. There is no runtime or test dependency on the research checkout.",
+    "ingress_and_graphs": "Reader ingress retains the original ZIP for unchanged publication. Borrowed-buffer ingress can re-encode the ZIP but is separately checked for byte-exact member payloads. Graph-changing comparisons require identical member sets, complete relationship attributes and effective content types; all other payloads are exact. The new tag anchor correctly changes cSld, while its native spTree and creation ID remain exact.",
+    "limits": "No native-authored recommendation/tag/laser/event evidence is claimed for these additions. Dedicated typed presentation default-style/Kinsoku access, line breaking, generic customer-data/schema semantics, arbitrary shared-anchor cases, laser replacement, event execution, rendering and fresh PowerPoint reopen remain outside the demonstrated scope. No macro or media execution occurred."
+  },
+  "results": {
+    "rust_passed_excluding_focused_repeat": 2245,
+    "rust_failed": 0,
+    "rust_ignored": 1,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 304,
+      "indexed_tests": 416
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 309,
+      "indexed_tests": 422,
+      "reviewed_native_fixture_gaps": 8,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 309,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 26,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 24,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_native_fixture_gap_requires_followup": 8,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-pptx --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-full.log",
+        "bytes": 238306,
+        "sha256": "0798ceaf0f8f26fe047ea89a4a91fbe63e4ace21515257a2a4fd2b0bc8e01fa9"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-pptx --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-full.log 2>&1",
+      "suites": 115,
+      "passed": 2035,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_reason": "Existing opened::cross_copy_plan::digest_reuse_tests::print_the_golden_transcript is an explicitly invoked diagnostic printer."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-pptx --all-features --test microsoft_office_native_preferences --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-native.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-native.log",
+        "bytes": 18936,
+        "sha256": "0cb8cb9042f7edfa34ee0615a9cc0159f8c83da72216734d429d7cd28e9bf337"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-pptx --all-features --test microsoft_office_native_preferences --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-native.log 2>&1",
+      "suites": 1,
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "note": "Focused six-test run; included again in the full owner suite and excluded from the combined unique-suite total."
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'pptx_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-ops.log",
+        "bytes": 36447,
+        "sha256": "4fada7eac073af7ca054963aafc5e39ad772f2e7acf7ddb115392a2627125087"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'pptx_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-ops.log 2>&1",
+      "suites": 27,
+      "passed": 189,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-facade.log",
+        "bytes": 19444,
+        "sha256": "1fcaa30be3f4399fbb69dd8438a328791aa6b66f3a6b2c5b05b1d7a88b17030d"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-pptx --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-clippy.log",
+        "bytes": 18177,
+        "sha256": "0e1637edaaa695468a01e5dc57eb2826fae2bc77d8f45fe78a8d916968cde5e0"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-pptx --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-python.log",
+        "bytes": 667,
+        "sha256": "e1a2d06816e9dce078f258d0da3478184ecd6fc979a93b3bfe2540ade08597f6"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-pptx-preferences-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-coverage.json",
+        "bytes": 1013805,
+        "sha256": "03ace7b2de587eccffb40556bf51d0e4c53b91d3af45e069cf5734657cf1296a"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-pptx-preferences-coverage.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 --check and git diff --check/staged checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit. The new Rust file has mode 100644; no binary executable or large evidence artifact was staged.",
+    "All three pre-existing untracked file SHA-256 values remain unchanged. The 75 Python checks include integrity of all 139 Office fixtures and four import assets.",
+    "Clippy passed with -D warnings on the owner library and all tests. Existing vendor warnings from zlib-rs and allsorts remain unchanged."
+  ],
+  "goal_status": "active; 309 of 494 feature rows have partial assertions and 422 tests are indexed. Eight reviewed native fixture gaps remain, with 24 operation, 26 bounded, 58 UI, 27 external and 41 unsupported reviews plus partial-scope reviews still open."
+}
