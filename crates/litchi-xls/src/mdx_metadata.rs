@@ -48,12 +48,13 @@ pub(crate) const MDX_PROP_RECORD_TYPE: u16 = 0x0888;
 pub(crate) const MDX_KPI_RECORD_TYPE: u16 = 0x0889;
 /// Record type of the `MDB` record (MS-XLS 2.4.161).
 pub(crate) const MDB_RECORD_TYPE: u16 = 0x088A;
-/// Record type of the `ContinueFrt12` record (MS-XLS 2.4.61) that continues
+/// Record type of the `ContinueFrt12` record (MS-XLS 2.4.62) that continues
 /// a `METADATA` payload.
 pub(crate) const CONTINUE_FRT12_RECORD_TYPE: u16 = 0x087F;
 
 /// Size in bytes of an `FrtHeader` (MS-XLS 2.5.135).
 const FRT_HEADER_LEN: usize = 12;
+pub(crate) const CONTINUE_FRT12_HEADER_LEN: usize = 12;
 /// Size in bytes of an `MDir` structure (MS-XLS 2.5.180).
 const MDIR_LEN: usize = 8;
 /// Maximum character count of an `LPWideString` (MS-XLS 2.5.179): the
@@ -65,6 +66,30 @@ fn invalid(record_type: u16, message: impl Into<String>) -> Error {
         record_type,
         message: message.into(),
     }
+}
+
+/// Validate and strip the FrtRefHeader from a continued metadata record.
+pub(crate) fn continuation_data(data: &[u8]) -> Result<&[u8]> {
+    let fail = |message| invalid(CONTINUE_FRT12_RECORD_TYPE, message);
+    if data.len() < CONTINUE_FRT12_HEADER_LEN {
+        return Err(fail("ContinueFrt12 header is truncated"));
+    }
+    let word = |offset| u16::from_le_bytes([data[offset], data[offset + 1]]);
+    if word(0) != CONTINUE_FRT12_RECORD_TYPE {
+        return Err(fail("ContinueFrt12 header has the wrong record type"));
+    }
+    let flags = word(2);
+    if flags & 2 != 0 {
+        return Err(fail("ContinueFrt12 alert flag must be zero"));
+    }
+    // FrtFlags' unused high bits MUST be ignored (MS-XLS 2.5.134).
+    // ContinueFrt12 explicitly requires ignoring ref8 when fFrtRef is zero.
+    if flags & 1 != 0 && (word(4) > word(6) || word(8) > word(10) || word(10) > 255) {
+        return Err(fail(
+            "ContinueFrt12 reference is outside the BIFF8 cell grid",
+        ));
+    }
+    Ok(&data[CONTINUE_FRT12_HEADER_LEN..])
 }
 
 fn read_u32(data: &[u8], offset: usize) -> u32 {
@@ -1013,7 +1038,8 @@ impl MdxMetadata {
     }
 
     /// Parse one `METADATA` record (payload including any trailing
-    /// `ContinueFrt12` bodies concatenated) into the collection.
+    /// `ContinueFrt12` data concatenated, excluding their FrtRefHeaders)
+    /// into the collection.
     pub(crate) fn push_record(&mut self, record_type: u16, payload: &[u8]) -> Result<()> {
         match record_type {
             MDT_INFO_RECORD_TYPE => self.add_info(MdtInfo::parse(payload)?),
@@ -1077,6 +1103,16 @@ impl MdxMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn truncated_continuation_headers_never_reach_metadata_payloads() {
+        for length in 0..CONTINUE_FRT12_HEADER_LEN {
+            let data = vec![0; length];
+            assert!(matches!(continuation_data(&data),
+                Err(Error::InvalidRecord { record_type: CONTINUE_FRT12_RECORD_TYPE, message })
+                    if message == "ContinueFrt12 header is truncated"));
+        }
+    }
 
     fn payload(record_type: u16, body: &[u8]) -> Vec<u8> {
         let mut data = frt_header_payload(record_type);

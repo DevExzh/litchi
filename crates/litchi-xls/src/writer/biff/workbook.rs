@@ -401,7 +401,7 @@ pub(super) fn write_theme<W: Write>(writer: &mut W, value: &crate::Theme) -> Res
 
 /// Write the workbook globals `METADATA` production (MS-XLS 2.1): every MDX
 /// metadata record in ABNF order, chunking oversized payloads into
-/// `ContinueFrt12` records (MS-XLS 2.4.61).
+/// `ContinueFrt12` records (MS-XLS 2.4.62).
 ///
 /// Record types: 0x0884–0x088A
 pub(super) fn write_mdx_metadata<W: Write>(
@@ -409,20 +409,23 @@ pub(super) fn write_mdx_metadata<W: Write>(
     value: &crate::MdxMetadata,
 ) -> Result<()> {
     for (record_type, payload) in value.to_record_payloads()? {
-        let mut chunks = payload.chunks(MAX_RECORD_DATA);
-        let first = chunks.next().expect("MDX metadata payload is never empty");
+        let first_len = payload.len().min(MAX_RECORD_DATA);
+        let first = &payload[..first_len];
         write_record_header(
             writer,
             record_type,
             crate::utils::truncate_usize_to_u16(first.len()),
         )?;
         writer.write_all(first)?;
-        for chunk in chunks {
+        let header_len = crate::mdx_metadata::CONTINUE_FRT12_HEADER_LEN;
+        for chunk in payload[first_len..].chunks(MAX_RECORD_DATA - header_len) {
             write_record_header(
                 writer,
                 crate::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE,
-                crate::utils::truncate_usize_to_u16(chunk.len()),
+                crate::utils::truncate_usize_to_u16(chunk.len() + header_len),
             )?;
+            writer.write_all(&crate::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE.to_le_bytes())?;
+            writer.write_all(&[0; crate::mdx_metadata::CONTINUE_FRT12_HEADER_LEN - 2])?;
             writer.write_all(chunk)?;
         }
     }

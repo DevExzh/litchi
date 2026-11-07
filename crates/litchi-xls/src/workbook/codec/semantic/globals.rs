@@ -159,15 +159,15 @@ impl<R: Read + Seek> Reader<R> {
                 | crate::mdx_metadata::MDX_KPI_RECORD_TYPE
                 | crate::mdx_metadata::MDB_RECORD_TYPE => {
                     // METADATA records are continued by ContinueFrt12 (MS-XLS
-                    // 2.1): the logical payload is the record body plus any
-                    // trailing ContinueFrt12 bodies.
+                    // 2.1). Strip each continuation's FrtRefHeader before
+                    // appending its data to the logical record payload.
                     let mut payload = record.payload().to_vec();
                     while records.get(i + 1).is_some_and(|next| {
                         next.kind().get()
                             == crate::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE
                     }) {
                         i += 1;
-                        payload.extend_from_slice(records[i].payload());
+                        payload.extend_from_slice(crate::mdx_metadata::continuation_data(records[i].payload())?);
                     }
                     self.mdx_metadata
                         .push_record(record.kind().get(), &payload)?;

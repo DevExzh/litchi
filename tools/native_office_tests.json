@@ -10973,6 +10973,100 @@
         "Builder-authored Hiragana/center metadata with 4000 ranges and unused format bits survives native-parent attachment, typed reads and an ordinary cell insertion with exact continued phonetic frames, unrelated streams and patch inverse."
       ],
       "scope_limit": "Explicit library-authored phonetic derivatives use public CFB setup. No native phonetic specimen, opened-workbook phonetic setter or phonetic rendering is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_mdx",
+      "name": "native_xls_mdx_continuations_reconstruct_all_record_kinds_and_preserve_cell_edits",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-188"
+      ],
+      "assertions": [
+        "Independent BIFF records reconstruct all seven MDX metadata kinds, exact shared Unicode strings, behavior flags and type/value indexes. Ordinary cell publication preserves continued metadata bytes, all other streams, source immutability and exact patch replay/inverse."
+      ],
+      "scope_limit": "Explicit inert metadata derivatives on native parents; no producer-authored MDX specimen, cell-to-metadata application, OLAP connection or cube evaluation is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_mdx",
+      "name": "native_xls_mdx_builder_emits_continuefrt12_headers",
+      "fixtures": [
+        "excel/excel-recorded-macro.xlt"
+      ],
+      "feature_rows": [
+        "xls-188"
+      ],
+      "assertions": [
+        "The fresh workbook builder emits mandatory twelve-byte ContinueFrt12 headers, and independently reassembled logical records match exact expected payloads. The same records survive attachment to a native macro template and save/reopen."
+      ],
+      "scope_limit": "Builder output is attached through public CFB setup with explicit Workbook offset relocation; this is not an opened-workbook MDX editor."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_mdx",
+      "name": "native_xls_mdx_builder_places_metadata_after_sheet_catalog_before_country",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-188"
+      ],
+      "assertions": [
+        "Builder metadata appears immediately after the last BoundSheet8 and before Country, matching the workbook globals grammar. Publication in the same position on a native parent exposes the exact typed metadata."
+      ],
+      "scope_limit": "Record-order evidence for explicit library-authored metadata; no native Office reopen or producer-authored cube workflow."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_mdx",
+      "name": "native_xls_mdx_continuation_sizes_include_the_twelve_byte_header",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-188"
+      ],
+      "assertions": [
+        "Logical payload sizes at 8224/8226/16436/16438 bytes produce exactly 0/1/1/2 continuation records with bounded payload sizes and independently checked bytes. Each result reads identically after native-parent publication."
+      ],
+      "scope_limit": "Bounded continuation framing and readback only; no OLAP server activity or native MDX authoring."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_mdx",
+      "name": "native_xls_mdx_metadata_lifecycle_keeps_indexes_and_rejects_invalid_staging",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-date1904-breaks.xls"
+      ],
+      "feature_rows": [
+        "xls-188"
+      ],
+      "assertions": [
+        "Appending strings, cube-value metadata and blocks retains exact indexes; invalid string/type/value references leave valid staging unchanged. Whole-record replacement and removal preserve unrelated bytes and restore the original Workbook stream with exact CFB inverses."
+      ],
+      "scope_limit": "Public metadata collection and fresh writer combined with caller-managed raw CFB publication; no dedicated package MDX CRUD or application of metadata to cells."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_mdx",
+      "name": "native_xls_mdx_continuation_headers_and_cross_record_indexes_are_validated",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-188"
+      ],
+      "assertions": [
+        "Full native-parent reads accept valid active ranges and ignore inactive range bytes and reserved flags. Wrong record echoes, alert flags, invalid active ranges and invalid string/type/value indexes produce exact typed errors without mutating the source."
+      ],
+      "scope_limit": "Explicit malformed derivatives exercise parser contracts; opaque preserved metadata does not imply cell-metadata semantics or external provider behavior."
     }
   ]
 }

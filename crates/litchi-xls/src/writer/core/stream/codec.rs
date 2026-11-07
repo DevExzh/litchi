@@ -345,6 +345,13 @@ pub(crate) fn generate_workbook_stream(
         biff::write_boundsheet(&mut stream, 0, &worksheet.name)?;
     }
 
+    // METADATA immediately follows BUNDLESHEET in the globals grammar.
+    if let Some(metadata) = mdx_metadata
+        && !metadata.is_empty()
+    {
+        biff::write_mdx_metadata(&mut stream, metadata)?;
+    }
+
     if let Some(settings) = calculation_settings.multithreaded_calculation {
         biff::write_mtr_settings(&mut stream, settings)?;
     }
@@ -411,14 +418,6 @@ pub(crate) fn generate_workbook_stream(
     // globals grammar.
     if let Some(theme) = theme {
         biff::write_theme(&mut stream, theme)?;
-    }
-
-    // METADATA follows the Theme/custom-view region in the workbook globals
-    // grammar.
-    if let Some(metadata) = mdx_metadata
-        && !metadata.is_empty()
-    {
-        biff::write_mdx_metadata(&mut stream, metadata)?;
     }
 
     // EOF record (end of workbook globals)
