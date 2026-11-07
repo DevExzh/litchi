@@ -237,3 +237,14 @@ These checks do not establish a complete Excel dependency/spill engine, external
 refresh, cache publication or fresh Excel acceptance. See
 `tools/native_office_evidence_reviews.json` and
 `crates/litchi-ops/tests/microsoft_office_native_calc.rs`.
+
+The runtime boundaries `xlsb-334`
+are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
+The operations test `microsoft_office_native_runtime_boundaries` checks all 139
+Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
+PDF requests return the advertised refusal through string, JSON and sink APIs,
+without writing to the sink. Locked files first require a password; supported
+unlocks still refuse visual output, and encrypted XLSB retains its separate
+unsupported-decryption boundary. Reads preserve publication bytes and all input
+files. Cited owner tests qualify saved data and bounded edits, not the excluded
+application rendering, layout or execution.

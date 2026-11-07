@@ -149,3 +149,17 @@ no-ops remain explicitly incomplete; no complete native external-content removal
 is claimed. LZFu/MELA cases wrap native payload bytes in library-generated
 transport, with byte-exact decompression, finite bounds and checksum checks.
 The native corpus does not contain Office-produced compressed-RTF transport.
+
+The runtime boundaries `rtf-493`
+are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
+The operations test `microsoft_office_native_runtime_boundaries` checks all 139
+Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
+PDF requests return the advertised refusal through string, JSON and sink APIs,
+without writing to the sink. Locked files first require a password; supported
+unlocks still refuse visual output, and encrypted XLSB retains its separate
+unsupported-decryption boundary. Reads preserve publication bytes and all input
+files. Cited owner tests qualify saved data and bounded edits, not the excluded
+application rendering, layout or execution.
+Native math/layout/mail-merge inputs also refuse the worksheet evaluator;
+saved field results remain unchanged. RTF field results use separate story
+owners and are checked in the field inventory rather than paragraph text.

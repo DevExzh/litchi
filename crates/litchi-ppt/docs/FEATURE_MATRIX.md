@@ -197,3 +197,14 @@ four JPEG and two EMF images, with no WMF. One paragraph build remains distinct
 from diagram builds; six unencrypted slide catalogs contain no diagram builds,
 and 42 slides refuse the absent build-list target. Recolor and diagram owners
 still need native specimens; these two reviews do not qualify their semantics.
+
+The runtime boundaries `ppt-375`, `ppt-393`
+are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
+The operations test `microsoft_office_native_runtime_boundaries` checks all 139
+Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
+PDF requests return the advertised refusal through string, JSON and sink APIs,
+without writing to the sink. Locked files first require a password; supported
+unlocks still refuse visual output, and encrypted XLSB retains its separate
+unsupported-decryption boundary. Reads preserve publication bytes and all input
+files. Cited owner tests qualify saved data and bounded edits, not the excluded
+application rendering, layout or execution.

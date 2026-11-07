@@ -1200,6 +1200,834 @@
         "crates/litchi-eval/src/lib.rs"
       ],
       "scope_limit": "An explicit limit on full Excel compatibility, not positive semantic coverage of this universal row. Concrete native assertions are indexed under the corresponding formula/cache/link rows. Historical authoring status and source fixtures remain unchanged."
+    },
+    {
+      "feature_row": "doc-038",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-mailmerge-fields.doc",
+        "word/word-math-navigation.doc",
+        "word/word-layout-extensions.doc"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Typed field instructions, switches, bookmark/source identities and producer-saved cached results.",
+      "unsupported_scope": "Resolving fields against bookmarks/pages/styles/documents/databases/prompts or host identity, refreshing fields and generating navigation results.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native",
+          "name": "native_word_mail_merge_retains_original_source_path_and_cached_records"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs",
+        "crates/litchi-ops/src/capabilities/m4.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "doc-066",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-mailmerge-fields.doc",
+        "word/word-math-navigation.doc",
+        "word/word-layout-extensions.doc"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Stored TOC/sequence/page and other field metadata and cached text are preserved as document data.",
+      "unsupported_scope": "Calculating fields or generating TOC/TOA/INDEX/statistics/page/sequence results.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native",
+          "name": "native_word_mail_merge_retains_original_source_path_and_cached_records"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs",
+        "crates/litchi-ops/src/capabilities/m4.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "doc-061",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.doc",
+        "word/word-tables-layout.doc",
+        "word/word-review-controls.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-math-navigation.doc",
+        "word/word-visual-objects.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-document-protection.doc",
+        "word/word-legacy-form.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-glossary.dot",
+        "word/word-bidi-eastasia.doc",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-encrypted.doc"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Document text, stored layout/drawing data and saved statistics; the native FIB/Dop2013 test distinguishes producer counters from parsed content.",
+      "unsupported_scope": "Word pagination/layout, page-field calculation, OfficeArt rasterization and visual Word-compatible output.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native_structure",
+          "name": "native_fib_generation_template_and_saved_statistics_remain_distinct"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "docx-123",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-visual-objects.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-glossary.dotx",
+        "word/word-glossary.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-master-document.docx",
+        "word/word-master-document/CHILD",
+        "word/word-master-native/LEGACY",
+        "word/word-tracked-moves.docx",
+        "word/word-encrypted.docx"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Source-preserving section/layout metadata and saved caption fields; ordinary text/outline/statistics projections.",
+      "unsupported_scope": "Word-compatible line breaking, pagination, page-field evaluation and visual rendering.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_layout",
+          "name": "native_caption_fields_keep_sequence_identifiers_and_cached_results"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs",
+        "crates/litchi-ops/src/capabilities/m4.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "docx-124",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-mailmerge-fields.docx",
+        "word/word-math-navigation.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Typed field delimiters/instructions/switches, saved SEQ caption results and mail-merge IF/merge/counter caches.",
+      "unsupported_scope": "Recalculating, resolving or refreshing Word fields and regenerated tables/indexes.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_layout",
+          "name": "native_caption_fields_keep_sequence_identifiers_and_cached_results"
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_mail_merge",
+          "name": "native_mail_merge_settings_and_field_caches_are_inert"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs",
+        "crates/litchi-ops/src/capabilities/m4.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "docx-125",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-mailmerge-fields.docx",
+        "word/word-math-navigation.docx",
+        "word/word-layout-extensions.docx"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "Nine DOC/DOCX/RTF math, layout and mail-merge inputs exercise both ingress modes. Evaluate capabilities explicitly say the formats have no worksheets; evaluate/recalculate calls return UnsupportedCapability, retaining text and complete publication bytes. MATCH_009 is read as saved DOC/DOCX text and via the separately owned RTF field inventory, not computed. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Bounded mail-merge settings/source metadata CRUD; native active-record updates preserve complete document XML and every unrelated package member.",
+      "unsupported_scope": "Opening/contacting a data source, executing SQL/query/provider logic, consuming credentials and generating mail-merge output.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_mail_merge",
+          "name": "native_mail_merge_settings_and_field_caches_are_inert"
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_mail_merge",
+          "name": "native_mail_merge_update_clear_and_replay_preserve_body_and_other_parts"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs",
+        "crates/litchi-ops/src/capabilities/m4.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "docx-130",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-review-controls.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-visual-objects.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-glossary.dotx",
+        "word/word-glossary.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-master-document.docx",
+        "word/word-master-document/CHILD",
+        "word/word-master-native/LEGACY",
+        "word/word-tracked-moves.docx",
+        "word/word-encrypted.docx"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Typed or opaque chart/drawing/diagram/OLE resources with bounded edits, saved caches and preserved relationships/embedded workbooks.",
+      "unsupported_scope": "Chart calculation/rendering, SmartArt layout, DrawingML/VML rasterization and embedded-workbook rendering.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-docx",
+          "target": "microsoft_office_native_visuals",
+          "name": "native_chart_hole_edit_preserves_cached_data_workbooks_and_companions"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "xls-194",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-interaction-print.xls",
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-conditional-drawings.xls",
+        "excel/excel-links-objects.xls",
+        "excel/excel-pivot-controls.xls",
+        "excel/excel-form-controls.xls",
+        "excel/excel-formula-owners.xls",
+        "excel/excel-connections.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-chart-families.xls",
+        "excel/excel-revisions.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-legacy-sheets.xls",
+        "excel/excel-encrypted.xls"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Bounded native chart-sheet series/cache reads and source-checked selected cache/geometry edits that preserve other records.",
+      "unsupported_scope": "Complete fresh chart authoring, unrestricted chart graph edits and Excel chart rendering.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-xls",
+          "target": "microsoft_office_native_charts",
+          "name": "native_chart_sheet_cache_edit_preserves_unrelated_records_and_inverts"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "xlsx-269",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsx",
+        "excel/excel-interaction-print.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-recorded-macro.xltm",
+        "excel/excel-visual-analytics.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-conditional-drawings.xlsx",
+        "excel/excel-links-objects.xlsx",
+        "excel/excel-pivot-controls.xlsx",
+        "excel/excel-form-controls.xlsx",
+        "excel/excel-formula-owners.xlsx",
+        "excel/excel-connections.xlsx",
+        "excel/excel-date1904-breaks.xlsx",
+        "excel/excel-chart-families.xlsx",
+        "excel/excel-revisions.xlsx",
+        "excel/excel-metadata.xlsx",
+        "excel/excel-legacy-sheets.xlsm",
+        "excel/excel-encrypted.xlsx"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Supported chart definitions, series/axis/cache data and bounded package edits with companion/relationship preservation.",
+      "unsupported_scope": "A full Excel renderer or unrestricted chart, DrawingML, slicer, timeline and producer-extension grammar.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native_charts",
+          "name": "native_embedded_chart_cache_update_preserves_companions_and_inverts"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "xlsb-334",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-visual-analytics.xlsb",
+        "excel/excel-conditional-drawings.xlsb",
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-form-controls.xlsb",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-connections.xlsb",
+        "excel/excel-date1904-breaks.xlsb",
+        "excel/excel-chart-families.xlsb",
+        "excel/excel-revisions.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-legacy-sheets.xlsb",
+        "excel/excel-encrypted.xlsb"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Chart-sheet/resource discovery and preserved native chart graphs/caches through scalar cell edits.",
+      "unsupported_scope": "Complete chart grammar, unrestricted chart graph authoring and Excel rendering.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native_charts",
+          "name": "native_cell_edit_keeps_chart_graph_and_saved_caches_inert"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "ppt-375",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Inert embedded media bytes, previews, resource IDs, frame/playback metadata and path values.",
+      "unsupported_scope": "Audio/video playback, browser/resource activation, external fetch, interpolation and rendering.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native",
+          "name": "native_powerpoint_media_previews_resolve_by_slot_and_retain_exact_payloads"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native",
+          "name": "native_powerpoint_media_and_ole_placeholders_keep_typed_frames"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "ppt-393",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Native shape/presentation data, timing/transition metadata and bounded source-preserving duration/advance edits.",
+      "unsupported_scope": "Computing effective layout, rendering slides/shapes, playing transitions or executing animation timelines.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_metadata",
+          "name": "native_animation_duration_edit_preserves_targets_builds_and_other_slides"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "pptx-452",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx",
+        "powerpoint/powerpoint-encrypted.pptx"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Supported package/shape/media/animation metadata with source-preserving edits and saved target/graph data.",
+      "unsupported_scope": "Slide rendering, effective layout, media/animation playback, link/action activation and macro/add-in execution.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native_visual",
+          "name": "native_chart_title_edit_retains_series_workbook_relationships_and_slide"
+        },
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native",
+          "name": "native_powerpoint_video_uses_the_embedded_office_resource_and_reads_caption_cues"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
+    },
+    {
+      "feature_row": "rtf-493",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-tables-layout.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-math-navigation.rtf",
+        "word/word-rtf-minimal.rtf",
+        "word/word-rtf-table-grid.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-mailmerge-fields.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-embedded-fonts.rtf",
+        "word/word-vector-diagram.rtf",
+        "word/word-bidi-eastasia.rtf",
+        "word/word-layout-extensions.rtf",
+        "word/word-tracked-moves.rtf",
+        "word/word-write-reservation.rtf"
+      ],
+      "reason": "The current owner matrix deliberately separates supported document/package metadata from the excluded application runtime. Native saved values and successful data edits do not establish that runtime.",
+      "required_evidence": "Current public capability/refusal parity on native inputs, unchanged source/output-sink behavior, and concrete owner tests for the supported data profile; rendering or calculation must not be inferred from retained bytes.",
+      "observed_evidence": "The complete 139-file corpus is exercised through file-backed Auto and Eager ingress. HTML/SVG/screenshot/PDF string, JSON and sink APIs agree with capabilities and emit no sink writes. Fourteen locked opens report DocumentProtected; twelve supported password unlocks then report UnsupportedCapability, while both encrypted XLSB unlock attempts retain their explicit unsupported-decryption error. Unencrypted publication and every input file remain unchanged. The additional owner checks qualify the specific inert data/profile described in supported_scope; they do not run the excluded application behavior.",
+      "supported_scope": "Modern layout/direction metadata, paragraph text and separately owned field instructions/results; saved header/footer PAGE and mail-merge IF caches remain data.",
+      "unsupported_scope": "Word-compatible rendering, pagination, shaping and field/formula calculation. RTF paragraph text does not incorporate separately owned field result text.",
+      "checks": [
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_office_corpus_visual_views_refuse_with_no_output_in_both_ingress_modes",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_runtime_boundaries",
+          "name": "native_word_field_and_mail_merge_inputs_refuse_worksheet_evaluation",
+          "required_features": [
+            "doc",
+            "docx",
+            "rtf",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "xlsb",
+            "encryption",
+            "eval"
+          ]
+        },
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native_layout",
+          "name": "native_header_footer_stories_retain_paragraphs_and_cached_page_fields"
+        },
+        {
+          "crate": "litchi-rtf",
+          "target": "microsoft_office_native",
+          "name": "native_word_mail_merge_preserves_empty_file_table_and_inert_source"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ops/src/capabilities.rs",
+        "crates/litchi-ops/src/read.rs",
+        "crates/litchi-ops/src/capabilities/m4.rs"
+      ],
+      "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
     }
   ]
 }

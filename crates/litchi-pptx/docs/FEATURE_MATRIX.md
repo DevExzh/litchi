@@ -342,3 +342,14 @@ not establish universal MS-PPTX/MS-ODRAWXML grammar or application semantics.
 The report counts the boundary separately from missing native specimens and
 positive semantic assertions; concrete extension owners remain independently
 qualified by their tests.
+
+The runtime boundaries `pptx-452`
+are explicitly reviewed in `tools/native_office_evidence_reviews.json`.
+The operations test `microsoft_office_native_runtime_boundaries` checks all 139
+Office files through Auto/file and Eager/byte ingress: HTML, SVG, screenshot and
+PDF requests return the advertised refusal through string, JSON and sink APIs,
+without writing to the sink. Locked files first require a password; supported
+unlocks still refuse visual output, and encrypted XLSB retains its separate
+unsupported-decryption boundary. Reads preserve publication bytes and all input
+files. Cited owner tests qualify saved data and bounded edits, not the excluded
+application rendering, layout or execution.
