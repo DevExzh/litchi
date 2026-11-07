@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "1730cd3292799d22d207186245b0167d50bebf73",
+  "base_commit": "b059356beb466e59ee917b7666d04dff790249cf",
+  "problem": "After a supported native PPT slide reorder appended a new live DocumentContainer, slide-view reads scanned both current and historical records and failed with duplicate SlideViewInfo instances. Normal/notes-text readers also selected the first historical occurrence instead of the live owner, and outline/sorter reads had the same unscoped traversal. Native preferences, programmable tags and CFB property transactions lacked specific coverage.",
+  "changes": [
+    "Resolve all four preference accessors through the live document persist mapping and its direct DocInfoList. Borrow the owned child slice instead of collecting view records across the stream history.",
+    "Validate the selected DocInfoList header and reject duplicate live owners. Reject duplicate normal/notes-text records and retain the existing slide/notes/outline/sorter duplicate checks inside the live scope. Missing live owners never fall back to history or unrelated containers.",
+    "Add five native semantic tests, four focused history/ownership unit regressions, and source-limit assertions on the four view accessors.",
+    "Audit all 11 native binary PowerPoint files for Presentation Advisor and smart-tag records. Add two separate fixture-gap reviews and update the feature matrix, test index and evidence-review accounting."
+  ],
+  "verification_scope": {
+    "native_view_values": "The three visual-object variants and fonts/math/handout source retain their native 104/100 slide zoom and origin 1440,192 when zoom exists; the POT omits zoom and notes-text state. The navigation fixture retains 105/100 and 1384,192. The handout specimen additionally retains 111/100 notes zoom at 3240,200. Native notes-text scaling is 1/1 at 0,0. Snap flags, empty guide lists and exact 20-byte opaque pane payloads are asserted without interpreting them as splitter geometry.",
+    "native_view_records": "Normal-view and slide/notes-view encodings reproduce the original native records including ignored bytes. These five immutable sources each contain one DocumentContainer; their PrintOptionsAtom is absent. The last-printed timestamp in the handout fixture is separate evidence and does not qualify print-option behavior.",
+    "incremental_publication": "Move the first slide to the end in PPT/PPS/POT visual variants, fonts/math/handout PPT and navigation PPT. File save/reopen returns the correct changed slide-text order and unchanged live normal/notes-text/slide/notes/outline/sorter views and document tags. The original PowerPoint Document stream remains an exact prefix, all streams other than PowerPoint Document/Current User stay exact, and retained-patch inverse restores the original CFB bytes.",
+    "history_and_scope_regressions": "Synthetic histories carry different old/live values for every preference family and verify selection of the live values. Missing live owners with historical and wrong-scope view records return absence. Duplicate selected records and duplicate/invalid DocInfoList owners remain typed corruption errors. The retained source payload budget propagates through all four accessors.",
+    "programmable_tags": "Native document tag order is PP12 then PP10, with PP9 appended in the navigation fixture. Exact payloads include PP12 document flags, PP10 grid spacing 49152 and the handout font-embedding flag. Navigation PP9 retains eight ExternalHyperlink9 containers, two 72-byte and six 24-byte bodies. Complete containers and typed extension codecs reproduce exact source bytes. Duplicate version and an 8-byte binary-payload limit yield their exact typed Corrupted errors. Payloads remain inert.",
+    "summary_reads": "PPT/PPS/POT visual variants, handout PPT and passive-macro PPT retain Mac codepage 10000, author/modifier Ryker Zhu, Microsoft Macintosh PowerPoint application, empty title/company, saved word counts 49/50/17, revision 1/3, source timestamp precision and absent-versus-empty template fields. The handout last-printed timestamp is exactly 2026-10-15T11:33:27.083Z. Exact no-op metadata transactions retain input bytes.",
+    "property_crud": "Create/update/remove title and custom Boolean values on those five native sources. A mixed unsupported identifier update preserves earlier staged properties. Each commit saves/reopens, forward-replays exactly, rejects stale replay and inverts to the exact original CFB bytes. Standard document-summary values and every non-property stream, including presentation, pictures, Current User, OLE and macro payloads, remain exact. Empty original title and removed title remain distinct.",
+    "evidence_review": "All 11 native binary PPT/PPS/POT files, including the decrypted encrypted PPT, expose nonempty strict document-extension inventories but no PresAdvisorFlags9Atom 0x177A or SmartTagStore11Container 0x36B3. Both contextual accessors return None and the raw known-version tag records contain neither target. Navigation PP9 positively contains its eight hyperlink records. The two feature rows remain uncovered and require direct native specimens; their historical authoring status is preserved.",
+    "specification_basis": "Read-only MS-PPT 2.4.4/2.4.5 research establishes the live DocumentContainer's DocInfoList owner and per-type cardinality, including the distinct slide/notes instances. MS-PPT 2.4.23 establishes versioned document tag families. No production or test code depends on the research checkout.",
+    "limits": "This qualifies saved preferences and native-source preservation, not layout, pagination, rendering, print options, nonempty guides, interpreted Mac pane geometry or preference mutation. Document-level PP9/10/12 tests do not qualify every slide/shape tag family. Metadata edits author Litchi derivatives; no fresh PowerPoint reopen, macro execution, hyperlink navigation, Advisor execution or smart-tag recognition was performed."
+  },
+  "results": {
+    "new_native_semantic_tests": 5,
+    "new_native_evidence_audits": 1,
+    "new_unit_regressions": 4,
+    "ppt_all_features_passed": 1632,
+    "ops_passed": 85,
+    "facade_passed": 21,
+    "rust_passed": 1738,
+    "rust_ignored": 3,
+    "python_passed": 75,
+    "ignored_reason": "Existing package::tests::test_invalid_file requires an external test file; generate_litchi_changed_artifact and read_back_native_resaved_artifact require an external native-application harness.",
+    "count_note": "Totals sum the full owner, operations and facade runs. The final seven-test native run overlaps the full suite and is excluded; it also checks the later explicit PrintOptions absence and precise tag-error assertions. Runtime production code was unchanged after the full owner run.",
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 297,
+      "indexed_tests": 403,
+      "reviewed_native_fixture_gaps": 8,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 297,
+        "native_ui_limitation_needs_review": 58,
+        "bounded_native_evidence_needs_verification": 28,
+        "external_fixture_handoff_needs_review": 27,
+        "operation_needs_verification": 34,
+        "unsupported_boundary_needs_review": 41,
+        "reviewed_native_fixture_gap_requires_followup": 8,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt --all-features --lib --tests --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-full.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-full.log",
+        "bytes": 162060,
+        "sha256": "bcc0e50633630c69f4d28f71f8507e34d579d8f0ae9cb1c8d5a48d92c352ac03"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt --all-features --lib --tests --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-full.log 2>&1",
+      "suites": 60,
+      "passed": 1632,
+      "failed": 0,
+      "ignored": 3
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'ppt_*' --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-ops.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-ops.log",
+        "bytes": 25630,
+        "sha256": "f08246b8157e1d511c8ec54855897a640bb896188ef4ac4aa5a9a973e4a80cec"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,docx,ppt,pptx,rtf,xls,xlsx,xlsb,encryption --test 'ppt_*' --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-ops.log 2>&1",
+      "suites": 10,
+      "passed": 85,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-facade.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-facade.log",
+        "bytes": 19662,
+        "sha256": "b21487b4b07333a3fe865780f11ad36ecbccfa8dc7e7cba63b8eadbbc93e38ef"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,vba-inspection,xls,xlsb,xlsx --test 'microsoft_office_native*' --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-facade.log 2>&1",
+      "suites": 3,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt --all-features --test microsoft_office_native_preferences --test microsoft_office_native_evidence_review --locked --offline",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-final.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-final.log",
+        "bytes": 19344,
+        "sha256": "a8b69992f14dedda0ecaa1a07b80a81a6a87abdabad3005a0a947cb28300c893"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt --all-features --test microsoft_office_native_preferences --test microsoft_office_native_evidence_review --locked --offline > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-final.log 2>&1",
+      "suites": 2,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "overlaps_full_suite": true
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ppt --all-features --lib --tests --locked --offline --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-clippy.log",
+        "bytes": 18963,
+        "sha256": "8243a4c263d26b0858f0ddf49d56fc871783142f3116e1efb00e43dff1619233"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ppt --all-features --lib --tests --locked --offline --no-deps -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-python.log",
+        "bytes": 667,
+        "sha256": "e28b3c3e3cb1d297323b194d83f9bd70f058963be09327cef9e3115cd25faa76"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-ppt-preferences-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-coverage.json",
+        "bytes": 985050,
+        "sha256": "a6931071ef8ee971966dadc140ba0cc0f932e089fa33f48c1a3ae2b1be242228"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-coverage.json 2>&1"
+    }
+  ],
+  "initial_reproduction": {
+    "artifact": {
+      "file_name": "native-ppt-preferences-reproduction.log",
+      "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-ppt-preferences-reproduction.log",
+      "bytes": 31563,
+      "sha256": "3218bdec246e9520791d3c1b0aaeac3e21d32be0f5d861939ffbc9afcb709e03"
+    },
+    "note": "The production reproduction native_views_remain_readable_after_incremental_slide_reorder failed with Corrupted(\"presentation contains duplicate SlideViewInfo instances\") after a supported native slide reorder. The same scratch log includes a raw sequential-record diagnostic; that diagnostic is not used as a feature assertion or an additional library-defect claim."
+  },
+  "additional_checks": [
+    "Targeted rustfmt --edition 2024 checks and git diff --check/staged checks passed.",
+    "Both AGENTS.md staged evidence-size/binaries guards printed nothing before the source commit; the new test source has mode 100644 and no executable was staged.",
+    "The three pre-existing untracked hashes remain unchanged. Corpus integrity checks cover all 139 native fixtures and four import assets.",
+    "Clippy passed with -D warnings; existing vendored zlib-rs 77 and allsorts 3 warnings remain."
+  ],
+  "goal_status": "active; 297 of 494 rows have partial assertions, 403 tests are indexed and eight reviewed native fixture gaps remain explicit. Remaining operation/bounded/UI/external/unsupported and partial-scope reviews are still required."
+}
