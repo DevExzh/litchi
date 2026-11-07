@@ -125,3 +125,53 @@ fn ignores_undefined_operator_bits_for_list_validations() {
     assert_eq!(rule.kind(), Kind::List);
     assert_eq!(rule.operator(), Operator::Between);
 }
+
+fn custom_at(tokens: &[u8], row: u16, column: u16) -> Vec<u8> {
+    let mut data = 7u32.to_le_bytes().to_vec();
+    for _ in 0..4 {
+        string(&mut data, "\0");
+    }
+    formula(&mut data, tokens);
+    formula(&mut data, &[]);
+    // Preserve source order: a later A1 range must not move the preview origin.
+    data.extend_from_slice(&2u16.to_le_bytes());
+    for value in [row, row, column, column, 0, 0, 0, 0] {
+        data.extend_from_slice(&value.to_le_bytes());
+    }
+    data
+}
+
+#[test]
+fn validation_reference_preview_uses_first_range_and_distinguishes_coordinates() {
+    for (tokens, expected) in [
+        (vec![0x4c, 0xff, 0xff, 0xff, 0xc0], "=C5"),
+        (vec![0x44, 0, 0, 0, 0xc0], "=A1"),
+        (vec![0x4c, 1, 0, 0xff, 0x40], "=C$2"),
+        (
+            vec![0x4d, 0xff, 0xff, 0, 0, 0xff, 0xc0, 0, 0xc0, 0x42, 1, 4, 0],
+            "=SUM(C5:D6)",
+        ),
+        (
+            vec![0x45, 0, 0, 1, 0, 0, 0xc0, 1, 0xc0, 0x42, 1, 4, 0],
+            "=SUM(A1:B2)",
+        ),
+    ] {
+        let rule = parse_dv(&custom_at(&tokens, 5, 3), None).unwrap();
+        assert_eq!(rule.formula1().unwrap().rendered(), Some(expected));
+        assert_eq!(rule.formula1().unwrap().tokens(), tokens);
+        assert_eq!(rule.ranges()[0].first_row(), 5);
+        assert_eq!(rule.ranges()[1].first_row(), 0);
+    }
+}
+
+#[test]
+fn validation_preview_keeps_biff_wraparound_and_unresolved_name_tokens() {
+    let tokens = [0x4c, 0xff, 0xff, 0xff, 0xc0];
+    let rule = parse_dv(&custom_at(&tokens, 0, 0), None).unwrap();
+    assert_eq!(rule.formula1().unwrap().rendered(), Some("=IV65536"));
+    // A valid PtgNameV needs workbook context, which this detached parse lacks.
+    let unresolved_name = [0x43, 1, 0, 0, 0];
+    let rule = parse_dv(&custom_at(&unresolved_name, 1, 8), None).unwrap();
+    assert_eq!(rule.formula1().unwrap().tokens(), unresolved_name);
+    assert_eq!(rule.formula1().unwrap().rendered(), None);
+}

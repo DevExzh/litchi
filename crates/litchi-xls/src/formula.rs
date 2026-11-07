@@ -468,6 +468,25 @@ pub(crate) fn render_shared_formula(
         .and_then(|formula| render_text(format_args!("={formula}")).ok())
 }
 
+/// Render a validation formula for one target cell. Only the N-reference
+/// tokens carry offsets; ordinary PtgRef/PtgArea coordinates stay literal.
+pub(crate) fn render_validation_formula(
+    tokens: &[u8],
+    context: Option<&FormulaContext>,
+    row: u16,
+    column: u8,
+) -> Option<String> {
+    if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+        return None;
+    }
+    let mut decoder = FormulaDecoder::new(tokens, context, None);
+    decoder.ref_n_origin = Some((row, u16::from(column)));
+    decoder
+        .decode()
+        .ok()
+        .and_then(|formula| render_text(format_args!("={formula}")).ok())
+}
+
 /// Return the shared/array formula anchor encoded by a standalone `PtgExp`.
 pub(crate) fn ptg_exp_anchor(tokens: &[u8]) -> Option<(u16, u16)> {
     if tokens.len() != 5 || tokens[0] != 0x01 || tokens[4] != 0 {
@@ -487,6 +506,8 @@ struct FormulaDecoder<'a> {
     name_x_operands: Vec<usize>,
     context: Option<&'a FormulaContext>,
     shared_origin: Option<(u16, u16)>,
+    /// Origin for offset-bearing PtgRefN/PtgAreaN, also used by validation.
+    ref_n_origin: Option<(u16, u16)>,
     references: Vec<FormulaReferenceSpan>,
     /// Locate references without a workbook context: names and 3-D sheet
     /// prefixes render as placeholders and 3-D references are recorded.
@@ -510,6 +531,7 @@ impl<'a> FormulaDecoder<'a> {
             name_x_operands: Vec::new(),
             context,
             shared_origin,
+            ref_n_origin: shared_origin,
             references: Vec::new(),
             locate_only: false,
             references_3d: Vec::new(),
@@ -740,7 +762,7 @@ impl<'a> FormulaDecoder<'a> {
                 }
                 let row = self.u16()?;
                 let col = self.u16()?;
-                let origin = self.shared_origin.ok_or(())?;
+                let origin = self.ref_n_origin.ok_or(())?;
                 let (row, col) = resolve_shared_reference(row, col, Some(origin))?;
                 self.push_text(cell_reference(row, col)?)
             },
@@ -760,7 +782,7 @@ impl<'a> FormulaDecoder<'a> {
                 let last_row = self.u16()?;
                 let first_col = self.u16()?;
                 let last_col = self.u16()?;
-                let origin = self.shared_origin.ok_or(())?;
+                let origin = self.ref_n_origin.ok_or(())?;
                 let (first_row, first_col) =
                     resolve_shared_reference(first_row, first_col, Some(origin))?;
                 let (last_row, last_col) =

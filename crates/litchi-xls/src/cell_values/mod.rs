@@ -3896,7 +3896,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns a typed name, ambiguity, allocation, or finite-bound error.
+    /// Returns a typed name, ambiguity, workbook-protection, allocation, or finite-bound error.
     pub(crate) fn rename_sheet(&mut self, selector: Selector<'_>, name: &str) -> Result<()> {
         let sheet = self.require_sheet(selector, "worksheet rename")?;
         structural::validate_sheet_name(name)?;
@@ -3918,6 +3918,7 @@ impl Edit {
         if before == name {
             return Ok(());
         }
+        self.require_unprotected_tab_structure()?;
         self.stage_structural(StructuralChange::RenameSheet {
             sheet,
             before,
@@ -4326,6 +4327,17 @@ impl Edit {
         Ok(())
     }
 
+    fn require_unprotected_tab_structure(&self) -> Result<()> {
+        if self.source.inner.source_policy.protection == SourceProtectionPolicy::WorkbookOrShared {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit cells",
+                "protected or shared workbook structure cannot change its tabs",
+            ));
+        }
+        Ok(())
+    }
+
     fn require_tab_edit(&self, creates_or_destroys: bool) -> Result<()> {
         self.require_no_tab_change()?;
         if !self.changes.is_empty()
@@ -4339,13 +4351,7 @@ impl Edit {
                 "a worksheet tab-structure change must be the only operation of its edit",
             ));
         }
-        if self.source.inner.source_policy.protection == SourceProtectionPolicy::WorkbookOrShared {
-            return Err(Error::refused(
-                RefusalKind::Protected,
-                "edit cells",
-                "protected or shared workbook structure cannot change its tabs",
-            ));
-        }
+        self.require_unprotected_tab_structure()?;
         if creates_or_destroys && !self.source.inner.source_policy.macro_free_workbook {
             return Err(Error::refused(
                 RefusalKind::UnsupportedOperation,

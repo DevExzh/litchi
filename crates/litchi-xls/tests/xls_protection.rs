@@ -49,3 +49,51 @@ fn file_sharing_rejects_long_user_name() {
             .is_err()
     );
 }
+
+#[test]
+fn worksheet_rename_respects_workbook_structure_but_not_sheet_content_protection() {
+    use litchi_xls::{Package, package::edit::Error};
+    for structure in [false, true] {
+        let mut builder = Builder::new();
+        let sheet = builder.add_worksheet("Protected").unwrap();
+        builder.protect_sheet(sheet, None, true, true).unwrap();
+        if structure {
+            builder.protect_workbook(None, true, false);
+        }
+        let source = builder.build().unwrap();
+        let bytes = source.to_bytes().unwrap();
+        let p = Package::from_bytes(&bytes).unwrap();
+        let mut edit = p.edit().unwrap();
+        edit.rename_sheet("Protected", "Protected").unwrap();
+        if structure {
+            assert!(matches!(edit.rename_sheet("Protected", "Renamed"),
+                Err(Error::CellValues(litchi_xls::Error::Refused(r))) if r.kind()==litchi_core::edit::RefusalKind::Protected));
+            assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), bytes);
+        } else {
+            edit.rename_sheet("Protected", "Renamed").unwrap();
+            let commit = edit.commit().unwrap();
+            assert_eq!(
+                commit.package().workbook().worksheet_names().unwrap(),
+                ["Renamed"]
+            );
+            let reopened = Reader::new(Cursor::new(commit.package().to_bytes().unwrap())).unwrap();
+            assert!(
+                reopened
+                    .xls_worksheet(0)
+                    .unwrap()
+                    .protection()
+                    .is_protected()
+            );
+            assert_eq!(
+                commit
+                    .package()
+                    .apply(&commit.patch().inverse())
+                    .unwrap()
+                    .package()
+                    .to_bytes()
+                    .unwrap(),
+                bytes
+            );
+        }
+    }
+}

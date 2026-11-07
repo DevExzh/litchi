@@ -1,7 +1,7 @@
 //! BIFF8 DVAL and DV payload codecs.
 
 use super::model::{ErrorStyle, Formula, ImeMode, Kind, Operator, Range, Rule, Settings};
-use crate::formula::{FormulaContext, render_formula};
+use crate::formula::{FormulaContext, render_validation_formula};
 use crate::{Error, Result};
 
 const MAX_VALIDATION_RANGES: usize = 432;
@@ -108,9 +108,6 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
     let error = cursor.unicode_string(225)?;
     let mut formula1 = cursor.formula()?;
     let mut formula2 = cursor.formula()?;
-    for formula in [&mut formula1, &mut formula2].into_iter().flatten() {
-        formula.rendered = render_formula(&formula.tokens, formula_context);
-    }
     let needs_two = !matches!(kind, Kind::Any | Kind::List | Kind::Custom)
         && matches!(operator, Operator::Between | Operator::NotBetween);
     match kind {
@@ -163,6 +160,17 @@ pub(crate) fn parse_dv(data: &[u8], formula_context: Option<&FormulaContext>) ->
             first_column,
             last_column,
         });
+    }
+    // Relative DV references describe the cell being validated. Expose one
+    // deterministic preview at the top-left of the first source range.
+    let anchor = &ranges[0]; // range_count was checked to be nonzero above.
+    for formula in [&mut formula1, &mut formula2].into_iter().flatten() {
+        formula.rendered = render_validation_formula(
+            &formula.tokens,
+            formula_context,
+            anchor.first_row,
+            anchor.first_column,
+        );
     }
     Ok(Rule {
         kind,

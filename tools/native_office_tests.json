@@ -6764,6 +6764,101 @@
         "Each of five native macro-document/template runs retains explicit ligatures=none, distinct from other absent OpenType properties. A detached native bold target run accepts five-family OpenType edits and restoration while every unowned XML byte remains exact."
       ],
       "scope_limit": "Run/snapshot reads and detached fragment rewrites; no source-package OpenType edit transaction, font shaping, rendering or macro activation is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_names_validation",
+      "name": "native_defined_names_keep_workbook_and_sheet_scope_with_exact_tokens",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "feature_rows": [
+        "xls-143"
+      ],
+      "assertions": [
+        "Exact native FixtureAmounts workbook name, sheet-scoped Print_Area and Print_Titles, record indices, built-in kinds, rendered formulas and source token bytes; source publication stays exact."
+      ],
+      "scope_limit": "One ordinary user name and two print names; no native name mutation, macro-name invocation or formula evaluation is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_names_validation",
+      "name": "native_seven_validation_kinds_keep_ranges_messages_and_inert_formulas",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "feature_rows": [
+        "xls-161"
+      ],
+      "assertions": [
+        "Seven native whole/list/date/decimal/time/text-length/custom rules retain exact ranges, flags, prompt/error strings, list separators, rendered formulas and custom/list token bytes. The custom MOD(I2,2)=0 preview uses the first target cell while stored input values remain unchanged."
+      ],
+      "scope_limit": "Best-effort formula display at the first stored range corner; no validation execution, cell rejection, UI prompts or native rule editing is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_names_validation",
+      "name": "native_passwordless_protection_keeps_flags_and_refuses_tab_rename",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "feature_rows": [
+        "xls-148",
+        "xls-160"
+      ],
+      "assertions": [
+        "Passwordless structure lock plus sheet/object/scenario flags remain typed; password verifiers and sharing state stay absent/zero. Exact same-name rename is a no-op, while changed tab rename returns Protected with no published change."
+      ],
+      "scope_limit": "Workbook tab protection only; no general worksheet authorization policy, password verification or encryption boundary is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_names_validation",
+      "name": "native_mac_property_streams_keep_producer_dates_and_reserved_hyperlinks",
+      "fixtures": [
+        "excel/excel-interaction-print.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xls"
+      ],
+      "feature_rows": [
+        "xls-146"
+      ],
+      "assertions": [
+        "Exact native author, modifier, application, created/modified timestamps, empty company and Mac codepage10000; interaction-print retains a 140-byte reserved _PID_HLINKS blob containing the inert fixture URL. Metadata no-ops keep exact source bytes."
+      ],
+      "scope_limit": "Saved CFB metadata only; the reserved hyperlink property stays opaque and no link is followed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_names_validation",
+      "name": "native_property_crud_preserves_workbook_rules_names_protection_and_macros",
+      "fixtures": [
+        "excel/excel-interaction-print.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xls"
+      ],
+      "feature_rows": [
+        "xls-146"
+      ],
+      "assertions": [
+        "Title and custom Boolean create/update/remove survive file save/reopen, exact forward replay and exact inverse, while stale replay refuses. A mixed unsupported identifier update retains earlier staged properties. Workbook/macro streams, root CLSID, document-summary fields and existing reserved custom values remain exact."
+      ],
+      "scope_limit": "Native-source property transactions; all formula/validation/protection/macro data stays inert and unchanged, with no Excel reopen claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_names_validation",
+      "name": "native_mac_custom_unicode_edit_changes_only_the_custom_section_codepage",
+      "fixtures": [
+        "excel/excel-interaction-print.xls"
+      ],
+      "feature_rows": [
+        "xls-146"
+      ],
+      "assertions": [
+        "Adding a Chinese custom-property name/value upgrades only the user-defined section to UTF-16. Native standard summary/document-summary snapshots, reserved hyperlink bytes, Workbook stream and all other streams remain exact; file reopen and inverse pass."
+      ],
+      "scope_limit": "New Unicode custom property is Litchi-authored on a native MacExcel source, not a native-authoring fixture claim."
     }
   ]
 }

@@ -94,7 +94,10 @@ impl Formula {
         &self.tokens
     }
 
-    /// Best-effort inert rendering using the workbook's existing BIFF token renderer.
+    /// Best-effort inert rendering at the top-left cell of the rule's first
+    /// stored range. Offset-bearing references are relative to that cell;
+    /// ordinary reference coordinates remain literal. This does not evaluate
+    /// the formula or validate any cell value.
     #[must_use]
     pub fn rendered(&self) -> Option<&str> {
         self.rendered.as_deref()
