@@ -614,3 +614,42 @@ fn macro_main_is_counted_once_and_dangling_activex_is_visible() {
         Some(1)
     );
 }
+
+#[test]
+fn image_relationships_admit_svg_and_still_reject_non_image_xml() {
+    for (content_type, invalid) in [("image/svg+xml", false), ("application/xml", true)] {
+        let bytes = valid_fixture();
+        let mut package = OpcPackage::from_bytes(&bytes, Default::default()).unwrap();
+        let name = PackURI::new("/word/media/vector.svg").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            name,
+            content_type.into(),
+            br#"<svg xmlns="http://www.w3.org/2000/svg"/>"#.to_vec(),
+        )));
+        package
+            .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::IMAGE.into(),
+                "media/vector.svg".into(),
+                "rSvg".into(),
+                false,
+            );
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let report = validate_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            has_issue(
+                &report,
+                "docx.main_document.relationship_target_content_type"
+            ),
+            invalid
+        );
+    }
+}

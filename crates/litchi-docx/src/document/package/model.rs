@@ -818,7 +818,9 @@ impl Document {
         let text = self.text()?;
 
         // Calculate text statistics
-        let word_count = count_words(&text);
+        // Paragraph and table-cell boundaries separate words even though the
+        // plain text projection concatenates their character data.
+        let mut word_count = 0usize;
         let character_count = count_characters(&text);
         let character_count_no_spaces = count_characters_no_spaces(&text);
 
@@ -835,6 +837,9 @@ impl Document {
         let mut drawing_count = 0usize;
 
         for para in self.paragraphs()? {
+            word_count = word_count
+                .checked_add(count_words(&para.text()?))
+                .ok_or_else(|| Error::InvalidFormat("DOCX word count overflow".into()))?;
             image_count = image_count
                 .checked_add(para.images()?.len())
                 .ok_or_else(|| Error::InvalidFormat("DOCX image count overflow".into()))?;

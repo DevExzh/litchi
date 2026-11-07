@@ -49,7 +49,11 @@ impl Statistics {
         Self::default()
     }
 
-    /// Get the word count.
+    /// Get the whitespace-delimited word count.
+    ///
+    /// Document traversal treats projected paragraph boundaries, including
+    /// table-cell paragraphs, as word boundaries. It does not perform Word UI
+    /// language-specific segmentation.
     #[inline]
     #[must_use]
     pub fn word_count(&self) -> usize {

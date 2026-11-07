@@ -8152,6 +8152,149 @@
         "All original package members and the complete metadata model remain exact after the rejected call."
       ],
       "scope_limit": "Intentional create-only API boundary, not a passing reaction update/removal operation. Existing graph mutation requires a separate supported owner."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_operations",
+      "name": "native_statistics_count_words_across_paragraph_and_table_cell_boundaries",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-121"
+      ],
+      "assertions": [
+        "Native text/table/BiDi documents have exact per-paragraph whitespace word counts 51/57/24, Unicode character counts 334/390/239, nonspace counts 295/365/222 and paragraph counts 12/36/7.",
+        "Table count, approximate lines/pages and separate overlapping image/drawing counts are pinned; native package members remain unchanged."
+      ],
+      "scope_limit": "Bounded visible-text statistics: whitespace words per projected paragraph, Unicode scalar characters and approximate lines/pages. Not Word UI linguistic segmentation, rendered page count or a disjoint physical-object total."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_operations",
+      "name": "native_validation_reports_inert_macro_external_and_embedded_presence_without_false_svg_errors",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx",
+        "word/word-bidi-eastasia.docx",
+        "word/word-visual-objects.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-math-navigation.dotx",
+        "word/word-document-protection.docx",
+        "word/word-layout-extensions.docx"
+      ],
+      "feature_rows": [
+        "docx-121"
+      ],
+      "assertions": [
+        "Ten native DOCX/DOTX/DOCM/DOTM inputs complete all applicable validation checks without error; valid SVG image/svg+xml relationships are admitted.",
+        "Exact direct-block counts, one external-target observation, five macro observations and two embedded-content observations are pinned where present. The math template retains its bounded unsupported-body warning; reports omit authored text/author/URL data and sources remain exact."
+      ],
+      "scope_limit": "Package/main-document/MCE and inert presence checks only; a complete check is not full schema or native rendering certification. No macro execution, external fetching or signature trust is established."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_operations",
+      "name": "native_validation_exact_main_payload_bound_and_one_under_report_distinct_states",
+      "fixtures": [
+        "word/word-vector-diagram.docx"
+      ],
+      "feature_rows": [
+        "docx-121"
+      ],
+      "assertions": [
+        "Validation completes at the exact native main-document byte size; one byte less produces Blocked markup compatibility and dependent StoppedBy semantics.",
+        "The same source remains byte-identical and blocked validation is not reported as complete."
+      ],
+      "scope_limit": "Main-payload resource boundary only; not an exhaustive validation limit matrix or evidence of native application validity."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_operations",
+      "name": "native_unicode_paragraphs_stream_through_short_writes_with_exact_text_and_counts",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-bidi-eastasia.docx"
+      ],
+      "feature_rows": [
+        "docx-120"
+      ],
+      "assertions": [
+        "Native paragraph text, including Arabic, Hebrew, CJK, accents and emoji, is sent one Unicode scalar at a time to a forward-only sink accepting at most three bytes per write.",
+        "Exact input/paragraph/run limits, three-member output, save/reopen paragraph and statistics parity, validation completion and released memory are checked; source packages stay unchanged."
+      ],
+      "scope_limit": "Fresh plaintext output from the native visible text projection. Formatting, bidi properties, comments, notes, links and other source package content are outside the streaming writer; no document-conversion or native Word compatibility claim."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_operations",
+      "name": "native_stream_input_limits_and_cancellation_preserve_failure_progress",
+      "fixtures": [
+        "word/word-bidi-eastasia.docx"
+      ],
+      "feature_rows": [
+        "docx-120"
+      ],
+      "assertions": [
+        "An actual native Arabic paragraph is refused at one byte below its UTF-8 input length before accepting text; written progress stays exact and the writer becomes unusable.",
+        "Cancellation after accepting the paragraph preserves output progress and refuses further publication; both paths release managed memory and leave the native source unchanged."
+      ],
+      "scope_limit": "Bounded input/cancellation behavior of a forward-only plaintext writer; partial output is not presented as a completed DOCX."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_story_batches",
+      "name": "native_direct_hyperlink_batch_changes_only_its_text_and_replays_exactly",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-074"
+      ],
+      "assertions": [
+        "The real paragraph-10 Reference link is updated through edit_stories; only its escaped text changes while all other document bytes, relationships and package members remain exact.",
+        "Story topology, save/reopen, exact no-op, forward/stale replay and inverse are checked."
+      ],
+      "scope_limit": "One native direct hyperlink through the batch API; no multi-story native authoring, URL fetching or field-based hyperlink editing."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_story_batches",
+      "name": "native_story_derivative_batch_preserves_every_unselected_byte_and_relationship",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-074"
+      ],
+      "assertions": [
+        "The native Reference link and inert target are copied into the main/header/footer stories of a labeled native-layout derivative, retaining the original producer roots and paragraph metadata.",
+        "A canonical three-story batch changes exactly the selected hyperlink text slots; complete lexical equality elsewhere, relationship/topology retention, file reopen, stale refusal and exact member inverse are checked."
+      ],
+      "scope_limit": "The header/footer hyperlinks are library-authored derivatives; the original corpus contains no such links. This qualifies batch mechanics on native story envelopes, not native application acceptance or all story kinds."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_story_batches",
+      "name": "native_story_batch_late_failure_and_ambiguous_selection_keep_prior_staging",
+      "fixtures": [
+        "word/word-text-structure.docx",
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-074"
+      ],
+      "assertions": [
+        "After a successful staged main-story edit, a batch with a valid early leaf and a missing late header paragraph fails without publishing either new change.",
+        "Empty, duplicate, reversed and unreachable selections preserve the prior staged package; committing retains only the earlier valid edit and the source stays unchanged."
+      ],
+      "scope_limit": "Failure atomicity for main/header/footer direct-link selectors only; notes, comments, glossary, nested controls and link-target changes are not claimed."
     }
   ]
 }

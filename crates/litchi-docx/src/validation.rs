@@ -767,7 +767,15 @@ fn is_embedded_package_content_type(value: &str) -> bool {
 fn is_image_content_type(value: &str) -> bool {
     matches!(
         value,
-        ct::BMP | ct::GIF | ct::JPEG | ct::PNG | ct::TIFF | ct::MS_PHOTO | ct::X_EMF | ct::X_WMF
+        ct::BMP
+            | ct::GIF
+            | ct::JPEG
+            | ct::PNG
+            | ct::TIFF
+            | ct::MS_PHOTO
+            | ct::X_EMF
+            | ct::X_WMF
+            | "image/svg+xml"
     )
 }
 
