@@ -11067,6 +11067,98 @@
         "Full native-parent reads accept valid active ranges and ignore inactive range bytes and reserved flags. Wrong record echoes, alert flags, invalid active ranges and invalid string/type/value indexes produce exact typed errors without mutating the source."
       ],
       "scope_limit": "Explicit malformed derivatives exercise parser contracts; opaque preserved metadata does not imply cell-metadata semantics or external provider behavior."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_cell_metadata",
+      "name": "native_xlsb_metadata_types_blocks_and_cell_associations_are_exact",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-333"
+      ],
+      "assertions": [
+        "Pin native XLDAPR/XLRICHVALUE metadata names, flags, version IDs, cell/value block indexes, OPC typing and workbook relationship. CellMeta maps to A4/D4 and ValueMeta to B5; unchanged cell publication is byte-exact."
+      ],
+      "scope_limit": "Independent raw metadata inspection and opaque preservation only. No typed MDX metadata model, metadata behavior evaluation, rich-value rendering or cube refresh is claimed."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_cell_metadata",
+      "name": "native_xlsb_inserting_before_dynamic_array_anchor_keeps_cell_metadata_on_its_formula",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-333"
+      ],
+      "assertions": [
+        "Inserting C4=88 leaves native CellMeta references on A4 and D4. Save/reopen and indexed reads retain native values, formulas, styles, metadata parts and all unrelated members, with exact replay/inverse."
+      ],
+      "scope_limit": "Cell-record insertion and metadata-prefix association only; native array formulas and their cached values are retained without evaluation."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_cell_metadata",
+      "name": "native_xlsb_inserting_before_rich_value_keeps_the_native_value_metadata_association",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-333"
+      ],
+      "assertions": [
+        "After removing the native A5 label, reinserting A5=88 keeps the native ValueMeta prefix on B5. All rich-data parts and relationships stay exact, and eager/indexed reads and full patch inverse agree."
+      ],
+      "scope_limit": "A deliberate ordinary cell-edit derivative creates the insertion point. The opaque rich-value payload is neither interpreted nor rendered."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_cell_metadata",
+      "name": "native_xlsb_removing_rich_value_removes_its_prefix_without_retargeting_the_next_cell",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-333"
+      ],
+      "assertions": [
+        "After adding C5=76, removal of B5 also removes its ValueMeta prefix while leaving C5 unassociated. Metadata/rich-data parts remain exact and the complete inverse restores the source."
+      ],
+      "scope_limit": "Complete cell-record removal, not metadata-type behavior evaluation or metadata-part garbage collection."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_cell_metadata",
+      "name": "native_xlsb_cache_and_header_edits_keep_metadata_prefixes_and_opaque_parts",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-333"
+      ],
+      "assertions": [
+        "A4 numeric-to-string cached-result publication preserves its formula tokens and CellMeta association. B5 phonetic-header edits retain its error storage and ValueMeta reference. Other cells and package members stay exact through save/reopen/replay/inverse."
+      ],
+      "scope_limit": "Explicit stored-cache and header edits only; no formula recalculation, rich-value interpretation or evaluation of metadata behavior flags."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_cell_metadata",
+      "name": "native_xlsb_malformed_metadata_prefixes_refuse_cell_publication_without_changing_source",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-333"
+      ],
+      "assertions": [
+        "Malformed derivatives with truncated, zero/negative, duplicate, reversed or orphaned metadata prefixes return exact InvalidFormat errors at cell publication and leave the source package and native fixture unchanged."
+      ],
+      "scope_limit": "Structural publication validates prefix framing and association; cross-part metadata-index semantics remain opaque and are not claimed."
     }
   ]
 }

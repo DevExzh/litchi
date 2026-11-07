@@ -1236,7 +1236,7 @@ impl Draft {
         self.insert_cell(reference, style, cache, Some(formula))
     }
 
-    /// Remove one supported stored cell record.
+    /// Remove one supported stored cell record and its cell/value metadata prefix.
     ///
     /// # Errors
     ///
@@ -2628,9 +2628,19 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
     let mut frt_depth = 0usize;
     let mut emitted_absent_rows = BTreeSet::new();
     let mut pending_insert_index = 0usize;
+    let mut metadata_start = None;
+    let mut metadata_flags = 0_u8;
 
     for item in Records::new(&edit.source, edit.limits.raw) {
         let record = item?;
+        if metadata_start.is_some()
+            && !is_supported_cell(record.kind())
+            && !matches!(record.kind(), kind::CELL_META | kind::VALUE_META)
+        {
+            return Err(Error::InvalidFormat(
+                "cell metadata prefix is not followed by a supported cell record",
+            ));
+        }
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
                 in_sheet_data = true;
@@ -2697,6 +2707,29 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                 in_sheet_data = false;
                 current_row = None;
             },
+            kind::CELL_META | kind::VALUE_META if in_sheet_data && frt_depth == 0 => {
+                if current_row.is_none() || record.payload().len() != 4 {
+                    return Err(Error::InvalidFormat(
+                        "cell metadata prefix has invalid framing",
+                    ));
+                }
+                let index = binary::read_u32_le_at(record.payload(), 0)?;
+                if !(1..=0x7fff_ffff).contains(&index) {
+                    return Err(Error::InvalidFormat("cell metadata index must be positive"));
+                }
+                let flag = if record.kind() == kind::CELL_META {
+                    1
+                } else {
+                    2
+                };
+                if metadata_flags & flag != 0 || (flag == 1 && metadata_flags != 0) {
+                    return Err(Error::InvalidFormat(
+                        "cell metadata prefix is duplicated or out of order",
+                    ));
+                }
+                metadata_flags |= flag;
+                metadata_start.get_or_insert(record.offset());
+            },
             cell_kind if in_sheet_data && frt_depth == 0 && is_any_cell(cell_kind) => {
                 let row = current_row
                     .ok_or(Error::InvalidFormat("cell record appears before BrtRowHdr"))?;
@@ -2708,17 +2741,25 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                     column,
                     edit.limits.raw,
                 )?;
-                if let Some(entry) = replacements.get(&record.offset()) {
-                    if !edit.removed.contains(&entry.cell.reference) {
-                        if entry.changed() {
-                            output.extend_from_slice(&encoded_cell(&entry.cell, edit.limits.raw)?);
-                        } else {
-                            copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
-                        }
+                let entry = replacements.get(&record.offset());
+                let removed =
+                    entry.is_some_and(|entry| edit.removed.contains(&entry.cell.reference));
+                if !removed {
+                    // Metadata applies to the following source cell. Emit
+                    // preceding insertions first, then retain its exact prefix.
+                    if let Some(start) = metadata_start {
+                        output.extend_from_slice(&edit.source[start..record.offset()]);
                     }
-                } else {
-                    copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
+                    if let Some(entry) = entry.filter(|entry| entry.changed()) {
+                        output.extend_from_slice(&encoded_cell(&entry.cell, edit.limits.raw)?);
+                    } else {
+                        copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
+                    }
                 }
+                // Removing a complete cell also removes its metadata references;
+                // leaving them in the stream would retarget a different cell.
+                metadata_start = None;
+                metadata_flags = 0;
             },
             kind::WS_DIM if !edit.inserted.is_empty() => {
                 let payload = expanded_dimensions(
@@ -2730,6 +2771,11 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
             },
             _ => copy_record(&edit.source, &record, edit.limits.raw, &mut output)?,
         }
+    }
+    if metadata_start.is_some() {
+        return Err(Error::InvalidFormat(
+            "cell metadata prefix is not followed by a supported cell record",
+        ));
     }
     if output.len() > edit.limits.source_bytes {
         return Err(Error::InvalidLength {
@@ -3392,6 +3438,131 @@ mod tests {
         payload.extend_from_slice(&0_u16.to_le_bytes());
         payload.extend_from_slice(&0_u32.to_le_bytes());
         payload.extend_from_slice(&0_u32.to_le_bytes());
+    }
+
+    fn with_cell_prefix(prefix: &[(Kind, &[u8])]) -> Vec<u8> {
+        let source = stream();
+        let mut bytes = Vec::new();
+        let mut writer = Encoder::new(&mut bytes, RawLimits::DEFAULT);
+        for record in Records::new(&source, RawLimits::DEFAULT) {
+            let record = record.expect("record");
+            if record.kind() == kind::CELL_REAL {
+                for (kind, payload) in prefix {
+                    writer.write_record(*kind, payload).expect("prefix");
+                }
+            }
+            writer
+                .write_record(record.kind(), record.payload())
+                .expect("source");
+        }
+        bytes
+    }
+
+    #[test]
+    fn both_metadata_prefixes_follow_the_source_cell_across_insertion_and_removal() {
+        let before = with_cell_prefix(&[
+            (kind::CELL_META, &[1, 0, 0, 0]),
+            (kind::VALUE_META, &[2, 0, 0, 0]),
+        ]);
+        let source = read(&before).expect("source");
+        let target = Reference::new(3, 2).expect("target");
+        let mut edit = source.draft();
+        edit.insert(
+            Reference::new(3, 1).expect("new"),
+            StyleIndex::new(0).expect("style"),
+            Value::Number(88.0),
+        )
+        .expect("insert");
+        edit.set_number(target, 76.0)
+            .expect("replace cached storage");
+        let changed = edit.commit().expect("commit");
+        let records = Records::new(changed.patch().after(), RawLimits::DEFAULT)
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("records");
+        let cell = records
+            .iter()
+            .position(|r| {
+                r.kind() == kind::CELL_REAL
+                    && binary::read_u32_le_at(r.payload(), 0).expect("column") == 2
+            })
+            .expect("cell");
+        assert_eq!(records[cell - 2].kind(), kind::CELL_META);
+        assert_eq!(records[cell - 2].payload(), &[1, 0, 0, 0]);
+        assert_eq!(records[cell - 1].kind(), kind::VALUE_META);
+        assert_eq!(records[cell - 1].payload(), &[2, 0, 0, 0]);
+        assert_eq!(
+            changed
+                .snapshot()
+                .cell(target)
+                .expect("lookup")
+                .expect("target")
+                .value(),
+            &Value::Number(76.0)
+        );
+        assert_eq!(
+            changed
+                .patch()
+                .inverse()
+                .apply(changed.patch().after())
+                .expect("inverse"),
+            before
+        );
+
+        let mut edit = source.draft();
+        edit.remove(target).expect("remove");
+        let removed = edit.commit().expect("commit");
+        assert!(
+            Records::new(removed.patch().after(), RawLimits::DEFAULT).all(|r| !matches!(
+                r.expect("record").kind(),
+                kind::CELL_META | kind::VALUE_META
+            ))
+        );
+        assert_eq!(
+            removed
+                .patch()
+                .inverse()
+                .apply(removed.patch().after())
+                .expect("inverse"),
+            before
+        );
+    }
+
+    #[test]
+    fn metadata_record_numbers_inside_opaque_frt_are_preserved_without_reinterpretation() {
+        let before = with_cell_prefix(&[
+            (kind::FRT_BEGIN, &[1, 0, 1, 0]),
+            (kind::CELL_META, &[0]),
+            (kind::VALUE_META, &[0xff; 4]),
+            (kind::FRT_END, &[]),
+        ]);
+        let source = read(&before).expect("source");
+        let mut edit = source.draft();
+        edit.set_boolean(Reference::new(3, 3).expect("target"), true)
+            .expect("value");
+        let changed = edit.commit().expect("commit");
+        let records = |bytes: &[u8]| {
+            Records::new(bytes, RawLimits::DEFAULT)
+                .map(|r| {
+                    let r = r.expect("record");
+                    (r.kind(), r.payload().to_vec())
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut expected = records(&before);
+        expected
+            .iter_mut()
+            .find(|r| r.0 == kind::CELL_BOOL)
+            .expect("boolean")
+            .1[8] = 1;
+        assert_eq!(records(changed.patch().after()), expected);
+        assert_eq!(
+            changed
+                .patch()
+                .inverse()
+                .apply(changed.patch().after())
+                .expect("inverse"),
+            before
+        );
     }
 
     fn stream() -> Vec<u8> {

@@ -5,7 +5,9 @@
 //! 2.4.684-687. Existing values retain their BIFF12 record family, while
 //! explicit insert/remove operations author or remove complete records.
 //! Length-changing strings and inert formula token/cache changes rebuild only
-//! selected records; unknown records remain byte-exact. Row spans and worksheet
+//! selected records; unknown records remain byte-exact. Cell/value metadata
+//! prefixes stay with their source cell and are removed when that complete cell
+//! is removed. Metadata-part payloads remain opaque. Row spans and worksheet
 //! dimensions expand with structural insertions, and whole-workbook publication
 //! validates style, shared-string, formula, and package dependency closure.
 //! The worksheet and structural families carry deterministic semantic deltas,

@@ -719,10 +719,10 @@ impl Edit {
     /// Remove one supported stored cell without shifting its neighbours.
     ///
     /// Returns `false` when the coordinate is already absent, including a
-    /// repeated removal in this edit. The cell header and formula payload are
-    /// removed together; shared-string occurrence counts are reconciled at
-    /// commit. Formula-group members and ordinary formulas with an opaque
-    /// calculation chain are refused before staging.
+    /// repeated removal in this edit. The cell header, formula payload and
+    /// cell/value metadata references are removed together; shared-string
+    /// occurrence counts are reconciled at commit. Formula-group members and
+    /// ordinary formulas with an opaque calculation chain are refused before staging.
     ///
     /// # Errors
     ///
