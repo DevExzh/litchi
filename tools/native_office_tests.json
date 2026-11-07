@@ -11255,6 +11255,72 @@
         "The fresh workbook builder emits DDE/OLE streams that match standalone canonical output and expose exact cached models. Reusing those streams on the native macro parent preserves the complete graph and all unrelated payloads through save/reopen/replay/inverse."
       ],
       "scope_limit": "Fresh library writing and native-parent publication only; no native DDE/OLE specimen, runtime exchange or Office validation is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xls_dde_ole_metadata_reads_exact_flags_names_and_continued_values",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-links-objects.xls"
+      ],
+      "feature_rows": [
+        "xls-187"
+      ],
+      "assertions": [
+        "Independent BIFF SupBook/ExternName/Continue records expose exact DDE targets, StdDocumentName, OLE storage IDs, clipboard/icon/automatic flags and mixed row-major cached values. Native supporting-book indexes and sheet references remain unchanged, and save/reopen is byte-exact."
+      ],
+      "scope_limit": "Explicit inert metadata derivatives, not native DDE/OLE producer specimens. Stored OLE IDs do not establish linked-storage resolution, activation, data exchange or refresh."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xls_dde_cache_builder_replacement_rechunks_whole_values_and_restores_source",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-links-objects.xls"
+      ],
+      "feature_rows": [
+        "xls-187"
+      ],
+      "assertions": [
+        "A 1024-value cache fills its original ExternName to 8224 bytes. Public fresh authoring with a longer Unicode item name keeps each operand within a record and reads the complete cache after CFB replacement; other links/streams remain exact and restoring the old record sequence restores the Workbook bytes."
+      ],
+      "scope_limit": "Fresh Builder output plus caller-managed CFB record replacement and offset relocation. No dedicated package DDE/OLE metadata editor or native Office reopen is claimed."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xls_dde_ole_continued_caches_survive_ordinary_cell_publication",
+      "fixtures": [
+        "excel/excel-metadata.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-links-objects.xls"
+      ],
+      "feature_rows": [
+        "xls-187"
+      ],
+      "assertions": [
+        "An ordinary Z121 cell insertion preserves the entire SupBook/ExternName/Continue collection byte-for-byte, including unused operand bytes, cached values and OLE metadata. Other CFB streams and directory metadata survive save/reopen with exact replay and inverse."
+      ],
+      "scope_limit": "Cell publication with opaque link/cache preservation; no cache refresh, external target resolution or linked-object activation."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native_dde_ole",
+      "name": "native_xls_dde_ole_invalid_items_and_split_values_have_exact_reader_errors",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-187"
+      ],
+      "assertions": [
+        "Malformed native-parent derivatives with an invalid StdDocumentName, an incomplete declared cache or an operand split across records produce exact InvalidRecord errors through the full workbook reader. The native source remains unchanged."
+      ],
+      "scope_limit": "Reader validation of explicit malformed metadata derivatives; no runtime DDE/OLE behavior or metadata-part authoring completeness is inferred."
     }
   ]
 }
