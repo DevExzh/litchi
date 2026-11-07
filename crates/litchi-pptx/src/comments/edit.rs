@@ -146,7 +146,10 @@ impl Edit<'_> {
         }))
     }
 
-    /// Replace the complete legacy comment graph (authors and every slide's comments).
+    /// Create the complete legacy comment graph (authors and slide comments).
+    ///
+    /// The package must not already contain a legacy graph. Use the author and
+    /// comment update/remove/reorder verbs to edit an existing graph.
     ///
     /// # Errors
     ///

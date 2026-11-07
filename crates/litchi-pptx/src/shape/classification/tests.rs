@@ -84,3 +84,53 @@ fn unknown_extensions_survive_first_class_authoring() {
         Some(Outcome::Footer)
     );
 }
+
+#[test]
+fn owner_scope_resolves_aliases_defaults_and_empty_sibling_rebindings() {
+    for namespace in [PML, "http://purl.oclc.org/ooxml/presentationml/main"] {
+        for prefix in ["s:", ""] {
+            let declaration = if prefix.is_empty() {
+                format!("xmlns=\"{namespace}\"")
+            } else {
+                format!("xmlns:s=\"{namespace}\"")
+            };
+            let shadow = if prefix.is_empty() {
+                "xmlns=\"urn:foreign\""
+            } else {
+                "xmlns:s=\"urn:foreign\""
+            };
+            let shape = format!(
+                "<{prefix}sp><{prefix}nvSpPr><{prefix}cNvPr id=\"1\"/><{prefix}cNvSpPr/><{prefix}nvPr><{prefix}extLst><{prefix}ext uri=\"{EXTENSION_URI}\"><k:classification val=\"hdr\"/></{prefix}ext></{prefix}extLst></{prefix}nvPr></{prefix}nvSpPr><{prefix}spPr/></{prefix}sp>"
+            );
+            let owner = format!(
+                "<{prefix}sld {declaration} xmlns:k=\"{NAMESPACE}\"><ignored {shadow}/>{shape}</{prefix}sld>"
+            );
+            let start = owner.find(&shape).unwrap();
+            let span = start..start + shape.len();
+            let source = codec::read_in_owner(owner.as_bytes(), span.clone()).unwrap();
+            assert_eq!(
+                source.snapshot.as_ref().unwrap().outcome(),
+                Some(Outcome::Header)
+            );
+            let changed =
+                transaction::set(shape.as_bytes(), &source, Outcome::Watermark, 1 << 20).unwrap();
+            let next = codec::replace(owner.as_bytes(), span.clone(), &changed, 1 << 20).unwrap();
+            assert_eq!(
+                codec::read_in_owner(&next, start..start + changed.len())
+                    .unwrap()
+                    .snapshot
+                    .unwrap()
+                    .outcome(),
+                Some(Outcome::Watermark)
+            );
+            let foreign = owner.replace(NAMESPACE, "urn:foreign-classification");
+            let start = foreign.find(&shape).unwrap();
+            assert!(
+                codec::read_in_owner(foreign.as_bytes(), start..start + shape.len())
+                    .unwrap()
+                    .snapshot
+                    .is_none()
+            );
+        }
+    }
+}

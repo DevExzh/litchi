@@ -223,3 +223,35 @@ fn native_powerpoint_corpus_content_parts_are_ink_only() {
         ]
     );
 }
+
+#[test]
+fn native_powerpoint_corpus_has_inkml_but_no_2014_ink_action_owners() {
+    let mut inkml = 0;
+    corpus(|name, p| {
+        let snapshots = p
+            .ink_actions()
+            .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        assert_eq!(
+            snapshots.len(),
+            p.presentation().unwrap().slide_count().unwrap()
+        );
+        for snapshot in snapshots {
+            assert!(
+                snapshot.anchors().is_empty(),
+                "{name}: active InkAction owner"
+            );
+            assert!(
+                snapshot.source_anchors().is_empty(),
+                "{name}: source InkAction owner"
+            );
+        }
+        elements(p, |ns, local| {
+            assert_ne!(
+                ns, b"http://schemas.microsoft.com/office/powerpoint/2014/inkAction",
+                "{name}: InkAction payload"
+            );
+            inkml += usize::from(ns == b"http://www.w3.org/2003/InkML" && local == b"ink");
+        });
+    });
+    assert_eq!(inkml, 2);
+}

@@ -19,11 +19,7 @@ pub(crate) fn load_with_limits<'k>(
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     let key = key.into();
     let span = crate::tag::shape::selected_raw_span_with_limits(part.blob(), key, shape_limits)?;
-    let source = codec::read(
-        part.blob()
-            .get(span)
-            .ok_or_else(|| Error::Invalid("classification shape span is invalid".into()))?,
-    )?;
+    let source = codec::read_in_owner(part.blob(), span)?;
     Ok(source.snapshot)
 }
 
@@ -48,8 +44,8 @@ pub(crate) fn put_with_limits<'k>(
         (
             part.partname().clone(),
             part.blob().to_vec(),
-            span,
-            codec::read(&shape_blob)?,
+            span.clone(),
+            codec::read_in_owner(part.blob(), span)?,
             shape_blob,
         )
     };
@@ -95,8 +91,8 @@ pub(crate) fn remove_with_limits<'k>(
         (
             part.partname().clone(),
             part.blob().to_vec(),
-            span,
-            codec::read(&shape_blob)?,
+            span.clone(),
+            codec::read_in_owner(part.blob(), span)?,
             shape_blob,
         )
     };
@@ -133,10 +129,7 @@ fn validate_staged(
     shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     let span = crate::tag::shape::selected_raw_span_with_limits(owner, key, shape_limits)?;
-    let shape = owner
-        .get(span)
-        .ok_or_else(|| Error::Invalid("staged classification shape span is invalid".into()))?;
-    let source = codec::read(shape)?;
+    let source = codec::read_in_owner(owner, span)?;
     if source.snapshot.as_ref().and_then(Snapshot::outcome) != Some(expected) {
         return Err(Error::Invalid(
             "staged classification did not round-trip its typed outcome".into(),
@@ -151,10 +144,7 @@ fn validate_removed(
     shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     let span = crate::tag::shape::selected_raw_span_with_limits(owner, key, shape_limits)?;
-    let shape = owner
-        .get(span)
-        .ok_or_else(|| Error::Invalid("staged classification shape span is invalid".into()))?;
-    let source = codec::read(shape)?;
+    let source = codec::read_in_owner(owner, span)?;
     if source.snapshot.is_some() {
         return Err(Error::Invalid(
             "staged classification still contains a typed outcome".into(),

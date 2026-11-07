@@ -5,7 +5,7 @@ use std::ops::Range;
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{Opaque, Outcome, Snapshot};
@@ -85,8 +85,37 @@ struct Frame {
     classification_seen: bool,
 }
 
-/// Parse a selected raw shape into a bounded classification source.
+/// Parse a selected shape with its actual inherited namespace bindings.
+/// The caller has already validated this raw owner/span under shape limits.
+pub(super) fn read_in_owner(owner: &[u8], span: Range<usize>) -> Result<Source> {
+    let shape = owner
+        .get(span.clone())
+        .ok_or_else(|| invalid("classification shape span is invalid"))?;
+    let mut reader = NsReader::from_reader(owner);
+    let origin = ReaderOrigin::of(owner);
+    loop {
+        let start = position(&reader, origin)?;
+        let (_, event) = reader.read_resolved_event().map_err(xml_error)?;
+        if start == span.start && matches!(event, Event::Start(_) | Event::Empty(_)) {
+            // Capture after opening the selected root: an immediately preceding
+            // empty sibling's pending namespace pop has then been applied.
+            return read_with_namespaces(shape, reader.resolver().clone());
+        }
+        if start > span.start || matches!(event, Event::Eof) {
+            return Err(invalid(
+                "classification shape span is not an element boundary",
+            ));
+        }
+    }
+}
+
+/// Parse a self-contained raw shape for detached codec tests.
+#[cfg(test)]
 pub(super) fn read(xml: &[u8]) -> Result<Source> {
+    read_with_namespaces(xml, NamespaceResolver::default())
+}
+
+fn read_with_namespaces(xml: &[u8], namespaces: NamespaceResolver) -> Result<Source> {
     if xml.is_empty() {
         return Err(invalid("classification shape XML is empty"));
     }
@@ -99,6 +128,7 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    *reader.resolver_mut() = namespaces;
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::<Frame>::new();

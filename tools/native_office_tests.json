@@ -10058,6 +10058,87 @@
         "A duplicate-CP point range remains valid. Moving the native terminal sentinel or an actual range start outside counted document positions returns the precise Invalid reason and preserves staging. Publication/reopen and exact snapshot/CFB inverses retain the original terminal."
       ],
       "scope_limit": "The source terminal may be preserved past the counted stories as already admitted by the reader; edits cannot invent or retarget that sentinel. Other range boundaries and continuity remain checked."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_classic_comments",
+      "name": "native_pptx_classic_comment_lifecycle_preserves_modern_threads_and_macro_payloads",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm"
+      ],
+      "feature_rows": [
+        "pptx-429"
+      ],
+      "assertions": [
+        "Explicit classic authors/comments are created beside the native modern thread or macro payload. Typed graph fields and eager/source snapshots retain Unicode text, dates, coordinates, IDs, names/initials and author counters. Comment update, author/comment ordering, referenced-author refusal, exact no-op and stale replay are checked.",
+        "Each stage saves/reopens/replays/inverts with exact member payloads. Original data parts and effective relationships/content types remain intact; scalar edits change only the two classic parts. Removing all records removes the comment part while retaining the empty author part."
+      ],
+      "scope_limit": "Classic comments are library-authored additions, not native-authored classic specimens. Modern comments/macros remain inert and unchanged. This does not qualify p15 collaboration extension editing or fresh PowerPoint acceptance."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_classic_comments",
+      "name": "native_pptx_classic_invalid_date_and_index_preserve_earlier_staging",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx"
+      ],
+      "feature_rows": [
+        "pptx-429"
+      ],
+      "assertions": [
+        "Whole-graph creation refuses a pre-existing classic graph with its precise Invalid reason. Replacing a comment with a changed identity or malformed date returns the exact Invalid error and preserves the prior valid staged graph, which still commits/reopens/replays/inverts."
+      ],
+      "scope_limit": "The public whole-graph set method creates an absent graph; existing records use dedicated CRUD verbs. This boundary is documented rather than claiming full graph replacement."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_shape_metadata",
+      "name": "native_pptx_classification_lifecycle_preserves_shapes_and_unowned_parts",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm"
+      ],
+      "feature_rows": [
+        "pptx-447"
+      ],
+      "assertions": [
+        "Native inherited-namespace shapes support absent to Header/Footer/Watermark/explicit None and removal. Invalid selection preserves a staged Header, exact no-op/stale handling pass, and explicit val=none remains distinct from no owner.",
+        "File reopen/replay/inverse retains every member payload; forward changes affect only the selected slide. Shape identity, name, text, geometry, all unselected shape XML and other package members remain exact."
+      ],
+      "scope_limit": "Typed library-authored classification metadata only, not host content classification, visible watermark rendering or native-app acceptance."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_shape_metadata",
+      "name": "native_pptx_designer_flags_properties_and_tags_keep_distinct_optional_states",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm"
+      ],
+      "feature_rows": [
+        "pptx-446"
+      ],
+      "assertions": [
+        "Native shape derivatives retain true/false design-element flags alongside independent p202 drawing properties/tags. Explicit editable=true changes to omitted editable with effective false and a present empty tag collection before owner removal; exact no-op and all file/patch inverses pass.",
+        "Every unowned package member, unselected shape XML and selected shape identity/text/geometry remains exact. Removing drawing properties preserves the independent design-element flag until its own removal."
+      ],
+      "scope_limit": "Stored metadata only; no Designer service, layout generation, callback, network or native Office validation occurs."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native_shape_metadata",
+      "name": "native_pptx_slide_designer_tags_preserve_stable_slide_bindings",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx"
+      ],
+      "feature_rows": [
+        "pptx-446"
+      ],
+      "assertions": [
+        "Slide-level Designer tags are stored on the native stable slide-ID owner. Unicode tags, present-empty and removed states retain the exact slide ID and relationship/part binding, while only presentation.xml changes. All slide bytes and other package members remain exact through reopen/replay/inverse."
+      ],
+      "scope_limit": "Stable slide-binding metadata is qualified without invoking Designer or asserting a fresh native-app change."
     }
   ]
 }

@@ -3329,6 +3329,45 @@
         "crates/litchi-doc/docs/FEATURE_MATRIX.md"
       ],
       "scope_limit": "Evidence-only native fixture gap, not positive payload coverage or an unsupported-library claim. Historical authoring statuses and native fixture bytes are unchanged. A native specimen containing this specific owner is still needed."
+    },
+    {
+      "feature_row": "pptx-438",
+      "classification": "fixture_feature_mismatch",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx",
+        "powerpoint/powerpoint-encrypted.pptx"
+      ],
+      "reason": "Native InkML annotations and ordinary MCE math/shape branches do not establish the distinct PowerPoint 2014 InkAction owner.",
+      "required_evidence": "A native source containing the supported p14/inkAction MCE Choice, p:contentPart/customXml relationship, text/xml iact:actions target and picture fallback closure, with producer provenance and expected action metadata.",
+      "observed_evidence": "All 15 native PPTX-family packages have zero active/source InkAction anchors and no elements in the 2014 inkAction namespace. Both native InkML roots are positively present. The encrypted source is audited after password-backed opening; original source files remain unchanged.",
+      "checks": [
+        {
+          "crate": "litchi-pptx",
+          "target": "microsoft_office_native_evidence_review",
+          "name": "native_powerpoint_corpus_has_inkml_but_no_2014_ink_action_owners",
+          "required_features": [
+            "encryption"
+          ]
+        }
+      ],
+      "evidence_refs": [
+        "test-data/microsoft-office/powerpoint/ink-inspection.json",
+        "crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs"
+      ],
+      "scope_limit": "Evidence-only native fixture gap, not positive action-payload coverage or an unsupported-library claim. Historical authoring inventory stays unchanged. Fresh native InkAction editing/interoperability remains unqualified."
     }
   ]
 }

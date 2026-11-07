@@ -137,3 +137,43 @@ fn rejects_wrong_target_type_and_stale_context() {
         Err(Error::ContentType { .. })
     ));
 }
+
+#[test]
+fn branch_text_rules_apply_only_to_action_owners_and_survive_nesting() {
+    for (payload, reason) in [
+        ("text", "ink-action MCE branch contains non-whitespace text"),
+        ("<![CDATA[text]]>", "ink-action MCE branch contains CDATA"),
+        (
+            "&#x41;",
+            "ink-action MCE branch contains a non-whitespace reference",
+        ),
+    ] {
+        for marker in ["<p:contentPart", "<p:pic"] {
+            let (package, slide) = fixture();
+            let xml = std::str::from_utf8(package.get_part(&slide).unwrap().blob()).unwrap();
+            let changed = xml.replace(marker, &format!("{payload}{marker}"));
+            assert!(
+                matches!(super::codec::scan_slide(changed.as_bytes(),10),Err(Error::Invalid(message)) if message==reason)
+            );
+            let unrelated = changed.replace("Requires=\"p14 ia\"", "Requires=\"p14\"");
+            assert!(
+                super::codec::scan_slide(unrelated.as_bytes(), 10)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+    let (package, slide) = fixture();
+    let xml = std::str::from_utf8(package.get_part(&slide).unwrap().blob()).unwrap();
+    let nested=xml.replace("<p:pic/>","<p:pic><mc:AlternateContent><mc:Choice Requires=\"p14\">hidden text</mc:Choice><mc:Fallback/></mc:AlternateContent></p:pic>");
+    assert!(
+        matches!(super::codec::scan_slide(nested.as_bytes(),10),Err(Error::Invalid(message)) if message=="ink-action MCE branch contains non-whitespace text")
+    );
+    let whitespace = xml.replace("<p:contentPart", "&#x20;<p:contentPart");
+    assert_eq!(
+        super::codec::scan_slide(whitespace.as_bytes(), 10)
+            .unwrap()
+            .len(),
+        1
+    );
+}

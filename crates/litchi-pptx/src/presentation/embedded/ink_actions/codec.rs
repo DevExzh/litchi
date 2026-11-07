@@ -135,6 +135,7 @@ struct BranchState {
     content_start: Option<usize>,
     content_end: Option<usize>,
     relationship_attributes: Vec<RelationshipAttribute>,
+    invalid_text: Option<&'static str>,
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +157,7 @@ impl BranchState {
             content_start: None,
             content_end: None,
             relationship_attributes: Vec::new(),
+            invalid_text: None,
         }
     }
 
@@ -510,10 +512,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 if stack.is_empty() && !whitespace {
                     return Err(invalid("ink-action slide has text outside its root"));
                 }
-                if !whitespace && active_alternate_branch(&stack).is_some() {
-                    return Err(invalid(
+                if !whitespace {
+                    record_branch_text(
+                        &mut stack,
                         "ink-action MCE branch contains non-whitespace text",
-                    ));
+                    );
                 }
             },
             Event::CData(value) => {
@@ -522,8 +525,8 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 if stack.is_empty() && !whitespace {
                     return Err(invalid("ink-action slide has CDATA outside its root"));
                 }
-                if !whitespace && active_alternate_branch(&stack).is_some() {
-                    return Err(invalid("ink-action MCE branch contains CDATA"));
+                if !whitespace {
+                    record_branch_text(&mut stack, "ink-action MCE branch contains CDATA");
                 }
             },
             Event::Comment(value) => {
@@ -536,12 +539,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                         "ink-action slide has a general reference outside its root",
                     ));
                 }
-                if active_alternate_branch(&stack).is_some()
-                    && !character.is_some_and(is_xml_whitespace_character)
-                {
-                    return Err(invalid(
+                if !character.is_some_and(is_xml_whitespace_character) {
+                    record_branch_text(
+                        &mut stack,
                         "ink-action MCE branch contains a non-whitespace reference",
-                    ));
+                    );
                 }
             },
             Event::Decl(declaration) => {
@@ -595,6 +597,17 @@ fn finalize_alternate(
     let has_action_capability = alternate.choices.iter().any(BranchState::action_capable);
     if !has_action_capability {
         return Ok(None);
+    }
+    // Unrelated MCE choices can contain ordinary DrawingML/OMML text. Apply
+    // the action owner's structural whitespace rule only after identifying
+    // this AlternateContent as an action-capable owner (including fallback).
+    if let Some(reason) = alternate
+        .choices
+        .iter()
+        .chain(alternate.fallback.iter())
+        .find_map(|branch| branch.invalid_text)
+    {
+        return Err(invalid(reason));
     }
     let source_ordinal = *raw_ordinal;
     *raw_ordinal = raw_ordinal
@@ -1041,22 +1054,29 @@ fn validate_namespace_binding(prefix: &[u8], value: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn active_alternate_branch(stack: &[ElementFrame]) -> Option<&BranchState> {
-    stack.iter().rev().find_map(|frame| {
-        frame.alternate.as_ref().and_then(|alternate| {
-            alternate
-                .choices
-                .iter()
+fn record_branch_text(stack: &mut [ElementFrame], reason: &'static str) {
+    let depth = stack.len();
+    for frame in stack {
+        if let Some(alternate) = frame.alternate.as_mut() {
+            let AlternateState {
+                choices, fallback, ..
+            } = alternate;
+            if let Some(branch) = choices
+                .iter_mut()
                 .rev()
-                .find(|branch| branch.end.is_none() && branch.depth <= stack.len())
+                .find(|branch| branch.end.is_none() && branch.depth <= depth)
                 .or_else(|| {
-                    alternate
-                        .fallback
-                        .as_ref()
-                        .filter(|branch| branch.end.is_none() && branch.depth <= stack.len())
+                    fallback
+                        .as_mut()
+                        .filter(|branch| branch.end.is_none() && branch.depth <= depth)
                 })
-        })
-    })
+            {
+                // Also retain the violation on outer owners: nested unrelated
+                // MCE must not hide text inside an actual InkAction branch.
+                branch.invalid_text.get_or_insert(reason);
+            }
+        }
+    }
 }
 
 fn validate_text(value: &[u8], field: &'static str) -> Result<()> {
