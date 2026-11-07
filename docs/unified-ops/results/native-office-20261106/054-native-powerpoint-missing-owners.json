@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-07",
+  "source_commit": "297008bdbde5f7cea90792e2982aced6eb4660e4",
+  "base_commit": "eb8c456bcddf5c29b91b5a3f577ba2e25c79fabd",
+  "problem": "Six remaining PowerPoint operation rows lacked automated evidence establishing whether their specific native owners exist. Comments, OLE objects, password-to-open encryption and Ink content parts could otherwise be mistaken for comparison history, ActiveX, modify-password or non-Ink evidence.",
+  "changes": [
+    "Add five evidence-only audits over all 11 binary and 15 PresentationML manifest fixtures, including both explicitly password-backed encrypted presentations.",
+    "Record six missing native feature owners separately from positive semantic coverage: ppt-377, ppt-383, ppt-384, pptx-432, pptx-435 and pptx-449. Preserve all historical authoring statuses and immutable fixture bytes.",
+    "Document the exact coverage distinctions in both owner feature matrices and enforce the expanded evidence-review set in the corpus gate. Add serde_json only as a PPTX development dependency for manifest-driven enumeration."
+  ],
+  "verification_scope": {
+    "custom_xml": "Every binary specimen lacks MsoDataStore and both redundant/modified promotion-marker entries. The shared bounded inspector returns None while the ordinary CFB document stream and presentation body remain readable.",
+    "comparison_and_modify_password": "Read the live Document snapshot, explicitly decode the PP10 BinaryTagData owner, and inventory 12 PP10 records across the corpus. All 11 lack DiffTree10, reviewing-toolbar state and CString instance 3 modify-password atoms. The encrypted fixture has password-to-open encryption but no modify password. All ten unencrypted packages refuse an absent reviewer-name edit with Refused(NotFound), retain empty staging and publish exact no-op bytes.",
+    "activex": "All 15 typed slide-control catalogs are empty. All package-part content types, relationships and XML elements, including inactive compatibility branches, lack control/ActiveX owners. Four OLE anchors are positively present across media-objects and modern-media, including compatibility alternatives.",
+    "revision_changes": "Typed revision/change loaders return None for all 15 files. No corresponding relationship, content type or revInfo/chgInfo XML element exists. Two modern comment parts are positively present and remain distinct from revision/change information.",
+    "non_ink_content_parts": "Typed discovery and an all-part XML scan agree on exactly two contentPart anchors, one in each Ink fixture. Both use rId2 to target the 2424-byte /ppt/ink/ink1.xml InkML payload. No inactive/orphan XML anchor supplies non-Ink evidence.",
+    "preservation": "All unencrypted packages retain exact no-op source bytes; encrypted packages continue to refuse implicit plaintext publication. Every source fixture is reread unchanged. No target, control, macro or provider is activated.",
+    "limits": "These absence audits do not qualify positive CRUD/codec semantics, mark library implementations unsupported, establish complete extension-schema conformance, or provide fresh native PowerPoint reopen/render/playback/protection validation. Native specimens of the six owners remain follow-up work. No production behavior changes were made."
+  },
+  "specification_evidence": [
+    {
+      "reference": "[MS-PPT] 2.1.8 Custom XML Data Storage",
+      "source": "User-supplied local full specification",
+      "finding": "The optional storage is named MsoDataStore. Audit the CFB storage catalog and shared typed inspector, rather than equating ordinary document properties or embedded packages with this owner."
+    },
+    {
+      "reference": "[MS-PPT] 2.4.7 ModifyPasswordAtom",
+      "source": "User-supplied local full specification",
+      "finding": "The modify-password value belongs to the PP10 document extension and is distinct from password-to-open ingress. The library audit reads metadata only and does not enforce application modify-access policy."
+    },
+    {
+      "reference": "[MS-PPT] 2.4.20.5 DiffTree10Container",
+      "source": "User-supplied local full specification",
+      "finding": "The reviewer comparison tree is a specific PP10 document container with reviewer name and change-display metadata. A comment thread does not establish it."
+    }
+  ],
+  "results": {
+    "new_evidence_audits": 5,
+    "new_positive_semantic_tests": 0,
+    "distinct_rust_tests_passed": 121,
+    "rust_suites": 19,
+    "rust_failed": 0,
+    "rust_ignored": 0,
+    "python_tests_passed": 75,
+    "native_coverage_before": {
+      "feature_rows_with_partial_tests": 341,
+      "indexed_tests": 491,
+      "reviewed_native_fixture_gaps": 15,
+      "operation_needs_verification": 11
+    },
+    "native_coverage_after": {
+      "fixtures": 139,
+      "fixtures_with_tests": 139,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 341,
+      "indexed_tests": 491,
+      "reviewed_native_fixture_gaps": 21,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      },
+      "verification_gaps": {
+        "partial_assertions_require_scope_review": 341,
+        "native_ui_limitation_needs_review": 58,
+        "external_fixture_handoff_needs_review": 27,
+        "reviewed_native_fixture_gap_requires_followup": 21,
+        "unsupported_boundary_needs_review": 41,
+        "operation_needs_verification": 5,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "historical_authoring_inventory_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt -p litchi-pptx --all-features --test 'microsoft_office_native*' --locked --offline --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-powerpoint-audit-owner.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-owner.log",
+        "bytes": 33792,
+        "sha256": "01558928343144ae69b25e5a7c260655c7771dfd9614a9b5596083c9ed3997f7"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test -p litchi-ppt -p litchi-pptx --all-features --test 'microsoft_office_native*' --locked --offline --no-fail-fast > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-owner.log 2>&1"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ppt -p litchi-pptx --all-features --test microsoft_office_native_missing_owners --test microsoft_office_native_evidence_review --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-powerpoint-audit-clippy.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-clippy.log",
+        "bytes": 19708,
+        "sha256": "ad534521fcf27a321e0812f752b39a309cd8494c08fa741ab8b72fdeb77e813b"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/home/zhuhe/.cache/litchi-native-office.V1L32Z/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy -p litchi-ppt -p litchi-pptx --all-features --test microsoft_office_native_missing_owners --test microsoft_office_native_evidence_review --locked --offline -- -D warnings > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-clippy.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-powerpoint-audit-python.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-python.log",
+        "bytes": 667,
+        "sha256": "2876b91456b0c9b738237764c924638461bbdecab4240eb58550642c793f494a"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-python.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-powerpoint-audit-gate.log",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-gate.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-gate.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "native-powerpoint-audit-coverage.json",
+        "path": "/home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-coverage.json",
+        "bytes": 1135443,
+        "sha256": "c2a090b4c5e81cfff2b4de2d5186df19f44481901ef05a2638b3fbb64cf6843e"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /home/zhuhe/.cache/litchi-native-office.V1L32Z/native-powerpoint-audit-coverage.json 2>&1"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-ppt/tests/microsoft_office_native_missing_owners.rs crates/litchi-pptx/tests/microsoft_office_native_evidence_review.rs",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --cached --check and both AGENTS.md staged evidence/binaries guards",
+      "result": "No output before source commit. No binaries or large evidence are committed."
+    }
+  ],
+  "validation_limits": "Only tests, evidence dispositions and documentation changed. Run all native PPT/PPTX integration targets and lint the changed audit targets; unrelated full-owner, operations and facade suites were not repeated. Existing vendor warnings remain unchanged.",
+  "remaining_work": "Five operation rows remain unverified: doc-068, docx-133, ppt-343, ppt-364 and pptx-451. The 341 partially asserted rows still require scope review; 21 reviewed fixture gaps, 58 native-UI limitations, 27 external handoffs and 41 unsupported-boundary rows also remain explicit. The overall goal is active."
+}
