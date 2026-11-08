@@ -27,16 +27,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Whole-presentation text (used as a fallback for slides whose per-slide
     // text extraction returns an empty string).
-    let all_text = pres.text().unwrap_or_default();
+    let all_text = pres.text()?;
     let total_chars = all_text.chars().count();
     println!("Total chars : {total_chars}");
 
     // Per-slide text.
     let slides = pres.slides()?;
+    let mut any_per_slide_text = false;
     for slide in &slides {
         let n = slide.slide_number();
-        let shape_count = slide.shape_count().unwrap_or(0);
-        let text = slide.text().unwrap_or("");
+        let shape_count = slide.shape_count()?;
+        let text = slide.text()?;
         println!("\n--- Slide {n} ({shape_count} shapes) ---");
         if text.trim().is_empty() {
             // Note: per-slide extraction may legitimately be empty for slides
@@ -44,6 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // -wide `pres.text()` call above gives a fallback aggregated view.
             println!("(no per-slide text extracted)");
         } else {
+            any_per_slide_text = true;
             // Cap each slide's preview at ~500 chars.
             let preview: String = text.chars().take(500).collect();
             println!("{preview}");
@@ -55,9 +57,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // If we got no per-slide text at all, dump the aggregated text as a fallback.
-    let any_per_slide_text = slides
-        .iter()
-        .any(|s| s.text().is_ok_and(|t| !t.trim().is_empty()));
     if !any_per_slide_text && !all_text.trim().is_empty() {
         println!("\n=== Aggregated presentation text (first 500 chars) ===");
         let preview: String = all_text.chars().take(500).collect();
