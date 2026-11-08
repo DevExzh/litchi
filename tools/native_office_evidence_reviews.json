@@ -3817,6 +3817,87 @@
         "crates/litchi-ppt/src/client_data/model.rs"
       ],
       "scope_limit": "An explicit scope boundary, not proof that all vendor records are absent or supported. The opaque payload used by the mutation tests is deliberately library-authored and remains uninterpreted."
+    },
+    {
+      "feature_row": "doc-065",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "word/word-master-native.doc",
+        "word/word-master-native/LEGACY",
+        "word/word-mailmerge-fields.doc"
+      ],
+      "reason": "Reading stored paths and opening a child supplied by the caller do not implement automatic external document, database or include resolution.",
+      "required_evidence": "Exact native reference metadata and inert-source behavior; any resolver would need explicit access policy and separate positive integration tests.",
+      "observed_evidence": "The master retains one WKB/FNIF child reference with exact stored absolute/relative paths; parent text excludes the child marker. The child opens independently. Refreshing the native mail-merge document reports seven unsupported fields and leaves bytes unchanged in both source modes.",
+      "supported_scope": "Passive subdocument and mail-merge metadata, independently opened local files and supported local cached-field refresh.",
+      "unsupported_scope": "Automatic master assembly, database access, external document/include resolution and merge execution.",
+      "checks": [
+        {
+          "crate": "litchi-doc",
+          "target": "microsoft_office_native",
+          "name": "native_word_binary_master_directory_and_extensionless_child_stay_inert"
+        },
+        {
+          "crate": "litchi-ops",
+          "target": "microsoft_office_native_refresh",
+          "name": "native_refresh_keeps_external_and_mail_merge_inputs_inert_and_refuses_missing_adapters"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+        "crates/litchi-doc/src/parts/subdocuments/model.rs",
+        "crates/litchi-ops/tests/microsoft_office_native_refresh.rs"
+      ],
+      "scope_limit": "Explicit library boundary. Stored native paths are metadata, not permission or successful external resolution."
+    },
+    {
+      "feature_row": "xlsx-268",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsx"
+      ],
+      "reason": "Slicer and timeline caption edits preserve pivot data but do not recalculate or refresh a PivotTable.",
+      "required_evidence": "Typed refusals for refresh-dependent operations and exact preservation of saved pivot data while supported metadata is edited.",
+      "observed_evidence": "Native slicer and timeline captions round-trip and invert with every unrelated OPC member retained. Both apply_filter calls return their precise Unsupported errors for UI, refresh and filter application.",
+      "supported_scope": "Reading saved pivot tables/caches and bounded metadata edits, including slicer and timeline captions.",
+      "unsupported_scope": "Complete PivotTable refresh/calculation, external-source refresh and executing slicer or timeline filtering.",
+      "checks": [
+        {
+          "crate": "litchi-xlsx",
+          "target": "microsoft_office_native",
+          "name": "native_excel_slicer_and_timeline_caption_edits_preserve_other_parts_and_invert"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "crates/litchi-xlsx/src/slicer/mod.rs",
+        "crates/litchi-xlsx/src/timeline/mod.rs"
+      ],
+      "scope_limit": "Typed refusals qualify the boundary, not successful PivotTable refresh or filter execution."
+    },
+    {
+      "feature_row": "xlsb-329",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "excel/excel-encrypted.xlsb"
+      ],
+      "reason": "The XLSB owner has no CFB encrypted-package ingress adapter; a precise container refusal is not password decryption support.",
+      "required_evidence": "Consistent typed rejection across byte, reader, path, eager and source-backed ingress routes without misclassifying the native container as corrupt ZIP.",
+      "observed_evidence": "Six public entry routes reject the native encrypted XLSB with UnsupportedFeature naming the CFB-container boundary, including encrypted packages.",
+      "supported_scope": "Ordinary OPC XLSB ingress and explicit unsupported-container diagnostics for the native encrypted specimen.",
+      "unsupported_scope": "Opening password-encrypted XLSB, password authentication, decryption, encrypted-source editing and rekeying.",
+      "checks": [
+        {
+          "crate": "litchi-xlsb",
+          "target": "microsoft_office_native",
+          "name": "native_excel_encrypted_xlsb_has_an_explicit_unsupported_container_boundary"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "crates/litchi-xlsb/tests/microsoft_office_native.rs"
+      ],
+      "scope_limit": "No correct/wrong-password or cryptographic-validity claim; the tested refusal occurs before such processing."
     }
   ]
 }

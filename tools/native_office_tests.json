@@ -1749,8 +1749,7 @@
         "word/word-master-native/LEGACY"
       ],
       "feature_rows": [
-        "doc-047",
-        "doc-065"
+        "doc-047"
       ],
       "assertions": [
         "Exact native WKB start/outline/file-name key and FNIF absolute/relative path metadata; parent does not load child, and the extensionless child opens independently with exact body text."
@@ -2063,21 +2062,6 @@
       "scope_limit": "No plaintext serialization, rekeying or encrypted-source editing; cached formula result only."
     },
     {
-      "crate": "litchi-xlsb",
-      "target": "microsoft_office_native",
-      "name": "native_excel_encrypted_xlsb_has_an_explicit_unsupported_container_boundary",
-      "fixtures": [
-        "excel/excel-encrypted.xlsb"
-      ],
-      "feature_rows": [
-        "xlsb-329"
-      ],
-      "assertions": [
-        "Native encrypted CFB is rejected as UnsupportedFeature on byte, reader, path, eager workbook and lazy sequential/positional entry points; input-byte limits keep precedence."
-      ],
-      "scope_limit": "XLSB package decryption is unimplemented. Container-signature diagnostic only; no password testing or cryptographic validation claimed."
-    },
-    {
       "crate": "litchi-ops",
       "target": "microsoft_office_native",
       "name": "native_excel_formula_queries_and_atomic_scalar_edits_work_on_both_owners",
@@ -2175,8 +2159,7 @@
       ],
       "feature_rows": [
         "xlsx-248",
-        "xlsx-249",
-        "xlsx-268"
+        "xlsx-249"
       ],
       "assertions": [
         "Native caption edits preserve every unrelated OPC member, retain complete readback models and invert after reopen; filter-application methods give explicit Unsupported errors."
@@ -11651,6 +11634,56 @@
         "Opaque client-data replacement/removal retains all other OfficeArt fields and restores exact source bytes on inverse. A duplicate external-object reference preserves prior valid staging, known child types cannot be disguised as opaque records, and stale replay is refused."
       ],
       "scope_limit": "Library-authored opaque payloads exercise byte retention on native frames. Their vendor-specific meaning and dependencies are intentionally not inferred."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_direct_properties",
+      "name": "native_word_direct_properties_keep_absence_distinct_from_style_inheritance",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [],
+      "current_features": [
+        "docx-current-direct-properties"
+      ],
+      "assertions": [
+        "Native Title and left-aligned paragraphs retain absent direct properties; centered paragraph has explicit center alignment. Bold, italic, strike and underline runs and multilingual font slots have exact local values. Original bytes survive reads."
+      ],
+      "scope_limit": "Direct local reads only; does not resolve style inheritance or claim computed formatting."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native_direct_properties",
+      "name": "native_macro_word_direct_run_and_paragraph_mark_properties_retain_explicit_zeroes",
+      "fixtures": [
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [],
+      "current_features": [
+        "docx-current-direct-properties"
+      ],
+      "assertions": [
+        "Run and paragraph-mark properties both retain bold, complex-script bold, explicit zero kerning and Times New Roman with absent size and no invalid-property flags. Native macro/template packages remain byte-identical."
+      ],
+      "scope_limit": "Reads existing inert formatting; no macro execution, style cascade or inferred font size."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native_fresh_creation",
+      "name": "native_values_seed_an_independent_fresh_xlsb_with_exact_eager_and_indexed_readback",
+      "fixtures": [
+        "excel/excel-metadata.xlsb",
+        "excel/excel-form-controls.xlsb"
+      ],
+      "feature_rows": [],
+      "current_features": [
+        "xlsb-current-fresh-creation"
+      ],
+      "assertions": [
+        "Exact native label, Print_015 B2 integer 42 and control-sheet B2 Boolean seed two new worksheets; fresh numeric storage reads as Float(42.0). Saved/reopened bytes, sheet names and eager/indexed cell values agree, including an authored Unicode string. Both native sources remain unchanged."
+      ],
+      "scope_limit": "Selected semantic value copy into fresh creation; no arbitrary workbook feature transfer or validation in Excel."
     }
   ]
 }

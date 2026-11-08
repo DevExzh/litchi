@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "renamed_rows": [
+    {
+      "feature_row": "rtf-455",
+      "current_feature": "Immutable package and read-only projection views",
+      "reason": "The checklist now names the package API; retain the historical identifier and its evidence."
+    },
+    {
+      "feature_row": "rtf-457",
+      "current_feature": "Existing-package transactions",
+      "reason": "The checklist now names the package API; retain the historical identifier and its evidence."
+    }
+  ],
+  "consolidated_rows": [
+    {
+      "feature_row": "xlsx-264",
+      "into_feature_row": "xlsx-200",
+      "reason": "Time groupings now fall under the Data Model descriptor and payload checklist entry. The historical time-grouping row and its native fixture gap remain independently accounted for."
+    }
+  ],
+  "additional_rows": [
+    {
+      "id": "docx-current-direct-properties",
+      "format": "docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "feature": "Direct (local) formatting properties",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "N/A"
+      },
+      "scope_limit": "Native paragraph/run properties, absence and explicit zeroes; no style cascade or computed formatting claim."
+    },
+    {
+      "id": "xlsb-current-fresh-creation",
+      "format": "xlsb",
+      "source_matrix": "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+      "feature": "Fresh workbook creation",
+      "current_status": {
+        "status": "✅",
+        "read": "✅",
+        "write": "✅"
+      },
+      "scope_limit": "Fresh workbooks seeded from selected native values; not a source resave, arbitrary feature transfer or native Excel reopen."
+    }
+  ],
+  "status_changes": [
+    {
+      "feature_row": "doc-038",
+      "current_status": {
+        "status": "🟡",
+        "read": "🟡",
+        "write": "🟡"
+      },
+      "reason": "Bounded local cached-field refresh; general evaluation and layout remain outside the profile."
+    },
+    {
+      "feature_row": "doc-066",
+      "current_status": {
+        "status": "🟡",
+        "read": "🟡",
+        "write": "🟡"
+      },
+      "reason": "Local caption-cache refresh; generated tables, indexes and layout-dependent results remain bounded."
+    },
+    {
+      "feature_row": "docx-124",
+      "current_status": {
+        "status": "🟡",
+        "read": "🟡",
+        "write": "🟡"
+      },
+      "reason": "Local caption-cache refresh without Word layout or general field evaluation."
+    },
+    {
+      "feature_row": "xlsx-215",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "🟡"
+      },
+      "reason": "Bounded ignored-error edits; cell watches remain metadata and preservation only."
+    },
+    {
+      "feature_row": "xlsx-217",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "❌"
+      },
+      "reason": "Typed phonetic properties reads and preservation without a package-level setter."
+    },
+    {
+      "feature_row": "xlsx-220",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "🟡"
+      },
+      "reason": "Bounded threaded-comment, people and mention metadata without collaboration execution."
+    },
+    {
+      "feature_row": "xlsx-227",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "🟡"
+      },
+      "reason": "Bounded query-table metadata without external data refresh."
+    },
+    {
+      "feature_row": "xlsx-250",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "🟡"
+      },
+      "reason": "Bounded external-workbook link metadata without resolution or refresh."
+    },
+    {
+      "feature_row": "xlsb-304",
+      "current_status": {
+        "status": "🟡",
+        "read": "🟡",
+        "write": "🟡"
+      },
+      "reason": "Page-break metadata reads and edits; worksheet page setup, margins and header/footer lack dedicated typed readers."
+    },
+    {
+      "feature_row": "xlsb-322",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "🟡"
+      },
+      "reason": "Bounded connection metadata edits without external service access."
+    },
+    {
+      "feature_row": "pptx-403",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "🟡"
+      },
+      "reason": "Handout-master projections and edits cover a bounded structural profile."
+    },
+    {
+      "feature_row": "pptx-410",
+      "current_status": {
+        "status": "🟡",
+        "read": "🟡",
+        "write": "🟡"
+      },
+      "reason": "Raw default-text-style preservation; dedicated typed Kinsoku/default-style access and editing remain outside the supported profile."
+    },
+    {
+      "feature_row": "rtf-492",
+      "current_status": {
+        "read": "🟡",
+        "write": "🟡"
+      },
+      "reason": "Bounded Word 6J control parsing and retention; broader East Asian semantics remain outside the profile."
+    }
+  ]
+}

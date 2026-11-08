@@ -13,7 +13,9 @@ from pathlib import Path
 import unittest
 import zipfile
 
-from tools.native_office_coverage import EVIDENCE_REVIEWS, evidence_reviews, report
+from tools.native_office_coverage import (
+    EVIDENCE_REVIEWS, evidence_reviews, matrix_rows, reconcile_matrices, report,
+)
 from tools.non_iwork_gate import FACADE_FORMAT_TEST_FEATURES
 
 
@@ -144,11 +146,93 @@ class NativeOfficeCorpus(unittest.TestCase):
         for row in coverage["feature_rows"]:
             self.assertEqual(row["automated_coverage"], "partial" if row["tests"] else "uncovered")
 
+    def test_current_checklists_are_reconciled_without_rewriting_historical_evidence(self) -> None:
+        coverage = report()
+        current = coverage["current_matrix"]
+        self.assertEqual(len(current["rows"]), 495)
+        self.assertEqual(len(current["renamed_rows"]), 2)
+        self.assertEqual(len(current["consolidated_rows"]), 1)
+        self.assertEqual(len(current["status_changes"]), 13)
+        additions = [row for row in current["rows"] if row["historical_feature_row"] is None]
+        self.assertEqual({row["id"] for row in additions}, {
+            "docx-current-direct-properties", "xlsb-current-fresh-creation",
+        })
+        for row in additions:
+            self.assertTrue(row["tests"])
+            self.assertEqual(row["automated_coverage"], "partial")
+            self.assertNotIn("native_fixture_status", row)
+        historical = {row["id"]: row for row in coverage["feature_rows"]}
+        self.assertEqual(len(historical), 494)
+        self.assertEqual(historical["xlsx-264"]["verification_gap"], "reviewed_native_fixture_gap_requires_followup")
+        self.assertNotIn("xlsx-264", {row["id"] for row in current["rows"]})
+        self.assertEqual(historical["rtf-455"]["feature"], "Immutable snapshot and borrowed story/resource views")
+        for row in current["rows"]:
+            if row["historical_feature_row"] is not None:
+                old = historical[row["historical_feature_row"]]
+                self.assertEqual(row["tests"], old["tests"])
+                self.assertEqual(row["verification_gap"], old["verification_gap"])
+
+    def test_additional_feature_test_bindings_require_known_ids_and_real_tests(self) -> None:
+        import tempfile
+        from unittest.mock import patch
+        from tools.native_office_coverage import INDEX
+
+        original = json.loads(INDEX.read_text())
+        for case in ("unknown", "historical_id", "empty", "missing_test"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                index = copy.deepcopy(original)
+                test = next(test for test in index["tests"] if test.get("current_features"))
+                if case == "missing_test":
+                    test["name"] = "nonexistent_current_feature_test"
+                else:
+                    test["current_features"] = {
+                        "unknown": ["docx-current-unknown"],
+                        "historical_id": ["docx-069"],
+                        "empty": [],
+                    }[case]
+                path = Path(directory) / "index.json"
+                path.write_text(json.dumps(index))
+                with patch("tools.native_office_coverage.INDEX", path):
+                    with self.assertRaises(ValueError):
+                        report()
+
     def test_facade_gate_enables_every_indexed_native_test(self) -> None:
         tests = [test for test in report()["tests"] if test["crate"] == "litchi"]
         self.assertTrue(tests)
         for test in tests:
             self.assertTrue(set(test["required_features"]) <= set(FACADE_FORMAT_TEST_FEATURES), test["name"])
+
+    def test_unsupported_ingress_has_boundary_checks_without_positive_feature_credit(self) -> None:
+        coverage = report()
+        self.assertEqual(coverage["summary"]["fixtures_with_any_checks"], 139)
+        for fixture in coverage["fixtures"]:
+            self.assertTrue(fixture["tests"] or fixture["evidence_checks"], fixture["path"])
+        encrypted = next(fixture for fixture in coverage["fixtures"] if fixture["path"] == "excel/excel-encrypted.xlsb")
+        self.assertEqual(encrypted["tests"], [])
+        self.assertTrue(any("unsupported_container_boundary" in check for check in encrypted["evidence_checks"]))
+        rows = {row["id"]: row for row in coverage["feature_rows"]}
+        for identity in ("doc-065", "xlsx-268", "xlsb-329"):
+            self.assertEqual(rows[identity]["verification_gap"], "reviewed_explicit_scope_boundary")
+            self.assertEqual(rows[identity]["tests"], [])
+
+    def test_unsupported_current_scope_cannot_gain_credit_by_deleting_its_review(self) -> None:
+        import tempfile
+        from unittest.mock import patch
+        from tools.native_office_coverage import INDEX
+
+        index = json.loads(INDEX.read_text())
+        index["tests"][0]["feature_rows"].append("doc-065")
+        evidence = json.loads(EVIDENCE_REVIEWS.read_text())
+        evidence["reviews"] = [row for row in evidence["reviews"] if row["feature_row"] != "doc-065"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "index.json").write_text(json.dumps(index))
+            (root / "reviews.json").write_text(json.dumps(evidence))
+            with patch("tools.native_office_coverage.INDEX", root / "index.json"), patch(
+                "tools.native_office_coverage.EVIDENCE_REVIEWS", root / "reviews.json"
+            ):
+                with self.assertRaisesRegex(ValueError, "unsupported matrix feature"):
+                    report()
 
     def test_gap_report_does_not_promote_native_evidence_or_pending_exclusions(self) -> None:
         coverage = report()
@@ -197,6 +281,7 @@ class NativeOfficeCorpus(unittest.TestCase):
             "docx-086",
             "doc-052",
             "ppt-389", "ppt-391",
+            "doc-065", "xlsx-268", "xlsb-329",
         })
         boundaries = [row for row in reviewed if row["evidence_review"]["classification"] == "explicit_scope_boundary"]
         self.assertEqual({row["id"] for row in boundaries}, {
@@ -211,6 +296,7 @@ class NativeOfficeCorpus(unittest.TestCase):
             "doc-067", "xls-189", "xls-190", "xls-191", "xlsx-267", "xlsb-332",
             "ppt-369", "ppt-390",
             "ppt-389", "ppt-391",
+            "doc-065", "xlsx-268", "xlsb-329",
         })
         self.assertEqual(coverage["summary"]["reviewed_native_fixture_gaps"], len(reviewed) - len(boundaries))
         self.assertEqual(coverage["summary"]["reviewed_explicit_scope_boundaries"], len(boundaries))
@@ -286,6 +372,107 @@ class NativeOfficeCorpus(unittest.TestCase):
                     with patch("tools.native_office_coverage.INDEX", path):
                         with self.assertRaisesRegex(ValueError, "evidence review conflicts"):
                             report()
+
+
+class MatrixReconciliation(unittest.TestCase):
+    def setUp(self) -> None:
+        import tempfile
+        from unittest.mock import patch
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        root_patch = patch("tools.native_office_coverage.ROOT", self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+        self.matrix = self.root / "matrix.md"
+        self.matrix.write_text(
+            "| Feature | Status | Read | Write |\n| --- | --- | --- | --- |\n"
+            "| Base | 🟡 | ✅ | 🟡 |\n| Renamed | ✅ | ✅ | ✅ |\n"
+            "| Added | ✅ | ✅ | ✅ |\n"
+        )
+        self.inventory = [
+            {"id": f"docx-{number}", "format": "docx", "source_matrix": "matrix.md",
+             "feature": feature, "matrix_status": "✅", "read": "✅", "write": "✅"}
+            for number, feature in enumerate(("Base", "Old name", "Consolidated"), 1)
+        ]
+        self.document = {
+            "schema_version": 1,
+            "renamed_rows": [{"feature_row": "docx-2", "current_feature": "Renamed", "reason": "API naming."}],
+            "consolidated_rows": [{"feature_row": "docx-3", "into_feature_row": "docx-1", "reason": "Grouped with Base."}],
+            "status_changes": [{"feature_row": "docx-1", "current_status": {"status": "🟡", "read": "✅", "write": "🟡"}, "reason": "Bounded profile."}],
+            "additional_rows": [{"id": "docx-current-added", "format": "docx", "source_matrix": "matrix.md",
+                                 "feature": "Added", "current_status": {"status": "✅", "read": "✅", "write": "✅"},
+                                 "scope_limit": "Added feature without historical evidence."}],
+        }
+
+    def test_reconciliation_retains_distinct_current_and_historical_identities(self) -> None:
+        reconciled = reconcile_matrices(self.inventory, self.document)
+        self.assertEqual([(row["id"], row["historical_feature_row"]) for row in reconciled["rows"]], [
+            ("docx-1", "docx-1"), ("docx-2", "docx-2"), ("docx-current-added", None),
+        ])
+        self.assertEqual(self.inventory[0]["matrix_status"], "✅")
+        self.assertEqual(self.inventory[1]["feature"], "Old name")
+        self.assertEqual(self.inventory[2]["feature"], "Consolidated")
+
+    def test_unreviewed_matrix_drift_fails_closed(self) -> None:
+        original = self.matrix.read_text()
+        mutations = [
+            original + "| Unaccounted | ✅ | ✅ | ✅ |\n",
+            original.replace("| Base | 🟡 | ✅ | 🟡 |\n", ""),
+            original.replace("| Base |", "| New base name |"),
+            original.replace("| Base | 🟡 | ✅ | 🟡 |", "| Base | ✅ | ✅ | ✅ |"),
+            original + "| Base | 🟡 | ✅ | 🟡 |\n",
+            original + "| Consolidated | ✅ | ✅ | ✅ |\n",
+            original.replace("| Added | ✅ | ✅ | ✅ |\n", ""),
+            "| Feature | Read | Write |\n| --- | --- | --- |\n| Base | ✅ | ✅ |\n",
+        ]
+        for changed in mutations:
+            with self.subTest(matrix=changed):
+                self.matrix.write_text(changed)
+                with self.assertRaises(ValueError):
+                    reconcile_matrices(self.inventory, self.document)
+
+    def test_invalid_or_stale_reconciliation_entries_are_rejected(self) -> None:
+        for case in ("unknown", "duplicate", "blank_reason", "redundant_rename", "redundant_status",
+                     "removed_target", "wrong_format", "duplicate_added_id", "duplicate_binding", "blank_scope"):
+            with self.subTest(case=case):
+                candidate = copy.deepcopy(self.document)
+                if case == "unknown":
+                    candidate["renamed_rows"][0]["feature_row"] = "docx-unknown"
+                elif case == "duplicate":
+                    candidate["status_changes"] *= 2
+                elif case == "blank_reason":
+                    candidate["consolidated_rows"][0]["reason"] = " "
+                elif case == "redundant_rename":
+                    candidate["renamed_rows"][0]["current_feature"] = "Old name"
+                elif case == "redundant_status":
+                    candidate["status_changes"][0]["current_status"] = {"status": "✅", "read": "✅", "write": "✅"}
+                elif case == "removed_target":
+                    candidate["consolidated_rows"][0]["into_feature_row"] = "docx-3"
+                elif case == "wrong_format":
+                    candidate["additional_rows"][0]["format"] = "xlsb"
+                elif case == "duplicate_added_id":
+                    candidate["additional_rows"] *= 2
+                elif case == "duplicate_binding":
+                    candidate["additional_rows"][0]["feature"] = "Renamed"
+                else:
+                    candidate["additional_rows"][0]["scope_limit"] = " "
+                with self.assertRaises(ValueError):
+                    reconcile_matrices(self.inventory, candidate)
+
+    def test_checklist_status_cells_reject_narrative_and_malformed_tables(self) -> None:
+        original = self.matrix.read_text()
+        for invalid in (
+            original.replace("| Base | 🟡", "| Base | 🟡 implementation details"),
+            original.replace("| Read |", "| Test results |"),
+            original.replace("| --- | --- | --- | --- |\n", ""),
+            original.replace("| Added | ✅ | ✅ | ✅ |", "| Added | ✅ | ✅ |"),
+            "| Feature | Read | Write |\n",
+            "No feature table.\n",
+        ):
+            with self.subTest(matrix=invalid), self.assertRaises(ValueError):
+                matrix_rows(invalid, "matrix.md")
 
 
 if __name__ == "__main__":
