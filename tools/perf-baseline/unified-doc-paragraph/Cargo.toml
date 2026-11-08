@@ -8,8 +8,8 @@ publish = false
 litchi-core = { path = "../../../crates/litchi-core" }
 litchi-doc = { path = "../../../crates/litchi-doc" }
 litchi-ops = { path = "../../../crates/litchi-ops", features = ["doc"] }
-serde_json = "1"
-sha2 = "0.11"
+serde_json = "1.0.154"
+sha2 = "0.11.1"
 
 [profile.release]
 debug = 1

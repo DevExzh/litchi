@@ -11,7 +11,7 @@ High-performance Python bindings for the Litchi Office file format parser. Parse
 - **Thread-Safe**: Handles are immutable and can be used from any thread
 - **Typed Errors**: Every error is a `LitchiError` with a stable `code`, a `message` and a `suggestion`
 - **Type Safe**: Complete type stubs for excellent IDE support
-- **Python 3.8+**: Compatible with Python 3.8 and above using abi3
+- **Python 3.9+**: Compatible with Python 3.9 and above using abi3
 
 ## Installation
 

@@ -26,7 +26,7 @@ doc = false
 bench = false
 
 [dependencies]
-libfuzzer-sys = "0.4"
+libfuzzer-sys = "0.4.13"
 litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
 litchi-numbers-wire = { path = ".." }
 

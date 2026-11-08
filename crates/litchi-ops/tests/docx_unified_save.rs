@@ -510,9 +510,9 @@ fn signed_noop_preserves_signature_and_explicit_unsign_publishes_unsigned_docx()
         let output_bytes = std::fs::read(&output).expect("read unsigned output");
         let archive = zip::ZipArchive::new(Cursor::new(&output_bytes)).expect("open unsigned ZIP");
         assert!(
-            archive
-                .file_names()
-                .all(|name| !name.starts_with("_xmlsignatures/")),
+            archive.file_names().all(|name| !name
+                .expect("valid ZIP member name")
+                .starts_with("_xmlsignatures/")),
             "signature members remain after explicit unsign"
         );
         let reopened = litchi_ops::open_bytes(output_bytes).expect("reopen unsigned output");

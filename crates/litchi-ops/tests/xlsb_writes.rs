@@ -120,6 +120,7 @@ fn has_signature_graph(bytes: &[u8]) -> bool {
             .by_index(index)
             .expect("read OPC archive member")
             .name()
+            .expect("valid ZIP member name")
             .to_ascii_lowercase()
             .starts_with("_xmlsignatures/")
     })

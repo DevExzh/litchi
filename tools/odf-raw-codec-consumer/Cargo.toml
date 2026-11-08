@@ -37,9 +37,9 @@ required-features = ["raw-codec-odf"]
 litchi-core = { path = "../../crates/litchi-core" }
 litchi-odf-common = { path = "../../crates/litchi-odf-common" }
 litchi-ops = { path = "../../crates/litchi-ops", default-features = false }
-quick-xml = "0.41"
-serde_json = "1"
-sha2 = "0.11"
+quick-xml = "0.41.0"
+serde_json = "1.0.154"
+sha2 = "0.11.1"
 soapberry-zip = { path = "../../crates/soapberry-zip" }
 
 # Match the production workspace's optimized native profile.  The allocator

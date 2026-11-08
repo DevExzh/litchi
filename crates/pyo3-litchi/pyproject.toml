@@ -19,7 +19,6 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Rust",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -27,7 +26,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Text Processing",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.urls]
 Homepage = "https://github.com/DevExzh/litchi"
@@ -35,7 +34,7 @@ Repository = "https://github.com/DevExzh/litchi"
 Documentation = "https://docs.rs/litchi"
 
 [tool.maturin]
-# Use abi3 for Python 3.8+ compatibility
+# Use abi3 for Python 3.9+ compatibility
 # Include type stubs
 include = ["python/litchi_py/__init__.pyi", "python/litchi_py/py.typed"]
 

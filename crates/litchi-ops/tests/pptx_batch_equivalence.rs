@@ -397,7 +397,7 @@ fn rewrite(bytes: &[u8], edit: impl Fn(&str, String) -> String) -> Vec<u8> {
     let mut out = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     for index in 0..archive.len() {
         let mut member = archive.by_index(index).expect("member");
-        let name = member.name().to_owned();
+        let name = member.name().expect("valid ZIP member name").into_owned();
         let mut data = Vec::new();
         member.read_to_end(&mut data).expect("read");
         if name.ends_with(".xml") && (name.contains("slides/") || name.contains("notesSlides/")) {

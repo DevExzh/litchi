@@ -755,7 +755,7 @@ fn fixture_features_read_and_keep_their_bytes() {
         (0..archive.len())
             .filter_map(|index| {
                 let mut entry = archive.by_index(index).unwrap();
-                let name = entry.name().to_owned();
+                let name = entry.name().expect("valid ZIP member name").into_owned();
                 if name.ends_with(".rels") || name == "[Content_Types].xml" {
                     return None;
                 }

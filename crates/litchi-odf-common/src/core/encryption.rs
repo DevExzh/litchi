@@ -11,7 +11,7 @@ use argon2::{
     Algorithm as Argon2Algorithm, Argon2, Params as Argon2Params, Version as Argon2Version,
 };
 use blowfish::Blowfish;
-use blowfish::cipher::{Block, BlockEncrypt, KeyInit};
+use blowfish::cipher::{Block, BlockCipherEncrypt};
 use cbc::{Decryptor, Encryptor};
 use flate2::read::DeflateDecoder;
 use litchi_core::{Error, Result};

@@ -12,7 +12,7 @@ edition      = "2024"
 authors      = ["Ryker Zhu <ryker.zhu@outlook.com>"]
 license      = "Apache-2.0"
 repository   = "https://github.com/DevExzh/litchi"
-rust-version = "1.89"
+rust-version = "1.95"
 
 [workspace.lints.rust]
 future_incompatible = { level = "deny", priority = -1 }
@@ -65,51 +65,32 @@ needless_return = "allow"
 disallowed_methods = "allow"
 
 [workspace.dependencies]
-
-# The font subsetter carries a checked allocation budget through Allsorts'
-# internal parser and writer paths. Keep the exact upstream 0.17.0 source in
-# the repository so the budgeted implementation is reproducible and cannot
-# silently use a registry cache copy.
-
-
 # External deps used by ≥2 crates — declared once, inherited by members.
-# VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.
-aes           = "0.9"
-aes-gcm       = { version = "0.11", features = ["alloc"] }
-aho-corasick  = "1.1"
-# allsorts' default `flate2_zlib` feature would turn on flate2's C zlib
-# backend, which flate2 prefers over `zlib-rs`: every build that enabled font
-# subsetting would then deflate with C zlib and publish different bytes. Keep
-# one Deflate backend, the workspace's `zlib-rs`, for every feature set.
-# The path is intentional as well as the patch below: a path consumer such as
-# `litchi-fonts` can be resolved from a standalone Cargo root where workspace
-# patches are not inherited.
-allsorts      = { version = "0.17", path = "vendor/allsorts", default-features = false, features = ["flate2_zlib-rs"] }
-argon2        = "0.5"
-atoi_simd     = "0.18"
-base64        = "0.22"
-bergshamra-c14n = "0.7"
-bitflags      = { version = "2.10", features = ["std", "serde"] }
-blowfish      = "0.9"
-bumpalo       = { version = "3", features = ["collections"] }
-bytes         = { version = "1", features = ["serde"] }
+aes           = "0.9.4"
+aes-gcm       = { version = "0.11.1", features = ["alloc"] }
+argon2        = "0.6.0"
+atoi_simd     = "0.18.1"
+base64        = "0.23.1"
+bergshamra-c14n = "0.11.1"
+bitflags      = { version = "2.13.2", features = ["std", "serde"] }
+blowfish      = "0.10.0"
+bumpalo       = { version = "3.20.3", features = ["collections"] }
+bytes         = { version = "1.12.1", features = ["serde"] }
 caseless      = "0.2.2"
-cbc           = { version = "0.2", features = ["alloc"] }
-chrono        = { version = "0", features = ["serde"] }
-crc-fast      = { version = "1.8", features = ["optimize_crc32_auto"] }
-encoding_rs   = "0.8"
-fast-float2   = "0.2"
-fixedbitset   = "0.5"
+cbc           = { version = "0.2.1", features = ["alloc"] }
+chrono        = { version = "0.4.45", features = ["serde"] }
+crc-fast      = { version = "1.10.0", features = ["optimize_crc32_auto"] }
+encoding_rs   = "0.8.44"
+fast-float2   = "0.2.4"
 # flate2 1.1.10 makes zlib-rs CPU dispatch opt-in when defaults are disabled.
 # Keep this path paired with the Allsorts bridge so every consumer selects one
 # exact flate2 -> zlib-rs decoder instance.
 flate2        = { version = "1.1.10", path = "vendor/flate2", features = ["zlib-rs", "runtime_detection"], default-features = false }
-font-kit      = "0.14"
-hmac          = "0.13"
-image         = { version = "0.25", features = ["default-formats", "rayon"] }
-itoa          = "1.0"
+font-kit      = "0.14.3"
+hmac          = "0.13.0"
+image         = { version = "0.25.10", features = ["default-formats", "rayon"] }
+itoa          = "1.0.18"
 # Path deps to internal crates.
-litchi              = { version = "0.0.1", path = "crates/litchi" }
 litchi-biff         = { version = "0.0.1", path = "crates/litchi-biff" }
 litchi-cfb          = { version = "0.0.1", path = "crates/litchi-cfb" }
 litchi-codepage     = { version = "0.0.1", path = "crates/litchi-codepage" }
@@ -128,12 +109,10 @@ litchi-iwa-common   = { version = "0.0.1", path = "crates/litchi-iwa-common" }
 litchi-iwa-core     = { version = "0.0.1", path = "crates/litchi-iwa-core" }
 litchi-iwa-detect   = { version = "0.0.1", path = "crates/litchi-iwa-detect" }
 litchi-iwa-graph    = { version = "0.0.1", path = "crates/litchi-iwa-graph" }
-litchi-iwa-index    = { version = "0.0.1", path = "crates/litchi-iwa-index" }
 litchi-iwa-package  = { version = "0.0.1", path = "crates/litchi-iwa-package" }
 litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
-litchi-iwa-table    = { version = "0.0.1", path = "crates/litchi-iwa-table" }
-litchi-iwa-structured = { version = "0.0.1", path = "crates/litchi-iwa-structured" }
 litchi-iwa-style    = { version = "0.0.1", path = "crates/litchi-iwa-style" }
+litchi-iwa-table    = { version = "0.0.1", path = "crates/litchi-iwa-table" }
 litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
 litchi-iwa-text-wire = { version = "0.0.1", path = "crates/litchi-iwa-text-wire" }
 litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }
@@ -142,7 +121,6 @@ litchi-numbers      = { version = "0.0.1", path = "crates/litchi-numbers" }
 litchi-numbers-wire = { version = "0.0.1", path = "crates/litchi-numbers-wire" }
 litchi-odb          = { version = "0.0.1", path = "crates/litchi-odb" }
 litchi-odc          = { version = "0.0.1", path = "crates/litchi-odc" }
-litchi-odf          = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-odf-common   = { version = "0.0.1", path = "crates/litchi-odf-common" }
 litchi-odf-formula  = { version = "0.0.1", path = "crates/litchi-odf-formula" }
 litchi-odg          = { version = "0.0.1", path = "crates/litchi-odg" }
@@ -165,66 +143,62 @@ litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }
 litchi-sheet        = { version = "0.0.1", path = "crates/litchi-sheet" }
 litchi-sheet-text   = { version = "0.0.1", path = "crates/litchi-sheet-text" }
 litchi-sign         = { version = "0.0.1", path = "crates/litchi-sign" }
-litchi-slide        = { version = "0.0.1", path = "crates/litchi-slide" }
 litchi-spreadsheet-drawing = { version = "0.0.1", path = "crates/litchi-spreadsheet-drawing" }
 litchi-vba          = { version = "0.0.1", path = "crates/litchi-vba" }
-litchi-word         = { version = "0.0.1", path = "crates/litchi-word" }
+litchi-xldm         = { version = "0.0.1", path = "crates/litchi-xldm" }
 litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
 litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
-litchi-xldm         = { version = "0.0.1", path = "crates/litchi-xldm" }
 litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
-md-5          = { version = "0.11", features = ["zeroize"] }
-memchr        = "2.7"
-num-complex   = "0.4"
-once_cell     = "1"
-p256          = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
-parking_lot   = { version = "0.12", features = ["hardware-lock-elision"] }
-pbkdf2        = "0.13"
-phf           = { version = "0.14", features = ["macros"] }
-plist         = "1"
-prost         = { version = "0.14", features = ["derive"] }
-prost-build   = "0.14"
-prost-types   = "0.14"
-quick-xml     = "0.41"
-rand          = "0.10"
-rayon         = "1.11"
-rc4           = { version = "0.2", features = ["zeroize"] }
-resvg         = { version = "0.45.1", default-features = false, features = ["raster-images", "system-fonts", "text"] }
-roaring       = "0"
-rowan         = "0.16"
-rsa           = { version = "0.9", features = ["sha1", "sha2"] }
-ryu           = "1.0"
+md-5          = { version = "0.11.0", features = ["zeroize"] }
+memchr        = "2.8.3"
+num-complex   = "0.4.6"
+once_cell     = "1.21.4"
+p256          = { version = "0.14.0", features = ["ecdsa", "pem", "pkcs8"] }
+parking_lot   = "0.13.0"
+pbkdf2        = "0.13.0"
+phf           = { version = "0.14.0", features = ["macros"] }
+plist         = "1.10.3"
+prost         = { version = "0.14.4", features = ["derive"] }
+prost-build   = "0.14.4"
+quick-xml     = "0.41.0"
+rand          = "0.10.3"
+rayon         = "1.12.0"
+rc4           = { version = "0.2.0", features = ["zeroize"] }
+resvg         = { version = "0.49.0", default-features = false, features = ["raster-images", "system-fonts", "text"] }
+roaring       = "0.12.0"
+rsa           = { version = "0.9.10", features = ["sha1", "sha2"] }
+ryu           = "1.0.23"
 same-file     = "1.0.6"
-serde         = { version = "1", features = ["derive"] }
-serde-saphyr  = "0"
+serde         = { version = "1.0.229", features = ["derive"] }
+serde-saphyr  = "2.1.1"
 # `float_roundtrip`: correctly rounded decimal-to-f64 parsing, so a JSON number
 # (batch payloads, property values) round-trips exactly (record 0338 F1).
-serde_json    = { version = "1", features = ["float_roundtrip"] }
-sha1          = { version = "0.11", features = ["zeroize"] }
+serde_json    = { version = "1.0.154", features = ["float_roundtrip"] }
+sha1          = { version = "0.11.0", features = ["zeroize"] }
 sha1_legacy   = { package = "sha1", version = "0.10" }
-sha2          = "0.11"
+sha2          = "0.11.1"
 sha2_legacy   = { package = "sha2", version = "0.10" }
-signature     = "2.2"
+signature     = "3.0.0"
 siphasher     = { version = "1.0.4", default-features = false }
-smallvec      = "1.15"
-snap          = "1"
+smallvec      = "1.16.5"
+snap          = "1.1.2"
 soapberry-zip       = { path = "crates/soapberry-zip" }
-statrs        = "0.18"
-subtle        = "2"
-sxd-document  = "0.3"
-sxd-xpath     = "0.4"
-tempfile      = "3"
-thiserror     = "2.0"
-tokio         = { version = "1", features = ["full"] }
-unicode-normalization = "0.1"
-url           = "2.5"
-urlencoding   = "2.1"
-x509-cert     = { version = "0.2", features = ["pem"] }
+statrs        = "0.19.1"
+subtle        = "2.6.1"
+sxd-document  = "0.3.2"
+sxd-xpath     = "0.4.2"
+tempfile      = "3.27.0"
+thiserror     = "2.0.21"
+tokio         = { version = "1.54.1", features = ["full"] }
+unicode-normalization = "0.1.26"
+url           = "2.5.8"
+urlencoding   = "2.1.3"
+x509-cert     = { version = "0.3.0", features = ["pem"] }
 xml-minifier        = { version = "0.1.0", path = "crates/xml-minifier" }
 xml-minifier-macros = { version = "0.1.0", path = "crates/xml-minifier-macros" }
-zerocopy      = { version = "0.8", features = ["std"] }
-zerocopy-derive = "0.8"
-zeroize       = "1"
+zerocopy      = { version = "0.8.63", features = ["std"] }
+zerocopy-derive = "0.8.63"
+zeroize       = "1.9.1"
 
 [profile.release]
 lto = true
@@ -240,6 +214,7 @@ inherits = "release"
 debug = true
 
 [patch.crates-io]
+# Keep the reviewed allocation budgets and decoder paths in vendored sources.
 allsorts = { path = "vendor/allsorts" }
 flate2 = { path = "vendor/flate2" }
 zlib-rs = { path = "vendor/zlib-rs" }

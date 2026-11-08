@@ -13,10 +13,10 @@ cargo-fuzz = true
 apply = ["litchi-ops/docx", "litchi-ops/xlsx", "litchi-ops/pptx"]
 
 [dependencies]
-libfuzzer-sys = "0.4"
+libfuzzer-sys = "0.4.13"
 litchi-core = { path = "../../litchi-core" }
 litchi-ops = { path = "..", default-features = false, features = ["test-support"] }
-serde_json = "1"
+serde_json = "1.0.154"
 
 [[bin]]
 name = "values"

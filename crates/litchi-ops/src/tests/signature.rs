@@ -496,6 +496,7 @@ fn assert_unsigned_output(format: FileFormat, output: &[u8], expected: &str, wha
             let archive = zip::ZipArchive::new(Cursor::new(output)).unwrap();
             let stale: Vec<_> = archive
                 .file_names()
+                .map(|name| name.expect("valid ZIP member name"))
                 .filter(|name| name.to_ascii_lowercase().starts_with("_xmlsignatures"))
                 .collect();
             assert!(

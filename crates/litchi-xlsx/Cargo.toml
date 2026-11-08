@@ -10,11 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-encryption = [
-    "dep:litchi-crypto",
-    "litchi-crypto/ooxml",
-    "litchi-ooxml-common/encryption",
-]
+encryption = ["dep:litchi-crypto", "litchi-crypto/ooxml", "litchi-ooxml-common/encryption"]
 vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
 
 [dependencies]

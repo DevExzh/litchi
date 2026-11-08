@@ -164,7 +164,7 @@ fn rewrite_manifest_size(bytes: &[u8], size: u64) -> Vec<u8> {
         for index in 0..archive.len() {
             let (name, mut data) = {
                 let mut entry = archive.by_index(index).expect("ZIP entry");
-                let name = entry.name().to_owned();
+                let name = entry.name().expect("valid ZIP member name").into_owned();
                 let mut data = Vec::new();
                 entry.read_to_end(&mut data).expect("ZIP entry bytes");
                 (name, data)

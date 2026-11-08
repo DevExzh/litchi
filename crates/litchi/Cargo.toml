@@ -187,7 +187,19 @@ yaml = ["dep:serde-saphyr", "litchi-ops?/yaml"]
 # Format and convenience aggregates
 legacy = ["doc", "ppt", "xls", "cfb", "ole"]
 ooxml = ["docx", "pptx", "xlsx", "xlsb", "opc", "ooxml-common", "drawingml"]
-odf = ["odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "odf-common"]
+odf = [
+    "odt",
+    "ods",
+    "odp",
+    "oth",
+    "odm",
+    "odg",
+    "odc",
+    "odi",
+    "odb",
+    "odf-formula",
+    "odf-common",
+]
 word = ["doc", "docx", "rtf", "odt", "pages"]
 slides = ["ppt", "pptx", "odp", "keynote"]
 spreadsheets = ["xls", "xlsx", "xlsb", "ods", "numbers", "sheet"]
@@ -249,7 +261,7 @@ litchi-sign = { workspace = true, optional = true } # Office signature support
 litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF support
 litchi-xlsb = { workspace = true, optional = true } # BIFF12 support
 litchi-xlsx = { workspace = true, optional = true } # SpreadsheetML support
-serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
+serde-saphyr = { version = "2.1.1", optional = true } # YAML metadata serialization
 
 [build-dependencies]
 # (none) — `build.rs` derives `cfg(litchi_unified)` from the format features
@@ -257,13 +269,13 @@ serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 # `crates/litchi-iwa-protos/build.rs`.
 
 [dev-dependencies]
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive"] }
 litchi-ops = { workspace = true, features = ["test-support"] }
-proptest = "1.5"
+proptest = "1.12.0"
 serde_json = { workspace = true }
-tempfile = "3"
+tempfile = "3.27.0"
 tokio = { workspace = true }
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9.4.2", default-features = false, features = ["deflate"] }
 
 [[example]]
 name = "docx_with_fonts"

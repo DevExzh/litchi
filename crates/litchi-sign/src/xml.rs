@@ -17,6 +17,8 @@ use quick_xml::{
     events::{BytesStart, Event},
 };
 use rsa::pkcs1v15::{Signature as RsaSignature, VerifyingKey as RsaVerifyingKey};
+use rsa::pkcs8::DecodePublicKey as _;
+use rsa::signature::Verifier as _;
 use rsa::traits::PublicKeyParts as _;
 use rsa::{BigUint, RsaPublicKey};
 use sha1_legacy::Sha1;
@@ -640,7 +642,7 @@ fn build_key_info(
     } else if let Some(key) = signer.p256_public() {
         format!(
             "<KeyValue><dsig11:ECKeyValue xmlns:dsig11=\"{DSIG11}\"><dsig11:NamedCurve URI=\"{P256_CURVE}\"></dsig11:NamedCurve><dsig11:PublicKey>{}</dsig11:PublicKey></dsig11:ECKeyValue></KeyValue>",
-            BASE64.encode(key.to_encoded_point(false).as_bytes())
+            BASE64.encode(key.to_sec1_point(false).as_bytes())
         )
     } else {
         String::new()
@@ -1143,8 +1145,8 @@ fn cert_spki(certificate: &Cert) -> Result<Vec<u8>> {
     let certificate = X509Certificate::from_der(certificate.der())
         .map_err(|error| Error::Key(error.to_string()))?;
     certificate
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .to_der()
         .map_err(|error| Error::Key(error.to_string()))
 }

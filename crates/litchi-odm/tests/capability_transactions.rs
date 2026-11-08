@@ -350,7 +350,7 @@ fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
     let mut mimetype = String::new();
     {
         let mut first = changed_archive.by_index(0).unwrap();
-        assert_eq!(first.name(), "mimetype");
+        assert_eq!(first.name().unwrap(), "mimetype");
         assert_eq!(first.compression(), zip::CompressionMethod::Stored);
         first.read_to_string(&mut mimetype).unwrap();
     }

@@ -45,7 +45,7 @@ fn zip_member_contents(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
     let mut members = Vec::with_capacity(archive.len());
     for index in 0..archive.len() {
         let mut member = archive.by_index(index).expect("read ZIP member");
-        let name = member.name().to_owned();
+        let name = member.name().expect("valid ZIP member name").into_owned();
         let mut contents = Vec::new();
         member
             .read_to_end(&mut contents)

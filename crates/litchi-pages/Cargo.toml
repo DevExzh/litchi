@@ -9,6 +9,32 @@ repository.workspace   = true
 rust-version.workspace = true
 autoexamples = false
 
+[features]
+default = []
+
+[dependencies]
+litchi-core       = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common = { workspace = true }
+litchi-iwa-core   = { workspace = true }
+litchi-iwa-detect = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-iwa-style = { workspace = true }
+litchi-iwa-table = { workspace = true }
+litchi-iwa-text = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+litchi-numbers-wire = { workspace = true }
+plist           = { workspace = true }
+sha1            = { workspace = true }
+thiserror       = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[dev-dependencies]
+prost    = { workspace = true }
+tempfile = { workspace = true }
+
 [[example]]
 name = "body_chart_arrangement"
 path = "examples/body_chart_arrangement.rs"
@@ -68,32 +94,6 @@ path = "examples/save_package.rs"
 [[example]]
 name = "generate_footnote_fixture"
 path = "examples/generate_footnote_fixture.rs"
-
-[features]
-default = []
-
-[dependencies]
-litchi-core       = { workspace = true }
-litchi-iwa-archive = { workspace = true }
-litchi-iwa-common = { workspace = true }
-litchi-iwa-core   = { workspace = true }
-litchi-iwa-detect = { workspace = true }
-litchi-iwa-protos = { workspace = true }
-litchi-iwa-style = { workspace = true }
-litchi-iwa-table = { workspace = true }
-litchi-iwa-text = { workspace = true }
-litchi-iwa-text-wire = { workspace = true }
-litchi-numbers-wire = { workspace = true }
-plist           = { workspace = true }
-sha1            = { workspace = true }
-thiserror       = { workspace = true }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
-[dev-dependencies]
-prost    = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

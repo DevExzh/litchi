@@ -26,7 +26,7 @@ fn package(extra_id: u16, extra_body: &[u8]) -> Vec<u8> {
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     let mut mimetype = FullFileOptions::default().compression_method(CompressionMethod::Stored);
     mimetype
-        .add_extra_data(extra_id, extra_body, false)
+        .add_extra_field(extra_id, extra_body, false)
         .unwrap();
     zip.start_file("mimetype", mimetype).unwrap();
     zip.write_all(MIME.as_bytes()).unwrap();
@@ -55,7 +55,7 @@ fn package_with_directory(extra_id: u16, extra_body: &[u8]) -> Vec<u8> {
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     let mut mimetype = FullFileOptions::default().compression_method(CompressionMethod::Stored);
     mimetype
-        .add_extra_data(extra_id, extra_body, false)
+        .add_extra_field(extra_id, extra_body, false)
         .unwrap();
     zip.start_file("mimetype", mimetype).unwrap();
     zip.write_all(MIME.as_bytes()).unwrap();
@@ -89,7 +89,7 @@ fn package_with_xml_member(path: &str, media_type: &str, xml: &[u8]) -> Vec<u8> 
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     let mut mimetype = FullFileOptions::default().compression_method(CompressionMethod::Stored);
     mimetype
-        .add_extra_data(0x5455, [1, 0, 0, 0, 0], false)
+        .add_extra_field(0x5455, [1, 0, 0, 0, 0], false)
         .unwrap();
     zip.start_file("mimetype", mimetype).unwrap();
     zip.write_all(MIME.as_bytes()).unwrap();
@@ -131,7 +131,7 @@ fn package_with_mimetype_last() -> Vec<u8> {
     zip.write_all(content.as_bytes()).unwrap();
     let mut mimetype = stored;
     mimetype
-        .add_extra_data(0x5455, [1, 0, 0, 0, 0], false)
+        .add_extra_field(0x5455, [1, 0, 0, 0, 0], false)
         .unwrap();
     zip.start_file("mimetype", mimetype).unwrap();
     zip.write_all(MIME.as_bytes()).unwrap();

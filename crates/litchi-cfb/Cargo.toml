@@ -14,7 +14,6 @@ default = []
 write = []
 
 [dependencies]
-fixedbitset     = { workspace = true }
 litchi-core     = { workspace = true }
 rayon           = { workspace = true }
 sha2            = { workspace = true }

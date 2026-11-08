@@ -26,7 +26,7 @@ fn signed_package(xml: &str) -> Vec<u8> {
             .compression_method(zip::CompressionMethod::Stored);
         for index in 0..input.len() {
             let mut entry = input.by_index(index).expect("fixture member should exist");
-            let name = entry.name().to_string();
+            let name = entry.name().expect("valid ZIP member name").into_owned();
             let mut bytes = Vec::new();
             entry
                 .read_to_end(&mut bytes)

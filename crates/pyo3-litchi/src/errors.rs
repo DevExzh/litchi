@@ -28,10 +28,11 @@ use litchi::{Code, FileFormat};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
-use pyo3::types::{PyCode, PyCodeInput, PyCodeMethods, PyDict, PyModule, PyType};
+use pyo3::types::code::PyCodeInput;
+use pyo3::types::{PyCode, PyCodeMethods, PyDict, PyModule, PyType};
 
 /// The Python source of the exception classes. It must stay valid on
-/// Python 3.8, the oldest version the `abi3-py38` build supports.
+/// Python 3.9, the oldest version the `abi3-py39` build supports.
 const CLASSES: &CStr = cr#"
 class LitchiError(Exception):
     """Base class of the errors litchi_py raises for a file it cannot open, read,

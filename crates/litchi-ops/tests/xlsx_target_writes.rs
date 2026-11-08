@@ -75,7 +75,7 @@ fn corrupt_deferred_worksheet_fixture() -> Vec<u8> {
     for index in 0..archive.len() {
         let (name, contents) = {
             let mut entry = archive.by_index(index).expect("read XLSX fixture member");
-            let name = entry.name().to_owned();
+            let name = entry.name().expect("valid ZIP member name").into_owned();
             let mut contents = Vec::new();
             entry
                 .read_to_end(&mut contents)

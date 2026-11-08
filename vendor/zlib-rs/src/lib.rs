@@ -22,9 +22,15 @@ cfg_select! {
         pub const MAX_WBITS: i32 = 15; // 32kb LZ77 window
     }
     _ => {
+        // Keep the zlib-compatible entry points for __internal-api consumers.
+        // The stable Rust facade deliberately reaches only part of this API.
+        #[expect(dead_code, reason = "allocator entry points for the hidden C API")]
         pub(crate) mod allocate;
+        #[expect(dead_code, reason = "C API constants and types retained for __internal-api")]
         pub(crate) mod c_api;
+        #[expect(dead_code, reason = "zlib-compatible operations outside the stable facade")]
         pub(crate) mod deflate;
+        #[expect(dead_code, reason = "zlib-compatible operations outside the stable facade")]
         pub(crate) mod inflate;
 
         pub(crate) const MIN_WBITS: i32 = 8; // 256b LZ77 window

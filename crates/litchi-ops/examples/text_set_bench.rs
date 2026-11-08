@@ -146,7 +146,7 @@ mod bench {
             .compression_method(zip::CompressionMethod::Stored);
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index).expect("entry");
-            let name = entry.name().to_owned();
+            let name = entry.name().expect("valid ZIP member name").into_owned();
             let mut contents = Vec::new();
             entry.read_to_end(&mut contents).expect("read");
             if name == "word/document.xml" {

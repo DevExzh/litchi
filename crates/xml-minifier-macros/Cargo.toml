@@ -13,8 +13,8 @@ proc-macro = true
 
 [dependencies]
 quick-xml = { workspace = true }
-quote = "1.0"
-syn = "2.0"
+quote = "1.0.47"
+syn = "3.0.9"
 
 [lints]
 workspace = true

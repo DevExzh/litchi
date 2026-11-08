@@ -20,11 +20,11 @@ litchi-core = { workspace = true }
 litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
-litchi-sign = { workspace = true, optional = true }
 litchi-sheet = { workspace = true }
+litchi-sign = { workspace = true, optional = true }
 litchi-spreadsheet-drawing = { workspace = true }
-litchi-xldm = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
+litchi-xldm = { workspace = true }
 once_cell = { workspace = true }
 quick-xml = { workspace = true }
 sha2 = { workspace = true }

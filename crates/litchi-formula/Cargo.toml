@@ -15,7 +15,6 @@ fast-float2     = { workspace = true }
 memchr          = { workspace = true }
 phf             = { workspace = true }
 quick-xml       = { workspace = true }
-rowan           = { workspace = true }
 smallvec        = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }

@@ -42,9 +42,29 @@ doc     = [
     "dep:litchi-vba",
 ]
 sign    = ["dep:litchi-sign", "litchi-ppt?/sign"]
-docx    = ["dep:base64", "dep:litchi-docx", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "opc"]
-ppt     = ["dep:litchi-biff", "dep:litchi-cfb", "dep:litchi-ograph", "dep:litchi-ole-common", "dep:litchi-ppt", "dep:litchi-sign"]
-pptx    = ["dep:base64", "dep:chrono", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
+docx    = [
+    "dep:base64",
+    "dep:litchi-docx",
+    "dep:litchi-drawingml",
+    "dep:litchi-ooxml-common",
+    "opc",
+]
+ppt     = [
+    "dep:litchi-biff",
+    "dep:litchi-cfb",
+    "dep:litchi-ograph",
+    "dep:litchi-ole-common",
+    "dep:litchi-ppt",
+    "dep:litchi-sign",
+]
+pptx    = [
+    "dep:base64",
+    "dep:chrono",
+    "dep:litchi-drawingml",
+    "dep:litchi-ooxml-common",
+    "dep:litchi-pptx",
+    "opc",
+]
 xls     = [
     "dep:base64",
     "dep:litchi-biff",
@@ -55,8 +75,20 @@ xls     = [
     "dep:litchi-vba",
     "dep:litchi-xls",
 ]
-xlsx    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
-xlsb    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
+xlsx    = [
+    "dep:base64",
+    "dep:litchi-drawingml",
+    "dep:litchi-ooxml-common",
+    "dep:litchi-xlsx",
+    "opc",
+]
+xlsb    = [
+    "dep:base64",
+    "dep:litchi-drawingml",
+    "dep:litchi-ooxml-common",
+    "dep:litchi-xlsb",
+    "opc",
+]
 rtf     = ["dep:litchi-rtf", "dep:chrono"]
 odt     = ["dep:litchi-odf-common", "dep:litchi-odt", "dep:soapberry-zip"]
 ods     = ["dep:base64", "dep:litchi-odf-common", "dep:litchi-ods", "dep:soapberry-zip"]
@@ -116,11 +148,8 @@ eval = ["dep:litchi-eval"]
 test-support = []
 
 [dependencies]
-caseless = { workspace = true }
-unicode-normalization = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 base64              = { workspace = true, optional = true } # Markdown, DOCX, PPTX, XLSX, XLSB, XLS, ODS and Keynote picture image data URIs
+caseless = { workspace = true }
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps; PPTX comment dates
 litchi-biff         = { workspace = true, optional = true } # Typed Graph framing errors
 litchi-cfb          = { workspace = true, optional = true }
@@ -142,17 +171,16 @@ litchi-odf-common   = { workspace = true, optional = true }
 litchi-odf-formula  = { workspace = true, optional = true }
 litchi-odg          = { workspace = true, optional = true }
 litchi-odi          = { workspace = true, optional = true }
+litchi-odm          = { workspace = true, optional = true }
 litchi-odp          = { workspace = true, optional = true }
-soapberry-zip       = { workspace = true, optional = true }
 litchi-ods          = { workspace = true, optional = true }
 litchi-odt          = { workspace = true, optional = true }
-litchi-odm          = { workspace = true, optional = true }
 litchi-ograph       = { workspace = true, optional = true } # Typed legacy chart errors
 litchi-ole-common   = { workspace = true, optional = true }
-litchi-oth          = { workspace = true, optional = true }
-litchi-pages        = { workspace = true, optional = true } # Pages owner (record 0296)
 litchi-ooxml-common = { workspace = true, optional = true }
 litchi-opc          = { workspace = true, optional = true }
+litchi-oth          = { workspace = true, optional = true }
+litchi-pages        = { workspace = true, optional = true } # Pages owner (record 0296)
 litchi-ppt          = { workspace = true, optional = true }
 litchi-pptx         = { workspace = true, optional = true }
 litchi-rtf          = { workspace = true, optional = true }
@@ -164,23 +192,23 @@ litchi-xlsb         = { workspace = true, optional = true }
 litchi-xlsx         = { workspace = true, optional = true }
 memchr              = { workspace = true } # Markdown HTML escaping; find/replace literal search
 quick-xml           = { workspace = true } # Raw layer: part addressing and `raw_set` splices (record 0336)
+serde = { workspace = true }
 serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
+serde_json = { workspace = true }
 sha2                = { workspace = true } # Streaming content proofs for process-local patch replay
+soapberry-zip       = { workspace = true, optional = true }
+unicode-normalization = { workspace = true }
 
 [dev-dependencies]
 # Native signature-policy tests author disposable signatures through OPC.
 litchi-opc = { workspace = true, features = ["sign"] }
 p256 = { workspace = true }
-proptest = "1.5" # PathArg display fixed point (record 0338 F2)
+proptest = "1.12.0" # PathArg display fixed point (record 0338 F2)
 tempfile = { workspace = true }
-zip      = { version = "8", default-features = false, features = ["deflate"] }
+zip      = { version = "9.4.2", default-features = false, features = ["deflate"] }
 
 [[test]]
 name = "path_allocations"
-required-features = ["test-support"]
-
-[[example]]
-name = "query_walk_bench"
 required-features = ["test-support"]
 
 # Representative queries over the OOXML corpora return what they returned
@@ -188,6 +216,28 @@ required-features = ["test-support"]
 [[test]]
 name              = "query_corpus_differential"
 required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
+
+# `File::dump` round trips over corpus files and built documents (record 0336).
+[[test]]
+name              = "dump_round_trip"
+required-features = [
+    "docx",
+    "xlsx",
+    "xlsb",
+    "pptx",
+    "ods",
+    "odt",
+    "rtf",
+    "doc",
+    "xls",
+    "ppt",
+    "odp",
+    "odg",
+]
+
+[[example]]
+name = "query_walk_bench"
+required-features = ["test-support"]
 
 # Prints the corpus query digests, to compare two builds (record 0262).
 [[example]]
@@ -198,9 +248,6 @@ required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
 [[example]]
 name              = "mac_queue_file_routes"
 required-features = ["pages", "keynote", "numbers"]
-
-[lints]
-workspace = true
 
 # Formula-evaluation parity against the corpus' cached results (record 0266).
 [[example]]
@@ -304,7 +351,5 @@ required-features = ["xlsb"]
 name              = "dump_bench"
 required-features = ["docx", "xlsx", "pptx"]
 
-# `File::dump` round trips over corpus files and built documents (record 0336).
-[[test]]
-name              = "dump_round_trip"
-required-features = ["docx", "xlsx", "xlsb", "pptx", "ods", "odt", "rtf", "doc", "xls", "ppt", "odp", "odg"]
+[lints]
+workspace = true

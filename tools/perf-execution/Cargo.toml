@@ -14,10 +14,10 @@ source-metrics = []
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
 litchi-opc = { path = "../../crates/litchi-opc" }
-rustix = { version = "1.1.4", default-features = false, features = ["time"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = "0.11"
+rustix = { version = "1.1.6", default-features = false, features = ["time"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
 soapberry-zip = { path = "../../crates/soapberry-zip" }
 
 [workspace]

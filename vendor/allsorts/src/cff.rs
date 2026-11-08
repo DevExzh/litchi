@@ -1778,14 +1778,6 @@ impl<'a> MaybeOwnedIndex<'a> {
         self.iter().position(|obj| obj == object)
     }
 
-    /// Push an object onto this `MaybeOwnedIndex`. Returns the index of the object in self.
-    ///
-    /// If self is `Borrowed` then it is converted to the `Owned` variant first.
-    fn push(&mut self, object: Vec<u8>) -> Result<usize, ParseError> {
-        budget::charge_allocation(object.capacity()).map_err(|_| ParseError::LimitExceeded)?;
-        self.push_owned(object)
-    }
-
     /// Push a borrowed byte string while charging its destination allocation
     /// before constructing the owned object.
     pub(crate) fn push_bytes(&mut self, object: &[u8]) -> Result<usize, ParseError> {
@@ -2027,23 +2019,9 @@ where
         self.dict.len()
     }
 
-    fn inner_mut(&mut self) -> &mut Vec<(Operator, Vec<Operand>)> {
-        &mut self.dict
-    }
-
     fn remove(&mut self, operator: Operator) {
         if let Some(index) = self.dict.iter().position(|(op, _)| *op == operator) {
             self.dict.remove(index);
-        }
-    }
-
-    /// Replace the entry in the DICT for `operator` with `operands`.
-    ///
-    /// If `operator` is not found then append it to the DICT.
-    fn replace(&mut self, operator: Operator, operands: Vec<Operand>) {
-        match self.dict.iter().position(|(op, _)| *op == operator) {
-            Some(index) => self.dict[index] = (operator, operands),
-            None => self.dict.push((operator, operands)),
         }
     }
 

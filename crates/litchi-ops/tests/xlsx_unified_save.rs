@@ -303,9 +303,9 @@ fn cell_edit_preserves_opaque_parts_and_non_part_members() {
         );
         let archive = zip::ZipArchive::new(Cursor::new(&output)).expect("open edited signed ZIP");
         assert!(
-            archive
-                .file_names()
-                .all(|name| !name.starts_with("_xmlsignatures/")),
+            archive.file_names().all(|name| !name
+                .expect("valid ZIP member name")
+                .starts_with("_xmlsignatures/")),
             "{owner} signature members remain after explicit removal edit"
         );
         assert!(!edited.is_signed(), "{owner} edit remains signed");
@@ -482,9 +482,9 @@ fn signed_xlsx_save_preserves_signature_and_explicit_unsign_removes_it() {
         let output_bytes = std::fs::read(&output).expect("read unsigned XLSX");
         let archive = zip::ZipArchive::new(Cursor::new(&output_bytes)).expect("open unsigned ZIP");
         assert!(
-            archive
-                .file_names()
-                .all(|name| !name.starts_with("_xmlsignatures/")),
+            archive.file_names().all(|name| !name
+                .expect("valid ZIP member name")
+                .starts_with("_xmlsignatures/")),
             "signature members remain after explicit unsign"
         );
         assert!(!litchi_ops::open_bytes(output_bytes).unwrap().is_signed());

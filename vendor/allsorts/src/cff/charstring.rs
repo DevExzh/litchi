@@ -7,7 +7,7 @@ pub use argstack::ArgumentsStack;
 use crate::GlyphId;
 use crate::binary::budget;
 use crate::binary::read::{ReadCtxt, ReadScope};
-use crate::binary::write::{WriteBinary, WriteBuffer, WriteContext, WriteCounter};
+use crate::binary::write::{WriteBinary, WriteContext, WriteCounter};
 use crate::binary::{I16Be, U8};
 use crate::cff;
 use crate::cff::cff2::BlendOperand;
@@ -260,29 +260,6 @@ impl UsedSubrs {
         }
         Ok(())
     }
-}
-
-pub(crate) fn convert_cff2_to_cff<'a, 'data>(
-    font: CFFFont<'a, 'data>,
-    char_strings_index: &'a MaybeOwnedIndex<'data>,
-    global_subr_index: &'a MaybeOwnedIndex<'data>,
-    glyph_id: GlyphId,
-    width: u16,
-    default_width: u16,
-    nominal_width: u16,
-) -> Result<Vec<u8>, CharStringConversionError> {
-    let mut buffer = WriteBuffer::new();
-    write_cff2_to_cff(
-        font,
-        char_strings_index,
-        global_subr_index,
-        glyph_id,
-        width,
-        default_width,
-        nominal_width,
-        &mut buffer,
-    )?;
-    Ok(buffer.into_inner())
 }
 
 /// Count the exact CFF CharString output without allocating its output buffer.

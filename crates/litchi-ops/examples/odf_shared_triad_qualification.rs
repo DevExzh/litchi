@@ -174,22 +174,34 @@ mod probe {
         let mut members = Vec::with_capacity(archive.len());
         for index in 0..archive.len() {
             let mut member = archive.by_index(index).expect("ODF ZIP member");
-            let name = member.name().to_owned();
+            let name = member.name().expect("valid ZIP member name").into_owned();
             let name_raw_sha256 = digest(member.name_raw());
             let compression = format!("{:?}", member.compression());
             let compressed_bytes = member.compressed_size();
             let crc32 = member.crc32();
             let metadata = member.get_metadata();
             let version_needed = metadata.version_needed();
-            let flags = metadata.flags;
+            let flags = metadata.flags.as_u16();
             let compression_options = format!("{:?}", member.options());
             let external_attributes = metadata.external_attributes;
-            let is_utf8 = metadata.is_utf8;
-            let using_data_descriptor = metadata.using_data_descriptor;
+            let is_utf8 = flags & 0x0800 != 0;
+            let using_data_descriptor = metadata.is_using_data_descriptor();
             let large_file = metadata.large_file;
-            let central_extra_sha256 = metadata.central_extra_field.as_deref().map(digest);
+            // ZIP 9 exposes parsed extra fields. Hash the original central
+            // record bytes so this preservation check remains byte-exact.
+            let central_offset = usize::try_from(metadata.central_header_start)
+                .expect("central header offset fits memory");
+            let central = &bytes[central_offset..];
+            let name_len = usize::from(u16::from_le_bytes(
+                central[28..30].try_into().expect("central name length"),
+            ));
+            let extra_len = usize::from(u16::from_le_bytes(
+                central[30..32].try_into().expect("central extra length"),
+            ));
+            let central_extra_sha256 = (extra_len != 0)
+                .then(|| digest(&central[46 + name_len..46 + name_len + extra_len]));
             let last_modified = member.last_modified().map(|value| format!("{value:?}"));
-            let extra_sha256 = member.extra_data().map(digest);
+            let extra_sha256 = member.extra_data().as_deref().map(digest);
             let comment = member.comment().to_owned();
             let unix_mode = member.unix_mode();
             let version_made_by = member.version_made_by();

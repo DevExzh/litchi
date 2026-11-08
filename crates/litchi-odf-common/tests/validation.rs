@@ -94,7 +94,7 @@ fn repairable_mimetype_package() -> Vec<u8> {
     let mut mimetype_options =
         FullFileOptions::default().compression_method(CompressionMethod::Stored);
     mimetype_options
-        .add_extra_data(0x5455, [1, 0, 0, 0, 0], false)
+        .add_extra_field(0x5455, [1, 0, 0, 0, 0], false)
         .unwrap();
     zip.start_file("mimetype", mimetype_options).unwrap();
     zip.write_all(mimetype.as_bytes()).unwrap();
@@ -374,7 +374,7 @@ fn mimetype_local_header_extra_fields_are_a_layout_error() {
     let mut mimetype_options =
         FullFileOptions::default().compression_method(CompressionMethod::Stored);
     mimetype_options
-        .add_extra_data(0x1234, b"extra", false)
+        .add_extra_field(0x1234, b"extra", false)
         .unwrap();
     zip.start_file("mimetype", mimetype_options).unwrap();
     zip.write_all(mimetype.as_bytes()).unwrap();
@@ -407,7 +407,7 @@ fn one_valid_extended_timestamp_gets_the_narrow_repair_diagnostic() {
     let mut mimetype_options =
         FullFileOptions::default().compression_method(CompressionMethod::Stored);
     mimetype_options
-        .add_extra_data(0x5455, [1, 0, 0, 0, 0], false)
+        .add_extra_field(0x5455, [1, 0, 0, 0, 0], false)
         .unwrap();
     zip.start_file("mimetype", mimetype_options).unwrap();
     zip.write_all(mimetype.as_bytes()).unwrap();

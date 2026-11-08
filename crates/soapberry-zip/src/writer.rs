@@ -3098,10 +3098,7 @@ impl std::fmt::Display for OwnedEntryLimitMarker {
 impl std::error::Error for OwnedEntryLimitMarker {}
 
 fn owned_entry_limit_io_error(actual: u64, maximum: u64) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::Other,
-        OwnedEntryLimitMarker { actual, maximum },
-    )
+    io::Error::other(OwnedEntryLimitMarker { actual, maximum })
 }
 
 pub(crate) fn owned_entry_limit_from_io_error(error: &io::Error) -> Option<(u64, u64)> {
@@ -3309,14 +3306,14 @@ impl<W: Write> Write for ZipOwnedEntryWriter<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
         self.inner
             .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "owned ZIP entry finished"))?
+            .ok_or_else(|| io::Error::other("owned ZIP entry finished"))?
             .write(buffer)
     }
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner
             .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "owned ZIP entry finished"))?
+            .ok_or_else(|| io::Error::other("owned ZIP entry finished"))?
             .flush()
     }
 }
@@ -4316,10 +4313,7 @@ mod tests {
                 return Ok(accepted);
             }
             if self.payload_started {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "precompressed payload sink failure",
-                ));
+                return Err(std::io::Error::other("precompressed payload sink failure"));
             }
             self.bytes.extend_from_slice(buffer);
             Ok(buffer.len())

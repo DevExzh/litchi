@@ -69,7 +69,7 @@ impl Probe {
         for index in 0..archive.len() {
             let member = archive.by_index_raw(index).expect("a member");
             starts.push((
-                member.name().to_owned(),
+                member.name().expect("valid ZIP member name").into_owned(),
                 member.header_start(),
                 member.data_start().expect("local header resolved")
                     ..member.data_start().expect("local header resolved")

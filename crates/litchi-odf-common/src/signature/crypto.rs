@@ -11,11 +11,13 @@ use rsa::pkcs1::DecodeRsaPublicKey as _;
 use rsa::pkcs1v15::{
     Signature as RsaSignature, SigningKey as RsaSigningKey, VerifyingKey as RsaVerifyingKey,
 };
+use rsa::pkcs8::DecodePrivateKey as _;
 use rsa::sha2::Sha256 as RsaSha256;
+use rsa::signature::{SignatureEncoding as _, Signer as _, Verifier as _};
 use rsa::traits::PublicKeyParts;
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use sha2::{Digest, Sha256};
-use signature::{SignatureEncoding, Signer, Verifier};
+use signature::{Signer, Verifier};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use std::collections::HashSet;
 use x509_cert::Certificate;
@@ -507,8 +509,8 @@ fn verify_bytes(
     let parsed_certificate = Certificate::from_der(certificate_der)
         .map_err(|error| format_error(format!("invalid DER X.509 certificate: {error}")))?;
     let public = parsed_certificate
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .raw_bytes();
     Ok(match algorithm {
@@ -547,8 +549,8 @@ fn validate_key_matches_certificate(
     let parsed_certificate = Certificate::from_der(certificate_der)
         .map_err(|error| format_error(format!("invalid DER X.509 certificate: {error}")))?;
     let public = parsed_certificate
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .raw_bytes();
     let matches = match algorithm {
@@ -567,7 +569,7 @@ fn validate_key_matches_certificate(
             let private = EcdsaSigningKey::from_pkcs8_der(private_key).map_err(|error| {
                 format_error(format!("invalid P-256 PKCS#8 private key: {error}"))
             })?;
-            private.verifying_key().to_encoded_point(false).as_bytes() == public
+            private.verifying_key().to_sec1_point(false).as_bytes() == public
         },
     };
     if !matches {

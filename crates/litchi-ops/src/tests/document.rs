@@ -1628,7 +1628,7 @@ mod odt {
             .compression_method(zip::CompressionMethod::Stored);
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index).unwrap();
-            let name = entry.name().to_owned();
+            let name = entry.name().expect("valid ZIP member name").into_owned();
             let mut data = Vec::new();
             entry.read_to_end(&mut data).unwrap();
             writer.start_file(name, options).unwrap();

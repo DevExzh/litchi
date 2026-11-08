@@ -78,7 +78,7 @@ fn rewrite(bytes: &[u8], change: impl Fn(&str) -> String) -> Vec<u8> {
         zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index).unwrap();
-        let name = entry.name().to_owned();
+        let name = entry.name().expect("valid ZIP member name").into_owned();
         if name.ends_with('/') {
             continue;
         }

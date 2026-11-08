@@ -107,6 +107,7 @@ fn loose_bundle(package: &Path) {
         let mut entry = archive.by_index(position).unwrap();
         let name = entry
             .name()
+            .expect("valid ZIP member name")
             .strip_prefix("Index/")
             .filter(|name| !name.is_empty() && !name.contains('/'))
             .expect("flat Index member")

@@ -208,7 +208,8 @@ class RtfReadTests(unittest.TestCase):
     def test_run_formatting_reports_explicit_false(self):
         # RTF answers False (not None) where the source has no bold/italic.
         paragraphs = L.Document.open(fixture(self.STYLES)).paragraphs()
-        self.assertEqual([p.text() for p in paragraphs], self.STYLE_LINES)
+        # Preserve the native empty paragraph after the final paragraph break.
+        self.assertEqual([p.text() for p in paragraphs], self.STYLE_LINES + [""])
         self.assertEqual(run_facts(paragraphs[0]), [("Test 1 - normal.", False, False)])
         self.assertEqual(run_facts(paragraphs[1]), [("Test 2 - italic.", False, True)])
         self.assertEqual(run_facts(paragraphs[2]), [("Test 3 - bold.", True, False)])
@@ -220,7 +221,7 @@ class RtfReadTests(unittest.TestCase):
         self.assertEqual(tables[0].row_count(), 1)
         self.assertEqual(table_grid(tables[0]), [["A1", ""]])
         # Unlike DOCX, DOC and ODT, RTF paragraphs() leaves out table-cell paragraphs.
-        self.assertEqual(document.paragraphs(), [])
+        self.assertEqual([p.text() for p in document.paragraphs()], [""])
 
 
 class OdtReadTests(unittest.TestCase):

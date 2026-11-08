@@ -29,8 +29,8 @@ litchi-cfb         = { workspace = true }
 litchi-codepage    = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-crypto      = { workspace = true, optional = true }
-litchi-formula     = { workspace = true, optional = true }
 litchi-fonts       = { workspace = true, optional = true }
+litchi-formula     = { workspace = true, optional = true }
 litchi-odraw       = { workspace = true }
 litchi-ograph      = { workspace = true }
 litchi-ole-common  = { workspace = true }

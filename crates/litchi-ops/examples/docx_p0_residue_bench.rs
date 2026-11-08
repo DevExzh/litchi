@@ -362,7 +362,10 @@ fn parts(bytes: &[u8]) -> Outcome<std::collections::BTreeMap<String, Vec<u8>>> {
         let mut member = archive.by_index(index)?;
         let mut payload = Vec::new();
         member.read_to_end(&mut payload)?;
-        members.insert(member.name().to_owned(), payload);
+        members.insert(
+            member.name().expect("valid ZIP member name").into_owned(),
+            payload,
+        );
     }
     Ok(members)
 }

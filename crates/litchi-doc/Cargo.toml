@@ -33,14 +33,13 @@ smallvec          = { workspace = true }
 subtle            = { workspace = true }
 thiserror          = { workspace = true }
 zerocopy           = { workspace = true }
-zerocopy-derive    = { workspace = true }
 zeroize            = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
-sha2 = { workspace = true }
 chrono = { workspace = true }
 flate2 = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

@@ -40,7 +40,7 @@ thiserror = { workspace = true, optional = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9.4.2", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

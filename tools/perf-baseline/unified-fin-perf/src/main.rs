@@ -299,7 +299,7 @@ fn members(bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
         let mut entry = archive.by_index(index)?;
         let mut data = Vec::new();
         std::io::Read::read_to_end(&mut entry, &mut data)?;
-        out.insert(entry.name().to_owned(), data);
+        out.insert(entry.name().expect("valid ZIP member name").into_owned(), data);
     }
     Ok(out)
 }

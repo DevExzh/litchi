@@ -9,6 +9,40 @@ repository.workspace   = true
 rust-version.workspace = true
 autoexamples = false
 
+[features]
+default = []
+
+[dependencies]
+litchi-core       = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common = { workspace = true }
+litchi-iwa-core   = { workspace = true }
+litchi-iwa-detect = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-iwa-style = { workspace = true }
+litchi-iwa-table = { workspace = true }
+litchi-iwa-text = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+litchi-numbers-wire = { workspace = true }
+once_cell         = { workspace = true }
+plist             = { workspace = true }
+serde             = { workspace = true }
+sha1              = { workspace = true }
+thiserror = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+] }
+
+[dev-dependencies]
+prost = { workspace = true }
+tempfile = { workspace = true }
+
 [[example]]
 name = "keynote_mac_queue_caption_routes"
 path = "examples/mac_queue_caption_routes.rs"
@@ -116,40 +150,6 @@ path = "examples/save_package.rs"
 [[example]]
 name = "set_slide_skipped"
 path = "examples/set_slide_skipped.rs"
-
-[features]
-default = []
-
-[dependencies]
-litchi-core       = { workspace = true }
-litchi-iwa-archive = { workspace = true }
-litchi-iwa-common = { workspace = true }
-litchi-iwa-core   = { workspace = true }
-litchi-iwa-detect = { workspace = true }
-litchi-iwa-protos = { workspace = true }
-litchi-iwa-style = { workspace = true }
-litchi-iwa-table = { workspace = true }
-litchi-iwa-text = { workspace = true }
-litchi-iwa-text-wire = { workspace = true }
-litchi-numbers-wire = { workspace = true }
-once_cell         = { workspace = true }
-plist             = { workspace = true }
-serde             = { workspace = true }
-sha1              = { workspace = true }
-thiserror = { workspace = true }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = [
-    "Win32_Foundation",
-    "Win32_Storage_FileSystem",
-] }
-
-[dev-dependencies]
-prost = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

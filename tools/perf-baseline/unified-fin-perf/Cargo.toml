@@ -63,9 +63,9 @@ litchi-odf-formula = { path = "../../../crates/litchi-odf-formula", optional = t
 litchi-pages = { path = "../../../crates/litchi-pages", optional = true }
 litchi-keynote = { path = "../../../crates/litchi-keynote", optional = true }
 litchi-numbers = { path = "../../../crates/litchi-numbers", optional = true }
-serde_json = "1"
-tempfile = { version = "3", optional = true }
-zip = { version = "8", default-features = false, features = ["deflate"] }
+serde_json = "1.0.154"
+tempfile = { version = "3.27.0", optional = true }
+zip = { version = "9.4.2", default-features = false, features = ["deflate"] }
 
 [profile.release]
 debug = 1

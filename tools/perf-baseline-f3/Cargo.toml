@@ -9,7 +9,7 @@ litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
 litchi-ole-common = { path = "../../crates/litchi-ole-common" }
 litchi-xls = { path = "../../crates/litchi-xls" }
-sha2 = "0.11"
+sha2 = "0.11.1"
 
 [[example]]
 name = "xls_f3_qualification"

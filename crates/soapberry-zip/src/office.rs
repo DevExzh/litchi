@@ -2320,12 +2320,7 @@ impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
 
     fn problem_io(&self) -> io::Error {
         self.problem.as_ref().map_or_else(
-            || {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    "verified ZIP reader failed without a diagnostic",
-                )
-            },
+            || io::Error::other("verified ZIP reader failed without a diagnostic"),
             VerifiedReaderFailure::as_io_error,
         )
     }
@@ -2473,8 +2468,7 @@ impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
                 Ok(buffer) => buffer.is_empty(),
                 Err(_) => {
                     return Err(self.problem.take().unwrap_or_else(|| {
-                        VerifiedReaderFailure::Transport(io::Error::new(
-                            io::ErrorKind::Other,
+                        VerifiedReaderFailure::Transport(io::Error::other(
                             "verified ZIP reader failed without a diagnostic",
                         ))
                     }));
@@ -6512,14 +6506,11 @@ fn streaming_payload_limit_io_error(
     actual: u64,
     maximum: u64,
 ) -> std::io::Error {
-    std::io::Error::new(
-        std::io::ErrorKind::Other,
-        StreamingPayloadLimitMarker {
-            resource,
-            actual,
-            maximum,
-        },
-    )
+    std::io::Error::other(StreamingPayloadLimitMarker {
+        resource,
+        actual,
+        maximum,
+    })
 }
 
 fn streaming_payload_limit_from_io_error(
@@ -6536,16 +6527,13 @@ fn streaming_limit_io_error(
     actual: u64,
     maximum: u64,
 ) -> std::io::Error {
-    std::io::Error::new(
-        std::io::ErrorKind::Other,
-        StreamingLimitMarker {
-            limit: StreamingLimitExceeded {
-                resource,
-                actual,
-                maximum,
-            },
+    std::io::Error::other(StreamingLimitMarker {
+        limit: StreamingLimitExceeded {
+            resource,
+            actual,
+            maximum,
         },
-    )
+    })
 }
 
 fn streaming_limit_from_error(error: &Error) -> Option<StreamingLimitExceeded> {
@@ -6649,7 +6637,7 @@ impl<W: Write> Write for BoundedOutput<W> {
             return Ok(0);
         }
         let requested = usize_to_u64(buffer.len(), "streaming ZIP output bytes requested")
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+            .map_err(std::io::Error::other)?;
         let attempted = self.accepted.checked_add(requested).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -6671,7 +6659,7 @@ impl<W: Write> Write for BoundedOutput<W> {
             ));
         }
         let written_u64 = usize_to_u64(written, "streaming ZIP output bytes accepted")
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+            .map_err(std::io::Error::other)?;
         self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -6732,7 +6720,7 @@ impl<'entry, 'archive, 'accounting, W> LimitedEntryWriter<'entry, 'archive, 'acc
 impl<W: Write> Write for LimitedEntryWriter<'_, '_, '_, W> {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
         let requested = usize_to_u64(buffer.len(), "generated ZIP payload bytes requested")
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+            .map_err(std::io::Error::other)?;
         let compressed = self.compressed_bytes();
         let attempted = compressed.checked_add(requested).ok_or_else(|| {
             std::io::Error::new(
@@ -6753,9 +6741,9 @@ impl<W: Write> Write for LimitedEntryWriter<'_, '_, '_, W> {
                 .add(
                     self.accounting,
                     usize_to_u64(written, "generated ZIP payload bytes accepted")
-                        .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?,
+                        .map_err(std::io::Error::other)?,
                 )
-                .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+                .map_err(std::io::Error::other)?;
         }
         Ok(written)
     }
@@ -6845,9 +6833,9 @@ impl<'a> CompressedScratch<'a> {
 impl Write for CompressedScratch<'_> {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
         let written = usize_to_u64(self.inner.len(), "compressed scratch bytes")
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+            .map_err(std::io::Error::other)?;
         let requested = usize_to_u64(buffer.len(), "compressed scratch bytes requested")
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+            .map_err(std::io::Error::other)?;
         let attempted = written.checked_add(requested).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -7172,9 +7160,7 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
         let result = self
             .entry
             .as_mut()
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::Other, "streaming ZIP entry finished")
-            })
+            .ok_or_else(|| std::io::Error::other("streaming ZIP entry finished"))
             .and_then(|entry| entry.write(buffer));
         match result {
             Ok(0) => {
@@ -7230,9 +7216,7 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
         let result = self
             .entry
             .as_mut()
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::Other, "streaming ZIP entry finished")
-            })
+            .ok_or_else(|| std::io::Error::other("streaming ZIP entry finished"))
             .and_then(Write::flush);
         match result {
             Ok(()) => Ok(()),

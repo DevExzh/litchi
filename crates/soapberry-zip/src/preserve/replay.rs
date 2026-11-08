@@ -23,7 +23,7 @@ use crate::path::ZipFilePath;
 use crate::writer::prepare_sized_member;
 use crate::{CompressionMethod, Error, ErrorKind, ReaderAt};
 use flate2::{Compress, Compression, FlushCompress, Status};
-use sha2_legacy::{Digest, Sha256};
+use sha2::{Digest, Sha256};
 use std::fmt;
 use std::io::{self, Write};
 use std::mem::size_of;
@@ -1387,10 +1387,7 @@ impl<W: Write> Write for ReplayPayloadWriter<'_, W> {
             ));
         }
         if self.failure.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "replay output has failed",
-            ));
+            return Err(io::Error::other("replay output has failed"));
         }
         if input.is_empty() {
             return Ok(0);
@@ -1412,9 +1409,8 @@ impl<W: Write> Write for ReplayPayloadWriter<'_, W> {
             return Err(failure_io(failure));
         }
         if let Err(error) = self.sink.flush() {
-            let returned = clone_io_error(Some(&error)).unwrap_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "replay sink flush failed")
-            });
+            let returned = clone_io_error(Some(&error))
+                .unwrap_or_else(|| io::Error::other("replay sink flush failed"));
             self.remember_failure(ReplayWriterFailure::Sink(error));
             return Err(returned);
         }
@@ -1736,8 +1732,7 @@ fn map_writer_failure<E, A>(
 fn failure_io(failure: &ReplayWriterFailure) -> io::Error {
     match failure {
         ReplayWriterFailure::Sink(source) | ReplayWriterFailure::Compression(source) => {
-            clone_io_error(Some(source))
-                .unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "replay writer failed"))
+            clone_io_error(Some(source)).unwrap_or_else(|| io::Error::other("replay writer failed"))
         },
         ReplayWriterFailure::Limit { resource, .. } => io::Error::new(
             io::ErrorKind::InvalidInput,

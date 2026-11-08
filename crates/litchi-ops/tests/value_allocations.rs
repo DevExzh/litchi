@@ -481,8 +481,9 @@ mod xls_allocations {
         let large_bytes = workbook_bytes(10_000, 1);
         let small = litchi_xls::Package::from_bytes(&small_bytes).expect("small native XLS");
         let large = litchi_xls::Package::from_bytes(&large_bytes).expect("large native XLS");
-        assert_eq!(native_first_cell(&small), (0, 0));
-        assert_eq!(native_first_cell(&large), (0, 0));
+        // The shared Cell projection exposes one-based row and column values.
+        assert_eq!(native_first_cell(&small), (1, 1));
+        assert_eq!(native_first_cell(&large), (1, 1));
 
         let (small_count, small_bytes) = allocation_measure(|| native_first_cell(&small));
         let (large_count, large_bytes) = allocation_measure(|| native_first_cell(&large));

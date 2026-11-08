@@ -36,10 +36,12 @@ use chrono::DateTime;
 use p256::ecdsa::{SigningKey as EcSigningKey, VerifyingKey as EcVerifyingKey};
 use p256::pkcs8::{DecodePrivateKey as _, DecodePublicKey as _};
 use rsa::pkcs1v15::{Signature as RsaSignature, SigningKey as RsaSigningKey};
+use rsa::pkcs8::{DecodePrivateKey as _, DecodePublicKey as _};
 use rsa::sha2::Sha256;
+use rsa::signature::{SignatureEncoding as _, Signer as _};
 use rsa::traits::PublicKeyParts as _;
 use rsa::{RsaPrivateKey, RsaPublicKey};
-use signature::{SignatureEncoding as _, Signer as _};
+use signature::Signer as _;
 use std::fmt;
 use thiserror::Error as ThisError;
 use x509_cert::Certificate as X509Certificate;
@@ -675,8 +677,8 @@ impl Signer {
         let certificate = X509Certificate::from_der(certificate)
             .map_err(|error| Error::Key(format!("invalid X.509 certificate: {error}")))?;
         let spki = certificate
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .to_der()
             .map_err(|error| Error::Key(error.to_string()))?;
         match &self.key {

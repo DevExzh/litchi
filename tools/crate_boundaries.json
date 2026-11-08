@@ -384,9 +384,7 @@
       "litchi-cfb",
       "litchi-codepage"
     ],
-    "litchi-word": [
-      "litchi-core"
-    ],
+    "litchi-word": [],
     "litchi-xldm": [],
     "litchi-xls": [
       "litchi-biff",

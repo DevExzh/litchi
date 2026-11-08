@@ -54,13 +54,13 @@ doc = false
 bench = false
 
 [dependencies]
-libfuzzer-sys = "0.4"
+libfuzzer-sys = "0.4.13"
 litchi-iwa-archive = { path = "../../litchi-iwa-archive" }
 litchi-iwa-common = { path = "../../litchi-iwa-common" }
 litchi-iwa-core = { path = "../../litchi-iwa-core" }
 litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
 litchi-keynote = { path = ".." }
-prost = "0.14"
+prost = "0.14.4"
 
 [profile.release]
 debug = 1

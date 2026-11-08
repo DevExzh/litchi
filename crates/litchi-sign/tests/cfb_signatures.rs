@@ -53,7 +53,7 @@ fn rsa_and_ecdsa_signatures_round_trip_with_chain_time_and_multiple_streams() {
     let original = ole(&[(&["Payload"], b"signed bytes")]);
     let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
     editor.add(&rsa_signer()).unwrap();
-    let ecdsa = Signer::p256(EcdsaSigningKey::random(&mut OsRng))
+    let ecdsa = Signer::p256(EcdsaSigningKey::from_slice(&[7; 32]).unwrap())
         .time("2026-07-19T12:35:56Z")
         .unwrap();
     editor.add(&ecdsa).unwrap();

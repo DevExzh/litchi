@@ -59,7 +59,7 @@ fn rezip(
         if member.is_dir() {
             continue;
         }
-        let name = member.name().to_owned();
+        let name = member.name().expect("valid ZIP member name").into_owned();
         let mut data = Vec::new();
         member.read_to_end(&mut data).expect("member bytes");
         let data = patch(&name, data);

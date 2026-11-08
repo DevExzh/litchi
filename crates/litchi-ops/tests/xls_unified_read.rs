@@ -141,7 +141,12 @@ fn navigation_query_and_views_are_public_and_owner_parity_is_stable() {
         let formula = file.get("/sheet[1]/E5").expect("formula cell");
         assert_eq!(formula.kind(), "cell");
         assert_eq!(formula.path().to_string(), "/sheet[1]/E5");
-        assert_eq!(property_text(&formula, "type").as_deref(), Some("Number"));
+        // The builder leaves an empty string cache and requests recalculation;
+        // writing a formula does not invent a numeric result.
+        assert_eq!(
+            property_text(&formula, "type").as_deref(),
+            Some("SharedString")
+        );
         assert_eq!(
             property_text(&formula, "formula").as_deref(),
             Some("(C3*2)")

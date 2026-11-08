@@ -72,12 +72,14 @@ fn manifest() -> Vec<u8> {
     .into_bytes()
 }
 
-fn file_options(method: ZipCompressionMethod) -> FileOptions<'static, ExtendedFileOptions> {
+fn file_options(
+    method: ZipCompressionMethod,
+) -> FileOptions<'static, 'static, ExtendedFileOptions> {
     let mut options = FileOptions::default()
         .compression_method(method)
         .with_file_comment("untouched member comment");
     options
-        .add_extra_data(0x1234, b"untouched member extra", false)
+        .add_extra_field(0x1234, b"untouched member extra", false)
         .unwrap();
     options
 }

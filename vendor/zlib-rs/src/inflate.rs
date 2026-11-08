@@ -25,6 +25,7 @@ use crate::{
 
 use crate::crc32::{crc32, Crc32Fold};
 
+#[cfg(feature = "__internal-api")]
 pub use self::infback::{back, back_end, back_init};
 pub use self::window::Window;
 use self::{

@@ -1375,7 +1375,7 @@ fn ordered_replacements_use_the_current_security_policy_state() {
     let plain_id = BlobId::of(plain_target.as_bytes()).as_hex();
     let source_fingerprint = DiagnosticFingerprint::of(source.as_bytes()).as_hex();
     let plain_fingerprint = DiagnosticFingerprint::of(plain_target.as_bytes()).as_hex();
-    let wire = serde_json::json!({
+    let mut wire = serde_json::json!({
         "format": "litchi.odg",
         "forward_blobs": [
             {"bytes": base64_encode(&signed_bytes), "sha256": signed_id},
@@ -1417,8 +1417,17 @@ fn ordered_replacements_use_the_current_security_policy_state() {
         ],
         "version": 1
     });
+    // Canonical blob tables are ordered by digest, independently of how the
+    // ZIP fixture encoder represents the same package members.
+    for key in ["forward_blobs", "reverse_blobs"] {
+        wire[key]
+            .as_array_mut()
+            .unwrap()
+            .sort_by(|left, right| left["sha256"].as_str().cmp(&right["sha256"].as_str()));
+    }
     let durable =
-        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&wire).unwrap()).unwrap();
+        edit::DurablePatch::from_deterministic_json(&litchi_core::canonical_json::to_vec(&wire))
+            .unwrap();
     assert!(durable.apply(&source).is_err());
     assert_eq!(
         durable

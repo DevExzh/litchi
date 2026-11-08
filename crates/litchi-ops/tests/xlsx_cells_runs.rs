@@ -423,7 +423,14 @@ fn a_pictures_source_is_replaced() {
     let bytes = replaced.to_bytes().unwrap();
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
     let media: Vec<String> = (0..archive.len())
-        .map(|index| archive.by_index(index).unwrap().name().to_owned())
+        .map(|index| {
+            archive
+                .by_index(index)
+                .unwrap()
+                .name()
+                .unwrap()
+                .into_owned()
+        })
         .filter(|name| name.starts_with("xl/media/"))
         .collect();
     assert_eq!(media.len(), 1, "{media:?}");

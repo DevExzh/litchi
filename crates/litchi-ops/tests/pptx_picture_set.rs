@@ -55,7 +55,7 @@ fn media(file: &File) -> Vec<Vec<u8>> {
     let mut out = Vec::new();
     for index in 0..archive.len() {
         let mut member = archive.by_index(index).unwrap();
-        if member.name().starts_with("ppt/media/") {
+        if member.name().unwrap().starts_with("ppt/media/") {
             let mut bytes = Vec::new();
             member.read_to_end(&mut bytes).unwrap();
             out.push(bytes);

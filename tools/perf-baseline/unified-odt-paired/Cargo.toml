@@ -12,7 +12,7 @@ odt = []
 litchi-core = { path = "../../../crates/litchi-core" }
 litchi-odt = { path = "../../../crates/litchi-odt" }
 litchi-ops = { path = "../../../crates/litchi-ops", default-features = false, features = ["odt"] }
-serde_json = "1"
+serde_json = "1.0.154"
 
 [[bin]]
 name = "unified-odt-paired-baseline"

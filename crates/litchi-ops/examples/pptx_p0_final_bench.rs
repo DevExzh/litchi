@@ -114,7 +114,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut member = archive.by_index(index).ok()?;
                 let mut data = Vec::new();
                 member.read_to_end(&mut data).ok()?;
-                parts.push((member.name().to_owned(), data));
+                parts.push((
+                    member.name().expect("valid ZIP member name").into_owned(),
+                    data,
+                ));
             }
             parts.sort();
             Some(parts)

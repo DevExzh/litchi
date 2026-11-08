@@ -50,7 +50,10 @@ fn members(file: &File) -> Vec<(String, String)> {
             let mut member = archive.by_index(index).unwrap();
             let mut text = String::new();
             let _ = member.read_to_string(&mut text);
-            (member.name().to_owned(), text)
+            (
+                member.name().expect("valid ZIP member name").into_owned(),
+                text,
+            )
         })
         .collect()
 }

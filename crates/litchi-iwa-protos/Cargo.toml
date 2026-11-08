@@ -9,6 +9,8 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+# build.rs verifies the generated projection sizes and source digests for this
+# exact compiler/runtime pair. Upgrade them with the projection review.
 buffa = "=0.9.1"
 prost = { workspace = true }
 ryu = { workspace = true }

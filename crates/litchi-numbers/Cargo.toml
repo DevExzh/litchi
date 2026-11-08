@@ -9,6 +9,33 @@ repository.workspace   = true
 rust-version.workspace = true
 autoexamples = false
 
+[features]
+default = []
+
+[dependencies]
+litchi-core        = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common  = { workspace = true }
+litchi-iwa-core    = { workspace = true }
+litchi-iwa-detect  = { workspace = true }
+litchi-iwa-protos  = { workspace = true }
+litchi-iwa-style   = { workspace = true }
+litchi-iwa-table   = { workspace = true }
+litchi-iwa-text    = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+litchi-numbers-wire = { workspace = true }
+plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
+ryu                = { workspace = true }
+sha1               = { workspace = true }
+thiserror          = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[dev-dependencies]
+prost    = { workspace = true }
+tempfile = { workspace = true }
+
 [[example]]
 name = "numbers_mac_queue_caption_routes"
 path = "examples/mac_queue_caption_routes.rs"
@@ -156,33 +183,6 @@ path = "examples/duplicate_numbers_sheet.rs"
 [[example]]
 name = "remove_numbers_sheet"
 path = "examples/remove_numbers_sheet.rs"
-
-[features]
-default = []
-
-[dependencies]
-litchi-iwa-archive = { workspace = true }
-litchi-iwa-common  = { workspace = true }
-litchi-iwa-core    = { workspace = true }
-litchi-iwa-detect  = { workspace = true }
-litchi-iwa-protos  = { workspace = true }
-litchi-iwa-style   = { workspace = true }
-litchi-iwa-table   = { workspace = true }
-litchi-iwa-text    = { workspace = true }
-litchi-iwa-text-wire = { workspace = true }
-litchi-core        = { workspace = true }
-litchi-numbers-wire = { workspace = true }
-plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
-ryu                = { workspace = true }
-sha1               = { workspace = true }
-thiserror          = { workspace = true }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
-[dev-dependencies]
-prost    = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

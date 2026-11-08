@@ -155,7 +155,10 @@ fn pptx_chart_add_get_set_remove_round_trip() {
 
 fn zip_names(bytes: &[u8]) -> Vec<String> {
     let archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
-    archive.file_names().map(str::to_owned).collect()
+    archive
+        .file_names()
+        .map(|name| name.expect("valid ZIP member name").into_owned())
+        .collect()
 }
 
 #[test]

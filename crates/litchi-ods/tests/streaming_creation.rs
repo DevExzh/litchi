@@ -180,7 +180,8 @@ fn assert_three_member_archive(bytes: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
                 .by_index(index)
                 .expect("indexed member")
                 .name()
-                .to_owned()
+                .expect("valid ZIP member name")
+                .into_owned()
         })
         .collect();
     assert_eq!(

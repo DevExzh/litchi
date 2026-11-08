@@ -15,13 +15,13 @@ litchi-iwa-common   = { workspace = true }
 litchi-iwa-core     = { workspace = true }
 litchi-iwa-protos   = { workspace = true }
 litchi-iwa-style    = { workspace = true }
-litchi-numbers-wire = { workspace = true }
 litchi-iwa-text     = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
+litchi-numbers-wire = { workspace = true }
 thiserror           = { workspace = true }
-
-[lints]
-workspace = true
 
 [dev-dependencies]
 prost = { workspace = true }
+
+[lints]
+workspace = true

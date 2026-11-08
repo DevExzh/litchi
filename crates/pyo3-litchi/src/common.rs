@@ -21,7 +21,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Represents the different Office file formats supported by Litchi: one
 /// value per format detection can report.
-#[pyclass(skip_from_py_object, module = "litchi_py")]
+#[pyclass(module = "litchi_py")]
 #[derive(Clone, Copy, Debug)]
 pub enum FileFormat {
     /// Microsoft Word 97-2003 (.doc)
@@ -219,7 +219,7 @@ impl FileFormat {
 /// RGB color representation
 ///
 /// Represents a color in RGB format with values from 0-255.
-#[pyclass(frozen, skip_from_py_object, module = "litchi_py")]
+#[pyclass(frozen, module = "litchi_py")]
 #[derive(Clone, Debug)]
 pub struct RGBColor {
     inner: litchi::RGBColor,
@@ -270,7 +270,7 @@ impl RGBColor {
 /// Length with units
 ///
 /// Represents a measurement with associated units (EMUs, points, inches, etc.).
-#[pyclass(frozen, skip_from_py_object, module = "litchi_py")]
+#[pyclass(frozen, module = "litchi_py")]
 #[derive(Clone, Debug)]
 pub struct Length {
     inner: litchi::Length,
