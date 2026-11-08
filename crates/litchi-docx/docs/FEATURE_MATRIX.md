@@ -81,7 +81,7 @@ Feature checklist. ✅ Supported · 🟡 Partial · ❌ Unsupported · N/A Not a
 | Mail-merge execution | ❌ | ❌ | ❌ |
 | AltChunk import and foreign-content conversion | ❌ | ❌ | ❌ |
 | Macro, ActiveX, form-control, and add-in execution | ❌ | ❌ | ❌ |
-| Ink / inkML model | 🟡 | 🟡 | 🟡 owning authoring and durable replay |
+| Ink / inkML model | 🟡 | 🟡 | 🟡 |
 | MS-OWEXML custom-function payloads | 🟡 | 🟡 | 🟡 |
 | Chart, SmartArt, DrawingML, VML, and embedded-workbook rendering | ❌ | ❌ | ❌ |
 | Protection enforcement | 🟡 | ✅ | ✅ |
