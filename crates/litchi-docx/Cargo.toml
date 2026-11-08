@@ -52,6 +52,7 @@ workspace = true
 optional = true
 
 [dev-dependencies]
+# Native encrypted-container and IRM fixture inspection.
 litchi-cfb = { workspace = true }
 soapberry-zip = { workspace = true }
 tempfile = { workspace = true }

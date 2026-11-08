@@ -4415,6 +4415,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.policy.dev_only_edges,
             frozenset(
                 {
+                    boundaries.Edge("litchi-docx", "litchi-cfb"),
                     boundaries.Edge("litchi-docx", "soapberry-zip"),
                     boundaries.Edge("litchi-iwa-detect", "litchi-iwa-protos"),
                     boundaries.Edge("litchi-iwa-structured", "litchi-iwa-text"),

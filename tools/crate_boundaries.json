@@ -63,6 +63,7 @@
       "litchi-vba"
     ],
     "litchi-docx": [
+      "litchi-cfb",
       "litchi-core",
       "litchi-crypto",
       "litchi-drawingml",
@@ -430,6 +431,10 @@
     "xml-minifier-macros": []
   },
   "dev_only_edges": [
+    {
+      "dependent": "litchi-docx",
+      "dependency": "litchi-cfb"
+    },
     {
       "dependent": "litchi-docx",
       "dependency": "soapberry-zip"
