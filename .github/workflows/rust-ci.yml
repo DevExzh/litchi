@@ -100,6 +100,23 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  workflow-lint:
+    name: GitHub Actions workflow validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install actionlint
+        uses: taiki-e/install-action@v2
+        with:
+          tool: actionlint@1.7.12
+
+      - name: Validate workflow definitions
+        run: actionlint -shellcheck= -pyflakes=
+
   architecture:
     name: crate dependency boundaries
     runs-on: ubuntu-latest

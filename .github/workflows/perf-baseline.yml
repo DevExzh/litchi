@@ -43,6 +43,8 @@ on:
       - 'crates/soapberry-zip/**'
       - 'crates/xml-minifier-macros/**'
       - 'crates/xml-minifier/**'
+      - 'vendor/flate2/**'
+      - 'vendor/zlib-rs/**'
       - 'tools/perf-baseline/**'
       - 'tools/perf_compare.py'
       - 'tools/test_perf_compare.py'
@@ -129,6 +131,8 @@ on:
       - 'crates/soapberry-zip/**'
       - 'crates/xml-minifier-macros/**'
       - 'crates/xml-minifier/**'
+      - 'vendor/flate2/**'
+      - 'vendor/zlib-rs/**'
       - 'tools/perf-baseline/**'
       - 'tools/perf_compare.py'
       - 'tools/test_perf_compare.py'
@@ -207,13 +211,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
       LITCHI_RUNNER_LABELS: ubuntu-latest
       LITCHI_SMOKE_POLICY: docs/performance/perf-smoke-baseline-policy-v1.json
       LITCHI_ALLOCATOR_POLICY: docs/performance/perf-regression-policy-allocator-v1.json
       LITCHI_SMOKE_DIR: target/perf/allocator-smoke
 
     steps:
+      # The runner context is available in steps, but not in job-level env.
+      - name: Configure temporary Cargo target
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
+        run: |
+          mkdir -p "$CARGO_TARGET_DIR"
+          echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR" >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -245,7 +256,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
-          cache-target: false
+          cache-targets: false
 
       # Record 0272: no other job lints the standalone harness, and its
       # findings had accumulated unnoticed.
@@ -1437,12 +1448,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     env:
-      CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
       LITCHI_RUNNER_LABELS: ubuntu-latest
       LITCHI_SMOKE_POLICY: docs/performance/perf-smoke-baseline-policy-v1.json
       LITCHI_ALLOCATOR_POLICY: docs/performance/perf-regression-policy-allocator-v1.json
 
     steps:
+      # The runner context is available in steps, but not in job-level env.
+      - name: Configure temporary Cargo target
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
+        run: |
+          mkdir -p "$CARGO_TARGET_DIR"
+          echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR" >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -1472,7 +1490,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
-          cache-target: false
+          cache-targets: false
 
       - name: Check historical REPORT claim classification
         run: |
