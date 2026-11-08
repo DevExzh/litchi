@@ -3740,6 +3740,83 @@
         "test-data/microsoft-office/word/visual-objects-inspection.json"
       ],
       "scope_limit": "Evidence-only native fixture gap, not positive ActiveX coverage or an unsupported-library claim. OLE objects are not relabeled as controls; no control is instantiated or executed and all source bytes remain unchanged."
+    },
+    {
+      "feature_row": "ppt-389",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "reason": "The feature matrix places complete chart authoring among explicit boundaries. The public writer and Graph model document a bounded three-family profile, and PPT does not rewrite Excel-hosted workbook packages through its Graph draft.",
+      "required_evidence": "Owner-specific native reading/preservation tests and explicit producer/profile boundaries; broader authoring needs a proven grammar and corresponding native producer/acceptance evidence.",
+      "observed_evidence": "The three native visual PPT/PPS/POT files expose an Excel.Chart.8 object on slide 4/shape 5122 with three series and 24 cached cells. Pristine streams replay exactly; Graph drafting of that Excel host and unproven parsed-title encoding are refused. Library-authored Bar/Line/Pie Graph storage lifecycles additionally preserve native visual and macro parents; frame retargeting retains the old preview bytes.",
+      "supported_scope": "Typed Graph/Excel inventory and pristine replay; bounded fresh standalone Graph Bar/Line/Pie profiles; Graph chart-stream replacement through object storage; explicit existing-frame references and anchors.",
+      "unsupported_scope": "Arbitrary chart families, secondary-axis/combination authoring, general parsed-chart mutations, automatic Excel-host conversion, complete frame/preview authoring and rendering/native Office acceptance are not established.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_charts_officeart",
+          "name": "native_ppt_excel_charts_replay_exactly_and_refuse_unproven_host_rewrites"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_charts_officeart",
+          "name": "native_ppt_graph_profile_storage_creation_replacement_and_removal_preserve_native_owners"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_charts_officeart",
+          "name": "native_ppt_graph_replacement_checks_host_identity_before_touching_staged_objects"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ppt/src/chart/model.rs",
+        "crates/litchi-ppt/src/writer/chart.rs",
+        "crates/litchi-ograph/src/chart/model/aggregate/semantic.rs"
+      ],
+      "scope_limit": "An explicit library boundary, not a native UI limitation or a claim of whole-feature completion. New Graph payloads are library-authored derivatives; historical native authoring status remains unchanged."
+    },
+    {
+      "feature_row": "ppt-391",
+      "classification": "explicit_scope_boundary",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot"
+      ],
+      "reason": "Known OfficeArt shape projections and opaque record retention do not establish the meaning of every OfficeArt property, record family or vendor extension. The public wire and host models explicitly preserve unknown kinds without semantic interpretation.",
+      "required_evidence": "Native known-shape/host-record regressions plus exact opaque-byte preservation and explicit semantic limits; vendor-specific interpretation requires its own grammar and fixtures.",
+      "observed_evidence": "The native grouped visual slide retains both text shapes and its connector. Native chart-frame derivatives retain exact unrelated OfficeArt fields while an opaque client-data record with type 0x7FFE, version 6 and instance 0x123 survives anchor changes, replacement and inverse. Duplicate modeled references and attempts to disguise a defined child as opaque are refused.",
+      "supported_scope": "Known shape/group/anchor and PPT ClientData projections, lossless raw-kind representation, and bounded source-preserving edits that retain opaque bytes.",
+      "unsupported_scope": "Full semantic decoding or dependency-aware editing of arbitrary unknown OfficeArt records, properties and vendor payloads; future-producer compatibility and rendering are not promised.",
+      "checks": [
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native",
+          "name": "native_powerpoint_group_keeps_both_text_shapes_and_the_connector"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_charts_officeart",
+          "name": "native_ppt_chart_frame_retarget_and_anchor_edits_keep_opaque_client_data"
+        },
+        {
+          "crate": "litchi-ppt",
+          "target": "microsoft_office_native_charts_officeart",
+          "name": "native_ppt_opaque_client_data_replacement_removal_and_failed_staging_are_exact"
+        }
+      ],
+      "evidence_refs": [
+        "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+        "crates/litchi-odraw/src/record.rs",
+        "crates/litchi-ppt/src/odraw/model.rs",
+        "crates/litchi-ppt/src/client_data/model.rs"
+      ],
+      "scope_limit": "An explicit scope boundary, not proof that all vendor records are absent or supported. The opaque payload used by the mutation tests is deliberately library-authored and remains uninterpreted."
     }
   ]
 }

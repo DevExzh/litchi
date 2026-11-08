@@ -11560,6 +11560,97 @@
         "A lexical connection-part change leaves both typed pivot views unchanged but makes both format and cached-name patches fail their source checks. Other native package members and metadata remain intact."
       ],
       "scope_limit": "Source-closure validation only; no connection activation or model refresh."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_charts_officeart",
+      "name": "native_ppt_excel_charts_replay_exactly_and_refuse_unproven_host_rewrites",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot"
+      ],
+      "feature_rows": [
+        "ppt-362"
+      ],
+      "assertions": [
+        "Native Excel.Chart.8 objects retain the exact slide-4/shape-5122 frame, three series, 24 caches and byte-identical pristine chart-stream replay. PPT Graph drafting of the Excel host and unproven parsed-title encoding return precise host/profile errors without changing the presentation."
+      ],
+      "scope_limit": "Native Excel chart reading and replay only. Excel-hosted package mutation is delegated to the Excel host; this does not establish arbitrary chart authoring or rendering."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_charts_officeart",
+      "name": "native_ppt_graph_profile_storage_creation_replacement_and_removal_preserve_native_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-362",
+        "ppt-376"
+      ],
+      "assertions": [
+        "Fresh Bar/Line/Pie Graph profiles have exact titles and three cached numeric points. Object storage creation, no-op, Graph-stream replacement and removal preserve every unrelated persist object, CFB stream and directory field; replacement retains nested host streams and Workbook prelude with exact replay/inverse."
+      ],
+      "scope_limit": "The added Graph object is explicitly library-authored and initially unframed. This is bounded Graph storage publication, not complete native chart/preview authoring or Office validation."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_charts_officeart",
+      "name": "native_ppt_chart_frame_retarget_and_anchor_edits_keep_opaque_client_data",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot"
+      ],
+      "feature_rows": [
+        "ppt-362",
+        "ppt-357",
+        "ppt-356"
+      ],
+      "assertions": [
+        "Retargeting the existing chart frame to an authored Graph object preserves all other OfficeArt fields. A full-width anchor edit has exact coordinates and retains the opaque client-data record kind/version/instance/payload, native Excel storage, previews and unrelated persisted content through save/reopen/inverse."
+      ],
+      "scope_limit": "Explicit frame-reference and anchor edits only. Native preview bytes are preserved, not regenerated; the opaque producer record is not semantically interpreted."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_charts_officeart",
+      "name": "native_ppt_graph_replacement_checks_host_identity_before_touching_staged_objects",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot"
+      ],
+      "feature_rows": [
+        "ppt-362",
+        "ppt-376"
+      ],
+      "assertions": [
+        "Graph replacement reports NotFound after staged removal and UnsupportedTarget after the same object ID is rebound to Excel metadata. Both refusals leave the preceding staged object collection and source package unchanged."
+      ],
+      "scope_limit": "Host identity validation for bounded Graph storage replacement; no arbitrary producer conversion or object activation."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native_charts_officeart",
+      "name": "native_ppt_opaque_client_data_replacement_removal_and_failed_staging_are_exact",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-visual-objects.pot"
+      ],
+      "feature_rows": [
+        "ppt-357",
+        "ppt-356"
+      ],
+      "assertions": [
+        "Opaque client-data replacement/removal retains all other OfficeArt fields and restores exact source bytes on inverse. A duplicate external-object reference preserves prior valid staging, known child types cannot be disguised as opaque records, and stale replay is refused."
+      ],
+      "scope_limit": "Library-authored opaque payloads exercise byte retention on native frames. Their vendor-specific meaning and dependencies are intentionally not inferred."
     }
   ]
 }
