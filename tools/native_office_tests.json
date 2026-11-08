@@ -11435,6 +11435,131 @@
         "An explicitly empty table relationship member and its comment are restored exactly after creation/save/reopen/inverse. A creation patch also rejects changed table bytes while its before catalog still has no Survey entries."
       ],
       "scope_limit": "An explicit empty-relationship derivative tests publication provenance on a native table; no Office application validation is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_pivot_extensions_read_exact_metadata_and_retain_noop_packages",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-244",
+        "xlsx-246"
+      ],
+      "assertions": [
+        "A workbook-referenced non-worksheet pivot and external model-marked cache expose exact server formats, decoded unique names, cache/field identities and unresolved index-bound diagnostics. They coexist with native worksheet pivots at A3 and retain exact no-op packages across Strict, template, macro and existing-connection parents."
+      ],
+      "scope_limit": "Explicitly authored metadata closure on native parents; no native non-worksheet pivot specimen, Data Model load, OLAP query, calculation or refresh is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_server_format_scalar_changes_preserve_exact_unowned_xml",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-244"
+      ],
+      "assertions": [
+        "Culture and format changes produce exact XML attribute substitutions, including escaped ST_Xstring literals and Unicode. Other XML and package members, complete graph state, save/reopen, forward replay and inverse remain exact."
+      ],
+      "scope_limit": "Stored server-format metadata only; no cell rendering or native Office validation."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_cached_unique_name_edits_preserve_indexes_and_refuse_unproven_structure",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-246"
+      ],
+      "assertions": [
+        "Existing unique-name edits preserve exact index values and source XML. Structural insertion/removal/index changes return precise unresolved-CT_Items errors without losing a valid staged name edit; save/reopen and inverse preserve all other parts."
+      ],
+      "scope_limit": "Diagnostic index-bound state remains unresolved; sharedItems is not substituted for the normative CT_Items anchor, and no structural support is inferred."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_server_format_structure_preserves_cell_index_associations",
+      "fixtures": [
+        "excel/excel-metadata.xlsx",
+        "excel/excel-recorded-macro.xlsm",
+        "excel/excel-visual-analytics-strict.xlsx",
+        "excel/excel-visual-analytics.xltx",
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-244"
+      ],
+      "assertions": [
+        "Insertion, permutation, removal and movement update count and proven pivotValueCellExtra indexes while retaining the same referenced format. Duplicate permutations and orphaning removal are rejected; unowned table XML and every other member survive exact replay/inverse."
+      ],
+      "scope_limit": "Bounded format-list editing of an explicit non-worksheet derivative; no pivot evaluation, refresh or rendering."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_pivot_diagnostic_boundaries_remain_readable_and_refuse_changed_publication",
+      "fixtures": [
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-244",
+        "xlsx-246"
+      ],
+      "assertions": [
+        "The inclusive format-index endpoint and MCE-selected format/name owners expose exact diagnostics and reject changed publication with precise errors. Unchanged cached-name publication remains a no-op and source bytes are retained."
+      ],
+      "scope_limit": "These are explicit read-only/unresolved boundaries, not complete MCE branch editing or general index semantics."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_pivot_owner_eligibility_and_mce_declarations_are_validated_in_context",
+      "fixtures": [
+        "excel/excel-visual-analytics-strict.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-244",
+        "xlsx-246"
+      ],
+      "assertions": [
+        "Non-worksheet location constraints, x14 editability/what-if/conditional-format restrictions and workbook-wide pivot-name uniqueness remain enforced while native worksheet pivots coexist. Invalid mc:Ignorable bindings, foreign annotation namespaces and non-model cached-name connections return exact errors."
+      ],
+      "scope_limit": "Public owner/snapshot checks on malformed derivatives; non-worksheet eligibility is not imposed on ordinary worksheet pivots."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "microsoft_office_native_pivot_extensions",
+      "name": "native_xlsx_pivot_patches_check_connection_source_bytes_without_losing_other_parts",
+      "fixtures": [
+        "excel/excel-connections.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-244",
+        "xlsx-246"
+      ],
+      "assertions": [
+        "A lexical connection-part change leaves both typed pivot views unchanged but makes both format and cached-name patches fail their source checks. Other native package members and metadata remain intact."
+      ],
+      "scope_limit": "Source-closure validation only; no connection activation or model refresh."
     }
   ]
 }

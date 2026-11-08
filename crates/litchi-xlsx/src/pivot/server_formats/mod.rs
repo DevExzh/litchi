@@ -68,6 +68,7 @@ const STRICT_REL_NS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relatio
 const PIVOT_TABLE_SERVER_FORMATS_URI: &str = "{C510F80B-63DE-4267-81D5-13C33094786E}";
 const PIVOT_TABLE_DATA_URI: &str = "{44433962-1CF7-4059-B4EE-95C3D5FFCF73}";
 const PIVOT_TABLE_REFERENCES_URI: &str = "{983426D0-5260-488c-9760-48F4B6AC55F4}";
+const PIVOT_TABLE_DEFINITION_URI: &str = "{962EF5D1-5CA2-4C93-8EF4-DBF5C05439D2}";
 const PIVOT_CACHE_DEFINITION_URI: &str = "{725AE2AE-9491-48BE-B2B4-4EB974FC3084}";
 const PIVOT_CACHE_ID_VERSION_URI: &str = "{ABF5C744-AB39-4b91-8756-CFA1BBC848D5}";
 const CACHE_SOURCE_URI: &str = "{F057638F-6D5F-4E77-A914-E7F072B9BCA8}";
@@ -2317,6 +2318,11 @@ fn rewrite_structural_table(
     }
     for old_index in 0..old_len {
         let old_entry = &before.entries[old_index];
+        let old_start = if old_index < staged.len() {
+            old_entry.element.start
+        } else {
+            removed_leaf_start(source, old_entry)
+        };
         let replacement_len = if old_index < staged.len() {
             staged_child_len(
                 before,
@@ -2329,12 +2335,7 @@ fn rewrite_structural_table(
             0
         };
         owner_len = owner_len
-            .checked_sub(
-                old_entry
-                    .element
-                    .end
-                    .saturating_sub(old_entry.element.start),
-            )
+            .checked_sub(old_entry.element.end.saturating_sub(old_start))
             .and_then(|length| length.checked_add(replacement_len))
             .ok_or_else(|| invalid("PivotTable server-format owner length overflows"))?;
     }
@@ -2474,6 +2475,20 @@ fn target_leaf_includes_open(source: &[u8], before: &Snapshot, new_index: usize)
             .and_then(|index| source.get(index))
             != Some(&b'<')
     })
+}
+
+/// The scanner may start a leaf span at its QName. Removing that leaf must
+/// also remove its opening delimiter, which retained slots copy as trivia.
+fn removed_leaf_start(source: &[u8], entry: &EntrySource) -> usize {
+    if source.get(entry.element.start) == Some(&b'<') {
+        return entry.element.start;
+    }
+    entry
+        .element
+        .start
+        .checked_sub(1)
+        .filter(|start| source.get(*start) == Some(&b'<'))
+        .unwrap_or(entry.element.start)
 }
 
 fn existing_leaf_len(
@@ -2803,10 +2818,15 @@ fn append_structural_owner(
     let mut count_written = false;
     for old_index in 0..before.entries.len() {
         let entry = &before.entries[old_index];
+        let gap_end = if old_index < staged.len() {
+            entry.element.start
+        } else {
+            removed_leaf_start(source, entry)
+        };
         append_source_segment(
             output,
             source,
-            cursor..entry.element.start,
+            cursor..gap_end,
             count_changed.then_some((before.count.value.clone(), count)),
             &mut count_written,
         )?;
@@ -3593,7 +3613,10 @@ fn parse_workbook_references(
         return Err(invalid("workbook has no pivotTableReferences extension"));
     };
     for attribute in &ext.attrs {
-        if !attribute.ns.is_empty() || attribute.local.as_slice() != b"uri" {
+        let extension_uri = attribute.ns.is_empty() && attribute.local.as_slice() == b"uri";
+        let ignorable =
+            attribute.ns.as_ref() == MCE_NS && attribute.local.as_slice() == b"Ignorable";
+        if !extension_uri && !ignorable {
             if parse_server_formats {
                 return Err(invalid(
                     "pivotTableReferences extension has an unknown attribute",
@@ -4047,6 +4070,7 @@ fn parse_table(
 ) -> Result<TableInfo> {
     let scan = scan_xml(part.blob(), "pivotTableDefinition", package.read_limits())?;
     let meta = scan_table_metadata_from_scan(&scan)?;
+    validate_non_worksheet_table(&scan)?;
     let mut matching_cache = part.rels().iter().filter(|relation| {
         matches!(
             relation.reltype(),
@@ -4123,6 +4147,21 @@ fn scan_table_metadata_from_scan(scan: &XmlScan) -> Result<TableMeta> {
         .map(|value| parse_u32(value, "PivotTable cacheId"))
         .transpose()?
         .ok_or_else(|| invalid("PivotTable definition requires cacheId"))?;
+    Ok(TableMeta {
+        name,
+        cache_id,
+        owner: root.start.start..root.end,
+    })
+}
+
+/// Only workbook-referenced tables carry these eligibility constraints.
+/// Worksheet tables participate in name uniqueness without inheriting them.
+fn validate_non_worksheet_table(scan: &XmlScan) -> Result<()> {
+    let root = scan
+        .elements
+        .iter()
+        .find(|element| element.parent_index.is_none())
+        .ok_or_else(|| invalid("PivotTable Part has no root"))?;
     if let Some(enable_edit) =
         unique_unqualified_attr(root, b"enableEdit", "PivotTable definition")?
     {
@@ -4166,11 +4205,45 @@ fn scan_table_metadata_from_scan(scan: &XmlScan) -> Result<TableMeta> {
             ));
         }
     }
-    Ok(TableMeta {
-        name,
-        cache_id,
-        owner: root.start.start..root.end,
-    })
+    // MS-XLSX 2.6.87 also constrains the x14 CT_PivotTableDefinition
+    // extension (2.6.32), where what-if edits and conditional formats live.
+    for definition in scan.elements.iter().filter(|element| {
+        element.ns.as_ref() == X14_NS
+            && element.local.as_slice() == b"pivotTableDefinition"
+            && is_owned_payload(scan, root, element, PIVOT_TABLE_DEFINITION_URI)
+    }) {
+        if let Some(value) =
+            unique_unqualified_attr(definition, b"enableEdit", "PivotTable extension")?
+            && parse_bool(value, "PivotTable enableEdit")?
+        {
+            return Err(invalid("Non-Worksheet PivotTable enableEdit must be false"));
+        }
+    }
+    for child in scan.elements.iter().filter(|element| {
+        element.ns.as_ref() == X14_NS
+            && matches!(
+                element.local.as_slice(),
+                b"pivotEdits" | b"pivotChanges" | b"conditionalFormats"
+            )
+    }) {
+        let mut parent = child.parent_index;
+        while let Some(index) = parent {
+            let element = &scan.elements[index];
+            if element.ns.as_ref() == X14_NS
+                && element.local.as_slice() == b"pivotTableDefinition"
+                && is_owned_payload(scan, root, element, PIVOT_TABLE_DEFINITION_URI)
+            {
+                return Err(invalid(
+                    "PivotTable is not eligible for pivotTableReferences",
+                ));
+            }
+            if element.ns.as_ref() != MCE_NS {
+                break;
+            }
+            parent = element.parent_index;
+        }
+    }
+    Ok(())
 }
 
 fn cache_requires_connection_route(
@@ -5466,7 +5539,23 @@ fn scan_xml_config(
                 let element_end = start.end;
                 let attrs =
                     parse_attrs(bytes, &element, &resolver, reader.decoder(), &start, limits)?;
-                let local_ignorable = if parse_mce_branches {
+                // The references owner accepts mc:Ignorable as processing
+                // metadata. Validate its prefixes even in the C510 scanner,
+                // which deliberately leaves unrelated MCE branches opaque.
+                let references_owner = expected_root == "workbook"
+                    && stack.len() == 2
+                    && parent.is_some_and(|parent| {
+                        let parent = &elements[parent.index];
+                        parent.ns == ns && parent.local.as_slice() == b"extLst"
+                    })
+                    && matches!(ns.as_ref(), CORE_NS | STRICT_CORE_NS)
+                    && local.as_slice() == b"ext"
+                    && attrs.iter().any(|attribute| {
+                        attribute.ns.is_empty()
+                            && attribute.local.as_slice() == b"uri"
+                            && xml_token_eq(&attribute.value, PIVOT_TABLE_REFERENCES_URI)
+                    });
+                let local_ignorable = if parse_mce_branches || references_owner {
                     parse_ignorable_namespaces(&element, &resolver, reader.decoder(), limits)?
                 } else {
                     Vec::new()
