@@ -11788,6 +11788,75 @@
         "In Auto and Eager modes, paragraph count, indexed text, paragraph objects, ordered elements and query paths retain the native field-only eighth paragraph. Comment queries/direct paths expose exact text, author, initials and dates. A two-comment text transaction changes only its two literal spans, survives save/reopen and restores exact bytes through inverse."
       ],
       "scope_limit": "RTF main-body paragraph and retained-comment projections/updates only; cached field results stay in their own story. No comment threading execution, anchor retargeting, field refresh or native Word reopen."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_tables",
+      "name": "native_nested_table_keeps_vertical_merge_roles_width_units_and_parent_insertion",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-470"
+      ],
+      "assertions": [
+        "Exact five-row outer catalog, all 17 cell texts, header flag, percentage widths and cell boundaries; nested two-by-two table retains its parent insertion point, all four values, 1057-twip widths and vertical merge start/continuation. Save/reopen and an owned detached table preserve those values."
+      ],
+      "scope_limit": "Native in-flow tables only. Word stores the summary as one wide cell without horizontal merge-role controls; no inferred four-column span, floating-table layout or body/table source-order claim."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_tables",
+      "name": "native_outer_cell_edit_preserves_nested_merge_geometry_and_rejected_staging",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-470",
+        "rtf-457",
+        "rtf-458"
+      ],
+      "assertions": [
+        "An Apples-to-Peaches cell update changes only the unique native literal and survives save/reopen/inverse. Invalid shortening of the cell that owns the nested table returns its exact dependency error without losing prior valid staging; nested merge metadata and the endnote remain intact."
+      ],
+      "scope_limit": "Existing outer-cell text updates only. Exact source-byte preservation retains physical table placement, but does not establish general body-flow reconstruction or nested-cell editing."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_tables",
+      "name": "native_nested_cell_edit_refuses_unproven_source_publication_without_mutating_input",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-470",
+        "rtf-457"
+      ],
+      "assertions": [
+        "A nested N2 cell replacement is staged but publication returns the precise UnsupportedContent refusal that canonical output would relocate body tables. The native table geometry and all source bytes remain unchanged."
+      ],
+      "scope_limit": "Explicit source-publication boundary; this refusal supplies no positive evidence of nested-cell write support."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_rtf_tables",
+      "name": "native_rtf_table_views_retain_nested_metadata_while_outer_cell_paths_edit_exactly",
+      "required_features": [
+        "rtf"
+      ],
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-470",
+        "rtf-455",
+        "rtf-457",
+        "rtf-458"
+      ],
+      "assertions": [
+        "Both source modes expose all 17 outer-cell query paths and exact direct text, while the detached RTF table retains native nested cells and vertical merge roles. Public capabilities disclose separate table-order and nested-cell gaps. An outer-cell transaction survives save/reopen and exact inverse without altering any unrelated source byte."
+      ],
+      "scope_limit": "Nested metadata is accessible through the retained format model, not projected as generic query children. Separate paragraph/table catalogs do not establish mixed source order; no nested-cell setter, inferred logical grid span or native Word validation is claimed."
     }
   ]
 }

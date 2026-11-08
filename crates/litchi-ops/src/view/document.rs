@@ -483,8 +483,10 @@ impl<'a> DocumentView<'a> {
         }
     }
 
-    /// Every paragraph and table, in document order, for sequential
-    /// processing such as Markdown conversion.
+    /// Every paragraph and table for sequential processing such as Markdown
+    /// conversion. DOC and DOCX retain document order; RTF exposes its separate
+    /// catalogs as paragraphs followed by tables (the `table-order` capability
+    /// gap).
     ///
     /// DOCX section properties are skipped; any other unmodeled DOCX body
     /// block is refused rather than dropped. ODT headings become paragraphs;
