@@ -86,6 +86,61 @@ fn paragraph_properties_after_a_break_attach_to_the_following_paragraph() {
 }
 
 #[test]
+fn paragraph_projections_keep_empty_paragraphs_line_breaks_and_mark_properties() {
+    let source =
+        r"{\rtf1\ansi\qc\par\ql \u20320?{\b \u-10179?\u-8704?}\line \u233?\par\qr\par\qc Tail}";
+    let package = crate::Package::parse(source).unwrap();
+    let document = package.raw();
+    let paragraphs = document.paragraphs_with_content();
+    assert_eq!(document.paragraph_count(), 4);
+    assert_eq!(
+        paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>(),
+        ["", "你😀\né", "", "Tail"]
+    );
+    assert_eq!(
+        paragraphs
+            .iter()
+            .map(|p| p.properties.alignment)
+            .collect::<Vec<_>>(),
+        [
+            Alignment::Center,
+            Alignment::Left,
+            Alignment::Right,
+            Alignment::Center
+        ]
+    );
+    assert_eq!(
+        document
+            .paragraphs()
+            .iter()
+            .map(|p| p.alignment)
+            .collect::<Vec<_>>(),
+        [
+            Alignment::Center,
+            Alignment::Left,
+            Alignment::Right,
+            Alignment::Center
+        ]
+    );
+    assert_eq!(
+        package
+            .body()
+            .paragraphs()
+            .map(|p| p.to_text())
+            .collect::<Vec<_>>(),
+        paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>()
+    );
+    let bold = paragraphs[1]
+        .runs
+        .iter()
+        .find(|run| run.text == "😀")
+        .unwrap();
+    assert!(bold.formatting.bold);
+    assert_eq!(paragraphs[0].runs.len(), 0);
+    assert_eq!(paragraphs[2].runs.len(), 0);
+}
+
+#[test]
 fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
     let mut document = Tree::parse(r"{\rtf1 body}", OpenOptions::default()).unwrap();
     let mut first = crate::Shape::new(crate::ShapeType::Rectangle);

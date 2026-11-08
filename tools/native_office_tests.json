@@ -11684,6 +11684,110 @@
         "Exact native label, Print_015 B2 integer 42 and control-sheet B2 Boolean seed two new worksheets; fresh numeric storage reads as Float(42.0). Saved/reopened bytes, sheet names and eager/indexed cell values agree, including an authored Unicode string. Both native sources remain unchanged."
       ],
       "scope_limit": "Selected semantic value copy into fresh creation; no arbitrary workbook feature transfer or validation in Excel."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_review",
+      "name": "native_review_comments_and_revisions_keep_exact_authors_dates_and_body_ranges",
+      "fixtures": [
+        "word/word-review-controls.rtf"
+      ],
+      "feature_rows": [
+        "rtf-474",
+        "rtf-476",
+        "rtf-477",
+        "rtf-455"
+      ],
+      "assertions": [
+        "All paragraph projections retain the field-only eighth paragraph. Exact nine-paragraph body projection, separate REF instruction/cache, revision-author table, insertion/deletion anchors, signed DTTM values, comment IDs/authors/initials, shared anchor ranges and literal reply parent survive canonical writing. Native source bytes remain unchanged."
+      ],
+      "scope_limit": "Stored review metadata only. The reply parent -1 is retained literally rather than interpreted as a resolved thread; formatting revisions, accept/reject and UI rendering are not claimed."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_review",
+      "name": "native_comment_body_edits_preserve_review_metadata_and_every_other_source_byte",
+      "fixtures": [
+        "word/word-review-controls.rtf"
+      ],
+      "feature_rows": [
+        "rtf-474",
+        "rtf-457",
+        "rtf-458"
+      ],
+      "assertions": [
+        "Root and reply text edits change only their two literal text spans. Temporary-file save/reopen retains all pinned authors, IDs, dates, anchors, field cache and revisions; deterministic durable JSON replays the output and restores exact native source bytes."
+      ],
+      "scope_limit": "Existing comment-body update only; does not create/remove a comment owner, retarget anchors, resolve reply threads or validate in Word."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_review",
+      "name": "native_comment_empty_and_unicode_edits_keep_identity_and_failed_staging_is_atomic",
+      "fixtures": [
+        "word/word-review-controls.rtf"
+      ],
+      "feature_rows": [
+        "rtf-474",
+        "rtf-457",
+        "rtf-458"
+      ],
+      "assertions": [
+        "Empty comment text retains its owner and metadata, then accepts braces, backslash, accented/CJK text, emoji and a tab. Missing-index and duplicate-destination errors preserve valid staging; stale replay is refused and inverse restores exact prior bytes."
+      ],
+      "scope_limit": "Bounded retained-comment text transactions only. Clearing text is not deleting an annotation; body anchors remain fixed and external actions stay inert."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_review",
+      "name": "native_review_body_run_replacement_has_an_explicit_source_profile_refusal",
+      "fixtures": [
+        "word/word-review-controls.rtf"
+      ],
+      "feature_rows": [
+        "rtf-457"
+      ],
+      "assertions": [
+        "A staged ordinary-run title replacement on the native review document refuses publication with the exact UnsupportedContent reason; the pinned review model and all original bytes remain unchanged."
+      ],
+      "scope_limit": "This is a refusal/atomicity check for the ordinary-run route, which excludes dependent review content. It supplies no positive evidence for remapping comment or revision anchors."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native_review",
+      "name": "native_tracked_move_revisions_keep_signed_dates_authors_and_visible_body_anchors",
+      "fixtures": [
+        "word/word-tracked-moves.rtf"
+      ],
+      "feature_rows": [
+        "rtf-476",
+        "rtf-490"
+      ],
+      "assertions": [
+        "Exact six-paragraph body, author table, deletion/insertion text including paragraph marks, signed DTTM dates and byte anchors survive the model writer. Paired move bookmarks retain tag, author, packed date, positions and source/destination contents."
+      ],
+      "scope_limit": "Native stored move and revision metadata only; no move execution, accept/reject, formatting revisions or fresh Word validation."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native_rtf_review",
+      "name": "native_rtf_comments_have_stable_public_paths_and_reversible_batched_text_edits",
+      "required_features": [
+        "rtf"
+      ],
+      "fixtures": [
+        "word/word-review-controls.rtf"
+      ],
+      "feature_rows": [
+        "rtf-455",
+        "rtf-457",
+        "rtf-458",
+        "rtf-474"
+      ],
+      "assertions": [
+        "In Auto and Eager modes, paragraph count, indexed text, paragraph objects, ordered elements and query paths retain the native field-only eighth paragraph. Comment queries/direct paths expose exact text, author, initials and dates. A two-comment text transaction changes only its two literal spans, survives save/reopen and restores exact bytes through inverse."
+      ],
+      "scope_limit": "RTF main-body paragraph and retained-comment projections/updates only; cached field results stay in their own story. No comment threading execution, anchor retargeting, field refresh or native Word reopen."
     }
   ]
 }

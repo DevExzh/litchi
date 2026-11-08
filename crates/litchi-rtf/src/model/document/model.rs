@@ -937,104 +937,89 @@ impl<'a> Tree<'a> {
         text
     }
 
-    /// Get the number of paragraphs in the document.
-    ///
-    /// Paragraphs are determined by paragraph breaks in the RTF source.
+    /// Number of logical body paragraphs, including explicitly empty ones.
     #[must_use]
     pub fn paragraph_count(&self) -> usize {
-        self.paragraphs().len()
+        self.body_paragraph_count
     }
 
-    /// Get all paragraphs in the document.
-    ///
-    /// This groups style blocks into paragraphs based on newline characters.
+    /// Retained paragraph ranges and the properties at their terminating mark.
+    /// Inline line breaks belong to their paragraph rather than ending it.
+    fn paragraph_ranges(&self) -> impl Iterator<Item = (Range<usize>, RtfParagraph)> + '_ {
+        let trailing_start = self
+            .body_boundaries
+            .iter()
+            .rev()
+            .find(|boundary| boundary.kind == crate::story::Break::Paragraph)
+            .map_or(0, |boundary| boundary.position + 1);
+        let ends = self
+            .body_boundaries
+            .iter()
+            .filter(|boundary| boundary.kind == crate::story::Break::Paragraph)
+            .map(|boundary| (boundary.position, true))
+            .chain((trailing_start < self.text_len).then_some((self.text_len, false)));
+        let mut start = 0;
+        let mut block_index = 0;
+        let mut block_start = 0;
+        ends.scan((), move |(), (end, terminated)| {
+            let format_position = if terminated { end } else { end.checked_sub(1)? };
+            loop {
+                let block = self.blocks.get(block_index)?;
+                let block_end = block_start + block.text.len();
+                if format_position < block_end {
+                    let range = start..end;
+                    start = if terminated { end + 1 } else { end };
+                    return Some((range, block.paragraph));
+                }
+                block_index += 1;
+                block_start = block_end;
+            }
+        })
+    }
+
+    /// Paragraph properties in logical body order, including empty paragraphs.
     #[must_use]
     pub fn paragraphs(&self) -> Vec<RtfParagraph> {
-        let mut paragraphs = Vec::new();
-        let mut current_para = RtfParagraph::default();
-        let mut has_content = false;
-
-        for block in &self.blocks {
-            let text = block.text.as_ref();
-
-            // Split on newlines to detect paragraph boundaries
-            let parts: Vec<&str> = text.split('\n').collect();
-
-            for (i, part) in parts.iter().enumerate() {
-                if !part.is_empty() {
-                    // Inherit paragraph properties from the style block
-                    current_para = block.paragraph;
-                    has_content = true;
-                }
-
-                // If this is not the last part, we have a paragraph break
-                if i < parts.len() - 1 && has_content {
-                    paragraphs.push(current_para);
-                    current_para = RtfParagraph::default();
-                    has_content = false;
-                }
-            }
-        }
-
-        // Add final paragraph if it has content
-        if has_content {
-            paragraphs.push(current_para);
-        }
-
-        paragraphs
+        self.paragraph_ranges()
+            .map(|(_, properties)| properties)
+            .collect()
     }
 
-    /// Get all paragraphs with their content (runs).
+    /// Logical body paragraphs and their formatted runs.
     ///
-    /// This groups style blocks into paragraphs based on newline characters,
-    /// and returns each paragraph with its associated runs.
+    /// Explicitly empty paragraphs are retained. Inline line breaks stay in
+    /// their owning paragraph, and its properties come from the paragraph mark
+    /// (or the last character for an unterminated final paragraph).
     #[must_use]
     pub fn paragraphs_with_content(&self) -> Vec<super::super::types::ParagraphContent<'_>> {
-        use std::borrow::Cow;
-
-        let mut paragraphs = Vec::new();
-        let mut current_para_props = RtfParagraph::default();
-        let mut current_runs: Vec<Run<'_>> = Vec::new();
-        let mut has_content = false;
-
-        for block in &self.blocks {
-            let text = block.text.as_ref();
-
-            // Split on newlines to detect paragraph boundaries
-            let parts: Vec<&str> = text.split('\n').collect();
-
-            for (i, part) in parts.iter().enumerate() {
-                if !part.is_empty() {
-                    // Inherit paragraph properties from the style block
-                    current_para_props = block.paragraph;
-                    has_content = true;
-
-                    // Add run for this part
-                    current_runs.push(Run::new(Cow::Borrowed(part), block.formatting));
+        let mut block_index = 0;
+        let mut block_start = 0;
+        self.paragraph_ranges()
+            .map(|(range, properties)| {
+                let mut runs = Vec::new();
+                while let Some(block) = self.blocks.get(block_index) {
+                    if block_start >= range.end {
+                        break;
+                    }
+                    let block_end = block_start + block.text.len();
+                    if block_end > range.start {
+                        let from = range.start.saturating_sub(block_start);
+                        let to = range.end.min(block_end) - block_start;
+                        if from < to
+                            && let Some(text) = block.text.get(from..to)
+                        {
+                            runs.push(Run::new(Cow::Borrowed(text), block.formatting));
+                        }
+                    }
+                    if block_end >= range.end {
+                        break;
+                    }
+                    block_index += 1;
+                    block_start = block_end;
                 }
-
-                // If this is not the last part, we have a paragraph break
-                if i < parts.len() - 1 && has_content {
-                    paragraphs.push(super::super::types::ParagraphContent::new(
-                        current_para_props,
-                        current_runs.clone(),
-                    ));
-                    current_runs.clear();
-                    current_para_props = RtfParagraph::default();
-                    has_content = false;
-                }
-            }
-        }
-
-        // Add final paragraph if it has content
-        if has_content {
-            paragraphs.push(super::super::types::ParagraphContent::new(
-                current_para_props,
-                current_runs,
-            ));
-        }
-
-        paragraphs
+                super::super::types::ParagraphContent::new(properties, runs)
+            })
+            .collect()
     }
 
     /// Get all runs in the document.
