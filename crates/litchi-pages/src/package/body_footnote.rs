@@ -515,13 +515,52 @@ pub struct Edit<'a> {
     source: &'a Package,
     selector: Selector,
     resolved: std::sync::OnceLock<ResolvedSource>,
-    after: Option<Arc<Footnote>>,
-    staged: bool,
+    intent: IntentState,
 }
 
 struct ResolvedSource {
     position: Position,
     before: Arc<Footnote>,
+}
+
+/// What an [`Edit`] publishes for its selected footnote.
+///
+/// - `Untouched --set | set_custom_mark--> Replace`, starting from the source
+///   footnote.
+/// - `Replace --set | set_custom_mark--> Replace`, changing the staged
+///   footnote.
+/// - `Remove --set | set_custom_mark--> Replace`, starting again from the
+///   source footnote: what was staged before the removal is gone.
+/// - `Untouched | Replace | Remove --clear--> Remove`.
+///
+/// `commit` reads the state and leaves it as it is; `Untouched` commits the
+/// source footnote, which is a no-op.
+enum IntentState {
+    Untouched,
+    Replace(Arc<Footnote>),
+    Remove,
+}
+
+impl IntentState {
+    /// Enter `Replace` and apply `change` to the staged footnote, which
+    /// starts as `before` unless a replacement is already staged.
+    fn replace(&mut self, before: &Arc<Footnote>, change: impl FnOnce(&mut Footnote)) {
+        let mut after = match std::mem::replace(self, Self::Untouched) {
+            Self::Replace(after) => after,
+            Self::Untouched | Self::Remove => Arc::clone(before),
+        };
+        change(Arc::make_mut(&mut after));
+        *self = Self::Replace(after);
+    }
+
+    /// The footnote to publish; `None` removes it.
+    fn after<'a>(&'a self, before: &'a Arc<Footnote>) -> Option<&'a Arc<Footnote>> {
+        match self {
+            Self::Untouched => Some(before),
+            Self::Replace(after) => Some(after),
+            Self::Remove => None,
+        }
+    }
 }
 
 /// Immutable semantic body-footnote values projected from one Pages package.
@@ -629,17 +668,13 @@ impl<'a> Edit<'a> {
         })
     }
 
-    fn resolve(&mut self) -> Result<(), Error> {
-        if self.resolved.get().is_none() {
-            self.resolved
-                .set(self.resolve_source()?)
-                .map_err(|_| Error::InvalidSource)?;
+    /// Borrow the selected source footnote, reading it on first access.
+    fn resolved(&self) -> Result<&ResolvedSource, Error> {
+        if let Some(resolved) = self.resolved.get() {
+            return Ok(resolved);
         }
-        if !self.staged && self.after.is_none() {
-            let resolved = self.resolved.get().ok_or(Error::InvalidSource)?;
-            self.after = Some(Arc::clone(&resolved.before));
-        }
-        Ok(())
+        let resolved = self.resolve_source()?;
+        Ok(self.resolved.get_or_init(|| resolved))
     }
 
     fn new(source: &'a Package, selector: Selector) -> Result<Self, Error> {
@@ -647,50 +682,44 @@ impl<'a> Edit<'a> {
             source,
             selector,
             resolved: std::sync::OnceLock::new(),
-            after: None,
-            staged: false,
+            intent: IntentState::Untouched,
         })
     }
 
     /// Return the checked UTF-16 anchor position, resolving on first access.
     pub fn position(&mut self) -> Result<Position, Error> {
-        self.resolve()?;
-        self.resolved
-            .get()
-            .map(|resolved| resolved.position)
-            .ok_or(Error::InvalidSource)
+        self.resolved().map(|resolved| resolved.position)
     }
 
     /// Borrow the original semantic footnote.
     pub fn before(&mut self) -> Result<&Footnote, Error> {
-        self.resolve()?;
-        self.resolved
-            .get()
-            .map(|resolved| resolved.before.as_ref())
-            .ok_or(Error::InvalidSource)
+        self.resolved().map(|resolved| resolved.before.as_ref())
     }
 
     /// Borrow the staged semantic result. `None` represents graph removal.
     pub fn after(&mut self) -> Result<Option<&Footnote>, Error> {
-        self.resolve()?;
-        Ok(self.after.as_deref())
+        let resolved = self.resolved()?;
+        Ok(self.intent.after(&resolved.before).map(Arc::as_ref))
     }
 
     /// Stage replacement of the selected footnote text.
+    ///
+    /// After [`Self::clear`] this stages the source footnote with the new
+    /// text, as on a fresh edit.
     pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
-        self.resolve()?;
+        let before = Arc::clone(&self.resolved()?.before);
         validate_authored(text, MAX_TEXT_BYTES, Error::Refused(Refusal::TextTooLarge))?;
-        let Some(after) = self.after.as_mut() else {
-            return Err(Error::Refused(Refusal::UnsupportedDependency));
-        };
-        Arc::make_mut(after).text = try_boxed(text)?;
-        self.staged = true;
+        let text = try_boxed(text)?;
+        self.intent.replace(&before, |after| after.text = text);
         Ok(self)
     }
 
     /// Stage replacement/removal of the optional custom marker.
+    ///
+    /// After [`Self::clear`] this stages the source footnote with the new
+    /// marker, as on a fresh edit.
     pub fn set_custom_mark(&mut self, custom_mark: Option<&str>) -> Result<&mut Self, Error> {
-        self.resolve()?;
+        let before = Arc::clone(&self.resolved()?.before);
         if let Some(value) = custom_mark {
             validate_authored(
                 value,
@@ -698,44 +727,22 @@ impl<'a> Edit<'a> {
                 Error::Refused(Refusal::CustomMarkTooLarge),
             )?;
         }
-        let Some(after) = self.after.as_mut() else {
-            return Err(Error::Refused(Refusal::UnsupportedDependency));
-        };
-        Arc::make_mut(after).custom_mark = custom_mark.map(try_boxed).transpose()?;
-        self.staged = true;
+        let custom_mark = custom_mark.map(try_boxed).transpose()?;
+        self.intent
+            .replace(&before, |after| after.custom_mark = custom_mark);
         Ok(self)
     }
 
     /// Stage complete removal of the selected body-footnote graph.
     pub fn clear(&mut self) -> &mut Self {
-        self.after = None;
-        self.staged = true;
+        self.intent = IntentState::Remove;
         self
     }
 
     /// Validate and atomically publish the staged lifecycle change.
     pub fn commit(&self) -> Result<Commit, Error> {
-        let resolved = match self.resolved.get() {
-            Some(resolved) => resolved,
-            None => {
-                let resolved = self.resolve_source()?;
-                return commit_resolved(
-                    self.source,
-                    &resolved,
-                    if self.staged {
-                        self.after.as_ref()
-                    } else {
-                        Some(&resolved.before)
-                    },
-                );
-            },
-        };
-        let after = if self.staged {
-            self.after.as_ref()
-        } else {
-            Some(&resolved.before)
-        };
-        commit_resolved(self.source, resolved, after)
+        let resolved = self.resolved()?;
+        commit_resolved(self.source, resolved, self.intent.after(&resolved.before))
     }
 }
 

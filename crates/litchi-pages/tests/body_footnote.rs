@@ -1083,6 +1083,67 @@ fn edit_set_custom_mark_and_clear_inserted_identity_atomically() -> TestResult {
 }
 
 #[test]
+fn edit_restages_from_the_source_footnote_after_clear() -> TestResult {
+    let fixture = build_fixture()?;
+    let package = Package::from_bytes(&fixture.bytes)?;
+    let inserted =
+        package.insert_body_footnote(Position::from_utf16_index(1)?, "Inserted", Some("‡"))?;
+    let source = inserted.package();
+
+    // `set` after `clear` gives what `set` alone gives on a fresh edit.
+    let mut fresh = source.edit_body_footnote(Selector::index(0))?;
+    fresh.set("Updated")?;
+    let expected = fresh.commit()?;
+    let mut restaged = source.edit_body_footnote(Selector::index(0))?;
+    restaged.clear();
+    assert_eq!(restaged.after()?, None);
+    restaged.set("Updated")?;
+    assert_eq!(
+        restaged.after()?,
+        Some(&Footnote::with_custom_mark(
+            Position::from_utf16_index(1)?,
+            "Updated",
+            Some("‡".into())
+        )?)
+    );
+    let actual = restaged.commit()?;
+    assert_eq!(actual.patch(), expected.patch());
+    assert_eq!(
+        exact_bytes(actual.package())?,
+        exact_bytes(expected.package())?
+    );
+
+    // Likewise for the custom mark; the cleared edit's earlier text is gone.
+    let mut fresh = source.edit_body_footnote(Selector::index(0))?;
+    fresh.set_custom_mark(Some("§"))?;
+    let expected = fresh.commit()?;
+    let mut restaged = source.edit_body_footnote(Selector::index(0))?;
+    restaged
+        .set("Discarded")?
+        .clear()
+        .set_custom_mark(Some("§"))?;
+    let actual = restaged.commit()?;
+    assert_eq!(actual.patch(), expected.patch());
+    assert_eq!(
+        exact_bytes(actual.package())?,
+        exact_bytes(expected.package())?
+    );
+    assert_eq!(
+        actual.package().body_footnotes()?[0].text.as_ref(),
+        "Inserted"
+    );
+
+    // `clear` alone, and `clear` after `set`, still remove the footnote.
+    let mut removal = source.edit_body_footnote(Selector::index(0))?;
+    removal.set("Updated")?.clear();
+    assert_eq!(removal.after()?, None);
+    let removed = removal.commit()?;
+    assert_eq!(removed.patch().after(), None);
+    assert_eq!(removed.package().body_footnotes()?.len(), 2);
+    Ok(())
+}
+
+#[test]
 fn remove_middle_note_preserves_inserted_and_following_identity() -> TestResult {
     let fixture = build_fixture()?;
     let package = Package::from_bytes(&fixture.bytes)?;
