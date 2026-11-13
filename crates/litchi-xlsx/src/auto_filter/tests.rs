@@ -219,3 +219,279 @@ fn worksheet_replacement_refuses_mce_and_bounded_hostile_input() {
     );
     assert!(super::package::replace_auto_filter(nested.as_bytes(), Some(&value)).is_err());
 }
+
+fn root_child_outcome(fragment: &str) -> String {
+    match parse_auto_filter_fragment(fragment.as_bytes()) {
+        Ok(value) => format!(
+            "ok columns={:?} sort conditions={:?}",
+            value
+                .columns
+                .iter()
+                .map(|column| column.column_id)
+                .collect::<Vec<_>>(),
+            value
+                .sort_state
+                .as_ref()
+                .map(|state| state.conditions.len())
+        ),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn root_child_order_matrix_is_stable() {
+    // `{id}` is replaced by the position of the child, so that two columns in
+    // one case never collide on `colId`.
+    let column = ("column", r#"<filterColumn colId="{id}"/>"#);
+    let open_column = (
+        "open column",
+        r#"<filterColumn colId="{id}"></filterColumn>"#,
+    );
+    let sort = ("sort", r#"<sortState ref="A2:C5"/>"#);
+    let open_sort = (
+        "open sort",
+        r#"<sortState ref="A2:C5"><sortCondition ref="A2:A5"/></sortState>"#,
+    );
+    let unknown = ("unknown", "<unknown/>");
+    let open_unknown = (
+        "unknown holding sort",
+        r#"<unknown><sortState ref="A2:C5"/></unknown>"#,
+    );
+    let foreign_sort = (
+        "foreign sort",
+        r#"<q:sortState xmlns:q="urn:other" ref="A2:C5"/>"#,
+    );
+    let column_holding_sort = (
+        "column holding sort",
+        r#"<filterColumn colId="{id}"><sortState ref="A2:C5"/></filterColumn>"#,
+    );
+    let children = [column, open_column, sort, open_sort, unknown];
+    let mut cases: Vec<Vec<(&str, &str)>> = vec![Vec::new()];
+    for first in children {
+        cases.push(vec![first]);
+    }
+    for first in children {
+        for second in children {
+            cases.push(vec![first, second]);
+        }
+    }
+    for extra in [open_unknown, foreign_sort, column_holding_sort] {
+        cases.push(vec![extra]);
+        cases.push(vec![extra, column]);
+        cases.push(vec![extra, sort]);
+        cases.push(vec![extra, open_sort]);
+        cases.push(vec![sort, extra]);
+        cases.push(vec![open_sort, extra]);
+    }
+    cases.push(vec![column, sort, column]);
+    cases.push(vec![column, open_sort, open_column]);
+    cases.push(vec![column, column, sort, sort]);
+    cases.push(vec![sort, unknown, column]);
+    cases.push(vec![sort, unknown, sort]);
+    let mut actual: Vec<(String, String)> = cases
+        .iter()
+        .map(|case| {
+            let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+            let body: String = case
+                .iter()
+                .enumerate()
+                .map(|(index, (_, xml))| xml.replace("{id}", &index.to_string()))
+                .collect();
+            (
+                label.join(","),
+                root_child_outcome(&format!(r#"<autoFilter ref="A1:E5">{body}</autoFilter>"#)),
+            )
+        })
+        .collect();
+    // The self-closing root, and markup before or after the root.
+    for (label, fragment) in [
+        ("self-closing root", r#"<autoFilter ref="A1:E5"/>"#),
+        (
+            "self-closing root, then sort twice",
+            r#"<autoFilter ref="A1:E5"/><sortState ref="A2:C5"/><sortState ref="A2:C5"/>"#,
+        ),
+        (
+            "self-closing root, then sort, then column",
+            r#"<autoFilter ref="A1:E5"/><sortState ref="A2:C5"/><filterColumn colId="0"/>"#,
+        ),
+        (
+            "root with sort, then root with sort",
+            r#"<autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter><autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter>"#,
+        ),
+        (
+            "root with sort, then sort outside",
+            r#"<autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter><sortState ref="A2:C5"/>"#,
+        ),
+        (
+            "sort before root",
+            r#"<sortState ref="A2:C5"/><autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter>"#,
+        ),
+        (
+            "strict prefix column after sort",
+            r#"<s:autoFilter ref="A1:E5"><s:sortState ref="A2:C5"/><s:filterColumn colId="0"/></s:autoFilter>"#,
+        ),
+    ] {
+        actual.push((label.to_owned(), root_child_outcome(fragment)));
+    }
+    let expected: &[(&str, &str)] = &[
+        ("", "ok columns=[] sort conditions=None"),
+        ("column", "ok columns=[0] sort conditions=None"),
+        ("open column", "ok columns=[0] sort conditions=None"),
+        ("sort", "ok columns=[] sort conditions=Some(0)"),
+        ("open sort", "ok columns=[] sort conditions=Some(1)"),
+        ("unknown", "ok columns=[] sort conditions=None"),
+        ("column,column", "ok columns=[0, 1] sort conditions=None"),
+        (
+            "column,open column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        ("column,sort", "ok columns=[0] sort conditions=Some(0)"),
+        ("column,open sort", "ok columns=[0] sort conditions=Some(1)"),
+        ("column,unknown", "ok columns=[0] sort conditions=None"),
+        (
+            "open column,column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        (
+            "open column,open column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        ("open column,sort", "ok columns=[0] sort conditions=Some(0)"),
+        (
+            "open column,open sort",
+            "ok columns=[0] sort conditions=Some(1)",
+        ),
+        ("open column,unknown", "ok columns=[0] sort conditions=None"),
+        (
+            "sort,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "sort,open column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        ("sort,sort", "Invalid(\"duplicate sortState\")"),
+        ("sort,open sort", "Invalid(\"duplicate sortState\")"),
+        ("sort,unknown", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "open sort,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "open sort,open column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        ("open sort,sort", "Invalid(\"duplicate sortState\")"),
+        ("open sort,open sort", "Invalid(\"duplicate sortState\")"),
+        ("open sort,unknown", "ok columns=[] sort conditions=Some(1)"),
+        ("unknown,column", "ok columns=[1] sort conditions=None"),
+        ("unknown,open column", "ok columns=[1] sort conditions=None"),
+        ("unknown,sort", "ok columns=[] sort conditions=Some(0)"),
+        ("unknown,open sort", "ok columns=[] sort conditions=Some(1)"),
+        ("unknown,unknown", "ok columns=[] sort conditions=None"),
+        ("unknown holding sort", "ok columns=[] sort conditions=None"),
+        (
+            "unknown holding sort,column",
+            "ok columns=[1] sort conditions=None",
+        ),
+        (
+            "unknown holding sort,sort",
+            "ok columns=[] sort conditions=Some(0)",
+        ),
+        (
+            "unknown holding sort,open sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        (
+            "sort,unknown holding sort",
+            "ok columns=[] sort conditions=Some(0)",
+        ),
+        (
+            "open sort,unknown holding sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        ("foreign sort", "ok columns=[] sort conditions=None"),
+        ("foreign sort,column", "ok columns=[1] sort conditions=None"),
+        ("foreign sort,sort", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "foreign sort,open sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        ("sort,foreign sort", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "open sort,foreign sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        ("column holding sort", "ok columns=[0] sort conditions=None"),
+        (
+            "column holding sort,column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        (
+            "column holding sort,sort",
+            "ok columns=[0] sort conditions=Some(0)",
+        ),
+        (
+            "column holding sort,open sort",
+            "ok columns=[0] sort conditions=Some(1)",
+        ),
+        (
+            "sort,column holding sort",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "open sort,column holding sort",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "column,sort,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "column,open sort,open column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "column,column,sort,sort",
+            "Invalid(\"duplicate sortState\")",
+        ),
+        (
+            "sort,unknown,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        ("sort,unknown,sort", "Invalid(\"duplicate sortState\")"),
+        ("self-closing root", "ok columns=[] sort conditions=None"),
+        (
+            "self-closing root, then sort twice",
+            "ok columns=[] sort conditions=None",
+        ),
+        (
+            "self-closing root, then sort, then column",
+            "ok columns=[] sort conditions=None",
+        ),
+        (
+            "root with sort, then root with sort",
+            "Invalid(\"duplicate sortState\")",
+        ),
+        (
+            "root with sort, then sort outside",
+            "ok columns=[] sort conditions=Some(0)",
+        ),
+        ("sort before root", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "strict prefix column after sort",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+    ];
+    let same = actual.len() == expected.len()
+        && actual.iter().zip(expected).all(
+            |((label, outcome), (expected_label, expected_outcome))| {
+                label == expected_label && outcome == expected_outcome
+            },
+        );
+    let observed: String = actual
+        .iter()
+        .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+        .collect();
+    assert!(same, "observed rows:\n{observed}");
+}

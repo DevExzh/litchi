@@ -2551,6 +2551,536 @@ mod rich_item_tests {
         assert_eq!(super::rich_item(xml, 3).unwrap(), None);
         assert_eq!(super::rich_item(xml, 9).unwrap(), None);
     }
+
+    /// What `read_runs` returns for `document`, whose first tag opens the
+    /// string item, and the source text the reader has not consumed.
+    fn runs_outcome(document: &str, consume_invalid: bool) -> String {
+        let mut reader = quick_xml::Reader::from_reader(document.as_bytes());
+        assert!(matches!(
+            reader.read_event(),
+            Ok(quick_xml::events::Event::Start(_))
+        ));
+        let outcome = match super::read_runs(&mut reader, consume_invalid) {
+            Ok(super::RunsRead::Complete(Some(value))) => value
+                .runs()
+                .iter()
+                .map(|run| format!("{:?}{:?}", run.properties, run.text()))
+                .collect::<Vec<_>>()
+                .join(" + "),
+            Ok(super::RunsRead::Complete(None)) => "no runs".to_owned(),
+            Ok(super::RunsRead::Aborted) => "aborted".to_owned(),
+            Err(error) => format!("{error:?}"),
+        };
+        let consumed = usize::try_from(reader.buffer_position()).expect("reader position");
+        format!("{outcome}, left {:?}", &document[consumed..])
+    }
+
+    #[test]
+    fn run_nesting_matrix_is_stable() {
+        let items: &[(&str, &str)] = &[
+            ("empty item", ""),
+            ("plain t", "<t>plain</t>"),
+            ("empty t in item", "<t/>"),
+            ("run with t", "<r><t>a</t></r>"),
+            (
+                "run with rPr and t",
+                r#"<r><rPr><b/><sz val="11"/></rPr><t>a</t></r>"#,
+            ),
+            ("run with empty rPr and t", "<r><rPr/><t>a</t></r>"),
+            (
+                "run with open empty rPr and t",
+                "<r><rPr></rPr><t>a</t></r>",
+            ),
+            ("run with empty t", "<r><t/></r>"),
+            ("run with rPr only", "<r><rPr><b/></rPr></r>"),
+            ("run without children", "<r></r>"),
+            ("empty run", "<r/>"),
+            ("two runs", "<r><t>a</t></r><r><t>b</t></r>"),
+            (
+                "formatted run, then bare run",
+                "<r><rPr><b/></rPr><t>a</t></r><r><t>b</t></r>",
+            ),
+            ("run, then empty run", "<r><t>a</t></r><r/>"),
+            ("rPr outside a run", "<rPr><b/></rPr>"),
+            ("empty rPr outside a run", "<rPr/>"),
+            (
+                "rPr outside a run, then run",
+                "<rPr><b/></rPr><r><t>a</t></r>",
+            ),
+            (
+                "run, then rPr outside a run",
+                "<r><t>a</t></r><rPr><b/></rPr>",
+            ),
+            ("run, then empty rPr outside a run", "<r><t>a</t></r><rPr/>"),
+            ("t inside rPr", "<r><rPr><t>x</t></rPr><t>a</t></r>"),
+            ("empty t inside rPr", "<r><rPr><t/></rPr><t>a</t></r>"),
+            ("empty rPr inside rPr", "<r><rPr><rPr/></rPr><t>a</t></r>"),
+            (
+                "rPr inside rPr",
+                "<r><rPr><rPr><b/></rPr></rPr><t>a</t></r>",
+            ),
+            ("empty r inside rPr", "<r><rPr><r/></rPr><t>a</t></r>"),
+            (
+                "property with content",
+                "<r><rPr><b>x</b></rPr><t>a</t></r>",
+            ),
+            ("rPr inside t", "<r><t><rPr><b/></rPr></t></r>"),
+            ("empty rPr inside t", "<r><t>a<rPr/>b</t></r>"),
+            ("t inside t", "<r><t>a<t>b</t>c</t></r>"),
+            ("empty t inside t", "<r><t>a<t/>b</t></r>"),
+            ("run inside t", "<r><t>a<r><t>b</t></r></t></r>"),
+            ("nested run", "<r><r><t>a</t></r></r>"),
+            ("nested empty run", "<r><r/><t>a</t></r>"),
+            ("run inside rPr", "<r><rPr><r><t>a</t></r></rPr></r>"),
+            ("rPr after t", "<r><t>a</t><rPr><b/></rPr></r>"),
+            ("empty rPr after t", "<r><rPr><b/></rPr><t>a</t><rPr/></r>"),
+            ("two t", "<r><t>a</t><t>b</t></r>"),
+            ("t, then empty t", "<r><t>a</t><t/></r>"),
+            ("two rPr", "<r><rPr><b/></rPr><rPr><i/></rPr><t>a</t></r>"),
+            (
+                "rPr, then empty rPr",
+                "<r><rPr><b/></rPr><rPr/><t>a</t></r>",
+            ),
+            (
+                "text at each level",
+                "0<r>1<rPr>2<b/>3</rPr>4<t>5</t>6</r>7",
+            ),
+            (
+                "reference and CDATA in t",
+                "<r><t>a&amp;<![CDATA[<b>]]>&#65;_x0042_</t></r>",
+            ),
+            (
+                "reference and CDATA outside t",
+                "&amp;<r>&amp;<![CDATA[x]]><rPr>&amp;<b/></rPr><t>a</t></r>",
+            ),
+            ("unknown reference in t", "<r><t>&bogus;</t></r>"),
+            ("comment in t", "<r><t>a<!--x-->b</t></r>"),
+            ("unknown element in run", "<r><t>a</t><x></x></r>"),
+            ("unknown empty element in run", "<r><t>a</t><x/></r>"),
+            ("unknown element in item", "<x><r><t>a</t></r></x>"),
+            ("plain t beside a run", "<r><t>a</t></r><t>b</t>"),
+            ("plain t before a run", "<t>b</t><r><t>a</t></r>"),
+            (
+                "phonetic run beside a run",
+                r#"<r><t>a</t></r><rPh sb="0" eb="1"><t>y</t></rPh>"#,
+            ),
+            (
+                "phonetic properties beside a run",
+                r#"<r><t>a</t></r><phoneticPr fontId="1"/>"#,
+            ),
+            (
+                "prefixed names",
+                r#"<x:r xmlns:x="urn:x"><x:rPr><x:b/></x:rPr><x:t>a</x:t></x:r>"#,
+            ),
+            ("mismatched end inside a run", "<r><t>a</t></x>"),
+            ("mismatched end after an invalid child", "<r><x/></y></r>"),
+        ];
+        let mut actual: Vec<(String, String)> = Vec::new();
+        for (label, body) in items {
+            let document = format!("<si>{body}</si><tail/>");
+            for (mode, consume_invalid) in [("stop", false), ("drain", true)] {
+                actual.push((
+                    format!("{label} ({mode})"),
+                    runs_outcome(&document, consume_invalid),
+                ));
+            }
+        }
+        // Items the source does not finish.
+        for (label, document) in [
+            ("end of input in item", "<si>"),
+            ("end of input in run", "<si><r>"),
+            ("end of input in t", "<si><r><t>a"),
+            ("end of input after run", "<si><r><t>a</t></r>"),
+            ("end of input after invalid child", "<si><x/>"),
+            ("broken tag in run", "<si><r><t>a</t><broken"),
+            ("broken tag after invalid child", "<si><r><rPh/></r><broken"),
+            ("broken tag after item", "<si><r><t>a</t></r></si><broken"),
+        ] {
+            for (mode, consume_invalid) in [("stop", false), ("drain", true)] {
+                actual.push((
+                    format!("{label} ({mode})"),
+                    runs_outcome(document, consume_invalid),
+                ));
+            }
+        }
+        let expected: &[(&str, &str)] = &[
+            ("empty item (stop)", "no runs, left \"<tail/>\""),
+            ("empty item (drain)", "no runs, left \"<tail/>\""),
+            ("plain t (stop)", "no runs, left \"plain</t></si><tail/>\""),
+            ("plain t (drain)", "no runs, left \"<tail/>\""),
+            ("empty t in item (stop)", "no runs, left \"</si><tail/>\""),
+            ("empty t in item (drain)", "no runs, left \"<tail/>\""),
+            ("run with t (stop)", "None\"a\", left \"<tail/>\""),
+            ("run with t (drain)", "None\"a\", left \"<tail/>\""),
+            (
+                "run with rPr and t (stop)",
+                "Some([(\"b\", \"\"), (\"sz\", \"val=\\\"11\\\"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "run with rPr and t (drain)",
+                "Some([(\"b\", \"\"), (\"sz\", \"val=\\\"11\\\"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "run with empty rPr and t (stop)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "run with empty rPr and t (drain)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "run with open empty rPr and t (stop)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "run with open empty rPr and t (drain)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            ("run with empty t (stop)", "None\"\", left \"<tail/>\""),
+            ("run with empty t (drain)", "None\"\", left \"<tail/>\""),
+            (
+                "run with rPr only (stop)",
+                "Some([(\"b\", \"\")])\"\", left \"<tail/>\"",
+            ),
+            (
+                "run with rPr only (drain)",
+                "Some([(\"b\", \"\")])\"\", left \"<tail/>\"",
+            ),
+            ("run without children (stop)", "None\"\", left \"<tail/>\""),
+            ("run without children (drain)", "None\"\", left \"<tail/>\""),
+            ("empty run (stop)", "no runs, left \"</si><tail/>\""),
+            ("empty run (drain)", "no runs, left \"<tail/>\""),
+            ("two runs (stop)", "None\"a\" + None\"b\", left \"<tail/>\""),
+            (
+                "two runs (drain)",
+                "None\"a\" + None\"b\", left \"<tail/>\"",
+            ),
+            (
+                "formatted run, then bare run (stop)",
+                "Some([(\"b\", \"\")])\"a\" + None\"b\", left \"<tail/>\"",
+            ),
+            (
+                "formatted run, then bare run (drain)",
+                "Some([(\"b\", \"\")])\"a\" + None\"b\", left \"<tail/>\"",
+            ),
+            (
+                "run, then empty run (stop)",
+                "no runs, left \"</si><tail/>\"",
+            ),
+            ("run, then empty run (drain)", "no runs, left \"<tail/>\""),
+            (
+                "rPr outside a run (stop)",
+                "no runs, left \"<b/></rPr></si><tail/>\"",
+            ),
+            ("rPr outside a run (drain)", "no runs, left \"<tail/>\""),
+            (
+                "empty rPr outside a run (stop)",
+                "no runs, left \"</si><tail/>\"",
+            ),
+            (
+                "empty rPr outside a run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "rPr outside a run, then run (stop)",
+                "no runs, left \"<b/></rPr><r><t>a</t></r></si><tail/>\"",
+            ),
+            (
+                "rPr outside a run, then run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "run, then rPr outside a run (stop)",
+                "no runs, left \"<b/></rPr></si><tail/>\"",
+            ),
+            (
+                "run, then rPr outside a run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "run, then empty rPr outside a run (stop)",
+                "no runs, left \"</si><tail/>\"",
+            ),
+            (
+                "run, then empty rPr outside a run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "t inside rPr (stop)",
+                "no runs, left \"x</t></rPr><t>a</t></r></si><tail/>\"",
+            ),
+            ("t inside rPr (drain)", "no runs, left \"<tail/>\""),
+            (
+                "empty t inside rPr (stop)",
+                "Some([(\"t\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "empty t inside rPr (drain)",
+                "Some([(\"t\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "empty rPr inside rPr (stop)",
+                "Some([(\"rPr\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "empty rPr inside rPr (drain)",
+                "Some([(\"rPr\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "rPr inside rPr (stop)",
+                "no runs, left \"<b/></rPr></rPr><t>a</t></r></si><tail/>\"",
+            ),
+            ("rPr inside rPr (drain)", "no runs, left \"<tail/>\""),
+            (
+                "empty r inside rPr (stop)",
+                "Some([(\"r\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "empty r inside rPr (drain)",
+                "Some([(\"r\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "property with content (stop)",
+                "no runs, left \"x</b></rPr><t>a</t></r></si><tail/>\"",
+            ),
+            ("property with content (drain)", "no runs, left \"<tail/>\""),
+            (
+                "rPr inside t (stop)",
+                "no runs, left \"<b/></rPr></t></r></si><tail/>\"",
+            ),
+            ("rPr inside t (drain)", "no runs, left \"<tail/>\""),
+            (
+                "empty rPr inside t (stop)",
+                "no runs, left \"b</t></r></si><tail/>\"",
+            ),
+            ("empty rPr inside t (drain)", "no runs, left \"<tail/>\""),
+            (
+                "t inside t (stop)",
+                "no runs, left \"b</t>c</t></r></si><tail/>\"",
+            ),
+            ("t inside t (drain)", "no runs, left \"<tail/>\""),
+            (
+                "empty t inside t (stop)",
+                "no runs, left \"b</t></r></si><tail/>\"",
+            ),
+            ("empty t inside t (drain)", "no runs, left \"<tail/>\""),
+            (
+                "run inside t (stop)",
+                "no runs, left \"<t>b</t></r></t></r></si><tail/>\"",
+            ),
+            ("run inside t (drain)", "no runs, left \"<tail/>\""),
+            (
+                "nested run (stop)",
+                "no runs, left \"<t>a</t></r></r></si><tail/>\"",
+            ),
+            ("nested run (drain)", "no runs, left \"<tail/>\""),
+            (
+                "nested empty run (stop)",
+                "no runs, left \"<t>a</t></r></si><tail/>\"",
+            ),
+            ("nested empty run (drain)", "no runs, left \"<tail/>\""),
+            (
+                "run inside rPr (stop)",
+                "no runs, left \"<t>a</t></r></rPr></r></si><tail/>\"",
+            ),
+            ("run inside rPr (drain)", "no runs, left \"<tail/>\""),
+            (
+                "rPr after t (stop)",
+                "Some([(\"b\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "rPr after t (drain)",
+                "Some([(\"b\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "empty rPr after t (stop)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "empty rPr after t (drain)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            ("two t (stop)", "None\"ab\", left \"<tail/>\""),
+            ("two t (drain)", "None\"ab\", left \"<tail/>\""),
+            ("t, then empty t (stop)", "None\"a\", left \"<tail/>\""),
+            ("t, then empty t (drain)", "None\"a\", left \"<tail/>\""),
+            (
+                "two rPr (stop)",
+                "Some([(\"i\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "two rPr (drain)",
+                "Some([(\"i\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "rPr, then empty rPr (stop)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "rPr, then empty rPr (drain)",
+                "Some([])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "text at each level (stop)",
+                "Some([(\"b\", \"\")])\"5\", left \"<tail/>\"",
+            ),
+            (
+                "text at each level (drain)",
+                "Some([(\"b\", \"\")])\"5\", left \"<tail/>\"",
+            ),
+            (
+                "reference and CDATA in t (stop)",
+                "None\"a&<b>AB\", left \"<tail/>\"",
+            ),
+            (
+                "reference and CDATA in t (drain)",
+                "None\"a&<b>AB\", left \"<tail/>\"",
+            ),
+            (
+                "reference and CDATA outside t (stop)",
+                "Some([(\"b\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "reference and CDATA outside t (drain)",
+                "Some([(\"b\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "unknown reference in t (stop)",
+                "Xml(Invalid(\"unsupported XML entity reference '&bogus;'\")), left \"</t></r></si><tail/>\"",
+            ),
+            (
+                "unknown reference in t (drain)",
+                "Xml(Invalid(\"unsupported XML entity reference '&bogus;'\")), left \"</t></r></si><tail/>\"",
+            ),
+            ("comment in t (stop)", "None\"ab\", left \"<tail/>\""),
+            ("comment in t (drain)", "None\"ab\", left \"<tail/>\""),
+            (
+                "unknown element in run (stop)",
+                "no runs, left \"</x></r></si><tail/>\"",
+            ),
+            (
+                "unknown element in run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "unknown empty element in run (stop)",
+                "no runs, left \"</r></si><tail/>\"",
+            ),
+            (
+                "unknown empty element in run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "unknown element in item (stop)",
+                "no runs, left \"<r><t>a</t></r></x></si><tail/>\"",
+            ),
+            (
+                "unknown element in item (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "plain t beside a run (stop)",
+                "no runs, left \"b</t></si><tail/>\"",
+            ),
+            ("plain t beside a run (drain)", "no runs, left \"<tail/>\""),
+            (
+                "plain t before a run (stop)",
+                "no runs, left \"b</t><r><t>a</t></r></si><tail/>\"",
+            ),
+            ("plain t before a run (drain)", "no runs, left \"<tail/>\""),
+            (
+                "phonetic run beside a run (stop)",
+                "no runs, left \"<t>y</t></rPh></si><tail/>\"",
+            ),
+            (
+                "phonetic run beside a run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "phonetic properties beside a run (stop)",
+                "no runs, left \"</si><tail/>\"",
+            ),
+            (
+                "phonetic properties beside a run (drain)",
+                "no runs, left \"<tail/>\"",
+            ),
+            (
+                "prefixed names (stop)",
+                "Some([(\"b\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "prefixed names (drain)",
+                "Some([(\"b\", \"\")])\"a\", left \"<tail/>\"",
+            ),
+            (
+                "mismatched end inside a run (stop)",
+                "Invalid(\"malformed string item: ill-formed document: expected `</r>`, but `</x>` was found\"), left \"</si><tail/>\"",
+            ),
+            (
+                "mismatched end inside a run (drain)",
+                "Invalid(\"malformed string item: ill-formed document: expected `</r>`, but `</x>` was found\"), left \"</si><tail/>\"",
+            ),
+            (
+                "mismatched end after an invalid child (stop)",
+                "no runs, left \"</y></r></si><tail/>\"",
+            ),
+            (
+                "mismatched end after an invalid child (drain)",
+                "aborted, left \"</r></si><tail/>\"",
+            ),
+            ("end of input in item (stop)", "no runs, left \"\""),
+            ("end of input in item (drain)", "aborted, left \"\""),
+            ("end of input in run (stop)", "no runs, left \"\""),
+            ("end of input in run (drain)", "aborted, left \"\""),
+            ("end of input in t (stop)", "no runs, left \"\""),
+            ("end of input in t (drain)", "aborted, left \"\""),
+            ("end of input after run (stop)", "no runs, left \"\""),
+            ("end of input after run (drain)", "aborted, left \"\""),
+            (
+                "end of input after invalid child (stop)",
+                "no runs, left \"\"",
+            ),
+            (
+                "end of input after invalid child (drain)",
+                "aborted, left \"\"",
+            ),
+            (
+                "broken tag in run (stop)",
+                "Invalid(\"malformed string item: syntax error: tag not closed: `>` not found before end of input\"), left \"\"",
+            ),
+            (
+                "broken tag in run (drain)",
+                "Invalid(\"malformed string item: syntax error: tag not closed: `>` not found before end of input\"), left \"\"",
+            ),
+            (
+                "broken tag after invalid child (stop)",
+                "no runs, left \"</r><broken\"",
+            ),
+            (
+                "broken tag after invalid child (drain)",
+                "aborted, left \"\"",
+            ),
+            (
+                "broken tag after item (stop)",
+                "None\"a\", left \"<broken\"",
+            ),
+            (
+                "broken tag after item (drain)",
+                "None\"a\", left \"<broken\"",
+            ),
+        ];
+        let same = actual.len() == expected.len()
+            && actual.iter().zip(expected).all(
+                |((label, outcome), (expected_label, expected_outcome))| {
+                    label == expected_label && outcome == expected_outcome
+                },
+            );
+        let observed: String = actual
+            .iter()
+            .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+            .collect();
+        assert!(same, "observed rows:\n{observed}");
+    }
 }
 
 #[cfg(test)]

@@ -1163,4 +1163,314 @@ mod tests {
         });
         assert!(write(&oversized).is_err());
     }
+
+    fn definition_outcome(xml: &str) -> String {
+        match parse(xml.as_bytes()) {
+            Ok(value) => format!(
+                "ok pivots={} data={:?} extLst={:?}",
+                value.pivot_tables.len(),
+                value.data.as_ref().map(Data::kind),
+                value
+                    .extension_list
+                    .as_ref()
+                    .map(|list| String::from_utf8_lossy(&list.0).into_owned())
+            ),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn definition_child_order_matrix_is_stable() {
+        let pivots = (
+            "pivots",
+            r#"<pivotTables><pivotTable tabId="1" name="P"/></pivotTables>"#,
+        );
+        let empty_pivots = ("empty pivots", "<pivotTables/>");
+        let data = ("data", r#"<data><tabular pivotCacheId="5"/></data>"#);
+        let empty_data = ("empty data", "<data/>");
+        let list = ("extLst", r#"<extLst><ext uri="urn:a"/></extLst>"#);
+        let empty_list = ("empty extLst", "<extLst/>");
+        let unknown = ("unknown", "<unknown/>");
+        let open_unknown = ("open unknown", "<unknown></unknown>");
+        let foreign_data = (
+            "foreign data",
+            r#"<q:data xmlns:q="urn:other"><q:tabular/></q:data>"#,
+        );
+        let empty_foreign_list = ("empty foreign extLst", r#"<q:extLst xmlns:q="urn:other"/>"#);
+        let children = [pivots, empty_pivots, data, empty_data, list, empty_list];
+        let mut cases: Vec<Vec<(&str, &str)>> = vec![Vec::new()];
+        for first in children {
+            cases.push(vec![first]);
+        }
+        for first in children {
+            for second in children {
+                cases.push(vec![first, second]);
+            }
+        }
+        cases.push(vec![pivots, data, list]);
+        cases.push(vec![pivots, data, empty_list]);
+        cases.push(vec![pivots, data, list, list]);
+        cases.push(vec![pivots, data, empty_list, pivots]);
+        for extra in [unknown, open_unknown, foreign_data, empty_foreign_list] {
+            cases.push(vec![extra]);
+            cases.push(vec![pivots, extra]);
+            cases.push(vec![data, extra]);
+            cases.push(vec![list, extra]);
+        }
+        let mut actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let body: String = case.iter().map(|(_, xml)| *xml).collect();
+                (
+                    label.join(","),
+                    definition_outcome(&format!(
+                        r#"<slicerCacheDefinition xmlns="{X14}" name="Cache" sourceName="Field">{body}</slicerCacheDefinition>"#
+                    )),
+                )
+            })
+            .collect();
+        actual.push((
+            "self-closing root".to_owned(),
+            definition_outcome(&format!(
+                r#"<slicerCacheDefinition xmlns="{X14}" name="Cache" sourceName="Field"/>"#
+            )),
+        ));
+        let expected: &[(&str, &str)] = &[
+            ("", "ok pivots=0 data=None extLst=None"),
+            ("pivots", "ok pivots=1 data=None extLst=None"),
+            ("empty pivots", "Invalid(\"pivotTables cannot be empty\")"),
+            ("data", "ok pivots=0 data=Some(Tabular) extLst=None"),
+            ("empty data", "Invalid(\"data cannot be empty\")"),
+            (
+                "extLst",
+                "ok pivots=0 data=None extLst=Some(\"<extLst><ext uri=\\\"urn:a\\\"/></extLst>\")",
+            ),
+            (
+                "empty extLst",
+                "ok pivots=0 data=None extLst=Some(\"<extLst/>\")",
+            ),
+            (
+                "pivots,pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,empty pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            ("pivots,data", "ok pivots=1 data=Some(Tabular) extLst=None"),
+            ("pivots,empty data", "Invalid(\"data cannot be empty\")"),
+            (
+                "pivots,extLst",
+                "ok pivots=1 data=None extLst=Some(\"<extLst><ext uri=\\\"urn:a\\\"/></extLst>\")",
+            ),
+            (
+                "pivots,empty extLst",
+                "ok pivots=1 data=None extLst=Some(\"<extLst/>\")",
+            ),
+            (
+                "empty pivots,pivots",
+                "Invalid(\"pivotTables cannot be empty\")",
+            ),
+            (
+                "empty pivots,empty pivots",
+                "Invalid(\"pivotTables cannot be empty\")",
+            ),
+            (
+                "empty pivots,data",
+                "Invalid(\"pivotTables cannot be empty\")",
+            ),
+            (
+                "empty pivots,empty data",
+                "Invalid(\"pivotTables cannot be empty\")",
+            ),
+            (
+                "empty pivots,extLst",
+                "Invalid(\"pivotTables cannot be empty\")",
+            ),
+            (
+                "empty pivots,empty extLst",
+                "Invalid(\"pivotTables cannot be empty\")",
+            ),
+            (
+                "data,pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,empty pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,empty data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,extLst",
+                "ok pivots=0 data=Some(Tabular) extLst=Some(\"<extLst><ext uri=\\\"urn:a\\\"/></extLst>\")",
+            ),
+            (
+                "data,empty extLst",
+                "ok pivots=0 data=Some(Tabular) extLst=Some(\"<extLst/>\")",
+            ),
+            ("empty data,pivots", "Invalid(\"data cannot be empty\")"),
+            (
+                "empty data,empty pivots",
+                "Invalid(\"data cannot be empty\")",
+            ),
+            ("empty data,data", "Invalid(\"data cannot be empty\")"),
+            ("empty data,empty data", "Invalid(\"data cannot be empty\")"),
+            ("empty data,extLst", "Invalid(\"data cannot be empty\")"),
+            (
+                "empty data,empty extLst",
+                "Invalid(\"data cannot be empty\")",
+            ),
+            (
+                "extLst,pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,empty pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,empty data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,empty extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty extLst,pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty extLst,empty pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty extLst,data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty extLst,empty data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty extLst,extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty extLst,empty extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,data,extLst",
+                "ok pivots=1 data=Some(Tabular) extLst=Some(\"<extLst><ext uri=\\\"urn:a\\\"/></extLst>\")",
+            ),
+            (
+                "pivots,data,empty extLst",
+                "ok pivots=1 data=Some(Tabular) extLst=Some(\"<extLst/>\")",
+            ),
+            (
+                "pivots,data,extLst,extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,data,empty extLst,pivots",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "open unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,open unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,open unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,open unknown",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "foreign data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,foreign data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,foreign data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,foreign data",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "empty foreign extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "pivots,empty foreign extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "data,empty foreign extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "extLst,empty foreign extLst",
+                "Invalid(\"unexpected or out-of-order Slicer Cache child\")",
+            ),
+            (
+                "self-closing root",
+                "Invalid(\"Slicer Cache root cannot be empty\")",
+            ),
+        ];
+        let same = actual.len() == expected.len()
+            && actual.iter().zip(expected).all(
+                |((label, outcome), (expected_label, expected_outcome))| {
+                    label == expected_label && outcome == expected_outcome
+                },
+            );
+        let observed: String = actual
+            .iter()
+            .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+            .collect();
+        assert!(same, "observed rows:\n{observed}");
+    }
 }
