@@ -222,10 +222,7 @@ impl Write for BoundedVecSink {
             io::Error::new(io::ErrorKind::InvalidInput, "bounded sink length overflow")
         })?;
         if next > self.maximum {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "bounded sink output ceiling reached",
-            ));
+            return Err(io::Error::other("bounded sink output ceiling reached"));
         }
         self.bytes.extend_from_slice(input);
         Ok(input.len())

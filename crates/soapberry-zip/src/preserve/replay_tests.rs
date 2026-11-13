@@ -169,7 +169,7 @@ impl TypedErrorSink {
 impl Write for TypedErrorSink {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
         if self.bytes.len() >= self.fail_after {
-            return Err(io::Error::new(io::ErrorKind::Other, SinkErrorSentinel));
+            return Err(io::Error::other(SinkErrorSentinel));
         }
         let available = self.fail_after - self.bytes.len();
         let written = buffer.len().min(available);

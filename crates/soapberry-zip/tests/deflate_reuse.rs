@@ -169,7 +169,7 @@ fn feed<W: Write>(writer: &mut W, payload: &[u8], plan: FeedPlan) -> io::Result<
         offset = end;
         chunk_number += 1;
         if let Some(period) = plan.flush_every {
-            if period != 0 && chunk_number % period == 0 {
+            if period != 0 && chunk_number.is_multiple_of(period) {
                 writer.flush()?;
                 flushes.push(offset);
             }
@@ -545,7 +545,7 @@ impl InterruptingSink {
     /// Counts a call and reports whether it is interrupted.
     fn interrupts(&mut self) -> bool {
         self.calls += 1;
-        let interrupted = self.armed.get() && self.calls % self.period == 0;
+        let interrupted = self.armed.get() && self.calls.is_multiple_of(self.period);
         if interrupted {
             self.interruptions.set(self.interruptions.get() + 1);
         }
