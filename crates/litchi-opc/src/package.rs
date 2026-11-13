@@ -170,32 +170,65 @@ fn same_optional_manifest_bytes(left: Option<&[u8]>, right: Option<&[u8]>) -> bo
 #[derive(Debug)]
 struct ContentTypesSourceState(AtomicU8);
 
-impl ContentTypesSourceState {
-    const UNKNOWN: u8 = 0;
-    const VALID: u8 = 1;
-    const INVALID: u8 = 2;
+/// The memo held by a [`ContentTypesSourceState`], stored as its `u8` value.
+///
+/// ```text
+/// Unknown --store(true)-->  Valid
+/// Unknown --store(false)--> Invalid
+/// Valid   --store(false)--> Invalid
+/// Invalid --store(true)-->  Valid
+/// any     --reset-->        Unknown
+/// ```
+#[derive(Clone, Copy)]
+#[repr(u8)]
+enum ContentTypesSourceStage {
+    /// Coverage has not been computed since the last metadata change.
+    Unknown = 0,
+    /// The retained content-types bytes still describe the package.
+    Valid = 1,
+    /// The retained content-types bytes no longer describe the package.
+    Invalid = 2,
+}
 
+impl ContentTypesSourceStage {
+    /// Decodes a stored value. Only the three discriminants are ever stored;
+    /// any other byte reads as `Unknown`, which makes the next query recompute.
+    const fn decode(raw: u8) -> Self {
+        match raw {
+            1 => Self::Valid,
+            2 => Self::Invalid,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl ContentTypesSourceState {
     fn unknown() -> Self {
-        Self(AtomicU8::new(Self::UNKNOWN))
+        Self(AtomicU8::new(ContentTypesSourceStage::Unknown as u8))
     }
 
     fn load(&self) -> Option<bool> {
-        match self.0.load(AtomicOrdering::Relaxed) {
-            Self::VALID => Some(true),
-            Self::INVALID => Some(false),
-            _ => None,
+        match ContentTypesSourceStage::decode(self.0.load(AtomicOrdering::Relaxed)) {
+            ContentTypesSourceStage::Valid => Some(true),
+            ContentTypesSourceStage::Invalid => Some(false),
+            ContentTypesSourceStage::Unknown => None,
         }
     }
 
     fn store(&self, valid: bool) {
-        self.0.store(
-            if valid { Self::VALID } else { Self::INVALID },
-            AtomicOrdering::Relaxed,
-        );
+        let stage = if valid {
+            ContentTypesSourceStage::Valid
+        } else {
+            ContentTypesSourceStage::Invalid
+        };
+        self.0.store(stage as u8, AtomicOrdering::Relaxed);
     }
 
     fn reset(&self) {
-        self.0.store(Self::UNKNOWN, AtomicOrdering::Relaxed);
+        self.0.store(
+            ContentTypesSourceStage::Unknown as u8,
+            AtomicOrdering::Relaxed,
+        );
     }
 }
 

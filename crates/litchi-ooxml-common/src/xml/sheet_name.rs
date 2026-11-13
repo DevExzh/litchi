@@ -2149,6 +2149,30 @@ fn is_xml_space_byte(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
 }
 
+/// Progress through the `HeadingPairs` groups of a workbook's extended
+/// properties. Each variant holds the pairs accepted so far.
+///
+/// ```text
+/// Start  --"Sheet" | "Worksheets"-->         Sheets
+/// Sheets --"Named Range" | "Named Ranges"--> NamedRanges
+/// ```
+///
+/// The sheet group is required and the named-range group is optional; each
+/// appears at most once, so every other label-and-stage combination is
+/// refused. The layout is complete in `Sheets` or `NamedRanges`.
+#[derive(Clone, Copy)]
+enum HeadingGroupStage<'a> {
+    /// No group seen.
+    Start,
+    /// The sheet group was seen.
+    Sheets { catalog: &'a InsertHeadingPair },
+    /// The sheet group and then the named-range group were seen.
+    NamedRanges {
+        catalog: &'a InsertHeadingPair,
+        named_ranges: &'a InsertHeadingPair,
+    },
+}
+
 fn validate_insert_layout<F>(
     title_vector: &InsertVector,
     heading_vector: &InsertVector,
@@ -2225,18 +2249,19 @@ where
         ));
     }
     let trailing = titles.len() - original_titles.len();
-    let mut catalog = None::<&InsertHeadingPair>;
-    let mut named_ranges = None::<&InsertHeadingPair>;
-    let mut group_stage = 0u8;
+    let mut stage = HeadingGroupStage::Start;
     for pair in heading_pairs {
         match pair.label.trim() {
             "Sheet" | "Worksheets" => {
-                if group_stage != 0 || catalog.replace(pair).is_some() {
-                    return Err(invalid(
-                        "extended-properties HeadingPairs sheet category is out of order or duplicated",
-                    ));
+                match stage {
+                    HeadingGroupStage::Start => {},
+                    HeadingGroupStage::Sheets { .. } | HeadingGroupStage::NamedRanges { .. } => {
+                        return Err(invalid(
+                            "extended-properties HeadingPairs sheet category is out of order or duplicated",
+                        ));
+                    },
                 }
-                group_stage = 1;
+                stage = HeadingGroupStage::Sheets { catalog: pair };
                 if pair.count != original_titles.len() {
                     return Err(invalid(
                         "extended-properties sheet category count does not match the catalog",
@@ -2244,12 +2269,18 @@ where
                 }
             },
             "Named Range" | "Named Ranges" => {
-                if group_stage != 1 || named_ranges.replace(pair).is_some() {
-                    return Err(invalid(
-                        "extended-properties HeadingPairs named-range category is out of order or duplicated",
-                    ));
-                }
-                group_stage = 2;
+                let catalog = match stage {
+                    HeadingGroupStage::Sheets { catalog } => catalog,
+                    HeadingGroupStage::Start | HeadingGroupStage::NamedRanges { .. } => {
+                        return Err(invalid(
+                            "extended-properties HeadingPairs named-range category is out of order or duplicated",
+                        ));
+                    },
+                };
+                stage = HeadingGroupStage::NamedRanges {
+                    catalog,
+                    named_ranges: pair,
+                };
                 if pair.count != trailing {
                     return Err(invalid(
                         "extended-properties named-range category count does not match trailing titles",
@@ -2264,10 +2295,18 @@ where
             },
         }
     }
-    let catalog = catalog.ok_or_else(|| {
-        invalid("extended-properties HeadingPairs has no Sheet or Worksheets category")
-    })?;
-    let named_range_count = named_ranges.map_or(0, |pair| pair.count);
+    let (catalog, named_range_count) = match stage {
+        HeadingGroupStage::Start => {
+            return Err(invalid(
+                "extended-properties HeadingPairs has no Sheet or Worksheets category",
+            ));
+        },
+        HeadingGroupStage::Sheets { catalog } => (catalog, 0),
+        HeadingGroupStage::NamedRanges {
+            catalog,
+            named_ranges,
+        } => (catalog, named_ranges.count),
+    };
     if trailing != named_range_count {
         return Err(invalid(
             "extended-properties trailing titles have no matching named-range category",
