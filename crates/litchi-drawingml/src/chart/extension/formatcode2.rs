@@ -2073,37 +2073,61 @@ fn validate_general_ref(reference: &BytesRef<'_>, max_value_bytes: usize) -> Res
     Ok(character)
 }
 
+/// Position in the XML declaration's pseudo-attribute sequence, named after
+/// the last accepted pseudo-attribute.
+///
+/// ```text
+/// Start    --version-->    Version
+/// Version  --encoding-->   Encoding     (optional)
+/// Version  --standalone--> Standalone   (optional)
+/// Encoding --standalone--> Standalone   (optional)
+/// ```
+///
+/// Any other known pseudo-attribute in a given stage is an attribute-order
+/// error. A declaration that ends in `Start` has no version and is refused;
+/// every other stage is a complete declaration.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DeclarationStage {
+    Start,
+    Version,
+    Encoding,
+    Standalone,
+}
+
 fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     let content = declaration.as_ref();
     let content = std::str::from_utf8(content).map_err(xml_error)?;
     let start = BytesStart::from_content(content, 3);
-    let mut seen_version = false;
-    let mut seen_encoding = false;
-    let mut seen_standalone = false;
-    let mut phase = 0u8;
+    let mut stage = DeclarationStage::Start;
     for raw_attribute in start.checked_attributes() {
         let attribute = raw_attribute.map_err(xml_error)?;
         match attribute.key.as_ref() {
             b"version" => {
-                if seen_version || phase != 0 {
-                    return Err(invalid(
-                        "formatcode2 XML declaration has invalid attribute order",
-                    ));
+                match stage {
+                    DeclarationStage::Start => stage = DeclarationStage::Version,
+                    DeclarationStage::Version
+                    | DeclarationStage::Encoding
+                    | DeclarationStage::Standalone => {
+                        return Err(invalid(
+                            "formatcode2 XML declaration has invalid attribute order",
+                        ));
+                    },
                 }
-                seen_version = true;
-                phase = 1;
                 if attribute.value.as_ref() != b"1.0" {
                     return Err(invalid("formatcode2 XML declaration must use version 1.0"));
                 }
             },
             b"encoding" => {
-                if !seen_version || seen_encoding || phase > 2 {
-                    return Err(invalid(
-                        "formatcode2 XML declaration has invalid attribute order",
-                    ));
+                match stage {
+                    DeclarationStage::Version => stage = DeclarationStage::Encoding,
+                    DeclarationStage::Start
+                    | DeclarationStage::Encoding
+                    | DeclarationStage::Standalone => {
+                        return Err(invalid(
+                            "formatcode2 XML declaration has invalid attribute order",
+                        ));
+                    },
                 }
-                seen_encoding = true;
-                phase = 2;
                 if !attribute.value.eq_ignore_ascii_case(b"utf-8") {
                     return Err(invalid(
                         "formatcode2 XML declaration must use UTF-8 encoding",
@@ -2111,13 +2135,16 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
                 }
             },
             b"standalone" => {
-                if !seen_version || seen_standalone || phase > 2 {
-                    return Err(invalid(
-                        "formatcode2 XML declaration has invalid attribute order",
-                    ));
+                match stage {
+                    DeclarationStage::Version | DeclarationStage::Encoding => {
+                        stage = DeclarationStage::Standalone;
+                    },
+                    DeclarationStage::Start | DeclarationStage::Standalone => {
+                        return Err(invalid(
+                            "formatcode2 XML declaration has invalid attribute order",
+                        ));
+                    },
                 }
-                seen_standalone = true;
-                phase = 3;
                 if !matches!(attribute.value.as_ref(), b"yes" | b"no") {
                     return Err(invalid(
                         "formatcode2 XML declaration standalone must be yes or no",
@@ -2131,7 +2158,7 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
             },
         }
     }
-    if !seen_version {
+    if stage == DeclarationStage::Start {
         return Err(invalid("formatcode2 XML declaration must declare version"));
     }
     Ok(())

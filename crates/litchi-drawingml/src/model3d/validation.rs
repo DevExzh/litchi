@@ -99,6 +99,45 @@ impl Error {
     }
 }
 
+/// Position in the `CT_Model3D` child sequence, named after the last accepted
+/// child of the model namespace.
+///
+/// ```text
+/// Start      --spPr-->    SpPr
+/// Start | SpPr            --camera-->  Camera
+/// Start | SpPr | Camera   --trans-->   Trans
+/// Trans | AttrSrcUrl             --attrSrcUrl-->  AttrSrcUrl  (optional, repeatable)
+/// Trans | AttrSrcUrl | Raster    --raster-->      Raster      (optional)
+/// Trans | AttrSrcUrl | Raster    --extLst-->      ExtLst      (optional)
+/// Trans | AttrSrcUrl | Raster | ExtLst
+///            --objViewport | winViewport-->       Viewport    (choice, exactly one)
+/// Viewport | Light        --ambientLight-->       Light       (optional, at most one)
+/// Viewport | Light
+///            --ptLight | spotLight | dirLight | unkLight-->  Light  (optional, repeatable)
+/// ```
+///
+/// Any other known child in a given stage is out of sequence, except that a
+/// second viewport in `Viewport` or `Light` is reported as two viewports.
+/// Children of other namespaces and unknown children of the model namespace
+/// leave the stage unchanged.
+///
+/// `camera` and `trans` are accepted without the children before them, so
+/// the stage alone does not prove that `spPr` and `camera` were present; the
+/// validator records those two separately and reports the first missing one
+/// at the end. A scene is complete only in `Viewport` or `Light`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Model3dStage {
+    Start,
+    SpPr,
+    Camera,
+    Trans,
+    AttrSrcUrl,
+    Raster,
+    ExtLst,
+    Viewport,
+    Light,
+}
+
 /// Validate the typed model and its retained scene sequence.
 /// # Errors
 ///
@@ -108,13 +147,10 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
     validate_counts(metadata)?;
     validate_reference(&metadata.reference, "model")?;
 
-    let mut stage = 0u8;
+    let mut stage = Model3dStage::Start;
     let mut sp_pr = false;
     let mut camera = false;
-    let mut transform = false;
-    let mut viewport = None;
     let mut raster = false;
-    let mut extension_list = false;
     let mut ambient = false;
 
     for child in &metadata.children {
@@ -136,72 +172,80 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
         let model = namespace == NAMESPACE;
         match (local_name, model) {
             ("spPr", true) => {
-                if sp_pr || stage != 0 {
+                if stage != Model3dStage::Start {
                     return Err(Error::ChildOrder { child: "spPr" });
                 }
                 sp_pr = true;
-                stage = 1;
+                stage = Model3dStage::SpPr;
             },
             ("camera", true) => {
-                if camera || stage > 1 {
+                if !matches!(stage, Model3dStage::Start | Model3dStage::SpPr) {
                     return Err(Error::ChildOrder { child: "camera" });
                 }
                 camera = true;
-                stage = 2;
+                stage = Model3dStage::Camera;
             },
             ("trans", true) => {
-                if transform || stage > 2 {
+                if !matches!(
+                    stage,
+                    Model3dStage::Start | Model3dStage::SpPr | Model3dStage::Camera
+                ) {
                     return Err(Error::ChildOrder { child: "trans" });
                 }
-                transform = true;
-                stage = 3;
+                stage = Model3dStage::Trans;
             },
             ("attrSrcUrl", true) => {
-                if !(3..=4).contains(&stage) {
+                if !matches!(stage, Model3dStage::Trans | Model3dStage::AttrSrcUrl) {
                     return Err(Error::ChildOrder {
                         child: "attrSrcUrl",
                     });
                 }
-                stage = 4;
+                stage = Model3dStage::AttrSrcUrl;
             },
             ("raster", true) => {
-                if !(3..=5).contains(&stage) {
+                if !matches!(
+                    stage,
+                    Model3dStage::Trans | Model3dStage::AttrSrcUrl | Model3dStage::Raster
+                ) {
                     return Err(Error::ChildOrder { child: "raster" });
                 }
-                stage = 5;
+                stage = Model3dStage::Raster;
             },
             ("extLst", true) => {
-                if extension_list || !(3..=6).contains(&stage) {
+                if !matches!(
+                    stage,
+                    Model3dStage::Trans | Model3dStage::AttrSrcUrl | Model3dStage::Raster
+                ) {
                     return Err(Error::ChildOrder { child: "extLst" });
                 }
-                extension_list = true;
-                stage = 6;
+                stage = Model3dStage::ExtLst;
             },
-            ("objViewport" | "winViewport", true) => {
-                if viewport.is_some() || !(3..=7).contains(&stage) {
-                    return if viewport.is_some() {
-                        Err(Error::MultipleViewports)
-                    } else {
-                        Err(Error::ChildOrder { child: "viewport" })
-                    };
-                }
-                viewport = Some(local_name);
-                stage = 7;
+            ("objViewport" | "winViewport", true) => match stage {
+                Model3dStage::Trans
+                | Model3dStage::AttrSrcUrl
+                | Model3dStage::Raster
+                | Model3dStage::ExtLst => stage = Model3dStage::Viewport,
+                Model3dStage::Viewport | Model3dStage::Light => {
+                    return Err(Error::MultipleViewports);
+                },
+                Model3dStage::Start | Model3dStage::SpPr | Model3dStage::Camera => {
+                    return Err(Error::ChildOrder { child: "viewport" });
+                },
             },
             ("ambientLight", true) => {
-                if ambient || stage < 7 {
+                if ambient || !matches!(stage, Model3dStage::Viewport | Model3dStage::Light) {
                     return Err(Error::ChildOrder {
                         child: "ambientLight",
                     });
                 }
                 ambient = true;
-                stage = 8;
+                stage = Model3dStage::Light;
             },
             ("ptLight" | "spotLight" | "dirLight" | "unkLight", true) => {
-                if stage < 7 {
+                if !matches!(stage, Model3dStage::Viewport | Model3dStage::Light) {
                     return Err(Error::ChildOrder { child: "light" });
                 }
-                stage = 8;
+                stage = Model3dStage::Light;
             },
             _ => {
                 // Future namespaces and unmodeled child vocabulary remain inert.
@@ -215,13 +259,16 @@ pub fn validate(metadata: &Metadata) -> Result<(), Error> {
     if !camera {
         return Err(Error::MissingChild("camera"));
     }
-    if !transform {
-        return Err(Error::MissingChild("trans"));
+    match stage {
+        Model3dStage::Start | Model3dStage::SpPr | Model3dStage::Camera => {
+            Err(Error::MissingChild("trans"))
+        },
+        Model3dStage::Trans
+        | Model3dStage::AttrSrcUrl
+        | Model3dStage::Raster
+        | Model3dStage::ExtLst => Err(Error::MissingChild("objViewport or winViewport")),
+        Model3dStage::Viewport | Model3dStage::Light => Ok(()),
     }
-    if viewport.is_none() {
-        return Err(Error::MissingChild("objViewport or winViewport"));
-    }
-    Ok(())
 }
 
 /// Validate semantic metadata against a host-provided package relationship graph.
