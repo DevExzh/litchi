@@ -5810,18 +5810,55 @@ struct CacheStateInner {
     clock: u64,
 }
 
-#[derive(Debug, Default)]
-struct FlightStateInner {
-    complete: bool,
-    payload: Option<CachedPayload>,
-    reservation: Option<Arc<Reservation>>,
-    flight_object_reservation: Option<Arc<Reservation>>,
-    payload_object_reservation: Option<Arc<Reservation>>,
+/// Lifecycle of one single-flight payload load.
+///
+/// ```text
+/// Loading --finish_success--> Succeeded(payload)
+/// Loading --finish_failure--> Failed
+/// ```
+///
+/// Both terminal states are final: a later completion is ignored and reports
+/// that it did not transition. The flight owns its reservations only while
+/// `Loading`; leaving that state releases them before waiters are woken.
+#[derive(Debug)]
+enum FlightPhase {
+    Loading {
+        reservation: Option<Arc<Reservation>>,
+        flight_object_reservation: Option<Arc<Reservation>>,
+        payload_object_reservation: Option<Arc<Reservation>>,
+    },
+    Succeeded(CachedPayload),
+    Failed,
+}
+
+impl FlightPhase {
+    /// Enter the terminal state `outcome` and release the flight-owned
+    /// reservations. Returns `false`, dropping `outcome`, when the flight is
+    /// already complete.
+    fn complete(&mut self, outcome: Self) -> bool {
+        match std::mem::replace(self, Self::Failed) {
+            Self::Loading {
+                reservation,
+                flight_object_reservation,
+                payload_object_reservation,
+            } => {
+                drop(reservation);
+                drop(payload_object_reservation);
+                drop(flight_object_reservation);
+                *self = outcome;
+                true
+            },
+            terminal @ (Self::Succeeded(_) | Self::Failed) => {
+                *self = terminal;
+                false
+            },
+        }
+    }
 }
 
 #[derive(Debug)]
 struct LoadFlight {
-    state: Mutex<FlightStateInner>,
+    state: Mutex<FlightPhase>,
     completed: Condvar,
 }
 
@@ -5832,11 +5869,10 @@ impl LoadFlight {
         payload_object_reservation: Option<Arc<Reservation>>,
     ) -> Self {
         Self {
-            state: Mutex::new(FlightStateInner {
+            state: Mutex::new(FlightPhase::Loading {
                 reservation,
                 flight_object_reservation,
                 payload_object_reservation,
-                ..FlightStateInner::default()
             }),
             completed: Condvar::new(),
         }
@@ -5846,11 +5882,12 @@ impl LoadFlight {
     where
         O: DiagnosticObserver,
     {
-        lock_with_observer(&self.state, observer, LockOperation::Flight)
+        match &*lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .reservation
-            .as_ref()
-            .map(Arc::clone)
+        {
+            FlightPhase::Loading { reservation, .. } => reservation.clone(),
+            FlightPhase::Succeeded(_) | FlightPhase::Failed => None,
+        }
     }
 
     fn payload_object_reservation_with_observer<O>(
@@ -5860,11 +5897,15 @@ impl LoadFlight {
     where
         O: DiagnosticObserver,
     {
-        lock_with_observer(&self.state, observer, LockOperation::Flight)
+        match &*lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .payload_object_reservation
-            .as_ref()
-            .map(Arc::clone)
+        {
+            FlightPhase::Loading {
+                payload_object_reservation,
+                ..
+            } => payload_object_reservation.clone(),
+            FlightPhase::Succeeded(_) | FlightPhase::Failed => None,
+        }
     }
 
     fn diagnostic_reservations_with_observer<O>(
@@ -5880,11 +5921,18 @@ impl LoadFlight {
     {
         let state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        (
-            state.reservation.as_ref().map(Arc::clone),
-            state.payload_object_reservation.as_ref().map(Arc::clone),
-            state.flight_object_reservation.as_ref().map(Arc::clone),
-        )
+        match &*state {
+            FlightPhase::Loading {
+                reservation,
+                flight_object_reservation,
+                payload_object_reservation,
+            } => (
+                reservation.clone(),
+                payload_object_reservation.clone(),
+                flight_object_reservation.clone(),
+            ),
+            FlightPhase::Succeeded(_) | FlightPhase::Failed => (None, None, None),
+        }
     }
 
     #[cfg(test)]
@@ -5906,7 +5954,7 @@ impl LoadFlight {
     {
         let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        while !state.complete {
+        while matches!(*state, FlightPhase::Loading { .. }) {
             if let Some(context) = context {
                 context.check()?;
             }
@@ -5921,7 +5969,10 @@ impl LoadFlight {
         if let Some(context) = context {
             context.check()?;
         }
-        Ok(state.payload.clone())
+        Ok(match &*state {
+            FlightPhase::Succeeded(payload) => Some(payload.clone()),
+            FlightPhase::Loading { .. } | FlightPhase::Failed => None,
+        })
     }
 
     fn finish_success_with_observer<O>(&self, payload: CachedPayload, observer: &mut O) -> bool
@@ -5930,22 +5981,16 @@ impl LoadFlight {
     {
         let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if state.complete {
-            drop(payload);
-            return false;
-        }
         // The published payload carries the memory and payload-object
-        // reservations. Drop the flight's ownership before waking waiters;
-        // the Arc clones retained by the payload prevent double release.
-        state.reservation = None;
-        state.payload_object_reservation = None;
-        // This reservation represents only the coordination object, not the
-        // delivered payload, so it is released at terminal success.
-        state.flight_object_reservation = None;
-        state.payload = Some(payload);
-        state.complete = true;
-        self.completed.notify_all();
-        true
+        // reservations. The flight's ownership is dropped before waking
+        // waiters; the Arc clones retained by the payload prevent double
+        // release. The flight-object reservation represents only the
+        // coordination object, so it is released at terminal success too.
+        let transitioned = state.complete(FlightPhase::Succeeded(payload));
+        if transitioned {
+            self.completed.notify_all();
+        }
+        transitioned
     }
 
     fn finish_failure_with_observer<O>(&self, observer: &mut O) -> bool
@@ -5954,18 +5999,14 @@ impl LoadFlight {
     {
         let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if state.complete {
-            return false;
-        }
         // A failed loader must release every flight-owned reservation before
         // notifying waiters. Otherwise a tight-budget waiter can retry while
         // the failed loader still holds the memory/object quota.
-        state.reservation = None;
-        state.payload_object_reservation = None;
-        state.flight_object_reservation = None;
-        state.complete = true;
-        self.completed.notify_all();
-        true
+        let transitioned = state.complete(FlightPhase::Failed);
+        if transitioned {
+            self.completed.notify_all();
+        }
+        transitioned
     }
 }
 

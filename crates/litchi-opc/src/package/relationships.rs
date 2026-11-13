@@ -1696,7 +1696,7 @@ impl OpcPackage {
         if owner.as_str() == "/" {
             self.revoke_exact_source();
             self.content_types_source_state.reset();
-            self.signature_graph_tracked = true;
+            self.signature = self.signature.graph_edited(false);
             self.rels = relationships;
         } else {
             *self.get_part_mut(owner)?.rels_mut() = relationships;
@@ -1777,7 +1777,7 @@ impl OpcPackage {
         if replacement.owner.as_str() == "/" {
             self.revoke_exact_source();
             self.content_types_source_state.reset();
-            self.signature_graph_tracked = true;
+            self.signature = self.signature.graph_edited(false);
             self.rels = relationships;
         } else {
             *self.get_part_mut(&replacement.owner)?.rels_mut() = relationships;

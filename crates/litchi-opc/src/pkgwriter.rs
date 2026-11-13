@@ -114,17 +114,45 @@ struct PlannedPart<'package> {
     audit_payload: bool,
     rels: &'package Relationships,
     relationships_member_present: bool,
+    relationships: RelationshipsPlanState<'package>,
+}
+
+/// What publication does about one part's `.rels` member.
+///
+/// ```text
+/// Absent   --plan built, part has relationships or a source member--> Planned
+/// Pristine --materialize_pristine (full writer)--> Planned
+/// ```
+///
+/// A plan starts `Pristine` or `Absent` and never returns to either.
+enum RelationshipsPlanState<'package> {
+    /// No relationships member is emitted.
+    Absent,
     /// The source `.rels` member still holds these relationships, proven by
     /// the open-time capture, so the member is copied verbatim and no
     /// serialization or audit is planned for it.
-    relationships_pristine: bool,
-    relationships: Option<PlannedRelationships<'package>>,
+    Pristine,
+    /// The member is published from this serialization.
+    Planned(PlannedRelationships<'package>),
+}
+
+impl<'package> RelationshipsPlanState<'package> {
+    /// The serialization to publish, when one was planned.
+    fn planned(&self) -> Option<&PlannedRelationships<'package>> {
+        match self {
+            Self::Planned(relationships) => Some(relationships),
+            Self::Absent | Self::Pristine => None,
+        }
+    }
 }
 
 impl<'package> PlannedPart<'package> {
     /// Whether publication emits a relationships member for this part.
     fn has_relationships(&self) -> bool {
-        self.relationships_pristine || self.relationships.is_some()
+        match self.relationships {
+            RelationshipsPlanState::Absent => false,
+            RelationshipsPlanState::Pristine | RelationshipsPlanState::Planned(_) => true,
+        }
     }
 
     /// The payload, decoding it if the part still defers it.
@@ -220,7 +248,7 @@ impl PlannedAppend<'_> {
             Self::Part(part) => Some(part.partname.membername()),
             Self::Relationships(part) => part
                 .relationships
-                .as_ref()
+                .planned()
                 .map(|relationships| relationships.uri.membername()),
         }
     }
@@ -277,8 +305,11 @@ impl<'package> PublicationPlan<'package> {
                 ) && !package.holds_original_source_xml(part),
                 rels: part.rels(),
                 relationships_member_present,
-                relationships_pristine,
-                relationships: None,
+                relationships: if relationships_pristine {
+                    RelationshipsPlanState::Pristine
+                } else {
+                    RelationshipsPlanState::Absent
+                },
             });
         }
         parts.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
@@ -335,12 +366,15 @@ impl<'package> PublicationPlan<'package> {
                 }
                 part.blob = Some(blob);
             }
-            if part.relationships_pristine {
+            if matches!(part.relationships, RelationshipsPlanState::Pristine) {
                 continue;
             }
             if !part.rels.is_empty() || part.relationships_member_present {
-                part.relationships =
-                    Some(planned_relationships(package, part.partname, part.rels)?);
+                part.relationships = RelationshipsPlanState::Planned(planned_relationships(
+                    package,
+                    part.partname,
+                    part.rels,
+                )?);
             }
         }
 
@@ -374,11 +408,13 @@ impl<'package> PublicationPlan<'package> {
             // to be materialized — and every decode refusal raised — before a
             // sequential sink sees a byte.
             part.blob = Some(part.materialized_blob()?);
-            if !part.relationships_pristine {
-                continue;
+            if matches!(part.relationships, RelationshipsPlanState::Pristine) {
+                part.relationships = RelationshipsPlanState::Planned(planned_relationships(
+                    package,
+                    part.partname,
+                    part.rels,
+                )?);
             }
-            part.relationships = Some(planned_relationships(package, part.partname, part.rels)?);
-            part.relationships_pristine = false;
         }
         Ok(())
     }
@@ -393,14 +429,14 @@ impl<'package> PublicationPlan<'package> {
         physical.write(&self.content_types_uri, content_types_xml.bytes())?;
         physical.write(&self.package_rels_uri, package_rels_xml.bytes())?;
         for part in &self.parts {
-            if part.relationships_pristine {
+            if matches!(part.relationships, RelationshipsPlanState::Pristine) {
                 return Err(unmaterialized_publication_error());
             }
             let Some(blob) = part.blob.as_deref() else {
                 return Err(unmaterialized_publication_error());
             };
             physical.write(part.partname, blob)?;
-            if let Some(relationships) = &part.relationships {
+            if let Some(relationships) = part.relationships.planned() {
                 physical.write(&relationships.uri, relationships.bytes())?;
             }
         }
@@ -522,7 +558,7 @@ fn try_write_preserved<W: Write>(
         })?;
     for part in &additions {
         appended.push(PlannedAppend::Part(part));
-        if part.relationships.is_some() {
+        if part.relationships.planned().is_some() {
             appended.push(PlannedAppend::Relationships(part));
         }
     }
@@ -785,10 +821,10 @@ fn try_write_preserved<W: Write>(
                 let Some(part) = planned_parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                if part.relationships_pristine {
+                if matches!(part.relationships, RelationshipsPlanState::Pristine) {
                     None
                 } else {
-                    let Some(relationships) = part.relationships.as_ref() else {
+                    let Some(relationships) = part.relationships.planned() else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
                     let Some(source_part) = provenance.parts.get(partname) else {
@@ -820,7 +856,7 @@ fn try_write_preserved<W: Write>(
         let bytes = match append {
             PlannedAppend::Part(part) => part.materialized_blob()?.len(),
             PlannedAppend::Relationships(part) => {
-                let Some(relationships) = part.relationships.as_ref() else {
+                let Some(relationships) = part.relationships.planned() else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
                 relationships.bytes().len()
@@ -901,10 +937,10 @@ fn try_write_preserved<W: Write>(
                     let Some(part) = planned_parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if part.relationships_pristine {
+                    if matches!(part.relationships, RelationshipsPlanState::Pristine) {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
-                        let Some(relationships) = &part.relationships else {
+                        let Some(relationships) = part.relationships.planned() else {
                             return Ok(PreservationWrite::Fallback(writer));
                         };
                         let Some(source_part) = provenance.parts.get(partname) else {
@@ -942,7 +978,7 @@ fn try_write_preserved<W: Write>(
                 part.materialized_blob()?,
             )?,
             PlannedAppend::Relationships(part) => {
-                let Some(relationships) = part.relationships.as_ref() else {
+                let Some(relationships) = part.relationships.planned() else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
                 regenerated_entry(
@@ -4324,7 +4360,7 @@ mod tests {
         for part in &plan.parts {
             let relationships = part
                 .relationships
-                .as_ref()
+                .planned()
                 .expect("the part carries a serialized relationships member");
             let _report =
                 xml_minifier::audit::verify_authored(relationships.xml.as_slice(), limits)

@@ -1413,34 +1413,18 @@ pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
 /// unfinished part abandons the consuming package writer and leaves any
 /// already-published sequential sink bytes incomplete.
 pub struct PartWriter<W: Write> {
-    entry: Option<soapberry_zip::office::StreamingArchiveEntry<W>>,
+    entry: soapberry_zip::office::StreamingArchiveEntry<W>,
     name_state: PartWriterNameState,
     directory_spool: bool,
 }
 
 impl<W: Write> Write for PartWriter<W> {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        self.entry
-            .as_mut()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "OPC Part writer has already been finished",
-                )
-            })?
-            .write(buffer)
+        self.entry.write(buffer)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.entry
-            .as_mut()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "OPC Part writer has already been finished",
-                )
-            })?
-            .flush()
+        self.entry.flush()
     }
 }
 
@@ -1453,19 +1437,13 @@ impl<W: Write> PartWriter<W> {
     /// [`OpcError::IncompleteOutput`] from `finish`.
     #[must_use]
     pub fn output_bytes(&self) -> u64 {
-        self.entry
-            .as_ref()
-            .map(|entry| entry.progress().output_bytes())
-            .unwrap_or(0)
+        self.entry.progress().output_bytes()
     }
 
     /// Number of uncompressed bytes accepted by this part.
     #[must_use]
     pub fn uncompressed_bytes(&self) -> u64 {
-        self.entry
-            .as_ref()
-            .map(soapberry_zip::office::StreamingArchiveEntry::uncompressed_bytes)
-            .unwrap_or(0)
+        self.entry.uncompressed_bytes()
     }
 
     /// Finish this part and recover the physical package writer.
@@ -1473,11 +1451,9 @@ impl<W: Write> PartWriter<W> {
     /// The part name becomes committed only after the ZIP entry is finalized.
     /// If finalization or the sink fails after bytes were accepted, the error
     /// carries the exact accepted byte count in [`OpcError::IncompleteOutput`].
-    pub fn finish(mut self) -> Result<PhysPkgWriter<W>> {
-        let entry = self.entry.take().ok_or_else(|| {
-            OpcError::ZipError("OPC Part writer has already been finished".to_string())
-        })?;
-        let (archive, _progress) = entry
+    pub fn finish(self) -> Result<PhysPkgWriter<W>> {
+        let (archive, _progress) = self
+            .entry
             .finish_with_progress()
             .map_err(map_streaming_failure)?;
         let part_names = match self.name_state {
@@ -1673,7 +1649,7 @@ impl<W: Write> PhysPkgWriter<W> {
             .start_entry(partname.membername(), compression_method)
             .map_err(map_streaming_failure)?;
         Ok(PartWriter {
-            entry: Some(entry),
+            entry,
             name_state,
             directory_spool: self.directory_spool,
         })

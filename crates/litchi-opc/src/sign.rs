@@ -1572,4 +1572,244 @@ mod tests {
         assert_eq!(reports[0].integrity(), Status::Valid);
         assert_eq!(reports[0].signature(), Status::Valid);
     }
+
+    /// The signature disposition as the package's `Debug` output reports it:
+    /// `"<exact> <ingress><tracked><authorized><required><api-authored>"`,
+    /// followed by whether a signature edit policy is required.
+    fn disposition(package: &OpcPackage) -> (String, bool) {
+        let debug = format!("{package:?}");
+        let bit = |name: &str| {
+            let start = debug.find(name).expect("disposition field") + name.len();
+            if debug[start..].starts_with(": true") {
+                '1'
+            } else {
+                assert!(debug[start..].starts_with(": false"));
+                '0'
+            }
+        };
+        let mut text = String::new();
+        text.push(bit("exact_source_authorized"));
+        text.push(' ');
+        for name in [
+            "source_ingress",
+            "signature_graph_tracked",
+            "signature_policy_authorized",
+            "signature_policy_required",
+            "signature_api_authored",
+        ] {
+            text.push(bit(name));
+        }
+        (text, package.requires_signature_edit_policy())
+    }
+
+    fn at(text: &str, required: bool) -> (String, bool) {
+        (text.to_owned(), required)
+    }
+
+    fn extra_part(name: &str) -> Box<BlobPart> {
+        Box::new(BlobPart::new(
+            PackURI::new(name).expect("URI"),
+            "application/octet-stream".into(),
+            b"extra".to_vec(),
+        ))
+    }
+
+    fn unsigned_source() -> Vec<u8> {
+        let mut output = std::io::Cursor::new(Vec::new());
+        package().write_to(&mut output).expect("serialize");
+        output.into_inner()
+    }
+
+    #[test]
+    fn authored_package_signature_disposition_transitions() {
+        let mut fresh = OpcPackage::new();
+        assert_eq!(disposition(&fresh), at("0 00000", false));
+        fresh.unsign();
+        assert_eq!(disposition(&fresh), at("0 00100", false));
+        fresh.add_part(extra_part("/extra.bin"));
+        assert_eq!(disposition(&fresh), at("0 01100", false));
+
+        let mut related = OpcPackage::new();
+        related.relate_to("/document.xml", "urn:test:plain");
+        assert_eq!(disposition(&related), at("0 01000", false));
+        related.relate_to_external("https://example.invalid", "urn:test:plain");
+        assert_eq!(disposition(&related), at("0 01000", false));
+        related.relate_to(ORIGIN_NAME, ORIGIN_REL);
+        assert!(related.is_signed());
+        assert_eq!(disposition(&related), at("0 01100", false));
+
+        let mut external = OpcPackage::new();
+        external.relate_to_external("https://example.invalid", ORIGIN_REL);
+        assert_eq!(disposition(&external), at("0 01100", false));
+
+        let mut low_level = OpcPackage::new();
+        let _ = low_level.relationships_mut();
+        assert_eq!(disposition(&low_level), at("0 01100", false));
+        let mut low_level = OpcPackage::new();
+        low_level.add_part(extra_part("/extra.bin"));
+        assert_eq!(disposition(&low_level), at("0 01000", false));
+        let _ = low_level.rels_mut();
+        assert_eq!(disposition(&low_level), at("0 01100", false));
+
+        let mut package = package();
+        assert_eq!(disposition(&package), at("0 01100", false));
+        package.sign(&signer(7)).expect("sign");
+        assert_eq!(disposition(&package), at("0 01111", false));
+        assert_eq!(disposition(&package.clone()), at("0 01111", false));
+
+        package
+            .try_add_part(extra_part("/unsigned.bin"))
+            .expect("part");
+        assert_eq!(disposition(&package), at("0 01011", true));
+        assert!(matches!(
+            crate::PackageWriter::to_bytes(&package),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+
+        let tight = Limits::standard().references(1).expect("limits");
+        assert!(package.sign(&signer(8)).is_err());
+        assert_eq!(disposition(&package), at("0 01011", true));
+        assert!(package.sign_with(&signer(8), &tight).is_err());
+        assert_eq!(disposition(&package), at("0 01011", true));
+        assert!(package.resign_with(&signer(8), &tight).is_err());
+        assert_eq!(disposition(&package), at("0 01011", true));
+
+        package.resign(&signer(8)).expect("resign");
+        assert_eq!(disposition(&package), at("0 01111", false));
+        let signature = PackURI::new("/_xmlsignatures/sig1.xml").expect("URI");
+        let _ = package.get_part_mut(&signature).expect("signature part");
+        assert_eq!(disposition(&package), at("0 01011", true));
+        package
+            .resign_with(&signer(9), &Limits::standard())
+            .expect("resign");
+        assert_eq!(disposition(&package), at("0 01111", false));
+
+        package.unsign();
+        assert!(!package.is_signed());
+        assert_eq!(disposition(&package), at("0 01100", false));
+        package
+            .try_add_part(extra_part("/after.bin"))
+            .expect("part");
+        assert_eq!(disposition(&package), at("0 01100", false));
+        package
+            .sign_with(&signer(10), &Limits::standard())
+            .expect("sign");
+        assert_eq!(disposition(&package), at("0 01111", false));
+
+        // Low-level removal of an API-authored graph keeps the requirement
+        // until the package relationships are opened while unsigned.
+        package.strip_signature_graph();
+        assert!(!package.is_signed());
+        assert_eq!(disposition(&package), at("0 01011", true));
+        let _ = package.rels_mut();
+        assert_eq!(disposition(&package), at("0 01111", false));
+    }
+
+    #[test]
+    fn signed_ingress_signature_disposition_transitions() {
+        let borrowed =
+            OpcPackage::from_bytes(POI_DOCX, SourceLimits::default()).expect("fixture opens");
+        assert_eq!(disposition(&borrowed), at("0 11010", true));
+
+        let mut package = OpcPackage::from_vec(POI_DOCX.to_vec(), SourceLimits::default())
+            .expect("fixture opens");
+        assert_eq!(disposition(&package), at("1 11010", false));
+        assert_eq!(disposition(&package.clone()), at("1 11010", false));
+
+        // A failed authoring call restores the exact-source authorization too.
+        let tight = Limits::standard().references(1).expect("limits");
+        assert!(package.sign(&signer(7)).is_err());
+        assert_eq!(disposition(&package), at("1 11010", false));
+        assert!(package.sign_with(&signer(7), &tight).is_err());
+        assert_eq!(disposition(&package), at("1 11010", false));
+        assert!(package.resign_with(&signer(7), &tight).is_err());
+        assert_eq!(disposition(&package), at("1 11010", false));
+        assert!(package.exact_source_shared().is_some());
+
+        let mut edited = package.clone();
+        edited.set_save_options(edited.save_options().clone());
+        assert_eq!(disposition(&edited), at("0 11010", true));
+        assert!(matches!(
+            edited.validate_signature_edit_from(&package),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(edited.sign(&signer(7)).is_err());
+        assert_eq!(disposition(&edited), at("0 11010", true));
+
+        package.resign(&signer(7)).expect("resign");
+        assert_eq!(disposition(&package), at("0 11111", false));
+        package
+            .try_add_part(extra_part("/unsigned.bin"))
+            .expect("part");
+        assert_eq!(disposition(&package), at("0 11011", true));
+        assert!(package.sign(&signer(8)).is_err());
+        assert_eq!(disposition(&package), at("0 11011", true));
+
+        package.unsign();
+        assert!(!package.is_signed());
+        assert_eq!(disposition(&package), at("0 11100", false));
+        package
+            .try_add_part(extra_part("/after.bin"))
+            .expect("part");
+        assert_eq!(disposition(&package), at("0 11000", false));
+
+        // A low-level signature part makes the package signed again; the
+        // requirement becomes sticky at the next mutation.
+        let orphan = "/_xmlsignatures/orphan.xml";
+        package.try_add_part(extra_part(orphan)).expect("part");
+        assert!(package.is_signed());
+        assert_eq!(disposition(&package), at("0 11000", true));
+        let _ = package.rels_mut();
+        assert_eq!(disposition(&package), at("0 11010", true));
+        assert!(package.remove_part(&PackURI::new(orphan).expect("URI")));
+        assert!(!package.is_signed());
+        assert_eq!(disposition(&package), at("0 11010", true));
+        package.unsign();
+        assert_eq!(disposition(&package), at("0 11100", false));
+        package.set_save_options(package.save_options().clone());
+        assert_eq!(disposition(&package), at("0 11000", false));
+    }
+
+    #[test]
+    fn unsigned_ingress_signature_disposition_transitions() {
+        let source = unsigned_source();
+        let package =
+            OpcPackage::from_vec(source.clone(), SourceLimits::default()).expect("source opens");
+        assert_eq!(disposition(&package), at("1 10000", false));
+        let borrowed =
+            OpcPackage::from_bytes(&source, SourceLimits::default()).expect("source opens");
+        assert_eq!(disposition(&borrowed), at("0 10000", false));
+
+        let mut options = package.clone();
+        options.with_fonts(crate::FontEmbedding::None);
+        assert_eq!(disposition(&options), at("0 10000", false));
+        options.unsign();
+        assert_eq!(disposition(&options), at("0 10100", false));
+        options.set_save_options(options.save_options().clone());
+        assert_eq!(disposition(&options), at("0 10000", false));
+
+        let mut related = package.clone();
+        let _ = related.rels_mut();
+        assert_eq!(disposition(&related), at("0 11000", false));
+        related.relate_to(ORIGIN_NAME, ORIGIN_REL);
+        assert!(related.is_signed());
+        assert_eq!(disposition(&related), at("0 11000", true));
+        related.relate_to_external("https://example.invalid", "urn:test:plain");
+        assert_eq!(disposition(&related), at("0 11010", true));
+        let _ = related.relationships_mut();
+        assert_eq!(disposition(&related), at("0 11010", true));
+        related.unsign();
+        assert!(!related.is_signed());
+        assert_eq!(disposition(&related), at("0 11100", false));
+        let _ = related.relationships_mut();
+        assert_eq!(disposition(&related), at("0 11000", false));
+
+        let mut signed = package;
+        signed.sign(&signer(7)).expect("sign");
+        assert_eq!(disposition(&signed), at("0 11111", false));
+        let _ = signed.rels_mut();
+        assert_eq!(disposition(&signed), at("0 11011", true));
+        signed.unsign();
+        assert_eq!(disposition(&signed), at("0 11100", false));
+    }
 }

@@ -648,11 +648,27 @@ pub struct ArtifactStreamTarget<'a> {
     writer: &'a mut dyn Write,
     policy: &'a ArtifactStreamPolicy<'a>,
     token: u64,
-    claimed: bool,
-    invalidated: bool,
+    state: ArtifactTargetState,
     written: u64,
     hasher: Sha256,
-    publication: Option<ArtifactStreamReport>,
+}
+
+/// One-shot publication lifecycle of an [`ArtifactStreamTarget`].
+///
+/// ```text
+/// Unclaimed  --claim-->            Attempted
+/// Attempted  --attempt succeeds--> Published(report)
+/// Attempted | Published | Invalidated --claim (refused)--> Invalidated
+/// ```
+///
+/// `Attempted` covers both a running attempt and one that failed. Only
+/// `Published` validates a publication proof, and only the report it holds.
+#[derive(Clone, Copy)]
+enum ArtifactTargetState {
+    Unclaimed,
+    Attempted,
+    Published(ArtifactStreamReport),
+    Invalidated,
 }
 
 impl<'a> ArtifactStreamTarget<'a> {
@@ -661,11 +677,28 @@ impl<'a> ArtifactStreamTarget<'a> {
             writer,
             policy,
             token: NEXT_ARTIFACT_STREAM_TARGET.fetch_add(1, Ordering::Relaxed),
-            claimed: false,
-            invalidated: false,
+            state: ArtifactTargetState::Unclaimed,
             written: 0,
             hasher: Sha256::new(),
-            publication: None,
+        }
+    }
+
+    /// Claim the target's single publication attempt. A second claim is
+    /// refused and voids any publication the first one produced.
+    fn claim(&mut self) -> Result<()> {
+        match self.state {
+            ArtifactTargetState::Unclaimed => {
+                self.state = ArtifactTargetState::Attempted;
+                Ok(())
+            },
+            ArtifactTargetState::Attempted
+            | ArtifactTargetState::Published(_)
+            | ArtifactTargetState::Invalidated => {
+                self.state = ArtifactTargetState::Invalidated;
+                Err(overlay_unavailable(
+                    "artifact stream target already has a publication attempt",
+                ))
+            },
         }
     }
 
@@ -673,13 +706,7 @@ impl<'a> ArtifactStreamTarget<'a> {
     where
         F: FnOnce(&mut dyn Write, &ArtifactStreamPolicy<'a>) -> Result<()>,
     {
-        if self.claimed {
-            self.invalidated = true;
-            return Err(overlay_unavailable(
-                "artifact stream target already has a publication attempt",
-            ));
-        }
-        self.claimed = true;
+        self.claim()?;
         let policy = self.policy;
         let mut sink = ArtifactTargetSink { target: self };
         operation(&mut sink, policy)?;
@@ -690,7 +717,7 @@ impl<'a> ArtifactStreamTarget<'a> {
             ),
             target_token: sink.target.token,
         };
-        sink.target.publication = Some(publication);
+        sink.target.state = ArtifactTargetState::Published(publication);
         Ok(publication)
     }
 
@@ -703,13 +730,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         G: ArtifactStreamGuard,
         F: FnOnce(&mut dyn Write, &ArtifactStreamPolicy<'a>) -> Result<()>,
     {
-        if self.claimed {
-            self.invalidated = true;
-            return Err(ArtifactStreamError::opc(overlay_unavailable(
-                "artifact stream target already has a publication attempt",
-            )));
-        }
-        self.claimed = true;
+        self.claim().map_err(ArtifactStreamError::opc)?;
         if let Err(error) = guard.check() {
             return Err(ArtifactStreamError::producer(error));
         }
@@ -768,7 +789,7 @@ impl<'a> ArtifactStreamTarget<'a> {
             fingerprint: self.fingerprint(),
             target_token: self.token,
         };
-        self.publication = Some(publication);
+        self.state = ArtifactTargetState::Published(publication);
         publication
     }
 
@@ -944,8 +965,7 @@ impl<'a> ArtifactStreamTarget<'a> {
     }
 
     fn validate_publication(&self, publication: ArtifactStreamReport) -> Result<()> {
-        if self.invalidated
-            || self.publication != Some(publication)
+        if !matches!(self.state, ArtifactTargetState::Published(minted) if minted == publication)
             || publication.target_token != self.token
             || publication.written != self.written
             || publication.fingerprint != self.fingerprint()
@@ -976,13 +996,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         O: ArtifactStream + ?Sized,
         C: ArtifactStream<Error = O::Error>,
     {
-        if self.claimed {
-            self.invalidated = true;
-            return Err(ArtifactStreamError::opc(overlay_unavailable(
-                "artifact stream target already has a publication attempt",
-            )));
-        }
-        self.claimed = true;
+        self.claim().map_err(ArtifactStreamError::opc)?;
         let policy = self.policy;
         let result = {
             let mut sink = ArtifactTargetSink { target: self };

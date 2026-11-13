@@ -2407,17 +2407,18 @@ enum SplicePhase {
 /// `PreviouslyVerifiedXml` capability, which is copied into the immutable
 /// plan and checked again at every publication pass.  Binary payloads keep
 /// the existing raw-drain path without carrying XML authorization.
+///
+/// ```text
+/// Binary    --after_candidate_audit--> Binary
+/// XmlAudit  --after_candidate_audit--> PreviouslyVerifiedXml(authorization)
+/// PreviouslyVerifiedXml --after_candidate_audit--> refused (reuse)
+/// ```
+#[allow(clippy::large_enum_variant)] // `Copy` capability held by value; boxing would allocate per splice
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SpliceAuditKind {
+enum SpliceAuditMode {
     Binary,
     XmlAudit,
-    PreviouslyVerifiedXml,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct SpliceAuditMode {
-    kind: SpliceAuditKind,
-    authorization: Option<CandidateXmlAuthorization>,
+    PreviouslyVerifiedXml(CandidateXmlAuthorization),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2429,28 +2430,15 @@ struct CandidateXmlAuthorization {
 
 impl SpliceAuditMode {
     const fn for_target(is_xml: bool) -> Self {
-        if is_xml {
-            Self {
-                kind: SpliceAuditKind::XmlAudit,
-                authorization: None,
-            }
-        } else {
-            Self {
-                kind: SpliceAuditKind::Binary,
-                authorization: None,
-            }
-        }
+        if is_xml { Self::XmlAudit } else { Self::Binary }
     }
 
     const fn needs_xml_workspace(self) -> bool {
-        matches!(
-            self.kind,
-            SpliceAuditKind::XmlAudit | SpliceAuditKind::PreviouslyVerifiedXml
-        )
+        matches!(self, Self::XmlAudit | Self::PreviouslyVerifiedXml(_))
     }
 
     const fn runs_xml_parser(self) -> bool {
-        matches!(self.kind, SpliceAuditKind::XmlAudit)
+        matches!(self, Self::XmlAudit)
     }
 
     fn after_candidate_audit(
@@ -2459,17 +2447,14 @@ impl SpliceAuditMode {
         target: usize,
         limits: SourcePartSpliceLimits,
     ) -> Result<Self> {
-        match (self.kind, self.authorization) {
-            (SpliceAuditKind::Binary, None) => Ok(Self::for_target(false)),
-            (SpliceAuditKind::XmlAudit, None) => Ok(Self {
-                kind: SpliceAuditKind::PreviouslyVerifiedXml,
-                authorization: Some(CandidateXmlAuthorization {
-                    proof,
-                    target,
-                    limits,
-                }),
-            }),
-            _ => Err(overlay_unavailable(
+        match self {
+            Self::Binary => Ok(Self::Binary),
+            Self::XmlAudit => Ok(Self::PreviouslyVerifiedXml(CandidateXmlAuthorization {
+                proof,
+                target,
+                limits,
+            })),
+            Self::PreviouslyVerifiedXml(_) => Err(overlay_unavailable(
                 "decoded splice candidate XML authorization was reused during preparation",
             )),
         }
@@ -2481,21 +2466,23 @@ impl SpliceAuditMode {
         target: usize,
         limits: SourcePartSpliceLimits,
     ) -> Result<()> {
-        match (self.kind, self.authorization) {
-            (SpliceAuditKind::Binary, None) => Ok(()),
-            (SpliceAuditKind::XmlAudit, None) => Err(overlay_unavailable(
+        match self {
+            Self::Binary => Ok(()),
+            Self::XmlAudit => Err(overlay_unavailable(
                 "decoded splice publication received an initial XML audit mode",
             )),
-            (SpliceAuditKind::PreviouslyVerifiedXml, Some(authorization))
+            Self::PreviouslyVerifiedXml(authorization) => {
                 if authorization.proof == proof
                     && authorization.target == target
-                    && authorization.limits == limits =>
-            {
-                Ok(())
+                    && authorization.limits == limits
+                {
+                    Ok(())
+                } else {
+                    Err(overlay_unavailable(
+                        "decoded splice candidate XML authorization does not match its plan",
+                    ))
+                }
             },
-            _ => Err(overlay_unavailable(
-                "decoded splice candidate XML authorization does not match its plan",
-            )),
         }
     }
 
@@ -2504,16 +2491,17 @@ impl SpliceAuditMode {
         proof: SourcePartSpliceProof,
         limits: SourcePartSpliceLimits,
     ) -> Result<()> {
-        match (self.kind, self.authorization) {
-            (SpliceAuditKind::Binary, None) | (SpliceAuditKind::XmlAudit, None) => Ok(()),
-            (SpliceAuditKind::PreviouslyVerifiedXml, Some(authorization))
-                if authorization.proof == proof && authorization.limits == limits =>
-            {
-                Ok(())
+        match self {
+            Self::Binary | Self::XmlAudit => Ok(()),
+            Self::PreviouslyVerifiedXml(authorization) => {
+                if authorization.proof == proof && authorization.limits == limits {
+                    Ok(())
+                } else {
+                    Err(overlay_unavailable(
+                        "decoded splice candidate XML authorization does not match this pass",
+                    ))
+                }
             },
-            _ => Err(overlay_unavailable(
-                "decoded splice candidate XML authorization does not match this pass",
-            )),
         }
     }
 }

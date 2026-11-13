@@ -205,6 +205,184 @@ impl Clone for ContentTypesSourceState {
     }
 }
 
+/// Signature disposition of a package: whether publishing it after an edit
+/// needs an explicit strip-or-sign decision first.
+///
+/// States (`tracked` records that a signature graph was established at
+/// ingress or that the package graph was mutated since):
+///
+/// - `Authored`: built in memory, never signed through the signing API.
+///   Never requires a policy; a hand-built signature graph is inert.
+///   `handled` records an explicit disposition (`unsign`, or opening the
+///   relationship graph while unsigned).
+/// - `IngressUnhandled`: read from a source, no pending requirement. Requires
+///   a policy while tracked and signature infrastructure is present.
+/// - `IngressRequired`: read from a source that was signed, or found signed
+///   at a mutation. Requires a policy while tracked, even after low-level
+///   removal empties the graph.
+/// - `IngressStripped`: read from a source, then explicitly unsigned.
+///   Requires nothing until the next mutation.
+/// - `ApiSigned`: the graph was authored by `sign`/`resign`. Requires a
+///   policy once `edited`.
+///
+/// Transitions (`signed` is `OpcPackage::is_signed` at that moment):
+///
+/// ```text
+/// (any)             --ingress(signed)-->   IngressRequired{tracked} | IngressUnhandled{untracked}
+/// Authored          --revoke-->            Authored
+/// IngressUnhandled  --revoke(signed)-->    IngressRequired | IngressUnhandled
+/// IngressStripped   --revoke(signed)-->    IngressRequired | IngressUnhandled
+/// IngressRequired   --revoke-->            IngressRequired
+/// ApiSigned         --revoke-->            ApiSigned{edited}
+/// (any)             --graph_edited-->      same state, tracked
+/// Authored          --graph_edited(authorizing)--> Authored{tracked, handled}
+/// ApiSigned{authored} --graph_edited(authorizing)--> ApiSigned{not edited}
+/// (any)             --signed-->            ApiSigned{not edited}, origin kept
+/// Authored          --unsigned-->          Authored{handled}
+/// Ingress*          --unsigned-->          IngressStripped
+/// ApiSigned         --unsigned-->          Authored{tracked, handled} | IngressStripped{tracked}
+/// ```
+///
+/// A failed `sign`/`resign` restores the state saved before the call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SignatureState {
+    Authored { tracked: bool, handled: bool },
+    IngressUnhandled { tracked: bool },
+    IngressRequired { tracked: bool },
+    IngressStripped { tracked: bool },
+    ApiSigned { ingress: bool, edited: bool },
+}
+
+/// The historical flag view of a [`SignatureState`], reported by
+/// `OpcPackage`'s `Debug` output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SignatureFlags {
+    source_ingress: bool,
+    graph_tracked: bool,
+    policy_authorized: bool,
+    policy_required: bool,
+    api_authored: bool,
+}
+
+impl SignatureState {
+    /// A package built in memory with nothing established yet.
+    const NEW: Self = Self::Authored {
+        tracked: false,
+        handled: false,
+    };
+
+    /// The state of a package just unmarshaled from an external source.
+    fn ingress(signed: bool) -> Self {
+        if signed {
+            Self::IngressRequired { tracked: true }
+        } else {
+            Self::IngressUnhandled { tracked: false }
+        }
+    }
+
+    /// A mutation is about to happen: an earlier disposition of a source or
+    /// API-authored graph no longer covers the package. `signed` is consulted
+    /// only where its answer changes the state.
+    fn revoked(self, signed: impl FnOnce() -> bool) -> Self {
+        match self {
+            Self::Authored { .. } | Self::IngressRequired { .. } => self,
+            Self::IngressUnhandled { tracked } | Self::IngressStripped { tracked } => {
+                if signed() {
+                    Self::IngressRequired { tracked }
+                } else {
+                    Self::IngressUnhandled { tracked }
+                }
+            },
+            Self::ApiSigned { ingress, .. } => Self::ApiSigned {
+                ingress,
+                edited: true,
+            },
+        }
+    }
+
+    /// The package graph was mutated. `authorizing` is set when the mutation
+    /// may establish a signature graph on a package that was unsigned before
+    /// it; only a package built in memory accepts that as a disposition.
+    fn graph_edited(self, authorizing: bool) -> Self {
+        match self {
+            Self::Authored { handled, .. } => Self::Authored {
+                tracked: true,
+                handled: handled || authorizing,
+            },
+            Self::IngressUnhandled { .. } => Self::IngressUnhandled { tracked: true },
+            Self::IngressRequired { .. } => Self::IngressRequired { tracked: true },
+            Self::IngressStripped { .. } => Self::IngressStripped { tracked: true },
+            Self::ApiSigned { ingress, edited } => Self::ApiSigned {
+                ingress,
+                edited: edited && (ingress || !authorizing),
+            },
+        }
+    }
+
+    /// `sign` or `resign` authored the current graph.
+    #[cfg(any(feature = "sign", test))]
+    fn signed(self) -> Self {
+        let ingress = match self {
+            Self::Authored { .. } => false,
+            Self::IngressUnhandled { .. }
+            | Self::IngressRequired { .. }
+            | Self::IngressStripped { .. } => true,
+            Self::ApiSigned { ingress, .. } => ingress,
+        };
+        Self::ApiSigned {
+            ingress,
+            edited: false,
+        }
+    }
+
+    /// `unsign` stripped the graph.
+    fn unsigned(self) -> Self {
+        match self {
+            Self::Authored { tracked, .. } => Self::Authored {
+                tracked,
+                handled: true,
+            },
+            Self::IngressUnhandled { tracked }
+            | Self::IngressRequired { tracked }
+            | Self::IngressStripped { tracked } => Self::IngressStripped { tracked },
+            Self::ApiSigned { ingress: false, .. } => Self::Authored {
+                tracked: true,
+                handled: true,
+            },
+            Self::ApiSigned { ingress: true, .. } => Self::IngressStripped { tracked: true },
+        }
+    }
+
+    /// Whether a changed package still needs an explicit disposition.
+    /// `signed` is consulted only where its answer decides.
+    fn requires_edit_policy(self, signed: impl FnOnce() -> bool) -> bool {
+        match self {
+            Self::Authored { .. } | Self::IngressStripped { .. } => false,
+            Self::IngressUnhandled { tracked } => tracked && signed(),
+            Self::IngressRequired { tracked } => tracked,
+            Self::ApiSigned { edited, .. } => edited,
+        }
+    }
+
+    fn flags(self) -> SignatureFlags {
+        let (source_ingress, graph_tracked, policy_authorized, policy_required, api_authored) =
+            match self {
+                Self::Authored { tracked, handled } => (false, tracked, handled, false, false),
+                Self::IngressUnhandled { tracked } => (true, tracked, false, false, false),
+                Self::IngressRequired { tracked } => (true, tracked, false, true, false),
+                Self::IngressStripped { tracked } => (true, tracked, true, false, false),
+                Self::ApiSigned { ingress, edited } => (ingress, true, !edited, true, true),
+            };
+        SignatureFlags {
+            source_ingress,
+            graph_tracked,
+            policy_authorized,
+            policy_required,
+            api_authored,
+        }
+    }
+}
+
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]
 pub struct SaveOptions {
@@ -684,33 +862,9 @@ pub struct OpcPackage {
     /// Clone-local authorization for exact whole-source publication.
     exact_source_authorized: bool,
 
-    /// Whether the package was unmarshaled from an external source. This is
-    /// retained even for borrowed ingress, which has no exact-source bytes.
-    source_ingress: bool,
-
-    /// Whether this package has had a signature graph established at ingress
-    /// or by an explicit authoring operation. New packages may author a
-    /// signature graph directly; this marker keeps that case distinct from an
-    /// untracked unsigned package while still catching later mutations.
-    signature_graph_tracked: bool,
-
-    /// Whether the current signature graph was explicitly handled by a
-    /// strip-or-sign operation. Ordinary mutations revoke this policy while a
-    /// package remains signed; an explicit unsign remains authorized for later
-    /// publication.
-    signature_policy_authorized: bool,
-
-    /// Whether a signed source or an API-authored signature graph still needs
-    /// an explicit signature edit policy. This remains set after generic
-    /// low-level removal empties the graph, so removal cannot masquerade as
-    /// signature stripping. Explicit `unsign` clears the requirement.
-    signature_policy_required: bool,
-
-    /// Whether the current signature graph was authored through the explicit
-    /// signing API. This lets newly authored packages retain the historical
-    /// inert-signature construction path while still rejecting later edits to
-    /// a graph produced by `sign` or `resign`.
-    signature_api_authored: bool,
+    /// Whether an edited package needs an explicit signature disposition
+    /// before publication, and what established that.
+    signature: SignatureState,
 
     /// Source identity used to prove safe targeted publication.
     preservation: Option<Arc<PreservationProvenance>>,
@@ -770,11 +924,7 @@ impl Clone for OpcPackage {
             source_content_types: self.source_content_types.clone(),
             content_types_source_state: self.content_types_source_state.clone(),
             exact_source_authorized: self.exact_source_authorized,
-            source_ingress: self.source_ingress,
-            signature_graph_tracked: self.signature_graph_tracked,
-            signature_policy_authorized: self.signature_policy_authorized,
-            signature_policy_required: self.signature_policy_required,
-            signature_api_authored: self.signature_api_authored,
+            signature: self.signature,
             preservation: self.preservation.clone(),
             package_identity: Arc::new(()),
             package_revision: self.package_revision,
@@ -809,20 +959,18 @@ impl MainPartname {
 
 impl std::fmt::Debug for OpcPackage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let signature = self.signature.flags();
         f.debug_struct("OpcPackage")
             .field("rels", &self.rels)
             .field("parts_count", &self.parts.len())
             .field("source_xml_parts_count", &self.source_xml_parts.len())
             .field("has_owned_source", &self.source_archive.is_some())
             .field("exact_source_authorized", &self.exact_source_authorized)
-            .field("source_ingress", &self.source_ingress)
-            .field("signature_graph_tracked", &self.signature_graph_tracked)
-            .field(
-                "signature_policy_authorized",
-                &self.signature_policy_authorized,
-            )
-            .field("signature_policy_required", &self.signature_policy_required)
-            .field("signature_api_authored", &self.signature_api_authored)
+            .field("source_ingress", &signature.source_ingress)
+            .field("signature_graph_tracked", &signature.graph_tracked)
+            .field("signature_policy_authorized", &signature.policy_authorized)
+            .field("signature_policy_required", &signature.policy_required)
+            .field("signature_api_authored", &signature.api_authored)
             .field("has_preservation_provenance", &self.preservation.is_some())
             .field("non_part_members", &self.non_part_members)
             .field("tolerance_report", &self.tolerance_report)
@@ -849,11 +997,7 @@ impl OpcPackage {
             source_limits: SourceLimits::default(),
             transfer_index: None,
             exact_source_authorized: false,
-            source_ingress: false,
-            signature_graph_tracked: false,
-            signature_policy_authorized: false,
-            signature_policy_required: false,
-            signature_api_authored: false,
+            signature: SignatureState::NEW,
             preservation: None,
             package_identity: Arc::new(()),
             package_revision: 0,
@@ -2392,9 +2536,7 @@ impl OpcPackage {
         package.parts = parts_map;
         package.part_bytes = Some(part_bytes);
         package.source_xml_parts = source_xml_parts;
-        package.source_ingress = true;
-        package.signature_graph_tracked = package.is_signed();
-        package.signature_policy_required = package.signature_graph_tracked;
+        package.mark_source_ingress_signature_policy();
         Ok(package)
     }
 
@@ -2808,7 +2950,7 @@ impl OpcPackage {
         self.content_types_source_state.reset();
         // A mutable Part exposes its relationship collection, so retain the
         // signature audit even when the caller edits that collection directly.
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         // Resolve the stored key first so the borrow of `self.parts` ends before
         // the mutable lookup; see `find_case_insensitive` for why this matches.
         let key = if self.parts.contains_key(partname) {
@@ -2912,7 +3054,7 @@ impl OpcPackage {
             return Err(OpcError::UnsupportedCustomPartPayload);
         }
         self.revoke_exact_source();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         self.part_bytes = None;
         for (partname, payload) in prepared {
             // Preflight resolved every key and no map mutation intervenes.
@@ -2956,7 +3098,7 @@ impl OpcPackage {
     pub fn add_part(&mut self, part: Box<dyn Part + Send + Sync>) {
         self.revoke_exact_source();
         self.content_types_source_state.reset();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         self.mark_content_types_invalid_if_uncovered(&*part);
         let partname = part.partname().clone();
         self.source_xml_parts.remove(&partname);
@@ -2973,7 +3115,7 @@ impl OpcPackage {
     pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         self.revoke_exact_source();
         self.content_types_source_state.reset();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         let partname = part.partname().clone();
         self.read_limits.check(
             crate::limits::SourceLimitKind::ArchiveMemberNameBytes,
@@ -3187,7 +3329,7 @@ impl OpcPackage {
 
         self.revoke_exact_source();
         self.content_types_source_state.reset();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         self.part_bytes = None;
         for part in parts {
             let name = part.partname().clone();
@@ -3378,7 +3520,7 @@ impl OpcPackage {
         }
         let source_blob = source_xml.then(|| part.payload_handle());
         self.revoke_exact_source();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         self.content_types_source_state.reset();
         self.source_relationships_xml.remove(&partname);
         self.part_bytes = None;
@@ -3467,7 +3609,7 @@ impl OpcPackage {
         checkpoint()?;
 
         self.revoke_exact_source();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         self.part_bytes = None;
         for (part, retain_source) in parts {
             let partname = part.partname().clone();
@@ -3506,7 +3648,7 @@ impl OpcPackage {
     /// Remove a part by name, returning whether it existed.
     pub fn remove_part(&mut self, partname: &PackURI) -> bool {
         self.revoke_exact_source();
-        self.signature_graph_tracked = true;
+        self.signature = self.signature.graph_edited(false);
         self.content_types_source_state.reset();
         self.source_xml_parts.remove(partname);
         self.source_relationships_xml.remove(partname);
@@ -3639,10 +3781,7 @@ impl OpcPackage {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
         self.content_types_source_state.reset();
-        self.signature_graph_tracked = true;
-        if !was_signed && !self.source_ingress {
-            self.signature_policy_authorized = true;
-        }
+        self.signature = self.signature.graph_edited(!was_signed);
         &mut self.rels
     }
 
@@ -3701,27 +3840,9 @@ impl OpcPackage {
     /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
-        let exact_source_authorized = self.exact_source_authorized;
-        let signature_graph_tracked = self.signature_graph_tracked;
-        let signature_policy_authorized = self.signature_policy_authorized;
-        let signature_policy_required = self.signature_policy_required;
-        let signature_api_authored = self.signature_api_authored;
-        self.revoke_exact_source();
-        self.content_types_source_state.reset();
-        let result = crate::sign::sign(self, signer, &litchi_sign::Limits::standard());
-        if result.is_ok() {
-            self.signature_graph_tracked = true;
-            self.signature_policy_authorized = true;
-            self.signature_policy_required = true;
-            self.signature_api_authored = true;
-        } else {
-            self.exact_source_authorized = exact_source_authorized;
-            self.signature_graph_tracked = signature_graph_tracked;
-            self.signature_policy_authorized = signature_policy_authorized;
-            self.signature_policy_required = signature_policy_required;
-            self.signature_api_authored = signature_api_authored;
-        }
-        result
+        self.author_signature(|package| {
+            crate::sign::sign(package, signer, &litchi_sign::Limits::standard())
+        })
     }
 
     /// Adds a signature with explicit authoring resource bounds.
@@ -3735,27 +3856,7 @@ impl OpcPackage {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> crate::sign::Result<PackURI> {
-        let exact_source_authorized = self.exact_source_authorized;
-        let signature_graph_tracked = self.signature_graph_tracked;
-        let signature_policy_authorized = self.signature_policy_authorized;
-        let signature_policy_required = self.signature_policy_required;
-        let signature_api_authored = self.signature_api_authored;
-        self.revoke_exact_source();
-        self.content_types_source_state.reset();
-        let result = crate::sign::sign(self, signer, limits);
-        if result.is_ok() {
-            self.signature_graph_tracked = true;
-            self.signature_policy_authorized = true;
-            self.signature_policy_required = true;
-            self.signature_api_authored = true;
-        } else {
-            self.exact_source_authorized = exact_source_authorized;
-            self.signature_graph_tracked = signature_graph_tracked;
-            self.signature_policy_authorized = signature_policy_authorized;
-            self.signature_policy_required = signature_policy_required;
-            self.signature_api_authored = signature_api_authored;
-        }
-        result
+        self.author_signature(|package| crate::sign::sign(package, signer, limits))
     }
 
     /// Atomically replaces the validated signature graph with one signature.
@@ -3765,27 +3866,9 @@ impl OpcPackage {
     /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
-        let exact_source_authorized = self.exact_source_authorized;
-        let signature_graph_tracked = self.signature_graph_tracked;
-        let signature_policy_authorized = self.signature_policy_authorized;
-        let signature_policy_required = self.signature_policy_required;
-        let signature_api_authored = self.signature_api_authored;
-        self.revoke_exact_source();
-        self.content_types_source_state.reset();
-        let result = crate::sign::resign(self, signer, &litchi_sign::Limits::standard());
-        if result.is_ok() {
-            self.signature_graph_tracked = true;
-            self.signature_policy_authorized = true;
-            self.signature_policy_required = true;
-            self.signature_api_authored = true;
-        } else {
-            self.exact_source_authorized = exact_source_authorized;
-            self.signature_graph_tracked = signature_graph_tracked;
-            self.signature_policy_authorized = signature_policy_authorized;
-            self.signature_policy_required = signature_policy_required;
-            self.signature_api_authored = signature_api_authored;
-        }
-        result
+        self.author_signature(|package| {
+            crate::sign::resign(package, signer, &litchi_sign::Limits::standard())
+        })
     }
 
     /// Atomically replaces signatures with explicit authoring resource bounds.
@@ -3799,25 +3882,25 @@ impl OpcPackage {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> crate::sign::Result<PackURI> {
-        let exact_source_authorized = self.exact_source_authorized;
-        let signature_graph_tracked = self.signature_graph_tracked;
-        let signature_policy_authorized = self.signature_policy_authorized;
-        let signature_policy_required = self.signature_policy_required;
-        let signature_api_authored = self.signature_api_authored;
+        self.author_signature(|package| crate::sign::resign(package, signer, limits))
+    }
+
+    /// Runs one signing operation. On success the package's graph is the one
+    /// the signing API authored; on failure the exact-source authorization and
+    /// the signature disposition are what they were before the call.
+    #[cfg(feature = "sign")]
+    fn author_signature<T>(
+        &mut self,
+        author: impl FnOnce(&mut Self) -> crate::sign::Result<T>,
+    ) -> crate::sign::Result<T> {
+        let saved = (self.exact_source_authorized, self.signature);
         self.revoke_exact_source();
         self.content_types_source_state.reset();
-        let result = crate::sign::resign(self, signer, limits);
+        let result = author(self);
         if result.is_ok() {
-            self.signature_graph_tracked = true;
-            self.signature_policy_authorized = true;
-            self.signature_policy_required = true;
-            self.signature_api_authored = true;
+            self.signature = self.signature.signed();
         } else {
-            self.exact_source_authorized = exact_source_authorized;
-            self.signature_graph_tracked = signature_graph_tracked;
-            self.signature_policy_authorized = signature_policy_authorized;
-            self.signature_policy_required = signature_policy_required;
-            self.signature_api_authored = signature_api_authored;
+            (self.exact_source_authorized, self.signature) = saved;
         }
         result
     }
@@ -3828,9 +3911,7 @@ impl OpcPackage {
     pub fn unsign(&mut self) {
         self.revoke_exact_source();
         self.strip_signature_graph();
-        self.signature_policy_authorized = true;
-        self.signature_policy_required = false;
-        self.signature_api_authored = false;
+        self.signature = self.signature.unsigned();
     }
 
     /// Relate the package to a part.
@@ -3848,10 +3929,9 @@ impl OpcPackage {
         self.revoke_exact_source();
         self.content_types_source_state.reset();
         let r_id = self.rels.get_or_add(reltype, partname).r_id().to_string();
-        self.signature_graph_tracked = true;
-        if !was_signed && !self.source_ingress && is_signature_relationship(reltype) {
-            self.signature_policy_authorized = true;
-        }
+        self.signature = self
+            .signature
+            .graph_edited(!was_signed && is_signature_relationship(reltype));
         r_id
     }
 
@@ -3868,10 +3948,9 @@ impl OpcPackage {
         self.revoke_exact_source();
         self.content_types_source_state.reset();
         let r_id = self.rels.get_or_add_ext_rel(reltype, target_url);
-        self.signature_graph_tracked = true;
-        if !was_signed && !self.source_ingress && is_signature_relationship(reltype) {
-            self.signature_policy_authorized = true;
-        }
+        self.signature = self
+            .signature
+            .graph_edited(!was_signed && is_signature_relationship(reltype));
         r_id
     }
 
@@ -3882,10 +3961,7 @@ impl OpcPackage {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
         self.content_types_source_state.reset();
-        self.signature_graph_tracked = true;
-        if !was_signed && !self.source_ingress {
-            self.signature_policy_authorized = true;
-        }
+        self.signature = self.signature.graph_edited(!was_signed);
         &mut self.rels
     }
 
@@ -4096,11 +4172,7 @@ impl OpcPackage {
     }
 
     pub(crate) fn mark_source_ingress_signature_policy(&mut self) {
-        self.source_ingress = true;
-        self.signature_graph_tracked = self.is_signed();
-        self.signature_policy_required = self.signature_graph_tracked;
-        self.signature_policy_authorized = false;
-        self.signature_api_authored = false;
+        self.signature = SignatureState::ingress(self.is_signed());
     }
 
     /// Whether a changed source still requires explicit signature disposition.
@@ -4112,12 +4184,7 @@ impl OpcPackage {
     /// Exact unchanged source publication does not require a new disposition.
     #[must_use]
     pub fn requires_signature_edit_policy(&self) -> bool {
-        !self.exact_source_authorized
-            && self.signature_graph_tracked
-            && ((self.signature_policy_required && !self.signature_policy_authorized)
-                || (self.is_signed()
-                    && (self.source_ingress || self.signature_api_authored)
-                    && !self.signature_policy_authorized))
+        !self.exact_source_authorized && self.signature.requires_edit_policy(|| self.is_signed())
     }
 
     /// Validate signature disposition when publishing an edited candidate.
@@ -4175,12 +4242,7 @@ impl OpcPackage {
     fn revoke_exact_source(&mut self) {
         self.package_revision = self.package_revision.wrapping_add(1);
         self.exact_source_authorized = false;
-        if self.source_ingress || self.signature_api_authored {
-            self.signature_policy_authorized = false;
-            if self.is_signed() {
-                self.signature_policy_required = true;
-            }
-        }
+        self.signature = self.signature.revoked(|| self.is_signed());
     }
 
     fn from_owned_bytes_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
@@ -6688,7 +6750,7 @@ mod tests {
             crate::PackageWriter::to_bytes(&package),
             Err(OpcError::SignedSourceRequiresExplicitPolicy)
         ));
-        assert!(package.signature_policy_required);
+        assert!(package.signature.flags().policy_required);
     }
 
     #[test]
@@ -7031,9 +7093,7 @@ mod tests {
             ));
             assert_eq!(package.part_count(), 0);
             assert!(!package.exact_source_authorized);
-            assert!(!package.signature_graph_tracked);
-            assert!(!package.signature_policy_authorized);
-            assert!(!package.signature_policy_required);
+            assert_eq!(package.signature, SignatureState::NEW);
             assert!(package.source_xml_parts.is_empty());
         }
 
@@ -7045,9 +7105,7 @@ mod tests {
             let mut package =
                 OpcPackage::from_vec(create_minimal_docx(), SourceLimits::default()).unwrap();
             let exact_source_authorized = package.exact_source_authorized;
-            let signature_graph_tracked = package.signature_graph_tracked;
-            let signature_policy_authorized = package.signature_policy_authorized;
-            let signature_policy_required = package.signature_policy_required;
+            let signature = package.signature;
             let source_xml_count = package.source_xml_parts.len();
             let error = package
                 .try_add_materialized_parts(vec![make_part(candidate)], || Ok(()))
@@ -7063,12 +7121,7 @@ mod tests {
             ));
             assert_eq!(package.part_count(), 1);
             assert_eq!(package.exact_source_authorized, exact_source_authorized);
-            assert_eq!(package.signature_graph_tracked, signature_graph_tracked);
-            assert_eq!(
-                package.signature_policy_authorized,
-                signature_policy_authorized
-            );
-            assert_eq!(package.signature_policy_required, signature_policy_required);
+            assert_eq!(package.signature, signature);
             assert_eq!(package.source_xml_parts.len(), source_xml_count);
         }
     }
@@ -7157,5 +7210,121 @@ mod tests {
         let equal_copy = reopened.get_part(&uri).unwrap().blob().to_vec();
         reopened.get_part_mut(&uri).unwrap().set_blob(equal_copy);
         assert!(!reopened.holds_original_source_xml(reopened.get_part(&uri).unwrap()));
+    }
+
+    /// The five signature flags and their update rules as `OpcPackage` kept
+    /// them before `SignatureState` replaced them.
+    fn flag_model_step(mut flags: SignatureFlags, event: u8, signed: bool) -> SignatureFlags {
+        match event {
+            // Source ingress.
+            0 => {
+                flags.source_ingress = true;
+                flags.graph_tracked = signed;
+                flags.policy_required = signed;
+                flags.policy_authorized = false;
+                flags.api_authored = false;
+            },
+            // Exact-source revocation before a mutation.
+            1 => {
+                if flags.source_ingress || flags.api_authored {
+                    flags.policy_authorized = false;
+                    if signed {
+                        flags.policy_required = true;
+                    }
+                }
+            },
+            // Graph mutation; `signed` stands for "may authorize".
+            2 => {
+                flags.graph_tracked = true;
+                if signed && !flags.source_ingress {
+                    flags.policy_authorized = true;
+                }
+            },
+            // Successful `sign`/`resign`.
+            3 => {
+                flags.graph_tracked = true;
+                flags.policy_authorized = true;
+                flags.policy_required = true;
+                flags.api_authored = true;
+            },
+            // `unsign`.
+            _ => {
+                flags.policy_authorized = true;
+                flags.policy_required = false;
+                flags.api_authored = false;
+            },
+        }
+        flags
+    }
+
+    fn signature_state_step(state: SignatureState, event: u8, signed: bool) -> SignatureState {
+        match event {
+            0 => SignatureState::ingress(signed),
+            1 => state.revoked(|| signed),
+            2 => state.graph_edited(signed),
+            3 => state.signed(),
+            _ => state.unsigned(),
+        }
+    }
+
+    #[test]
+    fn signature_state_matches_the_flag_model_on_every_reachable_state() {
+        let mut reached = vec![SignatureState::NEW];
+        let mut next = 0;
+        while let Some(&state) = reached.get(next) {
+            next += 1;
+            let flags = state.flags();
+            for signed in [false, true] {
+                let model = flags.graph_tracked
+                    && ((flags.policy_required && !flags.policy_authorized)
+                        || (signed
+                            && (flags.source_ingress || flags.api_authored)
+                            && !flags.policy_authorized));
+                assert_eq!(
+                    state.requires_edit_policy(|| signed),
+                    model,
+                    "{state:?} signed={signed}"
+                );
+                for event in 0..5 {
+                    let after = signature_state_step(state, event, signed);
+                    assert_eq!(
+                        after.flags(),
+                        flag_model_step(flags, event, signed),
+                        "{state:?} event={event} input={signed}"
+                    );
+                    if !reached.contains(&after) {
+                        reached.push(after);
+                    }
+                }
+            }
+        }
+
+        // Every state the type can hold is reachable, and no two states share
+        // a flag view, so the type is exactly the reachable flag combinations.
+        let mut all = Vec::new();
+        for first in [false, true] {
+            all.push(SignatureState::IngressUnhandled { tracked: first });
+            all.push(SignatureState::IngressRequired { tracked: first });
+            all.push(SignatureState::IngressStripped { tracked: first });
+            for second in [false, true] {
+                all.push(SignatureState::Authored {
+                    tracked: first,
+                    handled: second,
+                });
+                all.push(SignatureState::ApiSigned {
+                    ingress: first,
+                    edited: second,
+                });
+            }
+        }
+        assert_eq!(reached.len(), all.len());
+        for (index, state) in all.iter().enumerate() {
+            assert!(reached.contains(state), "{state:?}");
+            assert!(
+                all[..index]
+                    .iter()
+                    .all(|other| other.flags() != state.flags())
+            );
+        }
     }
 }
