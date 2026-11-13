@@ -1521,4 +1521,96 @@ mod tests {
             .collect();
         assert!(same, "observed rows:\n{observed}");
     }
+
+    /// Freezes how the slicer-cache `parse` treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn slicer_cache_envelope_matrix() {
+        const NAME: &str = "slicerCacheDefinition";
+        const OPEN: &str = r#"<slicerCacheDefinition xmlns="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" name="Cache" sourceName="Field">"#;
+        const EMPTY: &str = r#"<slicerCacheDefinition xmlns="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" name="Cache" sourceName="Field"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</slicerCacheDefinition>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"incomplete Slicer Cache XML\")",
+            "Invalid(\"incomplete Slicer Cache XML\")",
+            "Invalid(\"incomplete Slicer Cache XML\")",
+            "Invalid(\"Slicer Cache root cannot be empty\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"DTDs and processing instructions are rejected\")",
+            "Invalid(\"unexpected text in Slicer Cache part\")",
+            "Invalid(\"content after Slicer Cache root\")",
+            "Invalid(\"content after Slicer Cache root\")",
+            "Invalid(\"content after Slicer Cache root\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"unexpected text in Slicer Cache part\")",
+            "Invalid(\"incomplete Slicer Cache XML\")",
+            "Xml(Malformed(\"ill-formed document: close tag `</slicerCacheDefinition>` does not match any open tag\"))",
+            "Invalid(\"DTDs and processing instructions are rejected\")",
+            "Invalid(\"unexpected CDATA in Slicer Cache part\")",
+            "Invalid(\"unexpected CDATA in Slicer Cache part\")",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match parse(input.as_bytes()) {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
 }

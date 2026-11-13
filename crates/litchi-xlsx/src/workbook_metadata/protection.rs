@@ -606,4 +606,98 @@ mod tests {
         assert_eq!(verifier.spin_count(), 100_000);
         assert!(metadata.revisions_verifier().is_none());
     }
+
+    /// Freezes how the `workbookProtection` reader treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn workbook_protection_envelope_matrix() {
+        const NAME: &str = "workbook";
+        const OPEN: &str =
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</workbook>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"workbook XML is incomplete\")",
+            "Invalid(\"workbook XML is incomplete\")",
+            "Invalid(\"workbook XML is incomplete\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"workbook protection parser requires a SpreadsheetML workbook root\")",
+            "Invalid(\"workbook protection parser requires a SpreadsheetML workbook root\")",
+            "Invalid(\"workbook protection parser requires a SpreadsheetML workbook root\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"workbook XML is incomplete\")",
+            "Invalid(\"ill-formed document: close tag `</workbook>` does not match any open tag\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match parse_selected(input.as_bytes()) {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
 }

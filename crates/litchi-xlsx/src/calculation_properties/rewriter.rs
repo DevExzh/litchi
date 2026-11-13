@@ -1255,3 +1255,100 @@ fn is_mc(namespace: &ResolveResult<'_>, local: &[u8], expected: &[u8]) -> bool {
     local == expected
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE_NAMESPACE)
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    /// Freezes how `inspect_layout` treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn calculation_layout_envelope_matrix() {
+        const NAME: &str = "workbook";
+        const OPEN: &str =
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</workbook>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"unterminated workbook XML\")",
+            "Invalid(\"unterminated workbook XML\")",
+            "Invalid(\"unterminated workbook XML\")",
+            "Invalid(\"calculation metadata rewriter requires a nonempty workbook root\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"DTD and processing instructions are rejected\")",
+            "Invalid(\"text outside workbook root\")",
+            "Invalid(\"content follows the closed workbook root\")",
+            "Invalid(\"content follows the closed workbook root\")",
+            "Invalid(\"content follows the closed workbook root\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"text outside workbook root\")",
+            "Invalid(\"unterminated workbook XML\")",
+            "Xml(Malformed(\"invalid workbook calculation metadata XML: ill-formed document: close tag `</workbook>` does not match any open tag\"))",
+            "Invalid(\"DTD and processing instructions are rejected\")",
+            "Ok",
+            "Ok",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match super::inspect_layout(input.as_bytes(), &super::Limits::default()) {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
+}

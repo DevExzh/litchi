@@ -1471,4 +1471,100 @@ mod tests {
             format!(r#"<worksheet xmlns="{TRANSITIONAL_MAIN}"><sheetData/><cols/></worksheet>"#);
         assert!(parse_with_event_limit(xml.as_bytes(), &empty, 2).is_err());
     }
+
+    /// Freezes how the hyperlink reader treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn hyperlinks_envelope_matrix() {
+        const NAME: &str = "worksheet";
+        const OPEN: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</worksheet>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let relationships = Relationships::new("/xl/worksheets/".to_string());
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"XLSX worksheet root is missing\")",
+            "Invalid(\"XLSX worksheet root is missing\")",
+            "Invalid(\"XLSX worksheet root is missing\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"XLSX worksheet XML has text outside its root\")",
+            "Invalid(\"XLSX worksheet XML has more than one root\")",
+            "Invalid(\"XLSX worksheet XML has more than one root\")",
+            "Invalid(\"XLSX worksheet XML has more than one root\")",
+            "Invalid(\"XLSX worksheet XML declaration must precede the root\")",
+            "Ok",
+            "Ok",
+            "Invalid(\"XLSX worksheet XML has text outside its root\")",
+            "Invalid(\"XLSX worksheet hyperlink XML is not balanced\")",
+            "Invalid(\"invalid XLSX worksheet hyperlink XML: ill-formed document: close tag `</worksheet>` does not match any open tag\")",
+            "Invalid(\"XLSX worksheet hyperlink XML cannot contain a DTD\")",
+            "Invalid(\"XLSX worksheet XML has character data outside its root\")",
+            "Invalid(\"XLSX worksheet XML has character data outside its root\")",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match parse_with_event_limit(input.as_bytes(), &relationships, usize::MAX)
+            {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
 }

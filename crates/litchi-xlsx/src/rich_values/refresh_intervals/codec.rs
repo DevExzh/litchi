@@ -1098,3 +1098,98 @@ fn push_bounded<T>(
 fn allocation(resource: &'static str, source: TryReserveError) -> Error {
     Error::Allocation { resource, source }
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    /// Freezes how the refresh-interval `inspect` scan treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn refresh_intervals_envelope_matrix() {
+        const NAME: &str = "rvTypesInfo";
+        const OPEN: &str = r#"<rvTypesInfo xmlns="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2">"#;
+        const EMPTY: &str = r#"<rvTypesInfo xmlns="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</rvTypesInfo>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"missing rich-values XML root\")",
+            "Invalid(\"missing rich-values XML root\")",
+            "Invalid(\"missing rich-values XML root\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"DTDs and processing instructions are rejected\")",
+            "Invalid(\"text outside XML root\")",
+            "Invalid(\"multiple XML roots\")",
+            "Invalid(\"multiple XML roots\")",
+            "Invalid(\"multiple XML roots\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"text outside XML root\")",
+            "Invalid(\"unterminated rich-values XML\")",
+            "Xml(Malformed(\"ill-formed document: close tag `</rvTypesInfo>` does not match any open tag\"))",
+            "Invalid(\"DTDs and processing instructions are rejected\")",
+            "Invalid(\"CDATA outside XML root\")",
+            "Invalid(\"CDATA outside XML root\")",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match super::inspect(input.as_bytes(), &super::SourceLimits::default()) {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
+}
