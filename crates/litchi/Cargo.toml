@@ -271,7 +271,6 @@ serde-saphyr = { version = "2.1.1", optional = true } # YAML metadata serializat
 [dev-dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 litchi-ops = { workspace = true, features = ["test-support"] }
-proptest = "1.12.0"
 serde_json = { workspace = true }
 tempfile = "3.27.0"
 tokio = { workspace = true }
@@ -448,14 +447,6 @@ required-features = ["doc"]
 [[example]]
 name = "office_crud_demo"
 required-features = ["docx", "pptx", "xlsx", "ooxml-common"]
-
-[[example]]
-name = "ppt_shapes_showcase_advanced"
-required-features = ["ppt"]
-
-[[example]]
-name = "ppt_shapes_showcase_temp"
-required-features = ["ppt"]
 
 [[example]]
 name = "pptx_advanced_features"

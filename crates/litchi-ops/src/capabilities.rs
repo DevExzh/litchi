@@ -1284,15 +1284,9 @@ fn coverage(format: Option<FileFormat>) -> Coverage {
 }
 
 /// Why the unified reads of `format` are refused as a whole, when its
-/// adapter is not in this build: the M1 step that adds it to an open `File`
-/// variant, the cargo feature that is off, or the milestone that gives the
-/// format a `File` variant.
+/// adapter is not in this build: the cargo feature that is off, or the
+/// milestone that gives the format a `File` variant.
 fn refused(format: FileFormat) -> Refusal {
-    let pending = |follow_up, reason| Refusal {
-        code: Code::UnsupportedCapability,
-        follow_up,
-        reason,
-    };
     let closed = |follow_up, reason| Refusal {
         code: Code::UnsupportedFormat,
         follow_up,
@@ -1304,28 +1298,7 @@ fn refused(format: FileFormat) -> Refusal {
         reason: "the format's cargo feature is off in this build",
     };
     match format {
-        FileFormat::Docx if cfg!(feature = "docx") => pending(
-            "M1 R4a",
-            "the DOCX adapter of record 0010 §4.5 has not landed",
-        ),
-        FileFormat::Xlsb if cfg!(feature = "xlsb") => pending(
-            "M1 R4d",
-            "the XLSB adapter of record 0010 §4.7 has not landed",
-        ),
-        FileFormat::Doc if cfg!(feature = "doc") => pending(
-            "M1 R6a",
-            "the DOC adapter of record 0010 §4.8 has not landed",
-        ),
-        FileFormat::Odt if cfg!(feature = "odt") => pending(
-            "M1 R7",
-            "the ODT adapter of record 0010 §4.9 has not landed",
-        ),
-        FileFormat::Odp if cfg!(feature = "odp") => pending(
-            "M1 R7",
-            "the ODP adapter of record 0010 §4.9 has not landed",
-        ),
-        // A format whose adapter has landed but whose feature is off, or a
-        // tier 1-3 format without its feature.
+        // The adapter of every format below exists; its feature is off.
         FileFormat::Docx => feature("enable the `docx` cargo feature"),
         FileFormat::Xlsx => feature("enable the `xlsx` cargo feature"),
         FileFormat::Pptx => feature("enable the `pptx` cargo feature"),

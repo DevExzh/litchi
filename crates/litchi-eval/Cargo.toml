@@ -26,7 +26,6 @@ sxd-xpath    = { workspace = true, optional = true }
 urlencoding  = { workspace = true, optional = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 tokio    = { workspace = true }
 
 [lints]
