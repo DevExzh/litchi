@@ -524,7 +524,12 @@ where
         Ok(report) => report,
         Err(error) => {
             drop(package);
-            return Err(producer.map_error(error, &budgeted));
+            return Err(producer.map_error(
+                error,
+                PublicationFailureKind::Producer,
+                PublicationFailureKind::Archive,
+                &budgeted,
+            ));
         },
     };
 
@@ -567,8 +572,9 @@ where
     let input_text_bytes = producer.input_text_bytes;
     let finish = package.finish_to_writer();
     if let Err(error) = finish {
-        return Err(producer.map_error_kind(
+        return Err(producer.map_error(
             error,
+            PublicationFailureKind::Finalization,
             PublicationFailureKind::Finalization,
             &budgeted,
         ));
@@ -590,12 +596,7 @@ struct ProducerState<'context, I, S> {
     paragraphs: usize,
     input_text_bytes: usize,
     content_xml_bytes: usize,
-    execution_error: Option<ExecutionError>,
-    producer_error: Option<Error>,
-    invalid_error: Option<String>,
-    limit_error: Option<LocalLimit>,
-    counter_error: Option<&'static str>,
-    producer_failed: bool,
+    failure: Option<ProducerFailure>,
     _item: std::marker::PhantomData<fn() -> S>,
 }
 
@@ -608,14 +609,13 @@ impl<'context, I, S> ProducerState<'context, I, S> {
             paragraphs: 0,
             input_text_bytes: 0,
             content_xml_bytes: CONTENT_PREFIX.len() + CONTENT_SUFFIX.len(),
-            execution_error: None,
-            producer_error: None,
-            invalid_error: None,
-            limit_error: None,
-            counter_error: None,
-            producer_failed: false,
+            failure: None,
             _item: std::marker::PhantomData,
         }
+    }
+
+    fn fail(&mut self, failure: ProducerFailure) {
+        ProducerFailure::record(&mut self.failure, failure);
     }
 }
 
@@ -626,24 +626,22 @@ where
 {
     fn next_fragment(&mut self, output: &mut dyn Write) -> litchi_core::Result<bool> {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         if self.paragraphs == self.limits.max_paragraphs {
             if let Some(item) = self.source.next() {
                 if let Err(error) = item {
-                    self.producer_failed = true;
-                    self.producer_error = Some(error);
+                    self.fail(ProducerFailure::Source(error));
                     return Err(Error::Other(
                         "paragraph source returned an error".to_string(),
                     ));
                 }
-                self.producer_failed = true;
-                self.limit_error = Some(LocalLimit::new(
+                self.fail(ProducerFailure::Limit(LocalLimit::new(
                     "paragraphs",
                     self.paragraphs.saturating_add(1),
                     self.limits.max_paragraphs,
-                ));
+                )));
                 return Err(Error::InvalidFormat(
                     "paragraph iterator exceeds max_paragraphs".to_string(),
                 ));
@@ -656,8 +654,7 @@ where
         let value = match item {
             Ok(value) => value,
             Err(error) => {
-                self.producer_failed = true;
-                self.producer_error = Some(error);
+                self.fail(ProducerFailure::Source(error));
                 return Err(Error::Other(
                     "paragraph source returned an error".to_string(),
                 ));
@@ -665,12 +662,11 @@ where
         };
         let value = value.as_ref();
         if value.len() > self.limits.max_paragraph_text_bytes {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "paragraph text bytes",
                 value.len(),
                 self.limits.max_paragraph_text_bytes,
-            ));
-            self.producer_failed = true;
+            )));
             return Err(Error::InvalidFormat(
                 "paragraph text exceeds max_paragraph_text_bytes".to_string(),
             ));
@@ -678,20 +674,18 @@ where
         let total = match self.input_text_bytes.checked_add(value.len()) {
             Some(total) => total,
             None => {
-                self.counter_error = Some("aggregate text bytes");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("aggregate text bytes"));
                 return Err(Error::InvalidFormat(
                     "aggregate text counter overflow".to_string(),
                 ));
             },
         };
         if total > self.limits.max_total_text_bytes {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "aggregate text bytes",
                 total,
                 self.limits.max_total_text_bytes,
-            ));
-            self.producer_failed = true;
+            )));
             return Err(Error::InvalidFormat(
                 "paragraph source exceeds max_total_text_bytes".to_string(),
             ));
@@ -699,15 +693,14 @@ where
         let input_bytes = match u64::try_from(value.len()) {
             Ok(bytes) => bytes,
             Err(_) => {
-                self.counter_error = Some("input text bytes");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("input text bytes"));
                 return Err(Error::InvalidFormat(
                     "paragraph input length exceeds u64".to_string(),
                 ));
             },
         };
         if let Err(error) = self.context.consume(Resource::InputBytes, input_bytes) {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         // This charge accounts for the attempted source item. The report
@@ -715,17 +708,16 @@ where
         match validate_plain_text(value, self.context) {
             Ok(()) => {},
             Err(PlainTextFailure::Invalid(error)) => {
-                self.invalid_error = Some(error.to_string());
-                self.producer_failed = true;
+                self.fail(ProducerFailure::Invalid(error.to_string()));
                 return Err(error);
             },
             Err(PlainTextFailure::Execution(error)) => {
-                self.execution_error = Some(error.clone());
+                self.fail(ProducerFailure::Execution(error.clone()));
                 return Err(Error::Other(error.to_string()));
             },
         }
         if let Err(error) = self.context.consume(Resource::Objects, 1) {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         // Objects covers the admitted paragraph stage, while the public
@@ -738,14 +730,11 @@ where
             self.limits.max_content_xml_bytes,
         );
         let result = emit_paragraph(&mut paragraph, value);
-        if let Some(error) = paragraph.execution_error.take() {
-            self.execution_error = Some(error);
-        }
-        if let Some(error) = paragraph.limit_error.take() {
-            self.limit_error = Some(error);
+        if let Some(failure) = paragraph.failure.take() {
+            self.fail(failure);
         }
         if let Err(error) = result {
-            self.producer_failed = true;
+            self.fail(ProducerFailure::Untyped);
             return Err(error);
         }
         self.input_text_bytes = total;
@@ -756,8 +745,7 @@ where
         self.paragraphs = match self.paragraphs.checked_add(1) {
             Some(value) => value,
             None => {
-                self.counter_error = Some("paragraphs");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("paragraphs"));
                 return Err(Error::InvalidFormat(
                     "paragraph counter overflow".to_string(),
                 ));
@@ -766,77 +754,82 @@ where
         Ok(true)
     }
 
+    /// Resolves the error the caller receives once the package writer has
+    /// failed: the producer's own typed cause first, then whatever the sink
+    /// adapter recorded. `untyped` names an archive error that follows an
+    /// untyped producer refusal, `fallback` one the producer cannot explain.
     fn map_error<W: ?Sized>(
         &mut self,
         error: PackageWriterError,
+        untyped: PublicationFailureKind,
+        fallback: PublicationFailureKind,
         output: &BudgetedOutput<'_, W>,
     ) -> StreamingError {
-        if let Some(source) = self.producer_error.take() {
-            return StreamingError::Producer {
-                written: output.accepted(),
+        let written = output.accepted();
+        match self.failure.take() {
+            Some(ProducerFailure::Source(source)) => StreamingError::Producer {
+                written,
                 source: Box::new(source),
-            };
-        }
-        if let Some(error) = self.invalid_error.take() {
-            return StreamingError::Invalid {
-                error: Error::InvalidFormat(error),
-                written: output.accepted(),
-            };
-        }
-        if let Some(limit) = self.limit_error.take() {
-            return limit.as_error(output.accepted());
-        }
-        if let Some(resource) = self.counter_error.take() {
-            return StreamingError::CounterOverflow {
-                resource,
-                written: output.accepted(),
-            };
-        }
-        if let Some(error) = self.execution_error.take() {
-            return execution(error, output.accepted());
-        }
-        map_package_error(
-            error,
-            if self.producer_failed {
-                PublicationFailureKind::Producer
-            } else {
-                PublicationFailureKind::Archive
             },
-            output,
-        )
+            Some(ProducerFailure::Invalid(message)) => StreamingError::Invalid {
+                error: Error::InvalidFormat(message),
+                written,
+            },
+            Some(ProducerFailure::Limit(limit)) => limit.as_error(written),
+            Some(ProducerFailure::CounterOverflow(resource)) => {
+                StreamingError::CounterOverflow { resource, written }
+            },
+            Some(ProducerFailure::Execution(error)) => execution(error, written),
+            Some(ProducerFailure::Untyped) => map_package_error(error, untyped, output),
+            None => map_package_error(error, fallback, output),
+        }
+    }
+}
+
+/// Why the paragraph producer stopped, in decreasing priority.
+/// `ProducerState::failure` and `ParagraphWriter::failure` hold the highest-priority
+/// cause seen so far; `None` means no paragraph was refused.
+///
+/// ```text
+/// None --any cause--> Some(cause)
+/// Some(lower-priority cause) --higher-priority cause--> Some(higher-priority cause)
+/// ```
+///
+/// A later cause of the same priority replaces the earlier one.
+enum ProducerFailure {
+    /// The fallible source returned its own error.
+    Source(Error),
+    /// The source text is not representable in the generated XML.
+    Invalid(String),
+    /// A provider ceiling rejected the next paragraph or its text.
+    Limit(LocalLimit),
+    /// A progress counter could not represent its next value.
+    CounterOverflow(&'static str),
+    /// Cancellation or a shared budget stopped the paragraph.
+    Execution(ExecutionError),
+    /// The paragraph was refused without one of the typed causes above.
+    Untyped,
+}
+
+impl ProducerFailure {
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Source(_) => 5,
+            Self::Invalid(_) => 4,
+            Self::Limit(_) => 3,
+            Self::CounterOverflow(_) => 2,
+            Self::Execution(_) => 1,
+            Self::Untyped => 0,
+        }
     }
 
-    fn map_error_kind<W: ?Sized>(
-        &mut self,
-        error: PackageWriterError,
-        kind: PublicationFailureKind,
-        output: &BudgetedOutput<'_, W>,
-    ) -> StreamingError {
-        if let Some(source) = self.producer_error.take() {
-            return StreamingError::Producer {
-                written: output.accepted(),
-                source: Box::new(source),
-            };
+    fn record(slot: &mut Option<Self>, failure: Self) {
+        if slot
+            .as_ref()
+            .is_none_or(|current| failure.priority() >= current.priority())
+        {
+            *slot = Some(failure);
         }
-        if let Some(error) = self.invalid_error.take() {
-            return StreamingError::Invalid {
-                error: Error::InvalidFormat(error),
-                written: output.accepted(),
-            };
-        }
-        if let Some(limit) = self.limit_error.take() {
-            return limit.as_error(output.accepted());
-        }
-        if let Some(resource) = self.counter_error.take() {
-            return StreamingError::CounterOverflow {
-                resource,
-                written: output.accepted(),
-            };
-        }
-        if let Some(error) = self.execution_error.take() {
-            return execution(error, output.accepted());
-        }
-        map_package_error(error, kind, output)
     }
 }
 
@@ -873,8 +866,7 @@ struct ParagraphWriter<'a> {
     content_before: usize,
     content_maximum: usize,
     bytes: usize,
-    execution_error: Option<ExecutionError>,
-    limit_error: Option<LocalLimit>,
+    failure: Option<ProducerFailure>,
 }
 
 impl<'a> ParagraphWriter<'a> {
@@ -892,14 +884,17 @@ impl<'a> ParagraphWriter<'a> {
             content_before,
             content_maximum,
             bytes: 0,
-            execution_error: None,
-            limit_error: None,
+            failure: None,
         }
+    }
+
+    fn fail(&mut self, failure: ProducerFailure) {
+        ProducerFailure::record(&mut self.failure, failure);
     }
 
     fn check(&mut self) -> litchi_core::Result<()> {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         Ok(())
@@ -915,17 +910,21 @@ impl<'a> ParagraphWriter<'a> {
             .checked_add(next)
             .ok_or_else(|| Error::InvalidFormat("content XML byte counter overflow".to_string()))?;
         if content_next > self.content_maximum {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "content XML bytes",
                 content_next,
                 self.content_maximum,
-            ));
+            )));
             return Err(Error::InvalidFormat(
                 "content XML exceeds max_content_xml_bytes".to_string(),
             ));
         }
         if next > self.maximum {
-            self.limit_error = Some(LocalLimit::new("paragraph XML bytes", next, self.maximum));
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
+                "paragraph XML bytes",
+                next,
+                self.maximum,
+            )));
             return Err(Error::InvalidFormat(
                 "paragraph XML exceeds max_paragraph_xml_bytes".to_string(),
             ));
@@ -933,7 +932,7 @@ impl<'a> ParagraphWriter<'a> {
         let amount = u64::try_from(bytes.len())
             .map_err(|_| Error::InvalidFormat("paragraph XML length exceeds u64".to_string()))?;
         if let Err(error) = self.context.consume(Resource::Work, amount) {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         self.output.write_all(bytes)?;
@@ -968,7 +967,7 @@ impl<'a> ParagraphWriter<'a> {
             if matches!(&error, ExecutionError::ResourceLimit(_)) {
                 return Ok(PlainSpanResult::Fallback);
             }
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         self.output.write_all(bytes)?;
@@ -1152,10 +1151,47 @@ struct BudgetedOutput<'a, W: ?Sized> {
     context: &'a ExecutionContext,
     maximum: u64,
     accepted: u64,
-    execution_error: Option<ExecutionError>,
-    sink_failed: bool,
-    limit_failed: bool,
-    limit_observed: Option<u64>,
+    failure: Option<SinkFailure>,
+}
+
+/// Why the caller-sink adapter refused or lost a write, in decreasing
+/// priority. `BudgetedOutput::failure` holds the highest-priority cause seen
+/// so far; `None` means every write and flush succeeded.
+///
+/// ```text
+/// None --any cause--> Some(cause)
+/// Some(Sink) --limit or execution refusal--> Some(Limit | Execution)
+/// Some(Limit) --execution refusal--> Some(Execution)
+/// ```
+///
+/// A later cause of the same priority replaces the earlier one. A retried
+/// `Interrupted` write leaves `Sink` recorded for the rest of the stream.
+enum SinkFailure {
+    /// Cancellation or a shared budget refused the write or flush.
+    Execution(ExecutionError),
+    /// The write would have passed `maximum`, or the byte counter overflowed.
+    Limit { observed: u64 },
+    /// The caller sink returned an error, accepted nothing, or over-reported.
+    Sink,
+}
+
+impl SinkFailure {
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Execution(_) => 2,
+            Self::Limit { .. } => 1,
+            Self::Sink => 0,
+        }
+    }
+
+    fn record(slot: &mut Option<Self>, failure: Self) {
+        if slot
+            .as_ref()
+            .is_none_or(|current| failure.priority() >= current.priority())
+        {
+            *slot = Some(failure);
+        }
+    }
 }
 
 impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
@@ -1165,10 +1201,7 @@ impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
             context,
             maximum,
             accepted: 0,
-            execution_error: None,
-            sink_failed: false,
-            limit_failed: false,
-            limit_observed: None,
+            failure: None,
         }
     }
 
@@ -1176,10 +1209,8 @@ impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
         self.accepted
     }
 
-    fn final_check(&mut self) -> Result<(), ExecutionError> {
-        self.context
-            .check()
-            .inspect_err(|error| self.execution_error = Some(error.clone()))
+    fn final_check(&self) -> Result<(), ExecutionError> {
+        self.context.check()
     }
 }
 
@@ -1199,47 +1230,51 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
             return Ok(0);
         }
         self.context.check().map_err(|error| {
-            self.execution_error = Some(error.clone());
+            SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
             io::Error::other(BudgetedIoError(error))
         })?;
         let amount =
             u64::try_from(bytes.len()).map_err(|_| io::Error::other("output write exceeds u64"))?;
         let next = self.accepted.checked_add(amount).ok_or_else(|| {
-            self.limit_failed = true;
-            self.limit_observed = Some(u64::MAX);
+            SinkFailure::record(&mut self.failure, SinkFailure::Limit { observed: u64::MAX });
             io::Error::other("accepted output counter overflow")
         })?;
         if next > self.maximum {
-            self.limit_failed = true;
-            self.limit_observed = Some(next);
+            SinkFailure::record(&mut self.failure, SinkFailure::Limit { observed: next });
             return Err(io::Error::other("ODT output byte limit exceeded"));
         }
         let reservation = self
             .context
             .reserve(Resource::OutputBytes, amount)
             .map_err(|error| {
-                self.execution_error = Some(error.clone());
+                SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
                 io::Error::other(BudgetedIoError(error))
             })?;
         match self.sink.write(bytes) {
             Ok(written) => {
                 if written == 0 {
-                    self.sink_failed = true;
+                    SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                 }
                 let written_u64 = u64::try_from(written)
                     .map_err(|_| io::Error::other("sink count exceeds u64"))?;
                 if !reservation.commit(written_u64) {
-                    self.sink_failed = true;
+                    SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                     return Err(io::Error::other("output reservation commit failed"));
                 }
                 self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
-                    self.limit_failed = true;
+                    // An earlier limit refusal keeps the usage it observed.
+                    if !matches!(self.failure, Some(SinkFailure::Limit { .. })) {
+                        SinkFailure::record(
+                            &mut self.failure,
+                            SinkFailure::Limit { observed: u64::MAX },
+                        );
+                    }
                     io::Error::other("accepted output counter overflow")
                 })?;
                 Ok(written)
             },
             Err(error) => {
-                self.sink_failed = true;
+                SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                 drop(reservation);
                 Err(error)
             },
@@ -1248,10 +1283,12 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.context.check().map_err(|error| {
-            self.execution_error = Some(error.clone());
+            SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
             io::Error::other(BudgetedIoError(error))
         })?;
-        self.sink.flush().inspect_err(|_| self.sink_failed = true)
+        self.sink
+            .flush()
+            .inspect_err(|_| SinkFailure::record(&mut self.failure, SinkFailure::Sink))
     }
 }
 
@@ -1264,17 +1301,21 @@ fn map_package_error<W: ?Sized>(
     kind: PublicationFailureKind,
     output: &BudgetedOutput<'_, W>,
 ) -> StreamingError {
-    if let Some(error) = output.execution_error.clone() {
-        return execution(error, output.accepted());
-    }
-    if output.limit_failed {
-        return StreamingError::LimitExceeded {
-            resource: "output bytes",
-            observed: output.limit_observed.unwrap_or(u64::MAX),
-            limit: output.maximum,
-            written: output.accepted(),
-        };
-    }
+    let sink_failed = match &output.failure {
+        Some(SinkFailure::Execution(error)) => {
+            return execution(error.clone(), output.accepted());
+        },
+        Some(SinkFailure::Limit { observed }) => {
+            return StreamingError::LimitExceeded {
+                resource: "output bytes",
+                observed: *observed,
+                limit: output.maximum,
+                written: output.accepted(),
+            };
+        },
+        Some(SinkFailure::Sink) => true,
+        None => false,
+    };
     if let Some(limit) = error.limit() {
         return StreamingError::LimitExceeded {
             resource: match limit.resource() {
@@ -1313,7 +1354,7 @@ fn map_package_error<W: ?Sized>(
     }
     StreamingError::Publication(PublicationError {
         written: output.accepted(),
-        kind: if output.sink_failed {
+        kind: if sink_failed {
             PublicationFailureKind::Sink
         } else {
             kind

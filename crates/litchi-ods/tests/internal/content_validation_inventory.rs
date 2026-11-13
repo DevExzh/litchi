@@ -346,3 +346,76 @@ fn long_namespace_uri_is_interned_across_many_attributes() {
     .unwrap();
     assert!(snapshot.definitions()[0].has_opaque_content());
 }
+
+#[test]
+fn catalog_position_and_action_order_are_enforced() {
+    const DEFINITION: &str = r#"<t:content-validation t:name="v"/>"#;
+    const MISPLACED: &str =
+        "table:content-validations must be the unique catalog before worksheet tables";
+    const ACTIONS: &str = "duplicate or out-of-order validation action";
+    const HELP: &str = "<t:help-message/>";
+    const MESSAGE: &str = "<t:error-message/>";
+    const MACRO: &str = "<t:error-macro/>";
+    let catalog = format!("<t:content-validations>{DEFINITION}</t:content-validations>");
+    let table = r#"<t:table t:name="S"/>"#;
+    let with_actions = |actions: &str| {
+        format!(
+            r#"<t:content-validations><t:content-validation t:name="v">{actions}</t:content-validation></t:content-validations>"#
+        )
+    };
+    // `Ok` carries whether the catalog retained foreign content.
+    let cases: Vec<(String, Result<bool, &str>)> = vec![
+        (format!("{catalog}{table}"), Ok(false)),
+        (
+            format!("<t:tracked-changes/><t:calculation-settings/>{catalog}{table}"),
+            Ok(false),
+        ),
+        (format!("<x:p/>{catalog}{table}"), Ok(false)),
+        (format!("{catalog}{catalog}"), Err(MISPLACED)),
+        (format!("{table}{catalog}"), Err(MISPLACED)),
+        (format!("<t:named-expressions/>{catalog}"), Err(MISPLACED)),
+        (
+            format!(
+                r#"<t:table t:name="S"><t:table-row><t:table-cell>{catalog}</t:table-cell></t:table-row></t:table>"#
+            ),
+            Err(MISPLACED),
+        ),
+        (
+            "<t:content-validations/>".to_string(),
+            Err("table:content-validations must contain a definition"),
+        ),
+        (
+            format!(
+                "<t:content-validations><x:p/>{DEFINITION}</t:content-validations>{table}<x:p/>"
+            ),
+            Ok(true),
+        ),
+        (format!("{catalog}{table}<x:p/>"), Ok(false)),
+        (with_actions(HELP), Ok(false)),
+        (with_actions(MACRO), Ok(false)),
+        (with_actions(&format!("{HELP}{MESSAGE}")), Ok(false)),
+        (with_actions(&format!("{HELP}{MACRO}")), Ok(false)),
+        (with_actions(&format!("{MESSAGE}{HELP}")), Err(ACTIONS)),
+        (with_actions(&format!("{MACRO}{HELP}")), Err(ACTIONS)),
+        (with_actions(&format!("{HELP}{HELP}")), Err(ACTIONS)),
+        (with_actions(&format!("{MESSAGE}{MESSAGE}")), Err(ACTIONS)),
+        (with_actions(&format!("{MACRO}{MACRO}")), Err(ACTIONS)),
+        (with_actions(&format!("{MESSAGE}{MACRO}")), Err(ACTIONS)),
+        (with_actions(&format!("{MACRO}{MESSAGE}")), Err(ACTIONS)),
+        (
+            with_actions(&format!("{HELP}{MESSAGE}{MACRO}")),
+            Err(ACTIONS),
+        ),
+    ];
+    for (inner, expected) in cases {
+        let xml = document(&inner);
+        let actual = content_validation::Snapshot::parse(&xml)
+            .map(|snapshot| snapshot.has_opaque_catalog_content())
+            .map_err(|error| error.to_string());
+        assert_eq!(
+            actual,
+            expected.map_err(str::to_string),
+            "unexpected outcome for {inner}"
+        );
+    }
+}

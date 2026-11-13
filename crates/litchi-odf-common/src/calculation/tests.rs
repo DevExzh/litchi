@@ -233,4 +233,180 @@ mod handler_tests {
             assert_eq!(expected, actual, "handler and standalone disagree");
         }
     }
+
+    /// A one-line summary to pin, and the full value for driver parity.
+    fn outcome(
+        settings: Option<&super::Settings>,
+        tolerance: &crate::leniency::ToleranceReport,
+    ) -> (String, String) {
+        (
+            format!(
+                "ok settings={} defects={}",
+                settings.is_some(),
+                tolerance.total()
+            ),
+            format!("{settings:?} {tolerance:?}"),
+        )
+    }
+
+    /// The fused handler's outcome with its repairs, mirroring `handler_parse`.
+    fn handler_outcome(xml: &str) -> (String, String) {
+        let run = || -> Result<_> {
+            validate_size(xml)?;
+            let mut reader = NsReader::from_str(xml);
+            let mut buffer = Vec::new();
+            let mut handler = CalculationHandler::default();
+            loop {
+                let (namespace, event) = reader
+                    .read_resolved_event_into(&mut buffer)
+                    .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+                let (is_table, is_office) = classify(&namespace);
+                let is_eof = matches!(event, Event::Eof);
+                handler.on_event(
+                    is_table,
+                    is_office,
+                    &event,
+                    reader.resolver(),
+                    reader.decoder(),
+                )?;
+                buffer.clear();
+                if is_eof {
+                    break;
+                }
+            }
+            handler.finish_with_report()
+        };
+        match run() {
+            Ok((settings, tolerance)) => outcome(settings.as_ref(), &tolerance),
+            Err(error) => (error.to_string(), String::new()),
+        }
+    }
+
+    fn standalone_outcome(xml: &str) -> (String, String) {
+        match super::super::codec::parse_with_report(xml, crate::XmlStreamLimits::default()) {
+            Ok((settings, tolerance)) => outcome(settings.as_ref(), &tolerance),
+            Err(error) => (error.to_string(), String::new()),
+        }
+    }
+
+    /// One case per position the scan can be in when an event arrives: outside
+    /// the settings element, directly inside it, inside a known child, inside
+    /// a skipped unknown subtree, and after the element has closed.
+    #[test]
+    fn every_scan_position_reports_the_same_outcome_in_both_drivers() {
+        const SETTINGS: &str = "<t:calculation-settings>";
+        const END: &str = "</t:calculation-settings>";
+        let cases: [(&str, String, &str); 20] = [
+            (
+                "unknown child subtree is skipped with its content",
+                format!(
+                    "{SETTINGS}<x:a><x:b>text<![CDATA[c]]>&amp;&#65;<x:c/></x:b><!--c--><?p i?></x:a>{END}"
+                ),
+                "ok settings=true defects=1",
+            ),
+            (
+                "unknown entity inside a skipped subtree",
+                format!("{SETTINGS}<x:a>&unknown;</x:a>{END}"),
+                "Invalid format: table:calculation-settings cannot contain entity references",
+            ),
+            (
+                "unknown table child is skipped",
+                format!("{SETTINGS}<t:other><t:null-date/></t:other>{END}"),
+                "ok settings=true defects=1",
+            ),
+            (
+                "unknown empty child",
+                format!("{SETTINGS}<x:a/>{END}"),
+                "ok settings=true defects=1",
+            ),
+            (
+                "known child written with an end tag",
+                format!("{SETTINGS}<t:null-date></t:null-date><t:iteration> </t:iteration>{END}"),
+                "ok settings=true defects=0",
+            ),
+            (
+                "known child with an empty child",
+                format!("{SETTINGS}<t:null-date><x:a/></t:null-date>{END}"),
+                "Invalid format: calculation setting children must be empty",
+            ),
+            (
+                "known child with an open child",
+                format!("{SETTINGS}<t:null-date><x:a></x:a></t:null-date>{END}"),
+                "Invalid format: calculation setting children must be empty",
+            ),
+            (
+                "text inside a known child",
+                format!("{SETTINGS}<t:null-date>x</t:null-date>{END}"),
+                "Invalid format: table:calculation-settings cannot contain text",
+            ),
+            (
+                "character data inside the settings element",
+                format!("{SETTINGS}<![CDATA[x]]>{END}"),
+                "Invalid format: table:calculation-settings cannot contain CDATA",
+            ),
+            (
+                "blank character data inside the settings element",
+                format!("{SETTINGS} <![CDATA[ ]]><!--c--><?p i?>{END}"),
+                "ok settings=true defects=0",
+            ),
+            (
+                "entity reference inside the settings element",
+                format!("{SETTINGS}&amp;{END}"),
+                "Invalid format: table:calculation-settings cannot contain entity references",
+            ),
+            (
+                "entity reference inside a known child",
+                format!("{SETTINGS}<t:null-date>&#65;</t:null-date>{END}"),
+                "Invalid format: table:calculation-settings cannot contain entity references",
+            ),
+            (
+                "second settings element after a closed one",
+                format!("{SETTINGS}{END}{SETTINGS}{END}"),
+                "Invalid format: duplicate table:calculation-settings",
+            ),
+            (
+                "empty settings element after a closed one",
+                format!("{SETTINGS}{END}<t:calculation-settings/>"),
+                "Invalid format: duplicate table:calculation-settings",
+            ),
+            (
+                "settings element nested in the settings element",
+                format!("{SETTINGS}{SETTINGS}{END}{END}"),
+                "Invalid format: table:calculation-settings must be a direct office document-body child",
+            ),
+            (
+                "settings element nested in a known child",
+                format!("{SETTINGS}<t:null-date><t:calculation-settings/></t:null-date>{END}"),
+                "Invalid format: table:calculation-settings must be a direct office document-body child",
+            ),
+            (
+                "settings element nested in a skipped subtree",
+                format!("{SETTINGS}<x:a><t:calculation-settings/></x:a>{END}"),
+                "Invalid format: table:calculation-settings must be a direct office document-body child",
+            ),
+            (
+                "settings element below a table",
+                format!("<t:table>{SETTINGS}{END}</t:table>"),
+                "Invalid format: table:calculation-settings must be a direct office document-body child",
+            ),
+            (
+                "null-date after iteration is repaired",
+                format!("{SETTINGS}<t:iteration/><t:null-date/>{END}"),
+                "ok settings=true defects=1",
+            ),
+            (
+                "content after the closed settings element is ignored",
+                format!("{SETTINGS}{END}<t:table>text&amp;<t:null-date/></t:table>"),
+                "ok settings=true defects=0",
+            ),
+        ];
+        for (label, body, expected) in cases {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:example:other"><o:body><o:spreadsheet>{body}</o:spreadsheet></o:body></o:document-content>"#
+            );
+            let standalone = standalone_outcome(&xml);
+            assert_eq!(standalone.0, expected, "standalone: {label}");
+            assert_eq!(handler_outcome(&xml), standalone, "handler: {label}");
+        }
+    }
 }

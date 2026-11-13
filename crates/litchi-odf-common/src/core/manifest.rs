@@ -147,13 +147,73 @@ struct PartialEncryption {
     key_derivation: Option<ManifestKeyDerivation>,
 }
 
+/// Where the observer is inside one `manifest:file-entry`.
+///
+/// ```text
+/// Idle       --Start(FileEntry)-->      Entry
+/// Entry      --Start(EncryptionData)--> Encrypting
+/// Encrypting --End(EncryptionData)-->   Encrypted
+/// Encrypted  --Start(EncryptionData)--> Encrypting  (a repeated element replaces the descriptor)
+/// Entry      --End(FileEntry)-->        Idle
+/// Encrypted  --End(FileEntry)-->        Idle        (the descriptor is recorded for the path)
+/// Idle       --End(FileEntry)-->        Idle
+/// ```
+///
+/// Algorithm, start-key and key-derivation children are accepted only while
+/// `Encrypting`. Every other structural event is an error. An error is
+/// terminal: the manifest scanner delivers no further events to an observer
+/// that has failed, so the state left behind by a failed event is not read.
+#[derive(Default)]
+enum EntryState {
+    /// Outside every file entry.
+    #[default]
+    Idle,
+    /// Inside a file entry that has no encryption data so far.
+    Entry { path: String, size: Option<u64> },
+    /// Inside the file entry's open `manifest:encryption-data` element.
+    Encrypting {
+        path: String,
+        size: Option<u64>,
+        partial: PartialEncryption,
+    },
+    /// After a complete `manifest:encryption-data` element.
+    Encrypted {
+        path: String,
+        size: Option<u64>,
+        descriptor: ManifestEncryption,
+    },
+}
+
 #[derive(Default)]
 struct TypedManifestObserver {
-    current_path: Option<String>,
-    current_size: Option<u64>,
-    encryption: Option<PartialEncryption>,
-    completed_encryption: Option<ManifestEncryption>,
+    entry: EntryState,
     encrypted_entries: HashMap<String, ManifestEncryption>,
+}
+
+impl TypedManifestObserver {
+    fn partial_encryption(&mut self) -> Result<&mut PartialEncryption> {
+        match &mut self.entry {
+            EntryState::Encrypting { partial, .. } => Ok(partial),
+            EntryState::Idle | EntryState::Entry { .. } | EntryState::Encrypted { .. } => {
+                Err(Error::InvalidFormat(
+                    "Encryption child appears outside encryption-data".to_string(),
+                ))
+            },
+        }
+    }
+
+    /// Leaves the file entry for its `manifest:encryption-data` element and
+    /// returns the entry's path and size.
+    fn enter_encryption_data(&mut self) -> Result<(String, Option<u64>)> {
+        match std::mem::take(&mut self.entry) {
+            EntryState::Entry { path, size } | EntryState::Encrypted { path, size, .. } => {
+                Ok((path, size))
+            },
+            EntryState::Idle | EntryState::Encrypting { .. } => Err(Error::InvalidFormat(
+                "Misplaced or duplicate manifest encryption data".to_string(),
+            )),
+        }
+    }
 }
 
 impl common_package::ManifestScanObserver for TypedManifestObserver {
@@ -172,7 +232,7 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
 
         match event {
             ManifestScanEvent::Start(ManifestScanElement::FileEntry) => {
-                if self.current_path.is_some() {
+                if !matches!(self.entry, EntryState::Idle) {
                     return Err(Error::InvalidFormat(
                         "Nested manifest file entries are invalid".to_string(),
                     ));
@@ -180,8 +240,10 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
                 let path = file_entry_path.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
-                self.current_path = Some(try_copy_string(path, "ODF encrypted manifest path")?);
-                self.current_size = file_entry_size;
+                self.entry = EntryState::Entry {
+                    path: try_copy_string(path, "ODF encrypted manifest path")?,
+                    size: file_entry_size,
+                };
             },
             ManifestScanEvent::Empty(ManifestScanElement::FileEntry) => {
                 // Neutral file-entry validation and indexing are owned by
@@ -189,22 +251,18 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
                 // inspect on an empty element.
             },
             ManifestScanEvent::Start(ManifestScanElement::EncryptionData) => {
-                if self.current_path.is_none() || self.encryption.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "Misplaced or duplicate manifest encryption data".to_string(),
-                    ));
-                }
-                self.encryption = Some(PartialEncryption {
-                    checksum: parse_encryption_checksum(required_attributes(attributes)?)?,
-                    ..PartialEncryption::default()
-                });
+                let (path, size) = self.enter_encryption_data()?;
+                self.entry = EntryState::Encrypting {
+                    path,
+                    size,
+                    partial: PartialEncryption {
+                        checksum: parse_encryption_checksum(required_attributes(attributes)?)?,
+                        ..PartialEncryption::default()
+                    },
+                };
             },
             ManifestScanEvent::Empty(ManifestScanElement::EncryptionData) => {
-                if self.current_path.is_none() || self.encryption.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "Misplaced or duplicate manifest encryption data".to_string(),
-                    ));
-                }
+                self.enter_encryption_data()?;
                 parse_encryption_checksum(required_attributes(attributes)?)?;
                 return Err(Error::InvalidFormat(
                     "ODF package has encrypted entries with incomplete encryption metadata"
@@ -213,19 +271,19 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
             },
             ManifestScanEvent::Start(ManifestScanElement::Algorithm)
             | ManifestScanEvent::Empty(ManifestScanElement::Algorithm) => {
-                let encryption = encryption_mut(&mut self.encryption)?;
+                let encryption = self.partial_encryption()?;
                 let algorithm = parse_algorithm(required_attributes(attributes)?)?;
                 set_once(&mut encryption.algorithm, algorithm, "algorithm")?;
             },
             ManifestScanEvent::Start(ManifestScanElement::StartKeyGeneration)
             | ManifestScanEvent::Empty(ManifestScanElement::StartKeyGeneration) => {
-                let encryption = encryption_mut(&mut self.encryption)?;
+                let encryption = self.partial_encryption()?;
                 let start_key = parse_start_key(required_attributes(attributes)?)?;
                 set_once(&mut encryption.start_key, start_key, "start-key-generation")?;
             },
             ManifestScanEvent::Start(ManifestScanElement::KeyDerivation)
             | ManifestScanEvent::Empty(ManifestScanElement::KeyDerivation) => {
-                let encryption = encryption_mut(&mut self.encryption)?;
+                let encryption = self.partial_encryption()?;
                 let key_derivation = parse_key_derivation(required_attributes(attributes)?)?;
                 set_once(
                     &mut encryption.key_derivation,
@@ -234,43 +292,59 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
                 )?;
             },
             ManifestScanEvent::End(ManifestScanElement::EncryptionData) => {
-                let path = self.current_path.as_ref().ok_or_else(|| {
-                    Error::InvalidFormat("Encryption data has no file entry".to_string())
-                })?;
-                let descriptor = finish_encryption(self.encryption.take().ok_or_else(|| {
-                    Error::InvalidFormat("Unexpected encryption-data end".to_string())
-                })?)?;
-                if self.current_size.is_none() {
-                    return Err(Error::InvalidFormat(format!(
-                        "Encrypted manifest entry '{path}' has no plaintext size"
-                    )));
+                match std::mem::take(&mut self.entry) {
+                    EntryState::Idle => {
+                        return Err(Error::InvalidFormat(
+                            "Encryption data has no file entry".to_string(),
+                        ));
+                    },
+                    EntryState::Entry { .. } | EntryState::Encrypted { .. } => {
+                        return Err(Error::InvalidFormat(
+                            "Unexpected encryption-data end".to_string(),
+                        ));
+                    },
+                    EntryState::Encrypting {
+                        path,
+                        size,
+                        partial,
+                    } => {
+                        let descriptor = finish_encryption(partial)?;
+                        if size.is_none() {
+                            return Err(Error::InvalidFormat(format!(
+                                "Encrypted manifest entry '{path}' has no plaintext size"
+                            )));
+                        }
+                        self.entry = EntryState::Encrypted {
+                            path,
+                            size,
+                            descriptor,
+                        };
+                    },
                 }
-                self.completed_encryption = Some(descriptor);
             },
             ManifestScanEvent::End(ManifestScanElement::FileEntry) => {
-                if self.encryption.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "Unterminated manifest encryption data".to_string(),
-                    ));
-                }
-                if let Some(descriptor) = self.completed_encryption.take() {
-                    let path = self.current_path.take().ok_or_else(|| {
-                        Error::InvalidFormat("Manifest entry has no file path".to_string())
-                    })?;
-                    self.encrypted_entries
-                        .try_reserve(1)
-                        .map_err(|source| Error::Allocation {
-                            resource: "ODF typed encrypted manifest entries",
-                            source,
+                match std::mem::take(&mut self.entry) {
+                    EntryState::Encrypting { .. } => {
+                        return Err(Error::InvalidFormat(
+                            "Unterminated manifest encryption data".to_string(),
+                        ));
+                    },
+                    EntryState::Encrypted {
+                        path, descriptor, ..
+                    } => {
+                        self.encrypted_entries.try_reserve(1).map_err(|source| {
+                            Error::Allocation {
+                                resource: "ODF typed encrypted manifest entries",
+                                source,
+                            }
                         })?;
-                    self.encrypted_entries.insert(path, descriptor);
-                } else {
-                    self.current_path = None;
+                        self.encrypted_entries.insert(path, descriptor);
+                    },
+                    EntryState::Idle | EntryState::Entry { .. } => {},
                 }
-                self.current_size = None;
             },
             ManifestScanEvent::Eof => {
-                if self.current_path.is_some() || self.encryption.is_some() {
+                if !matches!(self.entry, EntryState::Idle) {
                     return Err(Error::InvalidFormat(
                         "Incomplete manifest file entry".to_string(),
                     ));
@@ -700,12 +774,6 @@ fn parse_argon2id(
     })
 }
 
-fn encryption_mut(encryption: &mut Option<PartialEncryption>) -> Result<&mut PartialEncryption> {
-    encryption.as_mut().ok_or_else(|| {
-        Error::InvalidFormat("Encryption child appears outside encryption-data".to_string())
-    })
-}
-
 fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
     if slot.replace(value).is_some() {
         return Err(Error::InvalidFormat(format!(
@@ -971,6 +1039,162 @@ mod tests {
                 .to_string(),
             "Invalid format: Encrypted manifest entry 'content.xml' has no plaintext size"
         );
+    }
+
+    /// The first error (or `ok`) of each structural event delivered to an
+    /// observer that is outside every file entry, inside a file entry, or
+    /// inside that entry's open `manifest:encryption-data` element.
+    #[test]
+    fn structural_events_report_the_same_error_from_each_position() {
+        use crate::package::{ManifestScanAttributes, ManifestScanElement, ManifestScanEvent};
+
+        #[derive(Clone, Copy, Debug)]
+        enum Position {
+            Outside,
+            InEntry,
+            InEncryptionData,
+        }
+
+        fn deliver(
+            observer: &mut TypedManifestObserver,
+            event: ManifestScanEvent,
+            path: Option<&str>,
+        ) -> String {
+            let attributes = match event {
+                ManifestScanEvent::Start(
+                    ManifestScanElement::EncryptionData | ManifestScanElement::Algorithm,
+                )
+                | ManifestScanEvent::Empty(
+                    ManifestScanElement::EncryptionData | ManifestScanElement::Algorithm,
+                ) => Some(ManifestScanAttributes::Manifest(Ok(HashMap::new()))),
+                _ => None,
+            };
+            match common_package::ManifestScanObserver::event(
+                observer,
+                event,
+                attributes,
+                path,
+                path.map(|_| 1),
+            ) {
+                Ok(()) => "ok".to_string(),
+                Err(error) => error.to_string(),
+            }
+        }
+
+        fn observer_at(position: Position) -> TypedManifestObserver {
+            let mut observer = TypedManifestObserver::default();
+            if matches!(position, Position::InEntry | Position::InEncryptionData) {
+                assert_eq!(
+                    deliver(
+                        &mut observer,
+                        ManifestScanEvent::Start(ManifestScanElement::FileEntry),
+                        Some("content.xml"),
+                    ),
+                    "ok"
+                );
+            }
+            if matches!(position, Position::InEncryptionData) {
+                assert_eq!(
+                    deliver(
+                        &mut observer,
+                        ManifestScanEvent::Start(ManifestScanElement::EncryptionData),
+                        None,
+                    ),
+                    "ok"
+                );
+            }
+            observer
+        }
+
+        const NESTED: &str = "Invalid format: Nested manifest file entries are invalid";
+        const MISPLACED: &str = "Invalid format: Misplaced or duplicate manifest encryption data";
+        const OUTSIDE: &str = "Invalid format: Encryption child appears outside encryption-data";
+        const INCOMPLETE: &str = "Invalid format: Incomplete manifest file entry";
+        let start_entry = ManifestScanEvent::Start(ManifestScanElement::FileEntry);
+        let start_data = ManifestScanEvent::Start(ManifestScanElement::EncryptionData);
+        let empty_data = ManifestScanEvent::Empty(ManifestScanElement::EncryptionData);
+        let algorithm = ManifestScanEvent::Empty(ManifestScanElement::Algorithm);
+        let end_data = ManifestScanEvent::End(ManifestScanElement::EncryptionData);
+        let end_entry = ManifestScanEvent::End(ManifestScanElement::FileEntry);
+        let cases = [
+            (Position::Outside, start_entry, Some("a.xml"), "ok"),
+            (
+                Position::Outside,
+                start_entry,
+                None,
+                "Invalid format: Manifest file entry has no full path",
+            ),
+            (Position::Outside, start_data, None, MISPLACED),
+            (Position::Outside, empty_data, None, MISPLACED),
+            (Position::Outside, algorithm, None, OUTSIDE),
+            (
+                Position::Outside,
+                end_data,
+                None,
+                "Invalid format: Encryption data has no file entry",
+            ),
+            (Position::Outside, end_entry, None, "ok"),
+            (Position::Outside, ManifestScanEvent::Eof, None, "ok"),
+            (Position::InEntry, start_entry, Some("a.xml"), NESTED),
+            (Position::InEntry, start_data, None, "ok"),
+            (
+                Position::InEntry,
+                empty_data,
+                None,
+                "Invalid format: ODF package has encrypted entries with incomplete encryption metadata",
+            ),
+            (Position::InEntry, algorithm, None, OUTSIDE),
+            (
+                Position::InEntry,
+                end_data,
+                None,
+                "Invalid format: Unexpected encryption-data end",
+            ),
+            (Position::InEntry, end_entry, None, "ok"),
+            (Position::InEntry, ManifestScanEvent::Eof, None, INCOMPLETE),
+            (
+                Position::InEncryptionData,
+                start_entry,
+                Some("a.xml"),
+                NESTED,
+            ),
+            (Position::InEncryptionData, start_data, None, MISPLACED),
+            (Position::InEncryptionData, empty_data, None, MISPLACED),
+            (
+                Position::InEncryptionData,
+                end_data,
+                None,
+                "Invalid format: Missing encryption algorithm",
+            ),
+            (
+                Position::InEncryptionData,
+                end_entry,
+                None,
+                "Invalid format: Unterminated manifest encryption data",
+            ),
+            (
+                Position::InEncryptionData,
+                ManifestScanEvent::Eof,
+                None,
+                INCOMPLETE,
+            ),
+        ];
+        for (case, (position, event, path, expected)) in cases.into_iter().enumerate() {
+            let mut observer = observer_at(position);
+            assert_eq!(
+                deliver(&mut observer, event, path),
+                expected,
+                "case {case} from {position:?}"
+            );
+            assert!(observer.encrypted_entries.is_empty());
+        }
+
+        // Leaving an entry returns the observer to the outside position.
+        let mut observer = observer_at(Position::InEntry);
+        assert_eq!(deliver(&mut observer, end_entry, None), "ok");
+        assert_eq!(deliver(&mut observer, start_entry, Some("b.xml")), "ok");
+        assert_eq!(deliver(&mut observer, end_entry, None), "ok");
+        assert_eq!(deliver(&mut observer, ManifestScanEvent::Eof, None), "ok");
     }
 
     #[test]

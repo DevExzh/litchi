@@ -648,7 +648,12 @@ where
         Ok(report) => report,
         Err(error) => {
             drop(package);
-            return Err(producer.map_error(error, &budgeted));
+            return Err(producer.map_error(
+                error,
+                PublicationFailureKind::Producer,
+                PublicationFailureKind::Archive,
+                &budgeted,
+            ));
         },
     };
 
@@ -695,8 +700,9 @@ where
         content_xml_bytes: generated.bytes(),
     };
     if let Err(error) = package.finish_to_writer() {
-        return Err(producer.map_error_kind(
+        return Err(producer.map_error(
             error,
+            PublicationFailureKind::Finalization,
             PublicationFailureKind::Finalization,
             &budgeted,
         ));
@@ -718,12 +724,7 @@ struct ProducerState<'context, I, S> {
     body_text_bytes: usize,
     total_text_bytes: usize,
     content_xml_bytes: usize,
-    execution_error: Option<ExecutionError>,
-    producer_error: Option<Error>,
-    invalid_error: Option<String>,
-    limit_error: Option<LocalLimit>,
-    counter_error: Option<&'static str>,
-    producer_failed: bool,
+    failure: Option<ProducerFailure>,
     _item: PhantomData<fn() -> S>,
 }
 
@@ -740,14 +741,13 @@ impl<'context, I, S> ProducerState<'context, I, S> {
             body_text_bytes: 0,
             total_text_bytes: 0,
             content_xml_bytes: CONTENT_PREFIX.len() + CONTENT_SUFFIX.len(),
-            execution_error: None,
-            producer_error: None,
-            invalid_error: None,
-            limit_error: None,
-            counter_error: None,
-            producer_failed: false,
+            failure: None,
             _item: PhantomData,
         }
+    }
+
+    fn fail(&mut self, failure: ProducerFailure) {
+        ProducerFailure::record(&mut self.failure, failure);
     }
 }
 
@@ -758,24 +758,22 @@ where
 {
     fn next_fragment(&mut self, output: &mut dyn Write) -> litchi_core::Result<bool> {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         if self.slides == self.limits.max_slides {
             match self.source.next() {
                 None => return Ok(false),
                 Some(Err(error)) => {
-                    self.producer_failed = true;
-                    self.producer_error = Some(error);
+                    self.fail(ProducerFailure::Source(error));
                     return Err(Error::Other("slide source returned an error".to_string()));
                 },
                 Some(Ok(_)) => {
-                    self.producer_failed = true;
-                    self.limit_error = Some(LocalLimit::new(
+                    self.fail(ProducerFailure::Limit(LocalLimit::new(
                         "slides",
                         self.slides.saturating_add(1),
                         self.limits.max_slides,
-                    ));
+                    )));
                     return Err(Error::InvalidFormat(
                         "slide iterator exceeds max_slides".to_string(),
                     ));
@@ -789,8 +787,7 @@ where
         let item = match item {
             Ok(item) => item,
             Err(error) => {
-                self.producer_failed = true;
-                self.producer_error = Some(error);
+                self.fail(ProducerFailure::Source(error));
                 return Err(Error::Other("slide source returned an error".to_string()));
             },
         };
@@ -799,23 +796,21 @@ where
         let title_bytes = title.map_or(0, str::len);
         let body_bytes = body.len();
         if title_bytes > self.limits.max_title_text_bytes {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "title text bytes",
                 title_bytes,
                 self.limits.max_title_text_bytes,
-            ));
-            self.producer_failed = true;
+            )));
             return Err(Error::InvalidFormat(
                 "title text exceeds max_title_text_bytes".to_string(),
             ));
         }
         if body_bytes > self.limits.max_body_text_bytes {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "body text bytes",
                 body_bytes,
                 self.limits.max_body_text_bytes,
-            ));
-            self.producer_failed = true;
+            )));
             return Err(Error::InvalidFormat(
                 "body text exceeds max_body_text_bytes".to_string(),
             ));
@@ -823,8 +818,7 @@ where
         let item_text = match title_bytes.checked_add(body_bytes) {
             Some(value) => value,
             None => {
-                self.counter_error = Some("slide text bytes");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("slide text bytes"));
                 return Err(Error::InvalidFormat(
                     "slide text counter overflow".to_string(),
                 ));
@@ -833,43 +827,39 @@ where
         let total = match self.total_text_bytes.checked_add(item_text) {
             Some(value) => value,
             None => {
-                self.counter_error = Some("aggregate text bytes");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("aggregate text bytes"));
                 return Err(Error::InvalidFormat(
                     "aggregate text counter overflow".to_string(),
                 ));
             },
         };
         if total > self.limits.max_total_text_bytes {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "aggregate text bytes",
                 total,
                 self.limits.max_total_text_bytes,
-            ));
-            self.producer_failed = true;
+            )));
             return Err(Error::InvalidFormat(
                 "slide source exceeds max_total_text_bytes".to_string(),
             ));
         }
         let input_bytes = u64::try_from(item_text).map_err(|_| {
-            self.counter_error = Some("input text bytes");
-            self.producer_failed = true;
+            self.fail(ProducerFailure::CounterOverflow("input text bytes"));
             Error::InvalidFormat("slide input length exceeds u64".to_string())
         })?;
         if let Err(error) = self.context.consume(Resource::InputBytes, input_bytes) {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         if let Some(title) = title {
             match validate_plain_text(title, self.context) {
                 Ok(()) => {},
                 Err(PlainTextFailure::Invalid(error)) => {
-                    self.invalid_error = Some(error.to_string());
-                    self.producer_failed = true;
+                    self.fail(ProducerFailure::Invalid(error.to_string()));
                     return Err(error);
                 },
                 Err(PlainTextFailure::Execution(error)) => {
-                    self.execution_error = Some(error.clone());
+                    self.fail(ProducerFailure::Execution(error.clone()));
                     return Err(Error::Other(error.to_string()));
                 },
             }
@@ -877,17 +867,16 @@ where
         match validate_plain_text(body, self.context) {
             Ok(()) => {},
             Err(PlainTextFailure::Invalid(error)) => {
-                self.invalid_error = Some(error.to_string());
-                self.producer_failed = true;
+                self.fail(ProducerFailure::Invalid(error.to_string()));
                 return Err(error);
             },
             Err(PlainTextFailure::Execution(error)) => {
-                self.execution_error = Some(error.clone());
+                self.fail(ProducerFailure::Execution(error.clone()));
                 return Err(Error::Other(error.to_string()));
             },
         }
         if let Err(error) = self.context.consume(Resource::Objects, 1) {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
 
@@ -899,14 +888,11 @@ where
             self.limits.max_content_xml_bytes,
         );
         let result = emit_slide(&mut slide, self.slides, title, body);
-        if let Some(error) = slide.execution_error.take() {
-            self.execution_error = Some(error);
-        }
-        if let Some(error) = slide.limit_error.take() {
-            self.limit_error = Some(error);
+        if let Some(failure) = slide.failure.take() {
+            self.fail(failure);
         }
         if let Err(error) = result {
-            self.producer_failed = true;
+            self.fail(ProducerFailure::Untyped);
             return Err(error);
         }
 
@@ -915,122 +901,121 @@ where
             self.title_text_bytes
                 .checked_add(title_bytes)
                 .ok_or_else(|| {
-                    self.counter_error = Some("title text bytes");
-                    self.producer_failed = true;
+                    self.fail(ProducerFailure::CounterOverflow("title text bytes"));
                     Error::InvalidFormat("title text counter overflow".to_string())
                 })?;
         self.body_text_bytes = self
             .body_text_bytes
             .checked_add(body_bytes)
             .ok_or_else(|| {
-                self.counter_error = Some("body text bytes");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("body text bytes"));
                 Error::InvalidFormat("body text counter overflow".to_string())
             })?;
         self.content_xml_bytes =
             self.content_xml_bytes
                 .checked_add(slide.bytes)
                 .ok_or_else(|| {
-                    self.counter_error = Some("content XML bytes");
-                    self.producer_failed = true;
+                    self.fail(ProducerFailure::CounterOverflow("content XML bytes"));
                     Error::InvalidFormat("content XML counter overflow".to_string())
                 })?;
         self.slides = match self.slides.checked_add(1) {
             Some(value) => value,
             None => {
-                self.counter_error = Some("slides");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("slides"));
                 return Err(Error::InvalidFormat("slide counter overflow".to_string()));
             },
         };
         if title.is_some() {
             self.title_count = self.title_count.checked_add(1).ok_or_else(|| {
-                self.counter_error = Some("title count");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("title count"));
                 Error::InvalidFormat("title count overflow".to_string())
             })?;
         }
         if !body.is_empty() {
             self.body_count = self.body_count.checked_add(1).ok_or_else(|| {
-                self.counter_error = Some("body count");
-                self.producer_failed = true;
+                self.fail(ProducerFailure::CounterOverflow("body count"));
                 Error::InvalidFormat("body count overflow".to_string())
             })?;
         }
         Ok(true)
     }
 
+    /// Resolves the error the caller receives once the package writer has
+    /// failed: the producer's own typed cause first, then whatever the sink
+    /// adapter recorded. `untyped` names an archive error that follows an
+    /// untyped producer refusal, `fallback` one the producer cannot explain.
     fn map_error<W: ?Sized>(
         &mut self,
         error: PackageWriterError,
+        untyped: PublicationFailureKind,
+        fallback: PublicationFailureKind,
         output: &BudgetedOutput<'_, W>,
     ) -> StreamingError {
-        if let Some(source) = self.producer_error.take() {
-            return StreamingError::Producer {
-                written: output.accepted(),
+        let written = output.accepted();
+        match self.failure.take() {
+            Some(ProducerFailure::Source(source)) => StreamingError::Producer {
+                written,
                 source: Box::new(source),
-            };
-        }
-        if let Some(error) = self.invalid_error.take() {
-            return StreamingError::Invalid {
-                error: Error::InvalidFormat(error),
-                written: output.accepted(),
-            };
-        }
-        if let Some(limit) = self.limit_error.take() {
-            return limit.as_error(output.accepted());
-        }
-        if let Some(resource) = self.counter_error.take() {
-            return StreamingError::CounterOverflow {
-                resource,
-                written: output.accepted(),
-            };
-        }
-        if let Some(error) = self.execution_error.take() {
-            return execution(error, output.accepted());
-        }
-        map_package_error(
-            error,
-            if self.producer_failed {
-                PublicationFailureKind::Producer
-            } else {
-                PublicationFailureKind::Archive
             },
-            output,
-        )
+            Some(ProducerFailure::Invalid(message)) => StreamingError::Invalid {
+                error: Error::InvalidFormat(message),
+                written,
+            },
+            Some(ProducerFailure::Limit(limit)) => limit.as_error(written),
+            Some(ProducerFailure::CounterOverflow(resource)) => {
+                StreamingError::CounterOverflow { resource, written }
+            },
+            Some(ProducerFailure::Execution(error)) => execution(error, written),
+            Some(ProducerFailure::Untyped) => map_package_error(error, untyped, output),
+            None => map_package_error(error, fallback, output),
+        }
+    }
+}
+
+/// Why the slide producer stopped, in decreasing priority.
+/// `ProducerState::failure` and `SlideWriter::failure` hold the highest-priority
+/// cause seen so far; `None` means no slide was refused.
+///
+/// ```text
+/// None --any cause--> Some(cause)
+/// Some(lower-priority cause) --higher-priority cause--> Some(higher-priority cause)
+/// ```
+///
+/// A later cause of the same priority replaces the earlier one.
+enum ProducerFailure {
+    /// The fallible source returned its own error.
+    Source(Error),
+    /// The source text is not representable in the generated XML.
+    Invalid(String),
+    /// A provider ceiling rejected the next slide or its text.
+    Limit(LocalLimit),
+    /// A progress counter could not represent its next value.
+    CounterOverflow(&'static str),
+    /// Cancellation or a shared budget stopped the slide.
+    Execution(ExecutionError),
+    /// The slide was refused without one of the typed causes above.
+    Untyped,
+}
+
+impl ProducerFailure {
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Source(_) => 5,
+            Self::Invalid(_) => 4,
+            Self::Limit(_) => 3,
+            Self::CounterOverflow(_) => 2,
+            Self::Execution(_) => 1,
+            Self::Untyped => 0,
+        }
     }
 
-    fn map_error_kind<W: ?Sized>(
-        &mut self,
-        error: PackageWriterError,
-        kind: PublicationFailureKind,
-        output: &BudgetedOutput<'_, W>,
-    ) -> StreamingError {
-        if let Some(source) = self.producer_error.take() {
-            return StreamingError::Producer {
-                written: output.accepted(),
-                source: Box::new(source),
-            };
+    fn record(slot: &mut Option<Self>, failure: Self) {
+        if slot
+            .as_ref()
+            .is_none_or(|current| failure.priority() >= current.priority())
+        {
+            *slot = Some(failure);
         }
-        if let Some(error) = self.invalid_error.take() {
-            return StreamingError::Invalid {
-                error: Error::InvalidFormat(error),
-                written: output.accepted(),
-            };
-        }
-        if let Some(limit) = self.limit_error.take() {
-            return limit.as_error(output.accepted());
-        }
-        if let Some(resource) = self.counter_error.take() {
-            return StreamingError::CounterOverflow {
-                resource,
-                written: output.accepted(),
-            };
-        }
-        if let Some(error) = self.execution_error.take() {
-            return execution(error, output.accepted());
-        }
-        map_package_error(error, kind, output)
     }
 }
 
@@ -1067,8 +1052,7 @@ struct SlideWriter<'a> {
     content_before: usize,
     content_maximum: usize,
     bytes: usize,
-    execution_error: Option<ExecutionError>,
-    limit_error: Option<LocalLimit>,
+    failure: Option<ProducerFailure>,
 }
 
 impl<'a> SlideWriter<'a> {
@@ -1086,14 +1070,17 @@ impl<'a> SlideWriter<'a> {
             content_before,
             content_maximum,
             bytes: 0,
-            execution_error: None,
-            limit_error: None,
+            failure: None,
         }
+    }
+
+    fn fail(&mut self, failure: ProducerFailure) {
+        ProducerFailure::record(&mut self.failure, failure);
     }
 
     fn check(&mut self) -> litchi_core::Result<()> {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         Ok(())
@@ -1102,29 +1089,37 @@ impl<'a> SlideWriter<'a> {
     fn write_bytes(&mut self, bytes: &[u8]) -> litchi_core::Result<()> {
         self.check()?;
         let next = self.bytes.checked_add(bytes.len()).ok_or_else(|| {
-            self.limit_error = Some(LocalLimit::new("slide XML bytes", usize::MAX, self.maximum));
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
+                "slide XML bytes",
+                usize::MAX,
+                self.maximum,
+            )));
             Error::InvalidFormat("slide XML byte counter overflow".to_string())
         })?;
         let content_next = self.content_before.checked_add(next).ok_or_else(|| {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "content XML bytes",
                 usize::MAX,
                 self.content_maximum,
-            ));
+            )));
             Error::InvalidFormat("content XML byte counter overflow".to_string())
         })?;
         if content_next > self.content_maximum {
-            self.limit_error = Some(LocalLimit::new(
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
                 "content XML bytes",
                 content_next,
                 self.content_maximum,
-            ));
+            )));
             return Err(Error::InvalidFormat(
                 "content XML exceeds max_content_xml_bytes".to_string(),
             ));
         }
         if next > self.maximum {
-            self.limit_error = Some(LocalLimit::new("slide XML bytes", next, self.maximum));
+            self.fail(ProducerFailure::Limit(LocalLimit::new(
+                "slide XML bytes",
+                next,
+                self.maximum,
+            )));
             return Err(Error::InvalidFormat(
                 "slide XML exceeds max_slide_xml_bytes".to_string(),
             ));
@@ -1132,7 +1127,7 @@ impl<'a> SlideWriter<'a> {
         let amount = u64::try_from(bytes.len())
             .map_err(|_| Error::InvalidFormat("slide XML length exceeds u64".to_string()))?;
         if let Err(error) = self.context.consume(Resource::Work, amount) {
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         self.output.write_all(bytes)?;
@@ -1161,7 +1156,7 @@ impl<'a> SlideWriter<'a> {
             if matches!(&error, ExecutionError::ResourceLimit(_)) {
                 return Ok(PlainSpanResult::Fallback);
             }
-            self.execution_error = Some(error.clone());
+            self.fail(ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
         self.output.write_all(bytes)?;
@@ -1396,10 +1391,47 @@ struct BudgetedOutput<'a, W: ?Sized> {
     context: &'a ExecutionContext,
     maximum: u64,
     accepted: u64,
-    execution_error: Option<ExecutionError>,
-    sink_failed: bool,
-    limit_failed: bool,
-    limit_observed: Option<u64>,
+    failure: Option<SinkFailure>,
+}
+
+/// Why the caller-sink adapter refused or lost a write, in decreasing
+/// priority. `BudgetedOutput::failure` holds the highest-priority cause seen
+/// so far; `None` means every write and flush succeeded.
+///
+/// ```text
+/// None --any cause--> Some(cause)
+/// Some(Sink) --limit or execution refusal--> Some(Limit | Execution)
+/// Some(Limit) --execution refusal--> Some(Execution)
+/// ```
+///
+/// A later cause of the same priority replaces the earlier one. A retried
+/// `Interrupted` write leaves `Sink` recorded for the rest of the stream.
+enum SinkFailure {
+    /// Cancellation or a shared budget refused the write or flush.
+    Execution(ExecutionError),
+    /// The write would have passed `maximum`, or the byte counter overflowed.
+    Limit { observed: u64 },
+    /// The caller sink returned an error, accepted nothing, or over-reported.
+    Sink,
+}
+
+impl SinkFailure {
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Execution(_) => 2,
+            Self::Limit { .. } => 1,
+            Self::Sink => 0,
+        }
+    }
+
+    fn record(slot: &mut Option<Self>, failure: Self) {
+        if slot
+            .as_ref()
+            .is_none_or(|current| failure.priority() >= current.priority())
+        {
+            *slot = Some(failure);
+        }
+    }
 }
 
 impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
@@ -1409,10 +1441,7 @@ impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
             context,
             maximum,
             accepted: 0,
-            execution_error: None,
-            sink_failed: false,
-            limit_failed: false,
-            limit_observed: None,
+            failure: None,
         }
     }
 
@@ -1420,10 +1449,8 @@ impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
         self.accepted
     }
 
-    fn final_check(&mut self) -> Result<(), ExecutionError> {
-        self.context
-            .check()
-            .inspect_err(|error| self.execution_error = Some(error.clone()))
+    fn final_check(&self) -> Result<(), ExecutionError> {
+        self.context.check()
     }
 }
 
@@ -1444,47 +1471,51 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
             return Ok(0);
         }
         self.context.check().map_err(|error| {
-            self.execution_error = Some(error.clone());
+            SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
             io::Error::other(BudgetedIoError(error))
         })?;
         let amount = u64::try_from(bytes.len())
             .map_err(|_| io::Error::other("ODP output write exceeds u64"))?;
         let next = self.accepted.checked_add(amount).ok_or_else(|| {
-            self.limit_failed = true;
-            self.limit_observed = Some(u64::MAX);
+            SinkFailure::record(&mut self.failure, SinkFailure::Limit { observed: u64::MAX });
             io::Error::other("ODP accepted output counter overflow")
         })?;
         if next > self.maximum {
-            self.limit_failed = true;
-            self.limit_observed = Some(next);
+            SinkFailure::record(&mut self.failure, SinkFailure::Limit { observed: next });
             return Err(io::Error::other("ODP output byte limit exceeded"));
         }
         let reservation = self
             .context
             .reserve(Resource::OutputBytes, amount)
             .map_err(|error| {
-                self.execution_error = Some(error.clone());
+                SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
                 io::Error::other(BudgetedIoError(error))
             })?;
         match self.sink.write(bytes) {
             Ok(written) => {
                 if written == 0 {
-                    self.sink_failed = true;
+                    SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                 }
                 let written_u64 = u64::try_from(written)
                     .map_err(|_| io::Error::other("ODP sink count exceeds u64"))?;
                 if !reservation.commit(written_u64) {
-                    self.sink_failed = true;
+                    SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                     return Err(io::Error::other("ODP output reservation commit failed"));
                 }
                 self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
-                    self.limit_failed = true;
+                    // An earlier limit refusal keeps the usage it observed.
+                    if !matches!(self.failure, Some(SinkFailure::Limit { .. })) {
+                        SinkFailure::record(
+                            &mut self.failure,
+                            SinkFailure::Limit { observed: u64::MAX },
+                        );
+                    }
                     io::Error::other("ODP accepted output counter overflow")
                 })?;
                 Ok(written)
             },
             Err(error) => {
-                self.sink_failed = true;
+                SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                 drop(reservation);
                 Err(error)
             },
@@ -1493,10 +1524,12 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.context.check().map_err(|error| {
-            self.execution_error = Some(error.clone());
+            SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
             io::Error::other(BudgetedIoError(error))
         })?;
-        self.sink.flush().inspect_err(|_| self.sink_failed = true)
+        self.sink
+            .flush()
+            .inspect_err(|_| SinkFailure::record(&mut self.failure, SinkFailure::Sink))
     }
 }
 
@@ -1509,17 +1542,21 @@ fn map_package_error<W: ?Sized>(
     kind: PublicationFailureKind,
     output: &BudgetedOutput<'_, W>,
 ) -> StreamingError {
-    if let Some(error) = output.execution_error.clone() {
-        return execution(error, output.accepted());
-    }
-    if output.limit_failed {
-        return StreamingError::LimitExceeded {
-            resource: "output bytes",
-            observed: output.limit_observed.unwrap_or(u64::MAX),
-            limit: output.maximum,
-            written: output.accepted(),
-        };
-    }
+    let sink_failed = match &output.failure {
+        Some(SinkFailure::Execution(error)) => {
+            return execution(error.clone(), output.accepted());
+        },
+        Some(SinkFailure::Limit { observed }) => {
+            return StreamingError::LimitExceeded {
+                resource: "output bytes",
+                observed: *observed,
+                limit: output.maximum,
+                written: output.accepted(),
+            };
+        },
+        Some(SinkFailure::Sink) => true,
+        None => false,
+    };
     if let Some(limit) = error.limit() {
         return StreamingError::LimitExceeded {
             resource: match limit.resource() {
@@ -1556,7 +1593,7 @@ fn map_package_error<W: ?Sized>(
     }
     StreamingError::Publication(PublicationError {
         written: output.accepted(),
-        kind: if output.sink_failed {
+        kind: if sink_failed {
             PublicationFailureKind::Sink
         } else {
             kind

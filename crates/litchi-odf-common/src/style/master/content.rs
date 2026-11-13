@@ -232,9 +232,7 @@ struct Region {
     blocks: Vec<Block>,
     block: Option<ActiveBlock>,
     field: Option<ActiveField>,
-    active_column: Option<ActiveColumn>,
-    last_column_region_order: Option<u8>,
-    has_plain_blocks: bool,
+    layout: LayoutState,
     token_count: usize,
     field_count: usize,
     expanded_spaces: usize,
@@ -248,6 +246,42 @@ struct ActiveBlock {
 struct ActiveColumn {
     kind: Column,
     depth: usize,
+}
+
+/// How a header/footer region arranges its blocks: directly, or inside
+/// `style:region-left|center|right` column wrappers, never both.
+///
+/// ```text
+/// Undecided --text:p | text:h outside a wrapper--> Plain
+/// Undecided --style:region-*-->                    Columns { open }
+/// Columns { open: Some } --wrapper end tag-->      Columns { open: None }
+/// Columns { open: None } --later style:region-*--> Columns { open }
+/// ```
+///
+/// A wrapper is an error in `Plain` and inside an open wrapper; a block
+/// outside a wrapper is an error in `Columns`. An empty wrapper element is
+/// recorded with `open: None`.
+enum LayoutState {
+    /// No block and no column wrapper has been seen.
+    Undecided,
+    /// At least one block was written directly in the region.
+    Plain,
+    /// At least one column wrapper was seen. `last_order` is the document
+    /// order of the latest one and `open` is the wrapper being read.
+    Columns {
+        last_order: u8,
+        open: Option<ActiveColumn>,
+    },
+}
+
+impl LayoutState {
+    /// The column wrapper being read, if any.
+    const fn open_column(&self) -> Option<&ActiveColumn> {
+        match self {
+            Self::Columns { open, .. } => open.as_ref(),
+            Self::Undecided | Self::Plain => None,
+        }
+    }
 }
 
 struct ActiveField {
@@ -264,9 +298,7 @@ impl Region {
             blocks: Vec::new(),
             block: None,
             field: None,
-            active_column: None,
-            last_column_region_order: None,
-            has_plain_blocks: false,
+            layout: LayoutState::Undecided,
             token_count: 0,
             field_count: 0,
             expanded_spaces: 0,
@@ -293,21 +325,28 @@ impl Region {
                     "nested header/footer paragraph or heading".to_string(),
                 ));
             }
-            if local.as_ref() == b"h" && self.active_column.is_some() {
-                return Err(Error::InvalidFormat(
-                    "style:region-* column regions may contain only text:p".to_string(),
-                ));
-            }
-            let column_region = self.active_column.as_ref().map(|region| region.kind);
-            if column_region.is_none() {
-                if self.last_column_region_order.is_some() {
+            let column_region = match &self.layout {
+                LayoutState::Columns {
+                    open: Some(column), ..
+                } => {
+                    if local.as_ref() == b"h" {
+                        return Err(Error::InvalidFormat(
+                            "style:region-* column regions may contain only text:p".to_string(),
+                        ));
+                    }
+                    Some(column.kind)
+                },
+                LayoutState::Columns { open: None, .. } => {
                     return Err(Error::InvalidFormat(
                         "header/footer mixes plain blocks with style:region-* column regions"
                             .to_string(),
                     ));
-                }
-                self.has_plain_blocks = true;
-            }
+                },
+                LayoutState::Undecided | LayoutState::Plain => {
+                    self.layout = LayoutState::Plain;
+                    None
+                },
+            };
             if self.blocks.len() >= MAX_BLOCKS {
                 return Err(limit_error("block"));
             }
@@ -366,28 +405,34 @@ impl Region {
     }
 
     fn start_column_region(&mut self, kind: Column, depth: usize, empty: bool) -> Result<()> {
-        if self.active_column.is_some() {
-            return Err(Error::InvalidFormat(
-                "nested style:region-* column regions".to_string(),
-            ));
+        match &self.layout {
+            LayoutState::Columns { open: Some(_), .. } => {
+                return Err(Error::InvalidFormat(
+                    "nested style:region-* column regions".to_string(),
+                ));
+            },
+            LayoutState::Plain => {
+                return Err(Error::InvalidFormat(
+                    "header/footer mixes plain blocks with style:region-* column regions"
+                        .to_string(),
+                ));
+            },
+            LayoutState::Columns {
+                last_order,
+                open: None,
+            } => {
+                if kind.order() <= *last_order {
+                    return Err(Error::InvalidFormat(
+                        "style:region-* column regions are duplicated or out of order".to_string(),
+                    ));
+                }
+            },
+            LayoutState::Undecided => {},
         }
-        if self.has_plain_blocks {
-            return Err(Error::InvalidFormat(
-                "header/footer mixes plain blocks with style:region-* column regions".to_string(),
-            ));
-        }
-        if self
-            .last_column_region_order
-            .is_some_and(|order| kind.order() <= order)
-        {
-            return Err(Error::InvalidFormat(
-                "style:region-* column regions are duplicated or out of order".to_string(),
-            ));
-        }
-        self.last_column_region_order = Some(kind.order());
-        if !empty {
-            self.active_column = Some(ActiveColumn { kind, depth });
-        }
+        self.layout = LayoutState::Columns {
+            last_order: kind.order(),
+            open: (!empty).then_some(ActiveColumn { kind, depth }),
+        };
         Ok(())
     }
 
@@ -419,18 +464,12 @@ impl Region {
             }
             self.finish_block()?;
         }
-        if self
-            .active_column
-            .as_ref()
-            .is_some_and(|region| region.depth == depth)
-        {
-            let column_kind = self
-                .active_column
+        if let LayoutState::Columns { open, .. } = &mut self.layout
+            && let Some(column_kind) = open
                 .as_ref()
-                .map(|region| region.kind)
-                .ok_or_else(|| {
-                    Error::InvalidFormat("missing active header/footer column region".to_string())
-                })?;
+                .filter(|column| column.depth == depth)
+                .map(|column| column.kind)
+        {
             if namespace != Some(STYLE_NAMESPACE) || Column::parse(local) != Some(column_kind) {
                 return Err(Error::InvalidFormat(
                     "malformed style:region-* column region nesting".to_string(),
@@ -441,7 +480,7 @@ impl Region {
                     "unterminated header/footer block inside a column region".to_string(),
                 ));
             }
-            self.active_column = None;
+            *open = None;
         }
         Ok(())
     }
@@ -630,7 +669,7 @@ pub(crate) fn parse(
                     let active = region.take().ok_or_else(|| {
                         Error::InvalidFormat("missing active header/footer region".to_string())
                     })?;
-                    if active.active_column.is_some() || active.block.is_some() {
+                    if active.layout.open_column().is_some() || active.block.is_some() {
                         return Err(crate::Error::from(Error::InvalidFormat(
                             "unterminated header/footer column region or block".to_string(),
                         )));
@@ -1365,5 +1404,59 @@ mod tests {
         );
         // Unterminated regions are malformed.
         assert!(parse(&column_region_document(r"<s:region-left><t:p>open</t:p>")).is_err());
+    }
+
+    #[test]
+    fn column_region_rejections_name_their_cause() {
+        const ORDER: &str = "style:region-* column regions are duplicated or out of order";
+        const MIXED: &str = "header/footer mixes plain blocks with style:region-* column regions";
+        const NESTED: &str = "nested style:region-* column regions";
+        const HEADING: &str = "style:region-* column regions may contain only text:p";
+        let cases: [(&str, std::result::Result<usize, &str>); 14] = [
+            ("<t:p/><t:h/>", Ok(2)),
+            ("<s:region-left/><s:region-center/><s:region-right/>", Ok(0)),
+            (
+                "<s:region-center><t:p/><t:p/></s:region-center><s:region-right/>",
+                Ok(2),
+            ),
+            ("<s:region-right/><s:region-left/>", Err(ORDER)),
+            ("<s:region-center/><s:region-center/>", Err(ORDER)),
+            (
+                "<s:region-left><t:p/></s:region-left><s:region-left><t:p/></s:region-left>",
+                Err(ORDER),
+            ),
+            ("<t:p/><s:region-left/>", Err(MIXED)),
+            ("<t:h/><s:region-left><t:p/></s:region-left>", Err(MIXED)),
+            ("<s:region-left/><t:p/>", Err(MIXED)),
+            ("<s:region-left><t:p/></s:region-left><t:h/>", Err(MIXED)),
+            (
+                "<s:region-left><s:region-center/></s:region-left>",
+                Err(NESTED),
+            ),
+            (
+                "<s:region-left><s:region-left/></s:region-left>",
+                Err(NESTED),
+            ),
+            ("<s:region-left><t:h/></s:region-left>", Err(HEADING)),
+            ("<s:region-left><t:p/><t:h/></s:region-left>", Err(HEADING)),
+        ];
+        for (content, expected) in cases {
+            let actual = parse(&column_region_document(content))
+                .map(|regions| {
+                    regions
+                        .get(&(String::from("A"), Kind::Header))
+                        .map_or(0, Vec::len)
+                })
+                .map_err(|error| error.to_string());
+            match (expected, actual) {
+                (Ok(expected), Ok(actual)) => assert_eq!(actual, expected, "{content}"),
+                (Err(cause), Err(message)) => {
+                    assert!(message.contains(cause), "{content}: {message}");
+                },
+                (expected, actual) => {
+                    panic!("{content}: expected {expected:?}, got {actual:?}")
+                },
+            }
+        }
     }
 }

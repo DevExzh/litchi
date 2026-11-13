@@ -8,7 +8,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, Resource,
 };
 
-use super::{RowWriter, write_text};
+use super::{ProducerFailure, RowWriter, write_text};
 
 #[derive(Debug)]
 struct Snapshot {
@@ -70,10 +70,16 @@ fn snapshot(value: &str, maximum: usize, parent_work: u64, child_work: u64) -> S
         .err()
         .map(|error| error.to_string());
     let row_bytes = writer.bytes;
-    let local_limit = writer
-        .limit_error
-        .map(|limit| (limit.resource, limit.observed, limit.limit));
-    let execution_error = writer.execution_error.clone();
+    let (local_limit, execution_error) = match writer.failure.take() {
+        Some(ProducerFailure::Limit(limit)) => {
+            (Some((limit.resource, limit.observed, limit.limit)), None)
+        },
+        Some(ProducerFailure::Execution(error)) => (None, Some(error)),
+        Some(ProducerFailure::CounterOverflow(_) | ProducerFailure::Untyped) => {
+            unreachable!("a row writer records only limit and execution refusals")
+        },
+        None => (None, None),
+    };
     drop(writer);
     Snapshot {
         result_error,

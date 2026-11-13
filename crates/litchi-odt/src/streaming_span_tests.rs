@@ -155,6 +155,24 @@ struct EmitObservation {
     execution_error: Option<ExecutionError>,
 }
 
+fn split_failure(
+    failure: Option<ProducerFailure>,
+) -> (Option<(&'static str, usize, usize)>, Option<ExecutionError>) {
+    match failure {
+        Some(ProducerFailure::Limit(limit)) => {
+            (Some((limit.resource, limit.observed, limit.limit)), None)
+        },
+        Some(ProducerFailure::Execution(error)) => (None, Some(error)),
+        Some(
+            ProducerFailure::Source(_)
+            | ProducerFailure::Invalid(_)
+            | ProducerFailure::CounterOverflow(_)
+            | ProducerFailure::Untyped,
+        ) => unreachable!("a paragraph writer records only limit and execution refusals"),
+        None => (None, None),
+    }
+}
+
 fn emit_with_context(
     output: &mut dyn Write,
     value: &str,
@@ -171,13 +189,12 @@ fn emit_with_context(
         content_limit,
     );
     let result = emit_paragraph(&mut writer, value);
+    let (local_limit, execution_error) = split_failure(writer.failure.take());
     EmitObservation {
         result,
         bytes: writer.bytes,
-        local_limit: writer
-            .limit_error
-            .map(|error| (error.resource, error.observed, error.limit)),
-        execution_error: writer.execution_error,
+        local_limit,
+        execution_error,
     }
 }
 
@@ -203,13 +220,12 @@ fn emit_reference_chunks(
             break;
         }
     }
+    let (local_limit, execution_error) = split_failure(writer.failure.take());
     EmitObservation {
         result,
         bytes: writer.bytes,
-        local_limit: writer
-            .limit_error
-            .map(|error| (error.resource, error.observed, error.limit)),
-        execution_error: writer.execution_error,
+        local_limit,
+        execution_error,
     }
 }
 

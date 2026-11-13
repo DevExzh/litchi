@@ -601,7 +601,7 @@ where
         Ok(generated) => generated,
         Err(error) => {
             drop(package);
-            return Err(producer.map_error(error, &budgeted));
+            return Err(producer.map_error(error, PublicationFailureKind::Archive, &budgeted));
         },
     };
 
@@ -614,11 +614,7 @@ where
     // through the same checked sink; its progress remains authoritative.
     let finish_result = package.finish_to_writer();
     if let Err(error) = finish_result {
-        return Err(producer.map_error_kind(
-            error,
-            PublicationFailureKind::Finalization,
-            &budgeted,
-        ));
+        return Err(producer.map_error(error, PublicationFailureKind::Finalization, &budgeted));
     }
     if let Err(error) = budgeted.final_check() {
         return Err(execution(error, budgeted.accepted()));
@@ -678,10 +674,47 @@ struct BudgetedOutput<'a, W: ?Sized> {
     context: &'a ExecutionContext,
     maximum: u64,
     accepted: u64,
-    execution_error: Option<ExecutionError>,
-    sink_failed: bool,
-    limit_failed: bool,
-    limit_observed: Option<u64>,
+    failure: Option<SinkFailure>,
+}
+
+/// Why the caller-sink adapter refused or lost a write, in decreasing
+/// priority. `BudgetedOutput::failure` holds the highest-priority cause seen
+/// so far; `None` means every write and flush succeeded.
+///
+/// ```text
+/// None --any cause--> Some(cause)
+/// Some(Sink) --limit or execution refusal--> Some(Limit | Execution)
+/// Some(Limit) --execution refusal--> Some(Execution)
+/// ```
+///
+/// A later cause of the same priority replaces the earlier one. A retried
+/// `Interrupted` write leaves `Sink` recorded for the rest of the stream.
+enum SinkFailure {
+    /// Cancellation or a shared budget refused the write or flush.
+    Execution(ExecutionError),
+    /// The write would have passed `maximum`, or the byte counter overflowed.
+    Limit { observed: u64 },
+    /// The caller sink returned an error, accepted nothing, or over-reported.
+    Sink,
+}
+
+impl SinkFailure {
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Execution(_) => 2,
+            Self::Limit { .. } => 1,
+            Self::Sink => 0,
+        }
+    }
+
+    fn record(slot: &mut Option<Self>, failure: Self) {
+        if slot
+            .as_ref()
+            .is_none_or(|current| failure.priority() >= current.priority())
+        {
+            *slot = Some(failure);
+        }
+    }
 }
 
 impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
@@ -691,10 +724,7 @@ impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
             context,
             maximum,
             accepted: 0,
-            execution_error: None,
-            sink_failed: false,
-            limit_failed: false,
-            limit_observed: None,
+            failure: None,
         }
     }
 
@@ -702,30 +732,8 @@ impl<'a, W: ?Sized> BudgetedOutput<'a, W> {
         self.accepted
     }
 
-    fn execution_error(&self) -> Option<ExecutionError> {
-        self.execution_error.clone()
-    }
-
-    fn sink_failed(&self) -> bool {
-        self.sink_failed
-    }
-
-    fn limit_failed(&self) -> bool {
-        self.limit_failed
-    }
-
-    fn limit_observed(&self) -> Option<u64> {
-        self.limit_observed
-    }
-
-    fn final_check(&mut self) -> Result<(), ExecutionError> {
-        match self.context.check() {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                self.execution_error = Some(error.clone());
-                Err(error)
-            },
-        }
+    fn final_check(&self) -> Result<(), ExecutionError> {
+        self.context.check()
     }
 }
 
@@ -750,20 +758,18 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
             return Ok(0);
         }
         self.context.check().map_err(|error| {
-            self.execution_error = Some(error.clone());
+            SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
             std::io::Error::other(BudgetedIoError(error))
         })?;
 
         let amount = u64::try_from(bytes.len())
             .map_err(|_| std::io::Error::other("caller sink write length exceeds u64"))?;
         let next = self.accepted.checked_add(amount).ok_or_else(|| {
-            self.limit_failed = true;
-            self.limit_observed = Some(u64::MAX);
+            SinkFailure::record(&mut self.failure, SinkFailure::Limit { observed: u64::MAX });
             std::io::Error::other("accepted output byte counter overflow")
         })?;
         if next > self.maximum {
-            self.limit_failed = true;
-            self.limit_observed = Some(next);
+            SinkFailure::record(&mut self.failure, SinkFailure::Limit { observed: next });
             return Err(std::io::Error::other(
                 "ODS output byte limit exceeded before sink write",
             ));
@@ -772,7 +778,7 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
             .context
             .reserve(Resource::OutputBytes, amount)
             .map_err(|error| {
-                self.execution_error = Some(error.clone());
+                SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
                 std::io::Error::other(BudgetedIoError(error))
             })?;
         let result = self.sink.write(bytes);
@@ -782,16 +788,22 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
                     .map_err(|_| std::io::Error::other("caller sink write count exceeds u64"))?;
                 debug_assert!(written <= bytes.len());
                 if written == 0 {
-                    self.sink_failed = true;
+                    SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                 }
                 if !reservation.commit(written_u64) {
-                    self.sink_failed = true;
+                    SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                     return Err(std::io::Error::other(
                         "output reservation commit exceeded its reservation",
                     ));
                 }
                 self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
-                    self.limit_failed = true;
+                    // An earlier limit refusal keeps the usage it observed.
+                    if !matches!(self.failure, Some(SinkFailure::Limit { .. })) {
+                        SinkFailure::record(
+                            &mut self.failure,
+                            SinkFailure::Limit { observed: u64::MAX },
+                        );
+                    }
                     std::io::Error::other("accepted output byte counter overflow")
                 })?;
                 Ok(written)
@@ -800,7 +812,7 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
                 // `Write::write` does not expose a partial count with an
                 // error. The reservation is therefore released and the
                 // accepted counter remains the last known sink prefix.
-                self.sink_failed = true;
+                SinkFailure::record(&mut self.failure, SinkFailure::Sink);
                 drop(reservation);
                 Err(error)
             },
@@ -809,11 +821,11 @@ impl<W: Write + ?Sized> Write for BudgetedOutput<'_, W> {
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.context.check().map_err(|error| {
-            self.execution_error = Some(error.clone());
+            SinkFailure::record(&mut self.failure, SinkFailure::Execution(error.clone()));
             std::io::Error::other(BudgetedIoError(error))
         })?;
         self.sink.flush().inspect_err(|_| {
-            self.sink_failed = true;
+            SinkFailure::record(&mut self.failure, SinkFailure::Sink);
         })
     }
 }
@@ -824,10 +836,50 @@ struct ProducerState<'context, I> {
     limits: StreamingLimits,
     rows: usize,
     cells: usize,
-    execution_error: Option<ExecutionError>,
-    producer_failed: bool,
-    limit_error: Option<LocalLimit>,
-    counter_error: Option<&'static str>,
+    failure: Option<ProducerFailure>,
+}
+
+/// Why the row producer stopped, in decreasing priority.
+/// `ProducerState::failure` and `RowWriter::failure` hold the
+/// highest-priority cause seen so far; `None` means no row was refused.
+///
+/// ```text
+/// None --any cause--> Some(cause)
+/// Some(Untyped) --typed cause--> Some(Execution | CounterOverflow | Limit)
+/// Some(Execution) --counter or limit refusal--> Some(CounterOverflow | Limit)
+/// Some(CounterOverflow) --limit refusal--> Some(Limit)
+/// ```
+///
+/// A later cause of the same priority replaces the earlier one.
+enum ProducerFailure {
+    /// A provider ceiling rejected the next row, cell, or text value.
+    Limit(LocalLimit),
+    /// A progress counter could not represent its next value.
+    CounterOverflow(&'static str),
+    /// Cancellation or a shared budget stopped the row.
+    Execution(ExecutionError),
+    /// The row was refused without one of the typed causes above.
+    Untyped,
+}
+
+impl ProducerFailure {
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Limit(_) => 3,
+            Self::CounterOverflow(_) => 2,
+            Self::Execution(_) => 1,
+            Self::Untyped => 0,
+        }
+    }
+
+    fn record(slot: &mut Option<Self>, failure: Self) {
+        if slot
+            .as_ref()
+            .is_none_or(|current| failure.priority() >= current.priority())
+        {
+            *slot = Some(failure);
+        }
+    }
 }
 
 impl<'context, I> ProducerState<'context, I> {
@@ -838,10 +890,7 @@ impl<'context, I> ProducerState<'context, I> {
             limits,
             rows: 0,
             cells: 0,
-            execution_error: None,
-            producer_failed: false,
-            limit_error: None,
-            counter_error: None,
+            failure: None,
         }
     }
 
@@ -851,7 +900,7 @@ impl<'context, I> ProducerState<'context, I> {
         R: IntoIterator<Item = StreamingCell<'cell>>,
     {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            ProducerFailure::record(&mut self.failure, ProducerFailure::Execution(error.clone()));
             return Err(Error::Other(error.to_string()));
         }
 
@@ -860,8 +909,7 @@ impl<'context, I> ProducerState<'context, I> {
             // refusal rather than silent truncation; EOF is the only valid
             // false result.
             if self.rows_source.next().is_some() {
-                self.producer_failed = true;
-                self.limit_error = Some(LocalLimit {
+                let limit = LocalLimit {
                     resource: "physical rows",
                     observed: self
                         .rows
@@ -869,7 +917,8 @@ impl<'context, I> ProducerState<'context, I> {
                         .and_then(|value| u64::try_from(value).ok())
                         .unwrap_or(u64::MAX),
                     limit: u64::try_from(self.limits.max_rows).unwrap_or(u64::MAX),
-                });
+                };
+                ProducerFailure::record(&mut self.failure, ProducerFailure::Limit(limit));
                 return Err(Error::InvalidFormat(
                     "row iterator exceeds max_rows".to_string(),
                 ));
@@ -882,85 +931,62 @@ impl<'context, I> ProducerState<'context, I> {
         };
         let mut row_writer = RowWriter::new(output, self.context, self.limits.max_row_xml_bytes);
         let result = emit_scalar_row(&mut row_writer, row, self.cells, self.limits);
-        if let Some(error) = row_writer.execution_error.take() {
-            self.execution_error = Some(error.clone());
+        if let Some(failure) = row_writer.failure.take() {
+            ProducerFailure::record(&mut self.failure, failure);
         }
-        if let Some(limit) = row_writer.limit_error.take() {
-            self.limit_error = Some(limit);
-        }
-        if result.is_err() && self.execution_error.is_none() {
+        if result.is_err() {
             // The callback returned a typed row/limit error.  The common
             // adapter must retain this source while adding accepted output
             // progress; it must not reinterpret it as producer EOF.
-            self.producer_failed = true;
+            ProducerFailure::record(&mut self.failure, ProducerFailure::Untyped);
         }
         let row_cells = result?;
         self.rows = match self.rows.checked_add(1) {
             Some(value) => value,
             None => {
-                self.counter_error = Some("physical rows");
+                ProducerFailure::record(
+                    &mut self.failure,
+                    ProducerFailure::CounterOverflow("physical rows"),
+                );
                 return Err(Error::InvalidFormat("row counter overflow".to_string()));
             },
         };
         self.cells = match self.cells.checked_add(row_cells) {
             Some(value) => value,
             None => {
-                self.counter_error = Some("logical cells");
+                ProducerFailure::record(
+                    &mut self.failure,
+                    ProducerFailure::CounterOverflow("logical cells"),
+                );
                 return Err(Error::InvalidFormat("cell counter overflow".to_string()));
             },
         };
         Ok(true)
     }
 
+    /// Resolves the error the caller receives once the package writer has
+    /// failed: the producer's own cause first, then whatever the sink adapter
+    /// recorded, then `fallback` for an otherwise unexplained archive error.
     fn map_error<W: ?Sized>(
         &mut self,
         error: PackageWriterError,
+        fallback: PublicationFailureKind,
         output: &BudgetedOutput<'_, W>,
     ) -> StreamingError {
-        if let Some(limit) = self.limit_error.take() {
-            return limit_error(limit, output.accepted());
-        }
-        if let Some(resource) = self.counter_error.take() {
-            return StreamingError::CounterOverflow {
+        match self.failure.take() {
+            Some(ProducerFailure::Limit(limit)) => limit_error(limit, output.accepted()),
+            Some(ProducerFailure::CounterOverflow(resource)) => StreamingError::CounterOverflow {
                 resource,
                 written: output.accepted(),
-            };
+            },
+            Some(ProducerFailure::Execution(execution_error)) => {
+                execution(execution_error, output.accepted())
+            },
+            Some(ProducerFailure::Untyped) => {
+                map_package_error(error, PublicationFailureKind::Producer, output)
+            },
+            None => map_package_error(error, fallback, output),
         }
-        if let Some(execution_error) = self.execution_error.take() {
-            return execution(execution_error, output.accepted());
-        }
-        let kind = if self.producer_failed {
-            PublicationFailureKind::Producer
-        } else {
-            PublicationFailureKind::Archive
-        };
-        map_package_error(error, kind, output)
-    }
-
-    fn map_error_kind<W: ?Sized>(
-        &mut self,
-        error: PackageWriterError,
-        kind: PublicationFailureKind,
-        output: &BudgetedOutput<'_, W>,
-    ) -> StreamingError {
-        if let Some(limit) = self.limit_error.take() {
-            return limit_error(limit, output.accepted());
-        }
-        if let Some(resource) = self.counter_error.take() {
-            return StreamingError::CounterOverflow {
-                resource,
-                written: output.accepted(),
-            };
-        }
-        if let Some(execution_error) = self.execution_error.take() {
-            return execution(execution_error, output.accepted());
-        }
-        let kind = if self.producer_failed {
-            PublicationFailureKind::Producer
-        } else {
-            kind
-        };
-        map_package_error(error, kind, output)
     }
 }
 
@@ -969,8 +995,7 @@ struct RowWriter<'a> {
     context: &'a ExecutionContext,
     maximum: usize,
     bytes: usize,
-    execution_error: Option<ExecutionError>,
-    limit_error: Option<LocalLimit>,
+    failure: Option<ProducerFailure>,
 }
 
 impl<'a> RowWriter<'a> {
@@ -980,14 +1005,21 @@ impl<'a> RowWriter<'a> {
             context,
             maximum,
             bytes: 0,
-            execution_error: None,
-            limit_error: None,
+            failure: None,
         }
+    }
+
+    fn fail_execution(&mut self, error: &ExecutionError) {
+        ProducerFailure::record(&mut self.failure, ProducerFailure::Execution(error.clone()));
+    }
+
+    fn fail_limit(&mut self, limit: LocalLimit) {
+        ProducerFailure::record(&mut self.failure, ProducerFailure::Limit(limit));
     }
 
     fn write_bytes(&mut self, bytes: &[u8]) -> litchi_core::Result<()> {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            self.fail_execution(&error);
             return Err(Error::Other(error.to_string()));
         }
         let next = self
@@ -995,7 +1027,7 @@ impl<'a> RowWriter<'a> {
             .checked_add(bytes.len())
             .ok_or_else(|| Error::InvalidFormat("row XML byte counter overflow".to_string()))?;
         if next > self.maximum {
-            self.limit_error = Some(LocalLimit {
+            self.fail_limit(LocalLimit {
                 resource: "row XML bytes",
                 observed: u64::try_from(next).unwrap_or(u64::MAX),
                 limit: u64::try_from(self.maximum).unwrap_or(u64::MAX),
@@ -1007,7 +1039,7 @@ impl<'a> RowWriter<'a> {
         let amount = u64::try_from(bytes.len())
             .map_err(|_| Error::InvalidFormat("row XML length exceeds u64".to_string()))?;
         if let Err(error) = self.context.consume(Resource::Work, amount) {
-            self.execution_error = Some(error.clone());
+            self.fail_execution(&error);
             return Err(Error::Other(error.to_string()));
         }
         self.output.write_all(bytes)?;
@@ -1028,7 +1060,7 @@ impl<'a> RowWriter<'a> {
     /// execution-policy failure rather than a batching boundary.
     fn write_plain_span(&mut self, bytes: &[u8]) -> litchi_core::Result<PlainSpanResult> {
         if let Err(error) = self.context.check() {
-            self.execution_error = Some(error.clone());
+            self.fail_execution(&error);
             return Err(Error::Other(error.to_string()));
         }
         let Some(next) = self.bytes.checked_add(bytes.len()) else {
@@ -1044,7 +1076,7 @@ impl<'a> RowWriter<'a> {
             if matches!(error, ExecutionError::ResourceLimit(_)) {
                 return Ok(PlainSpanResult::Fallback);
             }
-            self.execution_error = Some(error.clone());
+            self.fail_execution(&error);
             return Err(Error::Other(error.to_string()));
         }
         self.output.write_all(bytes)?;
@@ -1075,7 +1107,7 @@ where
 
     loop {
         if let Err(error) = output.context.check() {
-            output.execution_error = Some(error.clone());
+            output.fail_execution(&error);
             return Err(Error::Other(error.to_string()));
         }
         let Some(cell) = cells.next() else {
@@ -1085,7 +1117,7 @@ where
             .checked_add(1)
             .ok_or_else(|| Error::InvalidFormat("row cell counter overflow".to_string()))?;
         if next_row_cells > limits.max_cells_per_row {
-            output.limit_error = Some(LocalLimit {
+            output.fail_limit(LocalLimit {
                 resource: "cells per physical row",
                 observed: u64::try_from(next_row_cells).unwrap_or(u64::MAX),
                 limit: u64::try_from(limits.max_cells_per_row).unwrap_or(u64::MAX),
@@ -1098,7 +1130,7 @@ where
             .checked_add(next_row_cells)
             .ok_or_else(|| Error::InvalidFormat("cell counter overflow".to_string()))?;
         if next_total > limits.max_cells {
-            output.limit_error = Some(LocalLimit {
+            output.fail_limit(LocalLimit {
                 resource: "logical cells",
                 observed: u64::try_from(next_total).unwrap_or(u64::MAX),
                 limit: u64::try_from(limits.max_cells).unwrap_or(u64::MAX),
@@ -1124,7 +1156,7 @@ where
             StreamingCell::Text(value) => {
                 let value = value.as_ref();
                 if value.len() > limits.max_text_bytes {
-                    output.limit_error = Some(LocalLimit {
+                    output.fail_limit(LocalLimit {
                         resource: "text bytes",
                         observed: u64::try_from(value.len()).unwrap_or(u64::MAX),
                         limit: u64::try_from(limits.max_text_bytes).unwrap_or(u64::MAX),
@@ -1168,7 +1200,7 @@ fn charge_resource(
     output: &mut RowWriter<'_>,
 ) -> litchi_core::Result<()> {
     if let Err(error) = context.consume(resource, amount) {
-        output.execution_error = Some(error.clone());
+        output.fail_execution(&error);
         return Err(Error::Other(error.to_string()));
     }
     Ok(())
@@ -1208,7 +1240,7 @@ fn write_text(output: &mut RowWriter<'_>, value: &str) -> litchi_core::Result<()
     let mut span_start = 0usize;
     for (offset, character) in value.char_indices() {
         if let Err(error) = output.context.check() {
-            output.execution_error = Some(error.clone());
+            output.fail_execution(&error);
             return Err(Error::Other(error.to_string()));
         }
         let character_end = offset + character.len_utf8();
@@ -1298,18 +1330,22 @@ fn map_package_error<W: ?Sized>(
     kind: PublicationFailureKind,
     output: &BudgetedOutput<'_, W>,
 ) -> StreamingError {
-    if let Some(execution_error) = output.execution_error() {
-        return execution(execution_error, output.accepted());
-    }
     let written = output.accepted().max(error.written().unwrap_or(0));
-    if output.limit_failed() {
-        return StreamingError::LimitExceeded {
-            resource: "output bytes",
-            observed: output.limit_observed().unwrap_or(u64::MAX),
-            limit: output.maximum,
-            written,
-        };
-    }
+    let sink_failed = match &output.failure {
+        Some(SinkFailure::Execution(execution_error)) => {
+            return execution(execution_error.clone(), output.accepted());
+        },
+        Some(SinkFailure::Limit { observed }) => {
+            return StreamingError::LimitExceeded {
+                resource: "output bytes",
+                observed: *observed,
+                limit: output.maximum,
+                written,
+            };
+        },
+        Some(SinkFailure::Sink) => true,
+        None => false,
+    };
     if let Some(limit) = error.limit() {
         let resource = match limit.resource() {
             litchi_odf_common::core::PackageWriterLimitResource::FileCount => "file count",
@@ -1336,9 +1372,7 @@ fn map_package_error<W: ?Sized>(
             written,
         };
     }
-    let kind = if error.limit().is_some() || output.limit_failed() {
-        PublicationFailureKind::Limit
-    } else if output.sink_failed() {
+    let kind = if sink_failed {
         PublicationFailureKind::Sink
     } else {
         kind

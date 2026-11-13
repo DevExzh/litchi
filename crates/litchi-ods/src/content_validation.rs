@@ -1595,21 +1595,58 @@ struct Parser<'xml> {
     seen_body: bool,
     seen_spreadsheet: bool,
     closed_root: bool,
-    seen_catalog: bool,
-    seen_table: bool,
-    spreadsheet_prelude_complete: bool,
-    catalog_active: bool,
-    active_definition: Option<usize>,
-    definition_state: Option<DefinitionState>,
+    catalog: CatalogStage,
+    active_definition: Option<ActiveDefinition>,
     catalog_opaque_content: bool,
     binding_opaque_content: bool,
 }
 
-#[derive(Default)]
-struct DefinitionState {
-    seen_help: bool,
-    seen_error_message: bool,
-    seen_error_macro: bool,
+/// Where the scan is relative to the workbook's one
+/// `table:content-validations` catalog, which must precede every other
+/// `table:` child of `office:spreadsheet` except `table:tracked-changes` and
+/// `table:calculation-settings`.
+///
+/// ```text
+/// Pending --table:content-validations-->               Open
+/// Open    --its end tag-->                             Past
+/// Pending --any other table: child of the workbook--> Past
+/// ```
+///
+/// A catalog is accepted only in `Pending`.
+#[derive(Clone, Copy)]
+enum CatalogStage {
+    /// The catalog may still appear.
+    Pending,
+    /// Inside the catalog.
+    Open,
+    /// The catalog has ended, or a later workbook child has been seen.
+    Past,
+}
+
+/// The open `table:content-validation` element: its catalog index and the
+/// action children read so far.
+#[derive(Clone, Copy)]
+struct ActiveDefinition {
+    index: usize,
+    actions: ActionStage,
+}
+
+/// Which validation action children the open definition has had.
+///
+/// ```text
+/// Start             --table:help-message-->                      AfterHelp
+/// Start | AfterHelp --table:error-message | table:error-macro--> AfterError
+/// ```
+///
+/// Every other action is a duplicate or out of order.
+#[derive(Clone, Copy)]
+enum ActionStage {
+    /// No action child yet.
+    Start,
+    /// After `table:help-message`.
+    AfterHelp,
+    /// After `table:error-message` or `table:error-macro`.
+    AfterError,
 }
 
 impl<'xml> Parser<'xml> {
@@ -1628,12 +1665,8 @@ impl<'xml> Parser<'xml> {
             seen_body: false,
             seen_spreadsheet: false,
             closed_root: false,
-            seen_catalog: false,
-            seen_table: false,
-            spreadsheet_prelude_complete: false,
-            catalog_active: false,
+            catalog: CatalogStage::Pending,
             active_definition: None,
-            definition_state: None,
             catalog_opaque_content: false,
             binding_opaque_content: false,
         }
@@ -1784,16 +1817,13 @@ impl<'xml> Parser<'xml> {
         }
         if namespace == NamespaceKind::Table && local == b"content-validations" {
             if !matches!(self.stack.last(), Some(Element::Workbook))
-                || self.seen_catalog
-                || self.seen_table
-                || self.spreadsheet_prelude_complete
+                || !matches!(self.catalog, CatalogStage::Pending)
             {
                 return invalid(
                     "table:content-validations must be the unique catalog before worksheet tables",
                 );
             }
-            self.seen_catalog = true;
-            self.catalog_active = true;
+            self.catalog = CatalogStage::Open;
             if has_non_namespace_attributes(start) {
                 self.catalog_opaque_content = true;
             }
@@ -1804,7 +1834,7 @@ impl<'xml> Parser<'xml> {
             && local != b"content-validations"
             && !matches!(local, b"tracked-changes" | b"calculation-settings")
         {
-            self.spreadsheet_prelude_complete = true;
+            self.catalog = CatalogStage::Past;
         }
         if namespace == NamespaceKind::Table && local == b"content-validation" {
             if !matches!(self.stack.last(), Some(Element::Catalog(_))) {
@@ -1823,11 +1853,13 @@ impl<'xml> Parser<'xml> {
                 .map_err(|_error| Error::AllocationFailed("definition catalog"))?;
             self.definitions.push(definition);
             let index = self.definitions.len() - 1;
-            self.active_definition = Some(index);
-            self.definition_state = Some(DefinitionState::default());
+            self.active_definition = Some(ActiveDefinition {
+                index,
+                actions: ActionStage::Start,
+            });
             return Ok(Element::Definition);
         }
-        if let Some(index) = self.active_definition {
+        if let Some(definition) = self.active_definition.as_mut() {
             if matches!(
                 (namespace, local),
                 (
@@ -1838,35 +1870,26 @@ impl<'xml> Parser<'xml> {
                 if !matches!(self.stack.last(), Some(Element::Definition)) {
                     return invalid("validation action must be a direct definition child");
                 }
-                let state = self.definition_state.as_mut().ok_or_else(|| {
-                    Error::InvalidStructure("validation action state is missing".to_string())
-                })?;
-                match local {
-                    b"help-message"
-                        if !state.seen_help
-                            && !state.seen_error_message
-                            && !state.seen_error_macro =>
-                    {
-                        state.seen_help = true;
+                definition.actions = match (definition.actions, local) {
+                    (ActionStage::Start, b"help-message") => ActionStage::AfterHelp,
+                    (
+                        ActionStage::Start | ActionStage::AfterHelp,
+                        b"error-message" | b"error-macro",
+                    ) => ActionStage::AfterError,
+                    (ActionStage::Start | ActionStage::AfterHelp | ActionStage::AfterError, _) => {
+                        return invalid("duplicate or out-of-order validation action");
                     },
-                    b"error-message" if !state.seen_error_message && !state.seen_error_macro => {
-                        state.seen_error_message = true;
-                    },
-                    b"error-macro" if !state.seen_error_macro && !state.seen_error_message => {
-                        state.seen_error_macro = true;
-                    },
-                    _ => return invalid("duplicate or out-of-order validation action"),
-                }
+                };
             }
             // This prerequisite does not semantically own rich messages, events,
             // or foreign descendants; the exact source retains them instead.
+            let index = definition.index;
             self.definitions[index].opaque_content = true;
         }
         if namespace == NamespaceKind::Table && local == b"table" {
             if !matches!(self.stack.last(), Some(Element::Workbook)) {
                 return Ok(Element::Other);
             }
-            self.seen_table = true;
             check_limit(
                 LimitKind::Sheets,
                 self.sheets.len().saturating_add(1),
@@ -1983,7 +2006,7 @@ impl<'xml> Parser<'xml> {
         if self.active_definition.is_some() {
             if !known_definition_element(namespace, local) {
                 self.mark_opaque();
-            } else if let Some(index) = self.active_definition
+            } else if let Some(index) = self.inside_definition()
                 && has_unknown_definition_attributes(namespace, local, start, reader)?
             {
                 self.definitions[index].opaque_content = true;
@@ -2011,14 +2034,13 @@ impl<'xml> Parser<'xml> {
         match element {
             Element::Root => self.closed_root = true,
             Element::Catalog(start) => {
-                self.catalog_active = false;
+                self.catalog = CatalogStage::Past;
                 if self.definitions.len() == start {
                     return invalid("table:content-validations must contain a definition");
                 }
             },
             Element::Definition => {
                 self.active_definition = None;
-                self.definition_state = None;
             },
             Element::Row {
                 sheet,
@@ -2276,13 +2298,13 @@ impl<'xml> Parser<'xml> {
     }
 
     fn inside_definition(&self) -> Option<usize> {
-        self.active_definition
+        self.active_definition.map(|definition| definition.index)
     }
 
     fn mark_opaque(&mut self) {
         if let Some(index) = self.inside_definition() {
             self.definitions[index].opaque_content = true;
-        } else if self.catalog_active {
+        } else if matches!(self.catalog, CatalogStage::Open) {
             self.catalog_opaque_content = true;
         } else if self
             .stack
