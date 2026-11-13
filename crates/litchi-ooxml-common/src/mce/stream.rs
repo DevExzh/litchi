@@ -1002,8 +1002,7 @@ where
     let mut raw_enabled = true;
     let mut active_enabled = true;
     let mut active_stop = false;
-    let mut recovering = false;
-    let mut recovery_error = None;
+    let mut phase = DrivePhase::Semantic;
 
     loop {
         state.raw_state_valid = false;
@@ -1013,71 +1012,62 @@ where
             Ok(event) => event,
             Err(error) => {
                 let failure = stream_error_from_quick_xml(error, raw_error, active_error);
-                if recovering {
-                    return match failure {
+                return Err(match phase {
+                    DrivePhase::Semantic => failure,
+                    DrivePhase::Recovering { cause } => match failure {
                         StreamError::Input {
                             error,
                             raw_error,
                             active_error,
                             ..
-                        } => Err(StreamError::Input {
+                        } => StreamError::Input {
                             error,
-                            prior_mce_error: recovery_error.take(),
+                            prior_mce_error: Some(cause),
                             raw_error,
                             active_error,
-                        }),
+                        },
                         StreamError::Mce {
                             error,
                             raw_error,
                             active_error,
                             ..
-                        } => Err(StreamError::Mce {
+                        } => StreamError::Mce {
                             error,
-                            prior_mce_error: recovery_error.take(),
+                            prior_mce_error: Some(cause),
                             raw_error,
                             active_error,
-                        }),
+                        },
                         StreamError::Callback {
                             raw_error,
                             active_error,
-                        } => Err(StreamError::Mce {
-                            error: recovery_error
-                                .take()
-                                .unwrap_or_else(|| bad("stream recovery failure")),
+                        } => StreamError::Mce {
+                            error: cause,
                             prior_mce_error: None,
                             raw_error,
                             active_error,
-                        }),
-                    };
-                }
-                return Err(failure);
+                        },
+                    },
+                });
             },
         };
         let is_eof = matches!(&event, Event::Eof);
 
         if !matches!(&event, &Event::Eof | &Event::DocType(_) | &Event::PI(_)) {
             if let Err(error) = state.count_event() {
-                if recovering {
-                    return Err(StreamError::Mce {
-                        error,
-                        prior_mce_error: recovery_error.take(),
-                        raw_error,
-                        active_error,
-                    });
-                }
                 return Err(StreamError::Mce {
                     error,
-                    prior_mce_error: None,
+                    prior_mce_error: phase.into_cause(),
                     raw_error,
                     active_error,
                 });
             }
         }
 
-        let result = if recovering {
-            state.raw_event(event, decoder, &mut raw, &mut raw_enabled, &mut raw_error)
-        } else {
-            match event {
+        let result = match &phase {
+            DrivePhase::Recovering { .. } => {
+                state.raw_event(event, decoder, &mut raw, &mut raw_enabled, &mut raw_error)
+            },
+            DrivePhase::Semantic => match event {
                 Event::Start(element) => state.start(
                     &element,
                     decoder,
@@ -1163,55 +1153,72 @@ where
                     Err(bad("DTD and processing instructions are rejected"))
                 },
                 Event::Eof => state.eof(),
-            }
+            },
         };
 
         event_buffer.clear();
         reader.get_mut().finish_event();
 
         if let Err(error) = result {
-            if !recovering && state.can_recover(&error) && !is_eof {
-                recovery_error = Some(error);
-                recovering = true;
+            if matches!(phase, DrivePhase::Semantic) && state.can_recover(&error) && !is_eof {
+                phase = DrivePhase::Recovering { cause: error };
                 active_enabled = false;
                 state.stack.clear();
                 state.stack.shrink_to_fit();
                 continue;
             }
-            if recovering {
-                return Err(StreamError::Mce {
-                    error,
-                    prior_mce_error: recovery_error.take(),
-                    raw_error,
-                    active_error,
-                });
-            }
             return Err(StreamError::Mce {
                 error,
-                prior_mce_error: None,
+                prior_mce_error: phase.into_cause(),
                 raw_error,
                 active_error,
             });
         }
-        if recovering {
-            if is_eof {
+        match phase {
+            DrivePhase::Recovering { cause } if is_eof => {
                 return Err(StreamError::Mce {
-                    error: recovery_error
-                        .take()
-                        .unwrap_or_else(|| bad("stream recovery failure")),
+                    error: cause,
                     prior_mce_error: None,
                     raw_error,
                     active_error,
                 });
-            }
-            continue;
+            },
+            DrivePhase::Recovering { .. } => continue,
+            DrivePhase::Semantic => {},
         }
         // The stop is honoured only after the stopping event has been fully
         // processed and after every failure path above, so a typed XML, MCE,
         // limit or observer failure raised by that same event still outranks
         // it and still reaches the caller with its own identity.
-        if active_stop || state.finished {
+        if active_stop || state.position.is_finished() {
             return finish_callbacks(raw_error, active_error, state.report.clone());
+        }
+    }
+}
+
+/// Which flows the stream driver feeds.
+///
+/// ```text
+/// Semantic --recoverable MCE failure before the end of input--> Recovering
+/// ```
+///
+/// `Recovering` is final. The driver reads on through the raw flow only, so
+/// that a later input or structural failure is still found; such a failure
+/// becomes the primary error and `cause` its prior error. At a clean end of
+/// input `cause` is the primary error.
+enum DrivePhase {
+    /// Every event goes through the raw flow and then the semantic flow.
+    Semantic,
+    /// The semantic flow failed with `cause`; only the raw flow runs.
+    Recovering { cause: Error },
+}
+
+impl DrivePhase {
+    /// The semantic failure to report as prior to a later failure.
+    fn into_cause(self) -> Option<Error> {
+        match self {
+            Self::Semantic => None,
+            Self::Recovering { cause } => Some(cause),
         }
     }
 }
@@ -1834,19 +1841,93 @@ struct ParsedAttribute<'a> {
     namespace: UriId,
 }
 
+/// Where one flow of the stream processor is in the XML document. Element
+/// nesting is not part of it: the flow's element stack holds that, and the
+/// root element is open exactly while that stack is non-empty.
+///
+/// ```text
+/// Start  --XML declaration------------------------> Prolog
+/// Start  --comment or whitespace------------------> Prolog
+/// Start  --root start tag-------------------------> Rooted
+/// Prolog --comment or whitespace------------------> Prolog
+/// Prolog --root start tag-------------------------> Rooted
+/// Rooted --comment or whitespace, nested content--> Rooted
+/// Rooted --end of input---------------------------> Finished
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start` ("late XML declaration"),
+/// a second root start tag ("multiple roots"), and the end of input before
+/// `Rooted` ("missing document root").
+#[derive(Clone, Copy)]
+enum DocumentPosition {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment or whitespace was read; no root yet.
+    Prolog,
+    /// The root start tag was read: inside the root, or after it.
+    Rooted,
+    /// The end of input was accepted.
+    Finished,
+}
+
+impl DocumentPosition {
+    /// A comment or character data was read; the caller refuses character
+    /// data other than whitespace while no element is open.
+    fn content(&mut self) {
+        match self {
+            Self::Start => *self = Self::Prolog,
+            Self::Prolog | Self::Rooted | Self::Finished => {},
+        }
+    }
+
+    /// An XML declaration was read.
+    fn declaration(&mut self) -> Result<(), Error> {
+        match self {
+            Self::Start => {
+                *self = Self::Prolog;
+                Ok(())
+            },
+            Self::Prolog | Self::Rooted | Self::Finished => Err(bad("late XML declaration")),
+        }
+    }
+
+    /// A start tag was read while no element was open.
+    fn root(&mut self) -> Result<(), Error> {
+        match self {
+            Self::Start | Self::Prolog => {
+                *self = Self::Rooted;
+                Ok(())
+            },
+            Self::Rooted | Self::Finished => Err(bad("multiple roots")),
+        }
+    }
+
+    /// The end of input was read while no element was open.
+    fn end(&mut self) -> Result<(), Error> {
+        match self {
+            Self::Start | Self::Prolog => Err(bad("missing document root")),
+            Self::Rooted | Self::Finished => {
+                *self = Self::Finished;
+                Ok(())
+            },
+        }
+    }
+
+    fn is_finished(self) -> bool {
+        matches!(self, Self::Finished)
+    }
+}
+
 struct Processor<'a> {
     capabilities: &'a Capabilities,
     limits: &'a StreamLimits,
     stack: Vec<Frame>,
     raw_stack: Vec<RawFrame>,
-    root_seen: bool,
-    raw_root_seen: bool,
-    prolog_started: bool,
-    declaration_seen: bool,
-    raw_prolog_started: bool,
-    raw_declaration_seen: bool,
+    /// Position of the semantic flow, which `stack` nests.
+    position: DocumentPosition,
+    /// Position of the raw flow, which `raw_stack` nests.
+    raw_position: DocumentPosition,
     raw_state_valid: bool,
-    finished: bool,
     report: StreamReport,
     /// The bindings in scope at the element being processed; it follows the
     /// raw element stack, which the semantic stack mirrors until recovery
@@ -1862,14 +1943,9 @@ impl<'a> Processor<'a> {
             limits,
             stack: Vec::new(),
             raw_stack: Vec::new(),
-            root_seen: false,
-            raw_root_seen: false,
-            prolog_started: false,
-            declaration_seen: false,
-            raw_prolog_started: false,
-            raw_declaration_seen: false,
+            position: DocumentPosition::Start,
+            raw_position: DocumentPosition::Start,
             raw_state_valid: false,
-            finished: false,
             report: StreamReport::default(),
             scope: Scope::new(capabilities),
         }
@@ -1962,7 +2038,6 @@ impl<'a> Processor<'a> {
                 self.limits.processing.max_depth,
             ));
         }
-        self.prolog_started = true;
         let raw_parent = self
             .raw_stack
             .last()
@@ -2259,10 +2334,7 @@ impl<'a> Processor<'a> {
         empty: bool,
     ) -> Result<(), Error> {
         if self.stack.is_empty() {
-            if self.root_seen {
-                return Err(bad("multiple roots"));
-            }
-            self.root_seen = true;
+            self.position.root()?;
         }
         if empty {
             if matches!(&mode, Mode::Alt { .. }) {
@@ -2371,7 +2443,7 @@ impl<'a> Processor<'a> {
     {
         self.raw_text(raw, kind)?;
         self.raw_state_valid = true;
-        self.prolog_started = true;
+        self.position.content();
         if self.stack.is_empty() {
             if matches!(kind, TextKind::CData) {
                 return Err(bad("CDATA outside document root"));
@@ -2441,12 +2513,7 @@ impl<'a> Processor<'a> {
     {
         self.raw_decl(declaration)?;
         self.raw_state_valid = true;
-        if self.declaration_seen || self.prolog_started || self.root_seen || !self.stack.is_empty()
-        {
-            return Err(bad("late XML declaration"));
-        }
-        self.declaration_seen = true;
-        self.prolog_started = true;
+        self.position.declaration()?;
         if *active_enabled {
             invoke_active(
                 active_callback,
@@ -2484,7 +2551,6 @@ impl<'a> Processor<'a> {
         {
             return Err(bad("general reference directly inside AlternateContent"));
         }
-        self.prolog_started = true;
         check_name_bytes(reference.as_ref(), self.limits)?;
         let char_ref = reference.resolve_char_ref().map_err(xml_error)?;
         let name = reference.decode().map_err(xml_error)?;
@@ -2511,11 +2577,7 @@ impl<'a> Processor<'a> {
         if !self.stack.is_empty() {
             return Err(bad("unterminated XML"));
         }
-        if !self.root_seen {
-            return Err(bad("missing document root"));
-        }
-        self.finished = true;
-        Ok(())
+        self.position.end()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2573,12 +2635,8 @@ impl<'a> Processor<'a> {
     }
 
     fn raw_start_commit(&mut self, data: &ElementData<'_>, empty: bool) -> Result<(), Error> {
-        self.raw_prolog_started = true;
         if self.raw_stack.is_empty() {
-            if self.raw_root_seen {
-                return Err(bad("multiple roots"));
-            }
-            self.raw_root_seen = true;
+            self.raw_position.root()?;
         }
         let parent_context_bytes = self.raw_stack.last().map_or(0, |frame| frame.context_bytes);
         let parent_namespace_bytes = self.raw_stack.last().map_or(0, |frame| frame.ns.bytes);
@@ -2645,7 +2703,7 @@ impl<'a> Processor<'a> {
     }
 
     fn raw_text(&mut self, raw: &[u8], kind: TextKind) -> Result<(), Error> {
-        self.raw_prolog_started = true;
+        self.raw_position.content();
         if self.raw_stack.is_empty() {
             if matches!(kind, TextKind::CData) {
                 return Err(bad("CDATA outside document root"));
@@ -2671,16 +2729,7 @@ impl<'a> Processor<'a> {
 
     fn raw_decl(&mut self, declaration: &[u8]) -> Result<(), Error> {
         let _ = declaration;
-        if self.raw_declaration_seen
-            || self.raw_prolog_started
-            || self.raw_root_seen
-            || !self.raw_stack.is_empty()
-        {
-            return Err(bad("late XML declaration"));
-        }
-        self.raw_declaration_seen = true;
-        self.raw_prolog_started = true;
-        Ok(())
+        self.raw_position.declaration()
     }
 
     fn raw_reference(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<(), Error> {
@@ -2694,7 +2743,6 @@ impl<'a> Processor<'a> {
         {
             return Err(bad("general reference directly inside AlternateContent"));
         }
-        self.raw_prolog_started = true;
         check_name_bytes(reference.as_ref(), self.limits)?;
         let char_ref = reference.resolve_char_ref().map_err(xml_error)?;
         let name = reference.decode().map_err(xml_error)?;
@@ -2708,10 +2756,7 @@ impl<'a> Processor<'a> {
         if !self.raw_stack.is_empty() {
             return Err(bad("unterminated XML"));
         }
-        if !self.raw_root_seen {
-            return Err(bad("missing document root"));
-        }
-        Ok(())
+        self.raw_position.end()
     }
 
     #[allow(clippy::too_many_arguments)]

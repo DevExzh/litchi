@@ -90,6 +90,62 @@ impl<'a> Sink<'a> {
     }
 }
 
+/// Nesting depth of a `property` element below the root.
+const PROPERTY_DEPTH: usize = 2;
+/// Nesting depth of a value element, the deepest element the part may hold.
+const VALUE_DEPTH: usize = 3;
+const _: () = assert!(MAX_XML_DEPTH == VALUE_DEPTH);
+
+/// Where the reader is in the custom-properties document.
+///
+/// ```text
+/// Prolog   --first XML declaration------------> Prolog (declared)
+/// Prolog   --root start tag-------------------> Root
+/// Prolog   --empty root tag-------------------> Epilog
+/// Root     --property start tag---------------> Property
+/// Root     --empty element--------------------> Root      (repair)
+/// Root     --root end tag---------------------> Epilog
+/// Property --value start tag------------------> Value
+/// Property --empty value tag------------------> Property  (value stored)
+/// Property --end tag--------------------------> Root      (property stored)
+/// Value    --text, CDATA, known reference-----> Value
+/// Value    --end tag--------------------------> Property  (value stored)
+/// Skipping --start tag------------------------> Skipping  (one deeper)
+/// Skipping --end tag--------------------------> Skipping, or Root once the
+///                                               skipped root child closes
+/// ```
+///
+/// A repair is a defect the sink records instead of failing. The repairs that
+/// cost a whole root child move to `Skipping`, at the depth of the open
+/// element: an unknown or inadmissible root child, a property holding
+/// character content, a refused value element, an unparseable value, and an
+/// unsupported reference in a value. Comments and whitespace are accepted
+/// everywhere, `Skipping` accepts everything but a DTD and an element nested
+/// deeper than a value, and a processing instruction is a repair that changes
+/// nothing. Every other event is an error, and so is the end of input
+/// anywhere but `Epilog`.
+enum ReaderPosition {
+    /// Before the root element.
+    Prolog {
+        /// Whether the XML declaration was read.
+        declared: bool,
+    },
+    /// Directly inside the root element.
+    Root,
+    /// Inside a property, outside its value.
+    Property(PendingProperty),
+    /// Inside the value element of `property`; its text accumulates.
+    Value {
+        property: PendingProperty,
+        kind: WireKind,
+    },
+    /// Inside a root child that a repair dropped; `depth` is the depth of
+    /// the innermost open element, at least [`PROPERTY_DEPTH`].
+    Skipping { depth: usize },
+    /// After the root element.
+    Epilog,
+}
+
 fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
@@ -102,83 +158,53 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
     reader.config_mut().check_comments = true;
     let mut props = Props::new();
     let mut pids = HashSet::new();
-    let mut pending: Option<PendingProperty> = None;
-    let mut value_kind: Option<WireKind> = None;
+    let mut position = ReaderPosition::Prolog { declared: false };
     let mut value_text = String::new();
-    let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    // The property (or unknown root child) at depth 2 is being skipped until
-    // its end tag, after a recorded per-property repair.
-    let mut abandoned = false;
 
     loop {
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event()?;
-        if abandoned {
-            match event {
-                Event::Start(_) => {
-                    count_node(&mut nodes)?;
-                    depth = checked_depth(depth)?;
-                },
-                Event::End(_) => {
-                    count_node(&mut nodes)?;
-                    depth = depth
-                        .checked_sub(1)
-                        .ok_or_else(|| invalid("custom-properties XML depth underflow"))?;
-                    if depth <= 1 {
-                        abandoned = false;
-                        pending = None;
-                        value_kind = None;
-                        value_text.clear();
-                    }
-                },
-                Event::DocType(_) => {
-                    return Err(invalid(
-                        "DTD declarations are forbidden in custom-properties XML",
-                    ));
-                },
-                Event::Eof => break,
-                Event::PI(_) => {},
-                _ => count_node(&mut nodes)?,
-            }
-            continue;
-        }
         match event {
             Event::Decl(_) => {
                 count_node(&mut nodes)?;
-                if declaration_seen || root_seen {
-                    return Err(invalid("XML declaration must occur once before the root"));
-                }
-                declaration_seen = true;
+                position = match position {
+                    ReaderPosition::Prolog { declared: false } => {
+                        ReaderPosition::Prolog { declared: true }
+                    },
+                    skipping @ ReaderPosition::Skipping { .. } => skipping,
+                    ReaderPosition::Prolog { declared: true }
+                    | ReaderPosition::Root
+                    | ReaderPosition::Property(_)
+                    | ReaderPosition::Value { .. }
+                    | ReaderPosition::Epilog => {
+                        return Err(invalid("XML declaration must occur once before the root"));
+                    },
+                };
             },
             Event::DocType(_) => {
                 return Err(invalid(
                     "DTD declarations are forbidden in custom-properties XML",
                 ));
             },
-            Event::PI(_) => sink.tolerate(
-                invalid("processing instructions are forbidden in custom-properties XML"),
-                CustomPropertiesDefect::ProcessingInstruction,
-                None,
-                None,
-            )?,
+            Event::PI(_) => {
+                if !matches!(position, ReaderPosition::Skipping { .. }) {
+                    sink.tolerate(
+                        invalid("processing instructions are forbidden in custom-properties XML"),
+                        CustomPropertiesDefect::ProcessingInstruction,
+                        None,
+                        None,
+                    )?;
+                }
+            },
             Event::Start(element) => {
                 count_node(&mut nodes)?;
-                let child_depth = checked_depth(depth)?;
-                match child_depth {
-                    1 => {
-                        if root_seen || root_closed {
-                            return Err(invalid(
-                                "custom-properties XML must contain exactly one root",
-                            ));
-                        }
+                position = match position {
+                    ReaderPosition::Prolog { .. } => {
                         validate_root(&namespace, &element, decoder)?;
-                        root_seen = true;
+                        ReaderPosition::Root
                     },
-                    2 => {
+                    ReaderPosition::Root => {
                         if !is_name(&namespace, &element, CUSTOM_NS, b"property") {
                             let name = display_name(element.name().as_ref());
                             sink.tolerate(
@@ -189,163 +215,160 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
                                 Some(&name),
                                 None,
                             )?;
-                            abandoned = true;
-                        } else if pending.is_some() {
-                            return Err(invalid("custom properties cannot be nested"));
+                            ReaderPosition::Skipping {
+                                depth: PROPERTY_DEPTH,
+                            }
                         } else {
                             match admit_property(&element, decoder, &mut pids, sink)? {
-                                Some(parsed) => pending = Some(parsed),
-                                None => abandoned = true,
+                                Some(property) => ReaderPosition::Property(property),
+                                None => ReaderPosition::Skipping {
+                                    depth: PROPERTY_DEPTH,
+                                },
                             }
                         }
                     },
-                    3 => {
-                        let property = pending.as_ref().ok_or_else(|| {
-                            invalid("custom-property value has no owning property")
-                        })?;
-                        match start_value(property, value_kind.is_some(), &namespace, &element) {
+                    ReaderPosition::Property(property) => {
+                        match start_value(&property, &namespace, &element) {
                             Ok(kind) => {
-                                value_kind = Some(kind);
                                 value_text.clear();
+                                ReaderPosition::Value { property, kind }
                             },
                             Err((error, defect, value)) => {
-                                let name = property.name.clone();
-                                sink.tolerate(error, defect, Some(&name), value.as_deref())?;
-                                abandoned = true;
+                                sink.tolerate(
+                                    error,
+                                    defect,
+                                    Some(&property.name),
+                                    value.as_deref(),
+                                )?;
+                                ReaderPosition::Skipping { depth: VALUE_DEPTH }
                             },
                         }
                     },
-                    _ => {
-                        return Err(limit(
-                            crate::LimitKind::CustomPropertiesXmlDepth,
-                            MAX_XML_DEPTH,
-                            child_depth,
-                        ));
+                    ReaderPosition::Value { .. } => return Err(element_below_value()),
+                    ReaderPosition::Skipping { depth } => ReaderPosition::Skipping {
+                        depth: checked_depth(depth)?,
                     },
-                }
-                depth = child_depth;
+                    ReaderPosition::Epilog => return Err(second_root()),
+                };
             },
             Event::Empty(element) => {
                 count_node(&mut nodes)?;
-                let child_depth = checked_depth(depth)?;
-                match child_depth {
-                    1 => {
-                        if root_seen || root_closed {
-                            return Err(invalid(
-                                "custom-properties XML must contain exactly one root",
-                            ));
-                        }
-                        validate_root(&namespace, &element, decoder)?;
-                        root_seen = true;
-                        root_closed = true;
-                    },
-                    2 => {
-                        let is_property = is_name(&namespace, &element, CUSTOM_NS, b"property");
-                        let name = if is_property {
-                            property_name_attribute(&element, decoder)
-                        } else {
-                            Some(display_name(element.name().as_ref()))
-                        };
-                        sink.tolerate(
-                            invalid("custom property must contain exactly one typed value"),
-                            if is_property {
-                                CustomPropertiesDefect::MalformedProperty
+                position =
+                    match position {
+                        ReaderPosition::Prolog { .. } => {
+                            validate_root(&namespace, &element, decoder)?;
+                            ReaderPosition::Epilog
+                        },
+                        ReaderPosition::Root => {
+                            let is_property = is_name(&namespace, &element, CUSTOM_NS, b"property");
+                            let name = if is_property {
+                                property_name_attribute(&element, decoder)
                             } else {
-                                CustomPropertiesDefect::UnknownElement
-                            },
-                            name.as_deref(),
-                            None,
-                        )?;
-                    },
-                    3 => {
-                        let property = pending.as_mut().ok_or_else(|| {
-                            invalid("custom-property value has no owning property")
-                        })?;
-                        let parsed =
-                            start_value(property, value_kind.is_some(), &namespace, &element)
-                                .and_then(|kind| {
+                                Some(display_name(element.name().as_ref()))
+                            };
+                            sink.tolerate(
+                                invalid("custom property must contain exactly one typed value"),
+                                if is_property {
+                                    CustomPropertiesDefect::MalformedProperty
+                                } else {
+                                    CustomPropertiesDefect::UnknownElement
+                                },
+                                name.as_deref(),
+                                None,
+                            )?;
+                            ReaderPosition::Root
+                        },
+                        ReaderPosition::Property(mut property) => {
+                            let parsed =
+                                start_value(&property, &namespace, &element).and_then(|kind| {
                                     parse_value(kind, "").map(|value| (kind, value)).map_err(
                                         |error| (error, CustomPropertiesDefect::InvalidValue, None),
                                     )
                                 });
-                        match parsed {
-                            Ok(value) => property.value = Some(value),
-                            Err((error, defect, value)) => {
-                                let name = property.name.clone();
-                                sink.tolerate(error, defect, Some(&name), value.as_deref())?;
-                                // The property's own end tag closes the skip.
-                                abandoned = true;
-                                depth = 2;
-                            },
-                        }
-                    },
-                    _ => {
-                        return Err(limit(
-                            crate::LimitKind::CustomPropertiesXmlDepth,
-                            MAX_XML_DEPTH,
-                            child_depth,
-                        ));
-                    },
-                }
+                            match parsed {
+                                Ok(value) => {
+                                    property.value = Some(value);
+                                    ReaderPosition::Property(property)
+                                },
+                                Err((error, defect, value)) => {
+                                    sink.tolerate(
+                                        error,
+                                        defect,
+                                        Some(&property.name),
+                                        value.as_deref(),
+                                    )?;
+                                    // The property's own end tag closes the skip.
+                                    ReaderPosition::Skipping {
+                                        depth: PROPERTY_DEPTH,
+                                    }
+                                },
+                            }
+                        },
+                        ReaderPosition::Value { .. } => return Err(element_below_value()),
+                        skipping @ ReaderPosition::Skipping { .. } => skipping,
+                        ReaderPosition::Epilog => return Err(second_root()),
+                    };
             },
             Event::End(_) => {
                 count_node(&mut nodes)?;
-                match depth {
-                    3 => {
-                        let kind = value_kind
-                            .take()
-                            .ok_or_else(|| invalid("custom-property value state is incomplete"))?;
-                        let property = pending.as_mut().ok_or_else(|| {
-                            invalid("custom-property value has no owning property")
-                        })?;
+                position = match position {
+                    ReaderPosition::Value { mut property, kind } => {
                         match parse_value(kind, &value_text) {
-                            Ok(value) => property.value = Some((kind, value)),
+                            Ok(value) => {
+                                property.value = Some((kind, value));
+                                ReaderPosition::Property(property)
+                            },
                             Err(error) => {
-                                let name = property.name.clone();
                                 sink.tolerate(
                                     error,
                                     CustomPropertiesDefect::InvalidValue,
-                                    Some(&name),
+                                    Some(&property.name),
                                     Some(&value_text),
                                 )?;
-                                abandoned = true;
+                                ReaderPosition::Skipping {
+                                    depth: PROPERTY_DEPTH,
+                                }
                             },
                         }
-                        value_text.clear();
                     },
-                    2 => {
-                        let property = pending
-                            .take()
-                            .ok_or_else(|| invalid("custom-property record is incomplete"))?;
+                    ReaderPosition::Property(property) => {
                         insert_property(&mut props, property, sink)?;
+                        ReaderPosition::Root
                     },
-                    1 => {
-                        root_closed = true;
+                    ReaderPosition::Root => ReaderPosition::Epilog,
+                    ReaderPosition::Skipping { depth } if depth > PROPERTY_DEPTH => {
+                        ReaderPosition::Skipping { depth: depth - 1 }
                     },
-                    _ => return Err(invalid("unexpected XML end element")),
-                }
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| invalid("custom-properties XML depth underflow"))?;
+                    ReaderPosition::Skipping { .. } => ReaderPosition::Root,
+                    ReaderPosition::Prolog { .. } | ReaderPosition::Epilog => {
+                        return Err(invalid("unexpected XML end element"));
+                    },
+                };
             },
             Event::Text(text) => {
                 count_node(&mut nodes)?;
+                if matches!(position, ReaderPosition::Skipping { .. }) {
+                    continue;
+                }
                 let text = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| Error::Xml(format!("invalid XML text: {error}")))?;
-                if depth == 3 {
+                if matches!(position, ReaderPosition::Value { .. }) {
                     append_value_text(&mut value_text, &text)?;
                 } else if !text.trim().is_empty() {
                     let error =
                         invalid("non-whitespace text is not allowed outside a property value");
-                    abandon_pending(&mut pending, &mut abandoned, depth, error, sink)?;
+                    position = skip_property(position, error, sink)?;
                 }
             },
             Event::CData(text) => {
                 count_node(&mut nodes)?;
-                if depth != 3 {
+                if matches!(position, ReaderPosition::Skipping { .. }) {
+                    continue;
+                }
+                if !matches!(position, ReaderPosition::Value { .. }) {
                     let error = invalid("CDATA is only allowed inside a property value");
-                    abandon_pending(&mut pending, &mut abandoned, depth, error, sink)?;
+                    position = skip_property(position, error, sink)?;
                     continue;
                 }
                 let text = text
@@ -355,32 +378,41 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
             },
             Event::GeneralRef(reference) => {
                 count_node(&mut nodes)?;
-                if depth != 3 {
-                    let error =
-                        invalid("entity references are only allowed inside a property value");
-                    abandon_pending(&mut pending, &mut abandoned, depth, error, sink)?;
-                    continue;
-                }
-                match decode_reference(&reference) {
-                    Ok(decoded) => append_value_text(&mut value_text, &decoded)?,
-                    Err(error) => {
-                        let name = pending.as_ref().map(|property| property.name.clone());
-                        sink.tolerate(
-                            error,
-                            CustomPropertiesDefect::InvalidValue,
-                            name.as_deref(),
-                            None,
-                        )?;
-                        abandoned = true;
+                position = match position {
+                    ReaderPosition::Value { property, kind } => {
+                        match decode_reference(&reference) {
+                            Ok(decoded) => {
+                                append_value_text(&mut value_text, &decoded)?;
+                                ReaderPosition::Value { property, kind }
+                            },
+                            Err(error) => {
+                                sink.tolerate(
+                                    error,
+                                    CustomPropertiesDefect::InvalidValue,
+                                    Some(&property.name),
+                                    None,
+                                )?;
+                                ReaderPosition::Skipping { depth: VALUE_DEPTH }
+                            },
+                        }
                     },
-                }
+                    skipping @ ReaderPosition::Skipping { .. } => skipping,
+                    outside @ (ReaderPosition::Prolog { .. }
+                    | ReaderPosition::Root
+                    | ReaderPosition::Property(_)
+                    | ReaderPosition::Epilog) => {
+                        let error =
+                            invalid("entity references are only allowed inside a property value");
+                        skip_property(outside, error, sink)?
+                    },
+                };
             },
             Event::Comment(_) => count_node(&mut nodes)?,
             Event::Eof => break,
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || pending.is_some() || value_kind.is_some() {
+    if !matches!(position, ReaderPosition::Epilog) {
         return Err(invalid(
             "custom-properties XML must contain one complete Properties root",
         ));
@@ -390,27 +422,44 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
     Ok(props)
 }
 
-/// Content outside a value inside a property costs that property; at the
-/// root level it stays an error.
-fn abandon_pending(
-    pending: &mut Option<PendingProperty>,
-    abandoned: &mut bool,
-    depth: usize,
+/// Content outside a value inside a property costs that property; anywhere
+/// else it stays an error.
+fn skip_property(
+    position: ReaderPosition,
     error: Error,
     sink: &mut Sink<'_>,
-) -> Result<()> {
-    if depth != 2 {
-        return Err(error);
+) -> Result<ReaderPosition> {
+    match position {
+        ReaderPosition::Property(property) => {
+            sink.tolerate(
+                error,
+                CustomPropertiesDefect::MalformedProperty,
+                Some(&property.name),
+                None,
+            )?;
+            Ok(ReaderPosition::Skipping {
+                depth: PROPERTY_DEPTH,
+            })
+        },
+        ReaderPosition::Prolog { .. }
+        | ReaderPosition::Root
+        | ReaderPosition::Value { .. }
+        | ReaderPosition::Skipping { .. }
+        | ReaderPosition::Epilog => Err(error),
     }
-    let name = pending.as_ref().map(|property| property.name.clone());
-    sink.tolerate(
-        error,
-        CustomPropertiesDefect::MalformedProperty,
-        name.as_deref(),
-        None,
-    )?;
-    *abandoned = true;
-    Ok(())
+}
+
+/// A value element holds text only: an element inside it is too deep.
+fn element_below_value() -> Error {
+    limit(
+        crate::LimitKind::CustomPropertiesXmlDepth,
+        MAX_XML_DEPTH,
+        VALUE_DEPTH + 1,
+    )
+}
+
+fn second_root() -> Error {
+    invalid("custom-properties XML must contain exactly one root")
 }
 
 /// Admit a property start tag, or `None` after a recorded repair.
@@ -470,11 +519,10 @@ type ValueFailure = (Error, CustomPropertiesDefect, Option<String>);
 /// Validate a value element's position, type, and attributes.
 fn start_value(
     property: &PendingProperty,
-    value_open: bool,
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
 ) -> std::result::Result<WireKind, ValueFailure> {
-    if property.value.is_some() || value_open {
+    if property.value.is_some() {
         return Err((
             invalid(format!(
                 "custom property '{}' must contain exactly one value",

@@ -19,6 +19,8 @@ mod reserved;
 mod schema;
 
 #[cfg(test)]
+mod reader_position_tests;
+#[cfg(test)]
 mod tests;
 
 pub(crate) use codec::{encode_preflighted, encoded_len};
