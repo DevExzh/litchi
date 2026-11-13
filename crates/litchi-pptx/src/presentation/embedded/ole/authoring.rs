@@ -143,11 +143,34 @@ fn frame_xml(
     xml
 }
 
+/// Where the frame insertion is among the top-level elements of the slide.
+///
+/// ```text
+/// Prolog --p:sld start tag-------------------------> Rooted
+/// Prolog | Rooted --top-level empty-element tag----> unchanged (accepted: skipped)
+/// any    --declaration, comment, text, CDATA-------> unchanged
+/// ```
+///
+/// The insertion is lenient about empty-element tags: one at the top level is
+/// never taken for the root and is skipped whatever its name, before or after
+/// the root, so an empty `p:sld` alone is not a document. The last line holds
+/// in every phase: a declaration is accepted anywhere and content outside the
+/// root is ignored. Refused: a top-level start tag other than `p:sld` in
+/// `Prolog`; any top-level start tag in `Rooted`; a processing instruction or
+/// DOCTYPE anywhere; and the end of input in `Prolog` or inside an element.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// The root start tag has been read: inside the root, or after it.
+    Rooted,
+}
+
 fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
-    let mut root_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut tree_depth = None;
     let mut insertion = None;
     loop {
@@ -171,9 +194,9 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
                     crate::presentation::embedded::validate_root(
                         &namespace,
                         element.name(),
-                        root_seen,
+                        phase == RootPhase::Rooted,
                     )?;
-                    root_seen = true;
+                    phase = RootPhase::Rooted;
                 }
                 if is_presentationml_name(&namespace, element.name(), b"spTree")
                     && tree_depth.replace(depth).is_some()
@@ -181,6 +204,8 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
                     return Err(invalid("slide has multiple shape trees"));
                 }
             },
+            // An empty-element tag is never the root: at the top level it is
+            // skipped in either phase.
             Event::Empty(element) => {
                 if is_presentationml_name(&namespace, element.name(), b"spTree") {
                     return Err(invalid("slide has an empty shape tree"));
@@ -202,11 +227,19 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
-    if depth != 0 || !root_seen {
-        return Err(invalid("unterminated slide XML"));
+    match phase {
+        RootPhase::Rooted if depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Rooted => {
+            return Err(invalid("unterminated slide XML"));
+        },
     }
     let position = insertion.ok_or_else(|| invalid("slide has no shape tree"))?;
     let size = xml.len().checked_add(fragment.len()).ok_or_else(|| {

@@ -5700,6 +5700,31 @@ fn is_opaque_drawing_extension(
     Ok(!native_uri)
 }
 
+/// Where [`validate_full_slide_picture_relationships`] is relative to the
+/// `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, processing instruction, whitespace, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// CDATA outside the root is ignored. Refused: a first top-level element that
+/// is not `p:sld`; any top-level element in `Closed` ("more than one root");
+/// text outside the root unless it is whitespace; a DOCTYPE anywhere; and the
+/// end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PictureScanRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 fn validate_full_slide_picture_relationships(
     package: &SourceBackedPackage,
     xml: &[u8],
@@ -5712,8 +5737,7 @@ fn validate_full_slide_picture_relationships(
     // validating its XML stack, but do not infer a typed p:pic/a:blip owner
     // from namespace lookalikes nested inside that payload.
     let mut opaque_extension_depth = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = PictureScanRootPhase::Prolog;
     let mut expected_relationship_namespace = None;
     let mut buffer = Vec::new();
 
@@ -5735,7 +5759,7 @@ fn validate_full_slide_picture_relationships(
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                if root_closed {
+                if phase == PictureScanRootPhase::Closed {
                     return Err(Error::Invalid(
                         "source slide picture scan contains more than one root".into(),
                     ));
@@ -5743,7 +5767,7 @@ fn validate_full_slide_picture_relationships(
                 let depth = stack.len();
                 let name = element.name();
                 let opaque_ancestor = opaque_extension_depth.is_some();
-                if !root_seen {
+                if phase == PictureScanRootPhase::Prolog {
                     if !is_presentation_name(&namespace, name, b"sld") {
                         return Err(Error::Invalid(
                             "source slide picture scan does not have a p:sld root".into(),
@@ -5766,7 +5790,7 @@ fn validate_full_slide_picture_relationships(
                             ));
                         },
                     };
-                    root_seen = true;
+                    phase = PictureScanRootPhase::Open;
                 }
 
                 if !opaque_ancestor && is_presentation_name(&namespace, name, b"pic") {
@@ -5831,7 +5855,7 @@ fn validate_full_slide_picture_relationships(
                         opaque_extension_depth = Some(stack.len());
                     }
                 } else if stack.is_empty() {
-                    root_closed = true;
+                    phase = PictureScanRootPhase::Closed;
                 }
             },
             Event::End(element) => {
@@ -5854,7 +5878,7 @@ fn validate_full_slide_picture_relationships(
                     picture_depth = None;
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = PictureScanRootPhase::Closed;
                 }
             },
             Event::Text(text)
@@ -5877,14 +5901,25 @@ fn validate_full_slide_picture_relationships(
             },
             Event::PI(_) => {},
             Event::Eof => break,
-            _ => {},
+            // Accepted in every phase; whitespace and character data other
+            // than text outside the root are not read.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(Error::Invalid(
-            "source slide picture scan is not one closed root".into(),
-        ));
+    match phase {
+        PictureScanRootPhase::Closed if stack.is_empty() => {},
+        PictureScanRootPhase::Prolog
+        | PictureScanRootPhase::Open
+        | PictureScanRootPhase::Closed => {
+            return Err(Error::Invalid(
+                "source slide picture scan is not one closed root".into(),
+            ));
+        },
     }
     Ok(())
 }

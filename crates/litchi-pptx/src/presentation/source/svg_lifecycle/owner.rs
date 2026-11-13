@@ -577,6 +577,34 @@ pub(super) fn locate(xml: &[u8], image_position: usize) -> Result<PictureLayout>
 /// scene-order picture.  Callers which already have the scene model can then
 /// parse each sliced picture without rescanning the complete slide for every
 /// image.
+/// Where the picture-layout reader is relative to the `p:sld` root.
+///
+/// ```text
+/// Start          --XML declaration-------------------------------> Prolog
+/// Start          --comment, processing instruction, whitespace---> Prolog
+/// Start | Prolog --p:sld start tag-------------------------------> Open
+/// Open           --p:sld end tag---------------------------------> Closed
+/// Prolog | Open | Closed --comment, processing instruction, whitespace--> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so also a second one; an
+/// empty-element root; a top-level element other than `p:sld`; any top-level
+/// element in `Closed` ("a second root element"); text outside the root unless
+/// it is whitespace; CDATA or an entity reference outside the root; a DOCTYPE
+/// anywhere; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root start tag yet.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
@@ -600,10 +628,7 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
     })?;
     let mut buffer = Vec::new();
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog = true;
+    let mut phase = RootPhase::Start;
     let mut picture_count = 0usize;
     let mut captures = Vec::<PictureCapture>::new();
     let mut active_capture = None::<usize>;
@@ -632,7 +657,7 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                         MAX_XML_DEPTH,
                     ));
                 }
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("slide XML contains a second root element"));
                 }
                 let (_, declaration_count) = namespaces.preflight(&element, decoder)?;
@@ -661,10 +686,14 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                     )?;
                 }
                 if frames.is_empty() {
-                    if root_seen || !is_name(resolved, element.name(), b"sld", PML, STRICT_PML) {
+                    let first = match phase {
+                        RootPhase::Start | RootPhase::Prolog => true,
+                        RootPhase::Open | RootPhase::Closed => false,
+                    };
+                    if !first || !is_name(resolved, element.name(), b"sld", PML, STRICT_PML) {
                         return Err(invalid("slide XML must contain exactly one p:sld root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 if is_name(resolved, element.name(), b"pic", PML, STRICT_PML)
                     && mce_ancestor
@@ -806,7 +835,6 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                     context_before,
                     source_start: event_start,
                 });
-                prolog = false;
             },
             Event::Empty(element) => {
                 nodes = add_count(nodes, MAX_XML_NODES, crate::error::CodecLimitKind::XmlNodes)?;
@@ -824,7 +852,7 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                         MAX_XML_DEPTH,
                     ));
                 }
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("slide XML contains a second root element"));
                 }
                 let (_, declaration_count) = namespaces.preflight(&element, decoder)?;
@@ -853,7 +881,11 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                     )?;
                 }
                 if frames.is_empty() {
-                    if root_seen || !is_name(resolved, element.name(), b"sld", PML, STRICT_PML) {
+                    let first = match phase {
+                        RootPhase::Start | RootPhase::Prolog => true,
+                        RootPhase::Open | RootPhase::Closed => false,
+                    };
+                    if !first || !is_name(resolved, element.name(), b"sld", PML, STRICT_PML) {
                         return Err(invalid("slide XML must contain exactly one p:sld root"));
                     }
                     return Err(invalid("slide root p:sld cannot be empty"));
@@ -991,7 +1023,6 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                 }
                 namespaces.pop(depth, declaration_count);
                 namespaces.context = context_before;
-                prolog = false;
             },
             Event::End(element) => {
                 if frames.is_empty() {
@@ -1059,32 +1090,36 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                     if !is_name(resolved, element.name(), b"sld", PML, STRICT_PML) {
                         return Err(invalid("slide root close does not match p:sld"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 namespaces.pop(depth, frame.namespace_declarations);
                 namespaces.context = frame.context_before;
-                prolog = false;
             },
             Event::Decl(declaration) => {
-                if declaration_seen || !prolog || root_seen {
-                    return Err(invalid(
-                        "XML declaration is not at the beginning of the slide",
-                    ));
+                match phase {
+                    RootPhase::Start => {},
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "XML declaration is not at the beginning of the slide",
+                        ));
+                    },
                 }
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is forbidden in slide XML")),
             Event::Text(text) => {
                 validate_xml_text(text.as_ref())?;
                 let outside = frames.is_empty();
-                if outside && (!root_seen || root_closed) && !is_xml_whitespace(text.as_ref()) {
+                if outside && phase != RootPhase::Open && !is_xml_whitespace(text.as_ref()) {
                     return Err(invalid(
                         "non-whitespace text appears outside the slide root",
                     ));
                 }
                 validate_text_context(&frames, outside, !is_xml_whitespace(text.as_ref()))?;
-                prolog = false;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
+                }
             },
             Event::CData(data) => {
                 validate_xml_text(data.as_ref())?;
@@ -1092,7 +1127,6 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                     return Err(invalid("CDATA appears outside the slide root"));
                 }
                 validate_text_context(&frames, false, true)?;
-                prolog = false;
             },
             Event::GeneralRef(reference) => {
                 validate_reference(&reference)?;
@@ -1100,23 +1134,29 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                     return Err(invalid("entity reference appears outside the slide root"));
                 }
                 validate_text_context(&frames, false, true)?;
-                prolog = false;
             },
             Event::Comment(comment) => {
                 validate_xml_text(comment.as_ref())?;
-                prolog = false;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
+                }
             },
             Event::PI(pi) => {
                 validate_processing_instruction(pi.as_ref())?;
-                prolog = false;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
+                }
             },
             Event::Eof => break,
         }
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !frames.is_empty() {
-        return Err(invalid("slide XML has an incomplete p:sld root"));
+    match phase {
+        RootPhase::Closed if frames.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("slide XML has an incomplete p:sld root"));
+        },
     }
     if active_capture.is_some() {
         return Err(invalid("selected picture is not closed"));

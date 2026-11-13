@@ -24,6 +24,29 @@ pub(crate) struct Summary {
     pub(crate) groups: usize,
 }
 
+/// Where [`scan_slide`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SlideRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
     if xml.len() > MAX_SLIDE_BYTES {
         return Err(limit(
@@ -48,8 +71,7 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
     let mut ids = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = SlideRootPhase::Prolog;
     loop {
         let decoder = reader.decoder();
         let event = reader
@@ -76,8 +98,8 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
                     ));
                 }
                 if depth == 1 {
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
+                    validate_root(&namespace, element.name(), phase != SlideRootPhase::Prolog)?;
+                    phase = SlideRootPhase::Open;
                 }
                 if is_presentationml_name(&namespace, element.name(), b"contentPart") {
                     push_id(&mut ids, &element, decoder, &resolver)?;
@@ -100,9 +122,8 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
                     ));
                 }
                 if child_depth == 1 {
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
-                    root_closed = true;
+                    validate_root(&namespace, element.name(), phase != SlideRootPhase::Prolog)?;
+                    phase = SlideRootPhase::Closed;
                 }
                 if is_presentationml_name(&namespace, element.name(), b"contentPart") {
                     push_id(&mut ids, &element, decoder, &resolver)?;
@@ -116,7 +137,7 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
                         return Err(invalid("InkML slide must close with p:sld"));
                     }
-                    root_closed = true;
+                    phase = SlideRootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -125,13 +146,18 @@ pub(crate) fn scan_slide(xml: &[u8]) -> Result<Vec<String>> {
                     "InkML slide rejects DTDs and processing instructions",
                 ));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 {
+            Event::Eof => match phase {
+                SlideRootPhase::Closed if depth == 0 => return Ok(ids),
+                SlideRootPhase::Prolog | SlideRootPhase::Open | SlideRootPhase::Closed => {
                     return Err(invalid("unterminated InkML slide"));
-                }
-                return Ok(ids);
+                },
             },
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -158,6 +184,29 @@ fn push_id(
     Ok(())
 }
 
+/// Where [`inspect`] is relative to the `ink` root.
+///
+/// ```text
+/// Prolog --ink start tag-----> Open
+/// Prolog --empty ink tag-----> Closed
+/// Open   --ink end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InkRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
     if xml.len() > MAX_INK_BYTES {
         return Err(limit(
@@ -170,8 +219,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
     let mut result = Summary::default();
     let mut nodes = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = InkRootPhase::Prolog;
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
@@ -194,8 +242,8 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
                     ));
                 }
                 if depth == 1 {
-                    validate_ink_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
+                    validate_ink_root(&namespace, element.name(), phase != InkRootPhase::Prolog)?;
+                    phase = InkRootPhase::Open;
                 }
                 observe(&mut result, &namespace, element.name())?;
             },
@@ -216,9 +264,8 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
                     ));
                 }
                 if child_depth == 1 {
-                    validate_ink_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
-                    root_closed = true;
+                    validate_ink_root(&namespace, element.name(), phase != InkRootPhase::Prolog)?;
+                    phase = InkRootPhase::Closed;
                 }
                 observe(&mut result, &namespace, element.name())?;
             },
@@ -230,20 +277,25 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Summary> {
                     if !is_ink_name(&namespace, element.name(), b"ink") {
                         return Err(invalid("InkML must close with ink"));
                     }
-                    root_closed = true;
+                    phase = InkRootPhase::Closed;
                 }
                 depth -= 1;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("InkML rejects DTDs and processing instructions"));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 {
+            Event::Eof => match phase {
+                InkRootPhase::Closed if depth == 0 => return Ok(result),
+                InkRootPhase::Prolog | InkRootPhase::Open | InkRootPhase::Closed => {
                     return Err(invalid("unterminated InkML document"));
-                }
-                return Ok(result);
+                },
             },
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

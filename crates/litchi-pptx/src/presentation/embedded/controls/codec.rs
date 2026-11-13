@@ -24,6 +24,29 @@ pub(crate) struct Parsed {
     pub(crate) relationship_id: Option<String>,
 }
 
+/// Where the control scan is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
         return Err(limit(
@@ -46,8 +69,7 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
     let mut values = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut c_sld_depth = None;
     let mut controls_depth = None;
     let mut open_control_depth = None;
@@ -79,8 +101,8 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
                     ));
                 }
                 if depth == 1 {
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
+                    validate_root(&namespace, element.name(), phase != RootPhase::Prolog)?;
+                    phase = RootPhase::Open;
                 } else if depth == 2 && is_presentationml_name(&namespace, element.name(), b"cSld")
                 {
                     c_sld_depth = Some(depth);
@@ -118,9 +140,8 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
                     ));
                 }
                 if child_depth == 1 {
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
-                    root_closed = true;
+                    validate_root(&namespace, element.name(), phase != RootPhase::Prolog)?;
+                    phase = RootPhase::Closed;
                 } else if c_sld_depth == Some(child_depth - 1)
                     && is_presentationml_name(&namespace, element.name(), b"controls")
                 {
@@ -144,7 +165,7 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
                         return Err(invalid("control XML must close with p:sld"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if open_control_depth == Some(depth)
                     && is_presentationml_name(&namespace, element.name(), b"control")
@@ -168,13 +189,20 @@ pub(crate) fn scan(xml_bytes: &[u8], count: &mut usize) -> Result<Vec<Parsed>> {
                     "control XML rejects DTDs and processing instructions",
                 ));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 || open_control_depth.is_some() {
+            Event::Eof => match phase {
+                RootPhase::Closed if depth == 0 && open_control_depth.is_none() => {
+                    return Ok(values);
+                },
+                RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
                     return Err(invalid("unterminated PresentationML control slide"));
-                }
-                return Ok(values);
+                },
             },
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

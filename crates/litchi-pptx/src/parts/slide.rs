@@ -761,6 +761,32 @@ fn semantic_text_reader(xml: &[u8]) -> NsReader<&[u8]> {
     reader
 }
 
+/// Where the raw scan is in the slide document. Whether the root is still open
+/// is the element depth, not a phase.
+///
+/// ```text
+/// Start          --XML declaration-----------------------------> Prolog
+/// Start          --comment, processing instruction, whitespace-> Prolog
+/// Start | Prolog --any start or empty-element tag--> Rooted
+/// Prolog | Rooted --comment, processing instruction, whitespace--> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so also a second one;
+/// a top-level element in `Rooted`; text outside the root unless it is
+/// whitespace; CDATA or an entity reference outside the root; a DOCTYPE
+/// anywhere; and the end of input before `Rooted`.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RawRootPhase {
+    /// Nothing has been read.
+    #[default]
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read: inside the root, or after it.
+    Rooted,
+}
+
 /// Raw-byte validation of one slide for semantic text, one event at a time.
 ///
 /// [`Self::observe`] applies to each event exactly the checks the raw scan
@@ -769,9 +795,7 @@ fn semantic_text_reader(xml: &[u8]) -> NsReader<&[u8]> {
 #[derive(Default)]
 struct RawTextScan {
     budget: SemanticTextXmlBudget,
-    root_seen: bool,
-    declaration_seen: bool,
-    document_event_seen: bool,
+    phase: RawRootPhase,
 }
 
 impl RawTextScan {
@@ -787,9 +811,9 @@ impl RawTextScan {
         namespace: &ResolveResult<'_>,
         event: &Event<'_>,
     ) -> Result<bool> {
-        let declaration_is_first = !self.document_event_seen;
-        if !matches!(event, Event::Eof) {
-            self.document_event_seen = true;
+        let declaration_is_first = self.phase == RawRootPhase::Start;
+        if declaration_is_first && !matches!(event, Event::Eof) {
+            self.phase = RawRootPhase::Prolog;
         }
         self.budget.observe_event(semantic_event_bytes(event))?;
         match event {
@@ -798,10 +822,10 @@ impl RawTextScan {
                 validate_semantic_attribute_names(reader, element)?;
                 validate_semantic_element_namespace(namespace)?;
                 if self.budget.depth == 0 {
-                    if self.root_seen {
+                    if self.phase == RawRootPhase::Rooted {
                         return Err(invalid("semantic slide XML has multiple roots"));
                     }
-                    self.root_seen = true;
+                    self.phase = RawRootPhase::Rooted;
                 }
                 self.budget.start()?;
             },
@@ -810,10 +834,10 @@ impl RawTextScan {
                 validate_semantic_attribute_names(reader, element)?;
                 validate_semantic_element_namespace(namespace)?;
                 if self.budget.depth == 0 {
-                    if self.root_seen {
+                    if self.phase == RawRootPhase::Rooted {
                         return Err(invalid("semantic slide XML has multiple roots"));
                     }
-                    self.root_seen = true;
+                    self.phase = RawRootPhase::Rooted;
                 }
             },
             Event::End(_) => {
@@ -828,10 +852,9 @@ impl RawTextScan {
             // shape scene.
             Event::PI(_) => {},
             Event::Decl(_) => {
-                if self.declaration_seen || !declaration_is_first || self.root_seen {
+                if !declaration_is_first {
                     return Err(invalid("XML declarations must be the first document event"));
                 }
-                self.declaration_seen = true;
             },
             Event::Text(text) => {
                 let decoded = text
@@ -891,8 +914,11 @@ impl RawTextScan {
                 }
             },
             Event::Eof => {
-                if !self.root_seen {
-                    return Err(invalid("semantic slide XML lacks an element root"));
+                match self.phase {
+                    RawRootPhase::Start | RawRootPhase::Prolog => {
+                        return Err(invalid("semantic slide XML lacks an element root"));
+                    },
+                    RawRootPhase::Rooted => {},
                 }
                 if self.budget.depth != 0 {
                     return Err(invalid("semantic slide XML has unbalanced elements"));
@@ -956,12 +982,35 @@ fn is_presentationml_slide(namespace: &ResolveResult<'_>, name: QName<'_>) -> bo
     )
 }
 
+/// Where the semantic pass is in the slide document. Whether the root is still open
+/// is the element depth, not a phase.
+///
+/// ```text
+/// Start          --XML declaration-----------------------------> Prolog
+/// Start          --comment, processing instruction, whitespace-> Prolog
+/// Start | Prolog --p:sld start or empty-element tag--> Rooted
+/// Prolog | Rooted --comment, processing instruction, whitespace--> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so also a second one;
+/// a top-level element in `Rooted`; text outside the root unless it is
+/// whitespace; CDATA or an entity reference outside the root; a DOCTYPE
+/// anywhere; and the end of input before `Rooted`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SemanticRootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read: inside the root, or after it.
+    Rooted,
+}
+
 struct SemanticTextParser<'a> {
     budget: SemanticTextXmlBudget,
     output: String,
-    root_seen: bool,
-    declaration_seen: bool,
-    document_event_seen: bool,
+    phase: SemanticRootPhase,
     active_text_depth: Option<usize>,
     text_has_payload: bool,
     runs: usize,
@@ -988,9 +1037,7 @@ impl<'a> SemanticTextParser<'a> {
         Self {
             budget: SemanticTextXmlBudget::default(),
             output: String::new(),
-            root_seen: false,
-            declaration_seen: false,
-            document_event_seen: false,
+            phase: SemanticRootPhase::Start,
             active_text_depth: None,
             text_has_payload: false,
             runs: 0,
@@ -1297,18 +1344,20 @@ impl<'a> SemanticTextParser<'a> {
 
     fn consume(&mut self, namespace: ResolveResult<'_>, event: Event<'_>) -> Result<bool> {
         self.budget.observe_event(semantic_event_bytes(&event))?;
-        let declaration_is_first = !self.document_event_seen;
-        if !matches!(&event, Event::Eof) {
-            self.document_event_seen = true;
+        let declaration_is_first = self.phase == SemanticRootPhase::Start;
+        if declaration_is_first && !matches!(&event, Event::Eof) {
+            self.phase = SemanticRootPhase::Prolog;
         }
         match event {
             Event::Start(element) => {
                 validate_semantic_element_namespace(&namespace)?;
                 if self.budget.depth == 0 {
-                    if self.root_seen || !is_presentationml_slide(&namespace, element.name()) {
+                    if self.phase == SemanticRootPhase::Rooted
+                        || !is_presentationml_slide(&namespace, element.name())
+                    {
                         return Err(invalid("semantic slide XML has an invalid root"));
                     }
-                    self.root_seen = true;
+                    self.phase = SemanticRootPhase::Rooted;
                 }
                 self.budget.start()?;
                 self.start_element(&namespace, &element)?;
@@ -1316,10 +1365,12 @@ impl<'a> SemanticTextParser<'a> {
             Event::Empty(element) => {
                 validate_semantic_element_namespace(&namespace)?;
                 if self.budget.depth == 0 {
-                    if self.root_seen || !is_presentationml_slide(&namespace, element.name()) {
+                    if self.phase == SemanticRootPhase::Rooted
+                        || !is_presentationml_slide(&namespace, element.name())
+                    {
                         return Err(invalid("semantic slide XML has an invalid root"));
                     }
-                    self.root_seen = true;
+                    self.phase = SemanticRootPhase::Rooted;
                 }
                 self.empty_element(&namespace, &element)?;
             },
@@ -1338,10 +1389,9 @@ impl<'a> SemanticTextParser<'a> {
                 self.reference_event(&reference)?;
             },
             Event::Decl(_) => {
-                if self.declaration_seen || !declaration_is_first || self.root_seen {
+                if !declaration_is_first {
                     return Err(invalid("XML declarations must be the first document event"));
                 }
-                self.declaration_seen = true;
             },
             Event::Text(text) if self.budget.depth == 0 => {
                 let decoded = text
@@ -1429,10 +1479,18 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_comment(&decoded)?;
             },
             Event::Eof => {
-                if !self.root_seen || self.budget.depth != 0 || self.active_text_depth.is_some() {
-                    return Err(invalid("semantic slide XML has unbalanced elements"));
-                }
-                return Ok(true);
+                return match self.phase {
+                    SemanticRootPhase::Rooted
+                        if self.budget.depth == 0 && self.active_text_depth.is_none() =>
+                    {
+                        Ok(true)
+                    },
+                    SemanticRootPhase::Start
+                    | SemanticRootPhase::Prolog
+                    | SemanticRootPhase::Rooted => {
+                        Err(invalid("semantic slide XML has unbalanced elements"))
+                    },
+                };
             },
         }
         Ok(false)

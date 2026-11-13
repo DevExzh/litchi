@@ -128,6 +128,29 @@ impl Limits {
     }
 }
 
+/// Where the laser-trace scan is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 fn scan_slide_laser_traces(
     slide_index: usize,
     xml_bytes: &[u8],
@@ -159,8 +182,7 @@ fn scan_slide_laser_traces(
     let mut traces = Vec::new();
     let mut active_trace = None;
     let mut nodes = 0usize;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
 
     loop {
         let decoder = reader.decoder();
@@ -195,14 +217,14 @@ fn scan_slide_laser_traces(
                     decoder,
                     parent,
                     depth,
-                    saw_root,
+                    phase,
                     false,
                     &mut active_trace,
                     limits,
                     usage,
                 )?;
                 if kind == ElementKind::Root {
-                    saw_root = true;
+                    phase = RootPhase::Open;
                 }
                 stack.push(kind);
             },
@@ -229,15 +251,14 @@ fn scan_slide_laser_traces(
                     decoder,
                     parent,
                     depth,
-                    saw_root,
+                    phase,
                     true,
                     &mut active_trace,
                     limits,
                     usage,
                 )?;
                 if kind == ElementKind::Root {
-                    saw_root = true;
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 } else if kind == ElementKind::LaserTrace {
                     finish_trace(slide_index, &mut traces, &mut active_trace)?;
                 }
@@ -255,7 +276,7 @@ fn scan_slide_laser_traces(
                     &mut active_trace,
                 )?;
                 if kind == ElementKind::Root {
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text)
@@ -281,13 +302,19 @@ fn scan_slide_laser_traces(
                     "slide XML must not contain a processing instruction",
                 ));
             },
-            Event::Eof => {
-                if !stack.is_empty() || !saw_root || !closed_root {
+            Event::Eof => match phase {
+                RootPhase::Closed if stack.is_empty() => break,
+                RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
                     return Err(invalid("unterminated or missing PresentationML slide root"));
-                }
-                break;
+                },
             },
-            _ => {},
+            // Accepted in every phase; outside laser-trace markup the
+            // character data is ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -304,19 +331,21 @@ fn classify_element(
     decoder: Decoder,
     parent: ElementKind,
     depth: usize,
-    root_seen: bool,
+    phase: RootPhase,
     empty: bool,
     active_trace: &mut Option<Vec<TracePoint>>,
     limits: &Limits,
     usage: &mut Usage,
 ) -> Result<ElementKind> {
     if depth == 1 {
-        if root_seen || !is_presentationml_name(namespace, element.name(), b"sld") {
-            return Err(invalid(
+        return match phase {
+            RootPhase::Prolog if is_presentationml_name(namespace, element.name(), b"sld") => {
+                Ok(ElementKind::Root)
+            },
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => Err(invalid(
                 "slide XML must have one PresentationML sld root element",
-            ));
-        }
-        return Ok(ElementKind::Root);
+            )),
+        };
     }
 
     if is_presentationml_name(namespace, element.name(), b"ext")

@@ -106,6 +106,33 @@ struct Shape {
     narration: Option<Narration>,
 }
 
+/// Where the media-track search is among the top-level elements of the slide.
+///
+/// ```text
+/// Prolog --any start or empty-element tag--> Open
+/// Open   --top-level empty-element tag-----> Open
+/// Open   --end tag of a top-level element--> Closed
+/// Closed --top-level element---------------> Closed (accepted: read as slide content)
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The search is lenient about the envelope. The first element's name is not
+/// checked, and a later top-level element is read exactly like the first: its
+/// shapes are candidates too. The last line holds in every phase: a
+/// declaration is accepted anywhere and content outside every element is
+/// ignored. Refused: a processing instruction, DOCTYPE or general reference
+/// anywhere, and the end of input before `Closed` or inside an element, so an
+/// empty-element tag alone is not a document.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// An element has been read; no top-level element has ended yet.
+    Open,
+    /// A top-level element has ended.
+    Closed,
+}
+
 pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Option<Found>> {
     if xml.is_empty() {
         return Err(invalid("slide XML is empty"));
@@ -124,8 +151,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
     let mut stack = Vec::new();
     let mut shape = None;
     let mut found = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
 
     loop {
@@ -158,8 +184,14 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
                     &stack,
                     shape.as_ref(),
                 );
-                if !root_seen {
-                    root_seen = true;
+                match phase {
+                    RootPhase::Prolog => phase = RootPhase::Open,
+                    // A child of an open element, or a top-level empty-element
+                    // tag after another one.
+                    RootPhase::Open => {},
+                    // A later top-level element, or one nested in it: read
+                    // like the content of the first.
+                    RootPhase::Closed => {},
                 }
                 match kind {
                     Kind::Shape => {
@@ -297,7 +329,15 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
                     &stack,
                     shape.as_ref(),
                 );
-                root_seen = true;
+                match phase {
+                    RootPhase::Prolog => phase = RootPhase::Open,
+                    // A child of an open element, or a top-level empty-element
+                    // tag after another one.
+                    RootPhase::Open => {},
+                    // A later top-level element, or one nested in it: read
+                    // like the content of the first.
+                    RootPhase::Closed => {},
+                }
                 match kind {
                     Kind::Shape => {
                         let candidate = Shape {
@@ -426,7 +466,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
                     Kind::Media | Kind::TracksInfo | Kind::Narration | Kind::Other => {},
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -457,6 +497,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
             Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
                 return Err(invalid("unsupported XML construct in slide media metadata"));
             },
+            // Accepted in every phase, including after a top-level element.
             Event::Comment(_) | Event::Decl(_) => {},
             Event::Eof => break,
         }
@@ -466,8 +507,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("slide XML is not one complete document"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("slide XML is not one complete document"));
+        },
     }
     Ok(found)
 }

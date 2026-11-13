@@ -50,6 +50,30 @@ mod authors {
         parse_processed_author_list(selected.as_ref())
     }
 
+    /// Where the author-list reader is relative to the `p188:authorLst` root.
+    ///
+    /// ```text
+    /// Prolog --p188:authorLst start tag--> Open
+    /// Prolog --empty p188:authorLst tag--> Closed
+    /// Open   --p188:authorLst end tag----> Closed
+    /// any    --declaration, comment, whitespace--> unchanged
+    /// ```
+    ///
+    /// The last line holds in every phase: a declaration is accepted anywhere.
+    /// Refused: any other top-level element, before or after the root; text, CDATA
+    /// or a character reference outside the root unless it is whitespace; a
+    /// processing instruction or DOCTYPE anywhere; and the end of input before
+    /// `Closed`.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum RootPhase {
+        /// No root start tag has been read.
+        Prolog,
+        /// Inside the root.
+        Open,
+        /// The root has ended.
+        Closed,
+    }
+
     fn parse_processed_author_list(bytes: &[u8]) -> Result<Authors> {
         if bytes.len() > MAX_BYTES {
             return Err(limit(
@@ -63,8 +87,7 @@ mod authors {
         reader.config_mut().trim_text(false);
         let mut buffer = Vec::new();
         let mut stack: Vec<Frame> = Vec::new();
-        let mut root_seen = false;
-        let mut root_closed = false;
+        let mut phase = RootPhase::Prolog;
         let mut root_prefix = String::new();
         let mut namespace_declarations = Vec::new();
         let mut authors = Vec::new();
@@ -105,7 +128,7 @@ mod authors {
                     }
                     let local = decode_name(element.local_name().as_ref())?;
                     let kind = if stack.is_empty() {
-                        if root_seen || root_closed || namespace != P188 || local != "authorLst" {
+                        if phase != RootPhase::Prolog || namespace != P188 || local != "authorLst" {
                             return Err(invalid(
                                 "modern Comment Author root must be p188:authorLst",
                             ));
@@ -114,7 +137,7 @@ mod authors {
                         namespace_declarations =
                             namespace_declarations_from(&element, decoder, Some(&root_prefix))?;
                         no_non_namespace_attributes(&element)?;
-                        root_seen = true;
+                        phase = RootPhase::Open;
                         FrameKind::Root
                     } else {
                         child_frame(
@@ -144,7 +167,7 @@ mod authors {
                             &mut authors,
                         )?;
                         if matches!(frame.kind, FrameKind::Root) {
-                            root_closed = true;
+                            phase = RootPhase::Closed;
                         }
                     } else {
                         stack.push(frame);
@@ -167,7 +190,7 @@ mod authors {
                         &mut authors,
                     )?;
                     if matches!(frame.kind, FrameKind::Root) {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     }
                 },
                 Event::Text(text) => {
@@ -202,13 +225,17 @@ mod authors {
                 Event::DocType(_) | Event::PI(_) => {
                     return Err(invalid("DTD and processing instructions are rejected"));
                 },
+                // Accepted in every phase, including after the root.
                 Event::Decl(_) | Event::Comment(_) => {},
                 Event::Eof => break,
             }
             buffer.clear();
         }
-        if !root_seen || !root_closed || !stack.is_empty() {
-            return Err(invalid("unterminated modern Comment Author part"));
+        match phase {
+            RootPhase::Closed if stack.is_empty() => {},
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                return Err(invalid("unterminated modern Comment Author part"));
+            },
         }
         let value = Authors {
             root_prefix,

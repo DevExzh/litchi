@@ -402,6 +402,30 @@ enum Frame {
     Opaque,
 }
 
+/// Where the revision-information reader is relative to the `p1510:revInfo` root.
+///
+/// ```text
+/// Prolog --p1510:revInfo start tag--> Open
+/// Prolog --empty p1510:revInfo tag--> Closed
+/// Open   --p1510:revInfo end tag----> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: a first top-level element other than the root; a second top-level
+/// element ("multiple roots"); text or CDATA outside the root unless it is
+/// whitespace; a processing instruction, DOCTYPE or general reference
+/// anywhere; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
     if xml.len() > limits.max_input_bytes() {
         return Err(limit(
@@ -427,8 +451,7 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut seen_list = false;
     let mut seen_extensions = false;
     let mut clients = Vec::new();
@@ -468,13 +491,16 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                 }
                 let local = element.local_name();
                 let frame = if stack.is_empty() {
-                    if root_seen || root_closed {
-                        return Err(invalid("Revision Information has multiple roots"));
+                    match phase {
+                        RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("Revision Information has multiple roots"));
+                        },
                     }
                     expect_namespace_name(&namespace, P1510, local.as_ref(), b"revInfo")?;
                     let root_prefix = element_prefix(&element)?;
                     namespaces = root_namespaces(&element, reader.decoder(), &root_prefix, limits)?;
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     Frame::Root
                 } else {
                     match stack
@@ -584,7 +610,7 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                         extension_finish_pending = Some(from);
                     }
                     if matches!(frame, Frame::Root) {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     }
                 } else {
                     stack.push(frame);
@@ -607,7 +633,7 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                             .ok_or_else(|| invalid("missing extLst start offset"))?;
                         extension_finish_pending = Some(from);
                     },
-                    Frame::Root => root_closed = true,
+                    Frame::Root => phase = RootPhase::Closed,
                     _ => {},
                 }
             },
@@ -632,13 +658,17 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                     "DTD, processing instructions, and general references are rejected",
                 ));
             },
+            // Accepted in every phase, including after the root.
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() || extension_start.is_some() {
-        return Err(invalid("unterminated Revision Information part"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() && extension_start.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated Revision Information part"));
+        },
     }
     let value = Info {
         clients,

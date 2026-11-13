@@ -117,6 +117,30 @@ pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
     parse_processed_comment_list(selected.as_ref())
 }
 
+/// Where the comment-list reader is relative to the `p188:cmLst` root.
+///
+/// ```text
+/// Prolog --p188:cmLst start tag--> Open
+/// Prolog --empty p188:cmLst tag--> Closed
+/// Open   --p188:cmLst end tag----> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: any other top-level element, before or after the root; text, CDATA
+/// or a character reference outside the root unless it is whitespace; a
+/// processing instruction or DOCTYPE anywhere; and the end of input before
+/// `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
     if bytes.len() > MAX_BYTES {
         return Err(limit(
@@ -130,8 +154,7 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack: Vec<Frame> = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut root_prefix = String::new();
     let mut namespace_declarations = Vec::new();
     let mut comments = Vec::new();
@@ -173,14 +196,14 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
                 }
                 let local = decode_name(element.local_name().as_ref())?;
                 let kind = if stack.is_empty() {
-                    if root_seen || root_closed || namespace != P188 || local != "cmLst" {
+                    if phase != RootPhase::Prolog || namespace != P188 || local != "cmLst" {
                         return Err(invalid("modern Comment root must be p188:cmLst"));
                     }
                     root_prefix = element_prefix(&element)?;
                     namespace_declarations =
                         namespace_declarations_from(&element, decoder, Some(&root_prefix))?;
                     no_non_namespace_attributes(&element)?;
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     FrameKind::Root
                 } else {
                     let parent = stack
@@ -214,7 +237,7 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
                         &mut comments,
                     )?;
                     if matches!(frame.kind, FrameKind::Root) {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     }
                 } else {
                     stack.push(frame);
@@ -238,7 +261,7 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
                     &mut comments,
                 )?;
                 if matches!(frame.kind, FrameKind::Root) {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -267,13 +290,17 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
+            // Accepted in every phase, including after the root.
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("unterminated modern Comment part"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated modern Comment part"));
+        },
     }
     let value = List {
         root_prefix,

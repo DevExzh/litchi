@@ -627,6 +627,28 @@ fn scan_processed_xml(
     )
 }
 
+/// Where the notes-family scan is among the top-level elements.
+///
+/// ```text
+/// Prolog --first start or empty-element tag--> Rooted (inspected as the root)
+/// Rooted --later top-level element-----------> Rooted (accepted: inspected as content)
+/// any    --declaration, comment, text--------> unchanged
+/// ```
+///
+/// The scan is lenient about the envelope: only the first top-level element
+/// is held to the expected root name, and a later one is read as ordinary
+/// content of the same document. The last line holds in every phase: a
+/// declaration is accepted anywhere and text outside the root is ignored.
+/// Refused: a processing instruction, DOCTYPE or CDATA anywhere, and the end
+/// of input in `Prolog` or inside an element.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The first element has been read: inside it, or after it.
+    Rooted,
+}
+
 fn scan_processed_xml_with_limits(
     processed: &[u8],
     raw_len: usize,
@@ -657,7 +679,7 @@ fn scan_processed_xml_with_limits(
     let mut nodes = 0usize;
     let mut attributes = 0usize;
     let mut attribute_bytes = 0usize;
-    let mut root_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut scan = XmlScan::default();
     let (node_kind, _) = node_policy(expected_root);
     let node_limit = effective_node_limit(expected_root, limits);
@@ -696,18 +718,24 @@ fn scan_processed_xml_with_limits(
                 if nodes > node_limit {
                     return Err(limit(node_kind, nodes, node_limit));
                 }
+                let is_root = match phase {
+                    RootPhase::Prolog => true,
+                    // A child of the root or a later top-level element:
+                    // both are inspected as ordinary content.
+                    RootPhase::Rooted => false,
+                };
                 inspect_element(
                     &resolver,
                     &element,
                     conformance,
                     expected_root,
-                    !root_seen,
+                    is_root,
                     &mut attributes,
                     &mut attribute_bytes,
                     &mut scan,
                     limits,
                 )?;
-                root_seen = true;
+                phase = RootPhase::Rooted;
             },
             Ok(Event::Empty(element)) => {
                 resolver
@@ -732,18 +760,24 @@ fn scan_processed_xml_with_limits(
                         limits.max_depth,
                     ));
                 }
+                let is_root = match phase {
+                    RootPhase::Prolog => true,
+                    // A child of the root or a later top-level element:
+                    // both are inspected as ordinary content.
+                    RootPhase::Rooted => false,
+                };
                 inspect_element(
                     &resolver,
                     &element,
                     conformance,
                     expected_root,
-                    !root_seen,
+                    is_root,
                     &mut attributes,
                     &mut attribute_bytes,
                     &mut scan,
                     limits,
                 )?;
-                root_seen = true;
+                phase = RootPhase::Rooted;
             },
             Ok(Event::End(_)) => {
                 pending_pop = true;
@@ -757,12 +791,16 @@ fn scan_processed_xml_with_limits(
             },
             Ok(Event::CData(_)) => return Err(invalid("CDATA is rejected")),
             Ok(Event::Eof) => break,
-            Ok(_) => {},
+            // Accepted in every phase and not read.
+            Ok(Event::Decl(_) | Event::Comment(_) | Event::Text(_) | Event::GeneralRef(_)) => {},
             Err(error) => return Err(xml_error(error)),
         }
     }
-    if !root_seen || depth != 0 {
-        return Err(invalid("missing or unterminated XML root"));
+    match phase {
+        RootPhase::Rooted if depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Rooted => {
+            return Err(invalid("missing or unterminated XML root"));
+        },
     }
     Ok(scan)
 }

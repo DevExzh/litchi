@@ -264,6 +264,29 @@ impl LoadLimits {
     }
 }
 
+/// Where [`scan_slide_show_events`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ScanRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 fn scan_slide_show_events(
     slide_index: usize,
     xml_bytes: &[u8],
@@ -294,8 +317,7 @@ fn scan_slide_show_events(
     let mut stack = Vec::new();
     let mut events = Vec::new();
     let mut nodes = 0usize;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = ScanRootPhase::Prolog;
 
     loop {
         let decoder = reader.decoder();
@@ -330,7 +352,7 @@ fn scan_slide_show_events(
                     decoder,
                     parent,
                     depth,
-                    saw_root,
+                    phase,
                     false,
                     slide_index,
                     &mut events,
@@ -338,7 +360,7 @@ fn scan_slide_show_events(
                     limits,
                 )?;
                 if kind == ElementKind::Root {
-                    saw_root = true;
+                    phase = ScanRootPhase::Open;
                 }
                 stack.push(kind);
             },
@@ -365,7 +387,7 @@ fn scan_slide_show_events(
                     decoder,
                     parent,
                     depth,
-                    saw_root,
+                    phase,
                     true,
                     slide_index,
                     &mut events,
@@ -373,8 +395,7 @@ fn scan_slide_show_events(
                     limits,
                 )?;
                 if kind == ElementKind::Root {
-                    saw_root = true;
-                    closed_root = true;
+                    phase = ScanRootPhase::Closed;
                 }
             },
             XmlEvent::End(element) => {
@@ -383,7 +404,7 @@ fn scan_slide_show_events(
                     .ok_or_else(|| invalid("invalid slide XML nesting"))?;
                 finish_element(kind, &namespace, element.name())?;
                 if kind == ElementKind::Root {
-                    closed_root = true;
+                    phase = ScanRootPhase::Closed;
                 }
             },
             XmlEvent::Text(text)
@@ -409,13 +430,19 @@ fn scan_slide_show_events(
                     "slide XML must not contain a processing instruction",
                 ));
             },
-            XmlEvent::Eof => {
-                if !stack.is_empty() || !saw_root || !closed_root {
+            XmlEvent::Eof => match phase {
+                ScanRootPhase::Closed if stack.is_empty() => break,
+                ScanRootPhase::Prolog | ScanRootPhase::Open | ScanRootPhase::Closed => {
                     return Err(invalid("unterminated or missing PresentationML slide root"));
-                }
-                break;
+                },
             },
-            _ => {},
+            // Accepted in every phase; outside slide-show event markup the
+            // character data is ignored.
+            XmlEvent::Decl(_)
+            | XmlEvent::Comment(_)
+            | XmlEvent::Text(_)
+            | XmlEvent::CData(_)
+            | XmlEvent::GeneralRef(_) => {},
         }
     }
 
@@ -432,7 +459,7 @@ fn classify_element(
     decoder: Decoder,
     parent: ElementKind,
     depth: usize,
-    root_seen: bool,
+    phase: ScanRootPhase,
     empty: bool,
     slide_index: usize,
     events: &mut Vec<Event>,
@@ -440,12 +467,14 @@ fn classify_element(
     limits: &mut LoadLimits,
 ) -> Result<ElementKind> {
     if depth == 1 {
-        if root_seen || !is_presentationml_name(namespace, element.name(), b"sld") {
-            return Err(invalid(
+        return match phase {
+            ScanRootPhase::Prolog if is_presentationml_name(namespace, element.name(), b"sld") => {
+                Ok(ElementKind::Root)
+            },
+            ScanRootPhase::Prolog | ScanRootPhase::Open | ScanRootPhase::Closed => Err(invalid(
                 "slide XML must have one PresentationML sld root element",
-            ));
-        }
-        return Ok(ElementKind::Root);
+            )),
+        };
     }
 
     if is_presentationml_name(namespace, element.name(), b"ext")
@@ -934,6 +963,29 @@ pub(crate) fn locate(
     Ok(Some(located))
 }
 
+/// Where [`locate_raw`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LocateRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
     if source.len() > policy.max_slide_xml_bytes() {
         return Err(limit(
@@ -949,8 +1001,7 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
     let mut spans = Vec::new();
     let mut extension = None;
     let mut list_content = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = LocateRootPhase::Prolog;
     let mut extension_count = 0usize;
     let mut list_count = 0usize;
     let mut nodes = 0usize;
@@ -1001,12 +1052,14 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 }
                 let parent = stack.last();
                 let kind = if stack.is_empty() {
-                    if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
+                    if phase != LocateRootPhase::Prolog
+                        || !is_presentationml_name(&namespace, element.name(), b"sld")
+                    {
                         return Err(invalid(
                             "slide XML must have one PresentationML sld root element",
                         ));
                     }
-                    root_seen = true;
+                    phase = LocateRootPhase::Open;
                     Frame::Root
                 } else if is_presentationml_name(&namespace, element.name(), b"ext")
                     && is_show_event_extension(&element, decoder)?
@@ -1071,13 +1124,14 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 }
                 let parent = stack.last();
                 if stack.is_empty() {
-                    if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
+                    if phase != LocateRootPhase::Prolog
+                        || !is_presentationml_name(&namespace, element.name(), b"sld")
+                    {
                         return Err(invalid(
                             "slide XML must have one PresentationML sld root element",
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = LocateRootPhase::Closed;
                 } else if is_presentationml_name(&namespace, element.name(), b"ext")
                     && is_show_event_extension(&element, decoder)?
                 {
@@ -1116,7 +1170,7 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                         if !is_presentationml_name(&namespace, element.name(), b"sld") {
                             return Err(invalid("slide XML root closes with the wrong element"));
                         }
-                        root_closed = true;
+                        phase = LocateRootPhase::Closed;
                     },
                     Frame::Extension { start } => {
                         extension = Some(start..after);
@@ -1139,11 +1193,19 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 ));
             },
             XmlEvent::Eof => break,
-            _ => {},
+            // Accepted in every phase and not read.
+            XmlEvent::Decl(_)
+            | XmlEvent::Comment(_)
+            | XmlEvent::Text(_)
+            | XmlEvent::CData(_)
+            | XmlEvent::GeneralRef(_) => {},
         }
     }
-    if !stack.is_empty() || !root_seen || !root_closed {
-        return Err(invalid("unterminated or missing PresentationML slide root"));
+    match phase {
+        LocateRootPhase::Closed if stack.is_empty() => {},
+        LocateRootPhase::Prolog | LocateRootPhase::Open | LocateRootPhase::Closed => {
+            return Err(invalid("unterminated or missing PresentationML slide root"));
+        },
     }
     spans.sort_by_key(|span| span.range.start);
     let Some(extension) = extension else {

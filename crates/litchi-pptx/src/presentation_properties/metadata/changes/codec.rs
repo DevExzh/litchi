@@ -462,6 +462,30 @@ enum PendingSlice {
     ListExtension(usize),
 }
 
+/// Where the changes-information reader is relative to the `pc:chgInfo` root.
+///
+/// ```text
+/// Prolog --pc:chgInfo start tag--> Open
+/// Prolog --empty pc:chgInfo tag--> Closed
+/// Open   --pc:chgInfo end tag----> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: a first top-level element other than the root; a second top-level
+/// element ("multiple roots"); text or CDATA outside the root unless it is
+/// whitespace; a processing instruction, DOCTYPE or general reference
+/// anywhere; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
     if xml.len() > limits.max_input_bytes() {
         return Err(limit(
@@ -488,8 +512,7 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut command_prefix = String::new();
     let mut namespaces = Vec::new();
     let mut lists = Vec::new();
@@ -564,14 +587,17 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                 }
                 let local = element.local_name();
                 let frame = if stack.is_empty() {
-                    if root_seen || root_closed {
-                        return Err(invalid("Changes Information has multiple roots"));
+                    match phase {
+                        RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("Changes Information has multiple roots"));
+                        },
                     }
                     expect(&namespace, PC, local.as_ref(), b"chgInfo")?;
                     command_prefix = element_prefix(&element)?;
                     namespaces =
                         root_namespaces(&element, reader.decoder(), &command_prefix, limits)?;
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     Frame::Root
                 } else {
                     match stack
@@ -765,7 +791,7 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                 if empty {
                     close_empty(&frame)?;
                     match &frame {
-                        Frame::Root => root_closed = true,
+                        Frame::Root => phase = RootPhase::Closed,
                         Frame::List => {
                             lists.push(
                                 current_list.take().ok_or_else(|| {
@@ -799,7 +825,7 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                     .ok_or_else(|| invalid("unexpected closing element"))?;
                 validate_end(&namespace, element.local_name().as_ref(), &frame)?;
                 match frame {
-                    Frame::Root => root_closed = true,
+                    Frame::Root => phase = RootPhase::Closed,
                     Frame::List => lists.push(
                         current_list
                             .take()
@@ -875,6 +901,7 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
             Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
                 return Err(invalid("DTD, PI, and general references are rejected"));
             },
+            // Accepted in every phase, including after the root.
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
@@ -903,8 +930,11 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
             },
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() || current_list.is_some() {
-        return Err(invalid("unterminated Changes Information part"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() && current_list.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated Changes Information part"));
+        },
     }
     let value = Info {
         command_prefix,

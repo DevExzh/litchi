@@ -78,6 +78,29 @@ struct Replacement {
     value: Vec<u8>,
 }
 
+/// Where [`locate_controls`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ControlsRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
     if xml.len() > MAX_SLIDE_XML_BYTES {
         return Err(limit(
@@ -95,8 +118,7 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
     let mut open_control_depth = None;
     let mut controls = Vec::new();
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = ControlsRootPhase::Prolog;
 
     loop {
         let start = position(&reader, origin)?;
@@ -123,10 +145,12 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
                     ));
                 }
                 if child_depth == 1 {
-                    if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
+                    if phase != ControlsRootPhase::Prolog
+                        || !is_presentationml_name(&namespace, element.name(), b"sld")
+                    {
                         return Err(invalid("control XML must have one PresentationML sld root"));
                     }
-                    root_seen = true;
+                    phase = ControlsRootPhase::Open;
                 } else if child_depth == 2
                     && is_presentationml_name(&namespace, element.name(), b"cSld")
                 {
@@ -164,11 +188,12 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
                     ));
                 }
                 if child_depth == 1 {
-                    if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
+                    if phase != ControlsRootPhase::Prolog
+                        || !is_presentationml_name(&namespace, element.name(), b"sld")
+                    {
                         return Err(invalid("control XML must have one PresentationML sld root"));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = ControlsRootPhase::Closed;
                 } else if child_depth == 2
                     && is_presentationml_name(&namespace, element.name(), b"cSld")
                 {
@@ -209,7 +234,7 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
                         return Err(invalid("control XML must close with p:sld"));
                     }
-                    root_closed = true;
+                    phase = ControlsRootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -218,15 +243,48 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
                     "control XML rejects DTDs and processing instructions",
                 ));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 || open_control_depth.is_some() {
+            Event::Eof => match phase {
+                ControlsRootPhase::Closed if depth == 0 && open_control_depth.is_none() => {
+                    return Ok(controls);
+                },
+                ControlsRootPhase::Prolog | ControlsRootPhase::Open | ControlsRootPhase::Closed => {
                     return Err(invalid("unterminated PresentationML control slide"));
-                }
-                return Ok(controls);
+                },
             },
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
+}
+
+/// Where [`locate_descriptor`] is relative to the `ax:ocx` root.
+///
+/// ```text
+/// Prolog --ax:ocx start tag--------> Open
+/// Prolog --empty ax:ocx tag--------> Closed
+/// Open   --the root's end tag------> Closed
+/// Closed --top-level element-------> Closed (accepted: skipped unread)
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// Only the first top-level element is the descriptor. A later one is not
+/// checked against `ax:ocx` and nothing in it is read, but it must end before
+/// the end of input. The last line holds in every phase: a declaration is
+/// accepted anywhere and content outside the root is ignored. Refused: a first
+/// top-level element other than `ax:ocx`; a processing instruction or DOCTYPE
+/// anywhere; and the end of input before `Closed` or inside a later element.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DescriptorRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
 }
 
 pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
@@ -240,8 +298,7 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = DescriptorRootPhase::Prolog;
     let mut depth = 0usize;
     let mut result = None;
     let mut nodes = 0usize;
@@ -270,17 +327,24 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
                         MAX_XML_DEPTH,
                     ));
                 }
-                if !root_seen {
-                    if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *AX)
-                        || element.name().local_name().as_ref() != b"ocx"
-                    {
-                        return Err(invalid("control descriptor must have an ax:ocx root"));
-                    }
-                    root_seen = true;
-                    result = Some(parse_descriptor_source(&element, decoder, &reader, start)?);
+                match phase {
+                    DescriptorRootPhase::Prolog => {
+                        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *AX)
+                            || element.name().local_name().as_ref() != b"ocx"
+                        {
+                            return Err(invalid("control descriptor must have an ax:ocx root"));
+                        }
+                        phase = DescriptorRootPhase::Open;
+                        result = Some(parse_descriptor_source(&element, decoder, &reader, start)?);
+                    },
+                    // A child of the root: not read.
+                    DescriptorRootPhase::Open => {},
+                    // A later top-level element, or one nested in it: accepted
+                    // and skipped unread.
+                    DescriptorRootPhase::Closed => {},
                 }
                 if empty && depth == 0 {
-                    root_closed = true;
+                    phase = DescriptorRootPhase::Closed;
                 }
                 depth = child_depth;
                 if empty {
@@ -293,7 +357,7 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
                 }
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = DescriptorRootPhase::Closed;
                 }
             },
             Event::DocType(_) | Event::PI(_) => {
@@ -301,13 +365,22 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
                     "control descriptor rejects DTDs and processing instructions",
                 ));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 {
+            Event::Eof => match phase {
+                DescriptorRootPhase::Closed if depth == 0 => {
+                    return result.ok_or_else(|| invalid("control descriptor is empty"));
+                },
+                DescriptorRootPhase::Prolog
+                | DescriptorRootPhase::Open
+                | DescriptorRootPhase::Closed => {
                     return Err(invalid("unterminated ActiveX control descriptor"));
-                }
-                return result.ok_or_else(|| invalid("control descriptor is empty"));
+                },
             },
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

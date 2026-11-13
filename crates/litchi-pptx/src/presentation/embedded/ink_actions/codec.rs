@@ -174,6 +174,34 @@ impl BranchState {
 /// action anchors. Unsupported or generic content-part MCE branches are
 /// ignored as opaque source; a branch that advertises the exact action
 /// capability but has an invalid closure is reported as a typed error.
+/// Where the ink-action scan is relative to the `p:sld` root.
+///
+/// ```text
+/// Start          --XML declaration-------> Prolog
+/// Start          --comment, whitespace---> Prolog
+/// Start | Prolog --p:sld start tag-------> Open
+/// Start | Prolog --empty p:sld tag-------> Closed
+/// Open           --p:sld end tag---------> Closed
+/// Prolog | Open | Closed --comment, whitespace--> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so also a second one; a
+/// top-level element other than `p:sld`; a second top-level element ("multiple
+/// roots"); text or CDATA outside the root unless it is whitespace; a general
+/// reference outside the root; a processing instruction or DOCTYPE anywhere;
+/// and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment or whitespace was read; no root start tag yet.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
     if xml.len() > crate::presentation::embedded::MAX_XML_BYTES {
         return Err(limit(
@@ -194,12 +222,9 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
     let mut stack = Vec::<ElementFrame>::new();
     let mut candidates = Vec::new();
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut slide_dialect = None;
     let mut raw_ordinal = 0usize;
-    let mut declaration_seen = false;
-    let mut non_declaration_event_seen = false;
 
     loop {
         let before = position(&reader, origin)?;
@@ -210,8 +235,8 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
         let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (resolved, event) = resolver.resolve_event(event);
-        if !matches!(&event, Event::Decl(_) | Event::Eof) {
-            non_declaration_event_seen = true;
+        if phase == RootPhase::Start && !matches!(&event, Event::Decl(_) | Event::Eof) {
+            phase = RootPhase::Prolog;
         }
 
         match event {
@@ -241,14 +266,17 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 }
                 let local = element.name().local_name().as_ref().to_vec();
                 if depth == 1 {
-                    if root_seen || root_closed {
-                        return Err(invalid("ink-action slide has multiple roots"));
+                    match phase {
+                        RootPhase::Start | RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("ink-action slide has multiple roots"));
+                        },
                     }
                     if !namespace.is_pml() || local.as_slice() != b"sld" {
                         return Err(invalid("ink-action owner must have one p:sld root"));
                     }
                     slide_dialect = namespace.dialect();
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 if let Some(dialect) = slide_dialect {
                     validate_dialect(namespace, dialect)?;
@@ -389,15 +417,17 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 }
                 let local = element.name().local_name();
                 if depth == 1 {
-                    if root_seen || root_closed {
-                        return Err(invalid("ink-action slide has multiple roots"));
+                    match phase {
+                        RootPhase::Start | RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("ink-action slide has multiple roots"));
+                        },
                     }
                     if !namespace.is_pml() || local.as_ref() != b"sld" {
                         return Err(invalid("ink-action owner must have one p:sld root"));
                     }
                     slide_dialect = namespace.dialect();
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if let Some(dialect) = slide_dialect {
                     validate_dialect(namespace, dialect)?;
@@ -476,7 +506,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                     }
                 }
                 if frame.depth == 1 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if let Some(mut alternate) = frame.alternate {
                     let span = alternate.start..after;
@@ -547,24 +577,27 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                 }
             },
             Event::Decl(declaration) => {
-                if declaration_seen || non_declaration_event_seen {
-                    return Err(invalid(
-                        "ink-action slide XML declaration is misplaced or duplicated",
-                    ));
+                match phase {
+                    RootPhase::Start => {},
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "ink-action slide XML declaration is misplaced or duplicated",
+                        ));
+                    },
                 }
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid(
                     "ink-action slide rejects DTDs and processing instructions",
                 ));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || !stack.is_empty() {
+            Event::Eof => match phase {
+                RootPhase::Closed if stack.is_empty() => return Ok(candidates),
+                RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
                     return Err(invalid("ink-action slide root is absent or unterminated"));
-                }
-                return Ok(candidates);
+                },
             },
         }
     }

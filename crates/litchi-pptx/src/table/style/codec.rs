@@ -297,6 +297,29 @@ pub(super) fn parse_owned(source: Vec<u8>) -> Result<List> {
     })
 }
 
+/// Where the table-style reader is relative to the `a:tblStyleLst` root.
+///
+/// ```text
+/// Prolog --a:tblStyleLst start tag--> Open
+/// Prolog --empty a:tblStyleLst tag--> Closed
+/// Open   --a:tblStyleLst end tag----> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: any other top-level element, before or after the root; text or a
+/// character reference outside the root; CDATA, a processing instruction or a
+/// DOCTYPE anywhere; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
@@ -311,8 +334,7 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
     let mut conformance = None;
     let mut default = None;
     let mut root_attrs = Vec::new();
@@ -331,7 +353,8 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                 bump_node(&mut nodes)?;
                 depth = checked_depth(depth)?;
                 if depth == 1 {
-                    if saw_root || element.local_name().as_ref() != b"tblStyleLst" {
+                    if phase != RootPhase::Prolog || element.local_name().as_ref() != b"tblStyleLst"
+                    {
                         return Err(invalid(
                             "table-style part must contain one tblStyleLst root",
                         ));
@@ -339,7 +362,7 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                     let profile = drawing_conformance(&namespace)
                         .ok_or_else(|| invalid("table-style root has the wrong namespace"))?;
                     let (id, attrs) = parse_root_attrs(&element, decoder)?;
-                    saw_root = true;
+                    phase = RootPhase::Open;
                     conformance = Some(profile);
                     default = Some(id);
                     root_attrs = attrs;
@@ -386,7 +409,8 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                     ));
                 }
                 if child_depth == 1 {
-                    if saw_root || element.local_name().as_ref() != b"tblStyleLst" {
+                    if phase != RootPhase::Prolog || element.local_name().as_ref() != b"tblStyleLst"
+                    {
                         return Err(invalid(
                             "table-style part must contain one tblStyleLst root",
                         ));
@@ -394,8 +418,7 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                     let profile = drawing_conformance(&namespace)
                         .ok_or_else(|| invalid("table-style root has the wrong namespace"))?;
                     let (id, attrs) = parse_root_attrs(&element, decoder)?;
-                    saw_root = true;
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                     conformance = Some(profile);
                     default = Some(id);
                     root_attrs = attrs;
@@ -453,7 +476,7 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                     let profile = conformance
                         .ok_or_else(|| invalid("table-style root profile is missing"))?;
                     require_drawing(&namespace, profile, element.name(), b"tblStyleLst")?;
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -481,13 +504,18 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
                     "table-style XML must not contain a DTD or processing instruction",
                 ));
             },
+            // Accepted in every phase, including after the root.
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
-            _ => {},
+            // A character reference below a style definition: not read.
+            Event::GeneralRef(_) => {},
         }
     }
-    if !saw_root || !closed_root || depth != 0 || open.is_some() {
-        return Err(invalid("table-style XML root is missing or unterminated"));
+    match phase {
+        RootPhase::Closed if depth == 0 && open.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("table-style XML root is missing or unterminated"));
+        },
     }
     let parsed = Parsed {
         conformance: conformance.ok_or_else(|| invalid("missing table-style conformance"))?,

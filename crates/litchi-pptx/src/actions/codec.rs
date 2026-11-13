@@ -78,6 +78,28 @@ impl Limits {
     }
 }
 
+/// Where the action scan is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, processing instruction, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: any other top-level element,
+/// before or after the root; a DOCTYPE; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
         return Err(limit(
@@ -102,8 +124,7 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
     let mut actions = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
 
     loop {
         let decoder = reader.decoder();
@@ -132,8 +153,8 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
                     ));
                 }
                 if depth == 1 {
-                    validate_slide_root(&namespace, element.name(), saw_root)?;
-                    saw_root = true;
+                    validate_slide_root(&namespace, element.name(), phase)?;
+                    phase = RootPhase::Open;
                 }
                 maybe_push(
                     &mut actions,
@@ -161,9 +182,8 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
                     ));
                 }
                 if child_depth == 1 {
-                    validate_slide_root(&namespace, element.name(), saw_root)?;
-                    saw_root = true;
-                    closed_root = true;
+                    validate_slide_root(&namespace, element.name(), phase)?;
+                    phase = RootPhase::Closed;
                 }
                 maybe_push(
                     &mut actions,
@@ -184,18 +204,24 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
                             "slide XML must close with a PresentationML sld element",
                         ));
                     }
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
                 depth -= 1;
             },
             Event::DocType(_) => return Err(invalid("slide XML must not contain a DTD")),
-            Event::Eof => {
-                if !saw_root || !closed_root || depth != 0 {
+            Event::Eof => match phase {
+                RootPhase::Closed if depth == 0 => break,
+                RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
                     return Err(invalid("unterminated or missing PresentationML slide root"));
-                }
-                break;
+                },
             },
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 
@@ -240,14 +266,14 @@ fn maybe_push(
 fn validate_slide_root(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
-    root_seen: bool,
+    phase: RootPhase,
 ) -> Result<()> {
-    if root_seen || !is_presentationml_name(namespace, name, b"sld") {
-        return Err(invalid(
+    match phase {
+        RootPhase::Prolog if is_presentationml_name(namespace, name, b"sld") => Ok(()),
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => Err(invalid(
             "slide XML must have one PresentationML sld root element",
-        ));
+        )),
     }
-    Ok(())
 }
 
 fn is_presentationml_name(

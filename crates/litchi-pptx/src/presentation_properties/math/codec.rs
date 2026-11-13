@@ -51,6 +51,31 @@ enum ResolvedNamespace {
     Unknown(Vec<u8>),
 }
 
+/// Where the math-properties reader is relative to the `a14:m` root.
+///
+/// ```text
+/// Prolog --declaration, processing instruction--> Prolog
+/// Prolog --a14:m start tag----------------------> Open
+/// Open   --a14:m end tag------------------------> Closed
+/// any    --comment, whitespace------------------> unchanged
+/// ```
+///
+/// A declaration or a processing instruction is accepted any number of times,
+/// but only in `Prolog`. Refused: either of them in `Open` or `Closed`; an
+/// empty-element root; a top-level element other than `a14:m` in `Prolog`; any
+/// top-level element in `Closed` ("multiple roots"); text other than
+/// whitespace, CDATA, a reference or a DOCTYPE anywhere; and the end of input
+/// before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 /// Parse one complete a14:m payload.
 pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
     let max_bytes = limits.max_input_bytes().min(MAX_BYTES);
@@ -68,8 +93,7 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
     reader.config_mut().trim_text(false);
     let mut event_buffer = Vec::new();
     let mut stack = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
     let mut stage = MathStage::Start;
     let mut value = Properties::new();
@@ -105,14 +129,14 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
                         maximum: max_depth,
                     });
                 }
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("math extension contains multiple roots"));
                 }
                 let kind = start_kind(
                     &namespace,
                     &element,
                     &reader,
-                    &mut root_seen,
+                    &mut phase,
                     &mut stage,
                     &mut value,
                     stack.len(),
@@ -134,14 +158,14 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
                         maximum: max_nodes,
                     });
                 }
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("math extension contains multiple roots"));
                 }
                 let kind = start_kind(
                     &namespace,
                     &element,
                     &reader,
-                    &mut root_seen,
+                    &mut phase,
                     &mut stage,
                     &mut value,
                     stack.len(),
@@ -157,7 +181,7 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
                     .ok_or_else(|| invalid("math extension has an unexpected closing tag"))?;
                 expect_end(&namespace, element.name(), kind)?;
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -170,17 +194,21 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
                 return Err(invalid("math extension contains unsupported XML content"));
             },
             Event::Comment(_) => {},
-            Event::Decl(_) | Event::PI(_) => {
-                if root_seen {
+            Event::Decl(_) | Event::PI(_) => match phase {
+                RootPhase::Prolog => {},
+                RootPhase::Open | RootPhase::Closed => {
                     return Err(invalid("math extension has XML content after its root"));
-                }
+                },
             },
             Event::Eof => break,
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("math extension has an incomplete root"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("math extension has an incomplete root"));
+        },
     }
     value.validate()?;
     Ok(value)
@@ -223,7 +251,7 @@ fn start_kind(
     namespace: &ResolvedNamespace,
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
-    root_seen: &mut bool,
+    phase: &mut RootPhase,
     stage: &mut MathStage,
     value: &mut Properties,
     depth: usize,
@@ -231,10 +259,12 @@ fn start_kind(
     let local = element.name().local_name();
     match depth {
         0 => {
-            if *root_seen || !is_name(namespace, local.as_ref(), DRAWING_MATH_NAMESPACE, b"m") {
+            if *phase != RootPhase::Prolog
+                || !is_name(namespace, local.as_ref(), DRAWING_MATH_NAMESPACE, b"m")
+            {
                 return Err(invalid("expected one a14:m root"));
             }
-            *root_seen = true;
+            *phase = RootPhase::Open;
             no_attributes(element, reader, "a14:m")?;
             Ok(Kind::Root)
         },

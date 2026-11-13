@@ -69,6 +69,30 @@ fn mce_limits() -> MceLimits {
     }
 }
 
+/// Where [`scan_slide`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: a top-level element other than `p:sld` in `Prolog`; any top-level
+/// element in `Closed` ("multiple roots"); text or CDATA outside the root unless
+/// it is whitespace; a processing instruction or DOCTYPE anywhere; and the end
+/// of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ScanRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 /// Scan one slide owner and retain each active content-part anchor exactly.
 pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     if xml.len() > MAX_XML_BYTES {
@@ -86,8 +110,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     let mut anchors = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = ScanRootPhase::Prolog;
 
     loop {
         let before = position(&reader, origin)?;
@@ -104,11 +127,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                 increment_nodes(&mut nodes)?;
                 validate_attributes(&element)?;
                 if depth == 0 {
-                    if root_closed {
+                    if phase == ScanRootPhase::Closed {
                         return Err(invalid("content-part slide has multiple roots"));
                     }
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
+                    validate_root(&namespace, element.name(), phase != ScanRootPhase::Prolog)?;
+                    phase = ScanRootPhase::Open;
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     limit(
@@ -168,12 +191,11 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                     ));
                 }
                 if child_depth == 1 {
-                    if root_closed {
+                    if phase == ScanRootPhase::Closed {
                         return Err(invalid("content-part slide has multiple roots"));
                     }
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
-                    root_closed = true;
+                    validate_root(&namespace, element.name(), phase != ScanRootPhase::Prolog)?;
+                    phase = ScanRootPhase::Closed;
                 }
                 if is_content_part(&namespace, element.name()) {
                     if anchors.len() >= maximum {
@@ -228,7 +250,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
                         return Err(invalid("content-part slide must close with p:sld"));
                     }
-                    root_closed = true;
+                    phase = ScanRootPhase::Closed;
                 }
                 if frame.start >= after {
                     return Err(invalid("content-part XML frame has an invalid span"));
@@ -260,17 +282,45 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                 ));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 || !frames.is_empty() {
-                    return Err(invalid("unterminated content-part slide"));
+                match phase {
+                    ScanRootPhase::Closed if depth == 0 && frames.is_empty() => {},
+                    ScanRootPhase::Prolog | ScanRootPhase::Open | ScanRootPhase::Closed => {
+                        return Err(invalid("unterminated content-part slide"));
+                    },
                 }
                 if !content_frames.is_empty() {
                     return Err(invalid("unterminated content-part anchor"));
                 }
                 return Ok(anchors);
             },
-            _ => {},
+            // Accepted in every phase, including after the root.
+            Event::Decl(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
     }
+}
+
+/// Where [`locate_content_parts`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag-----> Open
+/// Prolog --empty p:sld tag-----> Closed
+/// Open   --p:sld end tag-------> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: a top-level element other than `p:sld` in `Prolog`; any top-level
+/// element in `Closed` ("multiple roots"); text or CDATA outside the root unless
+/// it is whitespace; a processing instruction or DOCTYPE anywhere; and the end
+/// of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LocateRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
 }
 
 /// Locate every raw content-part anchor, including equivalent MCE choice and
@@ -291,8 +341,7 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
     let mut anchors = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = LocateRootPhase::Prolog;
 
     loop {
         let before = position(&reader, origin)?;
@@ -309,11 +358,11 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
                 increment_nodes(&mut nodes)?;
                 validate_attributes(&element)?;
                 if depth == 0 {
-                    if root_closed {
+                    if phase == LocateRootPhase::Closed {
                         return Err(invalid("content-part slide has multiple roots"));
                     }
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
+                    validate_root(&namespace, element.name(), phase != LocateRootPhase::Prolog)?;
+                    phase = LocateRootPhase::Open;
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     limit(
@@ -361,12 +410,11 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
                     ));
                 }
                 if child_depth == 1 {
-                    if root_closed {
+                    if phase == LocateRootPhase::Closed {
                         return Err(invalid("content-part slide has multiple roots"));
                     }
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
-                    root_closed = true;
+                    validate_root(&namespace, element.name(), phase != LocateRootPhase::Prolog)?;
+                    phase = LocateRootPhase::Closed;
                 }
                 if is_content_part(&namespace, element.name()) {
                     let relationship_id = relationship_id(&element, decoder, &resolver)?;
@@ -404,7 +452,7 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
                         return Err(invalid("content-part slide must close with p:sld"));
                     }
-                    root_closed = true;
+                    phase = LocateRootPhase::Closed;
                 }
             },
             Event::Text(value) => {
@@ -433,12 +481,16 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
                 ));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 || !frames.is_empty() {
-                    return Err(invalid("unterminated content-part slide"));
+                match phase {
+                    LocateRootPhase::Closed if depth == 0 && frames.is_empty() => {},
+                    LocateRootPhase::Prolog | LocateRootPhase::Open | LocateRootPhase::Closed => {
+                        return Err(invalid("unterminated content-part slide"));
+                    },
                 }
                 return Ok(anchors);
             },
-            _ => {},
+            // Accepted in every phase, including after the root.
+            Event::Decl(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
     }
 }
@@ -846,6 +898,29 @@ pub(crate) fn rewrite_anchor_relationship_id(
     Ok(output)
 }
 
+/// Where [`shape_tree_insertion`] is relative to the `p:sld` root.
+///
+/// ```text
+/// Prolog --p:sld start tag--> Open
+/// Open   --p:sld end tag----> Closed
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere and
+/// content outside the root is ignored. Refused: an empty-element tag at the
+/// top level in any phase ("empty root"); any other top-level start tag,
+/// before or after the root; a processing instruction or DOCTYPE anywhere; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum InsertionRootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
 /// Find a safe insertion point immediately before the owning `p:spTree`
 /// close tag. Content parts are valid group-shape children in this location.
 pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
@@ -856,8 +931,7 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
     let mut tree_depth = None;
     let mut insertion = None;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = InsertionRootPhase::Prolog;
     loop {
         let before = position(&reader, origin)?;
         let event = reader
@@ -885,8 +959,12 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
                     ));
                 }
                 if child_depth == 1 {
-                    validate_root(&namespace, element.name(), root_seen)?;
-                    root_seen = true;
+                    validate_root(
+                        &namespace,
+                        element.name(),
+                        phase != InsertionRootPhase::Prolog,
+                    )?;
+                    phase = InsertionRootPhase::Open;
                 }
                 if is_presentationml_name(&namespace, element.name(), b"spTree")
                     && tree_depth.replace(child_depth).is_some()
@@ -919,7 +997,7 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
                         return Err(invalid("content-part slide must close with p:sld"));
                     }
-                    root_closed = true;
+                    phase = InsertionRootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -929,11 +1007,19 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            // Accepted in every phase and ignored.
+            Event::Decl(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
-        return Err(invalid("unterminated content-part slide"));
+    match phase {
+        InsertionRootPhase::Closed if depth == 0 => {},
+        InsertionRootPhase::Prolog | InsertionRootPhase::Open | InsertionRootPhase::Closed => {
+            return Err(invalid("unterminated content-part slide"));
+        },
     }
     insertion.ok_or_else(|| invalid("content-part slide has no non-empty shape tree"))
 }
